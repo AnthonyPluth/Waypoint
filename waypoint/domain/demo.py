@@ -94,6 +94,7 @@ def _family_two_years_ago(today: date) -> list[trips.SegmentIn]:
          "details": {"room": "Double"}},
         {"kind": "flight", "origin": "CDG", "destination": "JFK", "start_local": _at(today, -793, "11:15"), "end_local": _at(today, -793, "13:50"),
          "confirmation": "WM8D4P", "provider": "Air France", "details": {"flight_number": "AF 8", "cabin": "Business", "seat": "3F"}},
+    ]
 
 
 # Grandma Joan flies with the family on the same flights, on a reservation of her own: the trip shows each flight once, with a block

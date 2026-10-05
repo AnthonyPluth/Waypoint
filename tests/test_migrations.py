@@ -386,7 +386,7 @@ class MigrationTests(unittest.TestCase):
             c.execute(insert(schema.segments).values(trip_id=1, kind="flight", status="confirmed", start_local="2026-12-04T09:00",
                                                      start_zone="America/Chicago", end_local="2026-12-04T11:10", end_zone="America/Denver",
                                                      origin="ORD", destination="DEN", source="email"))
-            command.upgrade(db.alembic_config(c), "0011")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:   # a segment from before has no note to check
             self.assertEqual(conn.execute(select(schema.segments.c.check_times)).scalar(), False)
