@@ -31,33 +31,44 @@ def travelers(conn: db.Connection, passengers: tuple[extract.Passenger, ...]) ->
     return found
 
 
+class Ambiguous(Exception):
+    """A booking's times carry offsets that aren't its places' own, and nothing says which reading is right."""
+
+
 def _plausible(minutes: float, km: float) -> bool:
-    """Whether a flight of this length is believable over this distance (not faster than a jet, not slower than a long day)."""
-    return km / 950 * 60 + 15 <= minutes <= km / 300 * 60 + 300
+    """Whether a flight of this length is believable over this distance: no faster than a jet plus taxiing, no slower than
+    a slow cruise plus a long delay."""
+    return km / 950 * 60 + 20 <= minutes <= km / 600 * 60 + 75
 
 
 def _times(conn: db.Connection, b: extract.Booking, start_zone: str, end_zone: str) -> tuple[str, str] | None:
-    """A booking's start and end as wall-clock times at their places, or None when they aren't dates and times. Markup writes
-    a time with an offset, which is the place's own when the sender is careful; but many senders print the local clock with a
-    UTC mark ("19:00Z" for 19:00 at the airport). So when the offsets aren't the places' own, the clock is taken as written,
-    except for a flight where only the conversion from UTC gives a believable flight time for the distance between its
-    airports (a departure that would arrive in two hours across an ocean was in UTC)."""
+    """A booking's start and end as wall-clock times at their places, or None when they aren't dates and times. Raises
+    Ambiguous when they can't be told.
+
+    Markup writes a time with an offset. When it is the place's own (or there is none), the clock is what's written. When
+    it isn't, the sender either printed the local clock with a UTC mark ("19:00Z" for 19:00 at the airport) or really gave
+    UTC. A flight is decided when exactly one of the two readings gives a believable flight time for the distance between
+    its airports; everything else (a stay, a rental, a train, a short hop where both fit) is Ambiguous and goes to the
+    review queue, rather than being filed with a time that may be hours off."""
     start, end = extract.written_clock(b.start), extract.written_clock(b.end)
     if start is None or end is None:
         return None
     moved = extract.wall_clock(b.start, start_zone), extract.wall_clock(b.end, end_zone)
-    if b.kind != "flight" or None in moved or moved == (start, end) or not (extract.has_offset(b.start) and extract.has_offset(b.end)):
+    if moved == (start, end) or not (extract.has_offset(b.start) or extract.has_offset(b.end)):
         return start, end
+    if b.kind != "flight" or None in moved or not (extract.has_offset(b.start) and extract.has_offset(b.end)):
+        raise Ambiguous()
     origin, destination = airports.coords(conn, b.origin or ""), airports.coords(conn, b.destination or "")
     if origin is None or destination is None:
-        return start, end
+        raise Ambiguous()
     km = airports.distance_km(origin, destination)
 
     def minutes(first: str, last: str) -> float:
         return (trips.instant(last, end_zone) - trips.instant(first, start_zone)).total_seconds() / 60
-    if _plausible(minutes(start, end), km) or not _plausible(minutes(moved[0] or "", moved[1] or ""), km):
-        return start, end
-    return moved[0] or "", moved[1] or ""
+    as_written, as_moved = _plausible(minutes(start, end), km), _plausible(minutes(moved[0] or "", moved[1] or ""), km)
+    if as_written == as_moved:
+        raise Ambiguous()
+    return (start, end) if as_written else (moved[0] or "", moved[1] or "")
 
 
 def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
@@ -66,7 +77,10 @@ def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
     start_zone, end_zone = _zone(conn, b, b.origin, b.start_place), _zone(conn, b, b.destination, b.end_place)
     if not start_zone or not end_zone:
         return None
-    times = _times(conn, b, start_zone, end_zone)
+    try:
+        times = _times(conn, b, start_zone, end_zone)
+    except Ambiguous:
+        return None
     if times is None:
         return None
     start, end = times
@@ -83,8 +97,11 @@ def explain(conn: db.Connection, b: extract.Booking) -> str:
     """Why `file_booking` couldn't make this booking a segment, from a fixed list (nothing from the message)."""
     if not _zone(conn, b, b.origin, b.start_place) or not _zone(conn, b, b.destination, b.end_place):
         return "unknown airport" if b.kind == "flight" else "place's time zone unknown"
-    if fields(conn, b) is None:
-        return "time isn't a date and time"
+    try:
+        if _times(conn, b, _zone(conn, b, b.origin, b.start_place) or "", _zone(conn, b, b.destination, b.end_place) or "") is None:
+            return "time isn't a date and time"
+    except Ambiguous:
+        return "time offset doesn't match its place"
     return "rejected as a segment"
 
 

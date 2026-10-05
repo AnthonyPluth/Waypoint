@@ -12,7 +12,7 @@ sidebar:
 When a message looks like a booking (it’s from an airline, hotel, rental company, railway or booking site, and it has a confirmation word in it) but Waypoint can’t get a booking out of it, the message lands here instead of being guessed at or dropped. Each item shows who it came from, the day it was sent and why (not its subject: that is email content, which Waypoint doesn’t keep):
 
 - **No booking details found**: the email carries no machine-readable booking, and Waypoint doesn’t have a parser for that sender yet.
-- **Some details missing**: it has booking markup, but not enough to make a segment (no arrival time, an airport Waypoint doesn’t know, a hotel whose time zone Waypoint can’t work out).
+- **Some details missing**: it has booking markup, but not enough to make a segment (no arrival time, an airport Waypoint doesn’t know, a hotel whose time zone Waypoint can’t work out, or times marked as UTC that could be the local clock: see [Scanning](/waypoint/start/gmail/#scanning)).
 - **Couldn’t be opened**: the message itself was damaged.
 
 For each one you can:
