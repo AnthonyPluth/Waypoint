@@ -10,8 +10,10 @@ import { api } from "$lib/api";
 import type { FlightStatus as Status, FlightStatusList } from "$lib/api-types";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { toast } from "svelte-sonner";
+import { segment } from "../../test/fixtures";
 import FlightStatus, { clock, dayShift } from "./FlightStatus.svelte";
 
+const seg = segment({ id: 7 });   // JFK → LHR, 2026-11-20T19:00 to 2026-11-21T07:10
 const status = (extra: Partial<Status> = {}): Status => ({
   segment_id: 7, state: "delayed", origin: "JFK", destination: "LHR",
   dep_scheduled: "2026-11-20T19:00", dep_estimated: "2026-11-20T19:50", dep_actual: null, dep_zone: "America/New_York",
@@ -22,12 +24,16 @@ const status = (extra: Partial<Status> = {}): Status => ({
 const list = (extra: Partial<FlightStatusList> = {}): FlightStatusList =>
   ({ enabled: true, month: "2026-11", used: 12, limit: 400, paused: null, statuses: [status()], ...extra });
 
-beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.error).mockReset(); flightStatus.list = list(); });
-afterEach(() => { flightStatus.list = null; });
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-20T09:00:00-05:00"));   // ten hours before it leaves
+  vi.mocked(api).mockReset(); vi.mocked(toast.error).mockReset(); flightStatus.list = list();
+});
+afterEach(() => { vi.useRealTimers(); flightStatus.list = null; });
 
 describe("a flight’s live status", () => {
   it("shows a delay with the new time beside the booked one, the gate and terminal, and when it was fetched", () => {
-    render(FlightStatus, { segmentId: 7 });
+    render(FlightStatus, { segment: seg });
     const card = screen.getByTestId("flight-status");
     expect(card).toHaveTextContent("Delayed 50 min");
     expect(card).toHaveTextContent("Now 19:50 (booked 19:00)");   // the airport’s own clock: 19:50 stays 19:50 in any zone
@@ -48,7 +54,7 @@ describe("a flight’s live status", () => {
     ];
     for (const [extra, word, line] of cases) {
       flightStatus.list = list({ statuses: [status(extra)] });
-      const { unmount } = render(FlightStatus, { segmentId: 7 });
+      const { unmount } = render(FlightStatus, { segment: seg });
       expect(screen.getByTestId("flight-status")).toHaveTextContent(word);
       expect(screen.getByTestId("flight-status")).toHaveTextContent(line);
       unmount();
@@ -57,7 +63,7 @@ describe("a flight’s live status", () => {
 
   it("shows a time on another day with how many", () => {
     flightStatus.list = list({ statuses: [status({ dep_estimated: "2026-11-21T00:40" })] });
-    render(FlightStatus, { segmentId: 7 });
+    render(FlightStatus, { segment: seg });
     expect(screen.getByTestId("flight-status")).toHaveTextContent("Now 00:40 (+1 day) (booked 19:00)");
     expect(dayShift("2026-11-22T01:00", "2026-11-20T19:00")).toBe(" (+2 days)");
     expect(dayShift("2026-11-19T23:00", "2026-11-20T19:00")).toBe(" (−1 day)");
@@ -68,14 +74,26 @@ describe("a flight’s live status", () => {
 
   it("shows nothing without the key, and nothing for a flight with no status but a way to ask", async () => {
     flightStatus.list = list({ enabled: false });
-    const { unmount } = render(FlightStatus, { segmentId: 7 });
+    const { unmount } = render(FlightStatus, { segment: seg });
     expect(screen.queryByTestId("flight-status")).toBeNull();
     unmount();
     flightStatus.list = null;
-    render(FlightStatus, { segmentId: 7 });
+    render(FlightStatus, { segment: seg });
     expect(screen.queryByTestId("flight-status")).toBeNull();
     flightStatus.list = list({ statuses: [] });
     expect(await screen.findByRole("button", { name: "Check live status" })).toBeInTheDocument();
+  });
+
+  it("asks for nothing, and shows only what it has, once the flight landed hours ago", () => {
+    vi.setSystemTime(new Date("2026-11-21T14:00:00+00:00"));   // 6 h 50 min after the booked landing
+    flightStatus.list = list({ statuses: [] });
+    const { unmount } = render(FlightStatus, { segment: seg });
+    expect(screen.queryByTestId("flight-status")).toBeNull();
+    unmount();
+    flightStatus.list = list({ statuses: [status({ state: "landed", arr_actual: "2026-11-21T07:03" })] });
+    render(FlightStatus, { segment: seg });
+    expect(screen.getByTestId("flight-status")).toHaveTextContent("Landed 07:03");
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("says why nothing is fetched: the monthly limit, a rate limit, a refused key", () => {
@@ -83,7 +101,7 @@ describe("a flight’s live status", () => {
     for (const [reason, text] of [["limit", /Live status paused until Dec 1 \(monthly limit\)/], ["rate", /paused until \d\d:\d\d \(rate limit\)/],
       ["key", /paused until \d\d:\d\d \(RapidAPI didn’t accept the key\)/]] as const) {
       flightStatus.list = list({ paused: { until, reason } });
-      const { unmount } = render(FlightStatus, { segmentId: 7 });
+      const { unmount } = render(FlightStatus, { segment: seg });
       expect(screen.getByRole("status")).toHaveTextContent(text);
       expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();   // nothing to ask for
       expect(screen.getByTestId("flight-status")).toHaveTextContent("Delayed 50 min");   // and what it knew stays
@@ -94,7 +112,7 @@ describe("a flight’s live status", () => {
   it("refreshes: asks for this segment, then shows the new answer and the month’s count", async () => {
     vi.mocked(api).mockResolvedValue(list({ used: 13, statuses: [status({ state: "departed", dep_actual: "2026-11-20T19:55", delay_minutes: 55 })] }));
     flightStatus.list = list({ statuses: [status(), status({ segment_id: 8, state: "landed" })] });
-    render(FlightStatus, { segmentId: 7 });
+    render(FlightStatus, { segment: seg });
     await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
     expect(api).toHaveBeenCalledWith("/api/flight-status/7", { method: "POST", failed: "Couldn’t refresh the status" });
     await waitFor(() => expect(screen.getByTestId("flight-status")).toHaveTextContent("Departed"));
@@ -104,7 +122,7 @@ describe("a flight’s live status", () => {
 
   it("says what went wrong when the refresh fails, and keeps what it had", async () => {
     vi.mocked(api).mockRejectedValue(new Error("Couldn’t reach the flight status service."));
-    render(FlightStatus, { segmentId: 7 });
+    render(FlightStatus, { segment: seg });
     await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn’t reach the flight status service."));
     expect(screen.getByTestId("flight-status")).toHaveTextContent("Delayed 50 min");

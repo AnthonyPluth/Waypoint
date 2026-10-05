@@ -14,20 +14,22 @@
 
 <script lang="ts">
   import { act } from "$lib/act";
-  import type { FlightStatus } from "$lib/api-types";
+  import type { FlightStatus, Segment } from "$lib/api-types";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { flightStatus, refreshFlightStatus, statusFor } from "$lib/flightstatus.svelte";
+  import { endAt } from "$lib/trips";
 
   // The live status of one flight segment, beside its booked times (which it never changes): the state, the time the flight
   // is now expected, the gate and terminal, when the answer came, and a Refresh. Nothing without RAPIDAPI_KEY. A parent
-  // shows it on a flight's card: <FlightStatus segmentId={segment.id} />. The list is loaded by whoever shows it
-  // (loadFlightStatus), once for all the cards on the page.
-  let { segmentId }: { segmentId: number } = $props();
+  // shows it on a flight's card: <FlightStatus {segment} />. The list is loaded by whoever shows it (loadFlightStatus), once
+  // for all the cards on the page. A flight that landed hours ago has nothing left to ask for, so no button.
+  let { segment }: { segment: Segment } = $props();
   let busy = $state(false);
 
   const list = $derived(flightStatus.list);
-  const s = $derived(statusFor(segmentId));
+  const s = $derived(statusFor(segment.id));
+  const over = $derived(Date.now() > endAt(segment) + 6 * 3_600_000);
   const asOf = (t: string) => new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t));
 
   const WORDS: Record<FlightStatus["state"], string> = {
@@ -49,10 +51,10 @@
     return `Live status paused until ${time} (${p.reason === "rate" ? "rate limit" : "RapidAPI didn’t accept the key"})`;
   }
 
-  const refresh = () => act(() => refreshFlightStatus(segmentId), { busy: (on) => (busy = on) });
+  const refresh = () => act(() => refreshFlightStatus(segment.id), { busy: (on) => (busy = on) });
 </script>
 
-{#if list?.enabled}
+{#if list?.enabled && (s || !over)}
   <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm" data-testid="flight-status">
     {#if s}
       <Badge variant={variant(s)} class={s.state === "delayed" ? "bg-signal-soft text-signal-ink border-transparent" : ""}>{label(s)}</Badge>
@@ -77,7 +79,7 @@
     {/if}
     {#if list.paused}
       <span class="text-muted-foreground" role="status">{pausedText(list.paused)}</span>
-    {:else}
+    {:else if !over}
       <Button variant="ghost" size="sm" disabled={busy} onclick={refresh}>{busy ? "Refreshing…" : s ? "Refresh" : "Check live status"}</Button>
     {/if}
   </div>

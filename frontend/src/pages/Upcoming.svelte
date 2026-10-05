@@ -65,7 +65,7 @@
           {next.state === "now" ? when(END_WORD[s.kind], endAt(s) - now) : when(START_WORD[s.kind], startAt(s) - now)}
         </p>
         {#if subline(s)}<p class="break-words text-muted-foreground">{subline(s)}</p>{/if}
-        {#if s.kind === "flight" && s.status !== "cancelled"}<FlightStatus segmentId={s.id} />{/if}
+        {#if s.kind === "flight" && s.status !== "cancelled"}<FlightStatus segment={s} />{/if}
       </div>
       <div class="pass-tear" aria-hidden="true"></div>
       <dl class="grid grid-cols-2 gap-x-4 gap-y-3 p-6 text-sm md:p-8">
