@@ -170,16 +170,30 @@ class Tests(unittest.TestCase):
     def test_nothing_removed_passes(self):
         self.assertEqual(self.check(), [])
 
-    def test_a_removed_test_needs_a_trailer(self):
+    def test_a_removed_test_needs_a_trailer_naming_it(self):
         gone = "tests/test_trips.py::TripTests.test_hidden_trip_is_404"
         self.assertIn("Removes-Test: TripTests.test_hidden_trip_is_404", self.check(removed=[gone])[0])
-        self.assertEqual(self.check(removed=[gone], messages=[
-            "refactor: x\n\nRemoves-Test: TripTests.test_hidden_trip_is_404 — covered by test_every_route now\n"]), [])
+        for trailer in ("TripTests.test_hidden_trip_is_404 — covered by test_every_route now",
+                        "test_hidden_trip_is_404 — covered by test_every_route now", f"{gone} — moved"):
+            with self.subTest(trailer=trailer):
+                self.assertEqual(self.check(removed=[gone], messages=[f"refactor: x\n\nRemoves-Test: {trailer}\n"]), [])
+        other = "refactor: x\n\nRemoves-Test: test_hidden_trip — a different test whose name is part of this one's\n"
+        self.assertTrue(self.check(removed=[gone], messages=[other]))
 
-    def test_a_skip_needs_a_trailer(self):
-        added = "tests/test_trips.py: @unittest.skip('later')"
-        self.assertIn("Skips-Test:", self.check(skipped=[added])[0])
-        self.assertEqual(self.check(skipped=[added], messages=["x\n\nSkips-Test: test_y — needs Postgres\n"]), [])
+    def test_each_skip_needs_its_own_trailer(self):
+        added = [("tests/test_trips.py", "test_a", "@unittest.skip('later')"),
+                 ("tests/test_trips.py", "test_b", "self.skipTest('flaky')")]
+        found = self.check(skipped=added, messages=["x\n\nSkips-Test: test_a — needs Postgres\n"])
+        self.assertEqual(len(found), 1)
+        self.assertIn("Skips-Test: test_b", found[0])
+        self.assertEqual(self.check(skipped=added, messages=["x\n\nSkips-Test: test_a — needs Postgres\nSkips-Test: test_b — a reason\n"]), [])
+
+    def test_which_test_a_skip_belongs_to(self):
+        py = ["class T(unittest.TestCase):", "    @unittest.skip('later')", "    def test_decorated(self):",
+              "        pass", "", "    def test_inside(self):", "        self.skipTest('x')"]
+        self.assertEqual(fc.skipped_name("tests/test_t.py", py, 1), "test_decorated")
+        self.assertEqual(fc.skipped_name("tests/test_t.py", py, 6), "test_inside")
+        self.assertEqual(fc.skipped_name("frontend/src/a.test.ts", ['  it.skip("shows a trip", () => {});'], 0), "shows a trip")
 
     def test_the_repository_passes_against_main(self):
         base = fc._git("rev-parse", "--verify", "--quiet", "origin/main").strip() if fc._git(

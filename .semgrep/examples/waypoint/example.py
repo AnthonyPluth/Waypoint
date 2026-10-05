@@ -84,5 +84,13 @@ suggestion = ai.suggest(conn, item)
 
 # ruleid: waypoint-decrypt
 number = secretbox.decrypt(row["number"])
+# ruleid: waypoint-decrypt
+open_it = secretbox.decrypt
+# ruleid: waypoint-decrypt
+from .storage.secretbox import decrypt
+# ruleid: waypoint-decrypt
+from waypoint.storage.secretbox import encrypt, decrypt as reveal
+# ok: waypoint-decrypt
+from .storage.secretbox import encrypt
 # ok: waypoint-decrypt
 number = loyalty.reveal(conn, person, loyalty_id)

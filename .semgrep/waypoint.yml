@@ -160,6 +160,8 @@ rules:
     languages: [python]
     pattern-either:
       - pattern: secretbox.decrypt(...)
+      - pattern: secretbox.decrypt
+      - pattern-regex: \bfrom\s+[.\w]*secretbox\s+import\b[^\n]*\bdecrypt\b
     paths:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/storage/", "/waypoint/oidc.py", "/waypoint/domain/loyalty.py", "/waypoint/providers/gmail.py"]
@@ -184,6 +186,20 @@ rules:
       - pattern: update(Segment)
       - pattern: delete(Trip)
       - pattern: delete(Segment)
+      - pattern: $Q.join(Trip, ...)
+      - pattern: $Q.join(Segment, ...)
+      - pattern: $Q.join(SegmentTraveler, ...)
+      - pattern: $Q.outerjoin(Trip, ...)
+      - pattern: $Q.outerjoin(Segment, ...)
+      - pattern: $Q.join_from(..., Trip, ...)
+      - pattern: $Q.join_from(..., Segment, ...)
+      - pattern: $CONN.orm.query(...)
+      - pattern: aliased(Trip, ...)
+      - pattern: aliased(Segment, ...)
+      - pattern: schema.trips
+      - pattern: schema.segments
+      - pattern: schema.segment_travelers
+      - pattern-regex: (?i)\b(from|join|update|into)\s+"?(trips|segments|segment_travelers)\b
     paths:
       include: ["/waypoint/server/"]
 

@@ -174,33 +174,62 @@ def removed_tests(base: str) -> list[str]:
 STRING = re.compile(r"""(["'`])(?:\\.|(?!\1).)*\1""")
 
 
-def added_skips(base: str) -> list[str]:
-    """Lines the range adds to test files that skip a test or run only some (in code: a string that names one, as an
-    example in a test, doesn't count)."""
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+PY_DEF = re.compile(r"^\s*(?:async\s+)?def\s+(\w+)\s*\(")
+
+
+def skipped_name(path: str, lines: list[str], index: int) -> str:
+    """The test a skip on lines[index] (0-based) belongs to: for Python the function it's in, or the one it decorates;
+    for Vitest the title on that line. '' when it can't be told (then the file's name must be given)."""
+    if path.endswith(".py"):
+        here = lines[index].lstrip()
+        steps = range(index + 1, len(lines)) if here.startswith("@") else range(index, -1, -1)
+        for k in steps:
+            if m := PY_DEF.match(lines[k]):
+                return m.group(1)
+        return ""
+    m = TS_TEST.search(lines[index].replace(".skip(", "(").replace(".only(", "(").replace(".todo(", "("))
+    return m.group(2) if m else ""
+
+
+def added_skips(base: str) -> list[tuple[str, str, str]]:
+    """Lines the range adds to test files that skip a test or run only some, as (file, the test it skips, the line). In
+    code only: a string that names a skip, as an example in a test, doesn't count."""
     out = []
     diff = _git("diff", "--unified=0", f"{base}", "--", "tests", "frontend")
-    path = ""
+    path, line_no = "", 0
     for line in diff.splitlines():
         if line.startswith("+++ "):
             path = line[6:] if line.startswith("+++ b/") else ""
-        elif line.startswith("+") and not line.startswith("+++") and path and is_test_file(path) and SKIP.search(STRING.sub("", line)):
-            out.append(f"{path}: {line[1:].strip()[:100]}")
+        elif m := HUNK.match(line):
+            line_no = int(m.group(1))
+        elif line.startswith("+") and not line.startswith("+++"):
+            if path and is_test_file(path) and SKIP.search(STRING.sub("", line)):
+                lines = (ROOT / path).read_text().splitlines()
+                out.append((path, skipped_name(path, lines, line_no - 1), line[1:].strip()[:100]))
+            line_no += 1
     return out
 
 
+def _names(declared: list[str]) -> set[str]:
+    """What each trailer names: its first word (a test, `Class.test`, or `file::test`), before the reason."""
+    return {re.split(r"\s+[—–-]\s+|\s", d.strip(), maxsplit=1)[0] for d in declared if d.strip()}
+
+
 def check_tests(base: str, messages: list[str]) -> list[str]:
-    declared_removals = [r.strip() for m in messages for r in REMOVES.findall(m)]
-    declared_skips = [r.strip() for m in messages for r in SKIPS.findall(m)]
+    removals = _names([r for m in messages for r in REMOVES.findall(m)])
+    skips = _names([r for m in messages for r in SKIPS.findall(m)])
     problems = []
     for name in removed_tests(base):
         short = name.split("::", 1)[1]
-        if not any(short in d or name in d for d in declared_removals):
+        if not {name, short, short.rsplit(".", 1)[-1]} & removals:
             problems.append(f"the test {name} is gone: keep it, or say why on a commit with a "
                             f"'Removes-Test: {short} — <why>' trailer")
-    for where in added_skips(base):
-        if not declared_skips:
-            problems.append(f"a test is skipped or narrowed ({where}): say why on a commit with a "
-                            "'Skips-Test: <name> — <why>' trailer")
+    for path, test, text in added_skips(base):
+        names = {f"{path}::{test}", test} if test else {path, Path(path).name}
+        if not names & skips:
+            problems.append(f"a test is skipped or narrowed ({path}: {text}): say why on a commit with a "
+                            f"'Skips-Test: {test or Path(path).name} — <why>' trailer")
     return problems
 
 
