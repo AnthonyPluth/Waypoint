@@ -31,15 +31,45 @@ def travelers(conn: db.Connection, passengers: tuple[extract.Passenger, ...]) ->
     return found
 
 
+def _plausible(minutes: float, km: float) -> bool:
+    """Whether a flight of this length is believable over this distance (not faster than a jet, not slower than a long day)."""
+    return km / 950 * 60 + 15 <= minutes <= km / 300 * 60 + 300
+
+
+def _times(conn: db.Connection, b: extract.Booking, start_zone: str, end_zone: str) -> tuple[str, str] | None:
+    """A booking's start and end as wall-clock times at their places, or None when they aren't dates and times. Markup writes
+    a time with an offset, which is the place's own when the sender is careful; but many senders print the local clock with a
+    UTC mark ("19:00Z" for 19:00 at the airport). So when the offsets aren't the places' own, the clock is taken as written,
+    except for a flight where only the conversion from UTC gives a believable flight time for the distance between its
+    airports (a departure that would arrive in two hours across an ocean was in UTC)."""
+    start, end = extract.written_clock(b.start), extract.written_clock(b.end)
+    if start is None or end is None:
+        return None
+    moved = extract.wall_clock(b.start, start_zone), extract.wall_clock(b.end, end_zone)
+    if b.kind != "flight" or None in moved or moved == (start, end) or not (extract.has_offset(b.start) and extract.has_offset(b.end)):
+        return start, end
+    origin, destination = airports.coords(conn, b.origin or ""), airports.coords(conn, b.destination or "")
+    if origin is None or destination is None:
+        return start, end
+    km = airports.distance_km(origin, destination)
+
+    def minutes(first: str, last: str) -> float:
+        return (trips.instant(last, end_zone) - trips.instant(first, start_zone)).total_seconds() / 60
+    if _plausible(minutes(start, end), km) or not _plausible(minutes(moved[0] or "", moved[1] or ""), km):
+        return start, end
+    return moved[0] or "", moved[1] or ""
+
+
 def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
     """The segment a booking describes, or None when its times or places can't be settled (no known airport, a place whose
     zone isn't clear, a time that isn't a date and time)."""
     start_zone, end_zone = _zone(conn, b, b.origin, b.start_place), _zone(conn, b, b.destination, b.end_place)
     if not start_zone or not end_zone:
         return None
-    start, end = extract.wall_clock(b.start, start_zone), extract.wall_clock(b.end, end_zone)
-    if not start or not end:
+    times = _times(conn, b, start_zone, end_zone)
+    if times is None:
         return None
+    start, end = times
     out: trips.SegmentIn = {"kind": b.kind, "status": b.status, "confirmation": b.confirmation, "provider": b.provider,
                             "start_local": start, "start_zone": start_zone, "end_local": end, "end_zone": end_zone,
                             "origin": b.origin, "destination": b.destination,

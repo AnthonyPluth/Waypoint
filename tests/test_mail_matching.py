@@ -115,5 +115,36 @@ class ExplainTests(DbCase):
         self.assertEqual(ingest.explain(self.c, self.booking(end="2026-11-20T10:00:00-05:00")), "rejected as a segment")
 
 
+class TimesTests(DbCase):
+    """A booking's times as wall-clock times at its places, whatever the sender's offsets: the clock as written, unless the
+    sender evidently gave UTC (a flight that would otherwise take two hours across the Atlantic)."""
+
+    booking = ExplainTests.booking
+
+    def times(self, start, end, **kw):
+        found = ingest.fields(self.c, self.booking(start=start, end=end, **kw))
+        assert found is not None
+        return found["start_local"], found["end_local"]
+
+    def test_offsets_that_are_the_airports_own_change_nothing(self):
+        self.assertEqual(self.times("2026-11-20T19:00:00-05:00", "2026-11-21T07:10:00+00:00"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
+
+    def test_a_local_clock_marked_as_utc_is_kept_as_written(self):
+        self.assertEqual(self.times("2026-11-20T19:00:00Z", "2026-11-21T07:10:00Z"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
+        self.assertEqual(self.times("2026-11-20T19:00:00+00:00", "2026-11-21T07:10:00+00:00"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
+
+    def test_times_that_are_really_utc_are_moved_to_the_airports_clocks(self):
+        # Written as a departure at midnight and an arrival at 07:10: only as UTC is that a believable flight (7 hours 10).
+        self.assertEqual(self.times("2026-11-21T00:00:00Z", "2026-11-21T07:10:00Z"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
+
+    def test_times_with_no_offset_are_as_written_and_so_are_a_stays_whatever_its_offsets(self):
+        self.assertEqual(self.times("2026-11-20T19:00:00", "2026-11-21T07:10:00"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
+        stay = ingest.fields(self.c, self.booking(kind="hotel", origin="Harbour Hotel", destination=None, start="2026-11-21T15:00:00Z",
+                                                  end="2026-11-27T10:00:00Z", start_place=extract.Place("London", "GB"),
+                                                  end_place=extract.Place("London", "GB")))
+        assert stay is not None
+        self.assertEqual((stay["start_local"], stay["end_local"]), ("2026-11-21T15:00:00", "2026-11-27T10:00:00"))
+
+
 if __name__ == "__main__":
     unittest.main()

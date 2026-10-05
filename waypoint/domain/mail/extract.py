@@ -368,6 +368,25 @@ def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool, li
 
 # ------------------------------------------------------------------------------------------------ times
 
+def written_clock(text: str) -> str | None:
+    """The date and time exactly as written, whatever offset follows it (the clock a sender printed), or None when it isn't a
+    date and time."""
+    text = text.strip()
+    if "T" not in text.upper() and " " not in text:
+        return None
+    try:
+        return datetime.fromisoformat(text).replace(tzinfo=None).isoformat(timespec="seconds")
+    except ValueError:
+        return None
+
+
+def has_offset(text: str) -> bool:
+    try:
+        return datetime.fromisoformat(text.strip()).tzinfo is not None
+    except ValueError:
+        return False
+
+
 def wall_clock(text: str, zone: str | None = None) -> str | None:
     """The wall-clock time a booking's time says, as 2026-03-01T22:15:00 with no offset, at its place. A time with an offset is
     an instant, so it is put into the place's own zone (it needs one): when the offset is the place's own that is what is
