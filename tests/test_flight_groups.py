@@ -47,6 +47,12 @@ class CalendarGroups(Reminders):
         self.assertIn("BBBBBB: departs 23:30", text)
 
 
+    def test_a_cancelled_booking_with_other_times_is_not_a_disagreement(self):
+        text = "\n".join(self.lines(segment(id=1, confirmation="AAAAAA"),
+                                    segment(id=2, confirmation="BBBBBB", status="cancelled", start_local="2026-03-01T23:30:00"))).replace("\\n", "\n")
+        self.assertNotIn("Times differ between bookings", text)
+
+
 class ReminderGroups(Reminders):
     def test_a_flight_on_two_bookings_gets_one_check_in_reminder_and_one_line_in_the_day_summary(self):
         self.add(self.jane, {**FLIGHT_OUT, "confirmation": "MIA777"}, travelers=self.on(self.jane.person_id))   # (Jane's other booking of it)

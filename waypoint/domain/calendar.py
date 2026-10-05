@@ -130,9 +130,10 @@ def _description(group: Sequence[SegmentOut], trip: TripOut) -> str:
         lines.append(f"Confirmations: {', '.join(codes)}")
     elif codes:
         lines.append(f"Confirmation: {codes[0]}")
-    if len(group) > 1 and len({(g["start_local"], g["end_local"]) for g in group}) > 1:
+    live = [g for g in group if g["status"] != "cancelled" and not untimed(g["details"])]   # (as the screens count them)
+    if len({(g["start_local"], g["end_local"]) for g in live}) > 1:
         lines.append("Times differ between bookings:")
-        lines += [f"{g['confirmation'] or 'Booking'}: departs {_clock(g['start_local'])}, arrives {_clock(g['end_local'])}" for g in group]
+        lines += [f"{g['confirmation'] or 'Booking'}: departs {_clock(g['start_local'])}, arrives {_clock(g['end_local'])}" for g in live]
     lines += [f"{label}: {seg['details'][key]}" for key, label in DETAILS if seg["details"].get(key) and key != "flight_number"]
     for g in group:
         if g["manage_url"]:
