@@ -158,7 +158,7 @@ def _event(group: Sequence[SegmentOut], trip: TripOut, now: datetime) -> list[st
     lines = ["BEGIN:VEVENT", f"UID:segment-{group[0]['id']}@waypoint", f"DTSTAMP:{now.astimezone(UTC):%Y%m%dT%H%M%SZ}",
              *_times(seg),
              f"SUMMARY:{escape(_title(seg))}", f"DESCRIPTION:{escape(_description(group, trip))}"]
-    place = seg["origin"] if seg["kind"] in ("hotel", "car") else None
+    place = (seg["details"].get("address") or seg["origin"]) if seg["kind"] in ("hotel", "car") else None   # (the address a person or the email gave, else the place's name)
     if place:
         lines.append(f"LOCATION:{escape(place)}")
     cancelled = all(g["status"] == "cancelled" for g in group)

@@ -33,6 +33,7 @@ STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
 TIME_UNKNOWN = "time_unknown"
 # What a segment's details may hold (the rest of a booking has a field of its own), each a text. `time_unknown` ("yes") marks an
 # imported flight whose file gave no times: it starts and ends at midnight of its day and counts in distance, not time.
+ADDRESS_LIMIT = 300   # the longest address kept
 DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone", TIME_UNKNOWN)
 
 
@@ -266,6 +267,8 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
     details = fields.get("details") or {}
     if any(k not in DETAIL_KEYS for k in details):
         raise Invalid(f"Details can hold only: {', '.join(DETAIL_KEYS)}")
+    if len(details.get("address", "")) > ADDRESS_LIMIT:   # (the API refuses a longer one a person typed; an email's is cut so it can still be edited)
+        details = {**details, "address": details["address"][:ADDRESS_LIMIT].rstrip()}
     return {"kind": kind, "status": status, "confirmation": fields.get("confirmation"),
             "provider": fields.get("provider"), "start_local": start, "start_zone": start_zone, "end_local": end,
             "end_zone": end_zone, "origin": origin, "destination": destination,

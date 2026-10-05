@@ -28,6 +28,7 @@
   let loyalty = $state<LoyaltyEntry[]>([]);
   let loadError = $state("");
   let form = $state<Draft | null>(null);
+  let focus = $state("");   // the form field to put the cursor in (Add address)
   let removing = $state<Segment | null>(null);
   let asking = $state(false);
 
@@ -84,11 +85,11 @@
       <p class="text-muted-foreground">{dates(t)}{t.destination ? ` · ${t.destination}` : ""}</p>
       {#if t.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
     </div>
-    {#if !form}<Button onclick={() => (form = blank(t.id))}><Plus /> Add a booking</Button>{/if}
+    {#if !form}<Button onclick={() => { focus = ""; form = blank(t.id); }}><Plus /> Add a booking</Button>{/if}
   </div>
 
   {#if form}
-    {#key form.id ?? "new"}<SegmentForm initial={form} {people} oncancel={() => (form = null)} onsaved={saved} />{/key}
+    {#key form.id ?? "new"}<SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} />{/key}
   {/if}
 
   {#if t.segments.length === 0}
@@ -173,6 +174,15 @@
 
 {#snippet links(s: Segment)}
   {#if s.check_times}<p class="text-sm text-signal-ink" role="note">Check the times: the email gave them in UTC and Waypoint couldn’t tell which clock they mean. Edit the booking to correct or confirm them.</p>{/if}
+  {#if s.kind === "hotel" || s.kind === "car"}
+    {#if s.details.address}
+      <div class="mt-2 text-sm"><p class="eyebrow">{s.kind === "car" ? "Pick-up address" : "Address"}</p>
+        <CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" /></div>
+    {:else if s.status !== "cancelled"}
+      <p class="mt-2 text-sm"><button type="button" class="underline underline-offset-2" onclick={() => { focus = "segment-address"; form = draftOf(s); }}
+        aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
+    {/if}
+  {/if}
   {#if s.links.app || (s.status !== "cancelled" && (s.links.directions || s.links.call))}
     <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
       {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord}</Button>{/if}
@@ -201,7 +211,7 @@
 
 {#snippet buttons(s: Segment, name: string)}
   <div class="flex flex-wrap gap-2">
-    <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => (form = draftOf(s))}>Edit</Button>
+    <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => { focus = ""; form = draftOf(s); }}>Edit</Button>
     <Button variant="outline" size="sm" aria-label={`Remove ${name}`} onclick={() => { removing = s; asking = true; }}>Remove</Button>
   </div>
 {/snippet}

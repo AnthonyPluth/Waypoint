@@ -15,6 +15,7 @@ from ..contract import Airport, MergeBody, Ok, Segment, SegmentBody, SegmentEdit
 
 NAME_LIMIT = 100
 NOTES_LIMIT = 4000
+ADDRESS_LIMIT = trips.ADDRESS_LIMIT
 MAX_TRAVELERS = 20
 MAX_SEGMENTS_MOVED = 200
 _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {limit} characters)")
@@ -54,7 +55,8 @@ def _link(value: str | None) -> str | None:
 def _details(raw: Any) -> dict[str, str]:
     if not isinstance(raw, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in raw.items()):
         raise ApiError('Send "details" as an object of texts')
-    return {k: kept for k, v in raw.items() if (kept := _v.text(v, f"detail “{k[:30]}”", 200))}
+    limits = {"address": ADDRESS_LIMIT}   # (an address is as written, over several lines)
+    return {k: kept for k, v in raw.items() if (kept := _v.text(v.replace("\r\n", "\n").replace("\r", "\n"), f"detail “{k[:30]}”", limits.get(k, 200)))}
 
 
 def _travelers(raw: Any) -> list[trips.TravelerIn]:

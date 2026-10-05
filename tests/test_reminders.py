@@ -91,6 +91,15 @@ class CalendarTests(unittest.TestCase):
         i = zone.index("DTSTART:20261101T020000")   # 02:00 on the wall, as the clocks said
         self.assertEqual(zone[i - 1:i + 3], ["BEGIN:STANDARD", "DTSTART:20261101T020000", "TZOFFSETFROM:-0400", "TZOFFSETTO:-0500"])
 
+    def test_a_stay_and_a_rental_carry_their_address_as_the_location_else_the_place(self):
+        base = dict(kind="hotel", origin="Harbour Hotel", destination=None, start_zone="America/New_York", end_zone="America/New_York",
+                    start_local="2026-10-30T15:00", end_local="2026-11-03T10:00")
+        self.assertIn("LOCATION:1 Quay Street\\nLondon E1 0AA", self.lines(segment(**base, details={"address": "1 Quay Street\nLondon E1 0AA"})))
+        self.assertIn("LOCATION:Harbour Hotel", self.lines(segment(**base, details={})))
+        car = segment(**{**base, "kind": "car", "origin": "Airport desk"}, details={"address": "5 Depot Way"})
+        self.assertIn("LOCATION:5 Depot Way", self.lines(car))
+        self.assertFalse([l for l in self.lines(segment()) if l.startswith("LOCATION")])   # (a flight has none)
+
     def test_a_flight_changes_zone_between_its_ends_and_each_zone_is_described(self):
         lines = self.lines(segment(origin="JFK", destination="LHR", start_local="2026-11-20T19:00:00",
                                    end_local="2026-11-21T07:10:00", start_zone="America/New_York", end_zone="Europe/London"))

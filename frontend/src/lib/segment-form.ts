@@ -6,6 +6,9 @@ import { instant, untimed } from "./trips";
 export type Kind = Segment["kind"];
 export const KINDS: [Kind, string][] = [["flight", "Flight"], ["hotel", "Hotel"], ["car", "Car rental"], ["train", "Train"]];
 
+/** The longest address, which keeps its line breaks (the server holds the same limit). */
+export const ADDRESS_LIMIT = 300;
+
 /** The details each kind has room for, as the segment stores them. */
 export const DETAILS: Record<Kind, [string, string][]> = {
   flight: [["flight_number", "Flight number"], ["terminal", "Terminal"], ["seat", "Seat"], ["cabin", "Cabin"]],
@@ -78,6 +81,7 @@ export function problem(d: Draft): string | null {
   if (startZone && endZone && instant(d.end_local, endZone) < instant(d.start_local, startZone)) {
     return "This ends before it starts (times are compared at their own places’ zones)";
   }
+  if ((d.details.address ?? "").trim().length > ADDRESS_LIMIT) return `The address can be at most ${ADDRESS_LIMIT} characters`;
   if (d.manage_url.trim() && !/^https?:\/\//i.test(d.manage_url.trim())) return "The manage link must start with https:// or http://";
   if (d.people.length + d.printed.length === 0) return "Choose who’s travelling";
   return null;
