@@ -36,7 +36,8 @@ A segment is added to a trip you name, or without one: Waypoint puts it in the t
 Each booking card has buttons for what you'd do next:
 
 - **Open in app**: the booking's manage link (from the email, or one you entered). It's a link on the provider's own website; on an iPhone or Android phone it says **Open in app** and the provider's app opens it if installed; on a computer it says **Manage booking** and opens the provider's website. Only https links are offered. A cancelled booking keeps this one (you may need it for a refund) and loses the others. Waypoint doesn't build prefilled manage links for any provider yet, because it only adds one once its URL is confirmed from the provider's public site.
-- **Directions**: an Apple Maps link to a hotel's or rental's address (or its place name when there's no address).
+- **Address**: a hotel's or rental's address shows under its times, as written (up to 300 characters, over several lines if you like). Tap it to copy. With none, the card says **Add address**, which opens the edit form at that field. An address you enter is kept like any other edit: a later email won't replace it, and fills it only while it is empty. Waypoint never looks addresses up; it has only what an email or you gave it, and the calendar feed carries it as the event's location.
+- **Directions**: an Apple Maps link to a hotel's or rental's address (or its place name when there's no address). Your device hands the text to Apple Maps when you tap it; nothing is sent from the server.
 - **Call**: dials the phone number on the booking, when it has one.
 
 ## Times are where they happen

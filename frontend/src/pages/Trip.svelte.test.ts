@@ -303,4 +303,41 @@ describe("Trip", () => {
       expect(within(card).getAllByText("Departs")).toHaveLength(2);   // (once in each booking's block)
     });
   });
+
+  describe("a stay’s address", () => {
+    it("shows it as written, copies it on a tap, and Directions uses it", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+      held = trip([{ ...stay, details: { address: "1 Quay Street\nLondon E1 0AA" } }]);
+      render(TripPage);
+      await userEvent.click(await screen.findByRole("button", { name: /Copy address 1 Quay Street/ }));
+      expect(writeText).toHaveBeenCalledWith("1 Quay Street\nLondon E1 0AA");
+      expect(screen.queryByRole("button", { name: /Add address/ })).toBeNull();
+      expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", stay.links.directions!);
+      vi.unstubAllGlobals();
+    });
+
+    it("offers Add address only when there is none, and opens the form at the address field", async () => {
+      held = trip([flight, { ...stay, details: {}, links: { app: null, directions: "https://maps.apple.com/?q=Harbour%20Hotel", call: null } }]);
+      const u = userEvent.setup();
+      render(TripPage);
+      await screen.findByRole("heading", { name: "Trip to London" });
+      expect(screen.getAllByRole("button", { name: /Add address/ })).toHaveLength(1);   // (not on the flight)
+      await u.click(await screen.findByRole("button", { name: "Add address to Harbour Hotel" }));
+      const field = await screen.findByLabelText("Address");
+      expect(field.tagName).toBe("TEXTAREA");
+      expect(field).toHaveFocus();
+    });
+
+    it("saves an address typed in the form, trimmed, with its lines", async () => {
+      held = trip([{ ...stay, details: {} }]);
+      const u = userEvent.setup();
+      render(TripPage);
+      await u.click(await screen.findByRole("button", { name: "Add address to Harbour Hotel" }));
+      await u.type(await screen.findByLabelText("Address"), "  7 Mill Lane{Enter}London N1 1AA ");
+      await u.click(screen.getByRole("button", { name: "Save" }));
+      const post = vi.mocked(api).mock.calls.find(([path, o]) => path === "/api/segments/2" && o?.method === "POST")!;
+      expect((post[1] as { body: { details: Record<string, string> } }).body.details.address).toBe("7 Mill Lane\nLondon N1 1AA");
+    });
+  });
 });

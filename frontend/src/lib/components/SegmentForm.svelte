@@ -1,18 +1,22 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { actGet } from "$lib/act";
   import { apiCall } from "$lib/contract";
   import type { Person, Segment } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
-  import { body, DETAILS, KINDS, problem, type Draft } from "$lib/segment-form";
+  import { ADDRESS_LIMIT, body, DETAILS, KINDS, problem, type Draft } from "$lib/segment-form";
 
   // Adding a segment by hand, or editing one. A failed check or save keeps everything typed and says why; what you
   // change here is locked against later emails (the server does that).
-  let { initial, people, onsaved, oncancel }: { initial: Draft; people: Person[]; onsaved: (s: Segment) => void; oncancel: () => void } = $props();
+  // `focus`: the field to put the cursor in (Add address on a card opens the form at the address).
+  let { initial, people, onsaved, oncancel, focus = "" }: { initial: Draft; people: Person[]; onsaved: (s: Segment) => void; oncancel: () => void; focus?: string } = $props();
   // svelte-ignore state_referenced_locally
   let d = $state<Draft>({ ...initial, details: { ...initial.details }, people: [...initial.people], printed: [...initial.printed] });
   let error = $state("");
   let saving = $state(false);
+
+  onMount(() => { if (focus) document.getElementById(focus)?.focus(); });
 
   const flight = $derived(d.kind === "flight");
   const editing = $derived(d.id !== null);
@@ -79,7 +83,12 @@
       <datalist id="segment-zones">{#each zones as zone (zone)}<option value={zone}></option>{/each}</datalist>
       {#each DETAILS[d.kind] as [key, name] (key)}
         <label class={label}><span class="font-medium">{name}</span>
-          <Input value={d.details[key] ?? ""} oninput={(e) => (d.details[key] = e.currentTarget.value)} maxlength={200} autocomplete="off" /></label>
+          {#if key === "address"}
+            <textarea id="segment-address" rows="3" maxlength={ADDRESS_LIMIT} value={d.details[key] ?? ""} oninput={(e) => (d.details[key] = e.currentTarget.value)}
+              autocomplete="off" class={selectClass}></textarea>
+          {:else}
+            <Input value={d.details[key] ?? ""} oninput={(e) => (d.details[key] = e.currentTarget.value)} maxlength={200} autocomplete="off" />
+          {/if}</label>
       {/each}
       <label class={label}><span class="font-medium">Manage link</span>
         <Input bind:value={d.manage_url} maxlength={500} autocomplete="off" spellcheck={false} placeholder="https://" /></label>

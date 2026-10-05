@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blank, body, draftOf, problem, type Draft } from "./segment-form";
+import { blank, body, DETAILS, draftOf, problem, type Draft, type Kind } from "./segment-form";
 import { segment } from "../test/fixtures";
 
 /** A flight that's ready to send, with `extra` changing what a test cares about. */
@@ -75,5 +75,22 @@ describe("the request the form makes", () => {
     expect(body({ ...d, details: { ...d.details, seat: "15A" } }).details).toEqual({ time_unknown: "yes", seat: "15A" });   // other edits keep it
     expect(body({ ...d, start_local: "2025-03-08T09:30" }).details).toEqual({ seat: "14C" });
     expect(body(draftOf(segment({ details: { seat: "14C" } }))).details).toEqual({ seat: "14C" });
+  });
+});
+
+describe("the fields each kind shows", () => {
+  it("has the address, phone and room for a hotel, the pick-up address, phone and class for a car, and terminal, seat and cabin for a flight", () => {
+    const names = (k: Kind) => DETAILS[k].map(([, label]) => label);
+    expect(names("hotel")).toEqual(["Address", "Room", "Phone"]);
+    expect(names("car")).toEqual(["Pick-up address", "Car class", "Phone"]);
+    expect(names("flight")).toEqual(expect.arrayContaining(["Terminal", "Seat", "Cabin"]));
+  });
+
+  it("round-trips an address with its lines, and refuses one over the limit", () => {
+    const d = draftOf(segment({ kind: "hotel", origin: "Harbour Hotel", destination: null, start_zone: "Europe/London", end_zone: "Europe/London",
+      details: { address: "1 Quay Street\nLondon E1 0AA" }, travelers: [{ id: 1, person_id: 1, name: "Jane Doe" }] }));
+    expect(body({ ...d, details: { ...d.details, address: "  3 Mill Lane\nLondon  " } }).details?.address).toBe("3 Mill Lane\nLondon");
+    expect(problem(d)).toBeNull();
+    expect(problem({ ...d, details: { address: "x".repeat(301) } })).toMatch(/at most 300/);
   });
 });

@@ -259,6 +259,17 @@ class SegmentTests(Household):
         email = {"confirmation": "FROMMAIL", "provider": "Example Air", "status": "confirmed", "origin": "JFK"}
         self.assertEqual(trips.unlocked(email, more["locked_fields"]), {"origin": "JFK"})
 
+    def test_an_edited_address_is_locked_against_a_later_email_but_an_empty_one_is_filled(self):
+        mail = {**HOTEL, "confirmation": "H77001", "details": {"address": "9 Mill Lane\nLondon N1 1AA"}}
+        empty = self.add(self.jane, {**HOTEL, "confirmation": "H77001"})
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, mail), "updated")   # (nothing was there: the email fills it)
+        self.assertEqual(trips.get_segment(self.c, self.jane, empty["id"])["details"], {"address": "9 Mill Lane\nLondon N1 1AA"})
+        edited = trips.edit_segment(self.c, self.jane, empty["id"], {"details": {"address": "2 Dock Road"}})
+        assert edited
+        self.assertIn("details", edited["locked_fields"])
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, mail), "unchanged")
+        self.assertEqual(trips.get_segment(self.c, self.jane, empty["id"])["details"], {"address": "2 Dock Road"})
+
     def test_moving_a_flights_airport_takes_its_zone_along_unless_given(self):
         seg = self.add(self.jane, OUT)
         moved = trips.edit_segment(self.c, self.jane, seg["id"], {"origin": "ORD", "start_local": "2026-06-01T18:00"})
@@ -736,6 +747,15 @@ class LocalHouseholdTests(ServerCase):
 
 
 class ApiFieldTests(unittest.TestCase):
+    def test_an_address_is_trimmed_keeps_its_lines_and_is_at_most_300_characters(self):
+        got = api.segment_fields({"details": {"address": "  1 Quay Street\r\nLondon E1 0AA \n", "room": " 4B "}})
+        self.assertEqual(got["details"], {"address": "1 Quay Street\nLondon E1 0AA", "room": "4B"})
+        self.assertEqual(api.segment_fields({"details": {"address": "x" * 300}})["details"], {"address": "x" * 300})
+        with self.assertRaisesRegex(ApiError, "300"):
+            api.segment_fields({"details": {"address": "x" * 301}})
+        with self.assertRaisesRegex(ApiError, "200"):   # (the other details keep their limit)
+            api.segment_fields({"details": {"room": "x" * 201}})
+
     def test_what_is_left_out_stays_out(self):
         self.assertEqual(api.segment_fields({}), {})
         self.assertEqual(api.segment_fields({"provider": "  ", "details": {"seat": " "}}), {"provider": None, "details": {}})
