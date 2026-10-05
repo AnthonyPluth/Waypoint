@@ -342,6 +342,18 @@ class MergeTests(ScanCase):
         self.scan(now=NOW + 3600)
         self.assertEqual(self.segments()[0]["status"], "cancelled")
 
+    def test_a_cancellation_after_a_change_cancels_and_keeps_the_changed_time(self):
+        self.put("flight_jsonld")
+        self.scan()
+        later = eml("flight_jsonld").replace(b"2026-11-20T19:00:00-05:00", b"2026-11-20T21:30:00-05:00")
+        self.add_mail("later", later)
+        self.scan(now=NOW + 3600)
+        self.assertEqual(self.segments()[0]["status"], "changed")
+        self.add_mail("cancel", later.replace(b"ReservationConfirmed", b"ReservationCancelled"))
+        self.scan(now=NOW + 7200)
+        [seg] = self.segments()
+        self.assertEqual((seg["status"], seg["start_local"]), ("cancelled", "2026-11-20T21:30"))
+
     def test_a_segment_the_owner_cannot_see_is_never_merged_into(self):
         # Sam's mailbox gets the same email (for Mia): Jane's segment isn't Sam's to see, so he gets one of his own, and Jane
         # still sees only hers; Mia is on both.
