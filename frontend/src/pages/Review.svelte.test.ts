@@ -309,27 +309,44 @@ describe("Review: the message beside the form", () => {
   });
 });
 
-describe("Review: Ask the AI", () => {
+describe("Review: Ask AI", () => {
   it("is offered only when the AI is on", async () => {
     render(ReviewPage);
     await screen.findByTestId("review-item");
-    expect(screen.queryByRole("button", { name: /Ask the AI/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ask AI/ })).toBeNull();
   });
 
   it("asks the AI, then offers its suggestion to check", async () => {
     held = { items: [item()], who: [], ai: true };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Ask the AI about/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Ask AI about/ }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1/suggest", "POST", undefined]));
     expect(await screen.findByRole("button", { name: /Check the AI.s suggestion/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Ask the AI about/ })).toHaveTextContent("Ask again");
+    expect(screen.getByRole("button", { name: /Ask AI about/ })).toHaveTextContent("Ask again");
   });
 
   it("says when the AI couldn’t be asked", async () => {
     held = { items: [item()], who: [], ai: true };
     suggestFails = "Turn on AI suggestions in Settings first.";
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Ask the AI about/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Ask AI about/ }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Turn on AI suggestions in Settings first."));
+  });
+
+  it("asks about every message without a suggestion at once", async () => {
+    held = { items: [item(), item({ id: 2 }), item({ id: 3, suggestion: null })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 3" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 3 messages"));
+    expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest", "/api/review/2/suggest", "/api/review/3/suggest"]);
+  });
+
+  it("stops the bulk ask at the first failure and says how far it got", async () => {
+    held = { items: [item(), item({ id: 2 })], who: [], ai: true };
+    suggestFails = "Turn on AI suggestions in Settings first.";
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Asked about 0 of 2: Turn on AI suggestions in Settings first."));
+    expect(calls.filter((c) => c[0].endsWith("/suggest"))).toHaveLength(1);
   });
 });
