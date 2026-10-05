@@ -1,0 +1,10 @@
+From: Example Air <reservations@example-air.example>
+To: traveller@gmail.example
+Subject: Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F
+Date: Sat, 17 Oct 2026 07:45:00 -0400
+Message-ID: <fx-nomarkup@example-air.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body><p>CANARY-BODY-NOMARKUP-6H9C Flight EX 202 from Boston to Denver leaves on 2 January at 7:15 am.
+Confirmation code: ZZ9Y8X (made up). There is no structured markup in this email.</p></body></html>

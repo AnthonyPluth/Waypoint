@@ -11,7 +11,7 @@ import type { Mailbox, MailboxList } from "$lib/api-types";
 import { toast } from "svelte-sonner";
 import GmailSection from "./GmailSection.svelte";
 
-const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, ...extra });
+const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, ...extra });
 const list = (mailboxes: Mailbox[] = [], configured = true): MailboxList => ({ configured, mailboxes });
 /** Answers GET /api/mailboxes with `reply`; other calls with what `others` says. */
 const serve = (reply: MailboxList, others: (path: string) => unknown = () => ({})) =>
@@ -131,6 +131,58 @@ describe("Settings → Gmail", () => {
     render(GmailSection);
     await screen.findByRole("button", { name: "Connect Gmail" });
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says when a mailbox was last scanned, or that it hasn’t been", async () => {
+    serve(list([box({ last_scan: "2026-09-30T07:02:00+00:00" }), box({ id: 2, address: "work@gmail.example" })]));
+    render(GmailSection);
+    expect(await screen.findByText(/^Last scanned .*2026/)).toBeInTheDocument();
+    expect(screen.getByText("Not scanned yet.")).toBeInTheDocument();
+  });
+
+  it("scans now, and says when one is already running", async () => {
+    let started = true;
+    vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string }) =>
+      (opts?.method === "POST" ? { started } : list([box()])) as never);
+    render(GmailSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Scan now" }));
+    expect(api).toHaveBeenCalledWith("/api/mailboxes/1/scan", { method: "POST", failed: "Couldn’t start the scan" });
+    expect(toast).not.toHaveBeenCalled();
+    started = false;
+    await userEvent.click(screen.getByRole("button", { name: "Scan now" }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("A scan of this mailbox is already running."));
+  });
+
+  it("says a scan is running, and checks until it’s done", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let scanning = true;
+      vi.mocked(api).mockImplementation(async () => list([box({ scanning, last_scan: scanning ? null : "2026-09-30T07:02:00+00:00" })]) as never);
+      render(GmailSection);
+      expect(await screen.findByText("Scanning for bookings…")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Scanning…" })).toBeDisabled();
+      scanning = false;
+      await vi.advanceTimersByTimeAsync(3100);
+      expect(await screen.findByRole("button", { name: "Scan now" })).toBeEnabled();
+      expect(screen.queryByText("Scanning for bookings…")).toBeNull();
+      const calls = vi.mocked(api).mock.calls.length;
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(vi.mocked(api).mock.calls.length).toBe(calls);   // and stops asking
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("says what stopped the last scan, and that nothing was lost", async () => {
+    serve(list([box({ scan_error: "Couldn’t reach Google while reading the mailbox." })]));
+    render(GmailSection);
+    expect(await screen.findByText(/The last scan stopped: Couldn’t reach Google while reading the mailbox\. What it had read is kept/)).toBeInTheDocument();
+  });
+
+  it("offers no scan for a connection that needs reconnecting", async () => {
+    serve(list([box({ status: "reconnect", last_error: "Google no longer lets Waypoint read this mailbox." })]));
+    render(GmailSection);
+    await screen.findByRole("button", { name: "Reconnect" });
+    expect(screen.queryByRole("button", { name: "Scan now" })).toBeNull();
+    expect(screen.queryByText("Not scanned yet.")).toBeNull();
   });
 
   it("says when the list can’t be loaded, and tries again", async () => {

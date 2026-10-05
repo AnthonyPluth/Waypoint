@@ -193,6 +193,7 @@ mailboxes = Table(
     Column('status', Text, nullable=False),
     Column('last_error', Text),
     Column('created', Float),
+    Column('scan_error', Text),
     UniqueConstraint('owner_sub', 'address', name='uq_mailboxes_owner_address'),
     info={'doc': "Gmail accounts members connected (read-only); each belongs to the member who connected it, its refresh token is kept encrypted"},
 )
@@ -204,6 +205,39 @@ mailbox_pending = Table(
     Column('verifier', Text, nullable=False),
     Column('created', Float, nullable=False),
     info={'doc': 'Gmail connections in progress at Google'},
+)
+
+scanned_messages = Table(
+    'scanned_messages', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('mailbox_id', Integer, refers('scanned_messages', 'mailbox_id', 'mailboxes.id', 'CASCADE'), nullable=False),
+    Column('message_id', Text, nullable=False),
+    Column('outcome', Text, nullable=False),
+    Column('scanned', Float, nullable=False),
+    UniqueConstraint('mailbox_id', 'message_id', name='uq_scanned_messages_mailbox_message'),
+    info={'doc': "each Gmail message id a scan has looked at and what came of it (booking, unreadable, ignored), so nothing is read twice; holds no content"},
+)
+
+review_items = Table(
+    'review_items', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('mailbox_id', Integer, refers('review_items', 'mailbox_id', 'mailboxes.id', 'CASCADE'), nullable=False),
+    Column('message_id', Text, nullable=False),
+    Column('sender_domain', Text, nullable=False),
+    Column('received', Text),
+    Column('reason', Text, nullable=False),
+    Column('created', Float, nullable=False),
+    UniqueConstraint('mailbox_id', 'message_id', name='uq_review_items_mailbox_message'),
+    info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner alone; neither its subject nor its body is kept"},
+)
+
+ignored_senders = Table(
+    'ignored_senders', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('mailbox_id', Integer, refers('ignored_senders', 'mailbox_id', 'mailboxes.id', 'CASCADE'), nullable=False),
+    Column('domain', Text, nullable=False),
+    UniqueConstraint('mailbox_id', 'domain', name='uq_ignored_senders_mailbox_domain'),
+    info={'doc': "sender domains a mailbox's owner chose to stop reviewing: their mail is skipped by later scans"},
 )
 
 # Tables whose integer id is assigned by the database.

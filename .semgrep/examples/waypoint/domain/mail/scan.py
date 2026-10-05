@@ -15,3 +15,21 @@ start = today
 scanned_at = datetime.datetime.now()
 # ok: waypoint-naive-now
 scanned_at = datetime.datetime.now(datetime.timezone.utc)
+
+# Only extract.py reads what a message holds: the scan passes the message on and keeps the booking fields that come back.
+# ruleid: waypoint-message-body
+body = message["raw"]
+# ruleid: waypoint-message-body
+body = message.get("payload")
+# ruleid: waypoint-message-body
+body = message["payload"]["parts"][0]
+# ruleid: waypoint-message-body
+text = base64.urlsafe_b64decode(data)
+# ruleid: waypoint-message-body
+parsed = email.message_from_string(text)
+# ruleid: waypoint-message-body
+text = part.get_payload(decode=True)
+# ok: waypoint-message-body
+found = extract.read(message)
+# ok: waypoint-message-body
+sender = found.sender_domain

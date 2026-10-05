@@ -88,8 +88,8 @@ class FakeGoogle(BaseHTTPRequestHandler):
 
 
 class Google(HTTPServer):
-    def __init__(self):
-        super().__init__(("127.0.0.1", 0), FakeGoogle)
+    def __init__(self, handler=FakeGoogle):
+        super().__init__(("127.0.0.1", 0), handler)
         self.grants, self.live, self.revoked, self.calls, self.owners, self.emails = {}, set(), [], [], {}, {}
         self.refresh_fails, self.revoke_status = None, 200
         self._n = 0
@@ -110,12 +110,13 @@ class GoogleCase(ServerCase):
     """A Waypoint with sign-in on and a Google client set up, two members (Ana and Ben) with sessions, and a fake Google."""
     env = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint", "OIDC_ALLOWED_EMAILS": "ana@example.com,ben@example.com",
            "GOOGLE_CLIENT_ID": CLIENT_ID, "GOOGLE_CLIENT_SECRET": CLIENT_SECRET}
+    fake = FakeGoogle   # the handler of the fake Google (a test of more of Gmail's API gives its own)
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         os.environ["WAYPOINT_PUBLIC_URL"] = cls.base
-        cls.google = Google()
+        cls.google = Google(cls.fake)
         threading.Thread(target=cls.google.serve_forever, daemon=True).start()
         cls.addClassCleanup(cls.google.server_close)
         cls.addClassCleanup(cls.google.shutdown)   # (runs first)

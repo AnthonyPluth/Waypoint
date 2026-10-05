@@ -16,8 +16,14 @@ from sqlalchemy import insert
 
 from waypoint import oidc
 from waypoint.providers import gmail
-from waypoint.providers import flightstatus as flight_service
+from waypoint.domain import people as people_domain
+from waypoint.domain import trips
+from waypoint.domain.mail import review
+from waypoint.domain.visibility import Viewer
+from waypoint.server import jobs
 from waypoint.server.api import backups, flightstatus as flightstatus_api, mailboxes, people, state
+from waypoint.server.api import review as review_api
+from waypoint.providers import flightstatus as flight_service
 from waypoint.server.api import trips as trips_api
 from waypoint.server.api import loyalty
 from waypoint.server.common import _current
@@ -101,6 +107,7 @@ class Replies(DbCase):
         self.test_state()
         self.test_backups()
         self.test_mailboxes()
+        self.test_review()
         self.test_people()
         self.test_trips()
         self.test_flight_status()
@@ -138,8 +145,28 @@ class Replies(DbCase):
         reply = mailboxes.api_mailboxes(self.c, {}, {})
         self.assertEqual([m["status"] for m in reply["mailboxes"]], ["connected", "reconnect", "error"])
         self.check("GET /api/mailboxes", reply)
+        with mock.patch.object(jobs, "scan_now", return_value=True):
+            self.check("POST /api/mailboxes/{id}/scan", mailboxes.api_mailbox_scan(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
         with mock.patch.object(gmail, "_post", return_value={}):
             self.check("DELETE /api/mailboxes/{id}", mailboxes.api_mailbox_disconnect(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
+
+    def test_review(self):
+        _current.user = {"sub": "u1", "name": "Rosa Example", "email": "rosa@example.com"}
+        oidc.remember_user(self.c, "u1", "rosa@example.com", "Rosa Example")
+        self.check("GET /api/review", review_api.api_review(self.c, {}, {}))   # nothing yet
+        box = self.c.execute(insert(Mailbox).values(owner_sub="u1", address="rosa@gmail.example", token=secretbox.encrypt("t"),
+                                                    status="connected", created=1.0)).lastrowid
+        for n, reason in enumerate(("no_markup", "incomplete", "broken")):
+            review.add(self.c, box, f"m{n}", f"air{n}.example", "2026-10-17", reason, 1.0)   # type: ignore[arg-type]
+        me = Viewer(people_domain.person_for_sub(self.c, "u1"))
+        trips.add_segment(self.c, me, {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": "2026-12-08T08:00",
+                                       "end_local": "2026-12-08T11:20", "travelers": [{"person_id": None, "name": "DOE/MIA MISS"}]}, source="email")
+        listed = review_api.api_review(self.c, {}, {})
+        self.assertEqual((len(listed["items"]), len(listed["who"])), (3, 1))
+        self.check("GET /api/review", listed)
+        self.check("POST /api/review/who/{id}", review_api.api_review_who(self.c, {}, {"person_id": me.person_id}, str(listed["who"][0]["id"])))
+        self.check("POST /api/review/{id}/ignore", review_api.api_review_ignore(self.c, {}, {}, str(listed["items"][0]["id"])))
+        self.check("DELETE /api/review/{id}", review_api.api_review_dismiss(self.c, {}, {}, str(listed["items"][1]["id"])))
 
     def test_people(self):
         self.check("GET /api/people", people.api_people(self.c, {}, {}))   # nobody yet
@@ -213,7 +240,7 @@ class Mismatches(unittest.TestCase):
 
     def test_a_renamed_field_a_wrong_type_and_a_missing_one(self):
         st = {"version": "dev", "database": "sqlite", "user": {"name": None, "email": None, "local": True},
-              "last_backup": None}
+              "last_backup": None, "review_count": 0}
         schema = reply_schema("GET /api/state")
         self.assertEqual(problems(st, schema), [])
         renamed = {("backed_up" if k == "last_backup" else k): v for k, v in st.items()}
@@ -233,7 +260,9 @@ class Generated(unittest.TestCase):
 
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
-                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "GET /api/people", "POST /api/people",
+                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan",
+                                     "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "DELETE /api/review/{id}",
+                                     "GET /api/people", "POST /api/people",
                                      "POST /api/people/{id}", "DELETE /api/people/{id}",
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",

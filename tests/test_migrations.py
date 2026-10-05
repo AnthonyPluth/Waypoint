@@ -192,6 +192,7 @@ class MigrationTests(unittest.TestCase):
             self.assertNotIn("flight_status", sa.inspect(c).get_table_names())
             self.assertIn("trips", sa.inspect(c).get_table_names())
             command.upgrade(db.alembic_config(c), "0006")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:
             row = dict(flight_number="EX101", date="2026-11-20", state="delayed", fetched_at=1.0)
@@ -205,6 +206,38 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0005")
             self.assertNotIn("flight_status", sa.inspect(c).get_table_names())
             self.assertIn("trips", sa.inspect(c).get_table_names())
+
+    def test_0007_makes_the_scan_tables_and_takes_them_away(self):
+        from alembic import command
+        db.init(self.path)
+        scan_tables = {"scanned_messages", "review_items", "ignored_senders"}
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0006")
+            self.assertEqual(set(sa.inspect(c).get_table_names()) & scan_tables, set())
+            self.assertNotIn("scan_error", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
+            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="enc:v1:x", status="connected"))
+            command.upgrade(db.alembic_config(c), "0007")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:
+            self.assertIsNone(conn.execute(select(schema.mailboxes.c.scan_error)).scalar())   # a mailbox from before has no scan error
+            conn.execute(insert(schema.scanned_messages).values(mailbox_id=1, message_id="m1", outcome="booking", scanned=1.0))
+            conn.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m2", sender_domain="air.example",
+                                                            reason="no_markup", created=1.0))
+            conn.execute(insert(schema.ignored_senders).values(mailbox_id=1, domain="air.example"))
+        with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:   # a message is recorded once per mailbox
+            conn.execute(insert(schema.scanned_messages).values(mailbox_id=1, message_id="m1", outcome="booking", scanned=2.0))
+        with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:   # and belongs to a mailbox
+            conn.execute(insert(schema.review_items).values(mailbox_id=9, message_id="m3", sender_domain="x.example",
+                                                            reason="no_markup", created=1.0))
+        with db.session(self.path) as conn:   # disconnecting a mailbox takes what its scans kept
+            conn.execute(sa.delete(schema.mailboxes))
+            for t in (schema.scanned_messages, schema.review_items, schema.ignored_senders):
+                self.assertEqual(conn.execute(select(sa.func.count()).select_from(t)).scalar(), 0)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0006")
+            self.assertEqual(set(sa.inspect(c).get_table_names()) & scan_tables, set())
+            self.assertNotIn("scan_error", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
+            self.assertIn("mailboxes", sa.inspect(c).get_table_names())
 
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating

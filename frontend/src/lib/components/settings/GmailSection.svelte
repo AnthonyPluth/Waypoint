@@ -29,11 +29,20 @@
   let connecting = $state(false);
   let leaving = $state<Mailbox | null>(null);
   let asking = $state(false);
+  let starting = $state<number | null>(null);
 
   async function load() {
     try { list = await apiCall<"GET /api/mailboxes">("/api/mailboxes"); problem = ""; }
     catch (err) { problem = errMsg(err); }
   }
+
+  // A scan runs on the server for a while: check on it until it's done.
+  const POLL_MS = 3000;
+  $effect(() => {
+    if (!list?.mailboxes?.some((m) => m.scanning)) return;
+    const timer = setInterval(load, POLL_MS);
+    return () => clearInterval(timer);
+  });
 
   onMount(() => {
     const code = new URLSearchParams(location.search).get("gmail");
@@ -50,6 +59,12 @@
     location.href = r.url;
   }, { busy: (on) => (connecting = on) });
 
+  const scan = (m: Mailbox) => act(async () => {
+    const r = await apiCall<"POST /api/mailboxes/{id}/scan">(`/api/mailboxes/${m.id}/scan`, { method: "POST", failed: "Couldn’t start the scan" });
+    if (!r.started) toast("A scan of this mailbox is already running.");
+    await load();
+  }, { busy: (on) => (starting = on ? m.id : null) });
+
   async function disconnect() {
     const m = leaving;
     if (!m) return false;
@@ -60,6 +75,9 @@
       await load();
     });
   }
+
+  /** When a scan finished, in the viewer's own time zone (it's a moment in time, unlike a booking's times). */
+  const scanned = (m: Mailbox) => (m.last_scan ? new Date(m.last_scan).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : null);
 
   const label = (m: Mailbox) => (m.status === "connected" ? "Connected" : m.status === "reconnect" ? "Reconnect" : "Couldn’t reach Google");
 </script>
@@ -84,10 +102,17 @@
             <p class="text-sm text-muted-foreground">
               {#if m.status === "connected"}Waypoint can read this mailbox, read-only.{:else}{m.last_error ?? "Waypoint can’t read this mailbox right now."}{/if}
             </p>
+            {#if m.scanning}
+              <p class="text-sm text-muted-foreground" role="status">Scanning for bookings…</p>
+            {:else if m.status !== "reconnect"}
+              <p class="text-sm text-muted-foreground">{scanned(m) ? `Last scanned ${scanned(m)}.` : "Not scanned yet."}</p>
+            {/if}
+            {#if m.scan_error}<p class="text-sm text-signal-ink" role="status">The last scan stopped: {m.scan_error} What it had read is kept, and the next scan carries on.</p>{/if}
           </div>
           <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <Badge variant={m.status === "connected" ? "outline" : "secondary"}>{label(m)}</Badge>
-            {#if m.status === "reconnect"}<Button disabled={connecting} onclick={connect}>Reconnect</Button>{/if}
+            {#if m.status === "reconnect"}<Button disabled={connecting} onclick={connect}>Reconnect</Button>
+            {:else}<Button variant="outline" disabled={m.scanning || starting === m.id} onclick={() => scan(m)}>{m.scanning ? "Scanning…" : "Scan now"}</Button>{/if}
             <Button variant="outline" onclick={() => { leaving = m; asking = true; }}>Disconnect</Button>
           </div>
         </div>

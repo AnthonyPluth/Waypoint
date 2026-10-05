@@ -16,7 +16,8 @@ from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_e
 from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
 from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loyalty_remove, api_loyalty_reveal
 from .api.people import api_people, api_person_add, api_person_edit, api_person_remove
-from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailboxes
+from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_scan, api_mailboxes
+from .api.review import api_review, api_review_dismiss, api_review_ignore, api_review_who
 from .api.state import api_state
 
 
@@ -53,6 +54,11 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/mailboxes/connect", api_mailbox_connect),
     ("GET", "/api/mailboxes/callback", api_mailbox_callback),
     ("DELETE", "/api/mailboxes/{id}", api_mailbox_disconnect),
+    ("POST", "/api/mailboxes/{id}/scan", api_mailbox_scan),
+    ("GET", "/api/review", api_review),
+    ("POST", "/api/review/who/{id}", api_review_who),
+    ("POST", "/api/review/{id}/ignore", api_review_ignore),
+    ("DELETE", "/api/review/{id}", api_review_dismiss),
     ("GET", "/api/state", api_state),
 ]
 

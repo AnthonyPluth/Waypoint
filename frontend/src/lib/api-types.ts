@@ -97,11 +97,18 @@ export interface Mailbox {
   status: "connected" | "reconnect" | "error";
   last_error: string | null;
   last_scan: string | null;
+  scan_error: string | null;
+  scanning: boolean;
 }
 
 export interface MailboxList {
   configured: boolean;
   mailboxes: Mailbox[];
+}
+
+export interface Matched {
+  ok: boolean;
+  matched: number;
 }
 
 export interface MergeBody {
@@ -148,6 +155,28 @@ export interface Restored {
 
 export interface Revealed {
   number: string;
+}
+
+export interface Review {
+  items: ReviewItem[];
+  who: WhoIsThis[];
+}
+
+/**
+ * One message Waypoint couldn't read, for the member whose mailbox it is. Never its subject or text: only who it
+ * came from and its day (Open in Gmail shows the message).
+ */
+export interface ReviewItem {
+  id: number;
+  address: string;
+  sender_domain: string;
+  received: string | null;
+  reason: "no_markup" | "incomplete" | "broken";
+  gmail_url: string;
+}
+
+export interface ScanStarted {
+  started: boolean;
 }
 
 /**
@@ -234,6 +263,7 @@ export interface State {
   database: "sqlite" | "postgres";
   user: SignedIn | null;
   last_backup: string | null;
+  review_count: number;
 }
 
 export interface Traveler {
@@ -272,6 +302,26 @@ export interface TripList {
   trips: Trip[];
 }
 
+/** Who a printed name is: a person in People, or a name to add as a guest. Send one. */
+export interface WhoBody {
+  person_id?: number;
+  new_guest?: string;
+}
+
+/** A name on a booking that isn't matched to a person, with the segment it's on. */
+export interface WhoIsThis {
+  id: number;
+  name: string;
+  segment_id: number;
+  trip_id: number;
+  kind: "flight" | "hotel" | "car" | "train";
+  provider: string | null;
+  origin: string | null;
+  destination: string | null;
+  start_local: string;
+  start_zone: string;
+}
+
 /** Each covered route ("METHOD /path", as in waypoint/server/routes.py): what it takes and what it answers. */
 export interface Endpoints {
   "POST /api/backup/inspect": { body: never; reply: BackupContents };
@@ -302,5 +352,10 @@ export interface Endpoints {
   "GET /api/mailboxes": { body: never; reply: MailboxList };
   "POST /api/mailboxes/connect": { body: never; reply: Started };
   "DELETE /api/mailboxes/{id}": { body: never; reply: Disconnected };
+  "POST /api/mailboxes/{id}/scan": { body: never; reply: ScanStarted };
+  "GET /api/review": { body: never; reply: Review };
+  "POST /api/review/who/{id}": { body: WhoBody; reply: Matched };
+  "POST /api/review/{id}/ignore": { body: never; reply: Ok };
+  "DELETE /api/review/{id}": { body: never; reply: Ok };
   "GET /api/state": { body: never; reply: State };
 }

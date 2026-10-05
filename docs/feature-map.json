@@ -57,11 +57,13 @@
       "handler": "waypoint/server/api/people.py:api_people",
       "web": [
         "frontend/src/pages/People.svelte",
+        "frontend/src/pages/Review.svelte",
         "frontend/src/pages/Trip.svelte",
         "frontend/src/pages/Trips.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mail_scan.py",
         "tests/test_people.py"
       ],
       "docs": [
@@ -222,7 +224,8 @@
       "path": "/api/segments",
       "handler": "waypoint/server/api/trips.py:api_segment_add",
       "web": [
-        "frontend/src/lib/components/SegmentForm.svelte"
+        "frontend/src/lib/components/SegmentForm.svelte",
+        "frontend/src/pages/Review.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -453,6 +456,81 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/api/mailboxes/{id}/scan",
+      "handler": "waypoint/server/api/mailboxes.py:api_mailbox_scan",
+      "web": [
+        "frontend/src/lib/components/settings/GmailSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/gmail"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/review",
+      "handler": "waypoint/server/api/review.py:api_review",
+      "web": [
+        "frontend/src/pages/Review.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/review/who/{id}",
+      "handler": "waypoint/server/api/review.py:api_review_who",
+      "web": [
+        "frontend/src/pages/Review.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/review/{id}/ignore",
+      "handler": "waypoint/server/api/review.py:api_review_ignore",
+      "web": [
+        "frontend/src/pages/Review.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/review/{id}",
+      "handler": "waypoint/server/api/review.py:api_review_dismiss",
+      "web": [
+        "frontend/src/pages/Review.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
       "method": "GET",
       "path": "/api/state",
       "handler": "waypoint/server/api/state.py:api_state",
@@ -465,6 +543,7 @@
         "tests/test_backup.py",
         "tests/test_http_pinned.py",
         "tests/test_http_server.py",
+        "tests/test_mail_scan.py",
         "tests/test_monitoring.py",
         "tests/test_security.py",
         "tests/test_server.py",

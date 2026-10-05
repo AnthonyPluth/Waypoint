@@ -123,3 +123,25 @@ def reveal(conn: db.Connection, loyalty_id: int) -> str | None:
         return secretbox.decrypt(row.number) or ""
     except secretbox.SecretError as e:
         raise Unreadable() from e
+
+
+def _plain(number: str) -> str:
+    return "".join(number.split()).replace("-", "").casefold()
+
+
+def person_for_number(conn: db.Connection, number: str) -> int | None:
+    """The person who has this loyalty or Known Traveler number (as printed on a booking), so a booking is matched to them
+    by it. None when no one does, or when the number is on more than one person. The numbers stay in here: only who
+    they belong to comes out."""
+    wanted = _plain(number)
+    if not wanted:
+        return None
+    found: set[int] = set()
+    for row in conn.orm.scalars(select(LoyaltyId)).all():
+        try:
+            saved = secretbox.decrypt(row.number) or ""
+        except secretbox.SecretError:
+            continue   # (a number this key can't unlock can't match)
+        if _plain(saved) == wanted:
+            found.add(row.person_id)
+    return found.pop() if len(found) == 1 else None

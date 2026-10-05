@@ -8,9 +8,10 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, select
 
-from ..storage import db
-from ..storage.models import FlightStatus, LoyaltyId, Person, Segment, SegmentTraveler, Trip, User
+from ..storage import db, secretbox
+from ..storage.models import FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentTraveler, Trip, User
 from . import loyalty, people, trips
+from .mail import review
 from .visibility import Viewer
 
 # A household of two who have signed in (sub, email, name, first name), and two guests who haven't a login.
@@ -35,7 +36,7 @@ MEMBERSHIPS = [
 ]
 
 
-# Four trips, dated from today (so there is always a past one, one in progress and some to come): the family's two (Jane
+# Four trips (and a fifth, read from an email, below), dated from today (so there is always a past one, one in progress and some to come): the family's two (Jane
 # booked them for Jane, Sam and Mia: one last month, one under way), and one each for Jane and Sam alone, so each member
 # sees three and the other's solo trip isn't among them (AGENTS.md, "You see the trips you're on").
 def _at(today: date, days: int, clock: str) -> str:
@@ -95,6 +96,15 @@ def _flight_status(today: date) -> dict[str, str]:
         "arr_zone": "America/New_York", "arr_terminal": "8",
     }
 
+# A flight Waypoint read from an email, for a traveller whose printed name nobody matches yet ("Who is this?" in Review).
+def _read_from_email(today: date) -> trips.SegmentIn:
+    return {"kind": "flight", "origin": "JFK", "destination": "ORD", "start_local": _at(today, 60, "07:00"), "end_local": _at(today, 60, "08:45"),
+            "confirmation": "CH3K5P", "provider": "Example Air", "details": {"flight_number": "EX 410"}}
+
+# The household's one connected mailbox, and two messages Waypoint couldn't read (sender's domain, days before today, why).
+DEMO_MAILBOX = "jane.doe@gmail.example"
+UNREAD: list[tuple[str, int, review.Reason]] = [("example-air.example", 21, "no_markup"), ("example-stays.example", 15, "incomplete")]
+
 
 def _on(*ids: int | None) -> list[trips.TravelerIn]:
     return [{"person_id": i, "name": None} for i in ids]
@@ -117,6 +127,13 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id)})
     for fields in _sam_alone(today):
         trips.add_segment(conn, sam, {**fields, "travelers": _on(sam.person_id)})
+    trips.add_segment(conn, jane, {**_read_from_email(today), "travelers": [{"person_id": None, "name": "RIVERA/ALEX MR"}]}, source="email")
+    box = Mailbox(owner_sub="local", address=DEMO_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
+                  status="connected", created=0.0, last_scan=None)
+    conn.orm.add(box)
+    conn.orm.flush()
+    for domain, ago, reason in UNREAD:
+        review.add(conn, box.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
     by_name = {p["display_name"]: p["id"] for p in people.everyone(conn)}
     for who, kind, program, number, tier, expiry, notes in MEMBERSHIPS:
         loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number, "tier": tier,
@@ -127,4 +144,4 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
 
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
-               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentTraveler, FlightStatus))
+               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentTraveler, FlightStatus, Mailbox, ReviewItem))

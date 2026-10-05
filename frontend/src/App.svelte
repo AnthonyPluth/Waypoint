@@ -9,6 +9,7 @@
   import * as Card from "$lib/components/ui/card";
   import { pageFor } from "$lib/nav";
   import People from "./pages/People.svelte";
+  import Review from "./pages/Review.svelte";
   import Settings from "./pages/Settings.svelte";
   import Trip from "./pages/Trip.svelte";
   import Trips from "./pages/Trips.svelte";
@@ -17,7 +18,7 @@
   import type { Component } from "svelte";
 
   // A route's page, by the names in lib/nav.ts. Anything else (an old bookmark, a typo) opens Upcoming.
-  const PAGES: Record<string, Component> = { upcoming: Upcoming, trips: Trips, trip: Trip, people: People, settings: Settings };
+  const PAGES: Record<string, Component> = { upcoming: Upcoming, trips: Trips, trip: Trip, people: People, review: Review, settings: Settings };
   const Page = $derived(PAGES[pageFor(route.page)]);
 </script>
 

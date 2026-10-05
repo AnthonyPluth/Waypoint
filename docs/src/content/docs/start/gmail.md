@@ -7,9 +7,7 @@ sidebar:
 
 Waypoint reads bookings from Gmail with a Google OAuth client that **you** create in your own Google Cloud project, so no one else’s app sits between your mailbox and your server. This page sets that up once for the household; after that, each member connects their own Gmail from **Settings → Gmail**.
 
-:::note[What’s here today]
-Connecting, disconnecting and the “Reconnect” state work. Scanning the mailbox for bookings isn’t built yet, so a connected Gmail isn’t read for anything until it is. What Waypoint will do with it is described under [Email scanning](/waypoint/privacy/email-scanning/).
-:::
+Once a Gmail is connected, Waypoint scans it for booking emails: see [Scanning](#scanning) below, and [Email scanning](/waypoint/privacy/email-scanning/) for what it will and won’t do with a mailbox.
 
 ## Create the client
 
@@ -45,6 +43,19 @@ Each member opens **Settings → Gmail** and chooses **Connect Gmail**, picks th
 - **Disconnect.** Waypoint tells Google to revoke its access, then deletes the connection. If Google can’t be reached it keeps the connection and says so, rather than showing it gone while it still works; try again, or remove Waypoint at the Google permissions page.
 - **When someone loses access.** A connection ends when the person who made it can no longer sign in to Waypoint (taken off `OIDC_ALLOWED_EMAILS`, or past their sign-in with `OIDC_ALLOWED_GROUPS`): Waypoint checks before every use and once an hour (and whenever anyone opens Settings), revokes the token at Google and deletes it.
 
+## Scanning
+
+Waypoint scans each connected mailbox in the background, every few hours (by the server’s own clock, `TZ`), and when you choose **Scan now** under the mailbox in Settings. A scan:
+
+1. **Searches on Google’s side** for mail from a list of airlines, hotel groups, rental companies, railways and booking sites that also says *confirmation*, *itinerary*, *reservation*, *e-ticket* or *booking*, leaving out Gmail’s Promotions. Mail that doesn’t match is never downloaded. The first scan looks back 18 months; later ones ask Gmail’s history what arrived since the last one ended.
+2. **Reads each match in memory** for the booking markup airlines and hotels add to their emails (schema.org `FlightReservation`, `LodgingReservation`, `RentalCarReservation` and `TrainReservation`, as JSON-LD or microdata), and throws the message away. Only the booking’s fields are kept.
+3. **Merges it into your trips.** A booking is one segment, identified by its kind, provider, confirmation code and legs, so a later email about the same booking updates it (marking it *changed*, or *cancelled*) rather than adding another; a field you edited by hand is never overwritten. The booking is yours: you booked it, so you see its trip, and so does anyone it names whom Waypoint can match to a person.
+4. **Sends what it can’t read to [Review](/waypoint/start/review/).**
+
+Each mailbox in Settings shows when its last scan finished. A scan that stops halfway (Google couldn’t be reached) keeps what it had read, leaves the last good state as it was, and says what failed there; the next one carries on. Waypoint remembers each message it has read by Gmail’s id, with nothing of its content, so no message is read twice. A stay or a rental needs a time zone: Waypoint works it out from the city and country in the booking, and when it can’t, the booking goes to Review rather than being given a guess.
+
+What Waypoint can’t do yet: read mail with no booking markup (per-sender parsers come later), and any sender outside its list.
+
 ## What Waypoint keeps
 
-Per connection: the Gmail address, a **refresh token** and where its scans had got to. The refresh token is encrypted with `WAYPOINT_SECRET_KEY` (in backups too), is decrypted only to refresh or revoke it, and never appears in logs or error pages. Access tokens are used for the one call that needs them and aren’t kept. A backup holds the connections, so restoring one needs the same key; otherwise the connections turn to **Reconnect**.
+Per connection: the Gmail address, a **refresh token** and where its scans had got to (the point in Gmail’s history, and when the last scan finished or what stopped it), plus the ids of the messages already read and the [Review](/waypoint/start/review/) items. The refresh token is encrypted with `WAYPOINT_SECRET_KEY` (in backups too), is decrypted only to refresh or revoke it, and never appears in logs or error pages. Access tokens are used for the one call that needs them and aren’t kept. A backup holds the connections, so restoring one needs the same key; otherwise the connections turn to **Reconnect**.

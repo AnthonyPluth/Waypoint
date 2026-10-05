@@ -495,7 +495,7 @@ class DemoTests(DbCase):
         jane = Viewer(people.person_for_sub(self.c, "demo-jane"))
         sam = Viewer(people.person_for_sub(self.c, "demo-sam"))
         names = {who: [t["name"] for t in trips.listing(self.c, who)] for who in (jane, sam)}
-        self.assertEqual(len(names[jane]), 3)
+        self.assertEqual(len(names[jane]), 4)   # the family's two trips, her own, and the one read from an email for a name nobody matches
         self.assertEqual(len(names[sam]), 3)
         self.assertEqual(len(set(names[jane]) & set(names[sam])), 2)   # the family's two trips are both's; each has a solo one
         for t in trips.listing(self.c, Viewer(None, household=True)):

@@ -8,7 +8,7 @@ import { app, boot, checkIn, editing, refreshState, route, setQuery, whenBooted 
 import type { AppState } from "./types";
 
 const state = (extra: Partial<AppState> = {}): AppState =>
-  ({ version: "1.0", database: "sqlite", user: null, last_backup: null, ...extra });
+  ({ version: "1.0", database: "sqlite", user: null, last_backup: null, review_count: 0, ...extra });
 beforeEach(() => {
   vi.mocked(api).mockReset(); vi.mocked(newPage).mockClear();
   app.state = null; app.bootError = ""; app.sessionExpired = false;
