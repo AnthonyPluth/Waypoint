@@ -69,6 +69,7 @@ class Mailbox(TypedDict):
     last_scan: str | None           # when a scan last finished, with its UTC offset
     scan_error: str | None          # what the last scan couldn't do (the last good state is kept); null once one finishes
     scanning: bool                  # a scan is running now
+    scan_notice: str | None         # why the last scan couldn't start (nothing was recorded; it isn't a failed scan), until one does
 
 
 class MailboxList(TypedDict):

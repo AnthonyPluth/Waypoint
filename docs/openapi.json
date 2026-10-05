@@ -1681,6 +1681,12 @@
           },
           "scanning": {
             "type": "boolean"
+          },
+          "scan_notice": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -1690,7 +1696,8 @@
           "last_error",
           "last_scan",
           "scan_error",
-          "scanning"
+          "scanning",
+          "scan_notice"
         ],
         "additionalProperties": false
       },
