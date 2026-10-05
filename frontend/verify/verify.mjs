@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 
 export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 } };
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings"];
+export const SCHEMES = ["light", "dark"];   // a flow's colour scheme (the app follows the device's: prefers-color-scheme)
 
 /** The browser to launch: the Chromium preinstalled under PLAYWRIGHT_BROWSERS_PATH (or /opt/pw-browsers) when there is
  *  one, whatever its revision, otherwise undefined (Playwright's own download). */
@@ -48,6 +49,7 @@ export function flowProblems(flow) {
   }
   if (flow?.page !== undefined && !PAGES.includes(flow.page)) out.push(`unknown page ${flow.page}`);
   for (const v of flow?.viewports ?? []) if (!(v in VIEWPORTS)) out.push(`unknown viewport ${v}`);
+  if (flow?.scheme !== undefined && !SCHEMES.includes(flow.scheme)) out.push(`unknown scheme ${flow.scheme}`);
   return out;
 }
 
@@ -104,8 +106,8 @@ async function main() {
   const notes = [];      // what's only reported
   const results = [];
 
-  async function visit(label, viewport, work) {
-    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport] });
+  async function visit(label, viewport, work, scheme = "light") {
+    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: scheme });
     const page = await ctx.newPage();
     const where = `${label} @ ${viewport}`;
     const consoleErrors = [];
@@ -148,7 +150,7 @@ async function main() {
         await page.goto(`${base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
         for (const step of flow.steps) await runStep(page, step, (n) => shot(`flow-${flow.name}-${n}`));
         await shot(`flow-${flow.name}`);
-      });
+      }, flow.scheme);
     }
   }
   await browser.close();

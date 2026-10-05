@@ -3,12 +3,13 @@
   import { apiCall } from "$lib/contract";
   import type { Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
+  import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
-  import { dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, headline, nextUp, startAt, START_WORD, subline, tripDays, untimed, viewerZone, when } from "$lib/trips";
+  import { dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, headline, nextUp, startAt, START_WORD, subline, timesDiffer, tripDays, untimed, viewerZone, when } from "$lib/trips";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
 
   // The next thing on your trips (a card), then the trip it belongs to, day by day. A failed load leaves nothing drawn that
@@ -57,6 +58,7 @@
 {:else}
   {#if next}
     {@const s = next.segment}
+    {@const differ = timesDiffer(next.bookings)}
     <section class="pass mb-8" aria-labelledby="next-title">
       <div class="flex flex-col gap-3 p-6 md:p-8">
         <p class="eyebrow">{next.state === "now" ? "Under way" : "Next up"}</p>
@@ -69,13 +71,26 @@
       </div>
       <div class="pass-tear" aria-hidden="true"></div>
       <dl class="grid grid-cols-2 gap-x-4 gap-y-3 p-6 text-sm md:p-8">
-        <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
-          <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} zone={s.start_zone} />{/if}</dd></div>
-        <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
-          <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</dd></div>
+        {#if differ}
+          <div class="col-span-2"><dt class="eyebrow">Times</dt>
+            <dd class="mt-1 flex flex-col gap-1 text-base font-medium">
+              <span><Badge variant="secondary">Times differ between bookings</Badge></span>
+              {#each next.bookings as b (b.id)}
+                <span>{b.confirmation ? `${b.confirmation}: ` : ""}{START_WORD[b.kind].toLowerCase()} {dayLabel(b.start_local)}, <PlaceTime local={b.start_local} zone={b.start_zone} />, {END_WORD[b.kind].toLowerCase()} {dayLabel(b.end_local)}, <PlaceTime local={b.end_local} zone={b.end_zone} /></span>
+              {/each}
+            </dd></div>
+        {:else}
+          <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
+            <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} zone={s.start_zone} />{/if}</dd></div>
+          <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
+            <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</dd></div>
+        {/if}
         {#if s.details.terminal}<div><dt class="eyebrow">Terminal</dt><dd class="mt-1 text-base font-medium">{s.details.terminal}</dd></div>{/if}
         {#if s.kind === "hotel" && s.details.address}<div class="col-span-2"><dt class="eyebrow">Address</dt><dd class="mt-1 break-words text-base font-medium">{s.details.address}</dd></div>{/if}
-        {#if s.confirmation}<div><dt class="eyebrow">Confirmation</dt><dd class="mt-1 text-lg"><CopyCode code={s.confirmation} /></dd></div>{/if}
+        {#if next.bookings.some((b) => b.confirmation)}
+          <div><dt class="eyebrow">{next.bookings.length > 1 ? "Confirmations" : "Confirmation"}</dt>
+            <dd class="mt-1 flex flex-wrap gap-x-3 text-lg">{#each next.bookings as b (b.id)}{#if b.confirmation}<CopyCode code={b.confirmation} />{/if}{/each}</dd></div>
+        {/if}
       </dl>
       <div class="px-6 pb-6 md:px-8 md:pb-8"><Button href={`#trip/${s.trip_id}`} variant="outline" size="sm">Open {next.trip.name}</Button></div>
     </section>
@@ -97,6 +112,7 @@
                 <div class="min-w-0 flex-1">
                   <p class="break-words font-medium" class:line-through={seg.status === "cancelled"}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${headline(seg)}` : headline(seg)}</p>
                   {#if item.role === "start" && subline(seg)}<p class="break-words text-sm text-muted-foreground">{subline(seg)}</p>{/if}
+                  {#if item.role === "start" && item.bookings.length > 1}<p class="text-sm text-muted-foreground">{item.bookings.length} bookings{timesDiffer(item.bookings) ? " · times differ between bookings" : ""}</p>{/if}
                 </div>
                 <p class="text-sm font-medium">
                   {#if untimed(seg)}<span class="text-muted-foreground">time not recorded</span>

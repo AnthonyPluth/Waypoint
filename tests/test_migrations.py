@@ -14,6 +14,11 @@ from waypoint.storage.models import Setting, User
 from tests.shared import database_path
 
 
+def json_list(raw):
+    import json
+    return json.loads(raw)
+
+
 def drift(path):
     """Differences between the database and schema.py, as Alembic's autogenerate would see them."""
     with open(os.path.join(os.path.dirname(db.__file__), "migrations", "env.py")) as f:
@@ -309,6 +314,68 @@ class MigrationTests(unittest.TestCase):
             self.assertNotIn("airlines", sa.inspect(c).get_table_names())
             self.assertIn("scanned_messages", sa.inspect(c).get_table_names())
 
+    def test_0012_makes_the_recipients_table_and_merges_the_duplicate_segments(self):
+        from alembic import command
+        db.init(self.path)
+        seg = dict(kind="flight", status="confirmed", provider="American Airlines", start_zone="America/New_York",
+                   end_zone="Europe/London", origin="JFK", destination="LHR", source="email", locked_fields=None, manage_url=None)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0011")
+            self.assertNotIn("segment_recipients", sa.inspect(c).get_table_names())
+            for i, name in ((1, "Jane"), (2, "Sam"), (3, "Mia")):
+                c.execute(insert(schema.people).values(id=i, display_name=name))
+            for i, booker in ((1, 1), (2, 2)):
+                c.execute(insert(schema.trips).values(id=i, name=f"Trip {i}", auto=True, booked_by=booker))
+            c.execute(insert(schema.segments), [
+                # the oldest, on Jane's trip; a copy from Sam's mailbox on his own trip, the same flight written another way,
+                # cancelled and with an edit of its own; and a copy on Jane's trip changed by hand.
+                {**seg, "id": 1, "trip_id": 1, "booked_by": 1, "confirmation": "ZQ4PXD", "start_local": "2026-06-01T19:00",
+                 "end_local": "2026-06-02T07:10", "details": '{"flight_number": "AA 4001", "seat": "12A"}', "locked_fields": '["seat"]'},
+                {**seg, "id": 2, "trip_id": 2, "booked_by": 2, "confirmation": "zq4pxd ", "provider": "American Airlines Inc.",
+                 "start_local": "2026-06-01T19:00", "end_local": "2026-06-02T07:10", "status": "cancelled",
+                 "details": '{"flight_number": "AA04001", "seat": "30D"}', "locked_fields": '["manage_url", "seat"]',
+                 "manage_url": "https://example.com/manage/mine"},
+                {**seg, "id": 3, "trip_id": 1, "booked_by": 1, "confirmation": "ZQ4PXD", "start_local": "2026-06-01T19:00",
+                 "end_local": "2026-06-02T07:10", "details": '{"flight_number": "AA 4001"}'},
+                # not duplicates: another code on the same flight, the same code on another flight, and one with no code
+                {**seg, "id": 4, "trip_id": 1, "booked_by": 1, "confirmation": "QW9ERT", "start_local": "2026-06-01T19:00",
+                 "end_local": "2026-06-02T07:10", "details": '{"flight_number": "AA 4001"}'},
+                {**seg, "id": 5, "trip_id": 1, "booked_by": 1, "confirmation": "ZQ4PXD", "start_local": "2026-06-01T19:00",
+                 "end_local": "2026-06-02T07:10", "details": '{"flight_number": "AA 4002"}'},
+                {**seg, "id": 6, "trip_id": 1, "booked_by": 1, "confirmation": None, "start_local": "2026-06-01T19:00",
+                 "end_local": "2026-06-02T07:10", "details": '{"flight_number": "AA 4001"}'}])
+            c.execute(insert(schema.segment_travelers), [
+                {"segment_id": 1, "person_id": 1, "name": None}, {"segment_id": 2, "person_id": 1, "name": None}, {"segment_id": 2, "person_id": 3, "name": None},
+                {"segment_id": 2, "person_id": None, "name": "ROE/ALEX MR"}, {"segment_id": 3, "person_id": None, "name": "Roe/Alex Mr"},
+                {"segment_id": 1, "person_id": None, "name": "roe/alex mr"}])
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:
+            kept = {r["id"]: r for r in db.rows(conn.execute(select(schema.segments).order_by(schema.segments.c.id)))}
+            self.assertEqual(set(kept), {1, 4, 5, 6})   # the oldest of each leg stays
+            one = kept[1]
+            self.assertEqual((one["trip_id"], one["booked_by"], one["provider"], one["status"]), (1, 1, "American Airlines", "cancelled"))
+            self.assertEqual(one["details"], '{"flight_number": "AA 4001", "seat": "12A"}')   # (the oldest's seat: both locked it)
+            self.assertEqual(json_list(one["locked_fields"]), ["manage_url", "seat"])          # (the other's edit is kept and locked)
+            self.assertEqual(one["manage_url"], "https://example.com/manage/mine")
+            travelers = db.rows(conn.execute(select(schema.segment_travelers).order_by(schema.segment_travelers.c.id)))
+            on = sorted((t["person_id"] or 0, (t["name"] or "").casefold()) for t in travelers if t["segment_id"] == 1)
+            self.assertEqual(on, [(0, "roe/alex mr"), (1, ""), (3, "")])   # (everyone once)
+            self.assertEqual([t for t in travelers if t["segment_id"] in (2, 3)], [])
+            # Sam booked the copy on his own trip, which is now empty and goes; he still sees the booking as a recipient.
+            self.assertEqual([t["id"] for t in db.rows(conn.execute(select(schema.trips)))], [1])
+            self.assertEqual([(r["segment_id"], r["person_id"]) for r in db.rows(conn.execute(select(schema.segment_recipients)))], [(1, 2)])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0011")
+            self.assertNotIn("segment_recipients", sa.inspect(c).get_table_names())
+            command.upgrade(db.alembic_config(c), "head")
+        with db.session(self.path) as conn:   # (up again on what's left: nothing more to merge, and the table is empty)
+            self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.segment_recipients)).scalar(), 0)
+            self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 4)
+        with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:
+            conn.execute(insert(schema.segment_recipients).values(segment_id=1, person_id=2))
+            conn.execute(insert(schema.segment_recipients).values(segment_id=1, person_id=2))   # (once each)
+
     def test_0011_adds_the_check_times_flag_to_segments_and_takes_it_away(self):
         from alembic import command
         db.init(self.path)
@@ -319,7 +386,7 @@ class MigrationTests(unittest.TestCase):
             c.execute(insert(schema.segments).values(trip_id=1, kind="flight", status="confirmed", start_local="2026-12-04T09:00",
                                                      start_zone="America/Chicago", end_local="2026-12-04T11:10", end_zone="America/Denver",
                                                      origin="ORD", destination="DEN", source="email"))
-            command.upgrade(db.alembic_config(c), "0011")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:   # a segment from before has no note to check
             self.assertEqual(conn.execute(select(schema.segments.c.check_times)).scalar(), False)

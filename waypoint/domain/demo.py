@@ -97,6 +97,19 @@ def _family_two_years_ago(today: date) -> list[trips.SegmentIn]:
     ]
 
 
+# Grandma Joan flies with the family on the same flights, on a reservation of her own: the trip shows each flight once, with a block
+# for each booking.
+def _joan(today: date) -> list[trips.SegmentIn]:
+    return [
+        {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": _at(today, -2, "19:00"), "end_local": _at(today, -1, "07:10"),
+         "confirmation": "MW5T9Z", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy"},
+         "manage_url": "https://example.com/manage/MW5T9Z"},
+        {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": _at(today, 4, "11:30"), "end_local": _at(today, 4, "14:35"),
+         "confirmation": "MW5T9Z", "provider": "American Airlines", "details": {"flight_number": "AA 102", "terminal": "3"},
+         "manage_url": "https://example.com/manage/MW5T9Z"},
+    ]
+
+
 def _jane_alone(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": _at(today, 20, "08:00"), "end_local": _at(today, 20, "11:20"),
@@ -151,8 +164,12 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
         people.ensure_member(conn, sub, name, first)
     guests = [people.add_guest(conn, guest)["id"] for guest in GUESTS]
     jane, sam = (Viewer(people.person_for_sub(conn, sub)) for sub in ("demo-jane", "demo-sam"))
+    now_trip = None
     for fields in (*_family_two_years_ago(today), *_family_last_year(today), *_family_past(today), *_family_now(today)):
-        trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0])})
+        added = trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0])})
+        now_trip = added["trip_id"] if added and (fields.get("details") or {}).get("flight_number") == "AA 102" else now_trip
+    for fields in _joan(today):
+        trips.add_segment(conn, jane, {**fields, "travelers": _on(guests[1])}, now_trip)
     for fields in _jane_alone(today):
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id)})
     for fields in _sam_alone(today):

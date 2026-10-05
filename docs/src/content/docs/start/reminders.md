@@ -22,7 +22,7 @@ Notifications go through your browser’s own push service (Google’s, Apple’
 
 ## Calendar feed
 
-**Make my calendar address** gives you a private address that your calendar app (Apple Calendar, Google Calendar, Outlook, …) can subscribe to. It holds the trips you can see, each flight, stay, car and train as an event.
+**Make my calendar address** gives you a private address that your calendar app (Apple Calendar, Google Calendar, Outlook, …) can subscribe to. It holds the trips you can see, each flight, stay, car and train as an event (a flight booked on two reservations is one event, listing both confirmation codes).
 
 - **Times are where they happen.** Each event’s start and end carry the time zone of their own place, so a flight that leaves Auckland at 22:15 and lands in Los Angeles at 15:10 the same day shows exactly that, wherever your calendar is.
 - **The address is shown once.** It holds a random key; Waypoint keeps only a hash of it, so it can’t show it again. Make a **new address** if you lose it: the old one stops working at once.

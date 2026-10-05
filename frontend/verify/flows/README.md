@@ -15,7 +15,7 @@ Each `*.json` file here is a flow that `make verify` runs after visiting the pag
 }
 ```
 
-- `page` is the route the flow starts on (default `upcoming`); `viewports` defaults to all three.
+- `page` is the route the flow starts on (default `upcoming`); `viewports` defaults to all three; `scheme` is `light` (the default) or `dark`, the colour scheme the browser asks for (the app follows it).
 - A step has one action, and an optional `timeout` in milliseconds (default 10000). Selectors are [Playwright selectors](https://playwright.dev/docs/other-locators) (CSS, `text=…`, `role=…`).
   - `{"goto": "#route"}` opens a route of the app (or a full URL).
   - `{"click": selector}`, `{"fill": {"selector": …, "text": …}}`, `{"press": {"selector": …, "key": "Enter"}}`.
