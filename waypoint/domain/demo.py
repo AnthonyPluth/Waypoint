@@ -36,7 +36,7 @@ MEMBERSHIPS = [
 ]
 
 
-# Four trips, dated from today (so there is always a past one, one in progress and some to come): the family's two (Jane
+# Four trips (and a fifth, read from an email, below), dated from today (so there is always a past one, one in progress and some to come): the family's two (Jane
 # booked them for Jane, Sam and Mia: one last month, one under way), and one each for Jane and Sam alone, so each member
 # sees three and the other's solo trip isn't among them (AGENTS.md, "You see the trips you're on").
 def _at(today: date, days: int, clock: str) -> str:
@@ -87,14 +87,13 @@ def _sam_alone(today: date) -> list[trips.SegmentIn]:
 
 
 # A flight Waypoint read from an email, for a traveller whose printed name nobody matches yet ("Who is this?" in Review).
-READ_FROM_EMAIL: trips.SegmentIn = {
-    "kind": "flight", "origin": "JFK", "destination": "ORD", "start_local": "2027-02-03T07:00", "end_local": "2027-02-03T08:45",
-    "confirmation": "CH3K5P", "provider": "Example Air", "details": {"flight_number": "EX 410"}}
+def _read_from_email(today: date) -> trips.SegmentIn:
+    return {"kind": "flight", "origin": "JFK", "destination": "ORD", "start_local": _at(today, 60, "07:00"), "end_local": _at(today, 60, "08:45"),
+            "confirmation": "CH3K5P", "provider": "Example Air", "details": {"flight_number": "EX 410"}}
 
-# The household's one connected mailbox, and two messages Waypoint couldn't read (sender's domain, day, why).
+# The household's one connected mailbox, and two messages Waypoint couldn't read (sender's domain, days before today, why).
 DEMO_MAILBOX = "jane.doe@gmail.example"
-UNREAD: list[tuple[str, str, review.Reason]] = [("example-air.example", "2026-09-14", "no_markup"),
-                                                  ("example-stays.example", "2026-09-20", "incomplete")]
+UNREAD: list[tuple[str, int, review.Reason]] = [("example-air.example", 21, "no_markup"), ("example-stays.example", 15, "incomplete")]
 
 
 def _on(*ids: int | None) -> list[trips.TravelerIn]:
@@ -118,13 +117,13 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id)})
     for fields in _sam_alone(today):
         trips.add_segment(conn, sam, {**fields, "travelers": _on(sam.person_id)})
-    trips.add_segment(conn, jane, {**READ_FROM_EMAIL, "travelers": [{"person_id": None, "name": "RIVERA/ALEX MR"}]}, source="email")
+    trips.add_segment(conn, jane, {**_read_from_email(today), "travelers": [{"person_id": None, "name": "RIVERA/ALEX MR"}]}, source="email")
     box = Mailbox(owner_sub="local", address=DEMO_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
-                  status="connected", created=0.0, last_scan=1_790_000_000.0)
+                  status="connected", created=0.0, last_scan=None)
     conn.orm.add(box)
     conn.orm.flush()
-    for domain, day, reason in UNREAD:
-        review.add(conn, box.id, f"demo-{domain}", domain, day, reason, 0.0)
+    for domain, ago, reason in UNREAD:
+        review.add(conn, box.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
     by_name = {p["display_name"]: p["id"] for p in people.everyone(conn)}
     for who, kind, program, number, tier, expiry, notes in MEMBERSHIPS:
         loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number, "tier": tier,
