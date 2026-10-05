@@ -55,6 +55,9 @@ class Result:
 
 _running: set[int] = set()
 _lock = threading.Lock()
+# One message is filed at a time across every mailbox: two members' scans running together, with the same confirmation in both,
+# would each find no segment yet and add one. (A message's filing is quick; fetching it, the slow part, stays in parallel.)
+_filing = threading.Lock()
 # Why a mailbox's last scan couldn't start, until the next one does (never recorded as a failed run). Kept in this process, as a
 # note and not a record: a restart forgets it, and the next scan says it again if it still holds.
 _notices: dict[int, str] = {}
@@ -274,7 +277,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Resu
                         _record(conn, mailbox_id, message_id, IGNORED, now)
                 continue
             try:
-                with db.session() as conn:
+                with _filing, db.session() as conn:
                     a, b = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again)
             except Exception as e:
                 if db.is_busy(e):

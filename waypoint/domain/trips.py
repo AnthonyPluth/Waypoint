@@ -48,6 +48,9 @@ FIELDS = ("kind", "status", "confirmation", "provider", "start_local", "start_zo
 TIME_FIELDS = ("start_local", "start_zone", "end_local", "end_zone")   # (a person who looks at these has settled them)
 GAP_DAYS = 2    # a segment this many days or fewer from a trip (before or after it) can belong to it
 AWAY_DAYS = 60  # and one that carries on from where an unfinished trip's last leg landed (the way back), this many
+FLIGHT_NUMBER = re.compile(r"([A-Z0-9]{2,3}?)0*(\d{1,4}[A-Z]?)")   # carrier code, then the number without its leading zeros
+COMPANY_SUFFIXES = frozenset({"inc", "incorporated", "ltd", "limited", "llc", "plc", "corp", "corporation", "co", "company",
+                              "gmbh", "ag", "sa", "bv"})
 LOCAL_TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d(:\d\d)?")
 IATA = re.compile(r"[A-Za-z]{3}")
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -130,6 +133,60 @@ class TripOut(TypedDict):
     auto: bool
     booked_by: int | None
     segments: list[SegmentOut]
+
+
+# ------------------------------------------------------------------------------------------------ the same booking, written another way
+
+def flight_key(number: str | None) -> str | None:
+    """A flight number as one flight has it however it's written (carrier code and number, no spaces, no leading zeros,
+    upper case): "AA 4001", "aa4001" and "AA04001" are all AA4001. None for text that isn't one."""
+    n = re.sub(r"[\s-]", "", number or "").upper()
+    found = FLIGHT_NUMBER.fullmatch(n)
+    return f"{found.group(1)}{found.group(2)}" if found else None
+
+
+def provider_key(name: str | None) -> str:
+    """A company's name without case, punctuation, spacing or a trailing "Inc." or "Ltd": "American Airlines, Inc." and
+    "AMERICAN AIRLINES" are the same."""
+    words = re.sub(r"[^\w\s]", " ", (name or "").casefold()).split()
+    while len(words) > 1 and words[-1] in COMPANY_SUFFIXES:
+        words.pop()
+    return " ".join(words)
+
+
+def _text_key(text: str | None) -> str:
+    return " ".join((text or "").split()).casefold()
+
+
+def _code_key(code: str | None) -> str:
+    return re.sub(r"\s+", "", code or "").casefold()
+
+
+def flight_group_key(seg: SegmentOut) -> tuple[str, str, str, str] | None:
+    """What makes bookings the same flight: its flight number (`flight_key`), local departure date and airports. None for
+    anything but a flight that has a number: hotels and cars are never grouped."""
+    number = flight_key(seg["details"].get("flight_number")) if seg["kind"] == "flight" else None
+    if number is None:
+        return None
+    return number, seg["start_local"][:10], (seg["origin"] or "").upper(), (seg["destination"] or "").upper()
+
+
+def flight_groups(segs: Sequence[SegmentOut]) -> list[list[SegmentOut]]:
+    """These segments with the bookings of one flight together (each booking keeps its own segment; this is how the calendar
+    feed, the reminders and the screens count a flight once), in the order each group first appears. Everything that isn't a
+    numbered flight is a group of its own."""
+    groups: list[list[SegmentOut]] = []
+    by_key: dict[tuple[str, str, str, str], list[SegmentOut]] = {}
+    for seg in segs:
+        key = flight_group_key(seg)
+        if key is not None and key in by_key:
+            by_key[key].append(seg)
+            continue
+        group = [seg]
+        groups.append(group)
+        if key is not None:
+            by_key[key] = group
+    return groups
 
 
 # ------------------------------------------------------------------------------------------------ times and fields
@@ -524,33 +581,35 @@ EMAIL_MERGE_DAYS = 3   # an email updates a segment whose start is this many day
 
 
 def _same_leg(seg: Segment, values: Mapping[str, str | None], details: Mapping[str, str]) -> bool:
-    """Whether a stored segment is the booking's leg: the same kind and a confirmation code that both have, the same provider
-    when both have one, the same places (a flight's airports, a stay's hotel), the same flight number when both have one,
-    and a start within EMAIL_MERGE_DAYS of its own. A booking with no code is never taken for another segment."""
-    def same(a: str | None, b: str | None) -> bool:
-        return (a or "").casefold() == (b or "").casefold()
-    mine = decode_details(seg.details).get("flight_number")
-    theirs = details.get("flight_number")
+    """Whether a stored segment is the booking's leg: the same kind and a confirmation code that both have, the same places (a
+    flight's airports, a stay's hotel), a start within EMAIL_MERGE_DAYS of its own, and the same flight number when both
+    have one (written any way: `flight_key`). Providers are compared after `provider_key` when both have one, except that
+    two flight numbers already name the carrier. A booking with no code is never taken for another segment."""
+    mine, theirs = flight_key(decode_details(seg.details).get("flight_number")), flight_key(details.get("flight_number"))
     near = abs((date.fromisoformat(seg.start_local[:10]) - date.fromisoformat((values["start_local"] or "")[:10])).days) <= EMAIL_MERGE_DAYS
-    return (bool(values["confirmation"]) and near and seg.kind == values["kind"] and same(seg.confirmation, values["confirmation"])
-            and (not mine or not theirs or same(mine.replace(" ", ""), theirs.replace(" ", "")))
-            and (not seg.provider or not values["provider"] or same(seg.provider, values["provider"]))
-            and same(seg.origin, values["origin"]) and same(seg.destination, values["destination"]))
+    providers = bool(mine and theirs) or not seg.provider or not values["provider"] or provider_key(seg.provider) == provider_key(values["provider"])
+    return (bool(values["confirmation"]) and near and seg.kind == values["kind"]
+            and _code_key(seg.confirmation) == _code_key(values["confirmation"])
+            and (not mine or not theirs or mine == theirs) and providers
+            and _text_key(seg.origin) == _text_key(values["origin"]) and _text_key(seg.destination) == _text_key(values["destination"]))
 
 
 def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
                         again: bool = False) -> Literal["added", "updated", "unchanged"]:
-    """Put a booking read from the viewer's mail among their segments: the segment of the same (kind, provider,
-    confirmation, leg) that they can see takes what the email says, except the fields a person edited (`locked_fields`);
-    when there is none, a new one is added as the viewer's, grouped into a trip as `add_segment` does. A booking whose
+    """Put a booking read from the viewer's mail among the household's segments: the segment of the same (kind, provider,
+    confirmation, leg) takes what the email says, except the fields a person edited (`locked_fields`), whoever booked it. When
+    the viewer can't see that segment's trip they are noted as having received its confirmation (`visibility.note_recipient`).
+    With no such segment, a new one is added as the viewer's, grouped into a trip as `add_segment` does. A booking whose
     times moved is marked changed, one the email cancels cancelled; the people on it are added, never removed. `again`: the
     message was read again (Read bookings again), so a time that differs is the reading corrected, not the airline's change. A
     booking whose times couldn't be settled (`check_times`) is flagged, until a person edits or confirms them. Raises Invalid
     when the booking can't be a segment."""
     values = check(conn, fields)
     day = (values["start_local"] or "")[:10]
-    found = sorted((s for s in visibility.visible_segments(conn, viewer) if _same_leg(s, values, fields.get("details") or {})),
-                   key=lambda s: abs((date.fromisoformat(s.start_local[:10]) - date.fromisoformat(day)).days))
+    found = [s for s in visibility.household_segments(conn, values["kind"] or "") if _same_leg(s, values, fields.get("details") or {})]
+    if len(found) > 1:   # (the nearest in time, then one the viewer already sees, then the oldest)
+        seen = {s.id for s in visibility.visible_segments(conn, viewer)}
+        found.sort(key=lambda s: (abs((date.fromisoformat(s.start_local[:10]) - date.fromisoformat(day)).days), s.id not in seen, s.id))
     if not found:
         added = add_segment(conn, viewer, fields, source="email")
         if added is None:   # (no trip was named, so one is always found or made)
@@ -560,7 +619,22 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
     old: list[TravelerIn] = [{"person_id": t.person_id, "name": t.name} for t in conn.orm.scalars(
         select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id).order_by(SegmentTraveler.id)).all()]
     locked = decode_locked(seg.locked_fields)
-    incoming = unlocked({**fields, "details": {**decode_details(seg.details), **(fields.get("details") or {})}}, locked)
+    # (an email that doesn't say who runs the booking or where to manage it doesn't take what the segment has away)
+    given: SegmentIn = {**fields}
+    if given.get("provider") is None:
+        given.pop("provider", None)
+    if given.get("manage_url") is None:
+        given.pop("manage_url", None)
+    stored = decode_details(seg.details)
+    said = {**stored, **(fields.get("details") or {})}
+    if flight_key(stored.get("flight_number")) is not None and flight_key(stored.get("flight_number")) == flight_key(said.get("flight_number")):
+        said["flight_number"] = stored["flight_number"]   # (the same number written another way isn't a change)
+    named = given.get("provider")
+    if seg.provider and named:
+        code = named.strip().upper()   # (an airline given as its code, "AA", is the one the number names)
+        if provider_key(seg.provider) == provider_key(named) or (len(code) <= 3 and (flight_key(said.get("flight_number")) or "").startswith(code)):
+            given["provider"] = seg.provider
+    incoming = unlocked({**given, "details": said}, locked)
     if "status" not in locked and incoming.get("status") != "cancelled":
         moved = any(values[f] != getattr(seg, f) for f in ("start_local", "start_zone", "end_local", "end_zone", "origin", "destination"))
         if moved and not again and "start_local" not in locked and "end_local" not in locked:
@@ -585,6 +659,7 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
             _set_travelers(conn, seg.id, [*old, *extra])
             changed.append("travelers")
     conn.orm.flush()
+    visibility.note_recipient(conn, viewer, seg)
     trip = conn.orm.get(Trip, seg.trip_id)
     if trip:
         refresh(conn, trip)

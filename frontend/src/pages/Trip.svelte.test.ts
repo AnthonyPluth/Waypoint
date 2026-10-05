@@ -13,8 +13,8 @@ import { flightStatus } from "$lib/flightstatus.svelte";
 import { membership, segment, trip } from "../test/fixtures";
 import TripPage from "./Trip.svelte";
 
-const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true };
-const sam: Person = { id: 2, display_name: "Sam Doe", first_name: "Sam", legal_name: null, aliases: [], member: true };
+const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
+const sam: Person = { id: 2, display_name: "Sam Doe", first_name: "Sam", legal_name: null, aliases: [], member: true, links: [] };
 const flight = segment({ id: 1, locked_fields: ["terminal"], manage_url: "https://example.com/manage", links: { app: "https://example.com/manage", directions: null, call: null },
   travelers: [{ id: 1, person_id: 1, name: "Jane Doe" }, { id: 2, person_id: 2, name: "Sam Doe" }, { id: 3, person_id: null, name: "DOE/MIA MISS" }] });
 const stay = segment({ id: 2, kind: "hotel", provider: "Marriott", origin: "Harbour Hotel", destination: null, start_local: "2026-11-21T15:00", start_zone: "Europe/London",
@@ -256,5 +256,51 @@ describe("Trip", () => {
     await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2", { method: "DELETE" }));
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Harbour Hotel" })).toBeNull());
+  });
+
+  describe("a flight on two bookings", () => {
+    const sams = segment({ id: 5, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, manage_url: "https://example.com/manage/b",
+      links: { app: "https://example.com/manage/b", directions: null, call: null }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe" }] });
+    beforeEach(() => { held = trip([flight, sams, stay]); });
+
+    it("is one card for the flight with a block for each booking: its code, its travellers, its own Edit and Remove", async () => {
+      render(TripPage);
+      const list = await screen.findByRole("list", { name: "Bookings" });
+      const cards = within(list).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+      expect(cards).toHaveLength(2);   // (the flight once, then the stay)
+      expect(within(cards[0]).getAllByRole("heading", { name: "JFK → LHR" })).toHaveLength(1);
+      const blocks = within(cards[0]).getAllByRole("listitem").filter((li) => li.hasAttribute("data-booking"));
+      expect(blocks).toHaveLength(2);
+      expect(within(blocks[0]).getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
+      expect(within(blocks[0]).getByText("Jane Doe")).toBeInTheDocument();
+      expect(within(blocks[0]).queryByText("Sam Doe")).toBeInTheDocument();   // (flight's own travellers: Jane, Sam and a printed name)
+      expect(within(blocks[1]).getByRole("button", { name: "Copy confirmation code BBBBBB" })).toBeInTheDocument();
+      expect(within(blocks[1]).getByText("Sam Doe")).toBeInTheDocument();
+      expect(within(blocks[1]).queryByText("Jane Doe")).toBeNull();
+      expect(within(blocks[1]).getByRole("link", { name: /Manage booking|Open in app/ })).toHaveAttribute("href", "https://example.com/manage/b");
+      expect(within(blocks[0]).getByRole("button", { name: "Edit JFK → LHR booking KQ7M2X" })).toBeInTheDocument();
+      expect(within(blocks[1]).getByRole("button", { name: "Edit JFK → LHR booking BBBBBB" })).toBeInTheDocument();
+      expect(within(cards[0]).queryByText("Times differ between bookings")).toBeNull();
+      expect(within(cards[0]).getAllByText("Departs")).toHaveLength(1);   // (the times once)
+    });
+
+    it("removes the one booking whose Remove was pressed, and keeps the flight", async () => {
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Remove JFK → LHR booking BBBBBB" }));
+      await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/5", { method: "DELETE" }));
+      expect(api).not.toHaveBeenCalledWith("/api/segments/1", expect.anything());
+    });
+
+    it("says when the bookings disagree on the times, and shows each booking’s own rather than picking one", async () => {
+      held = trip([flight, { ...sams, start_local: "2026-11-20T21:30" }, stay]);
+      render(TripPage);
+      const card = (await screen.findAllByRole("heading", { name: "JFK → LHR" }))[0].closest("li.pass") as HTMLElement;
+      expect(within(card).getByText("Times differ between bookings")).toBeInTheDocument();
+      expect(within(card).getByText("9:30 PM")).toBeInTheDocument();
+      expect(within(card).getByText("7:00 PM")).toBeInTheDocument();
+      expect(within(card).getAllByText("Departs")).toHaveLength(2);   // (once in each booking's block)
+    });
   });
 });

@@ -33,7 +33,7 @@ The secrets Waypoint saves (such as the refresh token for that mailbox access) a
 
 Waypoint has no accounts of its own: sign-in decides who gets in, and everyone who gets in (`OIDC_ALLOWED_EMAILS`,
 `OIDC_ALLOWED_GROUPS`) can change settings and saved keys, download the backup (which
-holds the household’s data and its encrypted secrets, mailbox tokens included) and restore one. Which trips a person sees follows who is on them
-or booked them; that is about what the app shows, not a boundary between people with access to the server or its backups.
+holds the household’s data and its encrypted secrets, mailbox tokens included) and restore one. Which trips a person sees follows who is on them,
+booked them or got a booking’s confirmation in their own mailbox; that is about what the app shows, not a boundary between people with access to the server or its backups.
 That’s by design: it’s built for one household. Don’t let in anyone you wouldn’t trust with the household’s travel
 details, and don’t share one Waypoint between households.

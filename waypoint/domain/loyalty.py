@@ -49,6 +49,13 @@ class Listed(TypedDict):
     notes: str | None
 
 
+class Conflict(TypedDict):
+    """A person with two different numbers for one program (a claimed guest's and their own): both are kept, People flags it."""
+    person_id: int
+    kind: str
+    program: str
+
+
 class NoSuchPerson(Exception):
     """A membership names someone who isn't in People."""
 
@@ -75,6 +82,18 @@ def everyone(conn: db.Connection) -> list[Listed]:
     rows = conn.orm.scalars(select(LoyaltyId)).all()
     order = {k: i for i, k in enumerate(KINDS)}
     return [listed(r) for r in sorted(rows, key=lambda r: (r.person_id, order.get(r.kind, len(order)), r.program.casefold(), r.id))]
+
+
+def conflicts(conn: db.Connection) -> list[Conflict]:
+    """The people with more than one different number for the same program. Only who and which program come out."""
+    seen: dict[tuple[int, str, str], set[str]] = {}
+    for row in conn.orm.scalars(select(LoyaltyId)).all():
+        try:
+            number = _plain(secretbox.decrypt(row.number) or "")
+        except secretbox.SecretError:
+            continue   # (a number this key can't unlock can't be compared)
+        seen.setdefault((row.person_id, row.kind, row.program), set()).add(number)
+    return [{"person_id": p, "kind": k, "program": g} for (p, k, g), numbers in sorted(seen.items()) if len(numbers) > 1]
 
 
 def _person_exists(conn: db.Connection, person_id: int) -> bool:

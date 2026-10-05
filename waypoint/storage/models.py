@@ -66,6 +66,8 @@ class Person(Base):
     legal_name: Mapped[str | None]
     aliases: Mapped[str | None]   # a JSON list of the ways an airline prints the name (waypoint/domain/people.py)
     user_sub: Mapped[str | None]
+    links: Mapped[str | None]   # a JSON list of the guests a member claimed: who they were and when (waypoint/domain/people.py)
+    claim_dismissed: Mapped[bool | None]   # the member chose "None of these" to Upcoming's suggestion of guests to claim
 
 
 class Airport(Base):
@@ -127,6 +129,13 @@ class SegmentTraveler(Base):
     segment_id: Mapped[int]
     person_id: Mapped[int | None]
     name: Mapped[str | None]         # as printed, until it's matched to a person
+
+
+class SegmentRecipient(Base):
+    __table__ = schema.segment_recipients
+    id: Mapped[int]
+    segment_id: Mapped[int]
+    person_id: Mapped[int]           # got the booking's confirmation in their mailbox (waypoint/domain/mail/ingest.py)
 
 
 class LoyaltyId(Base):

@@ -2,10 +2,11 @@
 from sqlalchemy import func, select
 
 from waypoint import oidc
-from waypoint.domain import demo, people
+from waypoint.domain import demo, loyalty, people
 from waypoint.server.api import people as api
-from waypoint.server.common import ApiError
-from waypoint.storage.models import FlightStatus, Person, Segment, SegmentTraveler, Trip, User
+from waypoint.server.common import ApiError, _current
+from waypoint.storage.models import FlightStatus, Person, Segment, SegmentRecipient, SegmentTraveler, Trip, User
+from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
 
 
@@ -145,3 +146,219 @@ class PeopleRouteTests(ServerCase):
         self.assertEqual(status, 409)
         self.assertIn("can’t be removed", body["error"])
         self.assertTrue(any(p["id"] == member["id"] for p in self.req("GET", "/api/people")[1]["people"]))
+
+
+class ClaimTests(DbCase):
+    """A member who was already a guest claims the guest ("This is me"): the guest's trips become theirs (names and numbers here are made up)."""
+
+    def setUp(self):
+        super().setUp()
+        from waypoint.domain import trips
+        from waypoint.domain.visibility import Viewer, visible_trips
+        self.visible_trips, self.Viewer = visible_trips, Viewer
+        oidc.remember_user(self.c, "u1", "jane.doe@example.com", "Jane Doe", "Jane", 100.0)
+        self.member = people.person_for_sub(self.c, "u1")
+        self.guest = people.add_guest(self.c, guest(display_name="J. Doe", first_name="Jane", legal_name="Jane Q Doe", aliases=["DOE/JANE MS"]))["id"]
+        self.trip = Trip(name="Lisbon", auto=False, booked_by=self.guest)
+        self.c.orm.add(self.trip)
+        self.c.orm.flush()
+        seg = Segment(trip_id=self.trip.id, kind="flight", status="confirmed", start_local="2026-11-01T08:00", start_zone="Europe/London",
+                      end_local="2026-11-01T11:00", end_zone="Europe/Lisbon", source="manual", booked_by=self.guest)
+        self.c.orm.add(seg)
+        self.c.orm.flush()
+        self.c.orm.add(SegmentTraveler(segment_id=seg.id, person_id=self.guest))
+        self.c.orm.flush()
+        self.trips = trips
+
+    def test_a_member_who_claims_a_guest_sees_the_guests_trip(self):
+        me = self.Viewer(self.member)
+        self.assertEqual(self.visible_trips(self.c, me), [])
+        people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        self.assertEqual([t.name for t in self.visible_trips(self.c, me)], ["Lisbon"])
+
+    def test_the_guests_loyalty_ids_names_and_bookings_move_over_and_the_guest_is_gone(self):
+        loyalty.add(self.c, {"person_id": self.guest, "kind": "airline", "program": "Delta SkyMiles", "number": "CANARY-DL-3381",
+                             "tier": None, "expiry": None, "notes": None})
+        claimed = people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        self.assertEqual([m["person_id"] for m in loyalty.everyone(self.c)], [self.member])
+        self.assertEqual((claimed["display_name"], claimed["first_name"], claimed["legal_name"]), ("Jane Doe", "Jane", "Jane Q Doe"))
+        self.assertEqual(claimed["aliases"], ["J. Doe"])   # (DOE/JANE MS is the member's own name already)
+        self.assertEqual(claimed["links"], [{"guest": "J. Doe", "by": "Jane Doe", "on": "2026-10-05"}])
+        self.assertIsNone(people.get(self.c, self.guest))
+        self.c.orm.expire_all()
+        self.assertEqual(self.trip.booked_by, self.member)
+        self.assertEqual([s.booked_by for s in self.c.orm.scalars(select(Segment)).all()], [self.member])
+        self.assertEqual([t.person_id for t in self.c.orm.scalars(select(SegmentTraveler)).all()], [self.member])
+        self.assertEqual(people.match_name(self.c, "DOE/JANE MS"), self.member)
+
+    def test_the_member_keeps_their_own_names_and_a_second_legal_name_becomes_an_alias(self):
+        people.edit(self.c, self.member, {"display_name": "Janie", "first_name": None, "legal_name": "Jane Doe", "aliases": ["doe/jane"]})
+        claimed = people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        self.assertEqual((claimed["display_name"], claimed["legal_name"]), ("Janie", "Jane Doe"))
+        self.assertEqual((claimed["first_name"]), "Jane")   # (it was empty)
+        self.assertEqual(claimed["aliases"], ["doe/jane", "Jane Q Doe", "J. Doe"])   # (DOE/JANE MS is doe/jane already)
+
+    def test_someone_on_the_same_segment_is_not_added_twice(self):
+        seg = self.c.orm.scalars(select(Segment)).one()
+        self.c.orm.add(SegmentTraveler(segment_id=seg.id, person_id=self.member))
+        self.c.orm.flush()
+        people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        self.assertEqual([t.person_id for t in self.c.orm.scalars(select(SegmentTraveler)).all()], [self.member])
+
+    def test_a_booking_the_guest_received_stays_visible_to_the_member(self):
+        seg = self.c.orm.scalars(select(Segment)).one()
+        other = Segment(trip_id=self.trip.id, kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="Europe/Lisbon",
+                        end_local="2026-11-03T11:00", end_zone="Europe/Lisbon", source="email")
+        self.c.orm.add(other)
+        self.c.orm.flush()
+        self.c.orm.add_all([SegmentRecipient(segment_id=seg.id, person_id=self.guest), SegmentRecipient(segment_id=seg.id, person_id=self.member),
+                            SegmentRecipient(segment_id=other.id, person_id=self.guest)])
+        self.c.orm.flush()
+        people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        found = sorted((r.segment_id, r.person_id) for r in self.c.orm.scalars(select(SegmentRecipient)).all())
+        self.assertEqual(found, [(seg.id, self.member), (other.id, self.member)])
+
+    def test_a_member_cannot_be_claimed_and_a_guest_cannot_claim(self):
+        oidc.remember_user(self.c, "u2", "bo@example.com", "Bo Example", "Bo")
+        other = people.person_for_sub(self.c, "u2")
+        assert other
+        with self.assertRaises(people.NotAGuest):
+            people.claim_guest(self.c, self.member, other, "2026-10-05")
+        with self.assertRaises(people.NotAMember):
+            people.claim_guest(self.c, self.guest, self.guest, "2026-10-05")
+        with self.assertRaises(people.NoSuchGuest):
+            people.claim_guest(self.c, self.member, 999, "2026-10-05")
+        self.assertIsNotNone(people.get(self.c, self.guest))
+
+    def test_two_numbers_for_one_program_are_both_kept_and_flagged(self):
+        for who, number in ((self.member, "CANARY-AA-1111"), (self.guest, "CANARY-AA-2222")):
+            loyalty.add(self.c, {"person_id": who, "kind": "airline", "program": "American AAdvantage", "number": number,
+                                 "tier": None, "expiry": None, "notes": None})
+        loyalty.add(self.c, {"person_id": self.guest, "kind": "hotel", "program": "Hilton Honors", "number": "CANARY-HH-3333",
+                             "tier": None, "expiry": None, "notes": None})
+        self.assertEqual(loyalty.conflicts(self.c), [])
+        people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        self.assertEqual(len(loyalty.everyone(self.c)), 3)
+        self.assertEqual(loyalty.conflicts(self.c), [{"person_id": self.member, "kind": "airline", "program": "American AAdvantage"}])
+
+    def test_the_same_number_twice_is_not_a_conflict(self):
+        for who in (self.member, self.guest):
+            loyalty.add(self.c, {"person_id": who, "kind": "airline", "program": "Delta SkyMiles", "number": "CANARY-DL 4444",
+                                 "tier": None, "expiry": None, "notes": None})
+        people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        self.assertEqual(loyalty.conflicts(self.c), [])
+
+    def test_the_merge_writes_no_loyalty_number_anywhere(self):
+        number = "CANARY-AAD-9034172"
+        loyalty.add(self.c, {"person_id": self.guest, "kind": "airline", "program": "Delta SkyMiles", "number": number,
+                             "tier": None, "expiry": None, "notes": None})
+        self.c.commit()
+        with no_leaks(self, number, database=self.path):
+            people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+            self.c.commit()
+            loyalty.conflicts(self.c)
+
+
+class SuggestionTests(DbCase):
+    """After sign-in, a member with no trips is offered the guests that match their name."""
+
+    def setUp(self):
+        super().setUp()
+        oidc.remember_user(self.c, "u1", "jane.doe@example.com", "Jane Doe", "Jane", 100.0)
+        self.member = people.person_for_sub(self.c, "u1")
+        assert self.member
+        self.jane = people.add_guest(self.c, guest(display_name="Ms. J Doe", legal_name=None, aliases=["DOE/JANE MS"]))["id"]
+        self.legal = people.add_guest(self.c, guest(display_name="Janie", legal_name="Jane Doe", aliases=[]))["id"]
+        people.add_guest(self.c, guest(display_name="Mia Doe", aliases=[]))
+
+    def ids(self, name="Jane Doe"):
+        return [g["id"] for g in people.claim_suggestions(self.c, self.member, name)]
+
+    def test_guests_whose_name_matches_the_sign_in_are_offered(self):
+        self.assertEqual(self.ids(), [self.legal, self.jane])   # (by display name Janie < Ms. J Doe)
+        self.assertEqual(self.ids("DOE/JANE MRS"), [self.legal, self.jane])
+        self.assertEqual(self.ids("Someone Else"), [])
+        self.assertEqual(self.ids(""), [])
+        self.assertEqual(people.claim_suggestions(self.c, self.member, None), [])
+
+    def test_a_member_with_trips_is_not_offered_any(self):
+        trip = Trip(name="Lisbon", auto=False, booked_by=self.member)
+        self.c.orm.add(trip)
+        self.c.orm.flush()
+        self.assertEqual(self.ids(), [])
+
+    def test_none_of_these_hides_it_for_that_member_only(self):
+        oidc.remember_user(self.c, "u2", "jane2@example.com", "Jane Doe", "Jane", 100.0)
+        other = people.person_for_sub(self.c, "u2")
+        assert other
+        people.dismiss_claims(self.c, self.member)
+        self.assertEqual(self.ids(), [])
+        self.assertEqual(len(people.claim_suggestions(self.c, other, "Jane Doe")), 2)
+
+    def test_a_guest_is_never_offered_suggestions(self):
+        self.assertEqual(people.claim_suggestions(self.c, self.jane, "Jane Doe"), [])
+        people.dismiss_claims(self.c, self.jane)   # (nothing to dismiss for a guest)
+        self.assertFalse(self.c.orm.get(Person, self.jane).claim_dismissed)   # type: ignore[union-attr]
+
+    def test_a_member_is_preferred_over_a_guest_with_the_same_name(self):
+        self.assertEqual(people.match_name(self.c, "DOE/JANE MS"), self.member)   # (the guest has this alias too)
+        self.assertEqual(people.match_name(self.c, "Mia Doe"), self.c.orm.scalars(select(Person.id).where(Person.display_name == "Mia Doe")).one())
+
+    def test_two_members_with_the_same_name_still_match_neither(self):
+        oidc.remember_user(self.c, "u2", "jane2@example.com", "Jane Doe", "Jane", 100.0)
+        self.assertIsNone(people.match_name(self.c, "DOE/JANE MS"))
+
+
+class ClaimRouteTests(DbCase):
+    """The routes: only the signed-in member can claim, and only for themselves."""
+
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(setattr, _current, "user", getattr(_current, "user", None))
+        oidc.remember_user(self.c, "u1", "jane.doe@example.com", "Jane Doe", "Jane", 100.0)
+        oidc.remember_user(self.c, "u2", "bo@example.com", "Bo Example", "Bo", 100.0)
+        self.jane, self.bo = people.person_for_sub(self.c, "u1"), people.person_for_sub(self.c, "u2")
+        self.guest = people.add_guest(self.c, guest(display_name="Jane D", legal_name=None, aliases=[]))["id"]
+
+    def sign_in(self, sub="u1", name="Jane Doe"):
+        _current.user = {"sub": sub, "name": name, "email": "x@example.com"}
+
+    def test_a_member_claims_a_guest_for_themselves(self):
+        self.sign_in()
+        done = api.api_person_claim(self.c, {}, {}, str(self.guest))
+        self.assertEqual((done["id"], done["links"][0]["guest"]), (self.jane, "Jane D"))
+        self.assertIsNone(people.get(self.c, self.guest))
+
+    def test_the_request_cannot_name_another_member_to_link_to(self):
+        self.sign_in("u2", "Bo Example")
+        api.api_person_claim(self.c, {}, {"person_id": self.jane, "member": self.jane}, str(self.guest))   # (a body is ignored)
+        self.assertEqual(people.get(self.c, self.bo)["links"][0]["guest"], "Jane D")   # type: ignore[index]
+        self.assertEqual(people.get(self.c, self.jane)["links"], [])   # type: ignore[index]
+
+    def test_a_member_cannot_be_claimed_and_nobody_by_that_id_is_a_404(self):
+        self.sign_in()
+        for target, status in ((self.bo, 409), (999, 404), ("abc", 404)):
+            with self.subTest(target=target), self.assertRaises(ApiError) as caught:
+                api.api_person_claim(self.c, {}, {}, str(target))
+            self.assertEqual(caught.exception.status, status)
+        self.assertIsNotNone(people.get(self.c, self.guest))
+
+    def test_without_a_person_of_their_own_nothing_is_claimed(self):
+        for user in ({"name": None, "email": None, "local": True}, {"sub": "nobody", "name": "Jane Doe"}, None):
+            _current.user = user
+            with self.subTest(user=user), self.assertRaises(ApiError) as caught:
+                api.api_person_claim(self.c, {}, {}, str(self.guest))
+            self.assertEqual(caught.exception.status, 403)
+            self.assertEqual(api.api_claim_suggestions(self.c, {}, {}), {"guests": []})
+            self.assertEqual(api.api_claim_dismiss(self.c, {}, {}), {"ok": True})
+        self.assertIsNotNone(people.get(self.c, self.guest))
+
+    def test_the_suggestion_comes_from_the_sign_in_name_and_none_of_these_hides_it(self):
+        self.sign_in()
+        self.assertEqual([g["id"] for g in api.api_claim_suggestions(self.c, {}, {})["guests"]], [])   # (Jane D isn't Jane Doe)
+        people.add_guest(self.c, guest(display_name="Jane Doe", aliases=[]))
+        self.assertEqual([g["display_name"] for g in api.api_claim_suggestions(self.c, {}, {})["guests"]], ["Jane Doe"])
+        self.assertEqual(api.api_claim_dismiss(self.c, {}, {}), {"ok": True})
+        self.assertEqual(api.api_claim_suggestions(self.c, {}, {})["guests"], [])
+        self.sign_in("u2", "Bo Example")   # (it was only hidden for Jane)
+        self.assertEqual(api.api_claim_suggestions(self.c, {}, {})["guests"], [])

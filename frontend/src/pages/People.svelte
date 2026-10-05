@@ -1,5 +1,6 @@
 <script lang="ts">
   import { act, errMsg } from "$lib/act";
+  import { app } from "$lib/app.svelte";
   import { apiCall } from "$lib/contract";
   import type { LoyaltyEntry, LoyaltyList, Person } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
@@ -16,6 +17,7 @@
   let people = $state<Person[] | null>(null);
   let memberships = $state<LoyaltyEntry[]>([]);
   let programs = $state<LoyaltyList["programs"]>({});
+  let conflicts = $state<LoyaltyList["conflicts"]>([]);
   let loadError = $state("");
   // Numbers shown in the clear, by membership id: asked for one at a time, kept only on this page (never in browser storage).
   let revealed = $state<Record<number, string>>({});
@@ -24,8 +26,8 @@
     loadError = "";
     try {
       const [p, l] = await Promise.all([apiCall<"GET /api/people">("/api/people"), apiCall<"GET /api/loyalty">("/api/loyalty")]);
-      people = p.people; memberships = l.loyalty; programs = l.programs; revealed = {};
-    } catch (err) { people = null; memberships = []; loadError = errMsg(err); }
+      people = p.people; memberships = l.loyalty; programs = l.programs; conflicts = l.conflicts; revealed = {};
+    } catch (err) { people = null; memberships = []; conflicts = []; loadError = errMsg(err); }
   }
   $effect(() => { void load(); });
 
@@ -57,6 +59,17 @@
     toast.success(d.id === null ? "Guest added" : "Saved");
     await load();
   }
+
+  // "This is me": a signed-in member claims a guest for themselves (not on your own machine, where nobody signs in).
+  const canClaim = $derived(!!app.state?.user && !app.state.user.local);
+  let claiming = $state<Person | null>(null);
+  let claimAsking = $state(false);
+  const claim = (p: Person) => act(async () => {
+    await apiCall<"POST /api/people/{id}/claim">(`/api/people/${p.id}/claim`, { method: "POST" });
+    toast.success(`Linked ${p.display_name} to you`);
+    await load();
+  });
+  const doubled = (id: number) => conflicts.filter((c) => c.person_id === id).map((c) => c.program);
 
   const remove = (p: Person) => act(async () => {
     await apiCall<"DELETE /api/people/{id}">(`/api/people/${p.id}`, { method: "DELETE" });
@@ -202,6 +215,12 @@
           <p class="flex flex-wrap items-center gap-2 font-medium"><span class="break-words">{p.display_name}</span>
             <Badge variant={p.member ? "default" : "outline"}>{p.member ? "Member" : "Guest"}</Badge></p>
           {#if details(p)}<p class="break-words text-sm text-muted-foreground">{details(p)}</p>{/if}
+          {#each p.links as link (`${link.guest}-${link.on}`)}
+            <p class="break-words text-sm text-muted-foreground">Linked from guest {link.guest} by {link.by} on {link.on}</p>
+          {/each}
+          {#each doubled(p.id) as program (program)}
+            <p class="break-words text-sm text-signal-ink" role="status">Two numbers for {program}: both are kept. Remove the one that’s wrong.</p>
+          {/each}
           {#each byKind(p.id) as group (group.kind)}
             <section class="mt-3" aria-label={`${p.display_name}’s ${group.name} memberships`}>
               <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.name}</h3>
@@ -231,6 +250,7 @@
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" aria-label={`Add a membership for ${p.display_name}`} onclick={() => startAddId(p)}><Plus /> ID</Button>
           <Button variant="outline" size="sm" aria-label={`Edit ${p.display_name}`} onclick={() => startEdit(p)}>Edit</Button>
+          {#if !p.member && canClaim}<Button variant="outline" size="sm" aria-label={`This is me: ${p.display_name}`} onclick={() => { claiming = p; claimAsking = true; }}>This is me</Button>{/if}
           {#if !p.member}<Button variant="outline" size="sm" aria-label={`Remove ${p.display_name}`} onclick={() => { removing = p; asking = true; }}>Remove</Button>{/if}
         </div>
       </li>
@@ -241,6 +261,10 @@
 <ConfirmDialog bind:open={asking} title={`Remove ${removing?.display_name ?? ""}?`} confirmLabel="Remove" busyLabel="Removing…" destructive
   description="They’ll no longer appear in the household’s people, and their saved loyalty and Known Traveler numbers go with them. This can’t be undone."
   onconfirm={async () => { const p = removing; return p ? await remove(p) : true; }} />
+
+<ConfirmDialog bind:open={claimAsking} title={`Link ${claiming?.display_name ?? "this guest"} to you?`} confirmLabel="This is me" busyLabel="Linking…"
+  description="Their trips, loyalty and Known Traveler numbers and names become yours, and the guest is removed. This can’t be undone in Waypoint: restoring a backup is the way back."
+  onconfirm={async () => { const p = claiming; return p ? await claim(p) : true; }} />
 
 <ConfirmDialog bind:open={idAsking} title={`Remove ${idRemoving?.program ?? "this membership"}?`} confirmLabel="Remove" busyLabel="Removing…" destructive
   description="Its saved number is deleted. This can’t be undone."

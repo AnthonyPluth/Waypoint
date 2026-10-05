@@ -39,7 +39,7 @@ jobs:
   # gate too). Anything not listed as the web app's alone, or the backend's alone (the workflows, the Dockerfile, ...),
   # runs everything, and so does every push to main and every manual run.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
     permissions:
       contents: read
       pull-requests: read      # the pull request's list of changed files
@@ -89,7 +89,7 @@ jobs:
   test:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
     strategy:
       fail-fast: false         # one database failing still shows what the other found
       matrix:
@@ -176,7 +176,7 @@ jobs:
   # the web app's lib/api-types.ts, from the routes and waypoint/server/contract.py), which a change to either side can
   # make stale. Standard library only: no setup beyond Python.
   feature-map:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
@@ -192,7 +192,7 @@ jobs:
   # each new migration, the workflows' conventions and, on a pull request, that each of an agent's commits names its
   # model in a Co-Authored-By trailer. Standard library only.
   fleet-checks:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
@@ -215,7 +215,7 @@ jobs:
   web:
     needs: changes
     if: needs.changes.outputs.web == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
     defaults:
       run:
         shell: bash
@@ -273,7 +273,7 @@ jobs:
   # and ARM into the build cache. It has no permission to publish anything and sends nothing out.
   build:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
     outputs:
       version: ${{ steps.next.outputs.version }}
       new: ${{ steps.next.outputs.new }}
@@ -334,7 +334,7 @@ jobs:
   publish:
     needs: [test, web, build]
     if: needs.build.outputs.skip != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
     permissions:
       contents: write          # create the tag and the release
       packages: write          # publish to ghcr.io
@@ -403,7 +403,7 @@ jobs:
   # A third-party action, so it runs on its own with only the permission it needs (no access to the repository).
   cleanup:
     needs: publish
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
     permissions:
       packages: write          # delete old versions from ghcr.io
     steps:

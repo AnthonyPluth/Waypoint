@@ -16,7 +16,7 @@ const go = async (hash: string) => {
   await Promise.resolve();
 };
 
-beforeEach(async () => { vi.mocked(api).mockReset(); vi.mocked(api).mockResolvedValue({ trips: [], people: [], loyalty: [] }); app.state = state(); app.bootError = ""; await go("#upcoming"); });
+beforeEach(async () => { vi.mocked(api).mockReset(); vi.mocked(api).mockResolvedValue({ trips: [], people: [], loyalty: [], guests: [] }); app.state = state(); app.bootError = ""; await go("#upcoming"); });
 afterEach(() => { app.state = null; });
 
 describe("the shell", () => {

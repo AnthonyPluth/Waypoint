@@ -25,7 +25,8 @@ const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: 
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] }); vi.mocked(api).mockReset(); });
 afterEach(() => { vi.useRealTimers(); flightStatus.list = null; });
 
-const serve = (trips: unknown[]) => vi.mocked(api).mockResolvedValue({ trips });
+const serve = (trips: unknown[], guests: unknown[] = []) =>
+  vi.mocked(api).mockImplementation(async (path) => (path === "/api/people/claim-suggestions" ? { guests } : { trips }));
 const at = (iso: string) => vi.setSystemTime(new Date(iso));
 
 describe("Upcoming", () => {
@@ -34,6 +35,36 @@ describe("Upcoming", () => {
     render(Upcoming);
     expect(screen.getByRole("heading", { name: "Upcoming" })).toBeInTheDocument();
     expect(await screen.findByText(/No trips yet — they’ll appear here once Waypoint can read your confirmation emails, or when you add one\./)).toBeInTheDocument();
+  });
+
+  it("asks a member with no trips whether they are one of the matching guests, and links the one they pick", async () => {
+    const mia = { id: 2, display_name: "Mia Doe", first_name: null, legal_name: null, aliases: [], member: false, links: [] };
+    serve([], [mia]);
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: "Are you one of these?" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "This is me: Mia Doe" }));
+    const dialog = await screen.findByRole("dialog", { name: "Link Mia Doe to you?" });
+    expect(dialog).toHaveTextContent(/can’t be undone in Waypoint/);
+    serve([london], []);
+    await userEvent.click(within(dialog).getByRole("button", { name: "This is me" }));
+    expect(api).toHaveBeenCalledWith("/api/people/2/claim", { method: "POST" });
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Are you one of these?" })).toBeNull());
+  });
+
+  it("None of these hides the suggestion", async () => {
+    serve([], [{ id: 2, display_name: "Mia Doe", first_name: null, legal_name: null, aliases: [], member: false, links: [] }]);
+    render(Upcoming);
+    await userEvent.click(await screen.findByRole("button", { name: "None of these" }));
+    expect(api).toHaveBeenCalledWith("/api/people/claim-suggestions/dismiss", { method: "POST" });
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Are you one of these?" })).toBeNull());
+    expect(screen.getByRole("heading", { name: "No trips yet" })).toBeInTheDocument();
+  });
+
+  it("offers nothing when no guest matches, or when there are trips", async () => {
+    serve([]);
+    render(Upcoming);
+    await screen.findByRole("heading", { name: "No trips yet" });
+    expect(screen.queryByRole("heading", { name: "Are you one of these?" })).toBeNull();
   });
 
   it("leads with the next segment: countdown, flight, departure time, terminal, and a code to tap and copy", async () => {
@@ -132,5 +163,30 @@ describe("Upcoming", () => {
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("heading", { name: "JFK → LHR" })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("Waypoint is unreachable")).toBeNull());
+  });
+
+  it("shows a flight on two bookings once, with each booking’s code to copy", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const second = segment({ id: 10, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe" }] });
+    serve([trip([outbound, second, stay, home])]);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR", level: 2 })).closest("section")!;
+    expect(within(card).getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Copy confirmation code BBBBBB" })).toBeInTheDocument();
+    expect(within(card).queryByText("Times differ between bookings")).toBeNull();
+    const days = screen.getByRole("list", { name: "Trip to London, day by day" });
+    expect(within(days).getAllByText("JFK → LHR")).toHaveLength(1);   // (one row for the flight, not one per booking)
+    expect(within(days).getByText("2 bookings")).toBeInTheDocument();
+  });
+
+  it("says when the bookings of a flight disagree on its times, and gives each booking’s", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const moved = segment({ id: 10, confirmation: "BBBBBB", start_local: "2026-11-20T21:30", details: { flight_number: "AA 101" } });
+    serve([trip([outbound, moved, stay, home])]);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR", level: 2 })).closest("section")!;
+    expect(within(card).getByText("Times differ between bookings")).toBeInTheDocument();
+    expect(within(card).getByText(/^KQ7M2X: departs/)).toHaveTextContent(/departs Fri, Nov 20, 7:00 PM.*arrives Sat, Nov 21, 7:10 AM/);
+    expect(within(card).getByText(/^BBBBBB: departs/)).toHaveTextContent(/departs Fri, Nov 20, 9:30 PM/);
   });
 });
