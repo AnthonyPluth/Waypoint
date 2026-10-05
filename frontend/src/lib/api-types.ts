@@ -242,6 +242,15 @@ export interface PersonBody {
   aliases?: string[];
 }
 
+/**
+ * A review item's message as plain text, fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps
+ * none of it.
+ */
+export interface Preview {
+  text: string;
+  truncated: boolean;
+}
+
 /** A browser or phone that gets this member's notifications. */
 export interface ReminderDevice {
   id: number;
@@ -279,6 +288,7 @@ export interface Revealed {
 export interface Review {
   items: ReviewItem[];
   who: WhoIsThis[];
+  ai: boolean;
 }
 
 /**
@@ -598,6 +608,8 @@ export interface Endpoints {
   "GET /api/review": { body: never; reply: Review };
   "POST /api/review/who/{id}": { body: WhoBody; reply: Matched };
   "POST /api/review/{id}/ignore": { body: never; reply: Ok };
+  "GET /api/review/{id}/preview": { body: never; reply: Preview };
+  "POST /api/review/{id}/suggest": { body: never; reply: Ok };
   "DELETE /api/review/{id}": { body: never; reply: Ok };
   "GET /api/state": { body: never; reply: State };
 }

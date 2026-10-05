@@ -136,6 +136,14 @@ class WhoIsThis(TypedDict):
 class Review(TypedDict):
     items: list[ReviewItem]
     who: list[WhoIsThis]
+    ai: bool                        # the optional AI is on, so Ask the AI works
+
+
+class Preview(TypedDict):
+    """A review item's message as plain text, fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps
+    none of it."""
+    text: str
+    truncated: bool                 # cut at 30,000 characters
 
 
 class WhoBody(TypedDict):

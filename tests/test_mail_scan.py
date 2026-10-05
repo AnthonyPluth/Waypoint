@@ -458,6 +458,39 @@ class ReviewTests(ScanCase):
         self.assertEqual(self.segments(), [])
         self.assertEqual(self.items()[0]["reason"], "incomplete")
 
+    def test_an_items_message_is_read_again_for_its_owner_alone_and_kept_nowhere(self):
+        self.put("no_markup")
+        self.scan()
+        [item] = self.items()
+        with no_leaks(self, "CANARY-BODY-NOMARKUP-6H9C", database=self.path):   # (it comes back to the caller, and goes nowhere else)
+            text, cut = scan.preview("u-jane", item["id"])
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", text)
+        self.assertNotIn("<", text)   # (text, not markup)
+        self.assertFalse(cut)
+        with self.assertRaises(KeyError):
+            scan.preview("u-sam", item["id"])   # not Sam's
+        with self.assertRaises(KeyError):
+            scan.preview("u-jane", 9999)
+
+    def test_a_long_message_is_cut_and_a_deleted_one_says_so(self):
+        self.put("no_markup")
+        self.scan()
+        [item] = self.items()
+        with mock.patch.object(scan, "PREVIEW_LIMIT", 20):
+            text, cut = scan.preview("u-jane", item["id"])
+        self.assertEqual((len(text), cut), (20, True))
+        del self.google.mail["msg-no_markup"]
+        with self.assertRaises(gmail.MessageGone):
+            scan.preview("u-jane", item["id"])
+
+    def test_asking_the_ai_is_refused_while_it_is_off(self):
+        self.put("no_markup")
+        self.scan()
+        [item] = self.items()
+        with self.assertRaises(scan.NoAi):
+            scan.suggest_now("u-jane", item["id"], NOW)
+        self.assertEqual(self.google.fetched, ["msg-no_markup"])   # (the message wasn't fetched again for nothing)
+
     def test_the_log_says_what_stopped_messages_being_read_in_fixed_words_and_counts(self):
         unknown = eml("flight_jsonld").replace(b'"iataCode": "JFK"', b'"iataCode": "QQQ"')
         self.add_mail("unknown", unknown)
@@ -847,7 +880,7 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(sorted(i["reason"] for i in mine["items"]), ["incomplete", "no_markup"])
         item = next(i for i in mine["items"] if i["reason"] == "no_markup")
         self.assertEqual((item["address"], item["sender_domain"], item["received"]), ("ana@gmail.example", "example-air.example", "2026-10-17"))
-        self.assertEqual(self.call("ben", "GET", "/api/review")[1], {"items": [], "who": []})
+        self.assertEqual(self.call("ben", "GET", "/api/review")[1], {"items": [], "who": [], "ai": False})
         for method, path in (("DELETE", f"/api/review/{item['id']}"), ("POST", f"/api/review/{item['id']}/ignore")):
             status, body = self.call("ben", method, path, {} if method == "POST" else None)
             self.assertEqual((status, body["error"]), (404, "No such item"), path)
@@ -890,6 +923,30 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(self.call("ana", "GET", "/api/review")[1]["who"], [])
         self.assertEqual(self.call("ana", "POST", f"/api/review/who/{who['id']}", {"person_id": self.mia})[0], 404)   # done
         self.assertEqual(self.call("ana", "POST", "/api/review/who/zz", {"person_id": self.mia})[0], 404)
+
+    def test_a_message_can_be_previewed_by_its_owner_alone(self):
+        self.put("no_markup")
+        self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        status, body = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
+        self.assertEqual(status, 200)
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", body["text"])
+        self.assertFalse(body["truncated"])
+        self.assertEqual(self.call("ben", "GET", f"/api/review/{item['id']}/preview")[0], 404)
+        self.assertEqual(self.call("ana", "GET", "/api/review/9999/preview")[0], 404)
+        del self.google.mail["m-no_markup"]
+        status, body = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
+        self.assertEqual((status, body["error"]), (404, "That message is no longer in Gmail."))
+
+    def test_asking_the_ai_needs_it_on_and_is_the_owners_alone(self):
+        self.put("no_markup")
+        self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        self.assertFalse(self.call("ana", "GET", "/api/review")[1]["ai"])
+        status, body = self.call("ana", "POST", f"/api/review/{item['id']}/suggest", {})
+        self.assertEqual((status, body["error"]), (400, "Turn on AI suggestions in Settings first."))
+        self.assertEqual(self.call("ben", "POST", f"/api/review/{item['id']}/suggest", {})[0], 404)
+        self.assertEqual(self.call("ana", "POST", "/api/review/9999/suggest", {})[0], 404)
 
     def test_who_is_this_can_add_a_guest(self):
         self.put("flight_microdata")

@@ -1603,6 +1603,77 @@
         }
       }
     },
+    "/api/review/{id}/preview": {
+      "get": {
+        "operationId": "api_review_preview",
+        "x-handler": "waypoint/server/api/review.py:api_review_preview",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/review/{id}/suggest": {
+      "post": {
+        "operationId": "api_review_suggest",
+        "x-handler": "waypoint/server/api/review.py:api_review_suggest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/review/{id}": {
       "delete": {
         "operationId": "api_review_dismiss",
@@ -2654,6 +2725,23 @@
         ],
         "additionalProperties": false
       },
+      "Preview": {
+        "type": "object",
+        "description": "A review item's message as plain text, fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps\nnone of it.",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "text",
+          "truncated"
+        ],
+        "additionalProperties": false
+      },
       "ReminderDevice": {
         "type": "object",
         "description": "A browser or phone that gets this member's notifications.",
@@ -2796,11 +2884,15 @@
             "items": {
               "$ref": "#/components/schemas/WhoIsThis"
             }
+          },
+          "ai": {
+            "type": "boolean"
           }
         },
         "required": [
           "items",
-          "who"
+          "who",
+          "ai"
         ],
         "additionalProperties": false
       },
