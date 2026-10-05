@@ -1,11 +1,11 @@
-"""Writes waypoint/storage/airports.tsv.gz, the airports Waypoint knows by IATA code (the seed of migration 0004's
+"""Writes waypoint/storage/airports.tsv.gz, the airports Waypoint knows by IATA code (the seed of migration 0005's
 `airports` table): code, name, city, country, IANA time zone, latitude and longitude, one per line, sorted by code.
 
     python3 -m venv /tmp/airports && /tmp/airports/bin/pip install airportsdata && /tmp/airports/bin/python tools/airports.py
 
 The rows come from the `airportsdata` package, which is built from OurAirports' public-domain data with each airport's
 IANA zone added (OurAirports has none). It's needed only to regenerate the file, so it isn't one of Waypoint's
-dependencies. A changed file ships with a migration that updates the table, never by editing 0004's seed."""
+dependencies. A changed file ships with a migration that updates the table, never by editing 0005's seed."""
 from __future__ import annotations
 
 import gzip

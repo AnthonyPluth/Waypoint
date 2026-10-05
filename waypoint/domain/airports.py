@@ -1,5 +1,5 @@
 """Airports by IATA code: where a flight's times are written. A flight's start and end zones come from its airports
-(waypoint/storage/airports.tsv.gz, loaded by migration 0004), and a person can still name a zone by hand for an airport
+(waypoint/storage/airports.tsv.gz, loaded by migration 0005), and a person can still name a zone by hand for an airport
 the list doesn't have."""
 from __future__ import annotations
 
