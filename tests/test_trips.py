@@ -261,6 +261,12 @@ class SegmentTests(Household):
         with self.assertRaisesRegex(trips.Invalid, "ends before"):   # the whole segment is checked again
             trips.edit_segment(self.c, self.jane, seg["id"], {"end_local": "2026-05-01T00:00"})
 
+    def test_editing_a_stays_place_keeps_its_zone(self):
+        stay = self.add(self.jane, HOTEL)
+        renamed = trips.edit_segment(self.c, self.jane, stay["id"], {"origin": "Quay Hotel", "destination": "Elsewhere"})
+        assert renamed
+        self.assertEqual((renamed["origin"], renamed["start_zone"], renamed["end_zone"]), ("Quay Hotel", "Europe/London", "Europe/London"))
+
     def test_deleting_the_last_segment_of_a_grouped_trip_removes_it_but_not_a_made_one(self):
         grouped = self.add(self.jane, OUT)
         self.assertTrue(trips.delete_segment(self.c, self.jane, grouped["id"]))
@@ -341,6 +347,23 @@ class TripTests(Household):
         with self.assertRaisesRegex(trips.Invalid, "another trip"):
             trips.merge(self.c, self.jane, a["trip_id"], a["trip_id"])
         self.assertIsNone(trips.merge(self.c, self.jane, a["trip_id"], 9999))
+
+    def test_merging_trips_with_different_people_is_refused(self):
+        a = self.add(self.jane, OUT, travelers=self.on(self.jane.person_id, self.sam.person_id))
+        b = self.add(self.jane, {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"},
+                     travelers=self.on(self.jane.person_id))   # Jane's own: Sam would see it
+        with self.assertRaisesRegex(trips.Invalid, "different people"):
+            trips.merge(self.c, self.jane, a["trip_id"], b["trip_id"])
+        with self.assertRaisesRegex(trips.Invalid, "different people"):
+            trips.merge(self.c, self.jane, b["trip_id"], a["trip_id"])
+        self.assertEqual(trips.listing(self.c, self.sam)[0]["id"], a["trip_id"])
+        self.assertEqual(len(trips.listing(self.c, self.sam)), 1)
+        self.assertEqual(len(trips.listing(self.c, self.jane)), 2)
+
+    def test_adding_without_a_person_is_refused(self):
+        for make in (lambda: trips.create_trip(self.c, Viewer(None), {"name": "x"}), lambda: trips.add_segment(self.c, Viewer(None), OUT)):
+            with self.assertRaisesRegex(trips.Invalid, "no person"):
+                make()
 
     def test_merging_keeps_what_the_first_trip_lacks(self):
         empty = trips.create_trip(self.c, Viewer(None, household=True), {"name": "Blank"})

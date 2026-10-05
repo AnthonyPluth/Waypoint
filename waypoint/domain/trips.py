@@ -416,9 +416,16 @@ def _involves(travelers: Sequence[TravelerIn], booker: int | None) -> frozenset[
     return frozenset({t["person_id"] for t in travelers if t["person_id"] is not None} | ({booker} if booker is not None else set()))
 
 
+def _needs_person(viewer: Viewer) -> None:
+    """What someone adds is theirs (they booked it), so they need a person; one without would add what no one can see."""
+    if viewer.person_id is None and not viewer.household:
+        raise Invalid("Your sign-in has no person in People yet, so what you add couldn’t be shown to you. Sign in again.")
+
+
 def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id: int | None = None) -> SegmentOut | None:
     """Add a segment the viewer booked, to this trip, or (without one) to the trip it belongs to or a new one. Travellers
     default to the viewer. None: no such trip (for the viewer). Raises Invalid."""
+    _needs_person(viewer)
     values = check(conn, fields)
     given = fields.get("travelers")
     travelers = _travelers(conn, given if given is not None else
@@ -459,7 +466,8 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
     before = _current(seg, old)
     merged: SegmentIn = {**before, **changes}
     for place, zone in (("origin", "start_zone"), ("destination", "end_zone")):
-        if place in changes and zone not in changes and changes.get(place) != before.get(place):
+        # (only an airport gives a zone; a stay's or a rental's is the person's)
+        if place in changes and zone not in changes and changes.get(place) != before.get(place) and merged.get("kind") == "flight":
             merged[zone] = None   # type: ignore[literal-required]   # the old place's zone isn't the new one's
     values = check(conn, merged)
     travelers = _travelers(conn, merged.get("travelers") or [])
@@ -501,6 +509,7 @@ def delete_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> bool
 
 def create_trip(conn: db.Connection, viewer: Viewer, fields: TripIn) -> TripOut:
     """A trip made by hand, booked by the viewer, with no segments yet."""
+    _needs_person(viewer)
     start, end = fields.get("start_date"), fields.get("end_date")
     if (start is None) != (end is None):
         raise Invalid("Give both dates of a trip, or neither")
@@ -541,13 +550,21 @@ def delete_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> bool:
 
 def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int) -> TripOut | None:
     """Fold the other trip's segments into this one and remove the other: both are the viewer's, the result is a trip made by
-    hand (grouping leaves it alone). Everyone on either trip now sees both's segments, as they're one trip. None: either
-    trip isn't there (for the viewer). Raises Invalid for a trip with itself."""
+    hand (grouping leaves it alone). Trips are visible whole, so it is refused unless the same people (travellers and
+    bookers) are on both: nobody is shown a segment of a trip they aren't on. None: either trip isn't there (for the
+    viewer). Raises Invalid for a trip with itself or one with different people."""
     if trip_id == other_id:
         raise Invalid("Choose another trip to merge into this one")
     trip, other = visibility.visible_trip(conn, viewer, trip_id), visibility.visible_trip(conn, viewer, other_id)
     if trip is None or other is None:
         return None
+    if not viewer.household:
+        _, who = _involved(conn, [trip.id, other.id])
+        mine = who[trip.id] | ({trip.booked_by} if trip.booked_by is not None else set())
+        theirs = who[other.id] | ({other.booked_by} if other.booked_by is not None else set())
+        if mine != theirs:
+            raise Invalid("These trips involve different people, and merging would show each one’s segments to people who "
+                          "aren’t on it. Move a segment into the other trip by adding the missing travellers first.")
     conn.execute(update(Segment).where(Segment.trip_id == other.id).values(trip_id=trip.id))
     trip.auto = False
     trip.destination = trip.destination or other.destination

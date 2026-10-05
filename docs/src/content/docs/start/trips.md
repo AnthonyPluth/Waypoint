@@ -27,7 +27,7 @@ A trip’s dates are the local dates of its first and last segments.
 
 ## How segments are grouped
 
-Without a trip named, a new segment joins an existing grouped trip when it is within two days of it, the trip hasn’t already got back to where it began before the segment starts, and everyone the segment involves (its travellers and whoever booked it) is already on the trip. Otherwise it starts a trip of its own, so one person’s solo trip never takes in another person’s booking. You can **rename** a trip, **merge** two of yours into one and **split** some segments off into a new one; a trip you merged or split is yours from then on, and grouping leaves it alone. Merging shares each trip’s segments with everyone on the other.
+Without a trip named, a new segment joins an existing grouped trip when it is within two days of it, the trip hasn’t already got back to where it began before the segment starts, and everyone the segment involves (its travellers and whoever booked it) is already on the trip. Otherwise it starts a trip of its own, so one person’s solo trip never takes in another person’s booking. You can **rename** a trip, **merge** two of yours into one and **split** some segments off into a new one; a trip you merged or split is yours from then on, and grouping leaves it alone. A merge is refused unless the same people are on both trips, so nobody is shown a segment of a trip they aren’t on.
 
 ## What your edits keep
 
