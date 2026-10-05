@@ -17,7 +17,9 @@ one a correction that used to live as prose and now fails `make check` and CI in
   package's `PARSERS`, has `booking.eml`, `change.eml` and `cancellation.eml` under tests/fixtures/mail/<vendor>/, and has a
   test, tests/test_mail_parser_<vendor>.py, that names that directory and each of the three fixtures.
 - Workflows (.github/workflows/, .github/actions/): each workflow runs bash by default (so steps get -eo pipefail);
-  every action pinned by SHA has its version in a comment; and `gh api` with `per_page` paginates.
+  every action pinned by SHA has its version in a comment; `gh api` with `per_page` paginates; and every job runs on
+  RUNS_ON (the repository variable picking self-hosted runners; fork pull requests always get GitHub's), or on
+  `ubuntu-latest` with a `# hosted: <why>` comment.
 
 Exits 1, listing each problem, when any check fails."""
 from __future__ import annotations
@@ -286,6 +288,12 @@ PINNED = re.compile(r"@[0-9a-f]{40}$")
 BASH_DEFAULT = re.compile(r"^defaults:[ \t]*\n[ \t]+run:[ \t]*\n(?:[ \t]{4,}\S.*\n)*?[ \t]{4,}shell:[ \t]*bash[ \t]*(?:#.*)?$",
                           re.MULTILINE)
 GH_API_LIST = re.compile(r"\bgh api\b[^\n]*per_page=")
+# A job's runner: the repository variable RUNS_ON (a JSON label list such as ["self-hosted", "linux"], unset for GitHub's
+# runners), except for a fork's pull request, whose code never runs on the household's own machines.
+RUNS_ON = ("runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON "
+           "|| '\"ubuntu-latest\"') }}")
+RUNS_ON_LINE = re.compile(r"^[ \t]*runs-on:.*$", re.MULTILINE)
+HOSTED = re.compile(r"^runs-on: ubuntu-latest[ \t]+# hosted: \S")
 
 
 def check_workflow(name: str, text: str, workflow: bool = True) -> list[str]:
@@ -303,6 +311,10 @@ def check_workflow(name: str, text: str, workflow: bool = True) -> list[str]:
     for line in text.splitlines():
         if GH_API_LIST.search(line) and "--paginate" not in line:
             problems.append(f"{name}: `gh api ... per_page=` without --paginate reads only the first page: {line.strip()[:80]}")
+    for m in RUNS_ON_LINE.finditer(text):
+        line = m.group(0).strip()
+        if line != RUNS_ON and not HOSTED.match(line):
+            problems.append(f"{name}: `{line[:60]}` should be fleet_checks.RUNS_ON, or `runs-on: ubuntu-latest   # hosted: <why>`")
     return problems
 
 

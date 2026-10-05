@@ -163,6 +163,20 @@ Some routes have a typed contract with the web app, so a field renamed on one si
 
 To cover another route: add its types to `contract.py`, annotate its handler, run `make api-contract`, switch its callers to `apiCall`, and add a call to `tests/test_api_contract.py` (which fails until every covered route is checked there).
 
+## CI runners
+
+CI runs on GitHub's runners unless the repository variable `RUNS_ON` is set (Settings → Secrets and variables → Actions → Variables). Set it to a JSON list of runner labels, such as `["self-hosted", "linux", "x64"]`, and the jobs run on your own runners instead; delete it to go back to GitHub's. GitHub doesn't fall back by itself: while `RUNS_ON` is set and no runner with those labels is online, jobs wait in the queue.
+
+Some jobs always use GitHub's runners, whatever `RUNS_ON` says:
+
+- a pull request from a fork, so code from outside the household never runs on its machines;
+- Agent review and the merge gate, which read pull requests' content with secrets in reach;
+- OpenSSF Scorecard, which publishes its results only from GitHub's runners.
+
+A self-hosted runner needs Linux on x64, bash, git, and Docker (the Postgres tests run Postgres as a service container, and the image build uses Docker Buildx with QEMU for ARM). The setup actions install Python and Node themselves. Add the runner to this repository (Settings → Actions → Runners), not to an organization, and keep "Require approval for all external contributors" on (Settings → Actions → General).
+
+`tools/fleet_checks.py` holds every job to this: a job's `runs-on` is the shared `RUNS_ON` expression, or `ubuntu-latest` with a `# hosted: <why>` comment.
+
 ## Releases
 
 Every push to `main` runs the tests and, at the same time, builds the image for `linux/amd64` and `linux/arm64` with the next version baked in (and checks that it starts). Nothing is published until the tests pass; then GitHub Actions:
