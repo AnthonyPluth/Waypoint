@@ -197,10 +197,10 @@ class MigrationTests(unittest.TestCase):
             row = dict(flight_number="EX101", date="2026-11-20", state="delayed", fetched_at=1.0)
             conn.execute(insert(schema.flight_status).values(**row))
             conn.execute(insert(schema.flight_status).values(**{**row, "date": "2026-11-21"}))   # one a day, for each flight number
-            with self.assertRaises(sa.exc.IntegrityError):   # a flight and date have one answer
-                conn.execute(insert(schema.flight_status).values(**row))
-            with self.assertRaises(sa.exc.IntegrityError):   # which always says when it came
-                conn.execute(insert(schema.flight_status).values(flight_number="EX9", date="2026-11-20", state="landed"))
+        for values in (row,   # a flight and date have one answer
+                       dict(flight_number="EX9", date="2026-11-20", state="landed")):   # which always says when it came
+            with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:   # (each in a session of its own: Postgres ends a transaction at an error)
+                conn.execute(insert(schema.flight_status).values(**values))
         with db.engine(self.path).begin() as c:
             command.downgrade(db.alembic_config(c), "0005")
             self.assertNotIn("flight_status", sa.inspect(c).get_table_names())
