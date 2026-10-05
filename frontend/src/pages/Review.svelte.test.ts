@@ -26,6 +26,7 @@ const SUGGESTION = { kind: "flight" as const, provider: "Example Air", confirmat
 const PREVIEW = "Hello Jane,\nYour flight EX 410 leaves Boston at 7:15 am on 2 January.";
 let previewFails = "";
 let suggestFails = "";
+let suggestGate: Promise<void> | null = null;   // set: every suggest request waits for it
 let truncated = false;
 let held: Review;
 let calls: [string, string | undefined, unknown][];
@@ -38,14 +39,14 @@ function serve(failOn?: string) {
     if (path === "/api/state") return {} as never;
     if (path === "/api/segments") return {} as never;
     if (path.endsWith("/preview")) { if (previewFails) throw new Error(previewFails); return { text: PREVIEW, truncated } as never; }
-    if (path.endsWith("/suggest")) { if (suggestFails) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestion: SUGGESTION })) }; return { ok: true } as never; }
+    if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestion: SUGGESTION })) }; return { ok: true } as never; }
     if (opts?.method === "DELETE" || path.endsWith("/ignore")) { const id = Number(path.split("/")[3]); held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true } as never; }
     if (path.startsWith("/api/review/who/")) { const id = Number(path.split("/")[4]); held = { ...held, who: held.who.filter((w) => w.id !== id) }; return { ok: true, matched: 2 } as never; }
     throw new Error(`unexpected ${path}`);
   });
 }
 
-beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; previewFails = suggestFails = ""; truncated = false; held = { items: [item()], who: [who()], ai: false }; serve(); });
+beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; previewFails = suggestFails = ""; suggestGate = null; truncated = false; held = { items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
@@ -331,6 +332,24 @@ describe("Review: Ask AI", () => {
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1/suggest", "POST", undefined]));
     expect(await screen.findByRole("button", { name: /Check the AI.s suggestion/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Ask AI about/ })).toHaveTextContent("Ask again");
+  });
+
+  it("asks about several messages at once, each showing its own progress", async () => {
+    let open: () => void = () => {};
+    suggestGate = new Promise((r) => { open = r; });
+    held = { items: [item(), item({ id: 2 }), item({ id: 3 }), item({ id: 4 })], who: [], ai: true };
+    render(ReviewPage);
+    const asks = await screen.findAllByRole("button", { name: /Ask AI about “/ });
+    await userEvent.click(asks[0]);
+    await userEvent.click(asks[1]);
+    await waitFor(() => expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest", "/api/review/2/suggest"]));
+    expect(asks[0]).toHaveTextContent("Asking…");
+    expect(asks[1]).toHaveTextContent("Asking…");
+    expect(asks[0]).toBeDisabled();
+    expect(asks[2]).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Ask AI about all 2" })).toBeEnabled();   // only those not being asked
+    open();
+    await waitFor(() => expect(screen.getAllByRole("button", { name: /Check the AI.s suggestion/ })).toHaveLength(4));
   });
 
   it("says when the AI couldn’t be asked", async () => {
