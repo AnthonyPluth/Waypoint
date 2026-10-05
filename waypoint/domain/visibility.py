@@ -96,7 +96,8 @@ def household_segments(conn: db.Connection, kind: str) -> list[Segment]:
 
 def note_recipient(conn: db.Connection, viewer: Viewer, segment: Segment) -> bool:
     """The viewer got this booking's confirmation in their own mailbox, so they see its trip from now on: the email is
-    already theirs, and this shows them nothing else. Does nothing when they see the trip already (or aren't someone who
+    already theirs, but the whole trip becomes visible to them (every segment and traveller on it, as for a traveller), so it
+    rests on the match being right. Does nothing when they see the trip already (or aren't someone who
     can be noted). True when it noted them."""
     if viewer.household or viewer.person_id is None or visible_segment(conn, viewer, segment.id) is not None:
         return False
