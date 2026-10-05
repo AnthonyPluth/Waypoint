@@ -1,0 +1,15 @@
+data
+tests
+**/__pycache__
+*.db
+*.db-wal
+*.db-shm
+.env
+*.tar.gz
+.venv
+.git
+.github
+docs
+postgres
+frontend/node_modules
+waypoint/static/app

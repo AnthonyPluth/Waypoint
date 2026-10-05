@@ -1,0 +1,26 @@
+name: Set up Node and install packages
+description: Node (the version in .nvmrc, with npm's cache) and, unless told not to, the packages of frontend/ or docs/ (npm ci). Run after actions/checkout.
+
+# Every action is pinned by SHA, with its version in a comment, as in the workflows; Dependabot updates these too
+# (.github/dependabot.yml).
+inputs:
+  directory:
+    description: The npm project, with its package-lock.json (frontend or docs).
+    required: true
+  install:
+    description: Set to "false" to only set Node up (a job that needs no node_modules).
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+        cache-dependency-path: ${{ inputs.directory }}/package-lock.json
+    - name: Install the packages
+      if: inputs.install == 'true'
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: npm ci --no-audit --no-fund

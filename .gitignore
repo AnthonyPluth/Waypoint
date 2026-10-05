@@ -1,0 +1,32 @@
+# Your financial data and secrets: never commit these
+data/
+postgres/
+*.json.gz
+*.db
+*.db-wal
+*.db-shm
+.env
+
+# Python / tooling
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Packages and OS files
+*.tar.gz
+.DS_Store
+
+# The new web app: its dependencies, and what it builds (the Docker image builds it)
+node_modules/
+waypoint/static/app/
+
+# test coverage data (CI sends it to Codecov)
+.coverage
+coverage.xml
+# test results (CI sends them to Codecov)
+junit/
+frontend/junit.xml
+
+# make verify: screenshots and the report
+artifacts/

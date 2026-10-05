@@ -1,0 +1,103 @@
+// @vitest-environment jsdom
+import { render, screen, waitFor } from "@testing-library/svelte";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
+vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
+
+import { api } from "$lib/api";
+import { app } from "$lib/app.svelte";
+import { state } from "../test/fixtures";
+import Settings from "./Settings.svelte";
+
+const file = (name = "backup.json.gz") => new File(["x"], name, { type: "application/gzip" });
+const inspected = { created: "2026-09-01T10:00:00Z", source: "sqlite", counts: { trips: 3, loyalty_ids: 2 }, current: { trips: 1 }, database: "sqlite" };
+
+beforeEach(() => { vi.mocked(api).mockReset(); app.state = state(); });
+afterEach(() => { app.state = null; });
+
+describe("Settings account", () => {
+  it("says who is signed in, with a Sign out button", () => {
+    render(Settings);
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    expect(screen.getByText("ada@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+  });
+
+  it("says it runs without sign-in, and has nothing to sign out of", () => {
+    app.state = state({ user: { name: null, email: null, local: true } });
+    render(Settings);
+    expect(screen.getByText("Running without sign-in")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
+  });
+
+  it("signs out, then goes where the server says", async () => {
+    const fake = { href: "" };
+    vi.stubGlobal("location", fake);
+    vi.mocked(api).mockResolvedValue({ redirect: "/auth/signed-out" });
+    render(Settings);
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(api).toHaveBeenCalledWith("/auth/logout", { method: "POST" });
+    await waitFor(() => expect(fake.href).toBe("/auth/signed-out"));
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the version and the database", () => {
+    app.state = state({ database: "postgres" });
+    render(Settings);
+    expect(screen.getByText("1.2.3")).toBeInTheDocument();
+    expect(screen.getByText("Postgres")).toBeInTheDocument();
+  });
+});
+
+describe("Settings data", () => {
+  it("links to the backup download and says when the last one was", () => {
+    app.state = state({ last_backup: new Date().toISOString() });
+    render(Settings);
+    expect(screen.getByRole("link", { name: "Download backup" })).toHaveAttribute("href", "/api/backup");
+    expect(screen.getByText(/Last backup/)).toBeInTheDocument();
+  });
+
+  it("says when no backup has been downloaded", () => {
+    render(Settings);
+    expect(screen.getByText(/No backup downloaded yet/)).toBeInTheDocument();
+  });
+
+  it("reads a chosen file and shows what it holds before anything is replaced", async () => {
+    vi.mocked(api).mockResolvedValue(inspected);
+    const { container } = render(Settings);
+    const restore = screen.getByRole("button", { name: "Restore…" });
+    expect(restore).toBeDisabled();
+    await userEvent.upload(container.querySelector("input[type=file]")!, file());
+    const summary = await screen.findByTestId("backup-summary");
+    expect(summary).toHaveTextContent("5 rows");
+    expect(summary).toHaveTextContent("loyalty ids");
+    expect(restore).toBeEnabled();
+    expect(api).toHaveBeenCalledWith("/api/backup/inspect", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("says why a file can't be read", async () => {
+    vi.mocked(api).mockRejectedValue(new Error("Couldn’t read that backup (400)"));
+    const { container } = render(Settings);
+    await userEvent.upload(container.querySelector("input[type=file]")!, file());
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn’t read that backup");
+    expect(screen.getByRole("button", { name: "Restore…" })).toBeDisabled();
+  });
+
+  it("restores only after RESTORE is typed, then reports the safety copy and unreadable secrets", async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/restore"
+      ? { ok: true, created: "2026-09-01T10:00:00Z", source: "sqlite", counts: {}, safety_copy: "/data/before-restore.gz", unreadable_secrets: ["mail_password"] }
+      : path === "/api/state" ? state() : inspected) as never);
+    const { container } = render(Settings);
+    await userEvent.upload(container.querySelector("input[type=file]")!, file());
+    await userEvent.click(await screen.findByRole("button", { name: "Restore…" }));
+    const go = await screen.findByRole("button", { name: "Restore" });
+    expect(go).toBeDisabled();
+    await userEvent.type(screen.getByRole("textbox"), "RESTORE");
+    await userEvent.click(go);
+    expect(await screen.findByText("/data/before-restore.gz")).toBeInTheDocument();
+    expect(screen.getByText(/mail_password/)).toBeInTheDocument();
+    expect(api).toHaveBeenCalledWith("/api/restore", expect.objectContaining({ method: "POST" }));
+  });
+});

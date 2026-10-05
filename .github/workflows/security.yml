@@ -1,0 +1,233 @@
+name: Security scans
+
+# Static analysis, dependency, container, secret and workflow scans, on top of what docker.yml already runs (pip-audit).
+# Findings from Semgrep, Trivy, zizmor and Scorecard are uploaded to the Security tab (Code scanning), whose check runs
+# the merge gate requires; npm audit fails the build itself. CodeQL and Dependabot alerts come from GitHub's own
+# settings, not from here. Runs weekly too, because new vulnerabilities are published for code that hasn't changed.
+#
+# A pull request, and a push to main, runs only the scans its change can affect (see `changes`); the weekly and manual
+# runs scan everything.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+# bash, which runs each step with -eo pipefail: a command that fails inside a pipeline fails the step (without it, only
+# the last command in a pipeline counts, and a failed gh or curl passes silently).
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # What a pull request (or a push to main) changes, so the scans it can't affect are skipped (a skipped job counts as
+  # passed, for the merge gate too). A change to the workflows (.github/) runs every scan. Trivy's file scan always runs:
+  # a secret can be committed in any file.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read      # the pull request's list of changed files
+    outputs:
+      code: ${{ steps.what.outputs.code }}
+      web_deps: ${{ steps.what.outputs.web_deps }}
+      image: ${{ steps.what.outputs.image }}
+      workflows: ${{ steps.what.outputs.workflows }}
+    steps:
+      - name: Which scans the change can affect
+        id: what
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          # A rename counts for both its old and its new path.
+          paths='.filename, (.previous_filename // empty)'
+          if [ -n "$PR" ]; then
+            files=$(gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" --jq ".[] | $paths")
+            limit=3000      # the most the files API lists
+          elif [ "$EVENT" = push ] && [[ "$BEFORE" =~ ^[0-9a-f]{40}$ ]] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            files=$(gh api "repos/$REPO/compare/$BEFORE...$AFTER" --jq ".files[] | $paths")
+            limit=300       # the most a comparison lists
+          else
+            files=".github/(a scheduled or manual run scans everything)" limit=0
+          fi
+          # A change too big to list runs everything.
+          if [ "$limit" -gt 0 ] && [ "$(grep -c . <<< "$files" || true)" -ge "$limit" ]; then files=".github/(too many to list)"; fi
+          touches() { if grep -qE "$1|^\.github/" <<< "$files"; then echo true; else echo false; fi; }
+          {
+            echo "code=$(touches '^(waypoint|frontend/src|\.semgrep)/')"                          # Semgrep's paths
+            echo "web_deps=$(touches '^frontend/package(-lock)?\.json$')"                             # npm audit
+            echo "image=$(touches '^(Dockerfile|\.dockerignore|pyproject\.toml|poetry\.lock)$')"     # what the image holds beyond Waypoint's own code
+            echo "workflows=$(touches '^\.github/')"                                                 # zizmor
+          } | tee -a "$GITHUB_OUTPUT"
+
+  semgrep:
+    name: Semgrep
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      # Waypoint's own rules (.semgrep/waypoint.yml) go with the registry packs; `make semgrep` runs them locally. The pin is
+      # the Makefile's too.
+      - name: Check the Waypoint rules against their examples
+        run: python3 .semgrep/check_examples.py pipx run "semgrep==1.146.0"
+      - name: Semgrep
+        run: >
+          pipx run "semgrep==1.146.0" scan --metrics=off --sarif --output semgrep.sarif
+          --config p/python --config p/security-audit --config p/owasp-top-ten --config p/javascript
+          --config .semgrep/waypoint.yml waypoint run.py frontend/src
+      # Semgrep puts a finding with an inline `nosemgrep` in the SARIF as suppressed, and code scanning still alerts on it.
+      - name: Drop the findings suppressed in source
+        run: python3 .semgrep/drop_suppressed.py semgrep.sarif
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2   # v4.38.2
+        if: ${{ !cancelled() && hashFiles('semgrep.sarif') != '' }}
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  web:
+    name: npm audit
+    needs: changes
+    if: needs.changes.outputs.web_deps == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-app   # zizmor: ignore[self-repository] -- GitHub's documented form for a local action
+        with:
+          directory: frontend
+          install: "false"      # npm audit reads the lockfile
+      - name: Audit the web app's dependencies
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+
+  trivy:
+    name: Trivy (files)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Scan the repository (dependencies, secrets, Dockerfile and workflow settings)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25   # v0.36.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy-fs.sarif
+          severity: CRITICAL,HIGH
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2   # v4.38.2
+        if: ${{ !cancelled() && hashFiles('trivy-fs.sarif') != '' }}
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  image:
+    name: Trivy (image)
+    needs: changes
+    if: needs.changes.outputs.image == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069   # v4.4.1
+      # Built from the layers docker.yml's builds on main leave in the build cache, so only what the change touches is
+      # built again. Read-only: nothing this build makes goes back into the cache.
+      - name: Build the image (not published)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc   # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: waypoint:scan
+          cache-from: type=gha
+      - name: Scan the image (OS packages and libraries)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25   # v0.36.0
+        with:
+          image-ref: waypoint:scan
+          format: sarif
+          output: trivy-image.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2   # v4.38.2
+        if: ${{ !cancelled() && hashFiles('trivy-image.sarif') != '' }}
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+  workflows:
+    name: zizmor (GitHub Actions)
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      # zizmor at the version poetry.lock pins (pyproject.toml's dev group), the same as `poetry install` gives you.
+      - uses: ./.github/actions/setup-python-poetry   # zizmor: ignore[self-repository] -- GitHub's documented form for a local action
+        with:
+          cache-name: dev
+          install-args: --only dev
+      - name: Audit the workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: poetry run zizmor --format sarif . > zizmor.sarif
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2   # v4.38.2
+        if: ${{ !cancelled() && hashFiles('zizmor.sarif') != '' }}
+        with:
+          sarif_file: zizmor.sarif
+          category: zizmor
+
+  scorecard:
+    name: OpenSSF Scorecard
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc   # v2.4.4
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+          publish_results: true
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2   # v4.38.2
+        with:
+          sarif_file: scorecard.sarif
+          category: scorecard

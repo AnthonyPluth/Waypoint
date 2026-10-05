@@ -1,0 +1,114 @@
+# Waypoint's own Semgrep rules: the paved paths that earlier clean-ups left, so a copy of the old pattern fails CI
+# instead of coming back. `make semgrep` runs them (`make lint` and `make check` include it), and so does the Semgrep
+# job in .github/workflows/security.yml. Each rule has a passing and a failing example in .semgrep/examples/
+# (checked by .semgrep/check_examples.py, part of `make semgrep`).
+#
+# Fix a finding by using the paved path. Where a use is right for a reason, put `# nosemgrep: <rule id>` on the line,
+# with the reason beside it.
+rules:
+  - id: waypoint-raw-urlopen
+    message: >-
+      Make outbound HTTP calls through waypoint/tls.py's urlopen (certificate checks, https only, no stray redirects),
+      not urllib.request's urlopen or build_opener.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: urllib.request.urlopen(...)
+      - pattern: urllib.request.build_opener(...)
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/tls.py"]
+
+  - id: waypoint-unvalidated-body
+    message: >-
+      Read a request body's fields through waypoint/validate.py (it rejects what isn't the right type with a message
+      the user sees), not bool(), float() or int() on the raw value.
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern-either:
+          - pattern: $F(body)
+          - pattern: $F(body[...])
+          - pattern: $F(body.get(...))
+          - pattern: $F((body or ...)[...])
+          - pattern: $F((body or ...).get(...))
+      - metavariable-regex:
+          metavariable: $F
+          regex: ^(bool|float|int)$
+    paths:
+      include: ["/waypoint/server/api/"]
+
+  - id: waypoint-sql-from-string
+    message: >-
+      Don't build SQL from strings (an f-string, +, % or .format): use SQLAlchemy's expressions, or bind
+      parameters with sa.text(":name").
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: sqlalchemy.text(f"...")
+      - pattern: sqlalchemy.text($A + $B)
+      - pattern: sqlalchemy.text("..." % ...)
+      - pattern: sqlalchemy.text("...".format(...))
+      - pattern: text(f"...")
+      - pattern: text($A + $B)
+      - pattern: text("..." % ...)
+      - pattern: text("...".format(...))
+      - pattern: $C.exec_driver_sql(f"...")
+      - pattern: $C.exec_driver_sql($A + $B)
+      - pattern: $C.exec_driver_sql("..." % ...)
+      - pattern: $C.exec_driver_sql("...".format(...))
+      - pattern: $C.execute(f"...")
+      - pattern: $C.execute("..." % ...)
+      - pattern: $C.execute("...".format(...))
+    paths:
+      include: ["/waypoint/", "/run.py"]
+
+  - id: waypoint-today-in-jobs
+    message: >-
+      Background jobs (the mail scan) and provider code take the `today` they're given (so a test, and the scan's
+      local day, decide it) instead of reading the clock with date.today() (`today or date.today()` as a default is
+      fine).
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern-either:
+          - pattern: date.today()
+          - pattern: datetime.date.today()
+      # `today = today or date.today()`: the default for a caller that doesn't pass one.
+      - pattern-not-inside: $T or date.today()
+    paths:
+      include:
+        - "/waypoint/domain/mail/"
+        - "/waypoint/providers/"
+
+  - id: waypoint-utcnow
+    message: >-
+      datetime.utcnow() is deprecated and gives a naive time that reads as local. "Today" is the machine's local
+      time (TZ); anything sent to another system carries its zone (datetime.now(timezone.utc)).
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: datetime.utcnow()
+      - pattern: datetime.datetime.utcnow()
+    paths:
+      include: ["/waypoint/", "/run.py"]
+
+  - id: waypoint-month-arithmetic
+    message: >-
+      Month arithmetic (adding months, a month's length, months between) goes through waypoint/dates.py, which
+      clamps a day the month doesn't have; add the helper there if it's missing.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: dateutil.relativedelta.relativedelta(..., months=$N, ...)
+      - pattern: dateutil.relativedelta.relativedelta(..., years=$N, ...)
+      - pattern: relativedelta(..., months=$N, ...)
+      - pattern: relativedelta(..., years=$N, ...)
+      - pattern: calendar.monthrange(...)
+      - pattern: $D.year * 12
+      - pattern: ($A.year - $B.year) * 12
+      - pattern: $D.month + $N
+      - pattern: $D.month - $N
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/dates.py", "/waypoint/storage/migrations/"]

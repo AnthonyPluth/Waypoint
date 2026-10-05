@@ -1,0 +1,130 @@
+[project]
+name = "waypoint"
+version = "1.0.0"   # releases are versioned by Git tags (see README → Releases); this isn't bumped by hand
+description = "Self-hosted household travel: flights, hotels and rental cars from your email, read privately"
+readme = "README.md"
+requires-python = ">=3.14,<4.0"
+dependencies = [
+    "sqlalchemy (>=2.1.1,<3.0)",           # database engine for SQLite and Postgres
+    "alembic (>=1.13,<2.0)",             # schema migrations
+    "psycopg[binary] (>=3.1,<4.0)",      # Postgres driver (only used when DATABASE_URL is set)
+    "pyjwt[crypto] (>=2.8,<3.0)",        # verifying sign-in (OIDC) ID tokens
+    "pywebpush (>=2.0,<3.0)",            # push notifications (VAPID + encrypted payloads)
+    "python-dateutil (>=2.9,<3.0)",      # month arithmetic (waypoint/dates.py)
+    "sentry-sdk (>=2.30,<3.0)",         # error reports to Sentry (only when SENTRY_DSN is set; see waypoint/monitoring.py)
+]
+
+[tool.poetry]
+package-mode = false   # an application, not a library: `poetry install` just installs the dependencies
+
+# The tools CI runs (docker.yml, security.yml) and `make check` runs, pinned so every run uses the same versions;
+# Dependabot updates them here. `poetry install` adds them; the Docker image installs only the main dependencies.
+[tool.poetry.group.dev.dependencies]
+ruff = "0.16.9"
+mypy = "2.3.1"
+types-python-dateutil = "2.9.0.20260807"
+coverage = "7.16.2"
+unittest-parallel = "1.8.6"
+pip-audit = "2.10.1"
+zizmor = "1.30.1"
+import-linter = "2.15"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py314"
+# .semgrep/examples/ holds code that is wrong on purpose (the patterns the Semgrep rules flag), and is only parsed.
+extend-exclude = [".semgrep/examples"]
+
+[tool.ruff.lint]
+# Mistakes rather than style: undefined names, unused imports and variables, syntax errors, plus bugbear's likely
+# bugs, pyupgrade's modern idioms, simplifications and ruff's own checks. The code's own style (a few statements on
+# one line, lambdas for tiny helpers, imports after server/handler.py's MIME setup) is left alone.
+select = ["E4", "E7", "E9", "F", "B", "UP", "SIM", "RUF"]
+ignore = [
+    "E402", "E702", "E731", "E741",
+    # User-facing strings and comments use real typography on purpose (’ – −), not look-alike ASCII.
+    "RUF001", "RUF002", "RUF003",
+    # Class-level fixtures and lookup tables are plain attributes; the code doesn't annotate with ClassVar.
+    "RUF012",
+    # Nested `with` keeps a patch's scope apart from the assertRaises (or block) it sets up.
+    "SIM117",
+]
+
+[tool.coverage.run]
+# CI measures how much of Waypoint the tests run and sends it to Codecov (the README's backend badge):
+# `coverage run -m unittest discover tests`. The report names files from the repository root (waypoint/oidc.py, not
+# oidc.py relative to a <source> of waypoint), which is how Codecov matches them to the repository's files.
+source = ["."]
+omit = ["tests/*"]
+relative_files = true
+
+[tool.coverage.report]
+include = ["waypoint/*"]
+skip_empty = true
+
+# The backend's boundaries (AGENTS.md → Layout), checked by import-linter (`lint-imports`, part of `make lint` and CI).
+# Move code to where its imports are allowed rather than adding an exception; an exception below says why it's one.
+[tool.importlinter]
+root_package = "waypoint"
+include_external_packages = true   # so the network and database libraries can be named below
+
+[[tool.importlinter.contracts]]
+id = "server-on-top"
+name = "Only the server imports the server (the domain, providers, storage and shared modules don't)"
+type = "forbidden"
+source_modules = ["waypoint.domain", "waypoint.providers", "waypoint.storage", "waypoint.tls", "waypoint.validate",
+                  "waypoint.dates", "waypoint.monitoring", "waypoint.oidc"]
+forbidden_modules = ["waypoint.server"]
+
+[[tool.importlinter.contracts]]
+id = "network-through-tls"
+name = "Only waypoint.tls opens outbound connections"
+type = "protected"
+# Squashed to the top-level package (import-linter can't tell urllib.request from urllib.parse), so urllib isn't here:
+# Semgrep's waypoint-raw-urlopen keeps urlopen and build_opener in waypoint/tls.py.
+protected_modules = ["ssl", "socket", "http", "requests", "pywebpush"]
+allowed_importers = ["waypoint.tls"]
+ignore_imports = [
+    "waypoint.server.handler -> socket",                 # the web server itself: it accepts connections, it doesn't open them
+    "waypoint.server.handler -> http",
+    "waypoint.verify -> socket",                         # binds 127.0.0.1:0 to find a free port for the demo server; nothing is sent
+    "waypoint.providers.webpush -> requests",            # pywebpush sends with requests (a session that doesn't follow redirects)
+    "waypoint.providers.webpush -> pywebpush",
+]
+broken_contract_guidance = "Make the request with waypoint.tls.urlopen instead of opening the connection yourself."
+
+# A provider doesn't import another one: each new provider module (Gmail, a flight-status service) gets a contract of
+# its own here naming the others, as soon as there are two. What two of them share belongs in a module of its own.
+
+[[tool.importlinter.contracts]]
+id = "storage-at-the-bottom"
+name = "Storage imports nothing from the domain, the providers or the server"
+type = "forbidden"
+source_modules = ["waypoint.storage"]
+forbidden_modules = ["waypoint.domain", "waypoint.providers", "waypoint.server"]
+
+[[tool.importlinter.contracts]]
+id = "database-through-storage"
+name = "Only waypoint.storage talks to the database drivers and Alembic"
+type = "protected"
+protected_modules = ["sqlite3", "psycopg", "alembic"]
+allowed_importers = ["waypoint.storage"]
+broken_contract_guidance = "Reach the database through waypoint.storage.db (db.session(), db.connect())."
+
+[tool.mypy]
+# Static type checking: `make lint` and CI run `mypy` over the app. Not strict yet: unannotated functions are still
+# checked inside (check_untyped_defs), but nothing is required to carry annotations. Database rows are loosely typed
+# for now (db.Row reads by name, db.rows() gives plain dicts), so most row access is Any.
+python_version = "3.14"
+files = ["waypoint", "run.py"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+# Libraries that ship without type information (and have no stub package): imported as Any.
+[[tool.mypy.overrides]]
+module = ["py_vapid", "pywebpush"]
+ignore_missing_imports = true

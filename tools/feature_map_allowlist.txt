@@ -1,0 +1,3 @@
+# Routes that have no test yet, as "METHOD /path" (see tools/feature_map.py). `make check` fails for a route with no
+# test that isn't here, and for a line here whose route has a test or is gone: this list only shrinks. Waypoint's
+# started empty: every route has a test from its first commit, so there is never a line to add.

@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "findings"],
+  "properties": {
+    "summary": {"type": "string", "description": "Two or three sentences: what the change does and how sound it is."},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "title", "detail"],
+        "properties": {
+          "severity": {"enum": ["blocking", "advisory"]},
+          "file": {"type": "string", "description": "Path in the repository, if the finding is about one file."},
+          "line": {"type": "integer", "description": "Line in the pull request's version of the file."},
+          "title": {"type": "string", "description": "One line."},
+          "detail": {"type": "string", "description": "What is wrong, what happens because of it, and the fix."}
+        }
+      }
+    }
+  }
+}

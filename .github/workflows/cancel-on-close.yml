@@ -1,0 +1,39 @@
+name: Cancel runs on close
+
+# When a pull request is merged or closed, stop its runs that are still going: the Docker image build and tests,
+# and the security scans. Nothing is lost, since a merge starts main's own runs.
+#
+# GitHub doesn't cancel a pull request's runs when it closes. Each of those workflows is in a concurrency group per pull
+# request with cancel-in-progress, which is how a new push already replaces an older run. Each job below joins one of
+# those groups (the names must match the workflows'), so starting it cancels the run in progress; the job itself does
+# nothing. The groups are built from the pull request's number, never from github.ref: once a pull request is merged,
+# github.ref on its closed event is main's, and joining main's groups would cancel main's own release and scans.
+# GitHub's own CodeQL checks come from the repository's settings, not a workflow here, so they aren't covered.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+# bash, which runs each step with -eo pipefail: a command that fails inside a pipeline fails the step (without it, only
+# the last command in a pipeline counts, and a failed gh or curl passes silently).
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: docker-image-refs/pull/${{ github.event.pull_request.number }}/merge   # docker.yml
+      cancel-in-progress: true
+    steps:
+      - run: echo "Stopped any Docker image run still going on this pull request."
+  security:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: security-refs/pull/${{ github.event.pull_request.number }}/merge   # security.yml
+      cancel-in-progress: true
+    steps:
+      - run: echo "Stopped any security scan still running on this pull request."

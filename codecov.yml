@@ -1,0 +1,13 @@
+# Codecov (the README's coverage badges). CI uploads two reports: backend (coverage.py, from the SQLite test run) and
+# frontend (Vitest's lcov.info, whose paths start at frontend/).
+fixes:
+  - "^src/::frontend/src/"
+coverage:
+  status:
+    project:
+      default:
+        informational: true   # report coverage on pull requests, never fail them over it
+    patch:
+      default:
+        informational: true
+comment: false                # the status checks carry the numbers; no bot comment on every pull request
