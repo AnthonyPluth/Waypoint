@@ -1,9 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Waypoint">
-  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f93cb"/><stop offset="1" stop-color="#0a5a88"/></linearGradient></defs>
-  <rect width="64" height="64" rx="16" fill="url(#bg)"/>
-  <path d="M22 39C27 24 37 44 43 23" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="0.1 8"/>
-  <circle cx="15" cy="46" r="4.5" fill="none" stroke="#ffffff" stroke-width="3"/>
-  <circle cx="31" cy="34" r="4.5" fill="#ffffff"/>
-  <circle cx="48" cy="17" r="7" fill="#f6b73c"/>
-  <circle cx="48" cy="17" r="2.6" fill="#0a5a88"/>
+  <rect width="64" height="64" rx="14" fill="#0a1626"/>
+  <g>
+    <path d="M18 11h28a7 7 0 0 1 7 7v14H11V18a7 7 0 0 1 7-7z" fill="#1b3354"/>
+    <path d="M11 32h42v14a7 7 0 0 1-7 7H18a7 7 0 0 1-7-7z" fill="#12233a"/>
+    <path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M11 32h42" stroke="#0a1626" stroke-width="2.2"/>
+    <circle cx="11" cy="32" r="2.2" fill="#52c4ef"/>
+    <circle cx="53" cy="32" r="2.2" fill="#52c4ef"/>
+  </g>
 </svg>
