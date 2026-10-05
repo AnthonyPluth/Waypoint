@@ -206,5 +206,14 @@ class Tests(unittest.TestCase):
         self.assertEqual(fc.check_tests(fc._git("merge-base", base, "HEAD").strip(), [m for _, m in found]), [])
 
 
+class ManageLinks(unittest.TestCase):
+    def test_a_provider_needs_a_test_and_a_bare_host(self):
+        table = {"example air": ("www.example.com", "/m?c={code}")}
+        self.assertEqual(fc.check_manage_links(table, 'x("example air")'), [])
+        self.assertIn("has no test", fc.check_manage_links(table, "")[0])
+        self.assertIn("isn't a bare host", fc.check_manage_links({"a": ("evil.com/x", "/")}, '"a"')[0])
+        self.assertEqual(fc.check_manage_links({}, ""), [])
+
+
 if __name__ == "__main__":
     unittest.main()

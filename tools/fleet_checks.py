@@ -275,12 +275,26 @@ def check_workflows() -> list[str]:
     return problems
 
 
+def check_manage_links(table: dict, tests_text: str) -> list[str]:
+    """Every provider in the manage-link table is named in a test that builds its URL (tests/test_links.py), over https."""
+    problems = []
+    for provider, (host, _path) in table.items():
+        if not re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", host):
+            problems.append(f"manage link for {provider!r}: {host!r} isn't a bare host")
+        if f'"{provider}"' not in tests_text and f"'{provider}'" not in tests_text:
+            problems.append(f"manage link for {provider!r} has no test in tests/test_links.py")
+    return problems
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--commits", metavar="BASE..HEAD", help="also check these commits' trailers (a pull request's)")
     args = ap.parse_args(argv)
     problems = check_migrations(migrations(), MIGRATION_TESTS.read_text())
     problems += check_workflows()
+    sys.path.insert(0, str(ROOT))
+    from waypoint.domain import links
+    problems += check_manage_links(links.MANAGE, (ROOT / "tests/test_links.py").read_text())
     if args.commits:
         found = commits(args.commits)
         for sha, message in found:
@@ -292,7 +306,7 @@ def main(argv: list[str] | None = None) -> int:
     if not problems:
         print("Fleet checks passed: one migration head, migrations tested"
               + (", commit trailers, no test removed or skipped without a reason" if args.commits else "")
-              + ", workflow conventions.")
+              + ", workflow conventions, manage links tested.")
     return 1 if problems else 0
 
 

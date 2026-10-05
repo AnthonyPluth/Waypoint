@@ -165,6 +165,12 @@ class Traveler(TypedDict):
     name: str                       # the person's name, or the name as printed on the booking
 
 
+class SegmentLinks(TypedDict):
+    app: str | None                 # the provider's manage-trip page (https): its app opens it if installed
+    directions: str | None          # Apple Maps, for a hotel or a rental
+    call: str | None                # tel:
+
+
 class Segment(TypedDict):
     """One flight leg, hotel stay, car rental or train. Its times are local wall-clock times at the place, never
     converted: `start_local` is 2026-03-01T22:15 in `start_zone`, whatever zone the server or the viewer is in."""
@@ -186,6 +192,7 @@ class Segment(TypedDict):
     booked_by: int | None           # a person
     locked_fields: list[str]        # what a person edited, which a later email never overwrites
     travelers: list[Traveler]
+    links: SegmentLinks              # the card's actions, built by the server
 
 
 class Trip(TypedDict):

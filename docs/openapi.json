@@ -2070,6 +2070,9 @@
             "items": {
               "$ref": "#/components/schemas/Traveler"
             }
+          },
+          "links": {
+            "$ref": "#/components/schemas/SegmentLinks"
           }
         },
         "required": [
@@ -2090,7 +2093,8 @@
           "source",
           "booked_by",
           "locked_fields",
-          "travelers"
+          "travelers",
+          "links"
         ],
         "additionalProperties": false
       },
@@ -2268,6 +2272,35 @@
           }
         },
         "required": [],
+        "additionalProperties": false
+      },
+      "SegmentLinks": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "directions": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "call": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "app",
+          "directions",
+          "call"
+        ],
         "additionalProperties": false
       },
       "SignedIn": {

@@ -31,6 +31,15 @@ Each segment has a kind (flight, hotel, car or train), a status (confirmed, chan
 
 A segment is added to a trip you name, or without one: Waypoint puts it in the trip it belongs to (see below) or makes a new trip.
 
+## Actions on a booking
+
+Each booking card has buttons for what you'd do next:
+
+- **Open in app**: the booking's manage link (from the email, or one you entered). It's a link on the provider's own website; on a phone the provider's app opens it if the app is installed. Only https links are offered. Waypoint doesn't build prefilled manage links for any provider yet, because it only adds one once its URL is confirmed from the provider's public site.
+- **Wallet**: on an iPhone or iPad only. It opens the Wallet app itself; no link opens one pass.
+- **Directions**: an Apple Maps link to a hotel's or rental's address (or its place name when there's no address).
+- **Call**: dials the phone number on the booking, when it has one.
+
 ## Times are where they happen
 
 A segment’s times are the wall-clock times at its places, stored with the place’s time zone (an IANA name such as `Pacific/Auckland`). Waypoint never converts them to the server’s time zone or to UTC: a 22:15 departure from Auckland is 22:15 in Auckland, and the arrival that is the same day in Los Angeles is shown at its own local time. Type a time as it appears on the booking, like `2026-03-01T22:15`, without an offset. A flight’s zones come from its airports (Waypoint knows the airports by their three-letter code); name the zone yourself for a place that isn’t on the list. Waypoint refuses a segment that ends before it starts, comparing the two at their own zones, so a flight across the date line, whose arrival is earlier on the clock than its departure, is fine.
