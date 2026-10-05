@@ -72,6 +72,9 @@ export function until(ms: number): string {
   return `${days} day${days === 1 ? "" : "s"}${hours % 24 ? ` ${hours % 24} h` : ""}`;
 }
 
+/** An imported flight whose file gave no times: it has a day but no times, and no duration. */
+export const untimed = (s: Segment): boolean => s.details.time_unknown === "yes";
+
 export const startAt = (s: Segment): number => instant(s.start_local, s.start_zone);
 export const endAt = (s: Segment): number => instant(s.end_local, s.end_zone);
 
@@ -97,7 +100,7 @@ const groupKey = (s: Segment): string | null => {
 
 /** Whether the bookings that aren't cancelled don't agree on when the flight leaves or lands. */
 export const timesDiffer = (bookings: Segment[]): boolean =>
-  new Set(bookings.filter((s) => s.status !== "cancelled").map((s) => `${s.start_local}|${s.end_local}`)).size > 1;
+  new Set(bookings.filter((s) => s.status !== "cancelled" && !untimed(s)).map((s) => `${s.start_local}|${s.end_local}`)).size > 1;
 
 /** A trip's segments as cards: the bookings of one flight (the same flight number, local departure date and airports) are one
  *  card; a stay, a rental, a train, a flight with no number or one nobody else booked is a card of its own. In the order the
@@ -127,11 +130,11 @@ export type NextUp = { trip: Trip; segment: Segment; bookings: Segment[]; state:
 
 /** The segment the Upcoming page leads with, among every trip you can see. One under way (a flight in the air, a rental
  *  out) leads: "now". Otherwise the one that starts soonest: "next". A hotel stay under way doesn't push the day's flight
- *  aside; it leads only when nothing else is left. Cancelled segments and ones that are over never lead. A flight on
+ *  aside; it leads only when nothing else is left. Cancelled segments, ones that are over and ones with no times (there's nothing to count down to) never lead. A flight on
  *  several bookings is one: `segment` is the first, `bookings` all of them. */
 export function nextUp(trips: Trip[], now: number): NextUp | null {
   const live = trips.flatMap((trip) => bookingCards(trip.segments).flatMap((card) => {
-    const bookings = card.segments.filter((s) => s.status !== "cancelled" && endAt(s) > now);
+    const bookings = card.segments.filter((s) => s.status !== "cancelled" && !untimed(s) && endAt(s) > now);
     return bookings.length ? [{ trip, segment: bookings[0], bookings }] : [];
   }));
   const by = (a: { segment: Segment }, b: { segment: Segment }) => startAt(a.segment) - startAt(b.segment);

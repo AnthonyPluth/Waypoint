@@ -46,7 +46,7 @@ VERSION = 1
 # reference data every database is given by its migrations, and no row refers to them. The flight status cache is refetched.
 # Devices belong to the browsers that made them and feeds to the addresses that were handed out: both are set up again after
 # a restore (what was already sent isn't sent twice, but a restored database may be on another day's flights).
-SKIP = {"auth_sessions", "auth_pending", "mailbox_pending", "airports", "flight_status", "push_devices", "calendar_feeds",
+SKIP = {"auth_sessions", "auth_pending", "mailbox_pending", "airports", "airlines", "flight_status", "push_devices", "calendar_feeds",
         "reminders_sent"}
 NEWER = "That backup is from a newer version of Waypoint. Update Waypoint first."
 

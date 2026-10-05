@@ -103,6 +103,54 @@ export interface FlightStatusPause {
   reason: "limit" | "rate" | "key";
 }
 
+export interface ImportBody {
+  flights: ImportFlight[];
+  person_ids?: number[];
+}
+
+/** A flight to save, as the preview showed it: the web app sends back only the rows being saved, never the file. */
+export interface ImportFlight {
+  day: string;
+  origin: string;
+  destination: string;
+  flight_number?: string | null;
+  airline?: string | null;
+  start_local?: string | null;
+  end_local?: string | null;
+  seat?: string | null;
+  cabin?: string | null;
+}
+
+export interface ImportPreview {
+  format: string;
+  me: number | null;
+  rows: ImportRow[];
+}
+
+/**
+ * One row of the uploaded file as a flight, for the preview: new, already in Waypoint, or one that can't be read (with
+ * why). Times are local wall-clock times at the airports; both are null when the file gave none.
+ */
+export interface ImportRow {
+  line: number;
+  status: "new" | "exists" | "unreadable";
+  reason: string | null;
+  day: string | null;
+  origin: string | null;
+  destination: string | null;
+  flight_number: string | null;
+  airline: string | null;
+  start_local: string | null;
+  end_local: string | null;
+  seat: string | null;
+  cabin: string | null;
+}
+
+export interface Imported {
+  added: number;
+  existing: number;
+}
+
 /** A membership, to save or to change. `number` is needed to save one; left out when changing, the saved one is kept. */
 export interface LoyaltyBody {
   person_id: number;
@@ -263,7 +311,7 @@ export interface Segment {
   destination: string | null;
   details: Record<string, string>;
   manage_url: string | null;
-  source: "manual" | "email";
+  source: "manual" | "email" | "import";
   booked_by: number | null;
   locked_fields: string[];
   travelers: Traveler[];
@@ -336,6 +384,105 @@ export interface State {
   user: SignedIn | null;
   last_backup: string | null;
   review_count: number;
+}
+
+export interface Stats {
+  person: number | null;
+  year: number | null;
+  distance_unit: "mi" | "km";
+  flights: StatsFlights;
+  stays: StatsStays;
+  cars: StatsCars;
+  places: StatsPlaces;
+}
+
+export interface StatsAirline {
+  code: string | null;
+  name: string;
+  flights: number;
+}
+
+export interface StatsAirport {
+  code: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  visits: number;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface StatsCars {
+  days: number;
+  companies: StatsNamed[];
+}
+
+export interface StatsFlightRecord {
+  origin: string;
+  destination: string;
+  distance_km: number;
+  start_local: string;
+  flight_number: string | null;
+}
+
+export interface StatsFlights {
+  count: number;
+  distance_km: number;
+  air_seconds: number;
+  airports: StatsAirport[];
+  airlines: StatsAirline[];
+  countries: StatsNamed[];
+  routes: StatsRoute[];
+  cabins: StatsNamed[];
+  top_seat: string | null;
+  seat_positions: StatsSeats;
+  longest: StatsFlightRecord | null;
+  shortest: StatsFlightRecord | null;
+  most_visited_airport: string | null;
+  busiest_month: string | null;
+  times_around_earth: number;
+  moon_fraction: number;
+}
+
+export interface StatsNamed {
+  name: string;
+  count: number;
+}
+
+export interface StatsPlace {
+  name: string;
+  first_visit: string;
+  visits: number;
+}
+
+export interface StatsPlaces {
+  countries: StatsPlace[];
+  cities: StatsPlace[];
+}
+
+export interface StatsRoute {
+  a: string;
+  b: string;
+  flights: number;
+  distance_km: number | null;
+  a_latitude: number | null;
+  a_longitude: number | null;
+  b_latitude: number | null;
+  b_longitude: number | null;
+}
+
+export interface StatsSeats {
+  window: number;
+  aisle: number;
+  middle: number;
+  unknown: number;
+}
+
+export interface StatsStays {
+  nights: number;
+  chains: StatsNamed[];
+  cities: StatsNamed[];
+  countries: StatsNamed[];
 }
 
 export interface Traveler {
@@ -416,6 +563,9 @@ export interface Endpoints {
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };
   "DELETE /api/segments/{id}": { body: never; reply: Ok };
   "GET /api/airports/{id}": { body: never; reply: Airport };
+  "POST /api/import/preview": { body: never; reply: ImportPreview };
+  "POST /api/import": { body: ImportBody; reply: Imported };
+  "GET /api/stats": { body: never; reply: Stats };
   "GET /api/flight-status": { body: never; reply: FlightStatusList };
   "POST /api/flight-status/{id}": { body: never; reply: FlightStatusList };
   "GET /api/loyalty": { body: never; reply: LoyaltyList };

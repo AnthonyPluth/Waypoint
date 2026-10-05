@@ -280,6 +280,7 @@ class MigrationTests(unittest.TestCase):
             c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="enc:v1:x", status="connected"))
             c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m1", sender_domain="air.example",
                                                          reason="no_markup", created=1.0))
+            command.upgrade(db.alembic_config(c), "0009")
             command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:   # an item from before has no suggestion and no error
@@ -292,13 +293,33 @@ class MigrationTests(unittest.TestCase):
             self.assertNotIn("suggestion_error", names)
             self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)
 
-    def test_0010_makes_the_recipients_table_and_merges_the_duplicate_segments(self):
+    def test_0010_seeds_the_airlines_and_takes_them_away(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0009")
+            self.assertNotIn("airlines", sa.inspect(c).get_table_names())
+            command.upgrade(db.alembic_config(c), "0010")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:
+            a = schema.airlines.c
+            found = {code: (name, icao, country) for code, name, icao, country in conn.execute(select(a.code, a.name, a.icao, a.country)).fetchall()}
+            self.assertEqual(found["NZ"], ("Air New Zealand", "ANZ", "New Zealand"))
+            self.assertGreater(len(found), 900)
+        with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:   # a code is one airline
+            conn.execute(insert(schema.airlines).values(code="NZ", name="Another"))
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0009")
+            self.assertNotIn("airlines", sa.inspect(c).get_table_names())
+            self.assertIn("scanned_messages", sa.inspect(c).get_table_names())
+
+    def test_0011_makes_the_recipients_table_and_merges_the_duplicate_segments(self):
         from alembic import command
         db.init(self.path)
         seg = dict(kind="flight", status="confirmed", provider="American Airlines", start_zone="America/New_York",
                    end_zone="Europe/London", origin="JFK", destination="LHR", source="email", locked_fields=None, manage_url=None)
         with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0009")
+            command.downgrade(db.alembic_config(c), "0010")
             self.assertNotIn("segment_recipients", sa.inspect(c).get_table_names())
             for i, name in ((1, "Jane"), (2, "Sam"), (3, "Mia")):
                 c.execute(insert(schema.people).values(id=i, display_name=name))
@@ -344,7 +365,7 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual([t["id"] for t in db.rows(conn.execute(select(schema.trips)))], [1])
             self.assertEqual([(r["segment_id"], r["person_id"]) for r in db.rows(conn.execute(select(schema.segment_recipients)))], [(1, 2)])
         with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0009")
+            command.downgrade(db.alembic_config(c), "0010")
             self.assertNotIn("segment_recipients", sa.inspect(c).get_table_names())
             command.upgrade(db.alembic_config(c), "head")
         with db.session(self.path) as conn:   # (up again on what's left: nothing more to merge, and the table is empty)

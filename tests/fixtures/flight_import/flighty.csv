@@ -1,0 +1,7 @@
+Date,Airline,Flight,From,To,Dep Terminal,Dep Gate,Arr Terminal,Arr Gate,Canceled,Diverted To,Gate Departure (Scheduled),Gate Departure (Actual),Take off (Scheduled),Take off (Actual),Landing (Scheduled),Landing (Actual),Gate Arrival (Scheduled),Gate Arrival (Actual),Aircraft Type Name,Tail Number,PNR,Seat,Seat Type,Cabin Class,Flight Reason,Notes,Flight Flighty ID
+2025-03-01,DL,1001,JFK,LAX,4,B22,5,41,false,,2025-03-01T08:00:00-05:00,2025-03-01T08:12:00-05:00,2025-03-01T08:20:00-05:00,2025-03-01T08:31:00-05:00,2025-03-01T11:05:00-08:00,2025-03-01T11:14:00-08:00,2025-03-01T11:20:00-08:00,2025-03-01T11:29:00-08:00,Airbus A321,N123XX,CANARY-PNR-QQ7Z,14C,Aisle,Economy,Leisure,CANARY-NOTES-FLIGHTY-4D7Q,fl-1
+2025-03-08,DL,1002,LAX,JFK,,,,,false,,,,,,,,,,,,,,,,,,CANARY-NOTES-FLIGHTY-9K2M,fl-2
+2025-03-09,XX,77,JFK,ZZZ,,,,,false,,,,,,,,,,,,,,,,,,,fl-3
+2025-04-02,AS,2002,SEA,SFO,,,,,false,,2025-04-02T07:30:00-07:00,,,,,,,2025-04-02T09:40:00-07:00,,,,,,,Economy,,,fl-4
+2025-04-20,UA,310,ORD,DEN,,,,,true,,2025-04-20T10:00:00-05:00,,,,,,,2025-04-20T11:30:00-06:00,,,,,,,,,,fl-5
+not a date,UA,311,ORD,DEN,,,,,false,,,,,,,,,,,,,,,,,,,fl-6

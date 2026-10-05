@@ -30,8 +30,18 @@ Kind = Literal["flight", "hotel", "car", "train"]
 Status = Literal["confirmed", "changed", "cancelled"]
 KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train")
 STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
-# What a segment's details may hold (the rest of a booking has a field of its own), each a text.
-DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone")
+TIME_UNKNOWN = "time_unknown"
+# What a segment's details may hold (the rest of a booking has a field of its own), each a text. `time_unknown` ("yes") marks an
+# imported flight whose file gave no times: it starts and ends at midnight of its day and counts in distance, not time.
+DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone", TIME_UNKNOWN)
+
+
+def untimed(details: Mapping[str, str]) -> bool:
+    """Whether a segment's times are unknown (an imported flight whose file gave none): its start and end are only a
+    placeholder at midnight of its day, so nothing may show them as real times or schedule anything from them."""
+    return details.get(TIME_UNKNOWN) == "yes"
+
+
 # A person's edit locks the fields it changes; these are the names a lock can have.
 FIELDS = ("kind", "status", "confirmation", "provider", "start_local", "start_zone", "end_local", "end_zone", "origin",
           "destination", "details", "manage_url", "travelers")
@@ -103,7 +113,7 @@ class SegmentOut(TypedDict):
     destination: str | None
     details: dict[str, str]
     manage_url: str | None
-    source: Literal["manual", "email"]
+    source: Literal["manual", "email", "import"]
     booked_by: int | None
     locked_fields: list[str]
     travelers: list[TravelerOut]
@@ -310,7 +320,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
         {"id": s.id, "trip_id": s.trip_id, "kind": cast(Kind, s.kind), "status": cast(Status, s.status), "confirmation": s.confirmation,
          "provider": s.provider, "start_local": s.start_local, "start_zone": s.start_zone, "end_local": s.end_local,
          "end_zone": s.end_zone, "origin": s.origin, "destination": s.destination, "details": decode_details(s.details),
-         "manage_url": s.manage_url, "source": cast(Literal["manual", "email"], s.source), "booked_by": s.booked_by,
+         "manage_url": s.manage_url, "source": cast(Literal["manual", "email", "import"], s.source), "booked_by": s.booked_by,
          "locked_fields": decode_locked(s.locked_fields), "travelers": by_segment.get(s.id, []),
          "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, decode_details(s.details), s.origin)}
         for s in segs]
@@ -487,7 +497,7 @@ def _needs_person(viewer: Viewer) -> None:
 
 
 def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id: int | None = None,
-                source: Literal["manual", "email"] = "manual") -> SegmentOut | None:
+                source: Literal["manual", "email", "import"] = "manual") -> SegmentOut | None:
     """Add a segment the viewer booked, to this trip, or (without one) to the trip it belongs to or a new one. Travellers
     default to the viewer. `source`: where it came from (a scanned email, or the person). None: no such trip (for the
     viewer). Raises Invalid."""
@@ -531,6 +541,11 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id).order_by(SegmentTraveler.id)).all()]
     before = _current(seg, old)
     merged: SegmentIn = {**before, **changes}
+    if untimed(before.get("details") or {}):
+        # The marker is the server's: it stays until a person gives the segment real times, whatever "details" a client sends.
+        retimed = any(k in changes and changes[k] != before.get(k) for k in ("start_local", "end_local"))
+        kept = {k: v for k, v in (merged.get("details") or {}).items() if k != TIME_UNKNOWN}
+        merged["details"] = kept if retimed else {**kept, TIME_UNKNOWN: "yes"}
     for place, zone in (("origin", "start_zone"), ("destination", "end_zone")):
         # (only an airport gives a zone; a stay's or a rental's is the person's)
         if place in changes and zone not in changes and changes.get(place) != before.get(place) and merged.get("kind") == "flight":

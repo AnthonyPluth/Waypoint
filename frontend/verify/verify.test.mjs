@@ -15,6 +15,12 @@ describe("flowProblems", () => {
     expect(bad[2]).toMatch(/step 3 must have exactly one of/);
   });
 
+  it("takes a file to upload and an element to scroll to", () => {
+    const steps = [{ upload: { selector: "input[type=file]", file: "tests/fixtures/flight_import/flighty.csv" } }, { scroll_to: "#import-title" }];
+    expect(flowProblems({ ...ok, steps })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ upload: "x" }] })).toEqual(["step 1: upload takes a object"]);
+  });
+
   it("rejects a viewport it doesn't know", () => expect(flowProblems({ ...ok, viewports: ["watch"] })).toEqual(["unknown viewport watch"]));
 
   it("rejects a page the app doesn't have, so a typo can't pass for a clean run", () => {

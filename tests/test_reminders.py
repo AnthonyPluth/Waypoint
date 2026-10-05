@@ -65,6 +65,15 @@ class CalendarTests(unittest.TestCase):
         self.assertIn("DTEND;TZID=America/Los_Angeles:20260301T151000", lines)   # it lands "before" it left, on the same date
         self.assertIn("SUMMARY:Flight NZ 6 AKL → LAX", lines)
 
+    def test_a_flight_with_no_times_is_an_all_day_event_not_a_midnight_departure(self):
+        untimed = segment(start_local="2026-03-08T00:00", start_zone="America/Los_Angeles", end_local="2026-03-08T03:00",
+                          end_zone="America/New_York", details={"flight_number": "NZ 6", "time_unknown": "yes"})
+        lines = self.lines(untimed)
+        self.assertIn("DTSTART;VALUE=DATE:20260308", lines)
+        self.assertIn("DTEND;VALUE=DATE:20260309", lines)
+        self.assertEqual([l for l in lines if l.startswith("BEGIN:VTIMEZONE") or "T000000" in l or "T030000" in l], [])
+        self.assertNotIn("TZID:America/New_York", self.lines(untimed, segment(id=2)))   # (no zone is described for it)
+
     def test_no_event_time_is_converted_to_utc(self):
         for line in self.lines(segment(), segment(id=2, start_zone="Europe/London", end_zone="America/New_York")):
             if line.startswith(("DTSTART", "DTEND")):
@@ -264,6 +273,16 @@ class SendingTests(Reminders):
         self.due(datetime(2026, 11, 20, 1, 0, tzinfo=UTC), hour=3)
         trips.edit_segment(self.c, self.jane, self.out["id"], {"start_local": "2026-11-20T21:00", "end_local": "2026-11-21T09:10"})
         self.assertEqual(self.due(datetime(2026, 11, 20, 2, 0, tzinfo=UTC), hour=3), 1)
+
+    def test_a_flight_with_no_times_has_no_check_in_and_the_day_says_so(self):
+        self.device()
+        trips.edit_segment(self.c, self.jane, self.out["id"], {"start_local": "2026-11-20T00:00", "end_local": "2026-11-20T05:00",
+                                                                "details": {"flight_number": "EX 101", "time_unknown": "yes"}})
+        self.assertEqual(self.due(datetime(2026, 11, 19, 12, 0, tzinfo=UTC), hour=3), 0)   # the hours before midnight: no check-in
+        self.assertEqual(self.due(datetime(2026, 11, 20, 0, 30, tzinfo=UTC), hour=3), 0)
+        self.due(LATER, hour=8)
+        (_id, message), = self.sent
+        self.assertEqual(message["body"], "Time not recorded Flight EX 101 JFK → LHR")
 
     def test_a_cancelled_flight_and_a_hotel_have_no_check_in(self):
         self.device()

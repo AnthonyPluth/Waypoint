@@ -100,6 +100,11 @@ class ParserTests(unittest.TestCase):
         found = southwest.parse("", "Confirmation #: K7QW2N\n" + leg.replace("Nov 16", "Foo 16") * 200)
         self.assertEqual((found.bookings, found.unread), ((), southwest.MAX_LEGS))
 
+    def test_a_sender_with_a_parser_that_finds_nothing_says_so_in_the_tally(self):
+        m = read(mail("<p>Thanks for flying with us.</p>"))
+        self.assertEqual((m.bookings, m.gaps), ((), ("sender-specific parser found no booking",)))
+        self.assertEqual(read(raw("booking")).gaps, ())
+
     def test_html_that_cannot_be_parsed_finds_nothing(self):
         with mock.patch.object(southwest, "lines", side_effect=lambda h, t: []):
             self.assertEqual(southwest.parse("<<<", ""), parsers.Parsed())

@@ -15,7 +15,7 @@
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, subline } from "$lib/trips";
+  import { bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, subline, untimed } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Plus from "@lucide/svelte/icons/plus";
   import { toast } from "svelte-sonner";
@@ -103,7 +103,7 @@
         <li class="pass" class:opacity-70={s.status === "cancelled"}>
           <div class="flex flex-col gap-2 p-5 md:p-6">
             {@render heading(s)}
-            {#if s.kind === "flight" && s.status !== "cancelled"}<FlightStatus segment={s} />{/if}
+            {#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}
             <dl class="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               {@render times(s)}
               {#if s.confirmation}<div><dt class="eyebrow">Confirmation</dt><dd class="mt-1 text-lg"><CopyCode code={s.confirmation} /></dd></div>{/if}
@@ -122,7 +122,7 @@
         <li class="pass" class:opacity-70={card.cancelled} aria-label={`${headline(s)}, on ${card.segments.length} bookings`}>
           <div class="flex flex-col gap-2 p-5 md:p-6">
             {@render heading(s, card.cancelled)}
-            {#if live}<FlightStatus segment={s} />{/if}
+            {#if live && !untimed(s)}<FlightStatus segment={s} />{/if}
             {#if card.timesDiffer}
               <p class="mt-2 text-sm font-medium" data-times-differ><Badge variant="secondary">Times differ between bookings</Badge> <span class="text-muted-foreground">Each booking’s times are below.</span></p>
             {:else}
@@ -167,9 +167,9 @@
 
 {#snippet times(s: Segment)}
   <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
-    <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, <PlaceTime local={s.start_local} zone={s.start_zone} /></dd></div>
+    <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} zone={s.start_zone} />{/if}</dd></div>
   <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
-    <dd class="mt-1 text-base font-medium">{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} /></dd></div>
+    <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</dd></div>
 {/snippet}
 
 {#snippet links(s: Segment)}

@@ -59,6 +59,18 @@ describe("Upcoming", () => {
     expect(within(card).getByTestId("flight-status")).toHaveTextContent("Terminal 7 · Gate B24");
   });
 
+  it("shows a flight with no times by its day, with no countdown and no flight status", async () => {
+    at("2026-11-18T09:00:00-05:00");
+    const untimedTrip = trip([segment({ id: 9, origin: "SEA", destination: "SFO", start_local: "2026-11-20T00:00", start_zone: "America/Los_Angeles",
+      end_local: "2026-11-20T00:00", end_zone: "America/Los_Angeles", details: { flight_number: "AS 2002", time_unknown: "yes" } })]);
+    vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? delayed : { trips: [untimedTrip] }) as never);
+    render(Upcoming);
+    expect(await screen.findByText("time not recorded")).toBeInTheDocument();
+    expect(document.querySelector("[data-countdown]")).toBeNull();
+    expect(screen.queryByText("Next up")).toBeNull();
+    expect(screen.queryByTestId("flight-status")).toBeNull();
+  });
+
   it("says it's departing now, not \"in now\", in the last minute", async () => {
     at("2026-11-20T18:59:40-05:00");
     serve([london]);

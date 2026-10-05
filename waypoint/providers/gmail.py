@@ -427,4 +427,6 @@ def fetch(token: str, message_id: str) -> dict[str, Any]:
 
 def open_url(address: str, message_id: str) -> str:
     """Where a person opens a message in Gmail itself (a link for their browser; Waypoint doesn't call it)."""
-    return f"https://mail.google.com/mail/u/{urllib.parse.quote(address, safe='@')}/#all/{urllib.parse.quote(message_id, safe='')}"
+    # The account is chosen with `authuser` (an address works there; Gmail's /mail/u/<address>/ form answers "account
+    # temporarily unavailable" for some accounts).
+    return "https://mail.google.com/mail/?" + urllib.parse.urlencode({"authuser": address}) + "#all/" + urllib.parse.quote(message_id, safe="")

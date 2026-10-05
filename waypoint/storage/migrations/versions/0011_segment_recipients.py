@@ -5,8 +5,8 @@ travellers of all, any fields a person edited and the worst status, and the peop
 see it (as travellers or recipients). Nothing else refers to a segment by id except travellers, which are moved first
 (scanned messages and review items hold a mailbox and a message id only).
 
-Revision ID: 0010
-Revises: 0009
+Revision ID: 0011
+Revises: 0010
 """
 import json
 import re
@@ -15,8 +15,8 @@ from datetime import date
 import sqlalchemy as sa
 from alembic import op
 
-revision = '0010'
-down_revision = '0009'
+revision = '0011'
+down_revision = '0010'
 branch_labels = None
 depends_on = None
 

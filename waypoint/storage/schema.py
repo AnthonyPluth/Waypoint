@@ -89,6 +89,15 @@ airports = Table(
     info={'doc': 'airports by IATA code, with their IANA time zone (seeded from waypoint/storage/airports.tsv.gz; reference data, not part of a backup)'},
 )
 
+airlines = Table(
+    'airlines', metadata,
+    Column('code', Text, primary_key=True),
+    Column('icao', Text),
+    Column('name', Text, nullable=False),
+    Column('country', Text),
+    info={'doc': 'airlines by IATA code (seeded from waypoint/storage/airlines.tsv.gz, from OpenFlights under the ODbL; reference data, not part of a backup)'},
+)
+
 trips = Table(
     'trips', metadata,
     Column('id', Integer, primary_key=True, autoincrement=True),

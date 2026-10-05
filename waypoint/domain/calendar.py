@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from .trips import SegmentOut, TripOut, flight_groups
+from .trips import SegmentOut, TripOut, flight_groups, untimed
 
 PRODID = "-//Waypoint//Trips//EN"
 FOLD = 75   # a line's most octets (RFC 5545, 3.1)
@@ -141,13 +141,21 @@ def _description(group: Sequence[SegmentOut], trip: TripOut) -> str:
     return "\n".join(lines)
 
 
+def _times(seg: SegmentOut) -> list[str]:
+    """An event's start and end. A segment whose times are unknown (an imported flight with none) is an all-day event on
+    its day, not a time that was never given."""
+    if untimed(seg["details"]):
+        day = datetime.fromisoformat(seg["start_local"]).date()
+        return [f"DTSTART;VALUE=DATE:{day:%Y%m%d}", f"DTEND;VALUE=DATE:{day + timedelta(days=1):%Y%m%d}"]
+    return [f"DTSTART;TZID={seg['start_zone']}:{stamp(seg['start_local'])}", f"DTEND;TZID={seg['end_zone']}:{stamp(seg['end_local'])}"]
+
+
 def _event(group: Sequence[SegmentOut], trip: TripOut, now: datetime) -> list[str]:
     """One event for a flight however many bookings it's on: the first live booking's times, and cancelled only when every
     booking is."""
     seg = next((g for g in group if g["status"] != "cancelled"), group[0])
     lines = ["BEGIN:VEVENT", f"UID:segment-{group[0]['id']}@waypoint", f"DTSTAMP:{now.astimezone(UTC):%Y%m%dT%H%M%SZ}",
-             f"DTSTART;TZID={seg['start_zone']}:{stamp(seg['start_local'])}",
-             f"DTEND;TZID={seg['end_zone']}:{stamp(seg['end_local'])}",
+             *_times(seg),
              f"SUMMARY:{escape(_title(seg))}", f"DESCRIPTION:{escape(_description(group, trip))}"]
     place = seg["origin"] if seg["kind"] in ("hotel", "car") else None
     if place:
@@ -164,6 +172,8 @@ def feed(trips: Sequence[TripOut], now: datetime) -> str:
     spans: dict[str, tuple[date, date]] = {}
     for group, _trip in pairs:
         seg = next((g for g in group if g["status"] != "cancelled"), group[0])
+        if untimed(seg["details"]):
+            continue
         for zone, local in ((seg["start_zone"], seg["start_local"]), (seg["end_zone"], seg["end_local"])):
             day = datetime.fromisoformat(local).date()
             low, high = spans.get(zone, (day, day))

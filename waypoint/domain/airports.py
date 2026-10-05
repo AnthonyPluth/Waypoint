@@ -3,6 +3,7 @@
 the list doesn't have."""
 from __future__ import annotations
 
+import math
 from typing import TypedDict
 
 from sqlalchemy import func, select
@@ -29,6 +30,19 @@ def zones(conn: db.Connection, codes: list[str]) -> dict[str, str]:
     """The zone of each known code among `codes`."""
     wanted = [c.strip().upper() for c in codes]
     return dict(conn.execute(select(Airport.code, Airport.zone).where(Airport.code.in_(wanted))).fetchall())
+
+
+def coords(conn: db.Connection, code: str) -> tuple[float, float] | None:
+    """An airport's latitude and longitude, or None for a code the list doesn't have."""
+    a = conn.orm.get(Airport, code.strip().upper())
+    return (a.latitude, a.longitude) if a else None
+
+
+def distance_km(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """The great-circle distance between two places (latitude, longitude), in kilometres."""
+    la1, lo1, la2, lo2 = map(math.radians, (*a, *b))
+    h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2
+    return 2 * 6371.0 * math.asin(min(1.0, math.sqrt(h)))
 
 
 def zone_for_place(conn: db.Connection, city: str | None, country: str | None) -> str | None:

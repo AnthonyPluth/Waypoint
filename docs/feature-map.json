@@ -86,6 +86,7 @@
       "path": "/api/people",
       "handler": "waypoint/server/api/people.py:api_people",
       "web": [
+        "frontend/src/lib/components/settings/ImportSection.svelte",
         "frontend/src/pages/People.svelte",
         "frontend/src/pages/Review.svelte",
         "frontend/src/pages/Trip.svelte",
@@ -157,6 +158,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_flight_import.py",
         "tests/test_routes.py",
         "tests/test_trips.py"
       ],
@@ -320,6 +322,49 @@
       ],
       "docs": [
         "start/trips"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/import/preview",
+      "handler": "waypoint/server/api/flight_import.py:api_import_preview",
+      "web": [
+        "frontend/src/lib/components/settings/ImportSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_flight_import.py"
+      ],
+      "docs": [
+        "start/import"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/import",
+      "handler": "waypoint/server/api/flight_import.py:api_import",
+      "web": [
+        "frontend/src/lib/components/settings/ImportSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_flight_import.py"
+      ],
+      "docs": [
+        "start/import"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/stats",
+      "handler": "waypoint/server/api/stats.py:api_stats",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_stats.py"
+      ],
+      "docs": [
+        "start/stats"
       ]
     },
     {

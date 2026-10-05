@@ -221,9 +221,9 @@ class Segment(TypedDict):
     end_zone: str
     origin: str | None              # a flight's airport code; a stay's or a rental's place
     destination: str | None
-    details: dict[str, str]         # flight_number, terminal, seat, cabin, room, car_class, address, phone
+    details: dict[str, str]         # flight_number, terminal, seat, cabin, room, car_class, address, phone; time_unknown (an imported flight with no times)
     manage_url: str | None
-    source: Literal["manual", "email"]
+    source: Literal["manual", "email", "import"]
     booked_by: int | None           # a person
     locked_fields: list[str]        # what a person edited, which a later email never overwrites
     travelers: list[Traveler]
@@ -312,6 +312,54 @@ class Airport(TypedDict):
     zone: str                       # IANA
 
 
+# Importing past flights from another app's CSV export
+
+class ImportRow(TypedDict):
+    """One row of the uploaded file as a flight, for the preview: new, already in Waypoint, or one that can't be read (with
+    why). Times are local wall-clock times at the airports; both are null when the file gave none."""
+    line: int                       # the row's line in the file (the header is line 1)
+    status: Literal["new", "exists", "unreadable"]
+    reason: str | None
+    day: str | None                 # the local departure day, YYYY-MM-DD
+    origin: str | None              # airport codes
+    destination: str | None
+    flight_number: str | None
+    airline: str | None
+    start_local: str | None
+    end_local: str | None
+    seat: str | None
+    cabin: str | None
+
+
+class ImportPreview(TypedDict):
+    format: str                     # which app's export it is, from its header row
+    me: int | None                  # the person the sign-in belongs to (who the flights are for unless chosen otherwise)
+    rows: list[ImportRow]
+
+
+class ImportFlight(TypedDict):
+    """A flight to save, as the preview showed it: the web app sends back only the rows being saved, never the file."""
+    day: str
+    origin: str
+    destination: str
+    flight_number: NotRequired[str | None]
+    airline: NotRequired[str | None]
+    start_local: NotRequired[str | None]
+    end_local: NotRequired[str | None]
+    seat: NotRequired[str | None]
+    cabin: NotRequired[str | None]
+
+
+class ImportBody(TypedDict):
+    flights: list[ImportFlight]     # at most 1,000 at a time
+    person_ids: NotRequired[list[int]]   # who was on these flights; the signed-in member when left out
+
+
+class Imported(TypedDict):
+    added: int
+    existing: int                   # already in Waypoint, so left alone
+
+
 # Live flight status
 
 class FlightStatus(TypedDict):
@@ -384,6 +432,107 @@ class LoyaltyBody(TypedDict):
 
 class Revealed(TypedDict):
     number: str
+
+
+# Travel stats
+
+class StatsNamed(TypedDict):
+    name: str
+    count: int
+
+
+class StatsPlace(TypedDict):
+    name: str                       # a country's ISO code or a city's name
+    first_visit: str                # the local date, YYYY-MM-DD
+    visits: int
+
+
+class StatsAirport(TypedDict):
+    code: str
+    name: str                       # the code, for an airport that isn't in the table
+    city: str | None
+    country: str | None
+    visits: int                     # each departure from it and arrival at it
+    latitude: float | None          # for the map; none for an airport that isn't in the table
+    longitude: float | None
+
+
+class StatsAirline(TypedDict):
+    code: str | None
+    name: str                       # the code, for an airline that isn't in the table
+    flights: int
+
+
+class StatsRoute(TypedDict):
+    a: str                          # A–B and B–A are one route
+    b: str
+    flights: int
+    distance_km: float | None
+    a_latitude: float | None
+    a_longitude: float | None
+    b_latitude: float | None
+    b_longitude: float | None
+
+
+class StatsFlightRecord(TypedDict):
+    origin: str
+    destination: str
+    distance_km: float
+    start_local: str
+    flight_number: str | None
+
+
+class StatsSeats(TypedDict):
+    window: int
+    aisle: int
+    middle: int
+    unknown: int
+
+
+class StatsFlights(TypedDict):
+    count: int
+    distance_km: float
+    air_seconds: int                # booked departure to booked arrival, each at its own zone
+    airports: list[StatsAirport]    # most visited first
+    airlines: list[StatsAirline]
+    countries: list[StatsNamed]     # of the airports, by ISO code
+    routes: list[StatsRoute]        # most flown first
+    cabins: list[StatsNamed]
+    top_seat: str | None
+    seat_positions: StatsSeats
+    longest: StatsFlightRecord | None
+    shortest: StatsFlightRecord | None
+    most_visited_airport: str | None
+    busiest_month: str | None       # YYYY-MM
+    times_around_earth: float       # of 40,075 km
+    moon_fraction: float            # of the way to the Moon, 384,400 km
+
+
+class StatsStays(TypedDict):
+    nights: int
+    chains: list[StatsNamed]
+    cities: list[StatsNamed]
+    countries: list[StatsNamed]
+
+
+class StatsCars(TypedDict):
+    days: int
+    companies: list[StatsNamed]
+
+
+class StatsPlaces(TypedDict):
+    countries: list[StatsPlace]
+    cities: list[StatsPlace]
+
+
+class Stats(TypedDict):
+    person: int | None              # whose; none: the household
+    year: int | None                # none: lifetime
+    distance_unit: Literal["mi", "km"]   # the household's setting; every distance above is kilometres
+    flights: StatsFlights
+    stays: StatsStays
+    cars: StatsCars
+    places: StatsPlaces
 
 
 # Reminders and the calendar feed
