@@ -135,6 +135,25 @@ class MarkupTests(unittest.TestCase):
         two = one.replace('"underName":{"name":"Jane Doe"}', '"underName":[{"name":"Jane Doe"},{"givenName":"Sam","familyName":"Doe"}]')
         self.assertEqual(self.read(ld(two)).bookings[0].passengers, (extract.Passenger("Jane Doe"), extract.Passenger("Sam Doe")))
 
+    def test_what_an_unread_reservation_lacks_is_named_from_a_fixed_list(self):
+        cases = {
+            "FlightReservation": ('{"@type":"FlightReservation","reservationFor":{"departureAirport":{"iataCode":"JFK"},"departureTime":"2026-01-01T10:00"}}',
+                                  ["destination airport", "arrival time"]),
+            "LodgingReservation": ('{"@type":"LodgingReservation","checkinDate":"2026-01-01","checkoutDate":"2026-01-03","reservationFor":{"name":"H"}}',
+                                   ["check-in time", "check-out time", "dates without times"]),
+            "RentalCarReservation": ('{"@type":"RentalCarReservation"}', ["pick-up place", "pick-up time", "drop-off time"]),
+            "TrainReservation": ('{"@type":"TrainReservation","reservationFor":{"departureStation":{"name":"A"},"departureTime":"2026-01-01T10:00"}}',
+                                 ["arrival station", "arrival time"]),
+        }
+        for kind, (node, lacks) in cases.items():
+            with self.subTest(kind=kind):
+                self.assertEqual(self.read(ld(node)).gaps, tuple(lacks))
+
+    def test_structured_data_that_is_no_reservation_is_told_from_none_at_all(self):
+        other = self.read(ld('{"@type":"EmailMessage","description":"x"}'))
+        self.assertEqual((other.other_markup, other.markup, other.gaps), (True, False, ()))
+        self.assertFalse(self.read(eml("<p>plain</p>")).other_markup)
+
     def test_another_kind_of_reservation_is_seen_but_not_read(self):
         m = self.read(ld('{"@type":"FoodEstablishmentReservation","reservationNumber":"T1"}'))
         self.assertEqual((m.bookings, m.unread, m.markup), ((), 1, True))

@@ -13,7 +13,7 @@ import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
 
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
   id: 1, address: "ana@gmail.example", sender_domain: "example-air.example", received: "2026-10-17",
-  reason: "no_markup", gmail_url: "https://mail.google.com/mail/u/ana@gmail.example/#all/abc", suggestion: null, suggestion_error: null, ...extra });
+  reason: "no_markup", gmail_url: "https://mail.google.com/mail/?authuser=ana%40gmail.example#all/abc", suggestion: null, suggestion_error: null, ...extra });
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
   start_local: "2026-12-08T08:00", start_zone: "America/New_York", ...extra });
@@ -47,7 +47,7 @@ describe("Review", () => {
     expect(within(list).getByText("Sent 2026-10-17 · to ana@gmail.example")).toBeInTheDocument();
     expect(within(list).getByText(REASONS.no_markup)).toBeInTheDocument();
     const open = within(list).getByRole("link", { name: /Open .Mail from example-air.example on 2026-10-17. in Gmail/ });
-    expect(open).toHaveAttribute("href", "https://mail.google.com/mail/u/ana@gmail.example/#all/abc");
+    expect(open).toHaveAttribute("href", "https://mail.google.com/mail/?authuser=ana%40gmail.example#all/abc");
     expect(open).toHaveAttribute("rel", "noopener noreferrer");
     expect(open).toHaveAttribute("target", "_blank");
   });
