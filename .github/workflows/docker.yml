@@ -85,21 +85,18 @@ jobs:
           { echo "backend=$backend"; echo "web=$web"; echo "web_tests<<END_OF_FILES"; echo "$web_tests"; echo "END_OF_FILES"; } >> "$GITHUB_OUTPUT"
           echo "Python tests: $backend; web app checks: $web; web app tests: $([ "$web_tests" = all ] && echo all || echo "related to $(grep -c . <<< "$web_tests" || true) changed file(s)")"
 
-  # The Python tests, on SQLite (with coverage, lint and type-check) and on Postgres. The Postgres tests are split in
-  # three, each with its own Postgres (tests/shard.py): on one runner they mostly wait on each other.
+  # The Python tests, on SQLite (with coverage, lint and type-check) and on Postgres.
   test:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false         # one shard failing still shows what the others found
+      fail-fast: false         # one database failing still shows what the other found
       matrix:
         # 3.14 is the only Python Waypoint supports: what the image runs (see the Dockerfile).
         include:
           - {python: "3.14", database: sqlite}
-          - {python: "3.14", database: postgres, shard: 1/3}
-          - {python: "3.14", database: postgres, shard: 2/3}
-          - {python: "3.14", database: postgres, shard: 3/3}
+          - {python: "3.14", database: postgres}
     services:
       postgres:                # used by the postgres run; the sqlite run ignores it
         image: postgres:16
@@ -118,14 +115,11 @@ jobs:
         with:
           cache-name: ${{ matrix.database }}
           python-version: ${{ matrix.python }}
-      - name: Run tests (postgres, one shard)
+      - name: Run tests (postgres)
         if: matrix.database == 'postgres'
         env:
           DATABASE_URL: postgresql://waypoint:waypoint@localhost:5432/waypoint
-          SHARD: ${{ matrix.shard }}
-        run: |
-          # shellcheck disable=SC2046   # one -k argument per module
-          poetry run unittest-parallel -t . -s tests -j 4 $(python tests/shard.py "$SHARD")
+        run: poetry run unittest-parallel -t . -s tests -j 4
       # The SQLite run also measures how much of Waypoint the tests run: the table goes in the run's summary, and the
       # report goes to Codecov (the README's backend badge), along with each test's result (JUnit XML, from
       # tests/junit_result.py) for Codecov's test analytics.

@@ -30,8 +30,6 @@ docker stop waypoint-test-pg
 
 `make test-pg` runs the suite against the Postgres at `$DATABASE_URL` (the command above, with a check that the variable is set). Whatever Postgres you use must be UTF-8: a cluster you make yourself needs `initdb -E UTF8 --locale=C.UTF-8` (the `postgres` Docker image already is). Each test that writes settings or goes through the server makes and drops its own schema, so running the suite twice on the same database gives the same result.
 
-To run one CI shard of the Postgres tests (CI splits them across three runners, each with its own Postgres), add its modules: `... unittest-parallel -t . -s tests -j 4 $(python tests/shard.py 2/3)`.
-
 `make check` runs the checks to run before you push, each tool once: ruff, mypy and import-linter, Waypoint’s own Semgrep rules, the fleet checks (see [Merging](#merging)), the feature map and API contract checks, the Python tests (on SQLite, in parallel as CI runs them), and the web app's type-check, ESLint, Vitest tests and build, and the docs site's build. `make lint`, `make test` (serial, for a clearer failure), `make test-parallel` and `make frontend-check` run one part. The security scans run only in CI, each on the pull requests it can affect (see `.github/workflows/security.yml`): Semgrep, Trivy, zizmor, pip-audit, npm audit and CodeQL. So do the Postgres tests (see above to run them yourself). For the quick checks on every commit (ruff, trailing whitespace, YAML/TOML syntax, merge-conflict markers, large files), install [pre-commit](https://pre-commit.com) and run `pre-commit install` once.
 
 ## One paved path
