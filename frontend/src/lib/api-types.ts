@@ -103,6 +103,54 @@ export interface FlightStatusPause {
   reason: "limit" | "rate" | "key";
 }
 
+export interface ImportBody {
+  flights: ImportFlight[];
+  person_ids?: number[];
+}
+
+/** A flight to save, as the preview showed it: the web app sends back only the rows being saved, never the file. */
+export interface ImportFlight {
+  day: string;
+  origin: string;
+  destination: string;
+  flight_number?: string | null;
+  airline?: string | null;
+  start_local?: string | null;
+  end_local?: string | null;
+  seat?: string | null;
+  cabin?: string | null;
+}
+
+export interface ImportPreview {
+  format: string;
+  me: number | null;
+  rows: ImportRow[];
+}
+
+/**
+ * One row of the uploaded file as a flight, for the preview: new, already in Waypoint, or one that can't be read (with
+ * why). Times are local wall-clock times at the airports; both are null when the file gave none.
+ */
+export interface ImportRow {
+  line: number;
+  status: "new" | "exists" | "unreadable";
+  reason: string | null;
+  day: string | null;
+  origin: string | null;
+  destination: string | null;
+  flight_number: string | null;
+  airline: string | null;
+  start_local: string | null;
+  end_local: string | null;
+  seat: string | null;
+  cabin: string | null;
+}
+
+export interface Imported {
+  added: number;
+  existing: number;
+}
+
 /** A membership, to save or to change. `number` is needed to save one; left out when changing, the saved one is kept. */
 export interface LoyaltyBody {
   person_id: number;
@@ -263,7 +311,7 @@ export interface Segment {
   destination: string | null;
   details: Record<string, string>;
   manage_url: string | null;
-  source: "manual" | "email";
+  source: "manual" | "email" | "import";
   booked_by: number | null;
   locked_fields: string[];
   travelers: Traveler[];
@@ -416,6 +464,8 @@ export interface Endpoints {
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };
   "DELETE /api/segments/{id}": { body: never; reply: Ok };
   "GET /api/airports/{id}": { body: never; reply: Airport };
+  "POST /api/import/preview": { body: never; reply: ImportPreview };
+  "POST /api/import": { body: ImportBody; reply: Imported };
   "GET /api/flight-status": { body: never; reply: FlightStatusList };
   "POST /api/flight-status/{id}": { body: never; reply: FlightStatusList };
   "GET /api/loyalty": { body: never; reply: LoyaltyList };

@@ -31,7 +31,7 @@ DOCS = ROOT / "docs/src/content/docs"
 AREA_DOCS = {
     "ai": "start/ai", "state": "start/docker", "mailboxes": "start/gmail", "backup": "start/docker", "restore": "start/docker",
     "people": "start/people", "loyalty": "start/loyalty", "review": "start/review",
-    "trips": "start/trips", "segments": "start/trips", "airports": "start/trips", "flight-status": "start/flight-status",
+    "trips": "start/trips", "segments": "start/trips", "import": "start/import", "airports": "start/trips", "flight-status": "start/flight-status",
     "reminders": "start/reminders", "feed": "start/reminders",
 }
 

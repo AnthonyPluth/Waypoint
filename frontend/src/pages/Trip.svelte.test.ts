@@ -57,6 +57,18 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByTestId("flight-status")).toBeNull();
   });
 
+  it("shows a flight with no times by its day: “time not recorded” at both ends, and no live status", async () => {
+    held = trip([segment({ id: 1, origin: "LAX", destination: "JFK", start_local: "2026-03-08T00:00", start_zone: "America/Los_Angeles",
+      end_local: "2026-03-08T03:00", end_zone: "America/New_York", details: { flight_number: "DL 1002", time_unknown: "yes" } })]);
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? delayed : answer(path, opts)) as never);
+    render(TripPage);
+    const card = (await screen.findByRole("list", { name: "Bookings" })).querySelector(".pass") as HTMLElement;
+    expect(within(card).getAllByText("time not recorded")).toHaveLength(2);
+    expect(within(card).queryByText(/12:00 AM|3:00 AM/)).toBeNull();
+    expect(within(card).queryByTestId("flight-status")).toBeNull();
+  });
+
   it("offers each booking’s actions, and no Wallet off iOS", async () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });

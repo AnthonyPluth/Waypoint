@@ -70,7 +70,9 @@ class Validator:
                  not_whole: str = "The {label} must be a whole number",
                  too_long: str = "The {label} is too long (at most {limit} characters)",
                  not_date: str = "The {label} must be a date (YYYY-MM-DD)",
-                 too_large: str = "The {label} is too large"):
+                 too_large: str = "The {label} is too large",
+                 empty_file: str = "The {label} is empty",
+                 file_too_large: str = "The {label} is larger than {limit}"):
         self.error = error
         self.drop = drop
         self.missing = missing
@@ -80,6 +82,8 @@ class Validator:
         self.too_long = too_long
         self.not_date = not_date
         self.too_large = too_large
+        self.empty_file = empty_file
+        self.file_too_large = file_too_large
 
     @overload
     def number(self, v, label: str, low: float = ..., high: float = ..., *, required: Literal[True]) -> float: ...
@@ -138,6 +142,14 @@ class Validator:
         if len(s) > limit:
             raise self.error(self.too_long.format(label=label, limit=limit))
         return s or None
+
+    def file(self, v, label: str, limit: int) -> bytes:
+        """An uploaded file's bytes, at most `limit` of them and not none (the `limit` shown in the message in MB)."""
+        if not isinstance(v, bytes | bytearray) or not v.strip():
+            raise self.error(self.empty_file.format(label=label))
+        if len(v) > limit:
+            raise self.error(self.file_too_large.format(label=label, limit=f"{limit // (1024 * 1024)} MB"))
+        return bytes(v)
 
     @overload
     def day(self, v, label: str, required: Literal[True]) -> str: ...

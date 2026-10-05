@@ -22,7 +22,7 @@ from waypoint.domain.mail import review
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
 from waypoint.server.api import ai as ai_api
-from waypoint.server.api import backups, flightstatus as flightstatus_api, mailboxes, people, state
+from waypoint.server.api import backups, flight_import as flight_import_api, flightstatus as flightstatus_api, mailboxes, people, state
 from waypoint.server.api import review as review_api
 from waypoint.providers import flightstatus as flight_service
 from waypoint.server.api import trips as trips_api
@@ -113,6 +113,7 @@ class Replies(DbCase):
         self.test_ai()
         self.test_people()
         self.test_trips()
+        self.test_import()
         self.test_flight_status()
         self.test_loyalty()
         self.test_reminders()
@@ -191,6 +192,16 @@ class Replies(DbCase):
         pid = listed["people"][1]["id"]
         self.check("POST /api/people/{id}", people.api_person_edit(self.c, {}, {"display_name": "Mia D.", "legal_name": "Mia Rose Doe"}, str(pid)))
         self.check("DELETE /api/people/{id}", people.api_person_remove(self.c, {}, {}, str(pid)))
+
+    def test_import(self):
+        _current.user = {"name": None, "email": None, "local": True}
+        csv = (ROOT / "tests/fixtures/flight_import/flighty.csv").read_bytes()
+        shown = flight_import_api.api_import_preview(self.c, {}, csv)
+        self.assertEqual({r["status"] for r in shown["rows"]}, {"new", "unreadable"})
+        self.check("POST /api/import/preview", shown)
+        flights = [{k: r[k] for k in ("day", "origin", "destination", "flight_number", "start_local", "end_local")}
+                   for r in shown["rows"] if r["status"] == "new"]
+        self.check("POST /api/import", flight_import_api.api_import(self.c, {}, {"flights": flights}))
 
     def test_loyalty(self):
         self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))   # none yet
@@ -295,6 +306,7 @@ class Generated(unittest.TestCase):
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
                                      "DELETE /api/segments/{id}", "GET /api/airports/{id}",
+                                     "POST /api/import/preview", "POST /api/import",
                                      "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
                                      "POST /api/loyalty/{id}/reveal",

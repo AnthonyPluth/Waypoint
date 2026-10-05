@@ -221,9 +221,9 @@ class Segment(TypedDict):
     end_zone: str
     origin: str | None              # a flight's airport code; a stay's or a rental's place
     destination: str | None
-    details: dict[str, str]         # flight_number, terminal, seat, cabin, room, car_class, address, phone
+    details: dict[str, str]         # flight_number, terminal, seat, cabin, room, car_class, address, phone; time_unknown (an imported flight with no times)
     manage_url: str | None
-    source: Literal["manual", "email"]
+    source: Literal["manual", "email", "import"]
     booked_by: int | None           # a person
     locked_fields: list[str]        # what a person edited, which a later email never overwrites
     travelers: list[Traveler]
@@ -310,6 +310,54 @@ class Airport(TypedDict):
     city: str
     country: str
     zone: str                       # IANA
+
+
+# Importing past flights from another app's CSV export
+
+class ImportRow(TypedDict):
+    """One row of the uploaded file as a flight, for the preview: new, already in Waypoint, or one that can't be read (with
+    why). Times are local wall-clock times at the airports; both are null when the file gave none."""
+    line: int                       # the row's line in the file (the header is line 1)
+    status: Literal["new", "exists", "unreadable"]
+    reason: str | None
+    day: str | None                 # the local departure day, YYYY-MM-DD
+    origin: str | None              # airport codes
+    destination: str | None
+    flight_number: str | None
+    airline: str | None
+    start_local: str | None
+    end_local: str | None
+    seat: str | None
+    cabin: str | None
+
+
+class ImportPreview(TypedDict):
+    format: str                     # which app's export it is, from its header row
+    me: int | None                  # the person the sign-in belongs to (who the flights are for unless chosen otherwise)
+    rows: list[ImportRow]
+
+
+class ImportFlight(TypedDict):
+    """A flight to save, as the preview showed it: the web app sends back only the rows being saved, never the file."""
+    day: str
+    origin: str
+    destination: str
+    flight_number: NotRequired[str | None]
+    airline: NotRequired[str | None]
+    start_local: NotRequired[str | None]
+    end_local: NotRequired[str | None]
+    seat: NotRequired[str | None]
+    cabin: NotRequired[str | None]
+
+
+class ImportBody(TypedDict):
+    flights: list[ImportFlight]     # at most 1,000 at a time
+    person_ids: NotRequired[list[int]]   # who was on these flights; the signed-in member when left out
+
+
+class Imported(TypedDict):
+    added: int
+    existing: int                   # already in Waypoint, so left alone
 
 
 # Live flight status

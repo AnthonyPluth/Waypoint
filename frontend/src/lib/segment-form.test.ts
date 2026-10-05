@@ -68,4 +68,12 @@ describe("the request the form makes", () => {
     expect(d).toMatchObject({ id: 1, tripId: 1, origin: "JFK", start_zone: "", end_zone: "", people: [1], printed: ["DOE/MIA MISS"] });
     expect(draftOf(segment({ kind: "hotel", start_zone: "Europe/London", end_zone: "Europe/London" }))).toMatchObject({ start_zone: "Europe/London" });
   });
+  it("keeps an imported flight untimed until a person sets its times", () => {
+    const imported = segment({ start_local: "2025-03-08T00:00", end_local: "2025-03-08T03:00", details: { time_unknown: "yes", seat: "14C" } });
+    const d = draftOf(imported);
+    expect(body(d).details).toEqual({ time_unknown: "yes", seat: "14C" });
+    expect(body({ ...d, details: { ...d.details, seat: "15A" } }).details).toEqual({ time_unknown: "yes", seat: "15A" });   // other edits keep it
+    expect(body({ ...d, start_local: "2025-03-08T09:30" }).details).toEqual({ seat: "14C" });
+    expect(body(draftOf(segment({ details: { seat: "14C" } }))).details).toEqual({ seat: "14C" });
+  });
 });
