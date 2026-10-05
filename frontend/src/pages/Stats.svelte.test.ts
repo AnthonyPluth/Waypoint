@@ -73,6 +73,14 @@ describe("Stats", () => {
     expect(screen.getByTestId("stats-map-slot")).toBeInTheDocument();
   });
 
+  it("draws the map of the airports and routes in its slot", async () => {
+    serve(() => full);
+    render(Stats_);
+    const slot = await screen.findByTestId("stats-map-slot");
+    await waitFor(() => expect(slot.querySelectorAll("[data-dot]")).toHaveLength(airports.length));
+    expect(within(slot).getByRole("heading", { name: "Where you’ve been" })).toBeInTheDocument();
+  });
+
   it("uses kilometres when the household does", async () => {
     serve(() => ({ ...full, distance_unit: "km" }));
     render(Stats_);

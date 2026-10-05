@@ -5,6 +5,7 @@
   import type { Person, Stats } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
+  import type { Component } from "svelte";
   import TopList, { type Row } from "$lib/components/stats/TopList.svelte";
   import { comparisons, count, countryName, distance, duration, monthLabel, parseSelection, selectionQuery, share, statsPath } from "$lib/stats";
   import { dateLabel } from "$lib/trips";
@@ -35,6 +36,15 @@
     // The names for the picker: if they don't load, Everyone and your own numbers still work.
     apiCall<"GET /api/people">("/api/people").then((p) => { people = p.people; }).catch(() => { people = []; });   // (the picker falls back to Everyone)
   });
+
+  // The map's code and outlines are a separate download, fetched only once this page has something to draw on it.
+  let TravelMap = $state<Component<{ flights: Stats["flights"] }> | null>(null);
+  let mapError = $state("");
+  async function loadMap() {
+    mapError = "";
+    try { TravelMap = (await import("$lib/components/TravelMap.svelte")).default; } catch (err) { mapError = errMsg(err); }
+  }
+  $effect(() => { if (!TravelMap && !mapError) void loadMap(); });
 
   const current = $derived(loaded && loaded.key === key ? loaded.stats : null);
   const problem = $derived(failed && failed.key === key ? failed.message : "");
@@ -143,9 +153,15 @@
       </dl>
     </section>
 
-    <!-- The map (#30) goes here, between the totals and the lists: replace this placeholder with its component. -->
-    <section aria-label="Map" id="stats-map-slot" data-testid="stats-map-slot" class="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-      The map of where you’ve been is coming.
+    <section aria-labelledby="map-title" id="stats-map-slot" data-testid="stats-map-slot" class="scroll-mt-20 space-y-3">
+      <h3 id="map-title" class="eyebrow px-1">Where you’ve been</h3>
+      {#if TravelMap}
+        <TravelMap flights={f} />
+      {:else if mapError}
+        <p class="text-sm text-muted-foreground">The map couldn’t load: {mapError} <Button variant="outline" size="sm" onclick={loadMap}>Try again</Button></p>
+      {:else}
+        <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading the map"></div>
+      {/if}
     </section>
 
     {#each lists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
