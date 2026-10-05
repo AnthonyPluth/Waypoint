@@ -29,7 +29,7 @@ describe("flowProblems", () => {
     expect(unknownPages(PAGES)).toEqual([]);
   });
 
-  it("has the app's pages", () => expect(PAGES).toEqual(["upcoming", "trips", "people", "review", "stats", "settings"]));
+  it("has the app's pages", () => expect(PAGES).toEqual(["upcoming", "trips", "stats", "people", "review", "settings"]));
 });
 
 describe("screenshotFiles", () => {

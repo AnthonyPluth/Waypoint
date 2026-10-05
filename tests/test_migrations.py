@@ -295,6 +295,7 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0009")
             self.assertNotIn("airlines", sa.inspect(c).get_table_names())
             command.upgrade(db.alembic_config(c), "0010")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:
             a = schema.airlines.c
@@ -307,6 +308,25 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0009")
             self.assertNotIn("airlines", sa.inspect(c).get_table_names())
             self.assertIn("scanned_messages", sa.inspect(c).get_table_names())
+
+    def test_0011_adds_the_check_times_flag_to_segments_and_takes_it_away(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0010")
+            self.assertNotIn("check_times", {col["name"] for col in sa.inspect(c).get_columns("segments")})
+            c.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
+            c.execute(insert(schema.segments).values(trip_id=1, kind="flight", status="confirmed", start_local="2026-12-04T09:00",
+                                                     start_zone="America/Chicago", end_local="2026-12-04T11:10", end_zone="America/Denver",
+                                                     origin="ORD", destination="DEN", source="email"))
+            command.upgrade(db.alembic_config(c), "0011")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:   # a segment from before has no note to check
+            self.assertEqual(conn.execute(select(schema.segments.c.check_times)).scalar(), False)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0010")
+            self.assertNotIn("check_times", {col["name"] for col in sa.inspect(c).get_columns("segments")})
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 1)
 
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating

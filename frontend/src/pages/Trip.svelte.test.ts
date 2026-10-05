@@ -57,6 +57,14 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByTestId("flight-status")).toBeNull();
   });
 
+  it("asks for a look at the times of a booking whose times couldn’t be settled, and only that one", async () => {
+    held = trip([{ ...flight, check_times: true }, stay]);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+    expect(within(cards[0]).getByRole("note")).toHaveTextContent(/Check the times/);
+    expect(within(cards[1]).queryByRole("note")).toBeNull();
+  });
+
   it("shows a flight with no times by its day: “time not recorded” at both ends, and no live status", async () => {
     held = trip([segment({ id: 1, origin: "LAX", destination: "JFK", start_local: "2026-03-08T00:00", start_zone: "America/Los_Angeles",
       end_local: "2026-03-08T03:00", end_zone: "America/New_York", details: { flight_number: "DL 1002", time_unknown: "yes" } })]);
@@ -69,7 +77,7 @@ describe("Trip", () => {
     expect(within(card).queryByTestId("flight-status")).toBeNull();
   });
 
-  it("offers each booking’s actions, and no Wallet off iOS", async () => {
+  it("offers each booking’s actions, and no Wallet", async () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
     const hotel = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
@@ -79,13 +87,11 @@ describe("Trip", () => {
     expect(screen.queryByRole("link", { name: "Wallet" })).toBeNull();
   });
 
-  it("shows Wallet, opening shoebox://, on iOS", async () => {
+  it("offers the provider's app, and no Wallet, on iOS", async () => {
     vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)");
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
-    const wallets = screen.getAllByRole("link", { name: "Wallet" });
-    expect(wallets).toHaveLength(2);
-    expect(wallets[0]).toHaveAttribute("href", "shoebox://");
+    expect(screen.queryByRole("link", { name: "Wallet" })).toBeNull();
     expect(screen.getAllByRole("link", { name: "Open in app" })[0]).toHaveAttribute("href", "https://example.com/manage");
   });
 

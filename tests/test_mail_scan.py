@@ -33,7 +33,10 @@ REFRESH, ADDRESS = "refresh-jane-1", "jane@gmail.example"
 # Text that is only in the made-up bodies (and one subject): none of it may be kept, logged or sent anywhere.
 CANARIES = ("CANARY-BODY-FLIGHT-JSONLD-7Q2X", "CANARY-BODY-FLIGHT-MICRODATA-3K8D", "CANARY-BODY-HOTEL-5R1M",
             "CANARY-BODY-CAR-9T4V", "CANARY-BODY-TRAIN-2W6Z", "CANARY-BODY-NOMARKUP-6H9C", "CANARY-BODY-INCOMPLETE-4N7P",
-            "CANARY-SUBJECT-NOMARKUP-8B3F")
+            "CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-UTCLOCAL-4G8J", "CANARY-BODY-UTCCONV-6M2W", "CANARY-BODY-UTCNONE-9P5D",
+            "CANARY-BODY-OFFSET-3C7H", "CANARY-BODY-OVERNIGHT-8R4Y")
+UTC_FIXTURES = ("utc_marked_local_in_text", "utc_marked_converted_in_text", "utc_marked_no_times_in_text", "offset_marked_times",
+                "utc_marked_overnight")
 
 
 def eml(name: str) -> bytes:
@@ -162,8 +165,8 @@ class ScanCase(DbCase):
         self.google.matches.append(mid)
         self.google.added.append(mid)
 
-    def scan(self, mailbox_id=None, now=NOW, today=TODAY) -> scan.Result:
-        return scan.scan(mailbox_id or self.mailbox, now, today)
+    def scan(self, mailbox_id=None, now=NOW, today=TODAY, again=False) -> scan.Result:
+        return scan.scan(mailbox_id or self.mailbox, now, today, again)
 
     def read(self, fn):
         with db.session() as conn:
@@ -458,6 +461,39 @@ class ReviewTests(ScanCase):
         self.assertEqual(self.segments(), [])
         self.assertEqual(self.items()[0]["reason"], "incomplete")
 
+    def test_an_items_message_is_read_again_for_its_owner_alone_and_kept_nowhere(self):
+        self.put("no_markup")
+        self.scan()
+        [item] = self.items()
+        with no_leaks(self, "CANARY-BODY-NOMARKUP-6H9C", database=self.path):   # (it comes back to the caller, and goes nowhere else)
+            text, cut = scan.preview("u-jane", item["id"])
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", text)
+        self.assertNotIn("<", text)   # (text, not markup)
+        self.assertFalse(cut)
+        with self.assertRaises(KeyError):
+            scan.preview("u-sam", item["id"])   # not Sam's
+        with self.assertRaises(KeyError):
+            scan.preview("u-jane", 9999)
+
+    def test_a_long_message_is_cut_and_a_deleted_one_says_so(self):
+        self.put("no_markup")
+        self.scan()
+        [item] = self.items()
+        with mock.patch.object(scan, "PREVIEW_LIMIT", 20):
+            text, cut = scan.preview("u-jane", item["id"])
+        self.assertEqual((len(text), cut), (20, True))
+        del self.google.mail["msg-no_markup"]
+        with self.assertRaises(gmail.MessageGone):
+            scan.preview("u-jane", item["id"])
+
+    def test_asking_the_ai_is_refused_while_it_is_off(self):
+        self.put("no_markup")
+        self.scan()
+        [item] = self.items()
+        with self.assertRaises(scan.NoAi):
+            scan.suggest_now("u-jane", item["id"], NOW)
+        self.assertEqual(self.google.fetched, ["msg-no_markup"])   # (the message wasn't fetched again for nothing)
+
     def test_the_log_says_what_stopped_messages_being_read_in_fixed_words_and_counts(self):
         unknown = eml("flight_jsonld").replace(b'"iataCode": "JFK"', b'"iataCode": "QQQ"')
         self.add_mail("unknown", unknown)
@@ -603,8 +639,8 @@ class FailureTests(ScanCase):
     def test_a_message_that_cannot_be_filed_is_queued_rather_than_stopping_every_scan(self):
         self.put("flight_jsonld", "hotel_jsonld")
         real = ingest.file_booking
-        with mock.patch.object(ingest, "file_booking", side_effect=lambda conn, viewer, b: (
-                (_ for _ in ()).throw(RuntimeError("CANARY-FILE-DETAILS-2Y8W")) if b.kind == "flight" else real(conn, viewer, b))):
+        with mock.patch.object(ingest, "file_booking", side_effect=lambda conn, viewer, b, again=False: (
+                (_ for _ in ()).throw(RuntimeError("CANARY-FILE-DETAILS-2Y8W")) if b.kind == "flight" else real(conn, viewer, b, again))):
             result = self.scan()
         self.assertEqual((result.state, result.messages, result.bookings, result.review), ("done", 2, 1, 1))
         self.assertEqual(self.scanned(), {"msg-flight_jsonld": "unreadable", "msg-hotel_jsonld": "booking"})
@@ -728,15 +764,191 @@ class JobTests(ScanCase):
             time.sleep(0.2)
 
 
+class UtcMarkedTimesTests(ScanCase):
+    """An airline's markup says Z; the times mean the airport's own clock (or don't): see extract.times."""
+
+    def only(self, name) -> trips.SegmentOut:
+        self.put(name)
+        self.scan()
+        [seg] = self.segments()
+        return seg
+
+    def test_times_marked_utc_that_the_text_shows_as_local_are_the_airports_wall_clock(self):
+        seg = self.only("utc_marked_local_in_text")
+        self.assertEqual((seg["start_local"], seg["start_zone"], seg["end_local"], seg["end_zone"], seg["check_times"]),
+                         ("2026-12-04T09:00", "America/Chicago", "2026-12-04T11:10", "America/Denver", False))
+
+    def test_times_marked_utc_that_the_text_shows_converted_stay_converted(self):
+        seg = self.only("utc_marked_converted_in_text")
+        self.assertEqual((seg["start_local"], seg["end_local"], seg["check_times"]), ("2026-12-04T09:00", "2026-12-04T11:10", False))
+
+    def test_times_marked_utc_with_no_times_in_the_text_go_to_review_when_distance_cannot_tell_either(self):
+        # (a 3 h 10 min and a 2 h 10 min flight over the same distance both fit: nothing says which, so it isn't guessed)
+        self.put("utc_marked_no_times_in_text")
+        result = self.scan()
+        self.assertEqual((result.bookings, result.review, self.segments()), (0, 1, []))
+
+    def test_times_marked_utc_settled_only_by_distance_are_filed_and_flagged(self):
+        silent = eml("utc_marked_overnight").replace(b"Departs Los Angeles 10:30 PM", b"").replace(b"Arrives New York 6:55 AM", b"")
+        self.add_mail("silent", silent)
+        self.scan()
+        [seg] = self.segments()
+        self.assertEqual((seg["start_local"], seg["end_local"], seg["check_times"]), ("2026-12-10T22:30", "2026-12-11T06:55", True))
+
+    def test_a_real_offset_is_kept_and_not_flagged(self):
+        seg = self.only("offset_marked_times")
+        self.assertEqual((seg["start_local"], seg["end_local"], seg["check_times"]), ("2026-12-04T09:00", "2026-12-04T11:10", False))
+
+    def test_an_overnight_flight_across_zones_has_a_sane_duration(self):
+        seg = self.only("utc_marked_overnight")
+        self.assertEqual((seg["start_local"], seg["start_zone"], seg["end_local"], seg["end_zone"]),
+                         ("2026-12-10T22:30", "America/Los_Angeles", "2026-12-11T06:55", "America/New_York"))
+        hours = (trips.instant(seg["end_local"], seg["end_zone"]) - trips.instant(seg["start_local"], seg["start_zone"])).total_seconds() / 3600
+        self.assertTrue(4 < hours < 7, hours)
+
+    def test_every_flight_here_ends_after_it_starts(self):
+        self.put(*UTC_FIXTURES)
+        self.scan()
+        segs = self.segments()
+        self.assertEqual(len(segs), 4)   # (the fifth, with no times in its text, is queued for review)
+        for s in segs:
+            hours = (trips.instant(s["end_local"], s["end_zone"]) - trips.instant(s["start_local"], s["start_zone"])).total_seconds() / 3600
+            self.assertTrue(0 < hours < 8, (s["confirmation"], hours))
+
+    def flagged(self) -> trips.SegmentOut:
+        silent = eml("utc_marked_overnight").replace(b"Departs Los Angeles 10:30 PM", b"").replace(b"Arrives New York 6:55 AM", b"")
+        self.add_mail("silent", silent)
+        self.scan()
+        [seg] = self.segments()
+        self.assertTrue(seg["check_times"])
+        return seg
+
+    def test_the_note_stays_until_a_person_edits_or_confirms_the_times(self):
+        seg = self.flagged()
+        kept = self.read(lambda conn: trips.edit_segment(conn, self.jane, seg["id"], {"details": {"seat": "4B"}}))
+        assert kept is not None
+        self.assertTrue(kept["check_times"])   # (an edit elsewhere says nothing of the times)
+        confirmed = self.read(lambda conn: trips.edit_segment(conn, self.jane, seg["id"], {"start_local": seg["start_local"], "end_local": seg["end_local"]}))
+        assert confirmed is not None
+        self.assertEqual((confirmed["check_times"], confirmed["start_local"]), (False, "2026-12-10T22:30"))
+        self.assertTrue({"start_local", "end_local"} <= set(confirmed["locked_fields"]))   # (so a later reading doesn't flag them again)
+        self.scan(now=NOW + 60, again=True)
+        [after] = self.segments()
+        self.assertEqual((after["check_times"], after["start_local"]), (False, "2026-12-10T22:30"))
+
+    def test_editing_the_times_clears_the_note(self):
+        seg = self.flagged()
+        edited = self.read(lambda conn: trips.edit_segment(conn, self.jane, seg["id"], {"start_local": "2026-12-10T22:00"}))
+        assert edited is not None
+        self.assertEqual((edited["check_times"], edited["start_local"]), (False, "2026-12-10T22:00"))
+
+
+class RereadTests(ScanCase):
+    """Read bookings again: the messages already found that made bookings, read once more."""
+
+    def wrong(self, seg, start, end):
+        """Put in a segment the times an earlier version of Waypoint stored from the same message."""
+        def run(conn):
+            conn.execute(update(Segment).where(Segment.id == seg["id"]).values(start_local=start, end_local=end))
+        self.read(run)
+
+    def test_a_segment_with_wrong_times_is_corrected_without_a_new_search_or_a_duplicate(self):
+        self.put("utc_marked_local_in_text")
+        self.scan()
+        [seg] = self.segments()
+        self.wrong(seg, "2026-12-04T03:00", "2026-12-04T04:10")
+        before = self.row()
+        result = self.scan(now=NOW + 3600, again=True)
+        self.assertEqual((result.state, result.messages, result.bookings), ("done", 1, 1))
+        [after] = self.segments()
+        self.assertEqual((after["id"], after["start_local"], after["end_local"], after["status"]),
+                         (seg["id"], "2026-12-04T09:00", "2026-12-04T11:10", "confirmed"))   # (a correction isn't a schedule change)
+        self.assertEqual(len(self.google.queries), 1)   # the first scan's search only
+        self.assertEqual({k: self.row()[k] for k in ("last_scan", "history_id", "scan_error")},
+                         {k: before[k] for k in ("last_scan", "history_id", "scan_error")})
+        self.assertEqual(self.scanned(), {"msg-utc_marked_local_in_text": "booking"})
+
+    def test_a_time_a_person_edited_is_kept(self):
+        self.put("utc_marked_local_in_text")
+        self.scan()
+        [seg] = self.segments()
+        self.wrong(seg, "2026-12-04T03:00", "2026-12-04T04:10")
+        self.read(lambda conn: trips.edit_segment(conn, self.jane, seg["id"], {"end_local": "2026-12-04T11:20"}))
+        self.scan(now=NOW + 3600, again=True)
+        [after] = self.segments()
+        self.assertEqual((after["start_local"], after["end_local"]), ("2026-12-04T09:00", "2026-12-04T11:20"))   # (the edited time stays, the other is corrected)
+
+    def test_only_messages_that_made_bookings_are_read_again(self):
+        self.put("utc_marked_local_in_text", "no_markup", "incomplete")
+        self.scan()
+        self.google.fetched.clear()
+        result = self.scan(now=NOW + 3600, again=True)
+        self.assertEqual(self.google.fetched, ["msg-utc_marked_local_in_text"])
+        self.assertEqual((result.messages, result.review), (1, 0))
+        self.assertEqual(len(self.items()), 2)   # (the review queue is as it was)
+
+    def test_a_message_deleted_since_keeps_what_came_of_it(self):
+        self.put("utc_marked_local_in_text")
+        self.scan()
+        del self.google.mail["msg-utc_marked_local_in_text"]
+        self.assertEqual(self.scan(now=NOW + 3600, again=True).state, "done")
+        self.assertEqual(self.scanned(), {"msg-utc_marked_local_in_text": "booking"})
+        self.assertEqual(len(self.segments()), 1)
+
+    def test_a_failure_says_so_and_leaves_the_last_good_state(self):
+        self.put("utc_marked_local_in_text")
+        self.scan()
+        before = self.row()
+        self.google.fail_on = "msg-utc_marked_local_in_text"
+        with mock.patch("waypoint.providers.gmail.time.sleep"):
+            result = self.scan(now=NOW + 3600, again=True)
+        self.assertEqual(result.state, "failed")
+        self.assertEqual(self.row()["last_scan"], before["last_scan"])
+        self.assertEqual(self.scanned(), {"msg-utc_marked_local_in_text": "booking"})
+
+    def test_a_reading_that_still_cannot_settle_the_times_flags_them(self):
+        silent = eml("utc_marked_overnight").replace(b"Departs Los Angeles 10:30 PM", b"").replace(b"Arrives New York 6:55 AM", b"")
+        self.add_mail("silent", silent)
+        self.scan()
+        self.read(lambda conn: conn.execute(update(Segment).values(check_times=False)))
+        self.scan(now=NOW + 3600, again=True)
+        [seg] = self.segments()
+        self.assertTrue(seg["check_times"])
+
+    def test_a_scan_already_running_makes_the_next_ask_busy(self):
+        with scan._lock:
+            scan._running.add(self.mailbox)
+        try:
+            self.assertTrue(scan.running(self.mailbox))
+            self.assertEqual(self.scan(), scan.Result("busy"))
+            self.assertFalse(jobs.scan_now(self.mailbox))
+        finally:
+            with scan._lock:
+                scan._running.discard(self.mailbox)
+        self.assertFalse(scan.running(self.mailbox))
+
+    def test_a_long_scan_gets_a_new_access_token(self):
+        self.put("flight_jsonld", "hotel_jsonld")
+        ticks = iter([0, TOKEN_AFTER, TOKEN_AFTER, TOKEN_AFTER * 2, TOKEN_AFTER * 2, TOKEN_AFTER * 2, TOKEN_AFTER * 2])
+        with mock.patch.object(scan.time, "monotonic", lambda: next(ticks, TOKEN_AFTER * 3)):
+            self.assertEqual(self.scan().state, "done")
+        self.assertGreaterEqual(len([c for c in self.google.calls if c[1].get("grant_type") == "refresh_token"]), 2)
+
+
+TOKEN_AFTER = scan.TOKEN_LIFE + 1
+
+
 class PrivacyTests(ScanCase):
     def test_email_stays_on_the_server(self):
         # Every fixture is scanned (bookings, one with no markup, one half-read) with its body's text as a canary: none of
         # it may reach the database in the clear, the log, what was printed, or any request (but Gmail's own calls, which
         # carry only ids and a search).
-        self.put("flight_jsonld", "flight_microdata", "hotel_jsonld", "car_jsonld", "train_jsonld", "no_markup", "incomplete")
+        self.put("flight_jsonld", "flight_microdata", "hotel_jsonld", "car_jsonld", "train_jsonld", "no_markup", "incomplete", *UTC_FIXTURES)
         with no_leaks(self, *CANARIES, database=self.path):
             result = self.scan()
-        self.assertEqual((result.state, result.messages, result.bookings, result.review), ("done", 7, 5, 2))
+            again = self.scan(now=NOW + 60, again=True)   # (the visible text is read here too, in memory)
+        self.assertEqual((result.state, result.messages, result.bookings, result.review), ("done", 12, 9, 3))
+        self.assertEqual((again.state, again.messages, again.review), ("done", 9, 0))
 
     def test_what_a_failed_scan_logs_and_says_holds_none_of_it(self):
         self.put("flight_jsonld", "no_markup")
@@ -833,6 +1045,28 @@ class MailScanApiTests(GoogleCase):
                 time.sleep(0.1)
         self.assertEqual((m["scan_error"], m["last_scan"]), ("Google refused a request while reading the mailbox.", None))
 
+    def test_read_bookings_again_corrects_the_mailboxes_stored_times(self):
+        self.put("utc_marked_local_in_text")
+        self.scan_now()
+        with db.session() as conn:
+            conn.execute(update(Segment).values(start_local="2026-12-04T03:00", end_local="2026-12-04T04:10"))
+        status, body = self.call("ana", "POST", f"/api/mailboxes/{self.ana_box}/reread", {})
+        self.assertEqual((status, body), (200, {"started": True}))
+        for _ in range(100):
+            [m] = self.mailboxes()
+            with db.session() as conn:
+                start = conn.execute(select(Segment.start_local)).scalar()
+            if start == "2026-12-04T09:00" and not m["scanning"]:
+                break
+            time.sleep(0.1)
+        self.assertEqual(start, "2026-12-04T09:00")
+
+    def test_nobody_reads_another_members_mailbox_again(self):
+        status, body = self.call("ben", "POST", f"/api/mailboxes/{self.ana_box}/reread", {})
+        self.assertEqual((status, body["error"]), (404, "Not found"))
+        self.assertEqual(self.call("ben", "POST", "/api/mailboxes/abc/reread", {})[0], 404)
+        self.assertEqual(self.google.fetched, [])
+
     def test_nobody_scans_or_sees_another_members_mailbox(self):
         status, body = self.call("ben", "POST", f"/api/mailboxes/{self.ana_box}/scan", {})
         self.assertEqual((status, body["error"]), (404, "Not found"))
@@ -847,7 +1081,7 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(sorted(i["reason"] for i in mine["items"]), ["incomplete", "no_markup"])
         item = next(i for i in mine["items"] if i["reason"] == "no_markup")
         self.assertEqual((item["address"], item["sender_domain"], item["received"]), ("ana@gmail.example", "example-air.example", "2026-10-17"))
-        self.assertEqual(self.call("ben", "GET", "/api/review")[1], {"items": [], "who": []})
+        self.assertEqual(self.call("ben", "GET", "/api/review")[1], {"items": [], "who": [], "ai": False})
         for method, path in (("DELETE", f"/api/review/{item['id']}"), ("POST", f"/api/review/{item['id']}/ignore")):
             status, body = self.call("ben", method, path, {} if method == "POST" else None)
             self.assertEqual((status, body["error"]), (404, "No such item"), path)
@@ -890,6 +1124,30 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(self.call("ana", "GET", "/api/review")[1]["who"], [])
         self.assertEqual(self.call("ana", "POST", f"/api/review/who/{who['id']}", {"person_id": self.mia})[0], 404)   # done
         self.assertEqual(self.call("ana", "POST", "/api/review/who/zz", {"person_id": self.mia})[0], 404)
+
+    def test_a_message_can_be_previewed_by_its_owner_alone(self):
+        self.put("no_markup")
+        self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        status, body = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
+        self.assertEqual(status, 200)
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", body["text"])
+        self.assertFalse(body["truncated"])
+        self.assertEqual(self.call("ben", "GET", f"/api/review/{item['id']}/preview")[0], 404)
+        self.assertEqual(self.call("ana", "GET", "/api/review/9999/preview")[0], 404)
+        del self.google.mail["m-no_markup"]
+        status, body = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
+        self.assertEqual((status, body["error"]), (404, "That message is no longer in Gmail."))
+
+    def test_asking_the_ai_needs_it_on_and_is_the_owners_alone(self):
+        self.put("no_markup")
+        self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        self.assertFalse(self.call("ana", "GET", "/api/review")[1]["ai"])
+        status, body = self.call("ana", "POST", f"/api/review/{item['id']}/suggest", {})
+        self.assertEqual((status, body["error"]), (400, "Turn on AI suggestions in Settings first."))
+        self.assertEqual(self.call("ben", "POST", f"/api/review/{item['id']}/suggest", {})[0], 404)
+        self.assertEqual(self.call("ana", "POST", "/api/review/9999/suggest", {})[0], 404)
 
     def test_who_is_this_can_add_a_guest(self):
         self.put("flight_microdata")

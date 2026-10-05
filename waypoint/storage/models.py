@@ -118,6 +118,7 @@ class Segment(Base):
     source: Mapped[str]              # manual, email or import
     booked_by: Mapped[int | None]    # a person
     locked_fields: Mapped[str | None]   # a JSON list of the fields a person edited, which a later email never overwrites
+    check_times: Mapped[bool]        # an email gave the times in a way that couldn't be settled: the card asks for a look
 
 
 class SegmentTraveler(Base):

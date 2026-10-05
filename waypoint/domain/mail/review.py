@@ -72,6 +72,14 @@ def _mine(conn: db.Connection, owner: str, item_id: int) -> dict[str, Any] | Non
     return dict(row) if row is not None else None
 
 
+def locate(conn: db.Connection, owner: str, item_id: int) -> tuple[int, str] | None:
+    """The mailbox and Gmail message id of one of `owner`'s own items, to fetch it again; None when it isn't theirs (or isn't
+    there)."""
+    row = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id).join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
+                       .where(ReviewItem.id == item_id, Mailbox.owner_sub == owner)).fetchone()
+    return (int(row["mailbox_id"]), str(row["message_id"])) if row is not None else None
+
+
 def dismiss(conn: db.Connection, owner: str, item_id: int) -> bool:
     """Take an item off the queue (it was added by hand, or isn't a booking). The message stays remembered as read, so a scan
     doesn't queue it again. False: it isn't `owner`'s, or isn't there."""

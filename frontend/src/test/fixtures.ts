@@ -3,7 +3,7 @@ import type { AppState } from "$lib/types";
 
 /** GET /api/state, as a signed-in Waypoint answers it; `extra` changes what a test cares about. */
 export const state = (extra: Partial<AppState> = {}): AppState => ({
-  version: "1.2.3", database: "sqlite", user: { name: "Ada Lovelace", email: "ada@example.com" }, last_backup: null, review_count: 0, ...extra,
+  version: "1.2.3", database: "sqlite", user: { name: "Ada Lovelace", email: "ada@example.com" }, last_backup: null, review_count: 0, person_id: 1, ...extra,
 });
 
 
@@ -12,7 +12,7 @@ export const segment = (extra: Partial<Segment> = {}): Segment => ({
   id: 1, trip_id: 1, kind: "flight", status: "confirmed", confirmation: "KQ7M2X", provider: "American Airlines",
   start_local: "2026-11-20T19:00", start_zone: "America/New_York", end_local: "2026-11-21T07:10", end_zone: "Europe/London",
   origin: "JFK", destination: "LHR", details: { flight_number: "AA 101", terminal: "8" }, manage_url: null, source: "email", booked_by: 1,
-  locked_fields: [], travelers: [{ id: 1, person_id: 1, name: "Jane Doe" }], links: { app: null, directions: null, call: null }, ...extra,
+  locked_fields: [], check_times: false, travelers: [{ id: 1, person_id: 1, name: "Jane Doe" }], links: { app: null, directions: null, call: null }, ...extra,
 });
 
 /** A trip with these segments; its dates come from the first and last. */

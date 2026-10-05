@@ -22,7 +22,7 @@ limited to your household, a `WAYPOINT_SECRET_KEY`, and private backups.
 
 Members can connect their Gmail read-only (the `gmail.readonly` scope only; the refresh token is kept encrypted, and disconnecting revokes it at Google). Waypoint scans those mailboxes for bookings, keeping the promises on the
 [Email scanning](https://anthonypluth.github.io/waypoint/privacy/email-scanning/) page: read-only mailbox access,
-messages searched on Google’s side so only likely bookings are downloaded, bodies read in memory by one module and never stored, logged or sent anywhere but Gmail’s own API,
+messages searched on Google’s side so only likely bookings are downloaded, bodies read in memory by one module and never stored, logged or sent anywhere but Gmail’s own API (a member can preview the text of a message from their own mailbox: it is fetched when they ask, shown to them alone and kept nowhere),
 and nothing sent to a service run by the project. What a scan keeps is the booking’s fields, each message’s Gmail id and, for mail it couldn’t read,
 the sender’s domain and the day. A report about a way around any of those is as serious as one about sign-in.
 

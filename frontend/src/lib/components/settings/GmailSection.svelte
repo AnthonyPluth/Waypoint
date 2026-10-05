@@ -73,6 +73,14 @@
     watching = true;   // a scan that can't start ends at once: look again for a moment to say why
   }, { busy: (on) => (starting = on ? m.id : null) });
 
+  const reread = (m: Mailbox) => act(async () => {
+    const r = await apiCall<"POST /api/mailboxes/{id}/reread">(`/api/mailboxes/${m.id}/reread`, { method: "POST", failed: "Couldn’t start reading again" });
+    if (!r.started) toast("This mailbox is already being read.");
+    await load();
+    watchUntil = Date.now() + 2 * POLL_MS + 500;
+    watching = true;
+  }, { busy: (on) => (starting = on ? m.id : null) });
+
   async function disconnect() {
     const m = leaving;
     if (!m) return false;
@@ -115,6 +123,9 @@
             {:else if m.status !== "reconnect"}
               <p class="text-sm text-muted-foreground">{scanned(m) ? `Last scanned ${scanned(m)}.` : "Not scanned yet."}</p>
             {/if}
+            {#if m.status === "connected"}
+              <p class="text-sm text-muted-foreground">Read bookings again re-reads the messages Waypoint already found (it doesn’t search again) and corrects bookings it read wrongly before, such as flight times. Anything you edited stays as you left it.</p>
+            {/if}
             {#if m.scan_notice && !m.scanning && m.status !== "reconnect"}<p class="text-sm text-muted-foreground" role="status">The scan couldn’t start: {m.scan_notice}</p>{/if}
             {#if m.scan_error}<p class="text-sm text-signal-ink" role="status">The last scan stopped: {m.scan_error} What it had read is kept, and the next scan carries on.</p>{/if}
           </div>
@@ -122,6 +133,7 @@
             <Badge variant={m.status === "connected" ? "outline" : "secondary"}>{label(m)}</Badge>
             {#if m.status === "reconnect"}<Button disabled={connecting} onclick={connect}>Reconnect</Button>
             {:else}<Button variant="outline" disabled={m.scanning || starting === m.id} onclick={() => scan(m)}>{m.scanning ? "Scanning…" : "Scan now"}</Button>{/if}
+            {#if m.status === "connected"}<Button variant="outline" disabled={m.scanning || starting === m.id} onclick={() => reread(m)}>Read bookings again</Button>{/if}
             <Button variant="outline" onclick={() => { leaving = m; asking = true; }}>Disconnect</Button>
           </div>
         </div>

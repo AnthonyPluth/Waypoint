@@ -1,0 +1,41 @@
+From: Example Air <reservations@example-air.example>
+To: traveller@gmail.example
+Subject: Your itinerary VH9X1D
+Date: Mon, 12 Oct 2026 09:30:00 -0400
+Message-ID: <fx-offset_marked_times@example-air.example>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="fxb1"
+
+--fxb1
+Content-Type: text/plain; charset=utf-8
+
+CANARY-BODY-OFFSET-3C7H is only in this made-up body.
+Departs Chicago O'Hare 3:00 PM
+Arrives Denver 6:10 PM
+
+--fxb1
+Content-Type: text/html; charset=utf-8
+
+<html><head>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "FlightReservation",
+  "reservationNumber": "VH9X1D",
+  "reservationStatus": "http://schema.org/ReservationConfirmed",
+  "underName": {"@type": "Person", "name": "Alex Rivera"},
+  "reservationFor": {
+    "@type": "Flight",
+    "flightNumber": "301",
+    "airline": {"@type": "Airline", "name": "Example Air", "iataCode": "EX"},
+    "departureAirport": {"@type": "Airport", "iataCode": "ORD"},
+    "departureTime": "2026-12-04T09:00:00-06:00",
+    "arrivalAirport": {"@type": "Airport", "iataCode": "DEN"},
+    "arrivalTime": "2026-12-04T11:10:00-07:00"
+  }
+}
+</script><style>.t { color: #000 }</style></head>
+<body><p>CANARY-BODY-OFFSET-3C7H Your flight is confirmed.</p>
+<table><tr><td>Departs Chicago O'Hare 3:00 PM</td></tr><tr><td>Arrives Denver 6:10 PM</td></tr></table>
+</body></html>
+--fxb1--

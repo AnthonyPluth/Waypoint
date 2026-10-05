@@ -1,0 +1,41 @@
+From: Example Air <reservations@example-air.example>
+To: traveller@gmail.example
+Subject: Your itinerary WZ3F8G
+Date: Mon, 12 Oct 2026 09:30:00 -0400
+Message-ID: <fx-utc_marked_overnight@example-air.example>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="fxb1"
+
+--fxb1
+Content-Type: text/plain; charset=utf-8
+
+CANARY-BODY-OVERNIGHT-8R4Y is only in this made-up body.
+Departs Los Angeles 10:30 PM
+Arrives New York 6:55 AM
+
+--fxb1
+Content-Type: text/html; charset=utf-8
+
+<html><head>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "FlightReservation",
+  "reservationNumber": "WZ3F8G",
+  "reservationStatus": "http://schema.org/ReservationConfirmed",
+  "underName": {"@type": "Person", "name": "Alex Rivera"},
+  "reservationFor": {
+    "@type": "Flight",
+    "flightNumber": "412",
+    "airline": {"@type": "Airline", "name": "Example Air", "iataCode": "EX"},
+    "departureAirport": {"@type": "Airport", "iataCode": "LAX"},
+    "departureTime": "2026-12-10T22:30:00Z",
+    "arrivalAirport": {"@type": "Airport", "iataCode": "JFK"},
+    "arrivalTime": "2026-12-11T06:55:00Z"
+  }
+}
+</script><style>.t { color: #000 }</style></head>
+<body><p>CANARY-BODY-OVERNIGHT-8R4Y Your flight is confirmed.</p>
+<table><tr><td>Departs Los Angeles 10:30 PM</td></tr><tr><td>Arrives New York 6:55 AM</td></tr></table>
+</body></html>
+--fxb1--
