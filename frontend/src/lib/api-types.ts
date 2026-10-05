@@ -203,6 +203,7 @@ export interface Segment {
   booked_by: number | null;
   locked_fields: string[];
   travelers: Traveler[];
+  links: SegmentLinks;
 }
 
 /**
@@ -241,6 +242,12 @@ export interface SegmentEdit {
   details?: Record<string, string>;
   manage_url?: string | null;
   travelers?: TravelerBody[];
+}
+
+export interface SegmentLinks {
+  app: string | null;
+  directions: string | null;
+  call: string | null;
 }
 
 /** Who's signed in. Without sign-in configured (on your own machine), everyone is `local`. */
