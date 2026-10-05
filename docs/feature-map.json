@@ -293,6 +293,19 @@
     },
     {
       "method": "GET",
+      "path": "/api/stats",
+      "handler": "waypoint/server/api/stats.py:api_stats",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_stats.py"
+      ],
+      "docs": [
+        "start/stats"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/flight-status",
       "handler": "waypoint/server/api/flightstatus.py:api_flight_statuses",
       "web": [

@@ -1,0 +1,11 @@
+Waypoint
+Third-party data
+
+Airlines: waypoint/storage/airlines.tsv.gz is derived from the OpenFlights airlines database
+(https://openflights.org/data.html, airlines.dat). The database is made available under the Open Database License
+(ODbL) 1.0, https://opendatacommons.org/licenses/odbl/1-0/, and its individual contents under the Database Contents
+License, https://opendatacommons.org/licenses/dbcl/1-0/. The derived file is shared here under the same ODbL.
+
+Airports: waypoint/storage/airports.tsv.gz is derived from OurAirports' public-domain data
+(https://ourairports.com/data/), through the airportsdata package (https://pypi.org/project/airportsdata/), which adds
+time zones.

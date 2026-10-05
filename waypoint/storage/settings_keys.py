@@ -9,6 +9,8 @@ from __future__ import annotations
 # General preferences
 LAST_BACKUP = "last_backup"   # when a backup was last downloaded from Settings (ISO, the machine's local time)
 
+DISTANCE_UNIT = "distance_unit"   # the household's unit for distances in the stats: "mi" (the default) or "km"
+
 # Flight status (waypoint/domain/flightstatus.py): the calls made this month (the month is "YYYY-MM", local time), and
 # when fetching is paused (a JSON object: until, as seconds since the epoch, and why)
 FLIGHT_STATUS_MONTH = "flight_status_month"

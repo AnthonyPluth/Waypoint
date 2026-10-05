@@ -267,6 +267,105 @@ export interface State {
   review_count: number;
 }
 
+export interface Stats {
+  person: number | null;
+  year: number | null;
+  distance_unit: "mi" | "km";
+  flights: StatsFlights;
+  stays: StatsStays;
+  cars: StatsCars;
+  places: StatsPlaces;
+}
+
+export interface StatsAirline {
+  code: string | null;
+  name: string;
+  flights: number;
+}
+
+export interface StatsAirport {
+  code: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  visits: number;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface StatsCars {
+  days: number;
+  companies: StatsNamed[];
+}
+
+export interface StatsFlightRecord {
+  origin: string;
+  destination: string;
+  distance_km: number;
+  start_local: string;
+  flight_number: string | null;
+}
+
+export interface StatsFlights {
+  count: number;
+  distance_km: number;
+  air_seconds: number;
+  airports: StatsAirport[];
+  airlines: StatsAirline[];
+  countries: StatsNamed[];
+  routes: StatsRoute[];
+  cabins: StatsNamed[];
+  top_seat: string | null;
+  seat_positions: StatsSeats;
+  longest: StatsFlightRecord | null;
+  shortest: StatsFlightRecord | null;
+  most_visited_airport: string | null;
+  busiest_month: string | null;
+  times_around_earth: number;
+  moon_fraction: number;
+}
+
+export interface StatsNamed {
+  name: string;
+  count: number;
+}
+
+export interface StatsPlace {
+  name: string;
+  first_visit: string;
+  visits: number;
+}
+
+export interface StatsPlaces {
+  countries: StatsPlace[];
+  cities: StatsPlace[];
+}
+
+export interface StatsRoute {
+  a: string;
+  b: string;
+  flights: number;
+  distance_km: number | null;
+  a_latitude: number | null;
+  a_longitude: number | null;
+  b_latitude: number | null;
+  b_longitude: number | null;
+}
+
+export interface StatsSeats {
+  window: number;
+  aisle: number;
+  middle: number;
+  unknown: number;
+}
+
+export interface StatsStays {
+  nights: number;
+  chains: StatsNamed[];
+  cities: StatsNamed[];
+  countries: StatsNamed[];
+}
+
 export interface Traveler {
   id: number;
   person_id: number | null;
@@ -343,6 +442,7 @@ export interface Endpoints {
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };
   "DELETE /api/segments/{id}": { body: never; reply: Ok };
   "GET /api/airports/{id}": { body: never; reply: Airport };
+  "GET /api/stats": { body: never; reply: Stats };
   "GET /api/flight-status": { body: never; reply: FlightStatusList };
   "POST /api/flight-status/{id}": { body: never; reply: FlightStatusList };
   "GET /api/loyalty": { body: never; reply: LoyaltyList };

@@ -21,7 +21,7 @@ from waypoint.domain import trips
 from waypoint.domain.mail import review
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
-from waypoint.server.api import backups, flightstatus as flightstatus_api, mailboxes, people, state
+from waypoint.server.api import backups, flightstatus as flightstatus_api, mailboxes, people, state, stats as stats_api
 from waypoint.server.api import review as review_api
 from waypoint.providers import flightstatus as flight_service
 from waypoint.server.api import trips as trips_api
@@ -110,6 +110,7 @@ class Replies(DbCase):
         self.test_review()
         self.test_people()
         self.test_trips()
+        self.test_stats()
         self.test_flight_status()
         self.test_loyalty()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
@@ -214,6 +215,18 @@ class Replies(DbCase):
         self.check("DELETE /api/trips/{id}", trips_api.api_trip_remove(self.c, {}, {}, str(made["id"])))
         self.check("GET /api/airports/{id}", trips_api.api_airport(self.c, {}, {}, "AKL"))
 
+    def test_stats(self):
+        _current.user = {"name": None, "email": None, "local": True}
+        trips_api.api_segment_add(self.c, {}, {"kind": "flight", "origin": "JFK", "destination": "LHR",
+                                                "start_local": "2026-06-01T19:00", "end_local": "2026-06-02T07:10",
+                                                "details": {"flight_number": "BA 112", "seat": "12A", "cabin": "Business"}})
+        trips_api.api_segment_add(self.c, {}, {"kind": "hotel", "origin": "Harbour Hotel", "destination": "London",
+                                                "provider": "Example Hotels", "start_zone": "Europe/London",
+                                                "end_zone": "Europe/London", "start_local": "2026-06-02T15:00",
+                                                "end_local": "2026-06-08T10:00"})
+        self.check("GET /api/stats", stats_api.api_stats(self.c, {}, {}))
+        self.check("GET /api/stats", stats_api.api_stats(self.c, {"person": ["all"], "year": ["2026"]}, {}))
+
     def test_flight_status(self):
         _current.user = {"name": None, "email": None, "local": True}
         with mock.patch.dict("os.environ", {"RAPIDAPI_KEY": "test-key-12345678"}):
@@ -268,7 +281,7 @@ class Generated(unittest.TestCase):
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
                                      "DELETE /api/segments/{id}", "GET /api/airports/{id}",
-                                     "GET /api/flight-status", "POST /api/flight-status/{id}",
+                                     "GET /api/stats", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
                                      "POST /api/loyalty/{id}/reveal"})
         self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)

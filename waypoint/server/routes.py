@@ -19,6 +19,7 @@ from .api.people import api_people, api_person_add, api_person_edit, api_person_
 from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_scan, api_mailboxes
 from .api.review import api_review, api_review_dismiss, api_review_ignore, api_review_who
 from .api.state import api_state
+from .api.stats import api_stats
 
 
 # (method, path pattern, handler): each handler takes (conn, query, body, *path params) and returns the JSON reply, or
@@ -43,6 +44,7 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/segments/{id}", api_segment_edit),
     ("DELETE", "/api/segments/{id}", api_segment_remove),
     ("GET", "/api/airports/{id}", api_airport),
+    ("GET", "/api/stats", api_stats),
     ("GET", "/api/flight-status", api_flight_statuses),
     ("POST", "/api/flight-status/{id}", api_flight_status_refresh),
     ("GET", "/api/loyalty", api_loyalty),
