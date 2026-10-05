@@ -479,6 +479,7 @@
         "frontend/src/lib/components/settings/RemindersSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_reminders.py"
       ],
       "docs": [
@@ -493,6 +494,7 @@
         "frontend/src/lib/components/settings/RemindersSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_reminders.py"
       ],
       "docs": [
@@ -507,6 +509,7 @@
         "frontend/src/lib/components/settings/RemindersSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_reminders.py"
       ],
       "docs": [
@@ -521,6 +524,7 @@
         "frontend/src/lib/components/settings/RemindersSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_reminders.py"
       ],
       "docs": [
@@ -535,6 +539,7 @@
         "frontend/src/lib/components/settings/RemindersSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_reminders.py"
       ],
       "docs": [
@@ -549,6 +554,7 @@
         "frontend/src/lib/components/settings/RemindersSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_reminders.py"
       ],
       "docs": [

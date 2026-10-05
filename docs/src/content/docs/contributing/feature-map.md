@@ -44,12 +44,12 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/mailboxes/callback` | `mailboxes.py:api_mailbox_callback` | - | `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
 | `DELETE /api/mailboxes/{id}` | `mailboxes.py:api_mailbox_disconnect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/scan` | `mailboxes.py:api_mailbox_scan` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/waypoint/start/gmail/) |
-| `GET /api/reminders` | `reminders.py:api_reminders` | `lib/components/settings/RemindersSection.svelte` | `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
-| `POST /api/reminders` | `reminders.py:api_reminders_set` | `lib/components/settings/RemindersSection.svelte` | `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
-| `POST /api/reminders/devices` | `reminders.py:api_device_add` | `lib/components/settings/RemindersSection.svelte` | `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
-| `DELETE /api/reminders/devices/{id}` | `reminders.py:api_device_remove` | `lib/components/settings/RemindersSection.svelte` | `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
-| `POST /api/feed` | `reminders.py:api_feed_make` | `lib/components/settings/RemindersSection.svelte` | `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
-| `DELETE /api/feed` | `reminders.py:api_feed_off` | `lib/components/settings/RemindersSection.svelte` | `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `GET /api/reminders` | `reminders.py:api_reminders` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `POST /api/reminders` | `reminders.py:api_reminders_set` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `POST /api/reminders/devices` | `reminders.py:api_device_add` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `DELETE /api/reminders/devices/{id}` | `reminders.py:api_device_remove` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `POST /api/feed` | `reminders.py:api_feed_make` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `DELETE /api/feed` | `reminders.py:api_feed_off` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
 | `GET /api/review` | `review.py:api_review` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
 | `POST /api/review/who/{id}` | `review.py:api_review_who` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
 | `POST /api/review/{id}/ignore` | `review.py:api_review_ignore` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
