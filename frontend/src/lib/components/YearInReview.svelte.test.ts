@@ -96,6 +96,17 @@ describe("YearInReview", () => {
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
   });
 
+  it("says so on the map and share cards when the country outlines can't load", async () => {
+    const map = await import("$lib/map");
+    vi.spyOn(map, "loadCountries").mockRejectedValue(new Error("chunk failed"));
+    render(YearInReview, { stats: stats(2026), person: 1, onclose: () => {} });
+    await next(5);
+    expect(await screen.findByText(/country outlines couldn’t load/)).toBeTruthy();
+    await next(1);
+    expect(screen.getByTestId("share-card")).toBeTruthy();
+    expect(screen.getByText(/country outlines couldn’t load/)).toBeTruthy();
+  });
+
   it("leaves out the new-countries line when the all-time numbers don't load, and closes on Escape", async () => {
     vi.mocked(api).mockRejectedValue(new Error("offline"));
     const onclose = vi.fn();

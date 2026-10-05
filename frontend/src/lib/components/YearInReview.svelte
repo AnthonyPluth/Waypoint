@@ -16,13 +16,14 @@
   let countries = $state<Country[] | null>(null);
   let step = $state(0);
   let showName = $state(false);
+  let outlinesFailed = $state(false);
   let busy = $state(false);
   let result = $state("");
   let problem = $state("");
 
   $effect(() => {
     apiCall<"GET /api/stats">(`/api/stats?person=${person}&year=all`).then((s) => { allTime = s; }).catch(() => { allTime = null; });   // (the new-countries card is left out)
-    loadCountries().then((c) => { countries = c; }).catch(() => { countries = []; });   // (the map is drawn without outlines)
+    loadCountries().then((c) => { countries = c; }).catch(() => { countries = []; outlinesFailed = true; });   // (the map is drawn without outlines, and says so)
   });
 
   const facts = $derived(reviewFacts(stats, allTime));
@@ -73,12 +74,14 @@
         <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading the map"></div>
       {:else}
         <img src={dataUrl(mapSvg(facts, outlines))} alt="Map of the airports and routes flown in {facts.year}" class="w-full rounded-2xl" />
+      {#if outlinesFailed}<p class="text-sm text-muted-foreground" role="status">The country outlines couldn’t load, so the map shows only your airports and routes.</p>{/if}
       {/if}
     {:else if current.id === "share"}
       {#if countries === null}
         <div class="aspect-[4/5] animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Making the picture"></div>
       {:else}
         <img src={dataUrl(card)} alt="The picture to share: {facts.year}, {facts.distance}, {facts.flights} flights" class="mx-auto w-full max-w-sm rounded-2xl" data-testid="share-card" />
+      {#if outlinesFailed}<p class="text-sm text-muted-foreground" role="status">The country outlines couldn’t load, so the map shows only your airports and routes.</p>{/if}
       {/if}
       {#if mine}
         <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" bind:checked={showName} class="size-4 accent-primary" /> Show my name ({mine})</label>
