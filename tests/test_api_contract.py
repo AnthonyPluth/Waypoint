@@ -26,6 +26,7 @@ from waypoint.server.api import review as review_api
 from waypoint.providers import flightstatus as flight_service
 from waypoint.server.api import trips as trips_api
 from waypoint.server.api import loyalty
+from waypoint.server.api import reminders as reminders_api
 from waypoint.server.common import _current
 from tests.shared import DbCase
 
@@ -112,6 +113,7 @@ class Replies(DbCase):
         self.test_trips()
         self.test_flight_status()
         self.test_loyalty()
+        self.test_reminders()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
 
     def test_state(self):
@@ -190,6 +192,19 @@ class Replies(DbCase):
         self.check("POST /api/loyalty/{id}/reveal", loyalty.api_loyalty_reveal(self.c, {}, {}, str(added["id"])))
         self.check("DELETE /api/loyalty/{id}", loyalty.api_loyalty_remove(self.c, {}, {}, str(added["id"])))
 
+
+    def test_reminders(self):
+        from tests.test_reminders import subscription
+        _current.user = {"name": None, "email": None, "local": True}
+        self.check("GET /api/reminders", reminders_api.api_reminders(self.c, {}, {}))
+        self.check("POST /api/reminders", reminders_api.api_reminders_set(self.c, {}, {"check_in": False, "day_of": True}))
+        endpoint, p256dh, auth = subscription()
+        added = reminders_api.api_device_add(self.c, {}, {"endpoint": endpoint, "p256dh": p256dh, "auth": auth})
+        self.check("POST /api/reminders/devices", added)
+        self.check("POST /api/feed", reminders_api.api_feed_make(self.c, {}, {}))
+        self.check("GET /api/reminders", reminders_api.api_reminders(self.c, {}, {}))   # with a device and a feed
+        self.check("DELETE /api/reminders/devices/{id}", reminders_api.api_device_remove(self.c, {}, {}, str(added["id"])))
+        self.check("DELETE /api/feed", reminders_api.api_feed_off(self.c, {}, {}))
 
     def test_trips(self):
         _current.user = {"name": None, "email": None, "local": True}
@@ -270,7 +285,9 @@ class Generated(unittest.TestCase):
                                      "DELETE /api/segments/{id}", "GET /api/airports/{id}",
                                      "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
-                                     "POST /api/loyalty/{id}/reveal"})
+                                     "POST /api/loyalty/{id}/reveal",
+                                     "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",
+                                     "DELETE /api/reminders/devices/{id}", "POST /api/feed", "DELETE /api/feed"})
         self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)
         self.assertNotIn("GET /api/mailboxes/callback", covered())   # and this one as a redirect
 

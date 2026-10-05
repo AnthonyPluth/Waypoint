@@ -350,3 +350,37 @@ class LoyaltyBody(TypedDict):
 
 class Revealed(TypedDict):
     number: str
+
+
+# Reminders and the calendar feed
+
+class ReminderDevice(TypedDict):
+    """A browser or phone that gets this member's notifications."""
+    id: int
+    service: str                    # the push service's host, to tell devices apart
+    created: float                  # seconds since the epoch
+
+
+class Reminders(TypedDict):
+    """The signed-in member's own: which reminders they get, their devices, and whether they have a calendar feed."""
+    public_key: str                 # this server's key, for a browser to subscribe with
+    check_in: bool                  # "Check-in opens", 24 hours before a flight
+    day_of: bool                    # the summary of the day's bookings, from 7:00 on the machine's clock
+    devices: list[ReminderDevice]
+    feed: bool                      # a calendar feed is on (its address was shown once, when it was made)
+
+
+class RemindersBody(TypedDict):
+    check_in: bool
+    day_of: bool
+
+
+class DeviceBody(TypedDict):
+    """A browser's push subscription (`PushSubscription.toJSON()`)."""
+    endpoint: str
+    p256dh: str
+    auth: str
+
+
+class FeedMade(TypedDict):
+    url: str                        # the feed's address, with its key: shown once, and not kept anywhere in Waypoint

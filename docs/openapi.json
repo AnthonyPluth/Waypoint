@@ -1070,6 +1070,211 @@
         }
       }
     },
+    "/api/reminders": {
+      "get": {
+        "operationId": "api_reminders",
+        "x-handler": "waypoint/server/api/reminders.py:api_reminders",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reminders"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_reminders_set",
+        "x-handler": "waypoint/server/api/reminders.py:api_reminders_set",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemindersBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reminders"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/reminders/devices": {
+      "post": {
+        "operationId": "api_device_add",
+        "x-handler": "waypoint/server/api/reminders.py:api_device_add",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderDevice"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/reminders/devices/{id}": {
+      "delete": {
+        "operationId": "api_device_remove",
+        "x-handler": "waypoint/server/api/reminders.py:api_device_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/feed": {
+      "post": {
+        "operationId": "api_feed_make",
+        "x-handler": "waypoint/server/api/reminders.py:api_feed_make",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedMade"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "api_feed_off",
+        "x-handler": "waypoint/server/api/reminders.py:api_feed_off",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/review": {
       "get": {
         "operationId": "api_review",
@@ -1316,6 +1521,27 @@
         ],
         "additionalProperties": false
       },
+      "DeviceBody": {
+        "type": "object",
+        "description": "A browser's push subscription (`PushSubscription.toJSON()`).",
+        "properties": {
+          "endpoint": {
+            "type": "string"
+          },
+          "p256dh": {
+            "type": "string"
+          },
+          "auth": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint",
+          "p256dh",
+          "auth"
+        ],
+        "additionalProperties": false
+      },
       "Disconnected": {
         "type": "object",
         "properties": {
@@ -1329,6 +1555,18 @@
         "required": [
           "ok",
           "revoked"
+        ],
+        "additionalProperties": false
+      },
+      "FeedMade": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
         ],
         "additionalProperties": false
       },
@@ -1845,6 +2083,75 @@
         },
         "required": [
           "display_name"
+        ],
+        "additionalProperties": false
+      },
+      "ReminderDevice": {
+        "type": "object",
+        "description": "A browser or phone that gets this member's notifications.",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "service": {
+            "type": "string"
+          },
+          "created": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "service",
+          "created"
+        ],
+        "additionalProperties": false
+      },
+      "Reminders": {
+        "type": "object",
+        "description": "The signed-in member's own: which reminders they get, their devices, and whether they have a calendar feed.",
+        "properties": {
+          "public_key": {
+            "type": "string"
+          },
+          "check_in": {
+            "type": "boolean"
+          },
+          "day_of": {
+            "type": "boolean"
+          },
+          "devices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReminderDevice"
+            }
+          },
+          "feed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "public_key",
+          "check_in",
+          "day_of",
+          "devices",
+          "feed"
+        ],
+        "additionalProperties": false
+      },
+      "RemindersBody": {
+        "type": "object",
+        "properties": {
+          "check_in": {
+            "type": "boolean"
+          },
+          "day_of": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "check_in",
+          "day_of"
         ],
         "additionalProperties": false
       },
