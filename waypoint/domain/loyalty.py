@@ -82,10 +82,11 @@ def _person_exists(conn: db.Connection, person_id: int) -> bool:
 
 
 def add(conn: db.Connection, fields: Fields) -> Listed:
-    """Save a membership. Raises NoSuchPerson. `number` is required."""
+    """Save a membership. Raises NoSuchPerson, and ValueError when there is no number."""
     if not _person_exists(conn, fields["person_id"]):
         raise NoSuchPerson()
-    assert fields["number"], "a new membership has a number"
+    if not fields["number"]:
+        raise ValueError("a new membership needs a number")
     row = LoyaltyId(person_id=fields["person_id"], kind=fields["kind"], program=fields["program"],
                     number=secretbox.encrypt(fields["number"]) or "", tier=fields["tier"], expiry=fields["expiry"],
                     notes=fields["notes"])

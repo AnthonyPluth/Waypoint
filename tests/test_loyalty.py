@@ -9,7 +9,7 @@ from waypoint import oidc
 from waypoint.domain import demo, loyalty, people
 from waypoint.server.api import loyalty as api
 from waypoint.server.common import ApiError
-from waypoint.storage import secretbox
+from waypoint.storage import db, secretbox
 from waypoint.storage.models import LoyaltyId
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
@@ -61,6 +61,10 @@ class StorageTests(DbCase):
         self.assertEqual((kept["tier"], loyalty.reveal(self.c, added["id"])), ("Platinum", "DEMO1234567"))
         loyalty.edit(self.c, added["id"], membership(who, number="DEMO7654321"))
         self.assertEqual(loyalty.reveal(self.c, added["id"]), "DEMO7654321")
+
+    def test_a_membership_without_a_number_is_refused(self):
+        with self.assertRaises(ValueError):
+            loyalty.add(self.c, membership(guest(self.c), number=None))
 
     def test_nothing_by_that_id_and_nobody_by_that_person(self):
         who = guest(self.c)
@@ -174,7 +178,6 @@ class RouteTests(ServerCase):
 
     def test_a_number_the_key_cannot_unlock_is_a_409_to_reveal(self):
         status, added = self.save()
-        from waypoint.storage import db
         with db.session() as c:
             c.execute(LoyaltyId.__table__.update().where(LoyaltyId.id == added["id"]).values(number=secretbox.PREFIX + "bad"))
         status, _ = self.req("POST", f"/api/loyalty/{added['id']}/reveal")
