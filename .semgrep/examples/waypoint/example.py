@@ -62,3 +62,35 @@ following = today.month + 1
 later = dates.add_months(today, 1)
 # ok: waypoint-month-arithmetic
 later = today + relativedelta(days=7)
+
+# ruleid: waypoint-print
+print(f"scanned {message_id}")
+# ok: waypoint-print
+monitoring.log("Scanned the mailbox.")
+
+# ruleid: waypoint-google-hosts
+TOKEN_URL = "https://oauth2.googleapis.com/token"
+# ruleid: waypoint-google-hosts
+LIST = "https://gmail.googleapis.com/gmail/v1/users/me/messages"
+# ok: waypoint-google-hosts
+gmail.list_messages(conn, mailbox, query)
+
+# ruleid: waypoint-ai-hosts
+URL = "https://openrouter.ai/api/v1/chat/completions"
+# ruleid: waypoint-ai-hosts
+LOCAL = "http://127.0.0.1:11434/api/chat"
+# ok: waypoint-ai-hosts
+suggestion = ai.suggest(conn, item)
+
+# ruleid: waypoint-decrypt
+number = secretbox.decrypt(row["number"])
+# ruleid: waypoint-decrypt
+open_it = secretbox.decrypt
+# ruleid: waypoint-decrypt
+from .storage.secretbox import decrypt
+# ruleid: waypoint-decrypt
+from waypoint.storage.secretbox import encrypt, decrypt as reveal
+# ok: waypoint-decrypt
+from .storage.secretbox import encrypt
+# ok: waypoint-decrypt
+number = loyalty.reveal(conn, person, loyalty_id)

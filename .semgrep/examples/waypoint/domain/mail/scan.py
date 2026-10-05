@@ -10,3 +10,8 @@ start = datetime.date.today()
 today = today or date.today()
 # ok: waypoint-today-in-jobs
 start = today
+
+# ruleid: waypoint-naive-now
+scanned_at = datetime.datetime.now()
+# ok: waypoint-naive-now
+scanned_at = datetime.datetime.now(datetime.timezone.utc)

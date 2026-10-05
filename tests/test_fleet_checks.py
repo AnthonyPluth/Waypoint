@@ -135,3 +135,70 @@ class Workflows(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Tests(unittest.TestCase):
+    """A test that's removed or skipped needs a trailer saying why."""
+
+    def test_names_python_and_vitest(self):
+        py = "class A(unittest.TestCase):\n    def test_one(self):\n        pass\n\n\ndef test_free():\n    pass\n"
+        self.assertEqual(fc.test_names("tests/test_x.py", py), {"tests/test_x.py::A.test_one", "tests/test_x.py::test_free"})
+        ts = 'describe("x", () => {\n  it("shows a trip", () => {});\n  test(`keeps ${a}`, () => {});\n});\n'
+        self.assertEqual(fc.test_names("frontend/src/a.test.ts", ts),
+                         {"frontend/src/a.test.ts::shows a trip", "frontend/src/a.test.ts::keeps ${a}"})
+
+    def test_which_files_hold_tests(self):
+        self.assertTrue(fc.is_test_file("tests/test_backup.py"))
+        self.assertTrue(fc.is_test_file("frontend/src/lib/api.test.ts"))
+        self.assertFalse(fc.is_test_file("tests/shared.py"))
+        self.assertFalse(fc.is_test_file("waypoint/server/handler.py"))
+
+    def test_skips_are_recognised(self):
+        for line in ("@unittest.skip('later')", "self.skipTest('flaky')", "it.skip('x', () => {})", "describe.only('x')",
+                     "xit('x')", "@unittest.skipUnless(db.using_postgres(), 'Postgres only')"):
+            with self.subTest(line=line):
+                self.assertTrue(fc.SKIP.search(line))
+        for line in ("def test_skips_nothing(self):", "it('skips a cancelled leg', () => {})", "only = 1"):
+            with self.subTest(line=line):
+                self.assertFalse(fc.SKIP.search(line))
+
+    def check(self, removed=(), skipped=(), messages=()):
+        with mock.patch.object(fc, "removed_tests", return_value=list(removed)), \
+                mock.patch.object(fc, "added_skips", return_value=list(skipped)):
+            return fc.check_tests("base", list(messages))
+
+    def test_nothing_removed_passes(self):
+        self.assertEqual(self.check(), [])
+
+    def test_a_removed_test_needs_a_trailer_naming_it(self):
+        gone = "tests/test_trips.py::TripTests.test_hidden_trip_is_404"
+        self.assertIn("Removes-Test: TripTests.test_hidden_trip_is_404", self.check(removed=[gone])[0])
+        for trailer in ("TripTests.test_hidden_trip_is_404 — covered by test_every_route now",
+                        "test_hidden_trip_is_404 — covered by test_every_route now", f"{gone} — moved"):
+            with self.subTest(trailer=trailer):
+                self.assertEqual(self.check(removed=[gone], messages=[f"refactor: x\n\nRemoves-Test: {trailer}\n"]), [])
+        other = "refactor: x\n\nRemoves-Test: test_hidden_trip — a different test whose name is part of this one's\n"
+        self.assertTrue(self.check(removed=[gone], messages=[other]))
+
+    def test_each_skip_needs_its_own_trailer(self):
+        added = [("tests/test_trips.py", "test_a", "@unittest.skip('later')"),
+                 ("tests/test_trips.py", "test_b", "self.skipTest('flaky')")]
+        found = self.check(skipped=added, messages=["x\n\nSkips-Test: test_a — needs Postgres\n"])
+        self.assertEqual(len(found), 1)
+        self.assertIn("Skips-Test: test_b", found[0])
+        self.assertEqual(self.check(skipped=added, messages=["x\n\nSkips-Test: test_a — needs Postgres\nSkips-Test: test_b — a reason\n"]), [])
+
+    def test_which_test_a_skip_belongs_to(self):
+        py = ["class T(unittest.TestCase):", "    @unittest.skip('later')", "    def test_decorated(self):",
+              "        pass", "", "    def test_inside(self):", "        self.skipTest('x')"]
+        self.assertEqual(fc.skipped_name("tests/test_t.py", py, 1), "test_decorated")
+        self.assertEqual(fc.skipped_name("tests/test_t.py", py, 6), "test_inside")
+        self.assertEqual(fc.skipped_name("frontend/src/a.test.ts", ['  it.skip("shows a trip", () => {});'], 0), "shows a trip")
+
+    def test_the_repository_passes_against_main(self):
+        base = fc._git("rev-parse", "--verify", "--quiet", "origin/main").strip() if fc._git(
+            "branch", "-r", "--list", "origin/main").strip() else ""
+        if not base:
+            self.skipTest("no origin/main here to compare with")
+        found = fc.commits(f"{base}..HEAD")
+        self.assertEqual(fc.check_tests(fc._git("merge-base", base, "HEAD").strip(), [m for _, m in found]), [])

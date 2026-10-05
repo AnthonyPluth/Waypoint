@@ -50,3 +50,24 @@ describe("no .catch(() => {}) without a reason", () => {
     expect(await flagged("export const p = work().catch((e) => report(e));")).toEqual([]);
   });
 });
+
+describe("no browser storage", () => {
+  it("flags localStorage, sessionStorage and indexedDB", async () => {
+    expect(await flagged('localStorage.setItem("k", "v");')).toEqual(["no-restricted-syntax"]);
+    expect(await flagged('export const v = window.sessionStorage.getItem("k");')).toEqual(["no-restricted-syntax"]);
+    expect(await flagged('export const r = indexedDB.open("w");')).toEqual(["no-restricted-syntax"]);
+  });
+  it("leaves state kept in memory alone", async () => {
+    expect(await flagged("export const kept = new Map<string, string>();")).toEqual([]);
+  });
+});
+
+describe("no console", () => {
+  it("flags console.log, info and debug in the web app", async () => {
+    expect(await flagged('console.log("trip", 1);')).toEqual(["no-console"]);
+    expect(await flagged('console.info("trip", 1);')).toEqual(["no-console"]);
+  });
+  it("leaves errors alone", async () => {
+    expect(await flagged("console.error(new Error('x'));")).toEqual([]);
+  });
+});

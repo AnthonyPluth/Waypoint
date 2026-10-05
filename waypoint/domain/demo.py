@@ -5,7 +5,9 @@ There's nothing to add yet: each feature that stores something (people, trips) a
 `make verify` shows it."""
 from __future__ import annotations
 
+from ..storage import db
 
-def seed(conn) -> int:
+
+def seed(conn: db.Connection) -> int:
     """Fill an empty database with sample data. Returns how many rows it added."""
     return 0
