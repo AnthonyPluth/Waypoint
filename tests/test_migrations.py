@@ -89,6 +89,7 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual([col["name"] for col in tables.get_columns("mailboxes")],
                              ["id", "owner_sub", "address", "token", "history_id", "last_scan", "status", "last_error", "created"])
             self.assertEqual([col["name"] for col in tables.get_columns("mailbox_pending")], ["state", "owner_sub", "verifier", "created"])
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         row = dict(owner_sub="sub-1", address="ana@gmail.example", token="enc:v1:x", status="connected")
         with db.session(self.path) as conn:   # numbered by the database, one row for each address of a member
