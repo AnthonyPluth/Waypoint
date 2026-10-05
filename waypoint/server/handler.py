@@ -19,7 +19,7 @@ from typing import Any
 
 from ..storage import db, secretbox
 from .. import monitoring, oidc
-from . import jobs, routes, static
+from . import feed, jobs, routes, static
 from .common import NOT_READ, ApiError, BadJson, Response, _current, header_value, host_allowed, server_error
 
 # Files anyone may fetch: the sign-in pages' look, and what a phone needs to install Waypoint (it fetches the manifest
@@ -102,6 +102,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlsplit(getattr(self, "path", "") or "").path
         if path == "/healthz":
             return   # the container health check, every minute
+        if path.startswith(feed.PREFIX):
+            path = feed.PREFIX + "…"   # the calendar feed's key is in its address
         started = getattr(self, "_started", None)
         ms = f" {int((time.monotonic() - started) * 1000)}ms" if started else ""
         monitoring.log(f"{self.client_address[0]} {getattr(self, 'command', '-')} {path} {code}{ms}")
@@ -384,6 +386,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _feed(self, method: str, path: str) -> None:
+        """A member's calendar feed (waypoint/server/feed.py): 404 for any key that doesn't open one."""
+        if method != "GET":
+            return self._send(405, b"", "text/plain")
+        found = feed.serve(path)
+        if found is None:
+            return self._send(404, b"Not found", "text/plain")
+        self._respond(found)
+
     def _route(self, method: str) -> None:
         url = urllib.parse.urlsplit(self.path)
         if url.path == "/healthz" and method == "GET":   # container health check: says nothing about your data
@@ -398,6 +409,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("X-Waypoint") != "1":
                 return self._json(403, {"error": NO_APP_HEADER})
             return self._logout()
+        if url.path.startswith(feed.PREFIX):   # a calendar app can't sign in: its address's key is what lets it in
+            return self._feed(method, url.path)
         # The look of the sign-in pages is public; everything else needs you signed in.
         if url.path not in PUBLIC_FILES:
             self.user = self._user(renew=url.path.startswith("/api/"))   # API answers are never cached, so a new cookie is safe there

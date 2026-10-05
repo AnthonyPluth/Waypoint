@@ -29,9 +29,10 @@ DOCS = ROOT / "docs/src/content/docs"
 
 # The docs page for each area (an address's second segment), for a route no page names.
 AREA_DOCS = {
-    "state": "start/docker", "mailboxes": "start/gmail", "backup": "start/docker", "restore": "start/docker",
+    "ai": "start/ai", "state": "start/docker", "mailboxes": "start/gmail", "backup": "start/docker", "restore": "start/docker",
     "people": "start/people", "loyalty": "start/loyalty", "review": "start/review",
-    "trips": "start/trips", "segments": "start/trips", "airports": "start/trips", "flight-status": "start/flight-status",
+    "trips": "start/trips", "segments": "start/trips", "import": "start/import", "airports": "start/trips", "flight-status": "start/flight-status",
+    "reminders": "start/reminders", "feed": "start/reminders",
     "stats": "start/stats",
 }
 

@@ -2,6 +2,36 @@
   "routes": [
     {
       "method": "GET",
+      "path": "/api/ai",
+      "handler": "waypoint/server/api/ai.py:api_ai",
+      "web": [
+        "frontend/src/lib/components/settings/AiSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_ai.py"
+      ],
+      "docs": [
+        "start/ai"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/ai",
+      "handler": "waypoint/server/api/ai.py:api_ai_save",
+      "web": [
+        "frontend/src/lib/components/settings/AiSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_ai.py"
+      ],
+      "docs": [
+        "start/ai"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/backup",
       "handler": "waypoint/server/api/backups.py:api_backup",
       "web": [],
@@ -56,6 +86,7 @@
       "path": "/api/people",
       "handler": "waypoint/server/api/people.py:api_people",
       "web": [
+        "frontend/src/lib/components/settings/ImportSection.svelte",
         "frontend/src/pages/People.svelte",
         "frontend/src/pages/Review.svelte",
         "frontend/src/pages/Trip.svelte",
@@ -127,6 +158,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_flight_import.py",
         "tests/test_routes.py",
         "tests/test_trips.py"
       ],
@@ -229,6 +261,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_reminders.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -289,6 +322,36 @@
       ],
       "docs": [
         "start/trips"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/import/preview",
+      "handler": "waypoint/server/api/flight_import.py:api_import_preview",
+      "web": [
+        "frontend/src/lib/components/settings/ImportSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_flight_import.py"
+      ],
+      "docs": [
+        "start/import"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/import",
+      "handler": "waypoint/server/api/flight_import.py:api_import",
+      "web": [
+        "frontend/src/lib/components/settings/ImportSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_flight_import.py"
+      ],
+      "docs": [
+        "start/import"
       ]
     },
     {
@@ -486,6 +549,96 @@
     },
     {
       "method": "GET",
+      "path": "/api/reminders",
+      "handler": "waypoint/server/api/reminders.py:api_reminders",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/reminders",
+      "handler": "waypoint/server/api/reminders.py:api_reminders_set",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/reminders/devices",
+      "handler": "waypoint/server/api/reminders.py:api_device_add",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/reminders/devices/{id}",
+      "handler": "waypoint/server/api/reminders.py:api_device_remove",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/feed",
+      "handler": "waypoint/server/api/reminders.py:api_feed_make",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/feed",
+      "handler": "waypoint/server/api/reminders.py:api_feed_off",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/review",
       "handler": "waypoint/server/api/review.py:api_review",
       "web": [
@@ -493,6 +646,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mail_ai.py",
         "tests/test_mail_scan.py"
       ],
       "docs": [

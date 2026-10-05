@@ -429,7 +429,7 @@ class ReviewTests(ScanCase):
         self.assertEqual({(i["reason"], i["sender_domain"], i["received"]) for i in items},
                          {("no_markup", "example-air.example", "2026-10-17"), ("incomplete", "example-air.example", "2026-10-18")})
         nomarkup = next(i for i in items if i["reason"] == "no_markup")
-        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "sender_domain", "received", "reason", "gmail_url"}))
+        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "sender_domain", "received", "reason", "gmail_url", "suggestion", "suggestion_error"}))
         self.assertEqual(nomarkup["gmail_url"], "https://mail.google.com/mail/u/jane@gmail.example/#all/msg-no_markup")
         self.assertEqual(self.items("u-sam"), [])
         self.assertEqual(self.scanned(), {"msg-no_markup": "unreadable", "msg-incomplete": "unreadable", "msg-flight_jsonld": "booking"})
@@ -438,7 +438,7 @@ class ReviewTests(ScanCase):
         self.put("no_markup")
         self.scan()
         stored = self.read(lambda conn: dict(conn.execute(select(ReviewItem)).fetchone()))
-        self.assertEqual(sorted(stored), ["created", "id", "mailbox_id", "message_id", "reason", "received", "sender_domain"])
+        self.assertEqual(sorted(stored), ["created", "id", "mailbox_id", "message_id", "reason", "received", "sender_domain", "suggestion", "suggestion_error"])
         self.assertEqual((stored["sender_domain"], stored["received"]), ("example-air.example", "2026-10-17"))
 
     def test_a_message_that_cannot_be_decoded_is_queued_as_broken(self):

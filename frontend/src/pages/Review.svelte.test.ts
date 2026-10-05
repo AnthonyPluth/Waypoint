@@ -13,7 +13,7 @@ import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
 
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
   id: 1, address: "ana@gmail.example", sender_domain: "example-air.example", received: "2026-10-17",
-  reason: "no_markup", gmail_url: "https://mail.google.com/mail/u/ana@gmail.example/#all/abc", ...extra });
+  reason: "no_markup", gmail_url: "https://mail.google.com/mail/u/ana@gmail.example/#all/abc", suggestion: null, suggestion_error: null, ...extra });
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
   start_local: "2026-12-08T08:00", start_zone: "America/New_York", ...extra });
@@ -204,5 +204,42 @@ describe("providerFrom", () => {
     expect(providerFrom("ana.co.jp")).toBe("Ana");
     expect(providerFrom("localhost")).toBe("Localhost");
     expect(providerFrom("")).toBe("");
+  });
+});
+
+describe("Review: the AI’s suggestion", () => {
+  const suggestion = { kind: "flight" as const, provider: "Example Air", confirmation: "QW4R7T", origin: "BOS", destination: "DEN",
+    start_local: "2026-12-02T07:15", end_local: "2026-12-02T10:05" };
+
+  it("offers nothing extra when there is no suggestion", async () => {
+    render(ReviewPage);
+    await screen.findByTestId("review-item");
+    expect(screen.queryByRole("button", { name: /suggestion/ })).toBeNull();
+  });
+
+  it("starts the form filled in with it, to confirm or edit, and saves only when added", async () => {
+    held = { items: [item({ suggestion })], who: [] };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByRole("heading", { name: "Check this suggestion" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Confirmation code")).toHaveValue("QW4R7T");
+    expect(screen.getByLabelText("From (airport code)")).toHaveValue("BOS");
+    expect(screen.getByLabelText("Departs")).toHaveValue("2026-12-02T07:15");
+    expect(calls.some(([p]) => p === "/api/segments")).toBe(false);   // nothing saved yet
+    await userEvent.clear(screen.getByLabelText("Confirmation code"));
+    await userEvent.type(screen.getByLabelText("Confirmation code"), "QW4R7U");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    const [, , body] = calls.find(([p]) => p === "/api/segments")!;
+    expect(body).toMatchObject({ kind: "flight", confirmation: "QW4R7U", origin: "BOS", destination: "DEN", start_local: "2026-12-02T07:15" });
+  });
+
+  it("says why there’s none, and still offers adding by hand", async () => {
+    held = { items: [item({ suggestion_error: "The AI didn’t find a booking in this message." })], who: [] };
+    render(ReviewPage);
+    expect(await screen.findByText("The AI didn’t find a booking in this message.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Check the AI’s suggestion/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /by hand/ }));
+    expect(screen.getByRole("heading", { name: "Add this booking by hand" })).toBeInTheDocument();
   });
 });

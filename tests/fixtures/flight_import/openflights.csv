@@ -1,0 +1,5 @@
+Date,From,To,Flight_Number,Airline,Distance,Duration,Seat,Seat_Type,Class,Reason,Plane,Registration,Trip,Note,From_OID,To_OID,Airline_OID,Plane_OID
+2025-07-04,LHR,CDG,BA304,British Airways,214,01:10,12A,W,Y,L,Airbus A320,G-XXXX,,CANARY-NOTES-OPENFLIGHTS-2C8H,507,1382,1355,
+2025-07-11 18:45,CDG,LHR,AF1281,Air France,214,01:15,,,C,L,,,,,1382,507,137,
+2025-07-20,EGLL,LFPG,,,,,,,,,,,,,,,,
+2025-08-01,AMS,FRA,,,,,,,,,,,,,,,,

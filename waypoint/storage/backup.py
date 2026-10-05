@@ -44,7 +44,10 @@ FORMAT = "waypoint-backup"
 VERSION = 1
 # Sign-ins (and Gmail connections still at Google) don't travel: sign in again after a restore. Nor do the airports: they're
 # reference data every database is given by its migrations, and no row refers to them. The flight status cache is refetched.
-SKIP = {"auth_sessions", "auth_pending", "mailbox_pending", "airports", "airlines", "flight_status"}
+# Devices belong to the browsers that made them and feeds to the addresses that were handed out: both are set up again after
+# a restore (what was already sent isn't sent twice, but a restored database may be on another day's flights).
+SKIP = {"auth_sessions", "auth_pending", "mailbox_pending", "airports", "airlines", "flight_status", "push_devices", "calendar_feeds",
+        "reminders_sent"}
 NEWER = "That backup is from a newer version of Waypoint. Update Waypoint first."
 
 
@@ -251,6 +254,7 @@ LOYALTY_LABEL = "loyalty numbers (enter them again on People)"
 # What each secret is called where it's entered again (Settings), for saying which ones a restore couldn't read.
 SECRET_LABELS = {
     sk.VAPID_PRIVATE_KEY: "notifications' signing key (devices sign up for notifications again)",
+    sk.AI_OPENROUTER_KEY: "OpenRouter key (enter it again in Settings → AI)",
 }
 
 

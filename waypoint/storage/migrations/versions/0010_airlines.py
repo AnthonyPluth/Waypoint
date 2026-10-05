@@ -1,7 +1,7 @@
 """The airlines (by IATA code, with their names), which the stats name a flight's airline from.
 
-Revision ID: 0008
-Revises: 0007
+Revision ID: 0010
+Revises: 0009
 """
 import gzip
 from pathlib import Path
@@ -9,8 +9,8 @@ from pathlib import Path
 import sqlalchemy as sa
 from alembic import op
 
-revision = '0008'
-down_revision = '0007'
+revision = '0010'
+down_revision = '0009'
 branch_labels = None
 depends_on = None
 

@@ -113,9 +113,9 @@ class Segment(Base):
     end_zone: Mapped[str]
     origin: Mapped[str | None]
     destination: Mapped[str | None]
-    details: Mapped[str | None]      # a JSON object: flight number, terminal, seat, cabin, room, car class, address, phone
+    details: Mapped[str | None]      # a JSON object: flight number, terminal, seat, cabin, room, car class, address, phone, time_unknown
     manage_url: Mapped[str | None]
-    source: Mapped[str]              # manual or email
+    source: Mapped[str]              # manual, email or import
     booked_by: Mapped[int | None]    # a person
     locked_fields: Mapped[str | None]   # a JSON list of the fields a person edited, which a later email never overwrites
 
@@ -209,6 +209,8 @@ class ReviewItem(Base):
     received: Mapped[str | None]     # the day on the message's Date header
     reason: Mapped[str]              # why it couldn't be read: a code (waypoint/domain/mail/review.py)
     created: Mapped[float]
+    suggestion: Mapped[str | None]   # the booking's fields the optional AI read from it (JSON), for a person to confirm or edit
+    suggestion_error: Mapped[str | None]   # why the AI gave none: fixed text
 
 
 class IgnoredSender(Base):
@@ -216,3 +218,36 @@ class IgnoredSender(Base):
     id: Mapped[int]
     mailbox_id: Mapped[int]
     domain: Mapped[str]
+
+
+class PushDevice(Base):
+    __table__ = schema.push_devices
+    id: Mapped[int]
+    owner_sub: Mapped[str]
+    endpoint: Mapped[str]            # the push service's address for this browser
+    p256dh: Mapped[str]
+    auth: Mapped[str]
+    created: Mapped[float]
+
+
+class ReminderPrefs(Base):
+    __table__ = schema.reminder_prefs
+    owner_sub: Mapped[str]
+    check_in: Mapped[bool]
+    day_of: Mapped[bool]
+
+
+class ReminderSent(Base):
+    __table__ = schema.reminders_sent
+    id: Mapped[int]
+    owner_sub: Mapped[str]
+    kind: Mapped[str]                # check_in or day_of
+    ref: Mapped[str]                 # the segment's id (check_in) or the day (day_of)
+    sent: Mapped[float]
+
+
+class CalendarFeed(Base):
+    __table__ = schema.calendar_feeds
+    owner_sub: Mapped[str]
+    key_hash: Mapped[str]            # SHA-256 of the key in the feed's address; the key itself is never kept
+    created: Mapped[float]

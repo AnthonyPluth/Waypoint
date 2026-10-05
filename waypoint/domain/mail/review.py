@@ -5,13 +5,15 @@ domain and its day; never the message's subject or text (those are email content
 server"). A person opens the message in Gmail, adds the booking by hand, or ignores the sender."""
 from __future__ import annotations
 
+import json
 from typing import Any, Literal, TypedDict
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 
 from ...providers import gmail
 from ...storage import db
 from ...storage.models import IgnoredSender, Mailbox, ReviewItem
+from . import ai
 
 Reason = Literal["no_markup", "incomplete", "broken"]
 UNKNOWN_SENDER = ""   # an item's sender domain when the message didn't say
@@ -24,6 +26,8 @@ class ItemOut(TypedDict):
     received: str | None
     reason: Reason
     gmail_url: str
+    suggestion: ai.Suggestion | None         # what the optional AI read from it, for the person to confirm or edit
+    suggestion_error: str | None             # why it gave none, in fixed text
 
 
 def add(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: str | None, received: str | None,
@@ -35,14 +39,24 @@ def add(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: st
                      key=["mailbox_id", "message_id"])
 
 
+def set_suggestion(conn: db.Connection, mailbox_id: int, message_id: str, suggestion: ai.Suggestion | None,
+                   error: str | None) -> None:
+    """Keep what the AI made of a queued message: the booking's fields it read, or why it gave none. Never the message's
+    text, nor the AI's reply as it came."""
+    conn.execute(update(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)
+                 .values(suggestion=json.dumps(suggestion) if suggestion else None, suggestion_error=error))
+
+
 def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
     """`owner`'s own items, newest message first."""
     rows = conn.execute(select(ReviewItem.id, ReviewItem.message_id, ReviewItem.sender_domain,
-                               ReviewItem.received, ReviewItem.reason, Mailbox.address)
+                               ReviewItem.received, ReviewItem.reason, Mailbox.address, ReviewItem.suggestion,
+                               ReviewItem.suggestion_error)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(Mailbox.owner_sub == owner)
                         .order_by(ReviewItem.received.is_(None), ReviewItem.received.desc(), ReviewItem.id.desc())).fetchall()
     return [{"id": r["id"], "address": r["address"], "sender_domain": r["sender_domain"],
-             "received": r["received"], "reason": r["reason"], "gmail_url": gmail.open_url(r["address"], r["message_id"])}
+             "received": r["received"], "reason": r["reason"], "gmail_url": gmail.open_url(r["address"], r["message_id"]),
+             "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None, "suggestion_error": r["suggestion_error"]}
             for r in rows]
 
 

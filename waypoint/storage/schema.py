@@ -236,8 +236,10 @@ review_items = Table(
     Column('received', Text),
     Column('reason', Text, nullable=False),
     Column('created', Float, nullable=False),
+    Column('suggestion', Text),
+    Column('suggestion_error', Text),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_review_items_mailbox_message'),
-    info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner alone; neither its subject nor its body is kept"},
+    info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner alone; neither its subject nor its body is kept; `suggestion` is the booking's fields (JSON) the optional AI read from it, for the person to confirm or edit, and `suggestion_error` why it couldn't (fixed text)"},
 )
 
 ignored_senders = Table(
@@ -247,6 +249,47 @@ ignored_senders = Table(
     Column('domain', Text, nullable=False),
     UniqueConstraint('mailbox_id', 'domain', name='uq_ignored_senders_mailbox_domain'),
     info={'doc': "sender domains a mailbox's owner chose to stop reviewing: their mail is skipped by later scans"},
+)
+
+push_devices = Table(
+    'push_devices', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('owner_sub', Text, nullable=False),
+    Column('endpoint', Text, nullable=False),
+    Column('p256dh', Text, nullable=False),
+    Column('auth', Text, nullable=False),
+    Column('created', Float, nullable=False),
+    UniqueConstraint('endpoint', name='uq_push_devices_endpoint'),
+    Index('ix_push_devices_owner', 'owner_sub'),
+    info={'doc': "browsers and phones a member turned notifications on for; each ends when its owner can no longer sign in, and doesn't travel in a backup"},
+)
+
+reminder_prefs = Table(
+    'reminder_prefs', metadata,
+    Column('owner_sub', Text, primary_key=True),
+    Column('check_in', Boolean, nullable=False),
+    Column('day_of', Boolean, nullable=False),
+    info={'doc': "which reminders a member gets: \"Check-in opens\" 24 hours before a flight, and the day-of summary"},
+)
+
+reminders_sent = Table(
+    'reminders_sent', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('owner_sub', Text, nullable=False),
+    Column('kind', Text, nullable=False),
+    Column('ref', Text, nullable=False),
+    Column('sent', Float, nullable=False),
+    UniqueConstraint('owner_sub', 'kind', 'ref', name='uq_reminders_sent_owner_kind_ref'),
+    info={'doc': "each reminder already sent (a flight's check-in, a day's summary), so none goes out twice; holds no content"},
+)
+
+calendar_feeds = Table(
+    'calendar_feeds', metadata,
+    Column('owner_sub', Text, primary_key=True),
+    Column('key_hash', Text, nullable=False),
+    Column('created', Float, nullable=False),
+    UniqueConstraint('key_hash', name='uq_calendar_feeds_key_hash'),
+    info={'doc': "a member's private calendar feed: only the hash of the random key in its address is kept; ends when its owner can no longer sign in, and doesn't travel in a backup"},
 )
 
 # Tables whose integer id is assigned by the database.

@@ -29,13 +29,13 @@ Without sign-in, on your own machine, everyone is the one local household, which
 
 Each segment has a kind (flight, hotel, car or train), a status (confirmed, changed or cancelled), a confirmation code, the provider, a start and an end, where it starts and ends, a link to manage the booking, and details: flight number, terminal, seat, cabin, room, car class, address and phone. The **travellers** are people from [People](/waypoint/start/people/), or, until a name on a booking is matched to a person, the name as printed.
 
-A segment is added to a trip you name, or without one: Waypoint puts it in the trip it belongs to (see below) or makes a new trip.
+A segment is added to a trip you name, or without one: Waypoint puts it in the trip it belongs to (see below) or makes a new trip. Flights from before Waypoint can be [imported from another app’s CSV export](/waypoint/start/import/).
 
 ## Actions on a booking
 
 Each booking card has buttons for what you'd do next:
 
-- **Open in app**: the booking's manage link (from the email, or one you entered). It's a link on the provider's own website; on a phone the provider's app opens it if the app is installed. Only https links are offered. A cancelled booking keeps this one (you may need it for a refund) and loses the others. Waypoint doesn't build prefilled manage links for any provider yet, because it only adds one once its URL is confirmed from the provider's public site.
+- **Open in app**: the booking's manage link (from the email, or one you entered). It's a link on the provider's own website; on an iPhone or Android phone it says **Open in app** and the provider's app opens it if installed; on a computer it says **Manage booking** and opens the provider's website. Only https links are offered. A cancelled booking keeps this one (you may need it for a refund) and loses the others. Waypoint doesn't build prefilled manage links for any provider yet, because it only adds one once its URL is confirmed from the provider's public site.
 - **Wallet**: on an iPhone or iPad only. It opens the Wallet app itself; no link opens one pass.
 - **Directions**: an Apple Maps link to a hotel's or rental's address (or its place name when there's no address).
 - **Call**: dials the phone number on the booking, when it has one.

@@ -7,31 +7,35 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-37 routes; 0 have no test yet.
+47 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
 | Route | Handler | Web app | Tests | Docs |
 | --- | --- | --- | --- | --- |
+| `GET /api/ai` | `ai.py:api_ai` | `lib/components/settings/AiSection.svelte` | `test_api_contract.py`, `test_mail_ai.py` | [start/ai](/waypoint/start/ai/) |
+| `POST /api/ai` | `ai.py:api_ai_save` | `lib/components/settings/AiSection.svelte` | `test_api_contract.py`, `test_mail_ai.py` | [start/ai](/waypoint/start/ai/) |
 | `GET /api/backup` | `backups.py:api_backup` | - | `test_backup.py`, `test_http_pinned.py` | [start/docker](/waypoint/start/docker/) |
 | `POST /api/backup/inspect` | `backups.py:api_backup_inspect` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_http_pinned.py`, `test_monitoring.py`, `test_security.py`, `test_server_errors.py` | [start/docker](/waypoint/start/docker/) |
 | `POST /api/restore` | `backups.py:api_restore` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_hardening.py`, `test_http_pinned.py`, `test_http_server.py`, `test_monitoring.py` | [start/docker](/waypoint/start/docker/) |
-| `GET /api/people` | `people.py:api_people` | `pages/People.svelte`, `pages/Review.svelte`, `pages/Trip.svelte`, `pages/Trips.svelte` | `test_api_contract.py`, `test_mail_scan.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
+| `GET /api/people` | `people.py:api_people` | `lib/components/settings/ImportSection.svelte`, `pages/People.svelte`, `pages/Review.svelte`, `pages/Trip.svelte`, `pages/Trips.svelte` | `test_api_contract.py`, `test_mail_scan.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
 | `POST /api/people` | `people.py:api_person_add` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_people.py`, `test_trips.py` | [start/people](/waypoint/start/people/) |
 | `POST /api/people/{id}` | `people.py:api_person_edit` | `pages/People.svelte` | `test_api_contract.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
 | `DELETE /api/people/{id}` | `people.py:api_person_remove` | `pages/People.svelte` | `test_api_contract.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
-| `GET /api/trips` | `trips.py:api_trips` | `pages/Trips.svelte`, `pages/Upcoming.svelte` | `test_api_contract.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
+| `GET /api/trips` | `trips.py:api_trips` | `pages/Trips.svelte`, `pages/Upcoming.svelte` | `test_api_contract.py`, `test_flight_import.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/trips` | `trips.py:api_trip_add` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `GET /api/trips/{id}` | `trips.py:api_trip` | `pages/Trip.svelte` | `test_api_contract.py`, `test_monitoring.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/trips/{id}` | `trips.py:api_trip_edit` | - | `test_api_contract.py`, `test_monitoring.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `DELETE /api/trips/{id}` | `trips.py:api_trip_remove` | - | `test_api_contract.py`, `test_monitoring.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/trips/{id}/merge` | `trips.py:api_trip_merge` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/trips/{id}/split` | `trips.py:api_trip_split` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
-| `POST /api/segments` | `trips.py:api_segment_add` | `lib/components/SegmentForm.svelte`, `pages/Review.svelte` | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
+| `POST /api/segments` | `trips.py:api_segment_add` | `lib/components/SegmentForm.svelte`, `pages/Review.svelte` | `test_api_contract.py`, `test_reminders.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `GET /api/segments/{id}` | `trips.py:api_segment` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/segments/{id}` | `trips.py:api_segment_edit` | `lib/components/SegmentForm.svelte` | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `DELETE /api/segments/{id}` | `trips.py:api_segment_remove` | `pages/Trip.svelte` | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `GET /api/airports/{id}` | `trips.py:api_airport` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
+| `POST /api/import/preview` | `flight_import.py:api_import_preview` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/waypoint/start/import/) |
+| `POST /api/import` | `flight_import.py:api_import` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/waypoint/start/import/) |
 | `GET /api/stats` | `stats.py:api_stats` | - | `test_api_contract.py`, `test_stats.py` | [start/stats](/waypoint/start/stats/) |
 | `GET /api/flight-status` | `flightstatus.py:api_flight_statuses` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py` | [start/flight-status](/waypoint/start/flight-status/) |
 | `POST /api/flight-status/{id}` | `flightstatus.py:api_flight_status_refresh` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py` | [start/flight-status](/waypoint/start/flight-status/) |
@@ -45,7 +49,13 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/mailboxes/callback` | `mailboxes.py:api_mailbox_callback` | - | `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
 | `DELETE /api/mailboxes/{id}` | `mailboxes.py:api_mailbox_disconnect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py`, `test_mail_scan.py` | [start/gmail](/waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/scan` | `mailboxes.py:api_mailbox_scan` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/waypoint/start/gmail/) |
-| `GET /api/review` | `review.py:api_review` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
+| `GET /api/reminders` | `reminders.py:api_reminders` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `POST /api/reminders` | `reminders.py:api_reminders_set` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `POST /api/reminders/devices` | `reminders.py:api_device_add` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `DELETE /api/reminders/devices/{id}` | `reminders.py:api_device_remove` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `POST /api/feed` | `reminders.py:api_feed_make` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `DELETE /api/feed` | `reminders.py:api_feed_off` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
+| `GET /api/review` | `review.py:api_review` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_ai.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
 | `POST /api/review/who/{id}` | `review.py:api_review_who` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
 | `POST /api/review/{id}/ignore` | `review.py:api_review_ignore` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
 | `DELETE /api/review/{id}` | `review.py:api_review_dismiss` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |

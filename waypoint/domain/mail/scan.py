@@ -10,14 +10,18 @@ that looked like a booking but couldn't be read, a review item (its sender's dom
 Each message is filed and committed on its own, so a scan that stops halfway keeps what it did, and the scan's end (the
 history id and time it resumes from) moves only when it finishes: the last good state stays, and the mailbox says in a
 fixed text what failed. A scan that can't start (the connection needs reconnecting, its owner can no longer sign in, no
-one to book for) writes nothing about itself: that isn't a failed run. Counts only reach the log, never what a message said."""
+one to book for) writes nothing about itself: that isn't a failed run. Counts only reach the log, never what a message said.
+
+When the household turned the AI fallback on (waypoint/domain/mail/ai.py), a message that goes to the review queue is also
+offered to it, once, and what it reads (or why it couldn't) is kept on the item as a suggestion for a person to confirm. The
+setting is read again before each message, so turning it off stops the sending at once, mid-scan too."""
 from __future__ import annotations
 
 import threading
 import time
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import select, update
 
@@ -25,9 +29,9 @@ from ... import dates, monitoring
 from ...providers import gmail
 from ...storage import db
 from ...storage.models import Mailbox, ScannedMessage
-from .. import people
+from .. import loyalty, people
 from ..visibility import Viewer
-from . import extract, ingest, query, review
+from . import ai, extract, ingest, query, review
 
 State = Literal["done", "failed", "not_started", "busy"]
 BOOKING, UNREADABLE, IGNORED = "booking", "unreadable", "ignored"   # what came of a message (scanned_messages.outcome)
@@ -139,6 +143,30 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     return made, queued
 
 
+SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
+
+
+def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) -> None:
+    """Offer a queued message to the AI, if the household has it on (read now, not when the scan began), and keep the answer
+    on its review item. A failure here is the item's note, never the scan's."""
+    with db.session() as conn:
+        cfg = ai.config(conn)
+        known = tuple(loyalty.known_numbers(conn)) if cfg else ()
+    if cfg is None:
+        return
+    suggestion: ai.Suggestion | None = None
+    error: str | None = None
+    try:
+        suggestion = ai.suggest(cfg, extract.plain_text(raw), known)
+    except ai.AiError as e:
+        error = str(e)
+    except Exception as e:   # a bug: reported without what was sent or answered
+        monitoring.report(e, values=False)
+        error = SUGGESTION_FAILED
+    with db.session() as conn:
+        review.set_suggestion(conn, mailbox_id, message_id, suggestion, error)
+
+
 def _fail(mailbox_id: int, text: str, partial: tuple[int, int, int]) -> Result:
     """The scan stopped: say what, in a fixed text. Where it resumes from is left as it was."""
     with db.session() as conn:
@@ -181,7 +209,8 @@ def _scan(mailbox_id: int, now: float, today: date) -> Result:
                     token = gmail.access_token(conn, mailbox_id, time.time())
                 issued = time.monotonic()
             try:
-                message = extract.read(gmail.fetch(token, message_id))   # (the body is in memory only for this line's work)
+                raw = gmail.fetch(token, message_id)
+                message = extract.read(raw)   # (the body is in memory only while this message is handled)
             except gmail.MessageGone:   # deleted since it was found: nothing to read
                 with db.session() as conn:
                     _record(conn, mailbox_id, message_id, IGNORED, now)
@@ -199,6 +228,8 @@ def _scan(mailbox_id: int, now: float, today: date) -> Result:
                     review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "incomplete", now)
                     _record(conn, mailbox_id, message_id, UNREADABLE, now)
                 a, b = 0, 1
+            if b:
+                _suggest(mailbox_id, message_id, raw, now)
             read, made, queued = read + 1, made + a, queued + b
         with db.session() as conn:
             conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(

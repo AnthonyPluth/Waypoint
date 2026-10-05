@@ -45,7 +45,7 @@ beforeEach(() => {
   route.page = "trip"; route.sub = "1"; location.hash = "#trip/1";
   serve();
 });
-afterEach(() => { vi.useRealTimers(); flightStatus.list = null; });
+afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); flightStatus.list = null; });
 
 describe("Trip", () => {
   it("shows a flight’s live status on its card and none on a stay", async () => {
@@ -57,13 +57,25 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByTestId("flight-status")).toBeNull();
   });
 
+  it("shows a flight with no times by its day: “time not recorded” at both ends, and no live status", async () => {
+    held = trip([segment({ id: 1, origin: "LAX", destination: "JFK", start_local: "2026-03-08T00:00", start_zone: "America/Los_Angeles",
+      end_local: "2026-03-08T03:00", end_zone: "America/New_York", details: { flight_number: "DL 1002", time_unknown: "yes" } })]);
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? delayed : answer(path, opts)) as never);
+    render(TripPage);
+    const card = (await screen.findByRole("list", { name: "Bookings" })).querySelector(".pass") as HTMLElement;
+    expect(within(card).getAllByText("time not recorded")).toHaveLength(2);
+    expect(within(card).queryByText(/12:00 AM|3:00 AM/)).toBeNull();
+    expect(within(card).queryByTestId("flight-status")).toBeNull();
+  });
+
   it("offers each booking’s actions, and no Wallet off iOS", async () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
     const hotel = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
     expect(hotel.getByRole("link", { name: "Directions" })).toHaveAttribute("href", "https://maps.apple.com/?q=1%20Quay%20Street%2C%20London");
     expect(hotel.getByRole("link", { name: "Call" })).toHaveAttribute("href", "tel:+442079460000");
-    expect(hotel.queryByRole("link", { name: "Open in app" })).toBeNull();
+    expect(hotel.queryByRole("link", { name: "Manage booking" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Wallet" })).toBeNull();
   });
 
@@ -74,7 +86,7 @@ describe("Trip", () => {
     const wallets = screen.getAllByRole("link", { name: "Wallet" });
     expect(wallets).toHaveLength(2);
     expect(wallets[0]).toHaveAttribute("href", "shoebox://");
-    vi.restoreAllMocks();
+    expect(screen.getAllByRole("link", { name: "Open in app" })[0]).toHaveAttribute("href", "https://example.com/manage");
   });
 
   it("keeps a cancelled booking’s manage link and drops its other actions", async () => {
@@ -82,7 +94,7 @@ describe("Trip", () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
     const group = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
-    expect(group.getByRole("link", { name: "Open in app" })).toHaveAttribute("href", "https://example.com/manage");
+    expect(group.getByRole("link", { name: "Manage booking" })).toHaveAttribute("href", "https://example.com/manage");
     expect(group.queryByRole("link", { name: "Directions" })).toBeNull();
     expect(group.queryByRole("link", { name: "Call" })).toBeNull();
   });
@@ -96,7 +108,7 @@ describe("Trip", () => {
     expect(first.getByText("7:00 PM")).toBeInTheDocument();
     expect(first.getByText("7:10 AM")).toBeInTheDocument();
     expect(first.getByText("Edited by you")).toBeInTheDocument();
-    expect(first.getByRole("link", { name: "Open in app" })).toHaveAttribute("href", "https://example.com/manage");
+    expect(first.getByRole("link", { name: "Manage booking" })).toHaveAttribute("href", "https://example.com/manage");
     // Jane has an AAdvantage number (masked); Sam has none, with a hint; a printed name isn't matched yet.
     expect(first.getByRole("button", { name: "Show and copy American AAdvantage number" })).toHaveTextContent("••••4567");
     expect(first.getByText(/No American AAdvantage number yet/)).toBeInTheDocument();

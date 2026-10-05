@@ -1,4 +1,4 @@
-"""Writes waypoint/storage/airlines.tsv.gz, the airlines Waypoint knows by IATA code (the seed of migration 0008's
+"""Writes waypoint/storage/airlines.tsv.gz, the airlines Waypoint knows by IATA code (the seed of migration 0010's
 `airlines` table): IATA code, ICAO code, name and country, one per line, sorted by IATA code.
 
     curl -sSLo /tmp/airlines.dat https://raw.githubusercontent.com/jpatokal/openflights/master/data/airlines.dat
@@ -6,7 +6,7 @@
 
 The rows come from OpenFlights' `airlines.dat`, which is under the Open Database License (ODbL 1.0): see NOTICE and the
 "Data sources" docs page. Several airlines, mostly defunct ones, share an IATA code; the active one wins, then the
-lowest OpenFlights id. A changed file ships with a migration that updates the table, never by editing 0008's seed."""
+lowest OpenFlights id. A changed file ships with a migration that updates the table, never by editing 0010's seed."""
 from __future__ import annotations
 
 import csv

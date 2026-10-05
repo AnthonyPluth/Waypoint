@@ -21,11 +21,13 @@ from waypoint.domain import trips
 from waypoint.domain.mail import review
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
-from waypoint.server.api import backups, flightstatus as flightstatus_api, mailboxes, people, state, stats as stats_api
+from waypoint.server.api import ai as ai_api
+from waypoint.server.api import backups, flight_import as flight_import_api, flightstatus as flightstatus_api, mailboxes, people, state, stats as stats_api
 from waypoint.server.api import review as review_api
 from waypoint.providers import flightstatus as flight_service
 from waypoint.server.api import trips as trips_api
 from waypoint.server.api import loyalty
+from waypoint.server.api import reminders as reminders_api
 from waypoint.server.common import _current
 from tests.shared import DbCase
 
@@ -108,11 +110,14 @@ class Replies(DbCase):
         self.test_backups()
         self.test_mailboxes()
         self.test_review()
+        self.test_ai()
         self.test_people()
         self.test_trips()
         self.test_stats()
+        self.test_import()
         self.test_flight_status()
         self.test_loyalty()
+        self.test_reminders()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
 
     def test_state(self):
@@ -159,6 +164,9 @@ class Replies(DbCase):
                                                     status="connected", created=1.0)).lastrowid
         for n, reason in enumerate(("no_markup", "incomplete", "broken")):
             review.add(self.c, box, f"m{n}", f"air{n}.example", "2026-10-17", reason, 1.0)   # type: ignore[arg-type]
+        review.set_suggestion(self.c, box, "m0", {"kind": "flight", "origin": "BOS", "destination": "DEN", "start_local": "2026-12-02T07:15",
+                                                  "end_local": "2026-12-02T10:05"}, None)
+        review.set_suggestion(self.c, box, "m1", None, "The AI didn’t find a booking in this message.")
         me = Viewer(people_domain.person_for_sub(self.c, "u1"))
         trips.add_segment(self.c, me, {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": "2026-12-08T08:00",
                                        "end_local": "2026-12-08T11:20", "travelers": [{"person_id": None, "name": "DOE/MIA MISS"}]}, source="email")
@@ -168,6 +176,12 @@ class Replies(DbCase):
         self.check("POST /api/review/who/{id}", review_api.api_review_who(self.c, {}, {"person_id": me.person_id}, str(listed["who"][0]["id"])))
         self.check("POST /api/review/{id}/ignore", review_api.api_review_ignore(self.c, {}, {}, str(listed["items"][0]["id"])))
         self.check("DELETE /api/review/{id}", review_api.api_review_dismiss(self.c, {}, {}, str(listed["items"][1]["id"])))
+
+    def test_ai(self):
+        self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))   # off
+        self.check("POST /api/ai", ai_api.api_ai_save(self.c, {}, {"mode": "local", "ollama_url": "http://ollama.example:1234", "ollama_model": "llama3"}))
+        self.check("POST /api/ai", ai_api.api_ai_save(self.c, {}, {"mode": "openrouter", "openrouter_model": "some/model", "openrouter_key": "sk-or-test-1234567"}))
+        self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))
 
     def test_people(self):
         self.check("GET /api/people", people.api_people(self.c, {}, {}))   # nobody yet
@@ -180,6 +194,16 @@ class Replies(DbCase):
         self.check("POST /api/people/{id}", people.api_person_edit(self.c, {}, {"display_name": "Mia D.", "legal_name": "Mia Rose Doe"}, str(pid)))
         self.check("DELETE /api/people/{id}", people.api_person_remove(self.c, {}, {}, str(pid)))
 
+    def test_import(self):
+        _current.user = {"name": None, "email": None, "local": True}
+        csv = (ROOT / "tests/fixtures/flight_import/flighty.csv").read_bytes()
+        shown = flight_import_api.api_import_preview(self.c, {}, csv)
+        self.assertEqual({r["status"] for r in shown["rows"]}, {"new", "unreadable"})
+        self.check("POST /api/import/preview", shown)
+        flights = [{k: r[k] for k in ("day", "origin", "destination", "flight_number", "start_local", "end_local")}
+                   for r in shown["rows"] if r["status"] == "new"]
+        self.check("POST /api/import", flight_import_api.api_import(self.c, {}, {"flights": flights}))
+
     def test_loyalty(self):
         self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))   # none yet
         who = people.api_person_add(self.c, {}, {"display_name": "Mia Doe"})["id"]
@@ -191,6 +215,19 @@ class Replies(DbCase):
         self.check("POST /api/loyalty/{id}/reveal", loyalty.api_loyalty_reveal(self.c, {}, {}, str(added["id"])))
         self.check("DELETE /api/loyalty/{id}", loyalty.api_loyalty_remove(self.c, {}, {}, str(added["id"])))
 
+
+    def test_reminders(self):
+        from tests.test_reminders import subscription
+        _current.user = {"name": None, "email": None, "local": True}
+        self.check("GET /api/reminders", reminders_api.api_reminders(self.c, {}, {}))
+        self.check("POST /api/reminders", reminders_api.api_reminders_set(self.c, {}, {"check_in": False, "day_of": True}))
+        endpoint, p256dh, auth = subscription()
+        added = reminders_api.api_device_add(self.c, {}, {"endpoint": endpoint, "p256dh": p256dh, "auth": auth})
+        self.check("POST /api/reminders/devices", added)
+        self.check("POST /api/feed", reminders_api.api_feed_make(self.c, {}, {}))
+        self.check("GET /api/reminders", reminders_api.api_reminders(self.c, {}, {}))   # with a device and a feed
+        self.check("DELETE /api/reminders/devices/{id}", reminders_api.api_device_remove(self.c, {}, {}, str(added["id"])))
+        self.check("DELETE /api/feed", reminders_api.api_feed_off(self.c, {}, {}))
 
     def test_trips(self):
         _current.user = {"name": None, "email": None, "local": True}
@@ -274,6 +311,7 @@ class Generated(unittest.TestCase):
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
                                      "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan",
+                                     "GET /api/ai", "POST /api/ai",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "DELETE /api/review/{id}",
                                      "GET /api/people", "POST /api/people",
                                      "POST /api/people/{id}", "DELETE /api/people/{id}",
@@ -281,9 +319,12 @@ class Generated(unittest.TestCase):
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
                                      "DELETE /api/segments/{id}", "GET /api/airports/{id}",
+                                     "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
-                                     "POST /api/loyalty/{id}/reveal"})
+                                     "POST /api/loyalty/{id}/reveal",
+                                     "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",
+                                     "DELETE /api/reminders/devices/{id}", "POST /api/feed", "DELETE /api/feed"})
         self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)
         self.assertNotIn("GET /api/mailboxes/callback", covered())   # and this one as a redirect
 

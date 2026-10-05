@@ -92,6 +92,19 @@ class Disconnected(TypedDict):
 
 # Review: mail that looked like a booking and couldn't be read, and names on bookings to match to people
 
+class AiSuggestion(TypedDict):
+    """The booking's fields the AI read, as the Add by hand form has them. A flight has no zones: its airports give them."""
+    kind: Literal["flight", "hotel", "car", "train"]
+    origin: str
+    start_local: str                # YYYY-MM-DDTHH:MM, as written at the place
+    end_local: str
+    provider: NotRequired[str]
+    confirmation: NotRequired[str]
+    destination: NotRequired[str]
+    start_zone: NotRequired[str]
+    end_zone: NotRequired[str]
+
+
 class ReviewItem(TypedDict):
     """One message Waypoint couldn't read, for the member whose mailbox it is. Never its subject or text: only who it
     came from and its day (Open in Gmail shows the message)."""
@@ -101,6 +114,8 @@ class ReviewItem(TypedDict):
     received: str | None            # a day, YYYY-MM-DD
     reason: Literal["no_markup", "incomplete", "broken"]   # no booking details in it; some missing; couldn't be opened
     gmail_url: str                  # opens the message in Gmail
+    suggestion: AiSuggestion | None   # what the optional AI read from it (never its text), pre-filled into Add by hand to confirm or edit
+    suggestion_error: str | None    # why the AI gave none, in fixed text
 
 
 class WhoIsThis(TypedDict):
@@ -131,6 +146,25 @@ class WhoBody(TypedDict):
 class Matched(TypedDict):
     ok: bool
     matched: int                    # how many travellers on bookings became that person (the same printed name is matched everywhere)
+
+
+# AI (optional, off by default)
+
+class AiSettings(TypedDict):
+    mode: Literal["off", "local", "openrouter"]   # off; Ollama on your own network; OpenRouter with zero data retention
+    ollama_url: str
+    ollama_model: str
+    openrouter_model: str
+    key: Literal["env", "saved"] | None            # where the OpenRouter key comes from; the key itself never comes back
+
+
+class AiBody(TypedDict):
+    """Settings → AI. A field left out stays as it was; `openrouter_key: ""` forgets the saved key."""
+    mode: Literal["off", "local", "openrouter"]
+    ollama_url: NotRequired[str]
+    ollama_model: NotRequired[str]
+    openrouter_model: NotRequired[str]
+    openrouter_key: NotRequired[str]
 
 
 # People
@@ -187,9 +221,9 @@ class Segment(TypedDict):
     end_zone: str
     origin: str | None              # a flight's airport code; a stay's or a rental's place
     destination: str | None
-    details: dict[str, str]         # flight_number, terminal, seat, cabin, room, car_class, address, phone
+    details: dict[str, str]         # flight_number, terminal, seat, cabin, room, car_class, address, phone; time_unknown (an imported flight with no times)
     manage_url: str | None
-    source: Literal["manual", "email"]
+    source: Literal["manual", "email", "import"]
     booked_by: int | None           # a person
     locked_fields: list[str]        # what a person edited, which a later email never overwrites
     travelers: list[Traveler]
@@ -276,6 +310,54 @@ class Airport(TypedDict):
     city: str
     country: str
     zone: str                       # IANA
+
+
+# Importing past flights from another app's CSV export
+
+class ImportRow(TypedDict):
+    """One row of the uploaded file as a flight, for the preview: new, already in Waypoint, or one that can't be read (with
+    why). Times are local wall-clock times at the airports; both are null when the file gave none."""
+    line: int                       # the row's line in the file (the header is line 1)
+    status: Literal["new", "exists", "unreadable"]
+    reason: str | None
+    day: str | None                 # the local departure day, YYYY-MM-DD
+    origin: str | None              # airport codes
+    destination: str | None
+    flight_number: str | None
+    airline: str | None
+    start_local: str | None
+    end_local: str | None
+    seat: str | None
+    cabin: str | None
+
+
+class ImportPreview(TypedDict):
+    format: str                     # which app's export it is, from its header row
+    me: int | None                  # the person the sign-in belongs to (who the flights are for unless chosen otherwise)
+    rows: list[ImportRow]
+
+
+class ImportFlight(TypedDict):
+    """A flight to save, as the preview showed it: the web app sends back only the rows being saved, never the file."""
+    day: str
+    origin: str
+    destination: str
+    flight_number: NotRequired[str | None]
+    airline: NotRequired[str | None]
+    start_local: NotRequired[str | None]
+    end_local: NotRequired[str | None]
+    seat: NotRequired[str | None]
+    cabin: NotRequired[str | None]
+
+
+class ImportBody(TypedDict):
+    flights: list[ImportFlight]     # at most 1,000 at a time
+    person_ids: NotRequired[list[int]]   # who was on these flights; the signed-in member when left out
+
+
+class Imported(TypedDict):
+    added: int
+    existing: int                   # already in Waypoint, so left alone
 
 
 # Live flight status
@@ -451,3 +533,37 @@ class Stats(TypedDict):
     stays: StatsStays
     cars: StatsCars
     places: StatsPlaces
+
+
+# Reminders and the calendar feed
+
+class ReminderDevice(TypedDict):
+    """A browser or phone that gets this member's notifications."""
+    id: int
+    service: str                    # the push service's host, to tell devices apart
+    created: float                  # seconds since the epoch
+
+
+class Reminders(TypedDict):
+    """The signed-in member's own: which reminders they get, their devices, and whether they have a calendar feed."""
+    public_key: str                 # this server's key, for a browser to subscribe with
+    check_in: bool                  # "Check-in opens", 24 hours before a flight
+    day_of: bool                    # the summary of the day's bookings, from 7:00 on the machine's clock
+    devices: list[ReminderDevice]
+    feed: bool                      # a calendar feed is on (its address was shown once, when it was made)
+
+
+class RemindersBody(TypedDict):
+    check_in: bool
+    day_of: bool
+
+
+class DeviceBody(TypedDict):
+    """A browser's push subscription (`PushSubscription.toJSON()`)."""
+    endpoint: str
+    p256dh: str
+    auth: str
+
+
+class FeedMade(TypedDict):
+    url: str                        # the feed's address, with its key: shown once, and not kept anywhere in Waypoint

@@ -10,13 +10,17 @@ from typing import Any
 from ..storage import db
 from .common import ApiError, server_error
 
+from .api.ai import api_ai, api_ai_save
 from .api.backups import api_backup, api_backup_inspect, api_restore
 from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_edit, api_segment_remove, api_trip,
                         api_trip_add, api_trip_edit, api_trip_merge, api_trip_remove, api_trip_split, api_trips)
+from .api.flight_import import api_import, api_import_preview
 from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
 from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loyalty_remove, api_loyalty_reveal
 from .api.people import api_people, api_person_add, api_person_edit, api_person_remove
 from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_scan, api_mailboxes
+from .api.reminders import (api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
+                            api_reminders_set)
 from .api.review import api_review, api_review_dismiss, api_review_ignore, api_review_who
 from .api.state import api_state
 from .api.stats import api_stats
@@ -25,6 +29,8 @@ from .api.stats import api_stats
 # (method, path pattern, handler): each handler takes (conn, query, body, *path params) and returns the JSON reply, or
 # a common.Response for anything else (a download, a logo, a stream). A HEAD is answered as its GET, without the body.
 ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
+    ("GET", "/api/ai", api_ai),
+    ("POST", "/api/ai", api_ai_save),
     ("GET", "/api/backup", api_backup),
     ("POST", "/api/backup/inspect", api_backup_inspect),
     ("POST", "/api/restore", api_restore),
@@ -44,6 +50,8 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/segments/{id}", api_segment_edit),
     ("DELETE", "/api/segments/{id}", api_segment_remove),
     ("GET", "/api/airports/{id}", api_airport),
+    ("POST", "/api/import/preview", api_import_preview),
+    ("POST", "/api/import", api_import),
     ("GET", "/api/stats", api_stats),
     ("GET", "/api/flight-status", api_flight_statuses),
     ("POST", "/api/flight-status/{id}", api_flight_status_refresh),
@@ -57,6 +65,12 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/mailboxes/callback", api_mailbox_callback),
     ("DELETE", "/api/mailboxes/{id}", api_mailbox_disconnect),
     ("POST", "/api/mailboxes/{id}/scan", api_mailbox_scan),
+    ("GET", "/api/reminders", api_reminders),
+    ("POST", "/api/reminders", api_reminders_set),
+    ("POST", "/api/reminders/devices", api_device_add),
+    ("DELETE", "/api/reminders/devices/{id}", api_device_remove),
+    ("POST", "/api/feed", api_feed_make),
+    ("DELETE", "/api/feed", api_feed_off),
     ("GET", "/api/review", api_review),
     ("POST", "/api/review/who/{id}", api_review_who),
     ("POST", "/api/review/{id}/ignore", api_review_ignore),

@@ -9,13 +9,13 @@
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
-  import { isIOS } from "$lib/platform";
+  import { isIOS, isMobile } from "$lib/platform";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, subline } from "$lib/trips";
+  import { dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, subline, untimed } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Plus from "@lucide/svelte/icons/plus";
   import { toast } from "svelte-sonner";
@@ -32,6 +32,7 @@
 
   const id = $derived(route.sub);
   const ios = isIOS();
+  const appWord = isMobile() ? "Open in app" : "Manage booking";   // (a desktop browser has no app to open: it gets the provider’s website)
 
   let latest = 0;   // the newest load: an earlier, slower one finishing later must not put its trip on screen
   async function load() {
@@ -102,17 +103,17 @@
             {#if s.locked_fields.length}<Badge variant="outline" title="A later email won’t change what you edited">Edited by you</Badge>{/if}</p>
           <h2 class="break-words text-xl font-semibold tracking-tight" class:line-through={s.status === "cancelled"}>{headline(s)}</h2>
           {#if subline(s)}<p class="break-words text-sm text-muted-foreground">{subline(s)}</p>{/if}
-          {#if s.kind === "flight" && s.status !== "cancelled"}<FlightStatus segment={s} />{/if}
+          {#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}
           <dl class="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
-              <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, <PlaceTime local={s.start_local} zone={s.start_zone} /></dd></div>
+              <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} zone={s.start_zone} />{/if}</dd></div>
             <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
-              <dd class="mt-1 text-base font-medium">{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} /></dd></div>
+              <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</dd></div>
             {#if s.confirmation}<div><dt class="eyebrow">Confirmation</dt><dd class="mt-1 text-lg"><CopyCode code={s.confirmation} /></dd></div>{/if}
           </dl>
           {#if s.links.app || (live && (s.links.directions || s.links.call || ios))}
             <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
-              {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">Open in app</Button>{/if}
+              {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord}</Button>{/if}
               {#if live && ios}<Button variant="outline" size="sm" href="shoebox://">Wallet</Button>{/if}
               {#if live && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
               {#if live && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
