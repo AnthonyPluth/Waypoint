@@ -1,0 +1,10 @@
+{
+  "name": "open-trip",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/'] >> visible=true" },
+    { "expect_text": { "selector": "main", "text": "Travellers" } },
+    { "screenshot": "trip" }
+  ]
+}

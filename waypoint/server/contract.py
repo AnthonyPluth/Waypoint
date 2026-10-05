@@ -99,7 +99,8 @@ class People(TypedDict):
 
 
 class PersonBody(TypedDict):
-    """A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed)."""
+    """A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed). Changing
+    replaces all of them, so send every name to keep: one left out is cleared."""
     display_name: str
     first_name: NotRequired[str | None]
     legal_name: NotRequired[str | None]

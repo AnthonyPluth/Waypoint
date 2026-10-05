@@ -16,27 +16,27 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/backup` | `backups.py:api_backup` | - | `test_backup.py`, `test_http_pinned.py` | [start/docker](/waypoint/start/docker/) |
 | `POST /api/backup/inspect` | `backups.py:api_backup_inspect` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_http_pinned.py`, `test_monitoring.py`, `test_security.py`, `test_server_errors.py` | [start/docker](/waypoint/start/docker/) |
 | `POST /api/restore` | `backups.py:api_restore` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_hardening.py`, `test_http_pinned.py`, `test_http_server.py`, `test_monitoring.py` | [start/docker](/waypoint/start/docker/) |
-| `GET /api/people` | `people.py:api_people` | `pages/People.svelte` | `test_api_contract.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
+| `GET /api/people` | `people.py:api_people` | `pages/People.svelte`, `pages/Trip.svelte`, `pages/Trips.svelte` | `test_api_contract.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
 | `POST /api/people` | `people.py:api_person_add` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_people.py`, `test_trips.py` | [start/people](/waypoint/start/people/) |
 | `POST /api/people/{id}` | `people.py:api_person_edit` | `pages/People.svelte` | `test_api_contract.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
 | `DELETE /api/people/{id}` | `people.py:api_person_remove` | `pages/People.svelte` | `test_api_contract.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
-| `GET /api/trips` | `trips.py:api_trips` | - | `test_api_contract.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
+| `GET /api/trips` | `trips.py:api_trips` | `pages/Trips.svelte`, `pages/Upcoming.svelte` | `test_api_contract.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/trips` | `trips.py:api_trip_add` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
-| `GET /api/trips/{id}` | `trips.py:api_trip` | - | `test_api_contract.py`, `test_monitoring.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
+| `GET /api/trips/{id}` | `trips.py:api_trip` | `pages/Trip.svelte` | `test_api_contract.py`, `test_monitoring.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/trips/{id}` | `trips.py:api_trip_edit` | - | `test_api_contract.py`, `test_monitoring.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `DELETE /api/trips/{id}` | `trips.py:api_trip_remove` | - | `test_api_contract.py`, `test_monitoring.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/trips/{id}/merge` | `trips.py:api_trip_merge` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/trips/{id}/split` | `trips.py:api_trip_split` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
-| `POST /api/segments` | `trips.py:api_segment_add` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
+| `POST /api/segments` | `trips.py:api_segment_add` | `lib/components/SegmentForm.svelte` | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `GET /api/segments/{id}` | `trips.py:api_segment` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
-| `POST /api/segments/{id}` | `trips.py:api_segment_edit` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
-| `DELETE /api/segments/{id}` | `trips.py:api_segment_remove` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
+| `POST /api/segments/{id}` | `trips.py:api_segment_edit` | `lib/components/SegmentForm.svelte` | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
+| `DELETE /api/segments/{id}` | `trips.py:api_segment_remove` | `pages/Trip.svelte` | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `GET /api/airports/{id}` | `trips.py:api_airport` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
-| `GET /api/loyalty` | `loyalty.py:api_loyalty` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |
+| `GET /api/loyalty` | `loyalty.py:api_loyalty` | `pages/People.svelte`, `pages/Trip.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |
 | `POST /api/loyalty` | `loyalty.py:api_loyalty_add` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |
 | `POST /api/loyalty/{id}` | `loyalty.py:api_loyalty_edit` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |
 | `DELETE /api/loyalty/{id}` | `loyalty.py:api_loyalty_remove` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |
-| `POST /api/loyalty/{id}/reveal` | `loyalty.py:api_loyalty_reveal` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |
+| `POST /api/loyalty/{id}/reveal` | `loyalty.py:api_loyalty_reveal` | `lib/components/LoyaltyNumber.svelte`, `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |
 | `GET /api/mailboxes` | `mailboxes.py:api_mailboxes` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
 | `POST /api/mailboxes/connect` | `mailboxes.py:api_mailbox_connect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
 | `GET /api/mailboxes/callback` | `mailboxes.py:api_mailbox_callback` | - | `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |

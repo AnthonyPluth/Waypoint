@@ -4,6 +4,8 @@ real travel (AGENTS.md, "Personal data in the repo"): names, codes and numbers a
 Each feature that stores something (people, trips) adds its own sample rows here, so `make verify` shows it."""
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from sqlalchemy import func, select
 
 from ..storage import db
@@ -33,35 +35,64 @@ MEMBERSHIPS = [
 ]
 
 
-# Three trips: the family's (Jane booked it for Jane, Sam and Mia) and one each for Jane and Sam alone, so each member sees
-# two and the other's solo trip isn't among them (AGENTS.md, "You see the trips you're on").
-FAMILY: list[trips.SegmentIn] = [
-    {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-11-20T19:00", "end_local": "2026-11-21T07:10",
-     "confirmation": "KQ7M2X", "provider": "Example Air", "details": {"flight_number": "EX 101", "terminal": "7", "cabin": "Economy"}},
-    {"kind": "hotel", "origin": "Harbour Hotel", "start_local": "2026-11-21T15:00", "end_local": "2026-11-27T10:00",
-     "start_zone": "Europe/London", "end_zone": "Europe/London", "confirmation": "H88231",
-     "details": {"address": "1 Quay Street, London", "room": "Family room"}},
-    {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": "2026-11-27T11:30", "end_local": "2026-11-27T14:35",
-     "confirmation": "KQ7M2X", "provider": "Example Air", "details": {"flight_number": "EX 102"}},
-]
-JANE_ALONE: list[trips.SegmentIn] = [
-    {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": "2026-12-08T08:00", "end_local": "2026-12-08T11:20",
-     "confirmation": "PL4N9R", "provider": "Example Air", "details": {"flight_number": "EX 311"}},
-    {"kind": "flight", "origin": "SFO", "destination": "JFK", "start_local": "2026-12-10T17:00", "end_local": "2026-12-11T01:35",
-     "confirmation": "PL4N9R", "provider": "Example Air", "details": {"flight_number": "EX 318"}},
-]
-SAM_ALONE: list[trips.SegmentIn] = [
-    {"kind": "flight", "origin": "JFK", "destination": "AKL", "start_local": "2027-01-14T21:00", "end_local": "2027-01-16T06:30",
-     "confirmation": "ST2V7W", "provider": "Example Air", "details": {"flight_number": "EX 5"}},
-]
+# Four trips, dated from today (so there is always a past one, one in progress and some to come): the family's two (Jane
+# booked them for Jane, Sam and Mia: one last month, one under way), and one each for Jane and Sam alone, so each member
+# sees three and the other's solo trip isn't among them (AGENTS.md, "You see the trips you're on").
+def _at(today: date, days: int, clock: str) -> str:
+    return f"{today + timedelta(days=days):%Y-%m-%d}T{clock}"
+
+
+def _family_past(today: date) -> list[trips.SegmentIn]:
+    return [
+        {"kind": "flight", "origin": "JFK", "destination": "MCO", "start_local": _at(today, -41, "08:15"), "end_local": _at(today, -41, "11:20"),
+         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 1412", "terminal": "4", "cabin": "Economy"}},
+        {"kind": "hotel", "origin": "Lakeside Resort", "start_local": _at(today, -41, "15:00"), "end_local": _at(today, -36, "11:00"),
+         "start_zone": "America/New_York", "end_zone": "America/New_York", "confirmation": "H41207", "provider": "Hilton",
+         "details": {"address": "100 Lakeshore Drive, Orlando", "room": "Two queens"}},
+        {"kind": "flight", "origin": "MCO", "destination": "JFK", "start_local": _at(today, -36, "17:40"), "end_local": _at(today, -36, "20:10"),
+         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 2190"}},
+    ]
+
+
+def _family_now(today: date) -> list[trips.SegmentIn]:
+    return [
+        {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": _at(today, -2, "19:00"), "end_local": _at(today, -1, "07:10"),
+         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy"}},
+        {"kind": "hotel", "origin": "Harbour Hotel", "start_local": _at(today, -1, "15:00"), "end_local": _at(today, 4, "10:00"),
+         "start_zone": "Europe/London", "end_zone": "Europe/London", "confirmation": "H88231", "provider": "Marriott",
+         "details": {"address": "1 Quay Street, London", "room": "Family room"}},
+        {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": _at(today, 4, "11:30"), "end_local": _at(today, 4, "14:35"),
+         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 102", "terminal": "3"}},
+    ]
+
+
+def _jane_alone(today: date) -> list[trips.SegmentIn]:
+    return [
+        {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": _at(today, 20, "08:00"), "end_local": _at(today, 20, "11:20"),
+         "confirmation": "PL4N9R", "provider": "United Airlines", "details": {"flight_number": "UA 311", "terminal": "7"}},
+        {"kind": "car", "origin": "SFO airport", "destination": "SFO airport", "start_local": _at(today, 20, "12:30"), "end_local": _at(today, 22, "16:00"),
+         "start_zone": "America/Los_Angeles", "end_zone": "America/Los_Angeles", "confirmation": "C7710", "provider": "Hertz",
+         "details": {"car_class": "Midsize"}},
+        {"kind": "flight", "origin": "SFO", "destination": "JFK", "start_local": _at(today, 22, "17:00"), "end_local": _at(today, 23, "01:35"),
+         "confirmation": "PL4N9R", "provider": "United Airlines", "details": {"flight_number": "UA 318"}},
+    ]
+
+
+def _sam_alone(today: date) -> list[trips.SegmentIn]:
+    return [
+        {"kind": "flight", "origin": "JFK", "destination": "AKL", "start_local": _at(today, 45, "21:00"), "end_local": _at(today, 47, "06:30"),
+         "confirmation": "ST2V7W", "provider": "Delta Air Lines", "details": {"flight_number": "DL 5"}},
+    ]
 
 
 def _on(*ids: int | None) -> list[trips.TravelerIn]:
     return [{"person_id": i, "name": None} for i in ids]
 
 
-def seed(conn: db.Connection) -> int:
-    """Fill an empty database with sample data. Returns how many rows it added."""
+def seed(conn: db.Connection, today: date | None = None) -> int:
+    """Fill an empty database with sample data, its trips dated from `today` (this machine's, by default). Returns how many
+    rows it added."""
+    today = today or date.today()
     before = _rows(conn)
     for sub, email, name, first in MEMBERS:
         db.insert_ignore(conn, User, {"sub": sub, "email": email, "name": name, "first_name": first, "last_seen": 0.0},
@@ -69,11 +100,11 @@ def seed(conn: db.Connection) -> int:
         people.ensure_member(conn, sub, name, first)
     guests = [people.add_guest(conn, guest)["id"] for guest in GUESTS]
     jane, sam = (Viewer(people.person_for_sub(conn, sub)) for sub in ("demo-jane", "demo-sam"))
-    for fields in FAMILY:
+    for fields in (*_family_past(today), *_family_now(today)):
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0])})
-    for fields in JANE_ALONE:
+    for fields in _jane_alone(today):
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id)})
-    for fields in SAM_ALONE:
+    for fields in _sam_alone(today):
         trips.add_segment(conn, sam, {**fields, "travelers": _on(sam.person_id)})
     by_name = {p["display_name"]: p["id"] for p in people.everyone(conn)}
     for who, kind, program, number, tier, expiry, notes in MEMBERSHIPS:
