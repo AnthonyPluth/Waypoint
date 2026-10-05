@@ -51,6 +51,8 @@ def _leg(code: str | None, status: str, first: re.Match[str], dep: re.Match[str]
         return None
     start = datetime.combine(day, left)
     end = datetime.combine(day + timedelta(days=int(arr[5] or 0)), right)
+    if end <= start:
+        return None   # (a red-eye whose email gave no "+1 day": the arrival's day isn't guessed)
     return Booking("flight", "cancelled" if status == "cancelled" else "confirmed", code, PROVIDER,
                    start.isoformat(timespec="seconds"), end.isoformat(timespec="seconds"), dep[1].upper(), arr[1].upper(),
                    details=(("flight_number", f"WN {first[1]}"),), passengers=passengers)

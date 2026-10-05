@@ -73,6 +73,12 @@ class ParserTests(unittest.TestCase):
             with self.subTest(leg=leg):
                 self.assertEqual(southwest.parse("", f"Confirmation #: K7QW2N\n{leg}\n"), parsers.Parsed((), 1))
 
+    def test_an_arrival_that_would_come_before_the_departure_is_unread(self):
+        leg = "Flight 77 Mon, Nov 16, 2026\nHouston (Hobby), TX (HOU) 11:50 PM\nDallas (Love Field), TX (DAL) 12:55 AM{}\n"
+        self.assertEqual(southwest.parse("", "Confirmation #: K7QW2N\n" + leg.format("")), parsers.Parsed((), 1))
+        [b] = southwest.parse("", "Confirmation #: K7QW2N\n" + leg.format(" (+1 day)")).bookings
+        self.assertEqual((b.start, b.end), ("2026-11-16T23:50:00", "2026-11-17T00:55:00"))
+
     def test_a_leg_without_a_confirmation_code_is_unread(self):
         self.assertEqual(southwest.parse("", "Flight 77 Mon, Nov 16, 2026\nDallas (Love Field), TX (DAL) 8:05 AM\n"
                                              "Houston (Hobby), TX (HOU) 9:10 AM\n"), parsers.Parsed((), 1))
