@@ -299,7 +299,7 @@ class MigrationTests(unittest.TestCase):
         with db.engine(self.path).begin() as c:
             command.downgrade(db.alembic_config(c), "0009")
             self.assertNotIn("airlines", sa.inspect(c).get_table_names())
-            command.upgrade(db.alembic_config(c), "0010")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:
             a = schema.airlines.c
