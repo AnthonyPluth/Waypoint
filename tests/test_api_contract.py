@@ -153,6 +153,7 @@ class Replies(DbCase):
         self.check("GET /api/mailboxes", reply)
         with mock.patch.object(jobs, "scan_now", return_value=True):
             self.check("POST /api/mailboxes/{id}/scan", mailboxes.api_mailbox_scan(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
+            self.check("POST /api/mailboxes/{id}/reread", mailboxes.api_mailbox_reread(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
         with mock.patch.object(gmail, "_post", return_value={}):
             self.check("DELETE /api/mailboxes/{id}", mailboxes.api_mailbox_disconnect(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
 
@@ -317,6 +318,7 @@ class Generated(unittest.TestCase):
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
                                      "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan",
+                                     "POST /api/mailboxes/{id}/reread",
                                      "GET /api/ai", "POST /api/ai",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "DELETE /api/review/{id}",
                                      "GET /api/review/{id}/preview", "POST /api/review/{id}/suggest",

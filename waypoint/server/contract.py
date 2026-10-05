@@ -235,6 +235,7 @@ class Segment(TypedDict):
     source: Literal["manual", "email", "import"]
     booked_by: int | None           # a person
     locked_fields: list[str]        # what a person edited, which a later email never overwrites
+    check_times: bool               # an email's times couldn't be settled: the card asks for a look, until they're edited or confirmed
     travelers: list[Traveler]
     links: SegmentLinks              # the card's actions, built by the server
 

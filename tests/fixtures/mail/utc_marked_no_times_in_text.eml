@@ -1,0 +1,40 @@
+From: Example Air <reservations@example-air.example>
+To: traveller@gmail.example
+Subject: Your itinerary TS2K6B
+Date: Mon, 12 Oct 2026 09:30:00 -0400
+Message-ID: <fx-utc_marked_no_times_in_text@example-air.example>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="fxb1"
+
+--fxb1
+Content-Type: text/plain; charset=utf-8
+
+CANARY-BODY-UTCNONE-9P5D is only in this made-up body.
+Your seats are assigned at check-in.
+
+--fxb1
+Content-Type: text/html; charset=utf-8
+
+<html><head>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "FlightReservation",
+  "reservationNumber": "TS2K6B",
+  "reservationStatus": "http://schema.org/ReservationConfirmed",
+  "underName": {"@type": "Person", "name": "Alex Rivera"},
+  "reservationFor": {
+    "@type": "Flight",
+    "flightNumber": "301",
+    "airline": {"@type": "Airline", "name": "Example Air", "iataCode": "EX"},
+    "departureAirport": {"@type": "Airport", "iataCode": "ORD"},
+    "departureTime": "2026-12-04T09:00:00Z",
+    "arrivalAirport": {"@type": "Airport", "iataCode": "DEN"},
+    "arrivalTime": "2026-12-04T11:10:00Z"
+  }
+}
+</script><style>.t { color: #000 }</style></head>
+<body><p>CANARY-BODY-UTCNONE-9P5D Your flight is confirmed.</p>
+<table><tr><td>Your seats are assigned at check-in.</td></tr></table>
+</body></html>
+--fxb1--

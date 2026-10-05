@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 from ... import dates, monitoring
 from ...providers import gmail
@@ -71,15 +71,16 @@ def notice(mailbox_id: int) -> str | None:
         return _notices.get(mailbox_id)
 
 
-def scan(mailbox_id: int, now: float, today: date) -> Result:
+def scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Result:
     """Scan one mailbox: `now` is the time to note it by, `today` the local day (the search's reach). One scan of a mailbox
-    at a time: asking while one runs gives `busy`."""
+    at a time: asking while one runs gives `busy`. `again`: not a new search but the messages already found that made
+    bookings, read once more (Read bookings again), so bookings stored from an earlier reading are corrected."""
     with _lock:
         if mailbox_id in _running:
             return Result("busy")
         _running.add(mailbox_id)
     try:
-        result = _scan(mailbox_id, now, today)
+        result = _scan(mailbox_id, now, today, again)
     finally:
         with _lock:
             _running.discard(mailbox_id)
@@ -121,17 +122,20 @@ def _record(conn: db.Connection, mailbox_id: int, message_id: str, outcome: str,
 
 
 def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str, message: extract.Message,
-          ignored: list[str], now: float, why: Counter[str] | None = None) -> tuple[int, int]:
+          ignored: list[str], now: float, why: Counter[str] | None = None, again: bool = False) -> tuple[int, int]:
     """File what one message held: its bookings among the owner's segments, a review item for what couldn't be read, and
     the message as seen. Returns (segments added or changed, 1 if queued for review). `why` counts, in words from a fixed
-    list, what stopped messages being read (for the log: how many, never which or what they said)."""
+    list, what stopped messages being read (for the log: how many, never which or what they said). `again`: it was read
+    before, so what came of it is cleared first and recorded anew."""
     why = Counter() if why is None else why
+    if again:
+        conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id))
     if _ignores(ignored, message.sender_domain):
         _record(conn, mailbox_id, message_id, IGNORED, now)
         return 0, 0
     made, failed = 0, 0
     for booking in message.bookings:
-        filed = ingest.file_booking(conn, viewer, booking)
+        filed = ingest.file_booking(conn, viewer, booking, again)
         if filed is None:
             failed += 1
             why[ingest.explain(conn, booking)] += 1
@@ -219,7 +223,7 @@ def _fail(mailbox_id: int, text: str, partial: tuple[int, int, int]) -> Result:
     return Result("failed", text, *partial)
 
 
-def _scan(mailbox_id: int, now: float, today: date) -> Result:
+def _scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Result:
     with db.session() as conn:
         row = conn.execute(select(Mailbox.owner_sub, Mailbox.address, Mailbox.history_id, Mailbox.last_scan)
                            .where(Mailbox.id == mailbox_id)).fetchone()
@@ -238,17 +242,24 @@ def _scan(mailbox_id: int, now: float, today: date) -> Result:
     why: Counter[str] = Counter()
     issued = time.monotonic()
     try:
-        arrived = gmail.history_id(token)   # noted first, so mail arriving during the scan is for the next one
-        found = gmail.search(token, query.build(_since(last_scan, today), ignored))
-        if history and last_scan is not None:
-            try:
-                added = gmail.added_since(token, history)
-                found = [m for m in found if m in added]
-            except gmail.HistoryExpired:
-                pass   # the search by date (from the last scan's end) covers it
-        with db.session() as conn:
-            seen = set(conn.execute(select(ScannedMessage.message_id).where(
-                ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id.in_(found))).scalars()) if found else set()
+        if again:   # (no search: the messages already found that made bookings, and the scan's end stays where it was)
+            arrived = None
+            with db.session() as conn:
+                found = list(conn.execute(select(ScannedMessage.message_id).where(
+                    ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.outcome == BOOKING).order_by(ScannedMessage.message_id)).scalars())
+            seen: set[str] = set()
+        else:
+            arrived = gmail.history_id(token)   # noted first, so mail arriving during the scan is for the next one
+            found = gmail.search(token, query.build(_since(last_scan, today), ignored))
+            if history and last_scan is not None:
+                try:
+                    added = gmail.added_since(token, history)
+                    found = [m for m in found if m in added]
+                except gmail.HistoryExpired:
+                    pass   # the search by date (from the last scan's end) covers it
+            with db.session() as conn:
+                seen = set(conn.execute(select(ScannedMessage.message_id).where(
+                    ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id.in_(found))).scalars()) if found else set()
         for message_id in (m for m in found if m not in seen):
             if time.monotonic() - issued > TOKEN_LIFE:
                 with db.session() as conn:
@@ -258,12 +269,13 @@ def _scan(mailbox_id: int, now: float, today: date) -> Result:
                 raw = gmail.fetch(token, message_id)
                 message = extract.read(raw)   # (the body is in memory only while this message is handled)
             except gmail.MessageGone:   # deleted since it was found: nothing to read
-                with db.session() as conn:
-                    _record(conn, mailbox_id, message_id, IGNORED, now)
+                if not again:   # (read again, what came of it before stands)
+                    with db.session() as conn:
+                        _record(conn, mailbox_id, message_id, IGNORED, now)
                 continue
             try:
                 with db.session() as conn:
-                    a, b = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why)
+                    a, b = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again)
             except Exception as e:
                 if db.is_busy(e):
                     raise
@@ -277,15 +289,17 @@ def _scan(mailbox_id: int, now: float, today: date) -> Result:
             if b:
                 _suggest(mailbox_id, message_id, raw, now)
             read, made, queued = read + 1, made + a, queued + b
-        with db.session() as conn:
-            conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(
-                last_scan=now, scan_error=None, **({"history_id": arrived} if arrived else {})))
+        if not again:   # (reading again proves nothing of the search, so the last scan's end and any warning stay)
+            with db.session() as conn:
+                conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(
+                    last_scan=now, scan_error=None, **({"history_id": arrived} if arrived else {})))
     except gmail.GmailError as e:
         return _fail(mailbox_id, str(e), (read, made, queued))
     except Exception as e:   # a bug, or the database busy: never the details (a row, a message) in what's shown or logged
         monitoring.report(e, values=False)
         return _fail(mailbox_id, FAILED_GENERALLY, (read, made, queued))
-    monitoring.log(f"Scanned a mailbox: {read} message(s) read, {made} booking(s) added or changed, {queued} to review.")
+    monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Scanned a mailbox'}: {read} message(s) read, "
+                   f"{made} booking(s) added or changed, {queued} to review.")
     if why:   # (words from a fixed list and counts: never which message or what it said)
         monitoring.log("What stopped messages being read: " + "; ".join(f"{n} × {what}" for what, n in sorted(why.items())) + ".")
     return Result("done", None, read, made, queued)

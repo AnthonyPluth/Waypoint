@@ -41,24 +41,31 @@ def _plausible(minutes: float, km: float) -> bool:
     return km / 950 * 60 + 20 <= minutes <= km / 600 * 60 + 75
 
 
-def _times(conn: db.Connection, b: extract.Booking, start_zone: str, end_zone: str) -> tuple[str, str] | None:
+def _times(conn: db.Connection, b: extract.Booking, start_zone: str, end_zone: str) -> tuple[str, str, bool] | None:
     """A booking's start and end as wall-clock times at their places, or None when they aren't dates and times. Raises
     Ambiguous when they can't be told.
 
     Markup writes a time with an offset. When it is the place's own (or there is none), the clock is what's written. When
     it isn't, the sender either printed the local clock with a UTC mark ("19:00Z" for 19:00 at the airport) or really gave
     UTC. A flight is decided when exactly one of the two readings gives a believable flight time for the distance between
-    its airports; everything else (a stay, a rental, a train, a short hop where both fit) is Ambiguous and goes to the
-    review queue, rather than being filed with a time that may be hours off. A sender who gives one time with a non-zero
-    offset that is its place's own is giving real instants, so the other time (a "Z" into London in summer) is converted."""
+    its airports; before that, the message's own text can settle it (`extract.reading`). A guess made on distance alone for
+    times marked UTC is flagged (the third value) so the segment's card asks for a look. Everything else (a stay, a rental, a
+    train, a short hop where both fit) is Ambiguous and goes to the review queue, rather than being filed with a time that
+    may be hours off. A sender who gives one time with a non-zero offset that is its place's own is giving real instants, so
+    the other time (a "Z" into London in summer) is converted."""
     start, end = extract.written_clock(b.start), extract.written_clock(b.end)
     if start is None or end is None:
         return None
     moved = extract.wall_clock(b.start, start_zone), extract.wall_clock(b.end, end_zone)
     if moved == (start, end) or not (extract.has_offset(b.start) or extract.has_offset(b.end)):
-        return start, end
+        return start, end, False
     if None not in moved and any(extract.real_offset(t) and m == w for t, m, w in ((b.start, moved[0], start), (b.end, moved[1], end))):
-        return moved[0] or "", moved[1] or ""   # (an offset that is its own place's says the sender gives real instants)
+        return moved[0] or "", moved[1] or "", False   # (an offset that is its own place's says the sender gives real instants)
+    seen = extract.reading(b, start_zone, end_zone)
+    if seen == "written":
+        return start, end, False
+    if seen == "moved" and moved[0] and moved[1]:
+        return moved[0], moved[1], False
     if b.kind != "flight" or None in moved or not (extract.has_offset(b.start) and extract.has_offset(b.end)):
         raise Ambiguous()
     origin, destination = airports.coords(conn, b.origin or ""), airports.coords(conn, b.destination or "")
@@ -71,7 +78,8 @@ def _times(conn: db.Connection, b: extract.Booking, start_zone: str, end_zone: s
     as_written, as_moved = _plausible(minutes(start, end), km), _plausible(minutes(moved[0] or "", moved[1] or ""), km)
     if as_written == as_moved:
         raise Ambiguous()
-    return (start, end) if as_written else (moved[0] or "", moved[1] or "")
+    guessed = extract.utc_marked(b.start) or extract.utc_marked(b.end)
+    return (start, end, guessed) if as_written else (moved[0] or "", moved[1] or "", guessed)
 
 
 def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
@@ -86,11 +94,12 @@ def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
         return None
     if times is None:
         return None
-    start, end = times
+    start, end, guessed = times
     out: trips.SegmentIn = {"kind": b.kind, "status": b.status, "confirmation": b.confirmation, "provider": b.provider,
                             "start_local": start, "start_zone": start_zone, "end_local": end, "end_zone": end_zone,
                             "origin": b.origin, "destination": b.destination,
-                            "details": {k: v for k, v in b.details if k in trips.DETAIL_KEYS}, "manage_url": b.manage_url}
+                            "details": {k: v for k, v in b.details if k in trips.DETAIL_KEYS}, "manage_url": b.manage_url,
+                            "check_times": guessed}
     if b.passengers:
         out["travelers"] = travelers(conn, b.passengers)
     return out
@@ -108,12 +117,14 @@ def explain(conn: db.Connection, b: extract.Booking) -> str:
     return "rejected as a segment"
 
 
-def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking) -> Literal["added", "updated", "unchanged"] | None:
-    """Put one booking among `viewer`'s segments. None: it can't be made into a segment (it goes to the review queue)."""
+def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking,
+                 again: bool = False) -> Literal["added", "updated", "unchanged"] | None:
+    """Put one booking among `viewer`'s segments (`again`: from a message read again). None: it can't be made into a segment
+    (it goes to the review queue)."""
     found = fields(conn, b)
     if found is None:
         return None
     try:
-        return trips.merge_email_segment(conn, viewer, found)   # (it checks everything before it writes anything)
+        return trips.merge_email_segment(conn, viewer, found, again)   # (it checks everything before it writes anything)
     except trips.Invalid:
         return None
