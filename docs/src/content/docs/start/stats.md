@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-Waypoint adds up what you have flown, stayed and driven. The numbers come from `GET /api/stats?person=<id|all>&year=<yyyy|all>`; the Stats page and the map that show them come later.
+Waypoint adds up what you have flown, stayed and driven. The numbers come from `GET /api/stats?person=<id|all>&year=<yyyy|all>`; the Stats page shows them, starting with the map.
 
 ## Who and when
 
@@ -27,3 +27,9 @@ Distances are worked out in kilometres. The household’s display unit is a sett
 ## Airline names
 
 A flight’s airline comes from the two-character code its flight number starts with, named from [OpenFlights](/waypoint/reference/data-sources/); a code that isn’t in the list shows as the code.
+
+## The map
+
+The Stats page draws a world map of everywhere you have flown: an arc for each route (thicker for more flights), a dot for each airport (bigger for more visits), and the countries that hold one of your airports shaded. Tap or hover a dot or an arc for its name and count; drag, pinch or use the buttons to zoom, and Reset to see the whole world again. Hotel cities without an airport aren’t plotted, and neither is an airport Waypoint doesn’t have coordinates for.
+
+The map is drawn on your device from country outlines bundled with the app ([Natural Earth](https://www.naturalearthdata.com/), public domain, through the `world-atlas` package). It loads no tiles and calls no map service, so no one outside learns where the household goes. Its code and outlines are downloaded only when you open the Stats page.

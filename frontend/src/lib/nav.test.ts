@@ -3,7 +3,7 @@ import { initials, NAV, navFor, pageFor } from "./nav";
 
 describe("nav", () => {
   it("has Upcoming first, which is where an unknown route goes", () => {
-    expect(NAV.map((n) => n.page)).toEqual(["upcoming", "trips", "people", "review", "settings"]);
+    expect(NAV.map((n) => n.page)).toEqual(["upcoming", "trips", "people", "review", "stats", "settings"]);
     expect(pageFor("settings")).toBe("settings");
     expect(pageFor("budget")).toBe("upcoming");
     expect(pageFor("")).toBe("upcoming");

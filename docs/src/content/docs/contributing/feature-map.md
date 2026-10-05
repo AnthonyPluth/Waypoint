@@ -36,7 +36,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/airports/{id}` | `trips.py:api_airport` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/import/preview` | `flight_import.py:api_import_preview` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/waypoint/start/import/) |
 | `POST /api/import` | `flight_import.py:api_import` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/waypoint/start/import/) |
-| `GET /api/stats` | `stats.py:api_stats` | - | `test_api_contract.py`, `test_stats.py` | [start/stats](/waypoint/start/stats/) |
+| `GET /api/stats` | `stats.py:api_stats` | `pages/Stats.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/waypoint/start/stats/) |
 | `GET /api/flight-status` | `flightstatus.py:api_flight_statuses` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py` | [start/flight-status](/waypoint/start/flight-status/) |
 | `POST /api/flight-status/{id}` | `flightstatus.py:api_flight_status_refresh` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py` | [start/flight-status](/waypoint/start/flight-status/) |
 | `GET /api/loyalty` | `loyalty.py:api_loyalty` | `pages/People.svelte`, `pages/Trip.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |

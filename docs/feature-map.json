@@ -358,7 +358,9 @@
       "method": "GET",
       "path": "/api/stats",
       "handler": "waypoint/server/api/stats.py:api_stats",
-      "web": [],
+      "web": [
+        "frontend/src/pages/Stats.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_stats.py"
