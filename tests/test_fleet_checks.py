@@ -161,7 +161,7 @@ class MailParsers(unittest.TestCase):
 
 
 class Workflows(unittest.TestCase):
-    GOOD = ("name: X\non: push\ndefaults:\n  run:\n    shell: bash\njobs:\n  a:\n    steps:\n"
+    GOOD = ("name: X\non: push\ndefaults:\n  run:\n    shell: bash\njobs:\n  a:\n    " + fc.RUNS_ON + "\n    steps:\n"
             "      - uses: actions/checkout@" + "a" * 40 + "   # v7.0.1\n"
             "      - uses: ./.github/actions/local\n"
             "      - run: gh api --paginate \"repos/$R/pulls?per_page=100\"\n")
@@ -182,6 +182,12 @@ class Workflows(unittest.TestCase):
 
     def test_a_list_read_without_paginate_fails(self):
         self.assertIn("without --paginate", fc.check_workflow("x.yml", self.GOOD.replace("--paginate ", ""))[0])
+
+    def test_a_job_runs_on_runs_on_or_says_why_it_needs_githubs_runners(self):
+        hosted = self.GOOD.replace(fc.RUNS_ON, "runs-on: ubuntu-latest   # hosted: publishes from GitHub's runners only")
+        self.assertEqual(fc.check_workflow("x.yml", hosted), [])
+        for bare in ("runs-on: ubuntu-latest", "runs-on: self-hosted", "runs-on: ${{ fromJSON(vars.RUNS_ON) }}"):
+            self.assertIn("should be fleet_checks.RUNS_ON", fc.check_workflow("x.yml", self.GOOD.replace(fc.RUNS_ON, bare))[0])
 
 
 

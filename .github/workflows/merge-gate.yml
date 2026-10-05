@@ -43,7 +43,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request') ||
       (github.event_name == 'check_suite' && github.event.check_suite.app.slug != 'github-actions')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # hosted: runs for every pull request, forks included, with a write token
     timeout-minutes: 15   # waiting for CodeQL takes up to 10 (merge-gate.sh)
     permissions:
       contents: write          # merge Dependabot's pull requests

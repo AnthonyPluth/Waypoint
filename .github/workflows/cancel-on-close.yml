@@ -24,14 +24,14 @@ defaults:
 
 jobs:
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
     concurrency:
       group: docker-image-refs/pull/${{ github.event.pull_request.number }}/merge   # docker.yml
       cancel-in-progress: true
     steps:
       - run: echo "Stopped any Docker image run still going on this pull request."
   security:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
     concurrency:
       group: security-refs/pull/${{ github.event.pull_request.number }}/merge   # security.yml
       cancel-in-progress: true
