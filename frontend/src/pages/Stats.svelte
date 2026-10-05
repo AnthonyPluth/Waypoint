@@ -153,7 +153,7 @@
       </dl>
     </section>
 
-    <section aria-labelledby="map-title" id="stats-map-slot" data-testid="stats-map-slot" class="space-y-3">
+    <section aria-labelledby="map-title" id="stats-map-slot" data-testid="stats-map-slot" class="scroll-mt-20 space-y-3">
       <h3 id="map-title" class="eyebrow px-1">Where you’ve been</h3>
       {#if TravelMap}
         <TravelMap flights={f} />
