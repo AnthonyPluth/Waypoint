@@ -1,0 +1,10 @@
+{
+  "name": "mcp-settings",
+  "page": "settings",
+  "steps": [
+    { "wait_for": "#mcp-title" },
+    { "wait_for": "[data-testid=assistant]" },
+    { "scroll_to": "#mcp-title" },
+    { "screenshot": "card" }
+  ]
+}

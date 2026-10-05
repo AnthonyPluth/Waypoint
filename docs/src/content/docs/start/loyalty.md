@@ -23,6 +23,7 @@ Each kind has a fixed list of programs. Choose **Other** for one that isn’t li
 - The People page shows it **masked**, with only its last four characters. Choose **Show** to reveal it and **Copy** to copy it. Revealing is its own request, so loading the page never carries your numbers.
 - Numbers are never written to the log, to reports or notifications, and never sent to an AI.
 - Waypoint keeps nothing in your browser: a number you revealed is gone when you leave the page.
+- An [AI assistant you connect](/waypoint/start/mcp/) sees only the last four characters, unless you turn on **Let assistants see full ID numbers** and the member who connected it allows it. Each time it asks for a number, Waypoint’s log notes which membership and which connection, never the number.
 
 Anyone you let sign in can see every number, as with the rest of the household’s data. See [SECURITY.md](https://github.com/AnthonyPluth/waypoint/blob/main/SECURITY.md).
 

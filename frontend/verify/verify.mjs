@@ -6,12 +6,15 @@
 //
 // Exits 1 on a console error, an uncaught page error, a 5xx response or a failed scripted step.
 import { chromium } from "@playwright/test";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 } };
-export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings"];
+export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "oauth-approve"];
+/** Pages that aren't a route of the app: the server-rendered OAuth approval page, at an address made while seeding (seedAssistants). */
+const OWN_PAGES = ["oauth-approve"];
 export const SCHEMES = ["light", "dark"];   // a flow's colour scheme (the app follows the device's: prefers-color-scheme)
 
 /** The browser to launch: the Chromium preinstalled under PLAYWRIGHT_BROWSERS_PATH (or /opt/pw-browsers) when there is
@@ -51,6 +54,41 @@ export function flowProblems(flow) {
   for (const v of flow?.viewports ?? []) if (!(v in VIEWPORTS)) out.push(`unknown viewport ${v}`);
   if (flow?.scheme !== undefined && !SCHEMES.includes(flow.scheme)) out.push(`unknown scheme ${flow.scheme}`);
   return out;
+}
+
+const REDIRECT = "http://127.0.0.1:33418/callback";   // where a desktop assistant listens for the answer; nothing is there
+const pkce = () => { const verifier = randomBytes(32).toString("base64url"); return { verifier, challenge: createHash("sha256").update(verifier).digest("base64url") }; };
+
+/** Connects made-up assistants the way real ones do (register, ask, the person allows, trade the code for a token), so Settings →
+ *  AI assistants lists them, and registers one more that asks and isn't answered, for the approval page. Returns that page's address. */
+export async function seedAssistants(browser, base) {
+  const ctx = await browser.newContext();
+  try {
+    const post = (path, options) => ctx.request.post(`${base}${path}`, { headers: { "X-Waypoint": "1", Origin: base }, ...options });
+    const register = async (name) => (await (await post("/oauth/register", { data: { client_name: name, redirect_uris: [REDIRECT] } })).json()).client_id;
+    const askUrl = (clientId, challenge) => `${base}/oauth/authorize?` + new URLSearchParams({ response_type: "code", client_id: clientId,
+      redirect_uri: REDIRECT, scope: "read ids:read write", state: "demo", code_challenge: challenge, code_challenge_method: "S256", resource: `${base}/mcp` });
+    await post("/api/mcp-settings/writes", { data: { allow: true } });
+    for (const [name, change] of [["Claude", true], ["Claude Code", false]]) {
+      const { verifier, challenge } = pkce();
+      const clientId = await register(name);
+      const page = await ctx.newPage();
+      const answered = new Promise((resolve) => page.on("requestfailed", (r) => { if (r.url().startsWith(REDIRECT)) resolve(r.url()); }));
+      await page.goto(askUrl(clientId, challenge));
+      if (change) await page.locator("input[name=write]").check();
+      await page.locator("button[value=allow]").click();
+      await answered;   // the answer is a redirect to an address nothing listens on: the failed request carries it
+      const code = new URL(await answered).searchParams.get("code");
+      if (!code) throw new Error(`seeding ${name}: the approval page gave no code`);
+      const token = await (await post("/oauth/token", { form: { grant_type: "authorization_code", code, redirect_uri: REDIRECT, client_id: clientId,
+        code_verifier: verifier, resource: `${base}/mcp` } })).json();
+      if (!token.access_token) throw new Error(`seeding ${name}: no token (${JSON.stringify(token).slice(0, 80)})`);
+      if (change) await post("/mcp", { headers: { Authorization: `Bearer ${token.access_token}`, "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+        data: { jsonrpc: "2.0", id: 1, method: "tools/list" } });   // so Settings can say it was used
+      await page.close();
+    }
+    return askUrl(await register("Claude Desktop"), pkce().challenge);
+  } finally { await ctx.close(); }
 }
 
 async function runStep(page, step, shot) {
@@ -107,6 +145,9 @@ async function main() {
   const problems = [];   // what makes the run fail
   const notes = [];      // what's only reported
   const results = [];
+  let approveUrl = "";
+  try { approveUrl = await seedAssistants(browser, base); }
+  catch (e) { problems.push(`seeding the demo assistants: ${String(e.message).split("\n")[0]}`); }
 
   async function visit(label, viewport, work, scheme = "light") {
     const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: scheme });
@@ -140,7 +181,11 @@ async function main() {
   for (const name of pages) {
     for (const viewport of Object.keys(VIEWPORTS)) {
       await visit(name, viewport, async (page, shot) => {
-        await page.goto(`${base}/#${name}`, { waitUntil: "networkidle" });
+        if (OWN_PAGES.includes(name)) {
+          if (!approveUrl) throw new Error("no approval page: seeding the demo assistants failed");
+          await page.goto(approveUrl, { waitUntil: "networkidle" });
+          await page.locator("button[value=allow]").waitFor({ timeout: 10000 });
+        } else await page.goto(`${base}/#${name}`, { waitUntil: "networkidle" });
         await shot(name);
       });
     }

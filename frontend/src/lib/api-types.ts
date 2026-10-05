@@ -222,6 +222,33 @@ export interface Matched {
   matched: number;
 }
 
+/** An assistant connected with OAuth: one approval, ended by Disconnect or when its approver can no longer sign in. */
+export interface McpConnection {
+  id: number;
+  client: string | null;
+  who: string | null;
+  scope: string[];
+  created: string | null;
+  last_used: string | null;
+}
+
+export interface McpIdsBody {
+  allow: boolean;
+}
+
+export interface McpSettings {
+  allow_ids: boolean;
+  allow_writes: boolean;
+  oauth: boolean;
+  url: string | null;
+  reason: string | null;
+  connections: McpConnection[];
+}
+
+export interface McpWritesBody {
+  allow: boolean;
+}
+
 export interface MergeBody {
   merge: number;
 }
@@ -637,5 +664,9 @@ export interface Endpoints {
   "GET /api/review/{id}/preview": { body: never; reply: Preview };
   "POST /api/review/{id}/suggest": { body: never; reply: Ok };
   "DELETE /api/review/{id}": { body: never; reply: Ok };
+  "GET /api/mcp-settings": { body: never; reply: McpSettings };
+  "POST /api/mcp-settings/ids": { body: McpIdsBody; reply: McpIdsBody };
+  "POST /api/mcp-settings/writes": { body: McpWritesBody; reply: McpWritesBody };
+  "DELETE /api/mcp-settings/connections/{id}": { body: never; reply: Ok };
   "GET /api/state": { body: never; reply: State };
 }

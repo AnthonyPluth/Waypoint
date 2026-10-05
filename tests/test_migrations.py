@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import insert, select
+from sqlalchemy import delete, insert, select
 
 from waypoint.storage import db, schema
 from waypoint.storage.models import Setting, User
@@ -412,6 +412,34 @@ class MigrationTests(unittest.TestCase):
             names = {col["name"] for col in sa.inspect(c).get_columns("people")}
             self.assertEqual(names & {"links", "claim_dismissed"}, set())
             self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.people)).scalar(), 1)
+
+    def test_0014_adds_the_assistant_tables_and_takes_them_away(self):
+        from alembic import command
+        tables = {"oauth_clients", "oauth_grants", "oauth_codes", "oauth_tokens", "oauth_consents"}
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            self.assertEqual(tables - set(sa.inspect(c).get_table_names()), set())
+            command.downgrade(db.alembic_config(c), "0013")
+            self.assertEqual(tables & set(sa.inspect(c).get_table_names()), set())
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:   # an upgraded database has nobody connected, and the switches are off
+            for table in tables:
+                self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.metadata.tables[table])).scalar(), 0)
+            self.assertIsNone(db.get_setting(conn, "mcp_allow_ids"))
+            self.assertIsNone(db.get_setting(conn, "mcp_allow_writes"))
+
+    def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
+        db.init(self.path)
+        with db.session(self.path) as conn:
+            conn.execute(insert(schema.oauth_clients).values(id="wpc_x", redirect_uris="[]", auth_method="none", created=1.0))
+            conn.execute(insert(schema.oauth_grants).values(id=1, client_id="wpc_x", scope="read", resource="http://h/mcp", created=1.0))
+            conn.execute(insert(schema.oauth_tokens).values(token_hash="t", kind="access", grant_id=1, created=1.0, expires=2.0))
+            conn.execute(insert(schema.oauth_codes).values(code_hash="c", client_id="wpc_x", grant_id=1, redirect_uri="u",
+                                                           code_challenge="x", resource="r", created=1.0))
+            conn.execute(delete(schema.oauth_clients).where(schema.oauth_clients.c.id == "wpc_x"))
+            for table in ("oauth_grants", "oauth_tokens", "oauth_codes"):
+                self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.metadata.tables[table])).scalar(), 0, table)
 
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating

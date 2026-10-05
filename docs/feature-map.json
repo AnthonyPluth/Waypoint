@@ -96,6 +96,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mail_scan.py",
+        "tests/test_mcp_routes.py",
         "tests/test_people.py"
       ],
       "docs": [
@@ -112,6 +113,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_loyalty.py",
+        "tests/test_mcp_routes.py",
         "tests/test_people.py",
         "tests/test_trips.py"
       ],
@@ -143,6 +145,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
         "tests/test_people.py"
       ],
       "docs": [
@@ -159,6 +162,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
         "tests/test_people.py"
       ],
       "docs": [
@@ -206,6 +210,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_flight_import.py",
+        "tests/test_mcp_routes.py",
         "tests/test_routes.py",
         "tests/test_trips.py"
       ],
@@ -220,6 +225,8 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp.py",
+        "tests/test_mcp_routes.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -235,6 +242,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_routes.py",
         "tests/test_trips.py"
@@ -250,6 +258,7 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_routes.py",
         "tests/test_trips.py"
@@ -265,6 +274,8 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp.py",
+        "tests/test_mcp_routes.py",
         "tests/test_monitoring.py",
         "tests/test_trips.py"
       ],
@@ -279,6 +290,7 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -292,6 +304,8 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp.py",
+        "tests/test_mcp_routes.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -308,6 +322,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
         "tests/test_reminders.py",
         "tests/test_trips.py"
       ],
@@ -322,6 +337,7 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -337,6 +353,8 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp.py",
+        "tests/test_mcp_routes.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -352,6 +370,8 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp.py",
+        "tests/test_mcp_routes.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -440,6 +460,8 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp.py",
+        "tests/test_mcp_routes.py",
         "tests/test_stats.py"
       ],
       "docs": [
@@ -455,7 +477,8 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_flightstatus.py"
+        "tests/test_flightstatus.py",
+        "tests/test_mcp_routes.py"
       ],
       "docs": [
         "start/flight-status"
@@ -470,7 +493,8 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_flightstatus.py"
+        "tests/test_flightstatus.py",
+        "tests/test_mcp.py"
       ],
       "docs": [
         "start/flight-status"
@@ -486,7 +510,9 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_loyalty.py"
+        "tests/test_loyalty.py",
+        "tests/test_mcp.py",
+        "tests/test_mcp_routes.py"
       ],
       "docs": [
         "start/loyalty"
@@ -501,7 +527,8 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_loyalty.py"
+        "tests/test_loyalty.py",
+        "tests/test_mcp_routes.py"
       ],
       "docs": [
         "start/loyalty"
@@ -531,7 +558,8 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_loyalty.py"
+        "tests/test_loyalty.py",
+        "tests/test_mcp_routes.py"
       ],
       "docs": [
         "start/loyalty"
@@ -820,6 +848,66 @@
       ],
       "docs": [
         "start/review"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/mcp-settings",
+      "handler": "waypoint/server/api/mcp.py:api_mcp_settings",
+      "web": [
+        "frontend/src/lib/components/settings/McpSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_protocol.py"
+      ],
+      "docs": [
+        "start/mcp"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/mcp-settings/ids",
+      "handler": "waypoint/server/api/mcp.py:api_mcp_ids",
+      "web": [
+        "frontend/src/lib/components/settings/McpSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_protocol.py"
+      ],
+      "docs": [
+        "start/mcp"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/mcp-settings/writes",
+      "handler": "waypoint/server/api/mcp.py:api_mcp_writes",
+      "web": [
+        "frontend/src/lib/components/settings/McpSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_protocol.py"
+      ],
+      "docs": [
+        "start/mcp"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/mcp-settings/connections/{id}",
+      "handler": "waypoint/server/api/mcp.py:api_mcp_revoke",
+      "web": [
+        "frontend/src/lib/components/settings/McpSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_protocol.py"
+      ],
+      "docs": [
+        "start/mcp"
       ]
     },
     {

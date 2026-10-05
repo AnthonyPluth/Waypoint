@@ -12,7 +12,7 @@ from waypoint.storage.models import Mailbox
 from waypoint.storage import settings_keys as sk
 from unittest import mock
 
-from sqlalchemy import insert
+from sqlalchemy import insert, select
 
 from waypoint import oidc
 from waypoint.providers import gmail
@@ -23,7 +23,10 @@ from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
 from waypoint.server.api import ai as ai_api
 from waypoint.server.api import backups, flight_import as flight_import_api, flightstatus as flightstatus_api, mailboxes, people, state, stats as stats_api
+from waypoint.server.api import mcp as mcp_api
 from waypoint.server.api import review as review_api
+from waypoint.server import mcp_oauth
+from waypoint.storage.models import OAuthGrant, OAuthToken
 from waypoint.providers import flightstatus as flight_service
 from waypoint.server.api import trips as trips_api
 from waypoint.server.api import loyalty
@@ -118,6 +121,7 @@ class Replies(DbCase):
         self.test_flight_status()
         self.test_loyalty()
         self.test_reminders()
+        self.test_mcp_settings()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
 
     def test_state(self):
@@ -245,6 +249,21 @@ class Replies(DbCase):
         self.check("DELETE /api/reminders/devices/{id}", reminders_api.api_device_remove(self.c, {}, {}, str(added["id"])))
         self.check("DELETE /api/feed", reminders_api.api_feed_off(self.c, {}, {}))
 
+    def test_mcp_settings(self):
+        _current.host = "localhost:8765"
+        self.check("GET /api/mcp-settings", mcp_api.api_mcp_settings(self.c, {}, {}))   # nobody connected
+        self.check("POST /api/mcp-settings/ids", mcp_api.api_mcp_ids(self.c, {}, {"allow": True}))
+        self.check("POST /api/mcp-settings/writes", mcp_api.api_mcp_writes(self.c, {}, {"allow": True}))
+        client = mcp_oauth.register(self.c, {"client_name": "Claude", "redirect_uris": ["http://127.0.0.1:1/cb"]})
+        mcp_oauth.approve(self.c, {"client_id": client["client_id"], "redirect_uri": "http://127.0.0.1:1/cb", "code_challenge": "c" * 43,
+                                   "resource": "http://localhost:8765/mcp"}, frozenset({"read", "write"}), None, "ana@example.com")
+        grant = self.c.execute(select(OAuthGrant.id)).scalar()
+        self.c.execute(insert(OAuthToken).values(token_hash="h" * 64, kind="access", grant_id=grant, created=1.0, expires=9e12))
+        listed = mcp_api.api_mcp_settings(self.c, {}, {})
+        self.assertEqual(len(listed["connections"]), 1)
+        self.check("GET /api/mcp-settings", listed)   # with a connection
+        self.check("DELETE /api/mcp-settings/connections/{id}", mcp_api.api_mcp_revoke(self.c, {}, {}, str(grant)))
+
     def test_trips(self):
         _current.user = {"name": None, "email": None, "local": True}
         self.check("GET /api/trips", trips_api.api_trips(self.c, {}, {}))   # none yet
@@ -345,7 +364,9 @@ class Generated(unittest.TestCase):
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
                                      "POST /api/loyalty/{id}/reveal",
                                      "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",
-                                     "DELETE /api/reminders/devices/{id}", "POST /api/feed", "DELETE /api/feed"})
+                                     "DELETE /api/reminders/devices/{id}", "POST /api/feed", "DELETE /api/feed",
+                                     "GET /api/mcp-settings", "POST /api/mcp-settings/ids", "POST /api/mcp-settings/writes",
+                                     "DELETE /api/mcp-settings/connections/{id}"})
         self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)
         self.assertNotIn("GET /api/mailboxes/callback", covered())   # and this one as a redirect
 

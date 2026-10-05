@@ -19,7 +19,7 @@ from typing import Any
 
 from ..storage import db, secretbox
 from .. import monitoring, oidc
-from . import feed, jobs, routes, static
+from . import feed, jobs, mcp_http, mcp_oauth, mcp_server, oauth_http, routes, static
 from .common import NOT_READ, ApiError, BadJson, Response, _current, header_value, host_allowed, server_error
 
 # Files anyone may fetch: the sign-in pages' look, and what a phone needs to install Waypoint (it fetches the manifest
@@ -61,8 +61,10 @@ def route_name(path: str) -> str:
     if path.startswith("/api/"):
         found = routes.match(None, path)   # the route table's own pattern (by any method)
         return found.route.pattern if found else "/api/*"   # nothing answers it (a 404)
-    if path in AUTH_PATHS:
+    if path in AUTH_PATHS or path in oauth_http.OAUTH_PUBLIC or path in oauth_http.OAUTH_METADATA or path in ("/mcp", "/oauth/authorize"):
         return path
+    if path.startswith(("/.well-known/", "/oauth/")):
+        return path[:path.index("/", 1)] + "/*"   # nothing answers it (a 404)
     return "/"   # the web app's page
 
 
@@ -401,7 +403,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, b"ok", "text/plain")
         if not self._host_ok():
             return self._send(403, b"Waypoint doesn't recognise this address. Add it to WAYPOINT_ALLOWED_HOSTS.", "text/plain")
-        if method != "GET" and not self._same_site():
+        if url.path == "/mcp":   # MCP over HTTP, served here: an OAuth access token instead of a sign-in
+            return self._mcp_rpc(method)
+        if url.path.startswith(("/.well-known/", "/oauth/")) and url.path != "/oauth/authorize":
+            return oauth_http.app_calls(self, method, url)   # OAuth an app calls itself: no sign-in, no same-site checks (see OAUTH_PUBLIC)
+        if method != "GET" and url.path != "/oauth/authorize" and not self._same_site():   # (the consent form checks its own)
             return self._json(403, {"error": NOT_SAME_SITE})
         if url.path.startswith("/auth/") and method == "GET" and self._auth_routes(url):
             return
@@ -419,6 +425,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(401, {"error": "You've been signed out.", "login": "/auth/login"})
                 back = (url.path or "/") + ("?" + url.query if url.query else "")
                 return self._redirect("/auth/login?next=" + urllib.parse.quote(back, safe=""))
+        if url.path == "/oauth/authorize":   # approving an assistant: you, signed in
+            return oauth_http.authorize(self, method, url)
         if not url.path.startswith("/api/"):
             if method != "GET":
                 return self._send(405, b"", "text/plain")
@@ -454,6 +462,48 @@ class Handler(BaseHTTPRequestHandler):
         if isinstance(result, Response):
             return self._respond(result)
         return self._json(200, result)
+
+    def _mcp_rpc(self, method: str) -> None:
+        """POST /mcp: MCP's Streamable HTTP transport, answered by waypoint/server/mcp_server.py's handle() in this process, for an
+        OAuth access token issued for this address (mcp_http.authorized), within its scopes, the allowlists and the switches
+        (mcp_http.local_fetch), as the member who approved it. One JSON-RPC message per POST, answered with application/json;
+        notifications get 202. There is no server-to-client stream, so GET is 405."""
+        if method != "POST":
+            return self._send(405, b"", "text/plain", extra={"Allow": "POST"})
+        if not self._mcp_origin_ok():   # a web page in a browser (DNS rebinding); real clients send no Origin
+            return self._json(403, {"error": "Origin not allowed."})
+        iss = mcp_oauth.issuer(self.headers.get("Host"))
+        sent = self.headers.get("Authorization")
+        with db.session() as conn:
+            access = mcp_http.authorized(conn, sent, mcp_oauth.resource(iss) if iss else None)
+        if access is None:
+            self.close_connection = True
+            # RFC 9728: where to find out how to get a token; invalid_token only when one was sent (RFC 6750 §3.1)
+            challenge = 'Bearer realm="Waypoint"' + (f', resource_metadata="{mcp_oauth.resource_metadata_url(iss)}"' if iss else "")
+            if sent:
+                challenge += ', error="invalid_token"'
+            why = ("Connect with OAuth: add this address to your assistant and approve it in Waypoint." if iss
+                   else mcp_oauth.unavailable_reason())
+            return self._send(401, json.dumps({"error": why}).encode(), extra={"WWW-Authenticate": challenge})
+        try:
+            msg = self._read_json(MAX_JSON_BODY, None)
+        except BadJson:
+            return self._json(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}})
+        if msg is NOT_READ:
+            return
+        if not isinstance(msg, dict):   # a batch or something else: one message per POST
+            return self._json(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Send one JSON-RPC message per request"}})
+        reply = mcp_server.handle(msg, mcp_http.fetch_for(access))
+        if reply is None:
+            return self._send(202, b"")
+        return self._json(200, reply)
+
+    def _mcp_origin_ok(self) -> bool:
+        """No Origin (an app, not a web page), or this Waypoint's own address. Anything else, and "null", is refused."""
+        origin = self.headers.get("Origin")
+        if not origin:
+            return True
+        return origin != "null" and urllib.parse.urlsplit(origin).netloc.lower() == (self.headers.get("Host") or "").strip().lower()
 
     def do_GET(self):
         self._dispatch("GET")
