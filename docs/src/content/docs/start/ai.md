@@ -17,7 +17,9 @@ The OpenRouter key is saved encrypted with `WAYPOINT_SECRET_KEY` (and encrypted 
 
 ## What is sent
 
-Only the message’s plain text, and only for an item in “Couldn’t read”. Before it goes, Waypoint cuts quoted replies, everything under a reply header or a `-- ` signature, and footer lines (unsubscribe, privacy notices), and replaces anything that looks like a loyalty, Known Traveler or card number, plus every number saved under [Loyalty](/waypoint/start/loyalty/), wherever it’s written. The sender and the subject are not sent. Names and anything else written in the body are, so a traveller’s name in the email goes to the model. Prompts and replies are never logged. Only `domain/mail/ai.py` sends email text anywhere, and a lint rule keeps AI addresses out of the rest of the code.
+The setting is the household’s: any member can change it, and once it’s on, new “Couldn’t read” mail from every connected mailbox is offered, not just the mailbox of whoever turned it on. Whoever sets the Ollama address chooses where that mail goes, so use a server you trust.
+
+Only the message’s plain text, and only for an item in “Couldn’t read”. Before it goes, Waypoint cuts quoted replies, everything under a reply header or a `-- ` signature, and footer lines (unsubscribe, privacy notices), and replaces numbers that are labelled as a loyalty, Known Traveler, account or card number, long digit runs, letter-prefixed IDs of eight or more characters (such as `TT12345678`), plus every number saved under [Loyalty](/waypoint/start/loyalty/), wherever it’s written. The sender and the subject are not sent. Names and anything else written in the body are, so a traveller’s name in the email goes to the model. Prompts and replies are never logged. Only `domain/mail/ai.py` sends email text anywhere, and a lint rule keeps AI addresses out of the rest of the code.
 
 ## What comes back
 

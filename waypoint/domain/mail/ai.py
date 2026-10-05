@@ -36,7 +36,7 @@ LOCAL: Mode = "local"
 OPENROUTER: Mode = "openrouter"
 MODES: tuple[Mode, ...] = (OFF, LOCAL, OPENROUTER)
 KEY_ENV = "OPENROUTER_API_KEY"
-TIMEOUT = 60
+TIMEOUT = 30
 MAX_SENT = 12_000        # characters of a message's text that go out
 MAX_REPLY = 1_000_000    # bytes of a reply read
 KINDS = ("flight", "hotel", "car", "train")
@@ -137,6 +137,8 @@ LABELLED = re.compile(
     r"pre-?check|global entry|card(?: number)?|account(?: number)?)([^\n\d]{0,40}?)\b((?-i:[A-Z0-9][A-Z0-9 -]{2,30}\d))\b")
 CARD = re.compile(r"\b\d{4}[ -]\d{4}[ -]\d{4}[ -]\d{1,4}\b|\b\d{4}[ -]\d{6}[ -]\d{4,5}\b")
 LONG = re.compile(r"\b\d{9,}\b")
+# A letter-prefixed ID with no label (TT87654321, ABC1234567): 8 or more characters, mostly digits. A confirmation code is shorter.
+PREFIXED = re.compile(r"\b[A-Z]{1,4}-?\d{7,}\b")
 CUT = re.compile(r"(?im)^(?:on .{5,200} wrote:|-{2,}\s*(?:original message|reply message)\s*-{2,}|-- ?)\s*$")
 FOOTER = re.compile(r"(?i)unsubscribe|manage (?:your )?(?:email )?(?:preferences|subscriptions)|privacy (?:policy|notice)|"
                     r"you(?:'re| are) receiving this|view (?:this email )?in (?:your )?browser")
@@ -157,6 +159,7 @@ def redact(text: str, known: tuple[str, ...] = ()) -> str:
     out = LABELLED.sub(lambda m: f"{m.group(1)}{m.group(2)}{REMOVED}", out)
     out = CARD.sub(REMOVED, out)
     out = LONG.sub(REMOVED, out)
+    out = PREFIXED.sub(REMOVED, out)
     return re.sub(r"\n{3,}", "\n\n", out).strip()[:MAX_SENT]
 
 

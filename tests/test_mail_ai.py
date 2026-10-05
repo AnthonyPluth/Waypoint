@@ -91,6 +91,13 @@ class RedactTests(unittest.TestCase):
             self.assertNotIn(number, out)
         self.assertIn(ai.REMOVED, out)
 
+    def test_unlabelled_letter_prefixed_ids_are_removed_but_codes_and_flights_stay(self):
+        out = ai.redact("Passenger TT87654321 and ABC1234567 and AB-12345678. Code QW4R7T, flight EX 303, room 4401.")
+        for number in ("TT87654321", "ABC1234567", "12345678"):
+            self.assertNotIn(number, out)
+        for kept in ("QW4R7T", "EX 303", "4401"):
+            self.assertIn(kept, out)
+
     def test_what_is_needed_to_read_a_booking_stays(self):
         out = ai.redact(self.TEXT)
         for kept in (BODY, "EX 303", "2026-12-02T07:15", "BOS", "QW4R7T", "2026-10-18"):
