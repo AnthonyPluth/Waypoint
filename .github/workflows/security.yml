@@ -34,7 +34,7 @@ jobs:
   # passed, for the merge gate too). A change to the workflows (.github/) runs every scan. Trivy's file scan always runs:
   # a secret can be committed in any file.
   changes:
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
     permissions:
       contents: read
       pull-requests: read      # the pull request's list of changed files
@@ -79,7 +79,7 @@ jobs:
     name: Semgrep
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
     permissions:
       contents: read
       security-events: write
@@ -109,7 +109,7 @@ jobs:
     name: npm audit
     needs: changes
     if: needs.changes.outputs.web_deps == 'true'
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
         with:
@@ -124,7 +124,7 @@ jobs:
 
   trivy:
     name: Trivy (files)
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
     permissions:
       contents: read
       security-events: write
@@ -150,7 +150,7 @@ jobs:
     name: Trivy (image)
     needs: changes
     if: needs.changes.outputs.image == 'true'
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
     permissions:
       contents: read
       security-events: write
@@ -186,7 +186,7 @@ jobs:
     name: zizmor (GitHub Actions)
     needs: changes
     if: needs.changes.outputs.workflows == 'true'
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
     permissions:
       contents: read
       security-events: write

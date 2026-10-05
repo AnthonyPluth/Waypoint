@@ -18,7 +18,8 @@ one a correction that used to live as prose and now fails `make check` and CI in
   test, tests/test_mail_parser_<vendor>.py, that names that directory and each of the three fixtures.
 - Workflows (.github/workflows/, .github/actions/): each workflow runs bash by default (so steps get -eo pipefail);
   every action pinned by SHA has its version in a comment; `gh api` with `per_page` paginates; and every job runs on
-  RUNS_ON (the repository variable picking self-hosted runners; fork pull requests always get GitHub's), or on
+  RUNS_ON (the repository variable picking self-hosted runners; forks' and Dependabot's pull requests always get
+  GitHub's), or on
   `ubuntu-latest` with a `# hosted: <why>` comment.
 
 Exits 1, listing each problem, when any check fails."""
@@ -289,9 +290,11 @@ BASH_DEFAULT = re.compile(r"^defaults:[ \t]*\n[ \t]+run:[ \t]*\n(?:[ \t]{4,}\S.*
                           re.MULTILINE)
 GH_API_LIST = re.compile(r"\bgh api\b[^\n]*per_page=")
 # A job's runner: the repository variable RUNS_ON (a JSON label list such as ["self-hosted", "linux"], unset for GitHub's
-# runners), except for a fork's pull request, whose code never runs on the household's own machines.
-RUNS_ON = ("runs-on: ${{ fromJSON(vars.RUNS_ON != '' && !github.event.pull_request.head.repo.fork && vars.RUNS_ON "
-           "|| '\"ubuntu-latest\"') }}")
+# runners), except for a pull request that isn't from this repository (a fork's, or one whose fork was deleted) and
+# Dependabot's, whose code (or new dependencies' code) never runs on the household's own machines.
+RUNS_ON = ("runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && "
+           "(!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && "
+           "github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '\"ubuntu-latest\"') }}")
 RUNS_ON_LINE = re.compile(r"^[ \t]*runs-on:.*$", re.MULTILINE)
 HOSTED = re.compile(r"^runs-on: ubuntu-latest[ \t]+# hosted: \S")
 
