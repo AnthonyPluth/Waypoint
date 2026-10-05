@@ -1,7 +1,7 @@
 """Every API route answers a plain request without a server error.
 
 Each route is called once with no parameters, an empty body and a made-up (or a real) id. A route may refuse (4xx)
-what it's sent (and a route that talks to Plaid or another service answers 502 when that isn't set up), but a 500
+what it's sent (and a route that talks to another service answers 502 when that isn't set up), but a 500
 means a handler crashed on input it should have checked."""
 import json
 import unittest

@@ -33,7 +33,7 @@ _enabled = False
 _agent: contextvars.ContextVar[str | None] = contextvars.ContextVar("waypoint_ai_agent", default=None)
 _in_request: contextvars.ContextVar[bool] = contextvars.ContextVar("waypoint_sentry_request", default=False)
 
-# Secrets that can appear in an error's text: user:password@ in an address, and Plaid's tokens.
+# Secrets that can appear in an error's text: user:password@ in an address, and tokens shaped like access-production-…
 _USERINFO = re.compile(r"(\b[a-z][a-z0-9+.-]*://)[^/\s@]+@", re.I)
 _QUERY = re.compile(r"(\b[a-z][a-z0-9+.-]*://[^\s?#]*)\?[^\s#]*", re.I)
 _PLAID_TOKEN = re.compile(r"\b(access|public|link|processor)-(sandbox|development|production)-[0-9a-f-]{8,}", re.I)
@@ -65,7 +65,7 @@ def public_text(text: str) -> str: ...
 @overload
 def public_text(text: None) -> None: ...
 def public_text(text: str | None) -> str | None:
-    """What another service said (a bank's message through SimpleFIN or Plaid, an API's error), made safe to keep and
+    """What another service said (an airline's or Google's message, an API's error), made safe to keep and
     show: scrub(), and any run of five or more digits blanked, in case a message names an account or card number."""
     if not isinstance(text, str):
         return text

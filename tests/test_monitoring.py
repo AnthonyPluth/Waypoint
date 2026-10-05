@@ -83,7 +83,7 @@ class MonitoringTests(unittest.TestCase):
         sentry_sdk.get_client().transport = transport
         balance = sum([1000, 234.56])   # a local variable: its value must not be sent  # noqa: F841
         try:
-            raise ValueError(f"SimpleFIN said no: {SERVICE}?token=abc")
+            raise ValueError(f"The provider said no: {SERVICE}?token=abc")
         except ValueError:
             with mock.patch("traceback.print_exc"):
                 monitoring.report(ref="abcd1234")
@@ -124,12 +124,12 @@ class MonitoringTests(unittest.TestCase):
               "DETAIL:  Failing row contains (tx-9, 2026-09-01, -87.12, WHOLE FOODS, null).\n"
               "[SQL: INSERT INTO transactions ...]\n[parameters: {'id': 'tx-9', 'amount': -87.12}]\n"
               "(Background on this error at: https://sqlalche.me/e/20/gkpj)")
-        dup = "DETAIL:  Key (plaid_account_id)=(p-csp) already exists."
+        dup = "DETAIL:  Key (confirmation_code)=(p-csp) already exists."
         out = monitoring.scrub(pg) + monitoring.scrub(dup)
         for private in ("WHOLE FOODS", "87.12", "tx-9", "p-csp"):
             self.assertNotIn(private, out)
         self.assertIn("Failing row contains ([Filtered])", out)
-        self.assertIn("Key (plaid_account_id)=([Filtered]) already exists", out)
+        self.assertIn("Key (confirmation_code)=([Filtered]) already exists", out)
         self.assertIn("(Background on this error at: https://sqlalche.me/e/20/gkpj)", out)
         # Text that repeats a marker is scrubbed in linear time (a regex could take minutes on it).
         import time

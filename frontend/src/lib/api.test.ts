@@ -41,8 +41,8 @@ describe("api", () => {
       fetchMock.mockReturnValue(Promise.resolve(new Response("<html>Bad gateway</html>", { status })));
       await expect(api("/api/x")).rejects.toMatchObject({ message: "Waypoint is restarting or unreachable. Try again in a moment.", status });
     }
-    fetchMock.mockReturnValue(reply({ error: "Plaid is down" }, 502));
-    await expect(api("/api/x")).rejects.toMatchObject({ message: "Plaid is down", status: 502 });
+    fetchMock.mockReturnValue(reply({ error: "The airline is down" }, 502));
+    await expect(api("/api/x")).rejects.toMatchObject({ message: "The airline is down", status: 502 });
   });
 
   it("sends a file as it is, not as JSON, with the CSRF header", async () => {
