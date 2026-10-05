@@ -26,7 +26,7 @@ from tests.test_webpush import receiver
 NOW = datetime(2026, 11, 19, 12, 0, tzinfo=UTC)
 LATER = datetime(2026, 11, 21, 0, 30, tzinfo=UTC)   # the flights have left: only the day's summary is due
 LOYALTY_CANARY = "CANARY-LOYALTY-5550123"
-ENDPOINT = "https://push.example.com/send/abc123"
+ENDPOINT = "https://fcm.googleapis.com/send/abc123"
 
 # Made up: Jane and Mia fly to London from New York and stay in a hotel across the clocks going back; Sam has a trip of his own.
 FLIGHT_OUT = {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-11-20T19:00",
@@ -196,7 +196,7 @@ class LapseTests(Reminders):
 
     def test_a_device_and_a_feed_end_when_their_owner_can_no_longer_sign_in(self):
         self.device("u-jane", ENDPOINT)
-        self.device("u-sam", "https://push.example.com/send/sam")
+        self.device("u-sam", "https://fcm.googleapis.com/send/sam")
         reminders.set_prefs(self.c, "u-sam", {"check_in": True, "day_of": False})
         jane_key = reminders.new_feed_key(self.c, "u-jane", 1.0)
         sam_key = reminders.new_feed_key(self.c, "u-sam", 1.0)
@@ -218,7 +218,7 @@ class LapseTests(Reminders):
             self.assertFalse(reminders.feed_on(self.c, "u-sam"))
 
     def test_no_reminder_goes_to_a_lapsed_owner(self):
-        self.device("u-sam", "https://push.example.com/send/sam")
+        self.device("u-sam", "https://fcm.googleapis.com/send/sam")
         with mock.patch.dict(os.environ, self.ALLOWED):
             self.assertEqual(reminders.run_due(self.c, datetime(2026, 11, 20, 8, 0, tzinfo=UTC), date(2026, 11, 20), 8, self.send), 0)
         self.assertEqual(self.sent, [])
@@ -226,13 +226,13 @@ class LapseTests(Reminders):
 
     def test_with_groups_a_sign_in_that_is_too_old_lapses_it(self):
         groups = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint", "OIDC_ALLOWED_GROUPS": "household"}
-        self.device("u-sam", "https://push.example.com/send/sam")
+        self.device("u-sam", "https://fcm.googleapis.com/send/sam")
         with mock.patch.dict(os.environ, groups):
             self.c.execute(update(User).where(User.sub == "u-sam").values(last_seen=time.time() - 365 * 86400))
             self.assertEqual(reminders.end_lapsed(self.c), 1)
 
     def test_the_hourly_sweep_ends_them_and_survives_a_failure(self):
-        self.device("u-sam", "https://push.example.com/send/sam")
+        self.device("u-sam", "https://fcm.googleapis.com/send/sam")
         self.c.commit()
         with mock.patch.dict(os.environ, self.ALLOWED):
             jobs.sweep_lapsed()
@@ -309,7 +309,7 @@ class SendingTests(Reminders):
 
     def test_everyone_is_told_about_their_own_trips_only(self):
         self.device("u-jane", ENDPOINT)
-        self.device("u-sam", "https://push.example.com/send/sam")
+        self.device("u-sam", "https://fcm.googleapis.com/send/sam")
         self.due(LATER, hour=8)
         by_device = {d["id"]: owner for owner in ("u-jane", "u-sam") for d in reminders.devices(self.c, owner)}
         for device_id, message in self.sent:
@@ -323,13 +323,13 @@ class SendingTests(Reminders):
 
     def test_every_device_of_a_member_gets_it(self):
         self.device("u-jane", ENDPOINT)
-        self.device("u-jane", "https://push.example.com/send/second")
+        self.device("u-jane", "https://fcm.googleapis.com/send/second")
         self.assertEqual(self.due(datetime(2026, 11, 20, 1, 0, tzinfo=UTC), hour=3), 1)
         self.assertEqual(len(self.sent), 2)
 
     def test_a_device_that_is_gone_is_forgotten_and_the_rest_still_get_it(self):
         self.device("u-jane", ENDPOINT)
-        self.device("u-jane", "https://push.example.com/send/second")
+        self.device("u-jane", "https://fcm.googleapis.com/send/second")
         first = reminders.devices(self.c, "u-jane")[0]["id"]
 
         def send(device, message):
@@ -354,6 +354,13 @@ class SendingTests(Reminders):
         self.assertEqual(self.due(datetime(2026, 11, 20, 1, 5, tzinfo=UTC), hour=3), 1)   # the next round gets through
         self.assertEqual(len(calls), 1)
 
+    def test_old_sent_records_are_pruned_and_recent_ones_kept(self):
+        self.device()
+        for ref, sent in (("old", 1.0), ("recent", NOW.timestamp() - 3600)):
+            self.c.execute(insert(ReminderSent).values(owner_sub="u-jane", kind="day_of", ref=ref, sent=sent))
+        self.due(NOW, hour=3)
+        self.assertEqual(self.c.execute(select(ReminderSent.ref)).scalars(), ["recent"])
+
     def test_a_member_with_no_device_is_told_nothing_and_nothing_is_recorded(self):
         self.assertEqual(self.due(datetime(2026, 11, 20, 1, 0, tzinfo=UTC), hour=8), 0)
         self.assertEqual(self.c.execute(select(ReminderSent.id)).fetchall(), [])
@@ -371,18 +378,25 @@ class SendingTests(Reminders):
 class DeviceTests(Reminders):
     def test_a_subscription_is_checked_before_anything_is_stored(self):
         endpoint, p256dh, auth = subscription()
-        bad = [("http://push.example.com/x", p256dh, auth), ("https://127.0.0.1/x", p256dh, auth),
+        bad = [("http://fcm.googleapis.com/x", p256dh, auth), ("https://127.0.0.1/x", p256dh, auth),
                ("https://10.0.0.5/x", p256dh, auth), ("https://nas/x", p256dh, auth), ("https://nas.local/x", p256dh, auth),
-               ("https://user:pw@push.example.com/x", p256dh, auth), ("", p256dh, auth), (endpoint, "AAAA", auth),
-               (endpoint, p256dh, "AAAA"), (endpoint, p256dh, "!!!"), ("https://push.example.com/" + "x" * 3000, p256dh, auth)]
+               ("https://push.example.com/x", p256dh, auth), ("https://127.0.0.1.nip.io/x", p256dh, auth),   # any other host, though it may point inside
+               ("https://evilfcm.googleapis.com.example/x", p256dh, auth), ("https://fcm.googleapis.com:8443/x", p256dh, auth),
+               ("https://user:pw@fcm.googleapis.com/x", p256dh, auth), ("", p256dh, auth), (endpoint, "AAAA", auth),
+               (endpoint, p256dh, "AAAA"), (endpoint, p256dh, "!!!"), ("https://fcm.googleapis.com/" + "x" * 3000, p256dh, auth)]
         for args in bad:
             with self.subTest(endpoint=args[0][:30]), self.assertRaises(reminders.Invalid):
                 reminders.add_device(self.c, "u-jane", *args, 1.0)
         self.assertEqual(reminders.devices(self.c, "u-jane"), [])
 
+    def test_each_browsers_push_service_is_accepted(self):
+        for host in ("fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com", "wns2-par02p.notify.windows.com"):
+            with self.subTest(host=host):
+                self.assertEqual(self.device("u-jane", f"https://{host}/send/abc")["service"], host)
+
     def test_a_device_is_listed_by_its_service_and_belongs_to_one_member(self):
         made = self.device("u-jane")
-        self.assertEqual(reminders.devices(self.c, "u-jane"), [{"id": made["id"], "service": "push.example.com", "created": made["created"]}])
+        self.assertEqual(reminders.devices(self.c, "u-jane"), [{"id": made["id"], "service": "fcm.googleapis.com", "created": made["created"]}])
         self.assertEqual(reminders.devices(self.c, "u-sam"), [])
         self.assertFalse(reminders.remove_device(self.c, "u-sam", made["id"]))   # not Sam's to remove
         self.assertTrue(reminders.remove_device(self.c, "u-jane", made["id"]))
@@ -397,10 +411,10 @@ class DeviceTests(Reminders):
 
     def test_a_member_has_at_most_ten(self):
         for i in range(reminders.MAX_DEVICES):
-            self.device("u-jane", f"https://push.example.com/send/{i}")
+            self.device("u-jane", f"https://fcm.googleapis.com/send/{i}")
         with self.assertRaises(reminders.Invalid):
-            self.device("u-jane", "https://push.example.com/send/one-too-many")
-        self.device("u-jane", "https://push.example.com/send/3")   # one they have already is fine
+            self.device("u-jane", "https://fcm.googleapis.com/send/one-too-many")
+        self.device("u-jane", "https://fcm.googleapis.com/send/3")   # one they have already is fine
 
 
 class RouteCase(ServerCase):
@@ -452,13 +466,13 @@ class ApiTests(RouteCase):
         endpoint, p256dh, auth = subscription()
         body = {"endpoint": endpoint, "p256dh": p256dh, "auth": auth}
         status, added = self.call("ana", "POST", "/api/reminders/devices", body)
-        self.assertEqual((status, added["service"]), (200, "push.example.com"))
+        self.assertEqual((status, added["service"]), (200, "fcm.googleapis.com"))
         self.assertEqual(len(self.call("ana", "GET", "/api/reminders")[1]["devices"]), 1)
         self.assertEqual(self.call("ben", "GET", "/api/reminders")[1]["devices"], [])
         self.assertEqual(self.call("ben", "DELETE", f"/api/reminders/devices/{added['id']}")[0], 404)   # as one that isn't there
         self.assertEqual(self.call("ana", "DELETE", "/api/reminders/devices/x")[0], 404)
         self.assertEqual(self.call("ana", "DELETE", f"/api/reminders/devices/{added['id']}"), (200, {"ok": True}))
-        self.assertEqual(self.call("ana", "POST", "/api/reminders/devices", {**body, "endpoint": "http://push.example.com/x"})[0], 400)
+        self.assertEqual(self.call("ana", "POST", "/api/reminders/devices", {**body, "endpoint": "http://fcm.googleapis.com/x"})[0], 400)
         self.assertEqual(self.call("ana", "POST", "/api/reminders/devices", {"endpoint": 5, "p256dh": p256dh, "auth": auth})[0], 400)
         self.assertEqual(self.call("ana", "POST", "/api/reminders/devices", {"endpoint": endpoint})[0], 400)
 
@@ -483,7 +497,7 @@ class ApiTests(RouteCase):
     def test_a_lapsed_members_things_end_even_when_someone_else_opens_settings(self):
         self.call("ben", "POST", "/api/feed")
         with db.session() as conn:
-            reminders.add_device(conn, "sub-ben", *subscription("https://push.example.com/send/ben"), time.time())
+            reminders.add_device(conn, "sub-ben", *subscription("https://fcm.googleapis.com/send/ben"), time.time())
         with mock.patch.dict(os.environ, {"OIDC_ALLOWED_EMAILS": "ana@example.com"}):
             self.assertEqual(self.call("ana", "GET", "/api/reminders")[0], 200)
         with db.session() as conn:

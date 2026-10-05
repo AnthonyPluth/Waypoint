@@ -37,6 +37,15 @@ describe("Settings → Reminders", () => {
     await waitFor(() => expect(screen.getByRole("checkbox", { name: /Check-in opens/ })).not.toBeChecked());
   });
 
+  it("puts a checkbox back when saving fails, so it never shows what the server doesn’t have", async () => {
+    serve(() => view(), (_path, opts) => { if (opts?.method === "POST") throw new Error("down"); return {}; });
+    render(RemindersSection);
+    const box = await screen.findByRole("checkbox", { name: /Day-of summary/ });
+    await userEvent.click(box);
+    await waitFor(() => expect(box).toBeChecked());
+    expect(screen.getByRole("checkbox", { name: /Check-in opens/ })).toBeChecked();
+  });
+
   it("says when the server can’t be reached, and tries again", async () => {
     serve(() => view());
     vi.mocked(api).mockRejectedValueOnce(new Error("down"));

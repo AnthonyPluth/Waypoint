@@ -27,9 +27,17 @@
   }
   onMount(load);
 
-  const choose = (change: { check_in?: boolean; day_of?: boolean }) => act(async () => {
+  // A box the browser has already flipped goes back to what's saved when saving fails, so the page never says a reminder is
+  // on or off when the server has the opposite.
+  const choose = (change: { check_in?: boolean; day_of?: boolean }, box: HTMLInputElement) => act(async () => {
     if (!list) return;
-    list = await apiCall<"POST /api/reminders">("/api/reminders", { method: "POST", body: { check_in: list.check_in, day_of: list.day_of, ...change }, failed: "Couldn’t save that" });
+    const saved = list;
+    try {
+      list = await apiCall<"POST /api/reminders">("/api/reminders", { method: "POST", body: { check_in: saved.check_in, day_of: saved.day_of, ...change }, failed: "Couldn’t save that" });
+    } catch (err) {
+      box.checked = "check_in" in change ? saved.check_in : saved.day_of;
+      throw err;
+    }
   }, { busy: (on) => (busy = on) });
 
   /** The server's key as bytes, for the browser's push service. */
@@ -89,11 +97,11 @@
     {:else}
       <label class="row cursor-pointer flex-nowrap">
         <span class="min-w-0"><span class="block font-medium">Check-in opens</span><span class="block text-sm text-muted-foreground">24 hours before each flight.</span></span>
-        <input type="checkbox" class="size-5 shrink-0" checked={list.check_in} disabled={busy} onchange={(e) => choose({ check_in: e.currentTarget.checked })} />
+        <input type="checkbox" class="size-5 shrink-0" checked={list.check_in} disabled={busy} onchange={(e) => choose({ check_in: e.currentTarget.checked }, e.currentTarget)} />
       </label>
       <label class="row cursor-pointer flex-nowrap">
         <span class="min-w-0"><span class="block font-medium">Day-of summary</span><span class="block text-sm text-muted-foreground">What starts today, from 7:00 on Waypoint’s clock.</span></span>
-        <input type="checkbox" class="size-5 shrink-0" checked={list.day_of} disabled={busy} onchange={(e) => choose({ day_of: e.currentTarget.checked })} />
+        <input type="checkbox" class="size-5 shrink-0" checked={list.day_of} disabled={busy} onchange={(e) => choose({ day_of: e.currentTarget.checked }, e.currentTarget)} />
       </label>
 
       {#each devices as d (d.id)}

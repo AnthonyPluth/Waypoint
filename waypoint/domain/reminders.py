@@ -12,7 +12,6 @@ local time) on each day something starts, listing the day's bookings by their ow
 from __future__ import annotations
 
 import hashlib
-import ipaddress
 import secrets
 import time
 import urllib.parse
@@ -37,6 +36,10 @@ DAY_OF_HOUR = 7          # the machine's local hour from which a day's summary g
 LOCAL_OWNER = "local"    # who everything belongs to without sign-in (your own machine)
 MAX_DEVICES = 10         # a member's, so a stuck page can't fill the table
 MAX_ITEMS = 5            # bookings named in a day's summary; the rest are counted
+SENT_KEPT = 7 * 86400   # how long a sent reminder is remembered: far longer than the day in which it could be sent again
+# The push services browsers use (their hosts and subdomains): Chrome and Edge through Google's FCM, Firefox's, Safari's and
+# Windows'. A subscription anywhere else is refused: the server posts to the address, so it isn't left to whoever names it.
+PUSH_SERVICES = ("fcm.googleapis.com", "push.services.mozilla.com", "push.apple.com", "notify.windows.com")
 ENDPOINT_LIMIT = 2048
 KEY_LIMIT = 256
 
@@ -116,20 +119,15 @@ def set_prefs(conn: db.Connection, owner: str, chosen: Prefs) -> Prefs:
 # ------------------------------------------------------------------------------------------------ devices
 
 def check_subscription(endpoint: str, p256dh: str, auth: str) -> None:
-    """Raises Invalid unless this is a browser's push subscription: an https address on a named host (a push service's,
-    never an address inside the network), and the keys it came with."""
+    """Raises Invalid unless this is a browser's push subscription: an https address on one of the browsers' own push services
+    (PUSH_SERVICES), never a host a member names (a name can point inside the network), and the keys it came with."""
     if not endpoint or len(endpoint) > ENDPOINT_LIMIT or len(p256dh) > KEY_LIMIT or len(auth) > KEY_LIMIT:
         raise Invalid("That isn’t a notification subscription Waypoint can use.")
     parts = urllib.parse.urlsplit(endpoint)
     host = (parts.hostname or "").lower()
-    try:
-        ipaddress.ip_address(host)
-        literal = True
-    except ValueError:
-        literal = False
-    if parts.scheme != "https" or not host or literal or "." not in host or host.endswith((".local", ".internal", ".lan")) \
-            or parts.username or parts.password:
-        raise Invalid("That isn’t a notification service address Waypoint will send to.")
+    if parts.scheme != "https" or parts.username or parts.password or parts.port not in (None, 443) \
+            or not any(host == s or host.endswith("." + s) for s in PUSH_SERVICES):
+        raise Invalid("That isn’t the address of a notification service Waypoint sends to (Google’s, Apple’s, Mozilla’s or Microsoft’s).")
     try:
         keys_ok = webpush.valid_public_key(p256dh) and len(webpush.unb64u(auth)) >= 16
     except ValueError:
@@ -268,6 +266,7 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
     how many were sent."""
     stamp = now.timestamp()
     end_lapsed(conn, stamp)
+    conn.execute(delete(ReminderSent).where(ReminderSent.sent < stamp - SENT_KEPT))
     sent = 0
     for owner in sorted(set(conn.execute(select(PushDevice.owner_sub)).scalars())):
         chosen = prefs(conn, owner)
