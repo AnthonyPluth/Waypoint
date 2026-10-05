@@ -107,7 +107,7 @@
       }
     } catch (err) {
       await settle();
-      throw new Error(`Asked about ${done} of ${items.length}: ${errMsg(err)}`);
+      throw new Error(`Asked about ${done} of ${items.length}: ${errMsg(err)}`, { cause: err });
     }
     await settle();
     toast.success(`Asked the AI about ${done} ${done === 1 ? "message" : "messages"}`);
