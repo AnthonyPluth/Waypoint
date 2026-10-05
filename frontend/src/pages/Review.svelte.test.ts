@@ -253,21 +253,21 @@ describe("Review: the AI’s suggestion", () => {
 });
 
 describe("Review: the message beside the form", () => {
-  it("previews the message as plain text and hides it again", async () => {
+  it("shows the message as plain text beside the form, and has no separate Preview button", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Preview .Mail from example-air.example/ }));
+    await screen.findByTestId("review-item");
+    expect(screen.queryByRole("button", { name: /Preview/ })).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     const region = await screen.findByTestId("preview");
     expect(region).toHaveTextContent("Your flight EX 410 leaves Boston at 7:15 am on 2 January.");
     expect(calls).toContainEqual(["/api/review/1/preview", undefined, undefined]);
-    await userEvent.click(screen.getByRole("button", { name: /Hide .Mail from/ }));
-    expect(screen.queryByTestId("preview")).toBeNull();
   });
 
   it("shows the message as text, never as markup", async () => {
     const hostile = "<img src=x onerror=alert(1)><script>alert(2)</script> Hello";
     vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview") ? { text: hostile, truncated: false } : path === "/api/people" ? { people: [] } : held) as never);
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     const region = await screen.findByTestId("preview");
     expect(region).toHaveTextContent(hostile);
     expect(region.querySelector("img, script")).toBeNull();
@@ -276,18 +276,18 @@ describe("Review: the message beside the form", () => {
   it("says when it was cut short, and when the message has no text", async () => {
     truncated = true;
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     expect(await screen.findByText(/Cut short here: open it in Gmail for the rest/)).toBeInTheDocument();
   });
 
   it("says why it couldn’t be fetched, and tries again when asked again", async () => {
     previewFails = "That message is no longer in Gmail.";
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("That message is no longer in Gmail.");
     previewFails = "";
-    await userEvent.click(screen.getByRole("button", { name: /Hide/ }));
-    await userEvent.click(screen.getByRole("button", { name: /Preview/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: /by hand/ }));
     expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
   });
 
@@ -302,7 +302,7 @@ describe("Review: the message beside the form", () => {
     const stored: string[] = [];
     vi.spyOn(Storage.prototype, "setItem").mockImplementation((_k: string, v: string) => { stored.push(v); });   // (both of the browser's stores)
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     await screen.findByTestId("preview");
     expect(stored).toEqual([]);
     vi.restoreAllMocks();

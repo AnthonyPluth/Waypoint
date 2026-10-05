@@ -81,8 +81,8 @@
   // the browser's storage), and for this member's own items alone.
   type Peek = { state: "loading" } | { state: "ready"; text: string; truncated: boolean } | { state: "error"; message: string };
   let peeks = $state<Record<number, Peek>>({});
-  async function peek(item: ReviewItem, toggle = false) {
-    if (peeks[item.id]) { if (toggle) delete peeks[item.id]; if (toggle || peeks[item.id]?.state !== "error") return; }
+  async function peek(item: ReviewItem) {
+    if (peeks[item.id] && peeks[item.id]?.state !== "error") return;
     peeks[item.id] = { state: "loading" };
     try {
       const r = await apiCall<"GET /api/review/{id}/preview">(`/api/review/${item.id}/preview`);
@@ -169,19 +169,18 @@
     {#if review.items.length}
       <section aria-labelledby="unread-title" class="space-y-2">
         <h2 id="unread-title" class="eyebrow px-1">Couldn’t read</h2>
-        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see them. Open one in Gmail, or Preview it here to read it beside the form (Waypoint fetches it from Gmail when you ask, and keeps none of its text or subject).</p>
+        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see them. Open one in Gmail, or choose Add by hand to read it beside the form (Waypoint fetches it from Gmail when you ask, and keeps none of its text or subject).</p>
         <ul class="rows" aria-label="Couldn’t read">
           {#each review.items as item (item.id)}
             <li class="row items-start" data-testid="review-item">
-              <div class="min-w-0 basis-full sm:basis-0 sm:flex-1">
+              <div class="min-w-0 basis-full">
                 <p class="break-words font-medium">{subject(item)}</p>
                 <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, `to ${item.address}`].filter(Boolean).join(" · ")}</p>
                 <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestion} <Badge variant="outline">AI suggestion</Badge>{/if}</p>
                 {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
               </div>
-              <div class="flex flex-wrap gap-2">
+              <div class="flex basis-full flex-wrap gap-2">
                 <a class={buttonVariants({ variant: "outline", size: "sm" })} href={item.gmail_url} target="_blank" rel="noopener noreferrer" aria-label={`Open “${subject(item)}” in Gmail`}>Open in Gmail</a>
-                <Button variant="outline" size="sm" onclick={() => peek(item, true)} aria-label={`${peeks[item.id] ? "Hide" : "Preview"} “${subject(item)}”`}>{peeks[item.id] ? "Hide preview" : "Preview"}</Button>
                 {#if review.ai}<Button variant="outline" size="sm" disabled={asking_ai === item.id} onclick={() => askAi(item)} aria-label={`Ask the AI about “${subject(item)}”`}>{asking_ai === item.id ? "Asking…" : item.suggestion ? "Ask again" : "Ask the AI"}</Button>{/if}
                 {#if item.suggestion}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={`Check the AI’s suggestion for “${subject(item)}”`}>Check suggestion</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>

@@ -18,9 +18,8 @@ When a message looks like a booking (it’s from an airline, hotel, rental compa
 For each one you can:
 
 - **Open in Gmail**, to see the message yourself.
-- **Preview**: the message’s text as plain text, right on the page (and beside the form when you choose Add by hand), so you can read the details and type them in one place. Waypoint fetches it from Gmail when you ask, shows it only to you, and keeps none of it: it isn’t stored or logged, and it’s gone when you leave the page. No pictures, links or scripts in it are loaded; long messages are cut at 30,000 characters.
 - **Ask the AI** (when the optional [AI suggestions](/waypoint/start/ai/) are on): asks the model about this one message now, the same way a scan does for a new item, and offers what it read as a suggestion to check.
-- **Add by hand**: a form for the booking, with the sender’s name filled in as the provider. Saving it adds the booking to your trips and takes the item off the list.
+- **Add by hand**: a form for the booking, with the sender’s name filled in as the provider and the message’s text as plain text beside it, so you can read the details and type them in one place. Waypoint fetches the text from Gmail when you ask, shows it only to you, and keeps none of it: it isn’t stored or logged, and it’s gone when you leave the page. No pictures, links or scripts in it are loaded; long messages are cut at 30,000 characters. Saving it adds the booking to your trips and takes the item off the list.
 - **Ignore this sender**: later scans skip that sender’s mail for this mailbox, and its other items leave the list.
 - **Dismiss**: it isn’t a booking, so take it off. Waypoint remembers it has read the message, so it doesn’t come back.
 
