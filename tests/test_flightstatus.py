@@ -529,7 +529,7 @@ class BudgetTests(Household):
         self.fake.answer = (500, {"message": "down"})
         now = EARLY
         while now < ARRIVES + timedelta(hours=8):
-            _captured(lambda: flightstatus.run_due(self.c, now))
+            _captured(lambda at=now: flightstatus.run_due(self.c, at))
             now += timedelta(minutes=5)
         self.assertEqual(len(self.fake.calls), 5)
         self.assertEqual(self.used(ARRIVES), 5)
