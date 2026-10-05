@@ -9,7 +9,7 @@
   import { count } from "$lib/stats";
 
   // A person's year as a few full-screen cards, then a summary card to share. The picture is made here, on the device, and goes
-  // to the share sheet (or is downloaded): nothing is uploaded. The first name is on it only when "Show my name" is ticked.
+  // to the share sheet (or is downloaded): nothing is uploaded. The first name is on it only when "Show the first name" is ticked.
   let { stats, person, name = null, onclose }: { stats: Stats; person: number | "all"; name?: string | null; onclose: () => void } = $props();
 
   let allTime = $state<Stats | null>(null);   // to tell which countries were new; without it no country is called new
@@ -84,7 +84,7 @@
       {#if outlinesFailed}<p class="text-sm text-muted-foreground" role="status">The country outlines couldn’t load, so the map shows only your airports and routes.</p>{/if}
       {/if}
       {#if mine}
-        <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" bind:checked={showName} class="size-4 accent-primary" /> Show my name ({mine})</label>
+        <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" bind:checked={showName} class="size-4 accent-primary" /> Show the first name ({mine})</label>
       {/if}
       <p class="text-sm text-muted-foreground">Made on this device. It shows totals, the top route, countries and the map: no dates, confirmation codes, loyalty numbers or hotels.</p>
       <div class="flex flex-wrap items-center gap-3">

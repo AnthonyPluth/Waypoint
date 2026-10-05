@@ -42,12 +42,12 @@ describe("YearInReview", () => {
     expect(vi.mocked(api).mock.calls.map((c) => c[0])).toContain("/api/stats?person=1&year=all");
   });
 
-  it("puts the first name on the card only when 'Show my name' is ticked", async () => {
+  it("puts the first name on the card only when 'Show the first name' is ticked", async () => {
     render(YearInReview, { stats: stats(2026), person: 1, name: "Zelda Quimby", onclose: () => {} });
     await next(6);
     await screen.findByTestId("share-card");
     expect(cardText()).not.toContain("Zelda");
-    await userEvent.click(screen.getByLabelText(/Show my name \(Zelda\)/));
+    await userEvent.click(screen.getByLabelText(/Show the first name \(Zelda\)/));
     expect(cardText()).toContain("ZELDA’S YEAR IN REVIEW");
     expect(cardText()).not.toContain("Quimby");
     expect(cardText()).not.toContain("Hotel Canarios");
@@ -57,7 +57,7 @@ describe("YearInReview", () => {
     render(YearInReview, { stats: stats(2026), person: "all", name: "Zelda", onclose: () => {} });
     await next(6);
     await screen.findByTestId("share-card");
-    expect(screen.queryByLabelText(/Show my name/)).toBeNull();
+    expect(screen.queryByLabelText(/Show the first name/)).toBeNull();
   });
 
   it("hands the picture to the share sheet when the browser can share a file", async () => {
