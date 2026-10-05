@@ -136,7 +136,7 @@ class WhoIsThis(TypedDict):
 class Review(TypedDict):
     items: list[ReviewItem]
     who: list[WhoIsThis]
-    ai: bool                        # the optional AI is on, so Ask the AI works
+    ai: bool                        # the optional AI is on, so Ask AI works
 
 
 class Preview(TypedDict):
