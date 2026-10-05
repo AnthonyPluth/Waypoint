@@ -1562,7 +1562,7 @@
       },
       "PersonBody": {
         "type": "object",
-        "description": "A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed).",
+        "description": "A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed). Changing\nreplaces all of them, so send every name to keep: one left out is cleared.",
         "properties": {
           "display_name": {
             "type": "string"
@@ -1674,7 +1674,7 @@
       },
       "ReviewItem": {
         "type": "object",
-        "description": "One message Waypoint couldn't read, for the member whose mailbox it is. Never its text: who it came from, its\nsubject and its day.",
+        "description": "One message Waypoint couldn't read, for the member whose mailbox it is. Never its subject or text: only who it\ncame from and its day (Open in Gmail shows the message).",
         "properties": {
           "id": {
             "type": "integer"
@@ -1684,12 +1684,6 @@
           },
           "sender_domain": {
             "type": "string"
-          },
-          "subject": {
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "received": {
             "type": [
@@ -1712,7 +1706,6 @@
           "id",
           "address",
           "sender_domain",
-          "subject",
           "received",
           "reason",
           "gmail_url"

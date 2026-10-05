@@ -94,7 +94,10 @@ export interface Person {
   member: boolean;
 }
 
-/** A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed). */
+/**
+ * A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed). Changing
+ * replaces all of them, so send every name to keep: one left out is cleared.
+ */
 export interface PersonBody {
   display_name: string;
   first_name?: string | null;
@@ -121,14 +124,13 @@ export interface Review {
 }
 
 /**
- * One message Waypoint couldn't read, for the member whose mailbox it is. Never its text: who it came from, its
- * subject and its day.
+ * One message Waypoint couldn't read, for the member whose mailbox it is. Never its subject or text: only who it
+ * came from and its day (Open in Gmail shows the message).
  */
 export interface ReviewItem {
   id: number;
   address: string;
   sender_domain: string;
-  subject: string | null;
   received: string | null;
   reason: "no_markup" | "incomplete" | "broken";
   gmail_url: string;

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
 vi.mock("svelte-sonner", () => ({ Toaster: vi.fn(), toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
+import { api } from "$lib/api";
 import { app, route } from "$lib/app.svelte";
 import { state } from "./test/fixtures";
 import App from "./App.svelte";
@@ -15,7 +16,7 @@ const go = async (hash: string) => {
   await Promise.resolve();
 };
 
-beforeEach(async () => { app.state = state(); app.bootError = ""; await go("#upcoming"); });
+beforeEach(async () => { vi.mocked(api).mockReset(); vi.mocked(api).mockResolvedValue({ trips: [], people: [], loyalty: [] }); app.state = state(); app.bootError = ""; await go("#upcoming"); });
 afterEach(() => { app.state = null; });
 
 describe("the shell", () => {
@@ -41,6 +42,16 @@ describe("the shell", () => {
       expect(within(nav).getByRole("link", { name: "Upcoming" })).not.toHaveAttribute("aria-current");
     }
     expect(route.page).toBe("settings");
+  });
+
+  it("opens a trip by its address, with Trips lit in both menus", async () => {
+    vi.mocked(api).mockRejectedValue(new Error("No such trip"));
+    await go("#trip/7");
+    render(App);
+    expect(await screen.findByText("No such trip")).toBeInTheDocument();
+    for (const nav of screen.getAllByRole("navigation", { name: "Main" })) {
+      expect(within(nav).getByRole("link", { name: "Trips" })).toHaveAttribute("aria-current", "page");
+    }
   });
 
   it("opens Upcoming for a route it doesn't know (an old Runway bookmark, say)", async () => {

@@ -7,6 +7,18 @@ sidebar:
 
 A **trip** is a journey. It holds **segments**: one flight leg, hotel stay, car rental or train each. You can add them by hand, and Waypoint adds them from the booking emails in a connected Gmail (see [Scanning](/waypoint/start/gmail/#scanning)).
 
+## The pages
+
+- **Upcoming** leads with a card for what is next: a countdown, the flight number, departure time and terminal (or a hotel’s address and check-in time), and the confirmation code, which you tap to copy. A flight in the air or a rental car out counts as under way and leads until it ends; a hotel stay in progress doesn’t push the day’s flight aside. Below it, the trip that card belongs to (or the next one, when you aren’t travelling) is laid out day by day. Cancelled segments never lead.
+- **Trips** lists the trips you can see: the ones still to come or under way, and the past ones. Pick a traveller to see only their trips; the choice is kept in the address (`#trips?who=…`) so you can bookmark it.
+- A **trip** page shows each segment as a card with its local times, travellers and the loyalty number each traveller would use for that airline or hotel chain, masked. Tap a number to show it and copy it; tap again to hide it. When a traveller has no number for the program a booking is with, the card says so and links to [People](/waypoint/start/people/); a traveller known only by their printed name is marked as not matched to a person yet. Waypoint tells the program from the provider’s name (“American Airlines” is American AAdvantage), so write the provider the way the airline or chain does.
+
+Add a booking from Trips (Waypoint puts it in the trip it belongs to, or starts one) or from a trip page (it goes in that trip), edit any segment, or remove it. A save that fails keeps everything you typed and says why; a page that can’t reload its trips shows an error with Try again, not the old trips as if they were current.
+
+## Times beside yours
+
+A segment’s time is always shown as it is at the place. When your own time zone has a different offset at that moment, your time for the same moment follows it in brackets: `7:00 PM [4:00 PM PST]`. It is only a second reading; nothing is converted or stored in your zone.
+
 ## Who sees a trip
 
 You see a trip when you are travelling on any of its segments, or when you booked it (the trip, or any of its segments). Nobody else sees it, however they ask: its address answers “not found”, the same as a trip that doesn’t exist. A solo work trip stays its traveller’s. If you book a trip for a guest (a child, a grandparent), you see it because you booked it. Add someone as a traveller on a segment and the whole trip is shared with them.
@@ -31,7 +43,7 @@ Without a trip named, a new segment joins an existing grouped trip when it is wi
 
 ## What your edits keep
 
-When you change a field of a segment, Waypoint remembers it was you and a later email never overwrites it. An email about a booking Waypoint already has updates that segment instead of adding another, and marks it *changed* when its times or places moved, or *cancelled* when the airline says so.
+When you change a field of a segment, Waypoint remembers it was you and a later email never overwrites it. A segment you have edited is marked **Edited by you** on its card. An email about a booking Waypoint already has updates that segment instead of adding another, and marks it *changed* when its times or places moved, or *cancelled* when the airline says so.
 
 ## In a backup
 
