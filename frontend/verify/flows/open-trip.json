@@ -4,7 +4,8 @@
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "click": "a[href^='#trip/'] >> visible=true" },
-    { "expect_text": { "selector": "main", "text": "Travellers" } },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "expect_text": { "selector": "main", "text": "Jane Doe" } },
     { "screenshot": "trip" }
   ]
 }
