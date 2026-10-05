@@ -1,0 +1,169 @@
+"""The API contract (waypoint/server/contract.py, docs/openapi.json, frontend/src/lib/api-types.ts): each covered route's
+real reply, plus the cases that add fields (a signed-in person, Sentry on, a last backup), matches docs/openapi.json; the
+generated files are current; and tools/api_contract.py describes the types it's given."""
+import ast
+import importlib.util
+import json
+import os
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from waypoint.storage import backup, db
+from waypoint.storage import settings_keys as sk
+from waypoint.server.api import backups, state
+from waypoint.server.common import _current
+from tests.shared import DbCase
+
+ROOT = Path(__file__).resolve().parent.parent
+_spec = importlib.util.spec_from_file_location("api_contract", ROOT / "tools" / "api_contract.py")
+assert _spec and _spec.loader
+contract = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(contract)
+
+OPENAPI = json.loads((ROOT / "docs/openapi.json").read_text())
+
+
+def problems(value, schema, at="reply") -> list[str]:
+    """What in `value` (parsed JSON) doesn't match `schema` (the JSON schema subset docs/openapi.json uses)."""
+    if "$ref" in schema:
+        return problems(value, OPENAPI["components"]["schemas"][schema["$ref"].rsplit("/", 1)[1]], at)
+    if "anyOf" in schema:
+        found = [problems(value, s, at) for s in schema["anyOf"]]
+        if not all(found):
+            return []
+        not_null = [f for s, f in zip(schema["anyOf"], found, strict=True) if s != {"type": "null"}]
+        if len(not_null) == 1:   # `X | None`, and it isn't None: what's wrong with it as an X
+            return not_null[0]
+        return [f"{at}: {json.dumps(value)[:80]} is none of the types it can be"]
+    if "enum" in schema or "const" in schema:
+        allowed = schema["enum"] if "enum" in schema else [schema["const"]]
+        return [] if any(value == v and type(value) is type(v) for v in allowed) else [f"{at}: {value!r} isn't one of {allowed}"]
+    kinds = schema.get("type")
+    if kinds is None:
+        return []
+    kinds = kinds if isinstance(kinds, list) else [kinds]
+    is_a = {"string": lambda v: isinstance(v, str), "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
+            "number": lambda v: isinstance(v, int | float) and not isinstance(v, bool), "boolean": lambda v: isinstance(v, bool),
+            "null": lambda v: v is None, "array": lambda v: isinstance(v, list), "object": lambda v: isinstance(v, dict)}
+    kind = next((k for k in kinds if is_a[k](value)), None)
+    if kind is None:
+        return [f"{at}: {json.dumps(value)[:80]} isn't {' or '.join(kinds)}"]
+    if kind == "array":
+        return [p for i, v in enumerate(value) for p in problems(v, schema["items"], f"{at}[{i}]")]
+    if kind == "object":
+        props = schema.get("properties", {})
+        found = [f"{at}: no {k!r}" for k in schema.get("required", []) if k not in value]
+        for k, v in value.items():
+            if k in props:
+                found += problems(v, props[k], f"{at}.{k}")
+            elif schema.get("additionalProperties") is False:
+                found.append(f"{at}: {k!r} isn't in the contract")
+            elif isinstance(schema.get("additionalProperties"), dict):
+                found += problems(v, schema["additionalProperties"], f"{at}.{k}")
+        return found
+    return []
+
+
+def reply_schema(route: str) -> dict:
+    method, path = route.split(" ", 1)
+    address = contract.openapi_path(path)[0]
+    return OPENAPI["paths"][address][method.lower()]["responses"]["200"]["content"]["application/json"]["schema"]
+
+
+def covered() -> set[str]:
+    return {f"{m.upper()} {'/'.join('{id}' if s.startswith('{') else s for s in p.split('/'))}"
+            for p, ops in OPENAPI["paths"].items() for m in ops}
+
+
+class Replies(DbCase):
+    """Each covered route's reply, as the server would send it (through JSON), against docs/openapi.json."""
+
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(setattr, _current, "user", getattr(_current, "user", None))
+        self.checked: set[str] = set()
+
+    def check(self, route: str, reply) -> None:
+        self.checked.add(route)
+        found = problems(json.loads(json.dumps(reply, allow_nan=False)), reply_schema(route))
+        self.assertEqual(found, [], route)
+
+    def test_every_covered_route_is_checked(self):
+        self.test_state()
+        self.test_backups()
+        self.assertEqual(self.checked, covered(), "check each route the contract covers here")
+
+    def test_state(self):
+        _current.user = {"name": None, "email": None, "local": True}
+        with mock.patch.dict(os.environ, {"SENTRY_DSN": "", "SENTRY_BROWSER_DSN": ""}):
+            self.check("GET /api/state", state.api_state(self.c, {}, {}))
+        _current.user = {"sub": "u1", "name": "Rosa Example", "email": "rosa@example.com"}
+        db.set_setting(self.c, sk.LAST_BACKUP, "2026-09-30T07:02:00")
+        with mock.patch.dict(os.environ, {"SENTRY_DSN": "https://publickey@o123.ingest.us.sentry.io/456"}):
+            reply = state.api_state(self.c, {}, {})
+        self.assertIsNotNone(reply["sentry"])
+        self.check("GET /api/state", reply)
+        _current.user = None
+        self.check("GET /api/state", state.api_state(self.c, {}, {}))
+
+    def test_backups(self):
+        self.c.commit()
+        with db.session() as conn:
+            raw = backup.dump(conn)
+        self.check("POST /api/backup/inspect", backups.api_backup_inspect(None, {}, raw))
+        restored = backups.api_restore(None, {}, raw)
+        self.assertTrue(restored["ok"])
+        self.check("POST /api/restore", restored)
+
+
+class Mismatches(unittest.TestCase):
+    """The check above notices a reply that isn't the contract's."""
+
+    def test_a_renamed_field_a_wrong_type_and_a_missing_one(self):
+        st = {"version": "dev", "database": "sqlite", "user": {"name": None, "email": None, "local": True}, "sentry": None,
+              "last_backup": None}
+        schema = reply_schema("GET /api/state")
+        self.assertEqual(problems(st, schema), [])
+        renamed = {("backed_up" if k == "last_backup" else k): v for k, v in st.items()}
+        self.assertEqual(problems(renamed, schema), ["reply: no 'last_backup'", "reply: 'backed_up' isn't in the contract"])
+        self.assertEqual(problems({**st, "version": 3}, schema), ["reply.version: 3 isn't string"])
+        self.assertEqual(problems({**st, "database": "mysql"}, schema), ["reply.database: 'mysql' isn't one of ['sqlite', 'postgres']"])
+        self.assertEqual(problems({**st, "user": {"name": None, "email": None, "local": "yes"}}, schema),
+                         ['reply.user.local: "yes" isn\'t boolean'])
+        self.assertEqual(problems({**st, "last_backup": 5}, schema), ["reply.last_backup: 5 isn't string or null"])
+
+
+class Generated(unittest.TestCase):
+    def test_the_generated_files_are_current(self):
+        doc = contract.build()
+        self.assertEqual(contract.OPENAPI_OUT.read_text(), contract.render_json(doc), "run `make api-contract`")
+        self.assertEqual(contract.TS_OUT.read_text(), contract.render_ts(doc), "run `make api-contract`")
+
+    def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
+        self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore"})
+        self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)
+
+    def describe(self, annotation: str) -> str:
+        types = {"Thing": {"doc": None, "fields": []}}
+        return contract.ts_type(contract.schema(ast.parse(annotation, mode="eval").body, types, set(), "test"))
+
+    def test_types(self):
+        self.assertEqual(self.describe("str | None"), "string | null")
+        self.assertEqual(self.describe("int | float"), "number")
+        self.assertEqual(self.describe('Literal["a", "b"] | None'), '"a" | "b" | null')
+        self.assertEqual(self.describe("list[Thing | None]"), "(Thing | null)[]")
+        self.assertEqual(self.describe("dict[str, list[float]]"), "Record<string, number[]>")
+        self.assertEqual(self.describe("'Thing'"), "Thing")
+        self.assertEqual(self.describe("Any"), "unknown")
+        with self.assertRaises(contract.ContractError):
+            self.describe("set[str]")
+
+    def test_paths_number_their_ids(self):
+        self.assertEqual(contract.openapi_path("/api/things/{id}/parts/{id}/remove"),
+                         ("/api/things/{id}/parts/{id2}/remove", ["id", "id2"]))
+
+
+if __name__ == "__main__":
+    unittest.main()
+

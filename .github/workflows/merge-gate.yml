@@ -1,0 +1,66 @@
+name: Merge gate
+
+# One commit status, "Merge gate", on each pull request's head: passing once every check on it has passed (the rules
+# are in .github/scripts/merge-gate.sh). Require it in a ruleset on main
+# (Settings → Rules → Rulesets → Require status checks to pass → "Merge gate") and it's the one check a merge waits on.
+# It also merges Dependabot's pull requests once it passes.
+#
+# It runs from main's copy of this workflow and script, with a write token, and never checks out or runs a pull
+# request's code: it only reads the pull request's checks and threads through the API. So it works for pull requests
+# from forks too.
+# workflow_run is safe here: the job checks out main's script only, never the pull request's code, and hands the event's
+# values to it as environment variables.
+on:  # zizmor: ignore[dangerous-triggers]
+  # Each of the pull request's own workflows finishing (the last one to finish decides).
+  workflow_run:
+    workflows: [Docker image, Security scans, Docs]
+    types: [completed]
+  # Other apps' checks finishing (CodeQL, Semgrep, Trivy, zizmor, Codecov); GitHub doesn't send this for Actions' own.
+  check_suite:
+    types: [completed]
+  # By hand, to decide a pull request again; agent-review.yml starts it this way once it has set its status.
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number"
+        required: true
+
+permissions: {}
+
+# The newest evaluation of a commit wins: an older one still running would only report older news.
+concurrency:
+  group: merge-gate-${{ github.event.workflow_run.head_sha || github.event.check_suite.head_sha || inputs.pr }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  gate:
+    # Pull requests only (main's own runs and scheduled scans have none).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request') ||
+      (github.event_name == 'check_suite' && github.event.check_suite.app.slug != 'github-actions')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15   # waiting for CodeQL takes up to 10 (merge-gate.sh)
+    permissions:
+      contents: write          # merge Dependabot's pull requests
+      pull-requests: write     # merge them, and read review threads
+      statuses: write          # the "Merge gate" status
+      actions: write           # read the pull request's workflow runs, and start main's release after a merge
+      checks: read             # other apps' check runs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.event.check_suite.head_sha }}
+          PR: ${{ inputs.pr }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: .github/scripts/merge-gate.sh

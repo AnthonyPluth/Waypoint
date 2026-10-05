@@ -1,0 +1,64 @@
+name: Set up Python and Poetry
+description: Python, Poetry (cached) and the project's dependencies (cached virtualenv). Run after actions/checkout.
+
+# The one place the Poetry version is set (the Dockerfile installs the same one). Every action is pinned by SHA, with
+# its version in a comment, as in the workflows; Dependabot updates these too (.github/dependabot.yml).
+inputs:
+  python-version:
+    description: The Python to install (Waypoint supports only the one the Dockerfile runs).
+    default: "3.14"
+  poetry-version:
+    description: The Poetry to install.
+    default: "2.5.1"
+  cache-name:
+    description: Names the virtualenv cache (a job that installs other dependencies, or on another database, passes its own).
+    default: all
+  install-args:
+    description: Extra arguments for `poetry install` (for example `--only dev`).
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97   # v7.0.0
+      id: python
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    # Poetry and the project's virtualenv are cached between runs; a new Python or poetry.lock starts afresh. The
+    # runner's pipx installs into /opt/pipx, outside the cached paths (so the cache was never saved), so point it here.
+    # (Constants only, nothing from the event: the ignore is for zizmor's check of every write to the environment file.)
+    - name: Keep pipx's tools and the virtualenv in the home and project directories
+      shell: bash
+      run: |   # zizmor: ignore[github-env]
+        echo "PIPX_HOME=$HOME/.local/pipx" >> "$GITHUB_ENV"
+        echo "PIPX_BIN_DIR=$HOME/.local/bin" >> "$GITHUB_ENV"
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        echo "POETRY_VIRTUALENVS_IN_PROJECT=true" >> "$GITHUB_ENV"   # in .venv, where it's cached
+    - name: Cache Poetry
+      id: poetry-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
+      with:
+        path: |
+          ~/.local/pipx/venvs/poetry
+          ~/.local/bin/poetry
+        key: poetry-${{ inputs.poetry-version }}-${{ runner.os }}-py${{ steps.python.outputs.python-version }}
+    - name: Install Poetry
+      if: steps.poetry-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        PYTHON_PATH: ${{ steps.python.outputs.python-path }}
+        POETRY_VERSION: ${{ inputs.poetry-version }}
+      run: pipx install --python "$PYTHON_PATH" "poetry==$POETRY_VERSION"
+    - name: Cache dependencies
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-py${{ steps.python.outputs.python-version }}-${{ inputs.cache-name }}-${{ hashFiles('poetry.lock') }}
+    # Waypoint's dependencies and the tools (the dev group in pyproject.toml, at the versions poetry.lock pins).
+    - name: Install dependencies
+      shell: bash
+      env:
+        INSTALL_ARGS: ${{ inputs.install-args }}
+      # shellcheck disable=SC2086   # separate arguments
+      run: poetry install --no-root --no-interaction $INSTALL_ARGS

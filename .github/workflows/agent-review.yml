@@ -1,0 +1,197 @@
+name: Agent review
+
+# An independent review of every pull request an AI agent wrote: a fresh Claude Code session, with no access to the
+# session that wrote it, reads the change against main's AGENTS.md and posts its findings as a comment. Its verdict is
+# the "Agent review" commit status on the pull request's head, which the merge gate requires (.github/scripts/
+# merge-gate.sh): a blocking finding fails it, and so does a review that couldn't run. A new push reviews again.
+#
+# An agent's pull request is one whose commits carry a Claude-Session or a Claude Co-Authored-By trailer, or whose
+# description says Claude Code generated it (.github/scripts/agent_review.py). Anyone else's gets a passing status
+# saying so; Dependabot's get none (the merge gate doesn't ask for one).
+#
+# Authentication, one of two secrets: CLAUDE_CODE_OAUTH_TOKEN, a Claude Pro or Max subscription's token (made with
+# `claude setup-token`), or ANTHROPIC_API_KEY, an API key, which wins when both are set. The model and the most a
+# review may spend are the AGENT_REVIEW_MODEL and AGENT_REVIEW_BUDGET_USD variables (opus, and 5 US dollars, as Claude Code
+# estimates a run's cost).
+#
+# Why pull_request_target: it runs main's copy of this workflow, its prompt and its scripts, so a pull request can't
+# change how it is reviewed (with pull_request it could edit this file to pass itself). The cost is that the job sees
+# secrets while the pull request's code is checked out, so that code is never run, built or installed: it is only
+# read, by a reviewer (.github/scripts/agent-review-run.sh) whose only tools are Read, Grep and Glob, confined to the
+# review's directory (no shell, no writing, no network tools, no MCP servers), that loads no settings, hooks, skills,
+# plugins or CLAUDE.md (the pull request's included) and holds no GitHub token. Branches from forks aren't reviewed
+# (that would spend the secret on anyone's pull request): an agent's from a fork fails, for a maintainer to push to a
+# branch here. Posting the comment and the status happens in a second job that never sees the code or the secrets.
+on:  # zizmor: ignore[dangerous-triggers] -- runs main's workflow; the pull request's code is only read, never run
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+# A newer push replaces a review still running (github.ref is main's on pull_request_target).
+concurrency:
+  group: agent-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# bash, which runs each step with -eo pipefail: a command that fails inside a pipeline fails the step.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  review:
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read           # check out main's instructions and the pull request's code
+      pull-requests: read      # its commits
+    outputs:
+      verdict: ${{ steps.result.outputs.verdict }}
+      description: ${{ steps.result.outputs.description }}
+      comment: ${{ steps.result.outputs.comment }}
+    steps:
+      # Main's prompt, schema, scripts and AGENTS.md: what the review is judged by.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+          path: trusted
+          sparse-checkout: |
+            .github/agent-review
+            .github/scripts
+
+      - name: Is this an agent's pull request
+        id: who
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BODY: ${{ github.event.pull_request.body }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          agent=$(gh api --paginate "repos/$REPO/pulls/$PR/commits?per_page=100" --jq '.[].commit.message | @json' \
+                    | python3 trusted/.github/scripts/agent_review.py detect)
+          same_repo=$([ "$HEAD_REPO" = "$REPO" ] && echo true || echo false)
+          { echo "agent=$agent"; echo "same_repo=$same_repo"; } | tee -a "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
+        if: steps.who.outputs.agent == 'true' && steps.who.outputs.same_repo == 'true'
+        with:
+          node-version-file: trusted/.nvmrc
+          package-manager-cache: false
+
+      # At the version main's .github/agent-review/package-lock.json locks, installed outside any checkout (so no .npmrc
+      # of the pull request's applies).
+      - name: Install Claude Code
+        if: steps.who.outputs.agent == 'true' && steps.who.outputs.same_repo == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/claude-code"
+          cp trusted/.github/agent-review/package.json trusted/.github/agent-review/package-lock.json "$RUNNER_TEMP/claude-code/"
+          cd "$RUNNER_TEMP/claude-code"
+          npm ci --no-audit --no-fund
+          node_modules/.bin/claude --version
+
+      # The pull request's code, to read only: nothing in it is run.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        if: steps.who.outputs.agent == 'true' && steps.who.outputs.same_repo == 'true'
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0       # main's history too, for the diff against where it branched
+          path: review/pr
+
+      # Beside it in review/, from main: the prompt, the schema of the answer and AGENTS.md; and the change itself.
+      - name: Gather the change
+        if: steps.who.outputs.agent == 'true' && steps.who.outputs.same_repo == 'true'
+        env:
+          MAIN: ${{ github.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cp trusted/AGENTS.md trusted/.github/agent-review/prompt.md trusted/.github/agent-review/schema.json review/
+          git -C review/pr diff "$MAIN...$HEAD" > review/diff.patch
+          git -C review/pr diff --name-status "$MAIN...$HEAD" > review/files.txt
+          git -C review/pr log --format='commit %H%n%B' "$MAIN..$HEAD" > review/commits.txt
+          echo "$(wc -l < review/files.txt) file(s), $(wc -l < review/diff.patch) diff line(s)"
+
+      # The reviewer, in review/ (main's script; see it for how it is isolated), with whichever secret is set.
+      - name: Review
+        if: steps.who.outputs.agent == 'true' && steps.who.outputs.same_repo == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE: ${{ runner.temp }}/claude-code/node_modules/.bin/claude
+          MODEL: ${{ vars.AGENT_REVIEW_MODEL || 'opus' }}
+          BUDGET: ${{ vars.AGENT_REVIEW_BUDGET_USD || '5' }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::No CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY secret to review with."; exit 0
+          fi
+          cd review
+          ../trusted/.github/scripts/agent-review-run.sh
+
+      - name: Verdict
+        id: result
+        env:
+          AGENT: ${{ steps.who.outputs.agent }}
+          SAME_REPO: ${{ steps.who.outputs.same_repo }}
+          # Only to make sure the answer contains neither before it is posted.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$AGENT" != true ]; then
+            { echo "verdict=pass"; echo "description=Not an agent's pull request"; echo "comment="; } >> "$GITHUB_OUTPUT"
+          elif [ "$SAME_REPO" != true ]; then
+            { echo "verdict=error"; echo "description=Agents' pull requests are reviewed only from this repository's branches"; echo "comment="; } >> "$GITHUB_OUTPUT"
+          elif [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            { echo "verdict=error"; echo "description=No CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY secret to review with"; echo "comment="; } >> "$GITHUB_OUTPUT"
+          else
+            python3 trusted/.github/scripts/agent_review.py report review/output.json
+          fi
+
+  # Posts what the review found: the comment, the "Agent review" status, and asks the merge gate to decide again
+  # (setting a status starts no workflow by itself). It never sees the pull request's code or the secrets.
+  report:
+    needs: review
+    if: ${{ !cancelled() && github.event.pull_request.user.login != 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write     # the comment
+      statuses: write          # the "Agent review" status
+      actions: write           # start the merge gate
+    steps:
+      - name: Post the review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          RESULT: ${{ needs.review.result }}
+          VERDICT: ${{ needs.review.outputs.verdict }}
+          DESCRIPTION: ${{ needs.review.outputs.description }}
+          COMMENT: ${{ needs.review.outputs.comment }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          case "$RESULT:$VERDICT" in
+            success:pass) state=success ;;
+            success:blocking) state=failure ;;
+            *) state=error; [ -n "$DESCRIPTION" ] || DESCRIPTION="The review didn't finish; see the run" ;;
+          esac
+          echo "$state: $DESCRIPTION"
+          if [ -n "$COMMENT" ]; then
+            base64 -d <<< "$COMMENT" > comment.md
+            # One comment per pull request, updated by each review (the marker is its first line).
+            existing=$(gh api --paginate "repos/$REPO/issues/$PR/comments?per_page=100" \
+                         --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- agent-review -->"))) | .id')
+            existing=${existing%%$'\n'*}
+            if [ -n "$existing" ]; then
+              gh api -X PATCH "repos/$REPO/issues/comments/$existing" -F body=@comment.md > /dev/null
+            else
+              gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@comment.md > /dev/null
+            fi
+          fi
+          gh api -X POST "repos/$REPO/statuses/$SHA" -f state="$state" -f context="Agent review" \
+            -f description="${DESCRIPTION:0:140}" -f target_url="$RUN_URL" > /dev/null
+          gh workflow run merge-gate.yml --repo "$REPO" --ref main -f pr="$PR"

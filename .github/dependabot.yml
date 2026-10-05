@@ -1,0 +1,89 @@
+# Dependabot keeps the build's moving parts up to date with weekly pull requests. Each waits until a release is a week
+# old (cooldown): the merge gate merges Dependabot's pull requests by itself, and a compromised release is usually
+# caught and pulled within days. Security updates for a known vulnerability don't wait.
+version: 2
+updates:
+  # Python dependencies (pyproject.toml / poetry.lock)
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      python:
+        update-types: [minor, patch]   # one PR for routine updates; major versions get their own
+    commit-message:
+      prefix: deps
+
+  # Actions used by the workflows (.github/workflows/) and by the composite actions they share (.github/actions/)
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/*
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  # The web app's packages (frontend/package.json)
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      web:
+        update-types: [minor, patch]
+    ignore:
+      # TypeScript 7 (the Go rewrite) isn't supported by svelte-check yet (peer range ^5 || ^6).
+      # Remove once svelte-check accepts typescript 7.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: web
+
+  # The documentation site's packages (docs/package.json: Astro Starlight)
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      docs:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: docs
+
+  # The Claude Code that the independent review runs (.github/agent-review/package.json)
+  - package-ecosystem: npm
+    directory: /.github/agent-review
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
+
+  # The base images in the Dockerfile (python:3.14-slim, node:26-slim)
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: docker

@@ -1,0 +1,44 @@
+# Start:   docker compose up -d          (update later: docker compose pull && docker compose up -d)
+# Open:    the WAYPOINT_PUBLIC_URL you set in .env, and sign in with your identity provider.
+services:
+  waypoint:
+    image: ghcr.io/anthonypluth/waypoint:latest   # or pin a version: :1.2.3, :1.2 or :1 (see Releases on GitHub)
+    # build: .                                  # or build it yourself from this folder instead
+    container_name: waypoint
+    restart: unless-stopped
+    ports:
+      - "8765:8765"      # behind a reverse proxy on this machine, use "127.0.0.1:8765:8765" so only the proxy can reach it
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]      # Waypoint needs no special privileges
+    volumes:
+      - ./data:/data                                   # your database: back this folder up
+    env_file:
+      - path: .env       # every variable in it reaches Waypoint, so advanced ones (see the Configuration page) need no line here
+        required: false
+    environment:         # what needs a default or a check, and what's costly to lose; .env fills in the rest
+      TZ: ${TZ:-America/New_York}                       # decides "today" for forecasts and budgets
+      WAYPOINT_PUBLIC_URL: ${WAYPOINT_PUBLIC_URL:?Set WAYPOINT_PUBLIC_URL in .env}
+      OIDC_ISSUER: ${OIDC_ISSUER:?Set OIDC_ISSUER in .env}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Set OIDC_CLIENT_ID in .env}
+      # Also passed through by name, so they arrive even when your settings aren't in a .env file here (a stack.env,
+      # --env-file, shell exports): without the key Waypoint can’t read your saved mailbox access, and without DATABASE_URL
+      # it starts on an empty database.
+      WAYPOINT_SECRET_KEY: ${WAYPOINT_SECRET_KEY:-}
+      DATABASE_URL: ${DATABASE_URL:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_ALLOWED_EMAILS: ${OIDC_ALLOWED_EMAILS:-}
+      OIDC_ALLOWED_GROUPS: ${OIDC_ALLOWED_GROUPS:-}
+    # depends_on: [db]            # if you use the Postgres service below
+
+  # Optional Postgres, if you don't already run one. Then set in .env:
+  #   DATABASE_URL=postgresql://waypoint:<password>@db:5432/waypoint
+  # db:
+  #   image: postgres:16
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: waypoint
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+  #     POSTGRES_DB: waypoint
+  #   volumes:
+  #     - ./postgres:/var/lib/postgresql/data

@@ -1,0 +1,455 @@
+name: Docker image
+
+# Every push to main: run the tests (on SQLite and Postgres) and, at the same time, build the image for Intel/AMD and
+# ARM with the next version (v1.2.3) baked in. Only once the tests pass is it published to GitHub Container Registry as
+# ghcr.io/<owner>/waypoint:latest plus :1.2.3, :v1.2.3, :1.2 and :1 (so you can pin a version), the version tagged and a
+# GitHub Release published for it; then untagged leftovers are deleted.
+#
+# Versions: each push bumps the patch number (v1.0.0 -> v1.0.1). Put "#minor" in a commit message (or start it with
+# "feat:") for v1.1.0, and "#major" (or "BREAKING CHANGE") for v2.0.0.
+# Pull requests (including Dependabot's) only run the tests, and only the ones the change can affect: a pull request
+# that touches only the web app skips the Python tests, one that touches only the backend skips the web app's checks
+# (see `changes`), and one that changes only the web app's source runs just the web app tests that import what it
+# changed. Only main is ever released: a manual run from another branch just runs the tests, and re-running an
+# old build never moves :latest back to it.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: docker-image-${{ github.ref }}
+  # A newer push replaces a pull request's run that's still going. On main a release is never cut off halfway;
+  # the next run waits for it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+# bash, which runs each step with -eo pipefail: a command that fails inside a pipeline fails the step (without it, only
+# the last command in a pipeline counts, and a failed gh or curl passes silently).
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # What a pull request changes, so the jobs it can't affect are skipped (a skipped job counts as passed, for the merge
+  # gate too). Anything not listed as the web app's alone, or the backend's alone (the workflows, the Dockerfile, ...),
+  # runs everything, and so does every push to main and every manual run.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read      # the pull request's list of changed files
+    outputs:
+      backend: ${{ steps.what.outputs.backend }}
+      web: ${{ steps.what.outputs.web }}
+      web_tests: ${{ steps.what.outputs.web_tests }}
+    steps:
+      - name: Which parts the change touches
+        id: what
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$PR" ]; then
+            { echo "backend=true"; echo "web=true"; echo "web_tests=all"; } >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          listing=$(gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" --jq '.[] | [.status, .filename, (.previous_filename // "")] | @tsv')
+          # A rename counts for both its old and its new path.
+          files=$(cut -f2,3 <<< "$listing" | tr '\t' '\n' | grep . || true)
+          # The files API lists at most 3,000; a pull request that big runs everything.
+          if [ "$(grep -c . <<< "$files" || true)" -ge 3000 ]; then files="(too many to list)"; fi
+          # Only the web app or docs: the Python tests can't be affected.
+          web_only='^(frontend/|docs/|[^/]+\.md$)'
+          # Only the backend, its tests or docs: the web app's checks can't be affected (ESLint also reads waypoint/static/).
+          backend_only='^(waypoint/|tests/|docs/|[^/]+\.md$|pyproject\.toml$|poetry\.lock$)'
+          backend=false web=false
+          if grep -vqE "$web_only" <<< "$files"; then backend=true; fi
+          if grep -vqE "$backend_only" <<< "$files" || grep -qE '^waypoint/static/' <<< "$files"; then web=true; fi
+          # Which Vitest tests to run: only those whose imports reach a changed file under frontend/src/ (`vitest related`),
+          # unless the change could reach every test: anything else in frontend/ (package.json, the lockfile, Vite's or
+          # TypeScript's settings), the workflows or anything else not known to be outside the tests' reach (the tests
+          # only import from frontend/src/), the tests' shared setup (src/test/), or a file deleted or renamed (whose importers no longer import it,
+          # so `related` wouldn't find them). Every push to main runs them all.
+          web_tests=$(grep -E '^frontend/src/' <<< "$files" | sed 's|^frontend/||' || true)
+          beyond_tests='^(frontend/src/|waypoint/|tests/|docs/|[^/]+\.md$|pyproject\.toml$|poetry\.lock$)'
+          if [ "$files" = "(too many to list)" ] || grep -qvE "$beyond_tests" <<< "$files" \
+             || grep -qE '^frontend/src/test/' <<< "$files" \
+             || awk -F'\t' '$1 == "removed" || $1 == "renamed"' <<< "$listing" | cut -f2,3 | grep -q 'frontend/'; then
+            web_tests=all
+          fi
+          { echo "backend=$backend"; echo "web=$web"; echo "web_tests<<END_OF_FILES"; echo "$web_tests"; echo "END_OF_FILES"; } >> "$GITHUB_OUTPUT"
+          echo "Python tests: $backend; web app checks: $web; web app tests: $([ "$web_tests" = all ] && echo all || echo "related to $(grep -c . <<< "$web_tests" || true) changed file(s)")"
+
+  # The Python tests, on SQLite (with coverage, lint and type-check) and on Postgres. The Postgres tests are split in
+  # three, each with its own Postgres (tests/shard.py): on one runner they mostly wait on each other.
+  test:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false         # one shard failing still shows what the others found
+      matrix:
+        # 3.14 is the only Python Waypoint supports: what the image runs (see the Dockerfile).
+        include:
+          - {python: "3.14", database: sqlite}
+          - {python: "3.14", database: postgres, shard: 1/3}
+          - {python: "3.14", database: postgres, shard: 2/3}
+          - {python: "3.14", database: postgres, shard: 3/3}
+    services:
+      postgres:                # used by the postgres run; the sqlite run ignores it
+        image: postgres:16
+        env:
+          POSTGRES_USER: waypoint
+          POSTGRES_PASSWORD: waypoint
+          POSTGRES_DB: waypoint
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python-poetry   # zizmor: ignore[self-repository] -- GitHub's documented form for a local action
+        with:
+          cache-name: ${{ matrix.database }}
+          python-version: ${{ matrix.python }}
+      - name: Run tests (postgres, one shard)
+        if: matrix.database == 'postgres'
+        env:
+          DATABASE_URL: postgresql://waypoint:waypoint@localhost:5432/waypoint
+          SHARD: ${{ matrix.shard }}
+        run: |
+          # shellcheck disable=SC2046   # one -k argument per module
+          poetry run unittest-parallel -t . -s tests -j 4 $(python tests/shard.py "$SHARD")
+      # The SQLite run also measures how much of Waypoint the tests run: the table goes in the run's summary, and the
+      # report goes to Codecov (the README's backend badge), along with each test's result (JUnit XML, from
+      # tests/junit_result.py) for Codecov's test analytics.
+      - name: Run tests (sqlite) and measure coverage
+        if: matrix.database == 'sqlite'
+        env:
+          JUNIT_DIR: junit
+          PYTHONPATH: .            # so unittest-parallel finds tests/junit_result.py
+        run: |
+          poetry run unittest-parallel -t . -s tests -j 4 --coverage --coverage-rcfile pyproject.toml --result tests.junit_result.JUnitResult
+          poetry run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+          poetry run coverage xml -q -o coverage.xml
+      - name: Upload coverage to Codecov
+        if: matrix.database == 'sqlite'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5   # v7.1.1
+        with:
+          files: coverage.xml
+          flags: backend
+          disable_search: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false   # a Codecov outage never holds up a release
+      - name: Upload test results to Codecov
+        if: matrix.database == 'sqlite' && !cancelled()
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5   # v7.1.1
+        with:
+          report_type: test_results
+          files: junit/*.xml
+          flags: backend
+          disable_search: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+      - name: Check dependencies for known vulnerabilities
+        if: matrix.database == 'sqlite'
+        run: poetry run pip-audit
+      - name: Lint (Python with ruff)
+        if: matrix.database == 'sqlite'
+        run: poetry run ruff check .
+      # Type-check (settings in pyproject.toml). mypy runs in the Poetry environment so it sees Waypoint's dependencies.
+      - name: Type-check (Python with mypy)
+        if: matrix.database == 'sqlite'
+        run: poetry run mypy
+      # The backend's import boundaries (import-linter's contracts in pyproject.toml; AGENTS.md → Layout).
+      - name: Check import boundaries (Python with import-linter)
+        if: matrix.database == 'sqlite'
+        run: poetry run lint-imports
+
+  # The feature map (docs/feature-map.json and its docs page) is generated from the routes, the web app, the tests and
+  # the docs, so any of them can make it stale; it runs on every change. So does the API contract (docs/openapi.json and
+  # the web app's lib/api-types.ts, from the routes and waypoint/server/contract.py), which a change to either side can
+  # make stale. Standard library only: no setup beyond Python.
+  feature-map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the feature map is up to date and every route has a test
+        run: python3 tools/feature_map.py --check
+      - name: Check the API contract (docs/openapi.json, frontend/src/lib/api-types.ts) is up to date
+        if: ${{ !cancelled() }}
+        run: python3 tools/api_contract.py --check
+
+  # Checks that replaced instructions agents kept getting wrong (tools/fleet_checks.py): one Alembic head, a test for
+  # each new migration, the workflows' conventions and, on a pull request, that each of an agent's commits names its
+  # model in a Co-Authored-By trailer. Standard library only.
+  fleet-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0       # the pull request's commits, back to main
+      - name: Migrations, commit trailers and workflow conventions
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [[ "$BASE" =~ ^[0-9a-f]{40}$ && "$HEAD" =~ ^[0-9a-f]{40}$ ]]; then
+            python3 tools/fleet_checks.py --commits "$BASE..$HEAD"
+          else
+            python3 tools/fleet_checks.py      # main's commits are squashed: their trailers were checked on the pull request
+          fi
+
+  # The web app (frontend/): type-check and lint it (the lint covers waypoint/static/ too), run its unit tests with
+  # coverage, and build it (reporting its bundle sizes to Codecov).
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-app   # zizmor: ignore[self-repository] -- GitHub's documented form for a local action
+        with:
+          directory: frontend
+      - name: Type-check (svelte-check)
+        run: npm run check
+      - name: Lint (ESLint, also over waypoint/static/)
+        run: npm run lint
+      - name: Unit tests (Vitest), measuring coverage
+        if: needs.changes.outputs.web_tests == 'all'
+        run: npm run coverage -- --reporter=default --reporter=junit --outputFile.junit=junit.xml
+      # A pull request that changes only files under src/ runs just the tests that import them (see `changes`), without
+      # coverage: a share of the tests would report most of the app as untested.
+      - name: Unit tests (Vitest), only those the change can affect
+        if: needs.changes.outputs.web_tests != 'all'
+        env:
+          CHANGED: ${{ needs.changes.outputs.web_tests }}
+        run: |
+          mapfile -t changed < <(grep . <<< "$CHANGED" || true)
+          if [ "${#changed[@]}" -eq 0 ]; then echo "No file under frontend/src/ changed."; exit 0; fi
+          npx vitest related --run --passWithNoTests "${changed[@]}"   # every path starts with src/, never with -
+      - name: Upload coverage to Codecov
+        if: needs.changes.outputs.web_tests == 'all'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5   # v7.1.1
+        with:
+          files: frontend/coverage/lcov.info
+          flags: frontend
+          disable_search: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+      - name: Upload test results to Codecov
+        if: needs.changes.outputs.web_tests == 'all' && !cancelled()
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5   # v7.1.1
+        with:
+          report_type: test_results
+          files: frontend/junit.xml
+          flags: frontend
+          disable_search: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+      - name: Build (and send its bundle sizes to Codecov)
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: npm run build
+
+  # The image is built while the tests run, and published only once they (and the web app's checks) pass.
+  # build: works out the version, builds the image for this runner and checks it starts, then builds it for Intel/AMD
+  # and ARM into the build cache. It has no permission to publish anything; the only thing it sends out is the web app's
+  # source maps, to Sentry (with a SENTRY_AUTH_TOKEN secret; see the Dockerfile).
+  build:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      new: ${{ steps.next.outputs.new }}
+      newest: ${{ steps.next.outputs.newest }}
+      skip: ${{ steps.next.outputs.skip }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          fetch-depth: 0       # full history and tags, to find the last version
+          persist-credentials: false
+
+      - name: Work out the next version
+        id: next
+        run: .github/scripts/next-version.sh
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1   # v4.4.0
+        if: steps.next.outputs.skip != 'true'
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069   # v4.4.1
+        if: steps.next.outputs.skip != 'true'
+
+      # Start the image and ask it /healthz.
+      - name: Build for this runner
+        if: steps.next.outputs.skip != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc   # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: waypoint:smoke
+          build-args: |
+            VERSION=${{ steps.next.outputs.version }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_BROWSER_PROJECT=${{ vars.SENTRY_BROWSER_PROJECT || 'waypoint-web' }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+          cache-from: type=gha
+      - name: Check the image starts
+        if: steps.next.outputs.skip != 'true'
+        run: |
+          docker run -d --name smoke -p 8765:8765 -e WAYPOINT_ALLOW_NO_AUTH=1 waypoint:smoke
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/healthz; then docker rm -f smoke; exit 0; fi
+            sleep 1
+          done
+          docker logs smoke; exit 1
+
+      # The slow part (ARM is built under emulation), done now: into the build cache only, which publish reads back.
+      - name: Build for Intel/AMD and ARM (not pushed)
+        if: steps.next.outputs.skip != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc   # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          build-args: |
+            VERSION=${{ steps.next.outputs.version }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_BROWSER_PROJECT=${{ vars.SENTRY_BROWSER_PROJECT || 'waypoint-web' }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # publish: once the tests, the web app's checks and the build have all passed, push the image (from the build's
+  # cache, so it isn't built again) and then tag the release. The tag and Release come last, so a failed or cancelled
+  # push never leaves a version with no image.
+  publish:
+    needs: [test, web, build]
+    if: needs.build.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # create the tag and the release
+      packages: write          # publish to ghcr.io
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          fetch-depth: 0       # the commits since the last release, for Sentry's release (below)
+          persist-credentials: false
+
+      - name: Image name (registry names must be lowercase)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/waypoint" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1   # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069   # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f   # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image tags (latest, 1.2.3, v1.2.3, 1.2 and 1)
+        id: tags
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          NEWEST: ${{ needs.build.outputs.newest }}
+        run: |
+          v="${VERSION#v}"
+          IFS=. read -r major minor patch <<< "$v"
+          {
+            echo "list<<EOF"
+            echo "$IMAGE:$v"
+            echo "$IMAGE:v$v"
+            if [ "$NEWEST" = true ]; then
+              echo "$IMAGE:latest"
+              echo "$IMAGE:$major.$minor"
+              echo "$IMAGE:$major"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Push (from the build's cache)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc   # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.list }}
+          build-args: |
+            VERSION=${{ needs.build.outputs.version }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_BROWSER_PROJECT=${{ vars.SENTRY_BROWSER_PROJECT || 'waypoint-web' }}
+          # The same as the build job's, so a web app rebuilt here (the cache missed) matches the source maps uploaded.
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.build.outputs.version }}
+          cache-from: type=gha
+
+      - name: Tag and publish the release
+        if: needs.build.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          # --target makes GitHub create the tag v1.2.3 on this commit (through the API, so the checkout needs no
+          # credentials); a tag that already exists is used as it is.
+          gh release create "$VERSION" --target "$GITHUB_SHA" --title "Waypoint $VERSION" --generate-notes
+
+      # The version as a Sentry release in both projects (the server's and the web app's), with the commits it brings,
+      # so an issue shows the release that brought it and its suspect commits. The server and the web app tag what they
+      # send with the same version (WAYPOINT_VERSION). Needs a SENTRY_AUTH_TOKEN secret and a SENTRY_ORG variable (and
+      # SENTRY_PROJECT / SENTRY_BROWSER_PROJECT if the projects aren't waypoint and waypoint-web); without them it's
+      # skipped, and a Sentry problem never fails the release.
+      - name: Sentry release
+        if: needs.build.outputs.new == 'true'
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SERVER_PROJECT: ${{ vars.SENTRY_PROJECT || 'waypoint' }}
+          WEB_PROJECT: ${{ vars.SENTRY_BROWSER_PROJECT || 'waypoint-web' }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ] || [ -z "$SENTRY_ORG" ]; then
+            echo "No SENTRY_AUTH_TOKEN secret or SENTRY_ORG variable, so no Sentry release."; exit 0
+          fi
+          cli() { npx --yes @sentry/cli@2.58.6 "$@"; }
+          cli releases new "$VERSION" -p "$SERVER_PROJECT" -p "$WEB_PROJECT"
+          # Commits through Sentry's GitHub integration if it's set up, else from this checkout's history.
+          cli releases set-commits "$VERSION" --auto --ignore-missing || cli releases set-commits "$VERSION" --local --ignore-missing
+          cli releases finalize "$VERSION"
+
+  # A third-party action, so it runs on its own with only the permission it needs (no access to the repository).
+  cleanup:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write          # delete old versions from ghcr.io
+    steps:
+      - name: Delete untagged leftovers (every released version stays pullable)
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f   # v1.2.2
+        with:
+          package: waypoint
+          delete-untagged: true      # understands multi-architecture images, so tagged versions stay intact
+          token: ${{ secrets.GITHUB_TOKEN }}

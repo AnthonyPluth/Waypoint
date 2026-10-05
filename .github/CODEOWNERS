@@ -1,0 +1,8 @@
+# Who reviews changes to the automation and the rules it runs by: the workflows, the merge gate, Claude's
+# instructions and the security notes. With "Require review from Code Owners" in main's ruleset, a pull request that
+# touches these waits for that review (Dependabot's action updates included).
+/.github/     @AnthonyPluth
+/.claude/     @AnthonyPluth
+/AGENTS.md    @AnthonyPluth
+/CLAUDE.md    @AnthonyPluth
+/SECURITY.md  @AnthonyPluth

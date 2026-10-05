@@ -1,0 +1,8 @@
+{
+  "name": "waypoint-agent-review",
+  "private": true,
+  "description": "The Claude Code version .github/workflows/agent-review.yml runs, locked (npm ci).",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.289"
+  }
+}

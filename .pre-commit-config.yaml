@@ -1,0 +1,28 @@
+# Checks that run on `git commit` once you've run `pre-commit install`. `make check` runs the full suite; these are
+# the quick ones. `pre-commit run --all-files` runs them over the whole tree.
+#
+# Left alone: the files Waypoint serves as-is (waypoint/static: minified vendor code, fonts, logos), SVGs, lock files,
+# and the test fixtures, which are pages saved verbatim from real sites and must stay byte-for-byte what was captured.
+exclude: ^(waypoint/static/|tests/fixtures/)|\.svg$|(^|/)(poetry\.lock|package-lock\.json)$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+
+  # Ruff from the Poetry environment: the version poetry.lock pins, the one CI runs, so a commit that passes here
+  # passes there.
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: poetry run ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]

@@ -1,0 +1,65 @@
+---
+title: Waypoint
+description: "A self-hosted travel app for a household: flights, hotels and rental cars from your email, read privately on your own server."
+template: splash
+hero:
+  tagline: A self-hosted travel app for your household. See the trips you're on (flights, hotels, rental cars, confirmation numbers) and keep everyone's loyalty and TSA PreCheck numbers in one place, on your own hardware.
+  image:
+    file: ../../assets/logo.svg
+  actions:
+    - text: Install with Docker
+      link: /waypoint/start/docker/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/AnthonyPluth/waypoint
+      icon: external
+      variant: minimal
+---
+
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Status: early, Phase 0">
+Waypoint is just getting started. Today it signs you in (OpenID Connect), keeps settings and makes backups. The travel features below are planned and arrive in phases; nothing here promises a date.
+</Aside>
+
+## What Waypoint is for
+
+Planning a family trip means a dozen confirmation emails, and the one you need at the airport is never the one you can find. Waypoint gathers them for the household: who is flying where and when, in which seat, which hotel and which rental car, and the confirmation numbers for each. It also remembers everyone’s frequent-flyer, hotel-loyalty and TSA PreCheck (Known Traveler) numbers, so anyone in the family can book for anyone else.
+
+You see only the trips you’re on or that you booked. Bookings are meant to arrive by [scanning Gmail privately](/waypoint/privacy/email-scanning/): read-only, searched on the server, never stored.
+
+## Roadmap
+
+<CardGrid>
+  <Card title="Now: Phase 0" icon="rocket">
+    Sign-in with your own identity provider, settings, and backups you can download and restore.
+  </Card>
+  <Card title="People and loyalty IDs" icon="open-book">
+    Household members and their frequent-flyer, hotel and Known Traveler numbers.
+  </Card>
+  <Card title="Trips and manual entry" icon="pencil">
+    Trips with flights, hotels and rental cars, entered by hand.
+  </Card>
+  <Card title="Gmail scanning" icon="envelope">
+    Read-only, private scanning of booking emails, with a review queue for what couldn’t be read.
+  </Card>
+  <Card title="Vendor parsers" icon="setting">
+    Parsers for individual airlines, hotels and rental companies, after schema.org markup.
+  </Card>
+  <Card title="Deep links and reminders" icon="external">
+    Jump to an airline’s or hotel’s page for a booking, and get reminded before you go.
+  </Card>
+  <Card title="Optional AI suggestions" icon="star">
+    Off by default; a local Ollama, or OpenRouter with zero data retention.
+  </Card>
+  <Card title="Later" icon="random">
+    Travel stats and a map of where you’ve been.
+  </Card>
+</CardGrid>
+
+## Where to go next
+
+<LinkCard title="Install with Docker" description="Register Waypoint with your sign-in provider, start it, and put it on the internet safely." href="/waypoint/start/docker/" />
+<LinkCard title="Email scanning and privacy" description="What Waypoint will and won’t do with your mailbox (planned)." href="/waypoint/privacy/email-scanning/" />
+<LinkCard title="Configuration" description="Every environment variable Waypoint reads." href="/waypoint/reference/configuration/" />
+<LinkCard title="Contributing" description="Set up a checkout, run the checks and find your way around the code." href="/waypoint/contributing/development/" />

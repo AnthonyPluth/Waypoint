@@ -1,0 +1,11 @@
+/* Waypoint's own blue (frontend/src/app.css's --primary), for links and highlights. */
+:root {
+  --sl-color-accent-low: #0a2a4d;
+  --sl-color-accent: #0a84ff;
+  --sl-color-accent-high: #b3d7ff;
+}
+:root[data-theme='light'] {
+  --sl-color-accent-low: #d6e9ff;
+  --sl-color-accent: #0069d9;
+  --sl-color-accent-high: #003a78;
+}
