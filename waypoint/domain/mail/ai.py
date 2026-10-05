@@ -242,20 +242,24 @@ def parse(content: Any, sent: str) -> Suggestion:
     if any(len(v) > LIMITS[k] for k, v in values.items() if k in LIMITS):
         raise AiError(BAD_REPLY)
     start, end = _time(values.get("start_local")), _time(values.get("end_local"))
-    if datetime.fromisoformat(end) < datetime.fromisoformat(start):
-        raise AiError(BAD_REPLY)
     if "confirmation" in values and not _in(sent, values["confirmation"]):
         raise AiError(BAD_REPLY)   # a code that isn't in the message: some other booking's
     if kind == "flight":
         codes = [values["origin"], values.get("destination", "")]
         if not all(IATA.fullmatch(c) and re.search(rf"\b{c}\b", sent) for c in codes):
             raise AiError(BAD_REPLY)
+    zones: dict[str, ZoneInfo] = {}
     for zone in ("start_zone", "end_zone"):
         if zone in values and kind != "flight":
             try:
-                ZoneInfo(values[zone])
+                zones[zone] = ZoneInfo(values[zone])
             except (ZoneInfoNotFoundError, ValueError, OSError):
                 raise AiError(BAD_REPLY) from None
+    # The two times are at two places: an end before the start is only wrong where both zones say so (a flight's come from
+    # its airports, which nothing here looks up, so a flight's are not compared; AGENTS.md, "Times are where they happen").
+    if len(zones) == 2 and datetime.fromisoformat(end).replace(tzinfo=zones["end_zone"]) \
+            < datetime.fromisoformat(start).replace(tzinfo=zones["start_zone"]):
+        raise AiError(BAD_REPLY)
     for name in FIELDS:
         if name in values and not (kind == "flight" and name in ("start_zone", "end_zone")):
             out[name] = values[name]   # type: ignore[literal-required]

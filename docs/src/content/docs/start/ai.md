@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-**Settings → AI** is off until you turn it on. When it’s on, the mail in [Review](/waypoint/start/review/)’s “Couldn’t read” list is also offered to an AI, which suggests the booking in it. A booking Waypoint could already read is never sent.
+**Settings → AI** is off until you turn it on. When it’s on, mail that lands in [Review](/waypoint/start/review/)’s “Couldn’t read” list from then on is also offered to an AI, which suggests the booking in it. Items already in the list when you turn it on are not offered. A booking Waypoint could already read is never sent.
 
 ## Choosing where it runs
 
@@ -17,7 +17,7 @@ The OpenRouter key is saved encrypted with `WAYPOINT_SECRET_KEY` (and encrypted 
 
 ## What is sent
 
-Only the message’s plain text, and only for an item in “Couldn’t read”. Before it goes, Waypoint cuts quoted replies, everything under a reply header or a `-- ` signature, and footer lines (unsubscribe, privacy notices), and replaces anything that looks like a loyalty, Known Traveler or card number, plus every number saved under [Loyalty](/waypoint/start/loyalty/), wherever it’s written. The sender, subject and your name are not sent. Prompts and replies are never logged. Only `domain/mail/ai.py` sends email text anywhere, and a lint rule keeps AI addresses out of the rest of the code.
+Only the message’s plain text, and only for an item in “Couldn’t read”. Before it goes, Waypoint cuts quoted replies, everything under a reply header or a `-- ` signature, and footer lines (unsubscribe, privacy notices), and replaces anything that looks like a loyalty, Known Traveler or card number, plus every number saved under [Loyalty](/waypoint/start/loyalty/), wherever it’s written. The sender and the subject are not sent. Names and anything else written in the body are, so a traveller’s name in the email goes to the model. Prompts and replies are never logged. Only `domain/mail/ai.py` sends email text anywhere, and a lint rule keeps AI addresses out of the rest of the code.
 
 ## What comes back
 

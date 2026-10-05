@@ -27,7 +27,7 @@ Waypoint tries the cheapest, most reliable method first and falls through:
 
 ## Optional AI suggestions
 
-Off by default (Settings → AI; see [AI suggestions](/waypoint/start/ai/)). If you turn it on, Waypoint can ask a model to suggest the fields of an email in the “Couldn’t read” queue, and you confirm or correct the suggestion there.
+Off by default (Settings → AI; see [AI suggestions](/waypoint/start/ai/)). If you turn it on, Waypoint can ask a model to suggest the fields of an email that newly lands in the “Couldn’t read” queue, and you confirm or correct the suggestion there.
 
 - **Local:** an [Ollama](https://ollama.com) on your own network. The email text never leaves it.
 - **Hosted:** [OpenRouter](https://openrouter.ai), restricted to providers with zero data retention (every request denies data collection and requires zero retention).

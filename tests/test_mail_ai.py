@@ -150,13 +150,20 @@ class ParseTests(unittest.TestCase):
         for reply in ("not json", "[]", '"text"', "null", json.dumps({**GOOD, "kind": "boat"}),
                       json.dumps({**GOOD, "origin": ""}), json.dumps({**GOOD, "origin": "Boston"}),
                       json.dumps({**GOOD, "start_local": "2026-12-02T07:15:00-05:00"}), json.dumps({**GOOD, "start_local": "soon"}),
-                      json.dumps({**GOOD, "end_local": "2026-12-02T06:00"}), json.dumps({**GOOD, "provider": "x" * 101}),
+                      json.dumps({**GOOD, "provider": "x" * 101}),
                       json.dumps({**GOOD, "start_local": 7}), json.dumps({**GOOD, "start_local": "2026-13-45T07:15"}),
                       json.dumps({**GOOD, "kind": "hotel", "start_zone": "Mars/Base"})):
             with self.subTest(reply=reply):
                 self.refused(reply)
         with self.assertRaises(ai.AiError):
             ai.parse(None, self.SENT)
+
+    def test_a_flight_that_lands_earlier_on_the_clock_is_fine_but_a_stay_that_ends_before_it_starts_is_not(self):
+        date_line = {**GOOD, "origin": "NRT", "destination": "LAX", "start_local": "2026-12-02T17:00", "end_local": "2026-12-02T10:00"}
+        self.assertEqual(self.parse(date_line, "Confirmation code: QW4R7T NRT LAX")["end_local"], "2026-12-02T10:00")
+        stay = {"kind": "hotel", "origin": "Harbour Hotel", "start_local": "2026-12-05T15:00", "end_local": "2026-12-02T11:00",
+                "start_zone": "Europe/London", "end_zone": "Europe/London"}
+        self.refused(stay)
 
     def test_nothing_found_says_so(self):
         self.refused({}, ai.NO_BOOKING)

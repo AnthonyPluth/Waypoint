@@ -53,7 +53,7 @@
 
 <section aria-labelledby="ai-title" class="space-y-2">
   <h2 id="ai-title" class="eyebrow px-1">AI</h2>
-  <p class="px-1 text-sm text-muted-foreground">Optional. When it’s on, Waypoint offers the mail it couldn’t read (the Review page’s “Couldn’t read”) to an AI, which suggests the booking. You confirm or edit it; nothing is saved without you. Quoted replies, footers and anything that looks like a loyalty, Known Traveler or card number are removed first, and a booking Waypoint could read is never sent.</p>
+  <p class="px-1 text-sm text-muted-foreground">Optional. When it’s on, Waypoint offers mail it couldn’t read (new items on the Review page’s “Couldn’t read” list, not ones already there) to an AI, which suggests the booking. You confirm or edit it; nothing is saved without you. Quoted replies, footers and anything that looks like a loyalty, Known Traveler or card number are removed first, and a booking Waypoint could read is never sent.</p>
   <div class="rows">
     {#if problem}
       <div class="row"><p class="text-sm text-signal-ink" role="status">{problem}</p><Button variant="outline" onclick={load}>Try again</Button></div>
