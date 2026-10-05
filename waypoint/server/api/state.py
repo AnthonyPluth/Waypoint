@@ -4,9 +4,13 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime
 
+from ...domain import trips
+from ...domain.mail import review
 from ...storage import db
 from ...storage import settings_keys as sk
 from ..common import _current
+from .mailboxes import owner
+from .trips import viewer
 from ..contract import State
 
 
@@ -17,6 +21,7 @@ def api_state(conn, _q, _b) -> State:
         "database": "postgres" if db.using_postgres() else "sqlite",
         "user": user,
         "last_backup": with_offset(db.get_setting(conn, sk.LAST_BACKUP)),   # the last backup downloaded from Settings
+        "review_count": review.count(conn, owner()) + len(trips.unmatched(conn, viewer(conn))),
     }
 
 

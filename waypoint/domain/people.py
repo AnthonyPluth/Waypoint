@@ -6,6 +6,7 @@ the app shows, their first name, their legal name as on an ID, and the aliases a
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, TypedDict
 
 from sqlalchemy import delete, select, update
@@ -109,3 +110,41 @@ def remove_guest(conn: db.Connection, person_id: int) -> bool:
         raise MemberRemoval()
     conn.execute(delete(Person).where(Person.id == person_id, Person.user_sub.is_(None)))
     return True
+
+
+# ------------------------------------------------------------------------------------------------ matching names
+
+TITLES = frozenset({"mr", "mrs", "ms", "miss", "mstr", "master", "mx", "dr", "prof", "sir", "lady"})
+
+
+def normalize(name: str) -> str:
+    """A name as people and airlines write it, in one form to compare: no case, no titles, no punctuation, first name
+    first ("DOE/JANE MS" and "Jane Doe" are both "jane doe")."""
+    text = name.casefold()
+    if "/" in text:   # an airline's LAST/FIRST MIDDLE TITLE
+        last, _, first = text.partition("/")
+        text = f"{first} {last}"
+    return " ".join(t for t in re.split(r"\W+", text) if t and t not in TITLES)
+
+
+def match_name(conn: db.Connection, name: str) -> int | None:
+    """The one person whose display name, legal name or an alias is this name (as printed on a booking). None when no one
+    is, or when more than one person is (a booking never guesses between two people)."""
+    wanted = normalize(name)
+    if not wanted:
+        return None
+    found: set[int] = set()
+    for p in conn.orm.scalars(select(Person)).all():
+        names = [p.display_name, p.legal_name or "", *decode_aliases(p.aliases)]
+        if any(normalize(n) == wanted for n in names if n):
+            found.add(p.id)
+    return found.pop() if len(found) == 1 else None
+
+
+def add_alias(conn: db.Connection, person_id: int, printed: str) -> None:
+    """Remember how a booking printed someone's name, so later bookings match them, unless it already would."""
+    found = conn.orm.get(Person, person_id)
+    if found is None or not printed.strip() or match_name(conn, printed) == person_id:
+        return
+    found.aliases = encode_aliases([*decode_aliases(found.aliases), printed.strip()])
+    conn.orm.flush()

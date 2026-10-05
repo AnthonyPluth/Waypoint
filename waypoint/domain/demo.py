@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from sqlalchemy import func, select
 
-from ..storage import db
-from ..storage.models import LoyaltyId, Person, Segment, SegmentTraveler, Trip, User
+from ..storage import db, secretbox
+from ..storage.models import LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentTraveler, Trip, User
 from . import loyalty, people, trips
+from .mail import review
 from .visibility import Viewer
 
 # A household of two who have signed in (sub, email, name, first name), and two guests who haven't a login.
@@ -56,6 +57,17 @@ SAM_ALONE: list[trips.SegmentIn] = [
 ]
 
 
+# A flight Waypoint read from an email, for a traveller whose printed name nobody matches yet ("Who is this?" in Review).
+READ_FROM_EMAIL: trips.SegmentIn = {
+    "kind": "flight", "origin": "JFK", "destination": "ORD", "start_local": "2027-02-03T07:00", "end_local": "2027-02-03T08:45",
+    "confirmation": "CH3K5P", "provider": "Example Air", "details": {"flight_number": "EX 410"}}
+
+# The household's one connected mailbox, and two messages Waypoint couldn't read (sender's domain, subject, day, why).
+DEMO_MAILBOX = "jane.doe@gmail.example"
+UNREAD: list[tuple[str, str, str, review.Reason]] = [("example-air.example", "Your itinerary and receipt", "2026-09-14", "no_markup"),
+          ("example-stays.example", "Reservation confirmation", "2026-09-20", "incomplete")]
+
+
 def _on(*ids: int | None) -> list[trips.TravelerIn]:
     return [{"person_id": i, "name": None} for i in ids]
 
@@ -75,6 +87,13 @@ def seed(conn: db.Connection) -> int:
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id)})
     for fields in SAM_ALONE:
         trips.add_segment(conn, sam, {**fields, "travelers": _on(sam.person_id)})
+    trips.add_segment(conn, jane, {**READ_FROM_EMAIL, "travelers": [{"person_id": None, "name": "RIVERA/ALEX MR"}]}, source="email")
+    box = Mailbox(owner_sub="local", address=DEMO_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
+                  status="connected", created=0.0, last_scan=1_790_000_000.0)
+    conn.orm.add(box)
+    conn.orm.flush()
+    for domain, subject, day, reason in UNREAD:
+        review.add(conn, box.id, f"demo-{domain}", domain, subject, day, reason, 0.0)
     by_name = {p["display_name"]: p["id"] for p in people.everyone(conn)}
     for who, kind, program, number, tier, expiry, notes in MEMBERSHIPS:
         loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number, "tier": tier,
@@ -84,4 +103,4 @@ def seed(conn: db.Connection) -> int:
 
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
-               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentTraveler))
+               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentTraveler, Mailbox, ReviewItem))

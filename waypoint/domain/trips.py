@@ -422,9 +422,11 @@ def _needs_person(viewer: Viewer) -> None:
         raise Invalid("Your sign-in has no person in People yet, so what you add couldn’t be shown to you. Sign in again.")
 
 
-def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id: int | None = None) -> SegmentOut | None:
+def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id: int | None = None,
+                source: Literal["manual", "email"] = "manual") -> SegmentOut | None:
     """Add a segment the viewer booked, to this trip, or (without one) to the trip it belongs to or a new one. Travellers
-    default to the viewer. None: no such trip (for the viewer). Raises Invalid."""
+    default to the viewer. `source`: where it came from (a scanned email, or the person). None: no such trip (for the
+    viewer). Raises Invalid."""
     _needs_person(viewer)
     values = check(conn, fields)
     given = fields.get("travelers")
@@ -446,7 +448,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
                         booked_by=viewer.person_id)
             conn.orm.add(trip)
             conn.orm.flush()
-    seg = Segment(**values, trip_id=trip.id, source="manual", booked_by=viewer.person_id, locked_fields=None)
+    seg = Segment(**values, trip_id=trip.id, source=source, booked_by=viewer.person_id, locked_fields=None)
     conn.orm.add(seg)
     conn.orm.flush()
     _set_travelers(conn, seg.id, travelers)
@@ -486,6 +488,63 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
     if trip:
         refresh(conn, trip)
     return _after_change(conn, seg)
+
+
+def _same_leg(seg: Segment, values: Mapping[str, str | None]) -> bool:
+    """Whether a stored segment is the booking's leg: the same kind and confirmation code, the same provider when both
+    have one, and the same places (a flight's airports, a stay's hotel)."""
+    def same(a: str | None, b: str | None) -> bool:
+        return (a or "").casefold() == (b or "").casefold()
+    return (seg.kind == values["kind"] and same(seg.confirmation, values["confirmation"])
+            and (not seg.provider or not values["provider"] or same(seg.provider, values["provider"]))
+            and same(seg.origin, values["origin"]) and same(seg.destination, values["destination"]))
+
+
+def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn) -> Literal["added", "updated", "unchanged"]:
+    """Put a booking read from the viewer's mail among their segments: the segment of the same (kind, provider,
+    confirmation, leg) that they can see takes what the email says, except the fields a person edited (`locked_fields`);
+    when there is none, a new one is added as the viewer's, grouped into a trip as `add_segment` does. A booking whose
+    times moved is marked changed, one the email cancels cancelled; the people on it are added, never removed. Raises
+    Invalid when the booking can't be a segment."""
+    values = check(conn, fields)
+    day = (values["start_local"] or "")[:10]
+    found = sorted((s for s in visibility.visible_segments(conn, viewer) if _same_leg(s, values)),
+                   key=lambda s: abs((date.fromisoformat(s.start_local[:10]) - date.fromisoformat(day)).days))
+    if not found:
+        added = add_segment(conn, viewer, fields, source="email")
+        if added is None:   # (no trip was named, so one is always found or made)
+            raise Invalid("The booking couldn’t be added")
+        return "added"
+    seg = found[0]
+    old: list[TravelerIn] = [{"person_id": t.person_id, "name": t.name} for t in conn.orm.scalars(
+        select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id).order_by(SegmentTraveler.id)).all()]
+    locked = decode_locked(seg.locked_fields)
+    incoming = unlocked({**fields, "details": {**decode_details(seg.details), **(fields.get("details") or {})}}, locked)
+    if "status" not in locked and incoming.get("status") != "cancelled":
+        moved = any(values[f] != getattr(seg, f) for f in ("start_local", "start_zone", "end_local", "end_zone", "origin", "destination"))
+        if moved and "start_local" not in locked and "end_local" not in locked:
+            incoming["status"] = "changed"
+        else:
+            incoming["status"] = cast(Status, seg.status)   # (a confirmation again changes nothing)
+    merged: SegmentIn = {**_current(seg, old), **incoming}
+    changed_values = check(conn, merged)
+    changed = [f for f in FIELDS if f in changed_values and (decode_details(changed_values[f]) != decode_details(seg.details)
+                                                            if f == "details" else changed_values[f] != getattr(seg, f))]
+    for f in changed:
+        setattr(seg, f, changed_values[f])
+    if "travelers" not in locked:
+        have = {_key(t) for t in old}
+        extra = [t for t in _travelers(conn, fields.get("travelers") or []) if _key(t) not in have
+                 and not (t["person_id"] is None and any(o["person_id"] is None and (o["name"] or "").casefold() == (t["name"] or "").casefold()
+                                                         for o in old))]
+        if extra:
+            _set_travelers(conn, seg.id, [*old, *extra])
+            changed.append("travelers")
+    conn.orm.flush()
+    trip = conn.orm.get(Trip, seg.trip_id)
+    if trip:
+        refresh(conn, trip)
+    return "updated" if changed else "unchanged"
 
 
 def delete_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> bool:
@@ -601,3 +660,40 @@ def split(conn: db.Connection, viewer: Viewer, trip_id: int, segment_ids: Sequen
     return _trip_outs(conn, viewer, [new])[0]
 
 
+
+
+# ------------------------------------------------------------------------------------------------ who is this?
+
+def unmatched(conn: db.Connection, viewer: Viewer) -> list[tuple[SegmentTraveler, SegmentOut]]:
+    """The names on the viewer's segments that no person has been chosen for ("Who is this?"), each with its segment."""
+    found = visibility.visible_unmatched(conn, viewer)
+    segs = {s.id: s for s in visibility.visible_segments(conn, viewer, None) if s.id in {t.segment_id for t in found}}
+    outs = {s["id"]: s for s in _segment_outs(conn, list(segs.values()), [])}
+    return [(t, outs[t.segment_id]) for t in found if t.segment_id in outs]
+
+
+def name_traveler(conn: db.Connection, viewer: Viewer, traveler_id: int, person_id: int) -> int | None:
+    """Say who a name on a booking is: this traveller, and every other unmatched traveller the viewer sees with the same
+    printed name, become the person (a person already on the segment isn't added twice), and the printed name is kept
+    as one of their aliases so later bookings match. Returns how many were set; None: there's no such traveller (for the
+    viewer). Raises Invalid when the person isn't in People."""
+    row = visibility.visible_traveler(conn, viewer, traveler_id)
+    if row is None or row.person_id is not None:
+        return None
+    if person_id not in people.existing(conn, [person_id]):
+        raise Invalid("Choose someone from People")
+    printed = (row.name or "").strip()
+    same = [t for t in visibility.visible_unmatched(conn, viewer) if people.normalize(t.name or "") == people.normalize(printed)] or [row]
+    done = 0
+    for t in same:
+        already = conn.orm.scalars(select(SegmentTraveler.id).where(SegmentTraveler.segment_id == t.segment_id,
+                                                                    SegmentTraveler.person_id == person_id)).first()
+        if already is not None:
+            conn.execute(delete(SegmentTraveler).where(SegmentTraveler.id == t.id))
+        else:
+            t.person_id = person_id
+        done += 1
+    conn.orm.flush()
+    if printed:
+        people.add_alias(conn, person_id, printed)
+    return done

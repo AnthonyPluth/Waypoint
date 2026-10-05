@@ -10,7 +10,12 @@ made in its own Google Cloud project (docs/src/content/docs/start/gmail.md). The
 <WAYPOINT_PUBLIC_URL>/api/mailboxes/callback.
 
 A connection belongs to the member who made it and ends when they can no longer sign in (oidc.access_lapsed), checked
-before every use (access_token) and by a sweep (end_lapsed), so a connection nothing uses ends too. Scanning itself comes later.
+before every use (access_token) and by a sweep (end_lapsed), so a connection nothing uses ends too.
+
+Scanning (waypoint/domain/mail/scan.py) reads through the calls at the end of this module: a search that Gmail answers
+with message ids only (so mail that doesn't match is never downloaded), what was added since a history id, and one message
+by id. A message comes back as Google gave it, untouched: nothing here looks inside it (only domain/mail/extract.py does,
+Semgrep's `waypoint-message-body`), and nothing here logs or raises what Google said.
 """
 from __future__ import annotations
 
@@ -80,6 +85,14 @@ class Reconnect(GmailError):
 
 class Lapsed(GmailError):
     """The connection's owner can no longer sign in, so the connection was ended."""
+
+
+class MessageGone(GmailError):
+    """A message the search found has been deleted since."""
+
+
+class HistoryExpired(GmailError):
+    """Google no longer keeps history from the id a mailbox's last scan ended at (it keeps about a week)."""
 
 
 # ------------------------------------------------------------------------------------------------ configuration
@@ -211,8 +224,8 @@ def _revoke_quietly(token: str) -> None:
 
 def listing(conn: db.Connection, owner: str) -> list[dict[str, Any]]:
     """`owner`'s own mailboxes, never anyone else's, without their tokens."""
-    return db.rows(conn.execute(select(Mailbox.id, Mailbox.address, Mailbox.status, Mailbox.last_error, Mailbox.last_scan)
-                                .where(Mailbox.owner_sub == owner).order_by(Mailbox.id)))
+    return db.rows(conn.execute(select(Mailbox.id, Mailbox.address, Mailbox.status, Mailbox.last_error, Mailbox.last_scan,
+                                       Mailbox.scan_error).where(Mailbox.owner_sub == owner).order_by(Mailbox.id)))
 
 
 def _find(conn: db.Connection, mailbox_id: int, owner: str | None = None) -> Any:
@@ -324,3 +337,94 @@ def disconnect(conn: db.Connection, mailbox_id: int, owner: str) -> bool:
                          "Try again, or remove Waypoint at myaccount.google.com/permissions.")
     conn.execute(delete(Mailbox).where(Mailbox.id == mailbox_id))
     return token is not None
+
+
+# ------------------------------------------------------------------------------------------------ reading mail
+
+SEARCH_PAGE = 100
+MAX_FOUND = 5000     # messages one search returns at most (a mailbox's bookings from months are far fewer)
+FETCH_ATTEMPTS = 3   # a message that Google fails to give is tried this many times before the scan stops
+
+
+def _api(path: str, token: str, params: dict[str, str] | None = None) -> Any:
+    """One call to Gmail's API, answered as JSON. Raises GmailError (fixed text) for anything that goes wrong, MessageGone
+    for a message that's no longer there."""
+    url = HOSTS.api + path + ("?" + urllib.parse.urlencode(params) if params else "")
+    try:
+        return _get(url, token)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise MessageGone("That message is gone.") from e
+        if e.code == 429:
+            raise GmailError("Google asked Waypoint to slow down; the scan carries on next time.") from e
+        raise GmailError("Google refused a request while reading the mailbox.") from e
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        raise GmailError("Couldn’t reach Google while reading the mailbox.") from e
+
+
+def history_id(token: str) -> str | None:
+    """Where the mailbox is now (its history id), to note before a scan so that nothing arriving during it is missed."""
+    profile = _api("/profile", token)
+    found = profile.get("historyId") if isinstance(profile, dict) else None
+    return str(found) if found is not None else None
+
+
+def search(token: str, query: str) -> list[str]:
+    """The ids of the messages Gmail finds for this search (newest first), up to MAX_FOUND: the search runs at Google, so
+    only what matches is ever downloaded, and only ids come back here."""
+    ids: list[str] = []
+    page: str | None = None
+    while len(ids) < MAX_FOUND:
+        params = {"q": query, "maxResults": str(SEARCH_PAGE), **({"pageToken": page} if page else {})}
+        found = _api("/messages", token, params)
+        listed = found.get("messages") if isinstance(found, dict) else None
+        ids += [str(m["id"]) for m in listed or [] if isinstance(m, dict) and m.get("id")]
+        page = found.get("nextPageToken") if isinstance(found, dict) else None
+        if not page:
+            break
+    return ids[:MAX_FOUND]
+
+
+def added_since(token: str, start: str) -> set[str]:
+    """The ids of the messages added to the mailbox since this history id. Raises HistoryExpired when Google no longer
+    has it (the scan then looks back by date instead)."""
+    ids: set[str] = set()
+    page: str | None = None
+    while True:
+        params = {"startHistoryId": start, "historyTypes": "messageAdded", "maxResults": "500",
+                  **({"pageToken": page} if page else {})}
+        try:
+            found = _api("/history", token, params)
+        except MessageGone as e:   # (Google answers 404 for a history id it has dropped)
+            raise HistoryExpired("Google no longer has the history this scan resumes from.") from e
+        for record in (found.get("history") if isinstance(found, dict) else None) or []:
+            for added in record.get("messagesAdded") or []:
+                message = added.get("message") if isinstance(added, dict) else None
+                if isinstance(message, dict) and message.get("id"):
+                    ids.add(str(message["id"]))
+        page = found.get("nextPageToken") if isinstance(found, dict) else None
+        if not page:
+            return ids
+
+
+def fetch(token: str, message_id: str) -> dict[str, Any]:
+    """One message as Google gives it (`format=raw`), for domain/mail/extract.py alone to read: it's passed on untouched, in
+    memory. Raises MessageGone when it was deleted meanwhile, GmailError when Google fails to give it."""
+    quoted = urllib.parse.quote(message_id, safe="")
+    for attempt in range(FETCH_ATTEMPTS):
+        try:
+            found = _api(f"/messages/{quoted}", token, {"format": "raw"})
+        except MessageGone:
+            raise
+        except GmailError:
+            if attempt == FETCH_ATTEMPTS - 1:
+                raise
+            time.sleep(0.2 * (attempt + 1))
+            continue
+        return found if isinstance(found, dict) else {}
+    raise GmailError("Couldn’t reach Google while reading the mailbox.")   # (not reached)
+
+
+def open_url(address: str, message_id: str) -> str:
+    """Where a person opens a message in Gmail itself (a link for their browser; Waypoint doesn't call it)."""
+    return f"https://mail.google.com/mail/u/{urllib.parse.quote(address, safe='@')}/#all/{urllib.parse.quote(message_id, safe='')}"

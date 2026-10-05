@@ -151,11 +151,39 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/domain/mail/ai.py"]
 
+  - id: waypoint-message-body
+    message: >-
+      A message's body (Gmail's `payload`, `raw` and `parts`, the decoded text, an email parsed into parts) is read
+      only in waypoint/domain/mail/extract.py, in memory, and what leaves it is the fields of a booking (AGENTS.md,
+      "Email stays on the server"). Pass the message to extract.read() instead of looking inside it.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: $M["payload"]
+      - pattern: $M["raw"]
+      - pattern: $M["parts"]
+      - pattern: $M.get("payload", ...)
+      - pattern: $M.get("raw", ...)
+      - pattern: $M.get("parts", ...)
+      - pattern: $M.get_payload(...)
+      - pattern: $M.get_content(...)
+      - pattern: email.message_from_bytes(...)
+      - pattern: email.message_from_string(...)
+      - pattern: email.message_from_binary_file(...)
+      - pattern: email.message_from_file(...)
+      - pattern: base64.urlsafe_b64decode(...)
+      - pattern: base64.b64decode(...)
+      - pattern: base64.decodebytes(...)
+    paths:
+      include: ["/waypoint/domain/", "/waypoint/providers/gmail.py", "/waypoint/server/"]
+      exclude: ["/waypoint/domain/mail/extract.py"]
+
   - id: waypoint-decrypt
     message: >-
       Secrets are decrypted only where they're used: the storage layer (settings), waypoint/oidc.py (a session's ID
-      token, for signing out), waypoint/domain/loyalty.py (loyalty and Known Traveler numbers) and
-      waypoint/providers/gmail.py (mailbox tokens). Anywhere else, ask one of those.
+      token, for signing out), waypoint/domain/loyalty.py (loyalty and Known Traveler numbers),
+      waypoint/domain/mail/review.py (the subject of mail Waypoint couldn't read) and waypoint/providers/gmail.py
+      (mailbox tokens). Anywhere else, ask one of those.
     severity: ERROR
     languages: [python]
     pattern-either:
@@ -164,7 +192,8 @@ rules:
       - pattern-regex: \bfrom\s+[.\w]*secretbox\s+import\b[^\n]*\bdecrypt\b
     paths:
       include: ["/waypoint/", "/run.py"]
-      exclude: ["/waypoint/storage/", "/waypoint/oidc.py", "/waypoint/domain/loyalty.py", "/waypoint/providers/gmail.py"]
+      exclude: ["/waypoint/storage/", "/waypoint/oidc.py", "/waypoint/domain/loyalty.py", "/waypoint/domain/mail/review.py",
+                "/waypoint/providers/gmail.py"]
 
   - id: waypoint-trip-visibility
     message: >-

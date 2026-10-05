@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-A **trip** is a journey. It holds **segments**: one flight leg, hotel stay, car rental or train each. You can add them by hand; reading them from booking emails comes later.
+A **trip** is a journey. It holds **segments**: one flight leg, hotel stay, car rental or train each. You can add them by hand, and Waypoint adds them from the booking emails in a connected Gmail (see [Scanning](/waypoint/start/gmail/#scanning)).
 
 ## Who sees a trip
 
@@ -31,7 +31,7 @@ Without a trip named, a new segment joins an existing grouped trip when it is wi
 
 ## What your edits keep
 
-When you change a field of a segment, Waypoint remembers it was you and a later email never overwrites it.
+When you change a field of a segment, Waypoint remembers it was you and a later email never overwrites it. An email about a booking Waypoint already has updates that segment instead of adding another, and marks it *changed* when its times or places moved, or *cancelled* when the airline says so.
 
 ## In a backup
 

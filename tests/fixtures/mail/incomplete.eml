@@ -1,0 +1,14 @@
+From: Example Air <reservations@example-air.example>
+To: traveller@gmail.example
+Subject: Your itinerary (partial)
+Date: Sun, 18 Oct 2026 07:45:00 -0400
+Message-ID: <fx-incomplete@example-air.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head>
+<script type="application/ld+json">
+{"@context": "http://schema.org", "@type": "FlightReservation", "reservationNumber": "AB1CD2",
+ "reservationFor": {"@type": "Flight", "flightNumber": "9", "airline": {"@type": "Airline", "iataCode": "EX"},
+                    "departureAirport": {"@type": "Airport", "iataCode": "BOS"}}}
+</script></head><body><p>CANARY-BODY-INCOMPLETE-4N7P Your trip.</p></body></html>

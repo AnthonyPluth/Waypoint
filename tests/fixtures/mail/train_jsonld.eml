@@ -1,0 +1,27 @@
+From: Example Rail <tickets@example-rail.example>
+To: traveller@gmail.example
+Subject: Your e-ticket: London to Paris
+Date: Fri, 16 Oct 2026 10:00:00 +0100
+Message-ID: <fx-train@example-rail.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "TrainReservation",
+  "reservationNumber": "RL5G8H",
+  "underName": {"@type": "Person", "name": "Jane Doe"},
+  "reservedTicket": {"@type": "Ticket", "ticketedSeat": {"@type": "Seat", "seatNumber": "12A", "seatingType": "Standard"}},
+  "reservationFor": {
+    "@type": "TrainTrip",
+    "provider": {"@type": "Organization", "name": "Example Rail"},
+    "departureStation": {"@type": "TrainStation", "name": "London St Pancras", "address": {"@type": "PostalAddress", "addressLocality": "London", "addressCountry": "GB"}},
+    "departureTime": "2026-11-23T09:31:00+00:00",
+    "arrivalStation": {"@type": "TrainStation", "name": "Paris Gare du Nord", "address": {"@type": "PostalAddress", "addressLocality": "Paris", "addressCountry": "FR"}},
+    "arrivalTime": "2026-11-23T12:47:00+01:00"
+  }
+}
+</script></head>
+<body><p>CANARY-BODY-TRAIN-2W6Z Have a good journey.</p></body></html>

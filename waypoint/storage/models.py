@@ -149,6 +149,7 @@ class Mailbox(Base):
     status: Mapped[str]
     last_error: Mapped[str | None]
     created: Mapped[float | None]
+    scan_error: Mapped[str | None]   # what the last scan couldn't do (fixed text); cleared by a scan that finishes
 
 
 class MailboxPending(Base):
@@ -157,3 +158,31 @@ class MailboxPending(Base):
     owner_sub: Mapped[str]
     verifier: Mapped[str]
     created: Mapped[float]
+
+
+class ScannedMessage(Base):
+    __table__ = schema.scanned_messages
+    id: Mapped[int]
+    mailbox_id: Mapped[int]
+    message_id: Mapped[str]          # Gmail's id for the message: a reference, never its content
+    outcome: Mapped[str]             # booking, unreadable or ignored (waypoint/domain/mail/scan.py)
+    scanned: Mapped[float]
+
+
+class ReviewItem(Base):
+    __table__ = schema.review_items
+    id: Mapped[int]
+    mailbox_id: Mapped[int]
+    message_id: Mapped[str]
+    sender_domain: Mapped[str]
+    subject: Mapped[str | None]      # encrypted: read only through waypoint/domain/mail/review.py
+    received: Mapped[str | None]     # the day on the message's Date header
+    reason: Mapped[str]              # why it couldn't be read: a code (waypoint/domain/mail/review.py)
+    created: Mapped[float]
+
+
+class IgnoredSender(Base):
+    __table__ = schema.ignored_senders
+    id: Mapped[int]
+    mailbox_id: Mapped[int]
+    domain: Mapped[str]

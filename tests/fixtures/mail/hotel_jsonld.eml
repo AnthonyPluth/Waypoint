@@ -1,0 +1,28 @@
+From: Example Stays <noreply@example-stays.example>
+To: traveller@gmail.example
+Subject: Your reservation at Harbour Hotel is confirmed
+Date: Wed, 14 Oct 2026 12:00:00 +0100
+Message-ID: <fx-hotel@example-stays.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "LodgingReservation",
+  "reservationNumber": "H88231",
+  "reservationStatus": "http://schema.org/ReservationConfirmed",
+  "underName": {"@type": "Person", "name": "Jane Doe"},
+  "checkinTime": "2026-11-21T15:00:00+00:00",
+  "checkoutTime": "2026-11-27T10:00:00+00:00",
+  "lodgingUnitDescription": "Family room",
+  "reservationFor": {
+    "@type": "LodgingBusiness",
+    "name": "Harbour Hotel",
+    "telephone": "+44 20 7946 0000",
+    "address": {"@type": "PostalAddress", "streetAddress": "1 Quay Street", "addressLocality": "London", "addressCountry": "GB"}
+  }
+}
+</script></head>
+<body><p>CANARY-BODY-HOTEL-5R1M Your stay is booked.</p></body></html>

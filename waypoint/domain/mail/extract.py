@@ -1,0 +1,441 @@
+"""Reading one message for the bookings in it: the only module that looks inside a message (Gmail's `raw`, its decoded
+parts and their HTML). Semgrep's `waypoint-message-body` keeps those out of every other module (AGENTS.md, "Email stays on
+the server"), so the body is read here, in memory, and what comes out is only the fields of a booking.
+
+A booking is found in the markup airlines, hotels and rental companies add for Gmail's own cards: schema.org JSON-LD and
+microdata (`FlightReservation`, `LodgingReservation`, `RentalCarReservation`, `TrainReservation`). `read` returns the
+bookings, who the message is from and what it's about (its sender's domain, its subject and its day: the review queue's
+labels, never its text). Times come out as the markup wrote them (`wall_clock` turns one into the place's wall-clock
+time); the zone of a place is the scan's to find, since this module touches no database."""
+from __future__ import annotations
+
+import base64
+import binascii
+import email
+import email.policy
+import email.utils
+import json
+import re
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
+from datetime import datetime
+from html.parser import HTMLParser
+from typing import Any, Literal
+from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+Kind = Literal["flight", "hotel", "car", "train"]
+Status = Literal["confirmed", "cancelled"]
+
+RESERVATIONS: dict[str, Kind] = {"FlightReservation": "flight", "LodgingReservation": "hotel",
+                                 "RentalCarReservation": "car", "TrainReservation": "train"}
+MAX_PART = 2_000_000    # characters of one HTML part read (a booking's markup is far smaller)
+MAX_NODES = 200         # reservations considered in one message
+IATA = re.compile(r"[A-Z]{3}")
+BASE64URL = re.compile(r"[A-Za-z0-9_=-]+")
+VOID = {"meta", "link", "img", "source", "area", "br", "hr", "input", "wbr", "col", "embed", "track", "base"}
+
+
+@dataclass(frozen=True)
+class Place:
+    """Where a stay or a rental is, as far as the markup says: what finds its time zone."""
+    city: str | None = None
+    country: str | None = None
+
+
+@dataclass(frozen=True)
+class Passenger:
+    name: str
+    member_number: str | None = None   # a loyalty number printed on the booking (programMembership)
+
+
+@dataclass(frozen=True)
+class Booking:
+    kind: Kind
+    status: Status
+    confirmation: str | None
+    provider: str | None
+    start: str                         # the time as written (ISO 8601, with or without an offset)
+    end: str
+    origin: str | None                 # a flight's airport code; a stay's or a rental's place, a station
+    destination: str | None
+    start_place: Place = Place()
+    end_place: Place = Place()
+    details: tuple[tuple[str, str], ...] = ()
+    manage_url: str | None = None
+    passengers: tuple[Passenger, ...] = ()
+
+
+@dataclass(frozen=True)
+class Message:
+    """What a scan keeps in mind about one message, none of its text. `unread`: reservations in it that were found but
+    couldn't be made into a booking (a missing time or place)."""
+    sender_domain: str | None
+    subject: str
+    received: str | None               # the day on its Date header, as written
+    bookings: tuple[Booking, ...] = ()
+    unread: int = 0
+    broken: bool = False               # the message itself couldn't be decoded
+    markup: bool = False               # any reservation markup at all was found
+
+
+# ------------------------------------------------------------------------------------------------ markup
+
+class _Frame:
+    __slots__ = ("attrs", "item", "props", "tag", "text")
+
+    def __init__(self, tag: str, attrs: dict[str, str], item: dict[str, Any] | None):
+        self.tag, self.attrs, self.item = tag, attrs, item
+        self.props = (attrs.get("itemprop") or "").split()
+        self.text: list[str] = []
+
+
+def _type_name(itemtype: str) -> str:
+    return itemtype.strip().split()[0].rstrip("/").rsplit("/", 1)[-1] if itemtype.strip() else ""
+
+
+def _put(item: dict[str, Any], name: str, value: Any) -> None:
+    if name not in item:
+        item[name] = value
+    elif isinstance(item[name], list):
+        item[name].append(value)
+    else:
+        item[name] = [item[name], value]
+
+
+class _Markup(HTMLParser):
+    """The JSON-LD scripts and the microdata items of one HTML document."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.jsonld: list[str] = []
+        self.items: list[dict[str, Any]] = []
+        self._ld: list[str] | None = None
+        self._script = False   # inside a script that isn't JSON-LD
+        self._stack: list[_Frame] = []
+
+    def _scope(self) -> dict[str, Any] | None:
+        return next((f.item for f in reversed(self._stack) if f.item is not None), None)
+
+    @staticmethod
+    def _value(tag: str, attrs: dict[str, str], text: str) -> str:
+        if "content" in attrs:
+            return attrs["content"].strip()
+        for key, tags in (("href", ("a", "area", "link")), ("src", ("img", "source", "embed", "track")),
+                          ("datetime", ("time",)), ("value", ("data", "meter"))):
+            if tag in tags and key in attrs:
+                return attrs[key].strip()
+        return " ".join(text.split())
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        a = {k.lower(): (v or "") for k, v in attrs}
+        if tag == "script":
+            if a.get("type", "").lower().split(";")[0].strip() == "application/ld+json":
+                self._ld = []
+            else:
+                self._script = True
+            return
+        item = {"@type": _type_name(a.get("itemtype", ""))} if "itemscope" in a else None
+        frame = _Frame(tag, a, item)
+        if tag in VOID:
+            self._attach(frame, self._value(tag, a, ""))
+            return
+        self._stack.append(frame)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.handle_starttag(tag, attrs)
+        if tag not in VOID and tag != "script":
+            self.handle_endtag(tag)
+
+    def _attach(self, frame: _Frame, text: str) -> None:
+        """A finished element: its item is a property of the item around it (or a top-level item), or its value is."""
+        parent = self._scope()
+        if frame.item is not None:
+            if frame.props and parent is not None:
+                for name in frame.props:
+                    _put(parent, name, frame.item)
+            elif not frame.props:
+                self.items.append(frame.item)
+            return
+        if parent is not None:
+            value = self._value(frame.tag, frame.attrs, text)
+            for name in frame.props:
+                _put(parent, name, value)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script":
+            if self._ld is not None:
+                self.jsonld.append("".join(self._ld))
+                self._ld = None
+            self._script = False
+            return
+        for i in range(len(self._stack) - 1, -1, -1):
+            if self._stack[i].tag == tag:
+                break
+        else:
+            return
+        while len(self._stack) > i:
+            frame = self._stack.pop()
+            self._attach(frame, "".join(frame.text))
+            if self._stack:   # (its text belongs to the element around it too)
+                self._stack[-1].text.extend(frame.text)
+
+    def handle_data(self, data: str) -> None:
+        if self._ld is not None:
+            self._ld.append(data)
+            return
+        if self._stack and not self._script and self._scope() is not None:   # (text matters only inside an item)
+            self._stack[-1].text.append(data)   # the innermost element's own; the one around it takes it when this ends
+
+
+def _jsonld_nodes(raw: str) -> Iterator[dict[str, Any]]:
+    try:
+        found = json.loads(raw)
+    except (ValueError, RecursionError):
+        return
+    todo = [found]
+    while todo:
+        node = todo.pop()
+        if isinstance(node, list):
+            todo.extend(node)
+        elif isinstance(node, dict):
+            yield node
+            graph = node.get("@graph")
+            if graph is not None:
+                todo.append(graph)
+
+
+def _types(node: Mapping[str, Any]) -> list[str]:
+    t = node.get("@type")
+    return [_type_name(x) for x in (t if isinstance(t, list) else [t]) if isinstance(x, str)]
+
+
+# ------------------------------------------------------------------------------------------------ values
+
+def _one(v: Any) -> Any:
+    return v[0] if isinstance(v, list) and v else v
+
+
+def _text(v: Any) -> str | None:
+    """A value as text: a string, a number, or a node's name."""
+    v = _one(v)
+    if isinstance(v, dict):
+        v = v.get("name") or v.get("@value")
+    if isinstance(v, bool) or v is None:
+        return None
+    if isinstance(v, (str, int, float)):
+        return " ".join(str(v).split()) or None
+    return None
+
+
+def _node(v: Any) -> Mapping[str, Any]:
+    v = _one(v)
+    return v if isinstance(v, dict) else {}
+
+
+def _nodes(v: Any) -> list[Mapping[str, Any]]:
+    return [x for x in (v if isinstance(v, list) else [v]) if isinstance(x, dict)]
+
+
+def _link(v: Any) -> str | None:
+    t = _text(v)
+    return t if t and urlsplit(t).scheme in ("http", "https") else None
+
+
+def _place(v: Any) -> Place:
+    n = _node(v)
+    address = _node(n.get("address"))
+    return Place(_text(address.get("addressLocality")), _text(address.get("addressCountry")))
+
+
+def _address(v: Any) -> str | None:
+    one = _one(v)
+    if isinstance(one, str):
+        return _text(one)
+    n = _node(one)
+    parts = [_text(n.get(k)) for k in ("streetAddress", "addressLocality", "addressRegion", "postalCode", "addressCountry")]
+    return ", ".join(p for p in parts if p) or None
+
+
+def _status(res: Mapping[str, Any]) -> Status:
+    return "cancelled" if "cancel" in (_text(res.get("reservationStatus")) or "").lower() else "confirmed"
+
+
+def _passengers(res: Mapping[str, Any]) -> tuple[Passenger, ...]:
+    members = [_text(_node(m).get("memberNumber")) for m in _nodes(res.get("programMembership"))]
+    who = []
+    for p in _nodes(res.get("underName")):
+        name = _text(p.get("name")) or " ".join(x for x in (_text(p.get("givenName")), _text(p.get("familyName"))) if x)
+        if name:
+            who.append(name)
+    number = next((m for m in members if m), None)
+    # A membership number on a booking for one traveller is theirs; with several, whose it is isn't said.
+    return tuple(Passenger(name, number if len(who) == 1 else None) for name in who)
+
+
+def _details(**found: str | None) -> tuple[tuple[str, str], ...]:
+    return tuple((k, v) for k, v in found.items() if v)
+
+
+def _flight(res: Mapping[str, Any]) -> Booking | None:
+    trip = _node(res.get("reservationFor"))
+    airline = _node(trip.get("airline"))
+    number = _text(trip.get("flightNumber"))
+    code = _text(airline.get("iataCode"))
+    if number and code and not number.upper().startswith(code.upper()):
+        number = f"{code} {number}"
+    origin = (_text(_node(trip.get("departureAirport")).get("iataCode")) or "").upper()
+    destination = (_text(_node(trip.get("arrivalAirport")).get("iataCode")) or "").upper()
+    start, end = _text(trip.get("departureTime")), _text(trip.get("arrivalTime"))
+    if not (IATA.fullmatch(origin) and IATA.fullmatch(destination) and start and end):
+        return None
+    seat = _node(_node(res.get("reservedTicket")).get("ticketedSeat"))
+    return Booking("flight", _status(res), _text(res.get("reservationNumber")), _text(airline.get("name")) or code, start, end,
+                   origin, destination, details=_details(flight_number=number, terminal=_text(trip.get("departureTerminal")),
+                                                         seat=_text(seat.get("seatNumber")), cabin=_text(seat.get("seatingType"))),
+                   manage_url=_link(res.get("modifyReservationUrl")) or _link(res.get("url")), passengers=_passengers(res))
+
+
+def _hotel(res: Mapping[str, Any]) -> Booking | None:
+    stay = _node(res.get("reservationFor"))
+    name = _text(stay.get("name"))
+    start, end = _text(res.get("checkinTime")), _text(res.get("checkoutTime"))
+    if not (name and start and end):
+        return None
+    place = _place(stay)
+    return Booking("hotel", _status(res), _text(res.get("reservationNumber")), _text(_node(res.get("provider")).get("name")) or name,
+                   start, end, name, None, place, place,
+                   _details(address=_address(stay.get("address")), phone=_text(stay.get("telephone")),
+                            room=_text(res.get("lodgingUnitDescription")) or _text(res.get("lodgingUnitType"))),
+                   _link(res.get("modifyReservationUrl")) or _link(res.get("url")), _passengers(res))
+
+
+def _car(res: Mapping[str, Any]) -> Booking | None:
+    car = _node(res.get("reservationFor"))
+    company = _text(_node(car.get("rentalCompany")).get("name")) or _text(_node(res.get("provider")).get("name"))
+    pick, drop = _node(res.get("pickupLocation")), _node(res.get("dropoffLocation"))
+    origin, destination = _text(pick.get("name")), _text(drop.get("name")) or _text(pick.get("name"))
+    start, end = _text(res.get("pickupTime")), _text(res.get("dropoffTime"))
+    if not (origin and start and end):
+        return None
+    return Booking("car", _status(res), _text(res.get("reservationNumber")), company, start, end, origin, destination,
+                   _place(pick), _place(drop) if drop else _place(pick),
+                   _details(car_class=_text(car.get("name")) or _text(car.get("model")),
+                            address=_address(pick.get("address"))),
+                   _link(res.get("modifyReservationUrl")) or _link(res.get("url")), _passengers(res))
+
+
+def _train(res: Mapping[str, Any]) -> Booking | None:
+    trip = _node(res.get("reservationFor"))
+    dep, arr = _node(trip.get("departureStation")), _node(trip.get("arrivalStation"))
+    origin, destination = _text(dep.get("name")), _text(arr.get("name"))
+    start, end = _text(trip.get("departureTime")), _text(trip.get("arrivalTime"))
+    if not (origin and destination and start and end):
+        return None
+    seat = _node(_node(res.get("reservedTicket")).get("ticketedSeat"))
+    return Booking("train", _status(res), _text(res.get("reservationNumber")), _text(_node(trip.get("provider")).get("name")),
+                   start, end, origin, destination, _place(dep), _place(arr),
+                   _details(seat=_text(seat.get("seatNumber")), cabin=_text(seat.get("seatingClass")) or _text(seat.get("seatingType"))),
+                   _link(res.get("modifyReservationUrl")) or _link(res.get("url")), _passengers(res))
+
+
+_BUILD = {"flight": _flight, "hotel": _hotel, "car": _car, "train": _train}
+
+
+def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool]:
+    """The bookings in these markup nodes (each once), how many reservations couldn't be made into one, and whether any
+    reservation markup was there at all."""
+    found: list[Booking] = []
+    unread, seen = 0, False
+    for node in nodes[:MAX_NODES]:
+        for t in _types(node):
+            if t in RESERVATIONS:
+                seen = True
+                made = _BUILD[RESERVATIONS[t]](node)
+                if made is None:
+                    unread += 1
+                elif made not in found:   # (the same booking in JSON-LD and microdata is one)
+                    found.append(made)
+            elif t.endswith("Reservation"):   # another kind (a table, a show): seen, not ours to read
+                seen, unread = True, unread + 1
+    return found, unread, seen
+
+
+# ------------------------------------------------------------------------------------------------ times
+
+def wall_clock(text: str, zone: str | None = None) -> str | None:
+    """The wall-clock time a booking's time says, as 2026-03-01T22:15:00 with no offset: a time written with its place's
+    offset keeps what's written (that is the local time there). Only a time in UTC ('Z') is moved, into the place's own
+    zone, which it needs (None without one). None when it isn't a date and time."""
+    text = text.strip()
+    if "T" not in text.upper() and " " not in text:
+        return None   # a date alone isn't a time
+    try:
+        t = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if t.tzinfo is not None and text.upper().endswith("Z"):
+        if not zone:
+            return None
+        try:
+            t = t.astimezone(ZoneInfo(zone))
+        except (ZoneInfoNotFoundError, ValueError, OSError):
+            return None
+    return t.replace(tzinfo=None).isoformat(timespec="seconds")
+
+
+# ------------------------------------------------------------------------------------------------ the message
+
+def _decode(raw: Any) -> bytes | None:
+    if not isinstance(raw, str) or not raw or not BASE64URL.fullmatch(raw):
+        return None
+    try:
+        return base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
+    except (binascii.Error, ValueError):
+        return None
+
+
+def _domain(header: Any) -> str | None:
+    address = email.utils.parseaddr(str(header or ""))[1]
+    domain = address.rpartition("@")[2].strip().strip(">").lower()
+    return domain if domain and "." in domain else None
+
+
+def _day(header: Any) -> str | None:
+    try:
+        sent = email.utils.parsedate_to_datetime(str(header))
+    except (TypeError, ValueError, IndexError):
+        return None
+    return sent.date().isoformat()   # the day the sender's own clock says
+
+
+def read(message: Mapping[str, Any]) -> Message:
+    """The bookings in a message as Gmail returns it with `format=raw`, and who and what it's about. Nothing here raises
+    for what a message holds: one that can't be decoded comes back `broken`."""
+    data = _decode(message.get("raw"))
+    if data is None:
+        return Message(None, "", None, broken=True)
+    try:
+        parsed = email.message_from_bytes(data, policy=email.policy.default)
+        sender, subject, received = _domain(parsed.get("From")), str(parsed.get("Subject") or ""), _day(parsed.get("Date"))
+    except (ValueError, LookupError, TypeError):
+        return Message(None, "", None, broken=True)
+    nodes: list[dict[str, Any]] = []
+    for part in parsed.walk():
+        if part.get_content_type() != "text/html":
+            continue
+        try:
+            html = str(part.get_content())[:MAX_PART]
+        except (ValueError, LookupError, KeyError):
+            continue
+        scanner = _Markup()
+        try:
+            scanner.feed(html)
+            scanner.close()
+        except (ValueError, RecursionError, AssertionError):
+            continue
+        for ld in scanner.jsonld:
+            nodes.extend(_jsonld_nodes(ld))
+        nodes.extend(scanner.items)
+    bookings, unread, seen = _bookings(nodes)
+    return Message(sender, subject, received, tuple(bookings), unread, markup=seen)

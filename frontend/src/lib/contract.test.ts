@@ -9,7 +9,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("apiCall", () => {
   it("sends what api() does, for a route the contract covers", async () => {
-    fetchMock.mockReturnValue(reply({ version: "1.0", database: "sqlite", user: null, last_backup: null }));
+    fetchMock.mockReturnValue(reply({ version: "1.0", database: "sqlite", user: null, last_backup: null, review_count: 0 }));
     const r = await apiCall<"GET /api/state">("/api/state");
     expect(r.database).toBe("sqlite");
     const init = fetchMock.mock.calls[0][1];

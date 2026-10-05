@@ -37,6 +37,7 @@ class State(TypedDict):
     database: Literal["sqlite", "postgres"]
     user: SignedIn | None
     last_backup: str | None         # when a backup was last downloaded from Settings, with its UTC offset
+    review_count: int               # what waits in Review for the signed-in member: mail Waypoint couldn't read, names to match
 
 
 # Backups
@@ -65,7 +66,9 @@ class Mailbox(TypedDict):
     address: str
     status: Literal["connected", "reconnect", "error"]   # reconnect: Google no longer honours it; error: it couldn't be reached
     last_error: str | None
-    last_scan: str | None           # with its UTC offset
+    last_scan: str | None           # when a scan last finished, with its UTC offset
+    scan_error: str | None          # what the last scan couldn't do (the last good state is kept); null once one finishes
+    scanning: bool                  # a scan is running now
 
 
 class MailboxList(TypedDict):
@@ -77,9 +80,57 @@ class Started(TypedDict):
     url: str                        # Google's consent screen, to send the browser to
 
 
+class ScanStarted(TypedDict):
+    started: bool                   # false when a scan of this mailbox was already running
+
+
 class Disconnected(TypedDict):
     ok: bool
     revoked: bool                   # false when Waypoint couldn't unlock the saved token to revoke it: remove it at Google
+
+
+# Review: mail that looked like a booking and couldn't be read, and names on bookings to match to people
+
+class ReviewItem(TypedDict):
+    """One message Waypoint couldn't read, for the member whose mailbox it is. Never its text: who it came from, its
+    subject and its day."""
+    id: int
+    address: str                    # the mailbox it came from
+    sender_domain: str              # empty when the message didn't say
+    subject: str | None             # null when Waypoint can't unlock it any more (its key changed)
+    received: str | None            # a day, YYYY-MM-DD
+    reason: Literal["no_markup", "incomplete", "broken"]   # no booking details in it; some missing; couldn't be opened
+    gmail_url: str                  # opens the message in Gmail
+
+
+class WhoIsThis(TypedDict):
+    """A name on a booking that isn't matched to a person, with the segment it's on."""
+    id: int                         # the traveller to match
+    name: str                       # as printed on the booking
+    segment_id: int
+    trip_id: int
+    kind: Literal["flight", "hotel", "car", "train"]
+    provider: str | None
+    origin: str | None
+    destination: str | None
+    start_local: str
+    start_zone: str
+
+
+class Review(TypedDict):
+    items: list[ReviewItem]
+    who: list[WhoIsThis]
+
+
+class WhoBody(TypedDict):
+    """Who a printed name is: a person in People, or a name to add as a guest. Send one."""
+    person_id: NotRequired[int]
+    new_guest: NotRequired[str]
+
+
+class Matched(TypedDict):
+    ok: bool
+    matched: int                    # how many travellers on bookings became that person (the same printed name is matched everywhere)
 
 
 # People

@@ -1,0 +1,41 @@
+From: Example Air <reservations@example-air.example>
+To: traveller@gmail.example
+Subject: Your e-ticket receipt and itinerary QX7M2K
+Date: Mon, 12 Oct 2026 09:30:00 -0400
+Message-ID: <fx-flight-jsonld@example-air.example>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="fxb1"
+
+--fxb1
+Content-Type: text/plain; charset=utf-8
+
+Thanks for booking with Example Air. CANARY-BODY-FLIGHT-JSONLD-7Q2X is only in this made-up body.
+
+--fxb1
+Content-Type: text/html; charset=utf-8
+
+<html><head>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "FlightReservation",
+  "reservationNumber": "QX7M2K",
+  "reservationStatus": "http://schema.org/ReservationConfirmed",
+  "modifyReservationUrl": "https://example-air.example/manage/QX7M2K",
+  "underName": {"@type": "Person", "name": "Jane Doe"},
+  "programMembership": {"@type": "ProgramMembership", "memberNumber": "FXLOY-4400123", "program": "Example Miles"},
+  "reservedTicket": {"@type": "Ticket", "ticketedSeat": {"@type": "Seat", "seatNumber": "21C", "seatingType": "Economy"}},
+  "reservationFor": {
+    "@type": "Flight",
+    "flightNumber": "101",
+    "airline": {"@type": "Airline", "name": "Example Air", "iataCode": "EX"},
+    "departureAirport": {"@type": "Airport", "name": "John F. Kennedy", "iataCode": "JFK"},
+    "departureTime": "2026-11-20T19:00:00-05:00",
+    "departureTerminal": "7",
+    "arrivalAirport": {"@type": "Airport", "name": "Heathrow", "iataCode": "LHR"},
+    "arrivalTime": "2026-11-21T07:10:00+00:00"
+  }
+}
+</script></head>
+<body><p>Hello Jane. CANARY-BODY-FLIGHT-JSONLD-7Q2X Your trip to London is confirmed.</p></body></html>
+--fxb1--

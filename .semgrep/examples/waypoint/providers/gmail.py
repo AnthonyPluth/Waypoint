@@ -19,3 +19,11 @@ expires = datetime.datetime.fromtimestamp(stamp)
 expires = dt.now(datetime.timezone.utc)
 # ok: waypoint-naive-now
 expires = dt.fromtimestamp(stamp, datetime.timezone.utc)
+
+# The provider fetches a message and hands it over untouched; it doesn't look inside.
+# ruleid: waypoint-message-body
+text = message["raw"]
+# ruleid: waypoint-message-body
+text = base64.urlsafe_b64decode(message.get("raw", ""))
+# ok: waypoint-message-body
+found = _api("/messages/" + message_id, token, {"format": "raw"})

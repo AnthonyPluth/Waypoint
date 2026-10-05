@@ -3,10 +3,17 @@ import { initials, NAV, pageFor } from "./nav";
 
 describe("nav", () => {
   it("has Upcoming first, which is where an unknown route goes", () => {
-    expect(NAV.map((n) => n.page)).toEqual(["upcoming", "people", "settings"]);
+    expect(NAV.map((n) => n.page)).toEqual(["upcoming", "people", "review", "settings"]);
     expect(pageFor("settings")).toBe("settings");
     expect(pageFor("budget")).toBe("upcoming");
     expect(pageFor("")).toBe("upcoming");
+  });
+
+  it("shows what's waiting on Review, and nothing on the other pages", () => {
+    const review = NAV.find((n) => n.page === "review");
+    const s = { version: "1", database: "sqlite" as const, user: null, last_backup: null, review_count: 3 };
+    expect(review?.badge?.(s)).toBe(3);
+    expect(NAV.filter((n) => n.badge).map((n) => n.page)).toEqual(["review"]);
   });
 
   it("makes initials from a name or an email address", () => {

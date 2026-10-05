@@ -1,0 +1,33 @@
+From: Example Air <reservations@example-air.example>
+To: traveller@gmail.example
+Subject: Booking confirmation PL4N9R
+Date: Tue, 13 Oct 2026 18:05:00 +0000
+Message-ID: <fx-flight-microdata@example-air.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>CANARY-BODY-FLIGHT-MICRODATA-3K8D for DOE/MIA MISS, made up for tests.</p>
+<div itemscope itemtype="http://schema.org/FlightReservation">
+  <meta itemprop="reservationNumber" content="PL4N9R"/>
+  <link itemprop="reservationStatus" href="http://schema.org/ReservationConfirmed"/>
+  <div itemprop="underName" itemscope itemtype="http://schema.org/Person">
+    <meta itemprop="name" content="DOE/MIA MISS"/>
+  </div>
+  <div itemprop="reservationFor" itemscope itemtype="http://schema.org/Flight">
+    <meta itemprop="flightNumber" content="311"/>
+    <div itemprop="airline" itemscope itemtype="http://schema.org/Airline">
+      <meta itemprop="name" content="Example Air"/>
+      <meta itemprop="iataCode" content="EX"/>
+    </div>
+    <div itemprop="departureAirport" itemscope itemtype="http://schema.org/Airport">
+      <meta itemprop="iataCode" content="JFK"/>
+    </div>
+    <meta itemprop="departureTime" content="2026-12-08T08:00:00-05:00"/>
+    <div itemprop="arrivalAirport" itemscope itemtype="http://schema.org/Airport">
+      <meta itemprop="iataCode" content="SFO"/>
+    </div>
+    <meta itemprop="arrivalTime" content="2026-12-08T11:20:00-08:00"/>
+  </div>
+</div>
+</body></html>

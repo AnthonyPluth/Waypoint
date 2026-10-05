@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 } };
-export const PAGES = ["upcoming", "people", "settings"];
+export const PAGES = ["upcoming", "people", "review", "settings"];
 
 /** The browser to launch: the Chromium preinstalled under PLAYWRIGHT_BROWSERS_PATH (or /opt/pw-browsers) when there is
  *  one, whatever its revision, otherwise undefined (Playwright's own download). */

@@ -67,3 +67,18 @@ def visible_travelers(conn: db.Connection, viewer: Viewer, segment_ids: Sequence
         select(SegmentTraveler).join(Segment, Segment.id == SegmentTraveler.segment_id)
         .join(Trip, Trip.id == Segment.trip_id).where(can_see(viewer), SegmentTraveler.segment_id.in_(list(segment_ids)))
         .order_by(SegmentTraveler.id)).all())
+
+
+def visible_traveler(conn: db.Connection, viewer: Viewer, traveler_id: int) -> SegmentTraveler | None:
+    """Someone on a segment, or None when there's none by that id or the segment's trip isn't the viewer's."""
+    return conn.orm.scalars(
+        select(SegmentTraveler).join(Segment, Segment.id == SegmentTraveler.segment_id)
+        .join(Trip, Trip.id == Segment.trip_id).where(can_see(viewer), SegmentTraveler.id == traveler_id)).first()
+
+
+def visible_unmatched(conn: db.Connection, viewer: Viewer) -> list[SegmentTraveler]:
+    """The travellers on the viewer's segments who are only a name as printed on the booking, not yet a person."""
+    return list(conn.orm.scalars(
+        select(SegmentTraveler).join(Segment, Segment.id == SegmentTraveler.segment_id)
+        .join(Trip, Trip.id == Segment.trip_id).where(can_see(viewer), SegmentTraveler.person_id.is_(None))
+        .order_by(SegmentTraveler.id)).all())

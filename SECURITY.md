@@ -20,10 +20,11 @@ limited to your household, a `WAYPOINT_SECRET_KEY`, and private backups.
 
 ## What Waypoint will hold
 
-Members can connect their Gmail read-only (the `gmail.readonly` scope only; the refresh token is kept encrypted, and disconnecting revokes it at Google). Email scanning is planned, not built yet; the promises it is designed to keep are on the
+Members can connect their Gmail read-only (the `gmail.readonly` scope only; the refresh token is kept encrypted, and disconnecting revokes it at Google). Waypoint scans those mailboxes for bookings, keeping the promises on the
 [Email scanning](https://anthonypluth.github.io/waypoint/privacy/email-scanning/) page: read-only mailbox access,
-messages searched on the server, bodies read in memory and never stored, and nothing sent to a service run by the project.
-Once it exists, a report about a way around any of those is as serious as one about sign-in.
+messages searched on Google’s side so only likely bookings are downloaded, bodies read in memory by one module and never stored, logged or sent anywhere but Gmail’s own API,
+and nothing sent to a service run by the project. What a scan keeps is the booking’s fields, each message’s Gmail id and, for mail it couldn’t read,
+the sender’s domain, the day and the subject (encrypted). A report about a way around any of those is as serious as one about sign-in.
 
 The secrets Waypoint saves (such as the refresh token for that mailbox access) are encrypted with
 `WAYPOINT_SECRET_KEY`, and so are the copies in backups. Backups also hold everything else in the database, so keep them private.

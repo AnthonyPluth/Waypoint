@@ -27,7 +27,7 @@ from sqlalchemy import select, update
 
 from .. import monitoring
 from . import settings_keys
-from .models import LoyaltyId, Mailbox, Setting
+from .models import LoyaltyId, Mailbox, ReviewItem, Setting
 
 PREFIX = "enc:v1:"
 KEY_FILE = "secret.key"
@@ -35,8 +35,9 @@ MIN_KEY_LENGTH = 32
 
 # settings rows that hold secrets (the rest of the settings table is ordinary preferences)
 SECRET_SETTINGS = settings_keys.SECRETS
-# columns that hold secrets: table -> column (a mailbox's refresh token, a loyalty or Known Traveler number)
-SECRET_COLUMNS = {"mailboxes": "token", "loyalty_ids": "number"}
+# columns that hold secrets: table -> column (a mailbox's refresh token, a loyalty or Known Traveler number, the subject of
+# mail Waypoint couldn't read)
+SECRET_COLUMNS = {"mailboxes": "token", "loyalty_ids": "number", "review_items": "subject"}
 
 _lock = threading.Lock()
 _cache: dict[tuple, MultiFernet] = {}
@@ -193,5 +194,13 @@ def encrypt_stored(conn) -> int:
             continue
         if new != n["number"]:
             conn.execute(update(LoyaltyId).where(LoyaltyId.id == n["id"]).values(number=new))
+            changed += 1
+    for r in conn.execute(select(ReviewItem.id, ReviewItem.subject).where(ReviewItem.subject.is_not(None))).fetchall():
+        try:
+            new = reencrypt(r["subject"])
+        except InvalidToken:
+            continue   # (shown as one Waypoint can't unlock; the person can still open it in Gmail)
+        if new != r["subject"]:
+            conn.execute(update(ReviewItem).where(ReviewItem.id == r["id"]).values(subject=new))
             changed += 1
     return changed

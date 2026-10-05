@@ -1,0 +1,23 @@
+From: Example Rentals <reservations@example-rentals.example>
+To: traveller@gmail.example
+Subject: Rental car confirmation 7733-AB
+Date: Thu, 15 Oct 2026 08:15:00 -0700
+Message-ID: <fx-car@example-rentals.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "RentalCarReservation",
+  "reservationNumber": "7733-AB",
+  "underName": {"@type": "Person", "name": "Sam Doe"},
+  "pickupTime": "2026-12-08T12:00:00-08:00",
+  "dropoffTime": "2026-12-10T15:00:00-08:00",
+  "pickupLocation": {"@type": "Place", "name": "San Francisco Airport", "address": {"@type": "PostalAddress", "addressLocality": "San Francisco", "addressCountry": "US"}},
+  "dropoffLocation": {"@type": "Place", "name": "San Francisco Airport", "address": {"@type": "PostalAddress", "addressLocality": "San Francisco", "addressCountry": "US"}},
+  "reservationFor": {"@type": "RentalCar", "name": "Compact", "rentalCompany": {"@type": "Organization", "name": "Example Rentals"}}
+}
+</script></head>
+<body><p>CANARY-BODY-CAR-9T4V Your car is reserved.</p></body></html>

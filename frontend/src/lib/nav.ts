@@ -2,13 +2,17 @@
 import type { Component } from "svelte";
 import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
 import Users from "@lucide/svelte/icons/users";
+import Inbox from "@lucide/svelte/icons/inbox";
 import Settings from "@lucide/svelte/icons/settings";
+import type { AppState } from "./types";
 
-export type NavItem = { page: string; label: string; icon: Component<{ class?: string }> };
+/** `badge`: how much waits on that page, as a number on its link (nothing when it's 0). */
+export type NavItem = { page: string; label: string; icon: Component<{ class?: string }>; badge?: (s: AppState) => number };
 
 export const NAV: NavItem[] = [
   { page: "upcoming", label: "Upcoming", icon: PlaneTakeoff },
   { page: "people", label: "People", icon: Users },
+  { page: "review", label: "Review", icon: Inbox, badge: (s) => s.review_count },
   { page: "settings", label: "Settings", icon: Settings },
 ];
 

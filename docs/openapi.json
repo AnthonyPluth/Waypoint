@@ -969,6 +969,197 @@
         }
       }
     },
+    "/api/mailboxes/{id}/scan": {
+      "post": {
+        "operationId": "api_mailbox_scan",
+        "x-handler": "waypoint/server/api/mailboxes.py:api_mailbox_scan",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanStarted"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/review": {
+      "get": {
+        "operationId": "api_review",
+        "x-handler": "waypoint/server/api/review.py:api_review",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Review"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/review/who/{id}": {
+      "post": {
+        "operationId": "api_review_who",
+        "x-handler": "waypoint/server/api/review.py:api_review_who",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhoBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Matched"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/review/{id}/ignore": {
+      "post": {
+        "operationId": "api_review_ignore",
+        "x-handler": "waypoint/server/api/review.py:api_review_ignore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/review/{id}": {
+      "delete": {
+        "operationId": "api_review_dismiss",
+        "x-handler": "waypoint/server/api/review.py:api_review_dismiss",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/state": {
       "get": {
         "operationId": "api_state",
@@ -1231,6 +1422,15 @@
               "string",
               "null"
             ]
+          },
+          "scan_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scanning": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1238,7 +1438,9 @@
           "address",
           "status",
           "last_error",
-          "last_scan"
+          "last_scan",
+          "scan_error",
+          "scanning"
         ],
         "additionalProperties": false
       },
@@ -1258,6 +1460,22 @@
         "required": [
           "configured",
           "mailboxes"
+        ],
+        "additionalProperties": false
+      },
+      "Matched": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "matched": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "matched"
         ],
         "additionalProperties": false
       },
@@ -1429,6 +1647,87 @@
         },
         "required": [
           "number"
+        ],
+        "additionalProperties": false
+      },
+      "Review": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewItem"
+            }
+          },
+          "who": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WhoIsThis"
+            }
+          }
+        },
+        "required": [
+          "items",
+          "who"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewItem": {
+        "type": "object",
+        "description": "One message Waypoint couldn't read, for the member whose mailbox it is. Never its text: who it came from, its\nsubject and its day.",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "address": {
+            "type": "string"
+          },
+          "sender_domain": {
+            "type": "string"
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "received": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "enum": [
+              "no_markup",
+              "incomplete",
+              "broken"
+            ]
+          },
+          "gmail_url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "address",
+          "sender_domain",
+          "subject",
+          "received",
+          "reason",
+          "gmail_url"
+        ],
+        "additionalProperties": false
+      },
+      "ScanStarted": {
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "started"
         ],
         "additionalProperties": false
       },
@@ -1811,13 +2110,17 @@
               "string",
               "null"
             ]
+          },
+          "review_count": {
+            "type": "integer"
           }
         },
         "required": [
           "version",
           "database",
           "user",
-          "last_backup"
+          "last_backup",
+          "review_count"
         ],
         "additionalProperties": false
       },
@@ -1972,6 +2275,83 @@
         },
         "required": [
           "trips"
+        ],
+        "additionalProperties": false
+      },
+      "WhoBody": {
+        "type": "object",
+        "description": "Who a printed name is: a person in People, or a name to add as a guest. Send one.",
+        "properties": {
+          "person_id": {
+            "type": "integer"
+          },
+          "new_guest": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "WhoIsThis": {
+        "type": "object",
+        "description": "A name on a booking that isn't matched to a person, with the segment it's on.",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "integer"
+          },
+          "trip_id": {
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "flight",
+              "hotel",
+              "car",
+              "train"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "start_zone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "segment_id",
+          "trip_id",
+          "kind",
+          "provider",
+          "origin",
+          "destination",
+          "start_local",
+          "start_zone"
         ],
         "additionalProperties": false
       }
