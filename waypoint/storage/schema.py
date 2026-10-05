@@ -152,6 +152,29 @@ loyalty_ids = Table(
     info={'doc': "loyalty and Known Traveler numbers, one row per membership; the number is encrypted (waypoint/storage/secretbox.py)"},
 )
 
+flight_status = Table(
+    'flight_status', metadata,
+    Column('flight_number', Text, primary_key=True),
+    Column('date', Text, primary_key=True),
+    Column('state', Text, nullable=False),
+    Column('origin', Text),
+    Column('destination', Text),
+    Column('dep_scheduled', Text),
+    Column('dep_estimated', Text),
+    Column('dep_actual', Text),
+    Column('dep_zone', Text),
+    Column('dep_terminal', Text),
+    Column('dep_gate', Text),
+    Column('arr_scheduled', Text),
+    Column('arr_estimated', Text),
+    Column('arr_actual', Text),
+    Column('arr_zone', Text),
+    Column('arr_terminal', Text),
+    Column('arr_gate', Text),
+    Column('fetched_at', Float, nullable=False),
+    info={'doc': "the last live status answer for a flight number on a local departure date (a cache shared by everyone on the flight, with no personal data; not part of a backup)"},
+)
+
 settings = Table(
     'settings', metadata,
     Column('key', Text, primary_key=True),

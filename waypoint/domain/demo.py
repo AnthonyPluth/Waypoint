@@ -4,10 +4,12 @@ real travel (AGENTS.md, "Personal data in the repo"): names, codes and numbers a
 Each feature that stores something (people, trips) adds its own sample rows here, so `make verify` shows it."""
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import func, select
 
 from ..storage import db
-from ..storage.models import LoyaltyId, Person, Segment, SegmentTraveler, Trip, User
+from ..storage.models import FlightStatus, LoyaltyId, Person, Segment, SegmentTraveler, Trip, User
 from . import loyalty, people, trips
 from .visibility import Viewer
 
@@ -56,6 +58,16 @@ SAM_ALONE: list[trips.SegmentIn] = [
 ]
 
 
+# The family's outbound flight is running late, with a new gate: what live flight status shows (it appears where the
+# server has a RAPIDAPI_KEY, which `make verify` gives its demo server).
+FLIGHT_STATUS = {
+    "flight_number": "EX101", "date": "2026-11-20", "state": "delayed", "origin": "JFK", "destination": "LHR",
+    "dep_scheduled": "2026-11-20T19:00", "dep_estimated": "2026-11-20T19:50", "dep_zone": "America/New_York",
+    "dep_terminal": "7", "dep_gate": "B24", "arr_scheduled": "2026-11-21T07:10", "arr_estimated": "2026-11-21T08:05",
+    "arr_zone": "Europe/London", "arr_terminal": "5",
+}
+
+
 def _on(*ids: int | None) -> list[trips.TravelerIn]:
     return [{"person_id": i, "name": None} for i in ids]
 
@@ -79,9 +91,10 @@ def seed(conn: db.Connection) -> int:
     for who, kind, program, number, tier, expiry, notes in MEMBERSHIPS:
         loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number, "tier": tier,
                            "expiry": expiry, "notes": notes})
+    db.upsert(conn, FlightStatus, {**FLIGHT_STATUS, "fetched_at": datetime.now(UTC).timestamp()}, key=["flight_number", "date"])
     return _rows(conn) - before
 
 
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
-               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentTraveler))
+               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentTraveler, FlightStatus))

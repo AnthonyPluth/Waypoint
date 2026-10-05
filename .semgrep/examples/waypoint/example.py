@@ -79,6 +79,15 @@ CONSENT = "https://accounts.google.com/o/oauth2/v2/auth"
 # ok: waypoint-google-hosts
 gmail.list_messages(conn, mailbox, query)
 
+# ruleid: waypoint-flightstatus-hosts
+STATUS_URL = "https://aerodatabox.p.rapidapi.com/flights/number/EX101/2026-11-20"
+# ruleid: waypoint-flightstatus-hosts
+HEADERS = {"X-RapidAPI-Host": "aerodatabox.p.rapidapi.com"}
+# ruleid: waypoint-flightstatus-hosts
+OTHER = "https://example-api.rapidapi.com/status"
+# ok: waypoint-flightstatus-hosts
+flightstatus.fetch("EX101", "2026-11-20")
+
 # ruleid: waypoint-ai-hosts
 URL = "https://openrouter.ai/api/v1/chat/completions"
 # ruleid: waypoint-ai-hosts

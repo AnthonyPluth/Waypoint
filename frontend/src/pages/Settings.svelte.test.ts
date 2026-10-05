@@ -8,6 +8,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import { app } from "$lib/app.svelte";
+import { flightStatus } from "$lib/flightstatus.svelte";
 import { state } from "../test/fixtures";
 import Settings from "./Settings.svelte";
 
@@ -15,7 +16,29 @@ const file = (name = "backup.json.gz") => new File(["x"], name, { type: "applica
 const inspected = { created: "2026-09-01T10:00:00Z", source: "sqlite", counts: { trips: 3, loyalty_ids: 2 }, current: { trips: 1 }, database: "sqlite" };
 
 beforeEach(() => { vi.mocked(api).mockReset(); app.state = state(); });
-afterEach(() => { app.state = null; });
+afterEach(() => { app.state = null; flightStatus.list = null; });
+
+describe("Settings flight status", () => {
+  const usage = (extra = {}) => ({ enabled: true, month: "2026-11", used: 12, limit: 400, paused: null, statuses: [], ...extra });
+
+  it("shows the calls used this month out of the limit", async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? usage() : {}) as never);
+    render(Settings);
+    expect(await screen.findByText("12 of 400 calls used this month")).toBeInTheDocument();
+    expect(screen.getByText("Flight status")).toBeInTheDocument();
+  });
+
+  it("says it’s off without the key", async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? usage({ enabled: false, used: 0 }) : {}) as never);
+    render(Settings);
+    expect(await screen.findByText(/Off \(RAPIDAPI_KEY isn’t set\)/)).toBeInTheDocument();
+  });
+
+  it("shows nothing until it knows", () => {
+    render(Settings);
+    expect(screen.queryByTestId("flight-status-usage")).toBeNull();
+  });
+});
 
 describe("Settings account", () => {
   it("says who is signed in, with a Sign out button", () => {

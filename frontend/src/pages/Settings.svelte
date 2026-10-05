@@ -6,10 +6,14 @@
   import { Button } from "$lib/components/ui/button";
   import DataSection from "$lib/components/settings/DataSection.svelte";
   import GmailSection from "$lib/components/settings/GmailSection.svelte";
+  import { flightStatus, loadFlightStatus } from "$lib/flightstatus.svelte";
+  import { onMount } from "svelte";
 
   const s = $derived(app.state);
   const user = $derived(s?.user);
   let signingOut = $state(false);
+  const flights = $derived(flightStatus.list);
+  onMount(loadFlightStatus);
 
   // The server ends the session and says where to go next (the sign-in provider's own sign-out page, or Waypoint's).
   const signOut = () => act(async () => {
@@ -49,6 +53,12 @@
     <dl class="rows">
       <div class="row"><dt class="text-muted-foreground">Version</dt><dd class="code normal-case">{s?.version}</dd></div>
       <div class="row"><dt class="text-muted-foreground">Database</dt><dd class="font-medium">{s?.database === "postgres" ? "Postgres" : "SQLite"}</dd></div>
+      {#if flights}
+        <div class="row" data-testid="flight-status-usage">
+          <dt class="text-muted-foreground">Flight status</dt>
+          <dd class="font-medium">{flights.enabled ? `${flights.used} of ${flights.limit} calls used this month` : "Off (RAPIDAPI_KEY isn’t set)"}</dd>
+        </div>
+      {/if}
     </dl>
   </section>
 

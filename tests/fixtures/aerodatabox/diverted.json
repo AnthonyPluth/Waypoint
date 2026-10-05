@@ -1,0 +1,52 @@
+[
+  {
+    "number": "EX 101",
+    "status": "Diverted",
+    "departure": {
+      "airport": {
+        "icao": "KJFK",
+        "iata": "JFK",
+        "name": "Made-up JFK",
+        "timeZone": "America/New_York"
+      },
+      "scheduledTime": {
+        "utc": "2026-01-01 00:00Z",
+        "local": "2026-11-20 19:00-05:00"
+      },
+      "quality": [
+        "Basic",
+        "Live"
+      ],
+      "revisedTime": {
+        "utc": "2026-01-01 00:00Z",
+        "local": "2026-11-20 19:05-05:00"
+      },
+      "runwayTime": {
+        "utc": "2026-01-01 00:00Z",
+        "local": "2026-11-20 19:06-05:00"
+      }
+    },
+    "arrival": {
+      "airport": {
+        "icao": "KLHR",
+        "iata": "LHR",
+        "name": "Made-up LHR",
+        "timeZone": "Europe/London"
+      },
+      "scheduledTime": {
+        "utc": "2026-01-01 00:00Z",
+        "local": "2026-11-21 07:10+00:00"
+      },
+      "quality": [
+        "Basic",
+        "Live"
+      ]
+    },
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "airline": {
+      "name": "Example Air"
+    },
+    "lastUpdatedUtc": "2026-11-20 20:00Z"
+  }
+]

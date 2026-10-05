@@ -132,6 +132,28 @@ class LoyaltyId(Base):
     notes: Mapped[str | None]
 
 
+class FlightStatus(Base):
+    __table__ = schema.flight_status
+    flight_number: Mapped[str]       # no spaces, upper case: EX101
+    date: Mapped[str]                # the flight's local departure date, YYYY-MM-DD
+    state: Mapped[str]               # scheduled, delayed, departed, landed, cancelled, diverted or unknown (waypoint/domain/flightstatus.py)
+    origin: Mapped[str | None]       # airport codes, as the service names them
+    destination: Mapped[str | None]
+    dep_scheduled: Mapped[str | None]   # wall-clock times at the airports, 2026-03-01T22:15, never converted
+    dep_estimated: Mapped[str | None]
+    dep_actual: Mapped[str | None]
+    dep_zone: Mapped[str | None]     # the airport's IANA zone
+    dep_terminal: Mapped[str | None]
+    dep_gate: Mapped[str | None]
+    arr_scheduled: Mapped[str | None]
+    arr_estimated: Mapped[str | None]
+    arr_actual: Mapped[str | None]
+    arr_zone: Mapped[str | None]
+    arr_terminal: Mapped[str | None]
+    arr_gate: Mapped[str | None]
+    fetched_at: Mapped[float]        # when the answer came, seconds since the epoch
+
+
 class Setting(Base):
     __table__ = schema.settings
     key: Mapped[str]

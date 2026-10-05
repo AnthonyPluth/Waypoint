@@ -23,6 +23,45 @@ export interface Disconnected {
   revoked: boolean;
 }
 
+/**
+ * A flight's live status, shown beside its booked times (the booking is never changed). Times are `2026-03-01T22:15`
+ * wall-clock times at the airports, in their zones (`dep_zone`, `arr_zone`), never converted.
+ */
+export interface FlightStatus {
+  segment_id: number;
+  state: "scheduled" | "delayed" | "departed" | "landed" | "cancelled" | "diverted";
+  origin: string | null;
+  destination: string | null;
+  dep_scheduled: string | null;
+  dep_estimated: string | null;
+  dep_actual: string | null;
+  dep_zone: string;
+  dep_terminal: string | null;
+  dep_gate: string | null;
+  arr_scheduled: string | null;
+  arr_estimated: string | null;
+  arr_actual: string | null;
+  arr_zone: string;
+  arr_terminal: string | null;
+  arr_gate: string | null;
+  delay_minutes: number | null;
+  fetched_at: string;
+}
+
+export interface FlightStatusList {
+  enabled: boolean;
+  month: string;
+  used: number;
+  limit: number;
+  paused: FlightStatusPause | null;
+  statuses: FlightStatus[];
+}
+
+export interface FlightStatusPause {
+  until: string;
+  reason: "limit" | "rate" | "key";
+}
+
 /** A membership, to save or to change. `number` is needed to save one; left out when changing, the saved one is kept. */
 export interface LoyaltyBody {
   person_id: number;
@@ -250,6 +289,8 @@ export interface Endpoints {
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };
   "DELETE /api/segments/{id}": { body: never; reply: Ok };
   "GET /api/airports/{id}": { body: never; reply: Airport };
+  "GET /api/flight-status": { body: never; reply: FlightStatusList };
+  "POST /api/flight-status/{id}": { body: never; reply: FlightStatusList };
   "GET /api/loyalty": { body: never; reply: LoyaltyList };
   "POST /api/loyalty": { body: LoyaltyBody; reply: LoyaltyEntry };
   "POST /api/loyalty/{id}": { body: LoyaltyBody; reply: LoyaltyEntry };

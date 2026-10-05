@@ -1,0 +1,47 @@
+[
+  {
+    "number": "EX 101",
+    "status": "Expected",
+    "departure": {
+      "airport": {
+        "icao": "KJFK",
+        "iata": "JFK",
+        "name": "Made-up JFK",
+        "timeZone": "America/New_York"
+      },
+      "scheduledTime": {
+        "utc": "2026-01-01 00:00Z",
+        "local": "2026-11-20 19:00-05:00"
+      },
+      "quality": [
+        "Basic",
+        "Live"
+      ],
+      "terminal": "7",
+      "gate": "B22"
+    },
+    "arrival": {
+      "airport": {
+        "icao": "KLHR",
+        "iata": "LHR",
+        "name": "Made-up LHR",
+        "timeZone": "Europe/London"
+      },
+      "scheduledTime": {
+        "utc": "2026-01-01 00:00Z",
+        "local": "2026-11-21 07:10+00:00"
+      },
+      "quality": [
+        "Basic",
+        "Live"
+      ],
+      "terminal": "5"
+    },
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "airline": {
+      "name": "Example Air"
+    },
+    "lastUpdatedUtc": "2026-11-20 20:00Z"
+  }
+]

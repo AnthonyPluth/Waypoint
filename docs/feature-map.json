@@ -277,6 +277,34 @@
     },
     {
       "method": "GET",
+      "path": "/api/flight-status",
+      "handler": "waypoint/server/api/flightstatus.py:api_flight_statuses",
+      "web": [
+        "frontend/src/lib/flightstatus.svelte.ts"
+      ],
+      "tests": [
+        "tests/test_flightstatus.py"
+      ],
+      "docs": [
+        "start/flight-status"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/flight-status/{id}",
+      "handler": "waypoint/server/api/flightstatus.py:api_flight_status_refresh",
+      "web": [
+        "frontend/src/lib/flightstatus.svelte.ts"
+      ],
+      "tests": [
+        "tests/test_flightstatus.py"
+      ],
+      "docs": [
+        "start/flight-status"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/loyalty",
       "handler": "waypoint/server/api/loyalty.py:api_loyalty",
       "web": [
