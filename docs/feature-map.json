@@ -75,6 +75,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_loyalty.py",
         "tests/test_people.py"
       ],
       "docs": [
@@ -109,6 +110,81 @@
       ],
       "docs": [
         "start/people"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/loyalty",
+      "handler": "waypoint/server/api/loyalty.py:api_loyalty",
+      "web": [
+        "frontend/src/pages/People.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_loyalty.py"
+      ],
+      "docs": [
+        "start/loyalty"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/loyalty",
+      "handler": "waypoint/server/api/loyalty.py:api_loyalty_add",
+      "web": [
+        "frontend/src/pages/People.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_loyalty.py"
+      ],
+      "docs": [
+        "start/loyalty"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/loyalty/{id}",
+      "handler": "waypoint/server/api/loyalty.py:api_loyalty_edit",
+      "web": [
+        "frontend/src/pages/People.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_loyalty.py"
+      ],
+      "docs": [
+        "start/loyalty"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/loyalty/{id}",
+      "handler": "waypoint/server/api/loyalty.py:api_loyalty_remove",
+      "web": [
+        "frontend/src/pages/People.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_loyalty.py"
+      ],
+      "docs": [
+        "start/loyalty"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/loyalty/{id}/reveal",
+      "handler": "waypoint/server/api/loyalty.py:api_loyalty_reveal",
+      "web": [
+        "frontend/src/pages/People.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_loyalty.py"
+      ],
+      "docs": [
+        "start/loyalty"
       ]
     },
     {

@@ -16,7 +16,7 @@ from sqlalchemy import insert
 
 from waypoint import oidc
 from waypoint.providers import gmail
-from waypoint.server.api import backups, mailboxes, people, state
+from waypoint.server.api import backups, loyalty, mailboxes, people, state
 from waypoint.server.common import _current
 from tests.shared import DbCase
 
@@ -99,6 +99,7 @@ class Replies(DbCase):
         self.test_backups()
         self.test_mailboxes()
         self.test_people()
+        self.test_loyalty()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
 
     def test_state(self):
@@ -146,6 +147,17 @@ class Replies(DbCase):
         self.check("POST /api/people/{id}", people.api_person_edit(self.c, {}, {"display_name": "Mia D.", "legal_name": "Mia Rose Doe"}, str(pid)))
         self.check("DELETE /api/people/{id}", people.api_person_remove(self.c, {}, {}, str(pid)))
 
+    def test_loyalty(self):
+        self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))   # none yet
+        who = people.api_person_add(self.c, {}, {"display_name": "Mia Doe"})["id"]
+        body = {"person_id": who, "kind": "airline", "program": "American AAdvantage", "number": "DEMO1234567", "expiry": "2029-01-31"}
+        added = loyalty.api_loyalty_add(self.c, {}, body)
+        self.check("POST /api/loyalty", added)
+        self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))
+        self.check("POST /api/loyalty/{id}", loyalty.api_loyalty_edit(self.c, {}, {**body, "number": None}, str(added["id"])))
+        self.check("POST /api/loyalty/{id}/reveal", loyalty.api_loyalty_reveal(self.c, {}, {}, str(added["id"])))
+        self.check("DELETE /api/loyalty/{id}", loyalty.api_loyalty_remove(self.c, {}, {}, str(added["id"])))
+
 
 class Mismatches(unittest.TestCase):
     """The check above notices a reply that isn't the contract's."""
@@ -173,7 +185,9 @@ class Generated(unittest.TestCase):
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
                                      "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "GET /api/people", "POST /api/people",
-                                     "POST /api/people/{id}", "DELETE /api/people/{id}"})
+                                     "POST /api/people/{id}", "DELETE /api/people/{id}",
+                                     "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
+                                     "POST /api/loyalty/{id}/reveal"})
         self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)
         self.assertNotIn("GET /api/mailboxes/callback", covered())   # and this one as a redirect
 

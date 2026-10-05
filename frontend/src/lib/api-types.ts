@@ -15,6 +15,35 @@ export interface Disconnected {
   revoked: boolean;
 }
 
+/** A membership, to save or to change. `number` is needed to save one; left out when changing, the saved one is kept. */
+export interface LoyaltyBody {
+  person_id: number;
+  kind: string;
+  program: string;
+  number?: string | null;
+  tier?: string | null;
+  expiry?: string | null;
+  notes?: string | null;
+}
+
+/** One membership. The number comes only masked (its last four characters); `POST /api/loyalty/{id}/reveal` gives it. */
+export interface LoyaltyEntry {
+  id: number;
+  person_id: number;
+  kind: string;
+  program: string;
+  masked: string;
+  readable: boolean;
+  tier: string | null;
+  expiry: string | null;
+  notes: string | null;
+}
+
+export interface LoyaltyList {
+  loyalty: LoyaltyEntry[];
+  programs: Record<string, string[]>;
+}
+
 export interface Mailbox {
   id: number;
   address: string;
@@ -63,6 +92,10 @@ export interface Restored {
   unreadable_secrets: string[];
 }
 
+export interface Revealed {
+  number: string;
+}
+
 /** Who's signed in. Without sign-in configured (on your own machine), everyone is `local`. */
 export interface SignedIn {
   name: string | null;
@@ -90,6 +123,11 @@ export interface Endpoints {
   "POST /api/people": { body: PersonBody; reply: Person };
   "POST /api/people/{id}": { body: PersonBody; reply: Person };
   "DELETE /api/people/{id}": { body: never; reply: Ok };
+  "GET /api/loyalty": { body: never; reply: LoyaltyList };
+  "POST /api/loyalty": { body: LoyaltyBody; reply: LoyaltyEntry };
+  "POST /api/loyalty/{id}": { body: LoyaltyBody; reply: LoyaltyEntry };
+  "DELETE /api/loyalty/{id}": { body: never; reply: Ok };
+  "POST /api/loyalty/{id}/reveal": { body: never; reply: Revealed };
   "GET /api/mailboxes": { body: never; reply: MailboxList };
   "POST /api/mailboxes/connect": { body: never; reply: Started };
   "DELETE /api/mailboxes/{id}": { body: never; reply: Disconnected };

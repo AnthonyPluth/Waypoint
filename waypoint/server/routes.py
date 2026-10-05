@@ -11,6 +11,7 @@ from ..storage import db
 from .common import ApiError, server_error
 
 from .api.backups import api_backup, api_backup_inspect, api_restore
+from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loyalty_remove, api_loyalty_reveal
 from .api.people import api_people, api_person_add, api_person_edit, api_person_remove
 from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailboxes
 from .api.state import api_state
@@ -26,6 +27,11 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/people", api_person_add),
     ("POST", "/api/people/{id}", api_person_edit),
     ("DELETE", "/api/people/{id}", api_person_remove),
+    ("GET", "/api/loyalty", api_loyalty),
+    ("POST", "/api/loyalty", api_loyalty_add),
+    ("POST", "/api/loyalty/{id}", api_loyalty_edit),
+    ("DELETE", "/api/loyalty/{id}", api_loyalty_remove),
+    ("POST", "/api/loyalty/{id}/reveal", api_loyalty_reveal),
     ("GET", "/api/mailboxes", api_mailboxes),
     ("POST", "/api/mailboxes/connect", api_mailbox_connect),
     ("GET", "/api/mailboxes/callback", api_mailbox_callback),
