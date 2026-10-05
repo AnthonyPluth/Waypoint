@@ -1,0 +1,41 @@
+From: Example Air <reservations@example-air.example>
+To: traveller@gmail.example
+Subject: Your itinerary RM8V3N
+Date: Mon, 12 Oct 2026 09:30:00 -0400
+Message-ID: <fx-utc_marked_converted_in_text@example-air.example>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="fxb1"
+
+--fxb1
+Content-Type: text/plain; charset=utf-8
+
+CANARY-BODY-UTCCONV-6M2W is only in this made-up body.
+Departs Chicago O'Hare 9:00 AM
+Arrives Denver 11:10 AM
+
+--fxb1
+Content-Type: text/html; charset=utf-8
+
+<html><head>
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "FlightReservation",
+  "reservationNumber": "RM8V3N",
+  "reservationStatus": "http://schema.org/ReservationConfirmed",
+  "underName": {"@type": "Person", "name": "Alex Rivera"},
+  "reservationFor": {
+    "@type": "Flight",
+    "flightNumber": "301",
+    "airline": {"@type": "Airline", "name": "Example Air", "iataCode": "EX"},
+    "departureAirport": {"@type": "Airport", "iataCode": "ORD"},
+    "departureTime": "2026-12-04T15:00:00Z",
+    "arrivalAirport": {"@type": "Airport", "iataCode": "DEN"},
+    "arrivalTime": "2026-12-04T18:10:00Z"
+  }
+}
+</script><style>.t { color: #000 }</style></head>
+<body><p>CANARY-BODY-UTCCONV-6M2W Your flight is confirmed.</p>
+<table><tr><td>Departs Chicago O'Hare 9:00 AM</td></tr><tr><td>Arrives Denver 11:10 AM</td></tr></table>
+</body></html>
+--fxb1--

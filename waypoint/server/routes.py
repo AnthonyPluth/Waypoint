@@ -19,12 +19,13 @@ from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
 from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loyalty_remove, api_loyalty_reveal
 from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, api_person_add, api_person_claim,
                           api_person_edit, api_person_remove)
-from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_scan, api_mailboxes
+from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_reread, api_mailbox_scan, api_mailboxes
 from .api.reminders import (api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
                             api_reminders_set)
-from .api.review import api_review, api_review_dismiss, api_review_ignore, api_review_who
+from .api.review import (api_review, api_review_dismiss, api_review_ignore, api_review_preview, api_review_suggest,
+                         api_review_who)
 from .api.state import api_state
-from .api.stats import api_stats
+from .api.stats import api_distance_unit, api_distance_unit_save, api_stats
 
 
 # (method, path pattern, handler): each handler takes (conn, query, body, *path params) and returns the JSON reply, or
@@ -57,6 +58,8 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/import/preview", api_import_preview),
     ("POST", "/api/import", api_import),
     ("GET", "/api/stats", api_stats),
+    ("GET", "/api/distance-unit", api_distance_unit),
+    ("POST", "/api/distance-unit", api_distance_unit_save),
     ("GET", "/api/flight-status", api_flight_statuses),
     ("POST", "/api/flight-status/{id}", api_flight_status_refresh),
     ("GET", "/api/loyalty", api_loyalty),
@@ -69,6 +72,7 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/mailboxes/callback", api_mailbox_callback),
     ("DELETE", "/api/mailboxes/{id}", api_mailbox_disconnect),
     ("POST", "/api/mailboxes/{id}/scan", api_mailbox_scan),
+    ("POST", "/api/mailboxes/{id}/reread", api_mailbox_reread),
     ("GET", "/api/reminders", api_reminders),
     ("POST", "/api/reminders", api_reminders_set),
     ("POST", "/api/reminders/devices", api_device_add),
@@ -78,6 +82,8 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/review", api_review),
     ("POST", "/api/review/who/{id}", api_review_who),
     ("POST", "/api/review/{id}/ignore", api_review_ignore),
+    ("GET", "/api/review/{id}/preview", api_review_preview),
+    ("POST", "/api/review/{id}/suggest", api_review_suggest),
     ("DELETE", "/api/review/{id}", api_review_dismiss),
     ("GET", "/api/state", api_state),
 ]

@@ -1,5 +1,5 @@
 """Waypoint's database schema, for SQLite and Postgres alike. Alembic migrations (waypoint/storage/migrations) create and change it."""
-from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, MetaData, Table, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, MetaData, Table, Text, UniqueConstraint, false
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 
@@ -133,6 +133,7 @@ segments = Table(
     Column('source', Text, nullable=False),
     Column('booked_by', Integer, refers('segments', 'booked_by', 'people.id', 'SET NULL')),
     Column('locked_fields', Text),
+    Column('check_times', Boolean, nullable=False, server_default=false()),
     Index('ix_segments_trip_id', 'trip_id'),
     Index('ix_segments_booked_by', 'booked_by'),
     info={'doc': "one flight leg, hotel stay, car rental or train; times are local wall-clock times with the place's IANA zone"},

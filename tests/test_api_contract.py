@@ -18,7 +18,7 @@ from waypoint import oidc
 from waypoint.providers import gmail
 from waypoint.domain import people as people_domain
 from waypoint.domain import trips
-from waypoint.domain.mail import review
+from waypoint.domain.mail import review, scan
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
 from waypoint.server.api import ai as ai_api
@@ -153,6 +153,7 @@ class Replies(DbCase):
         self.check("GET /api/mailboxes", reply)
         with mock.patch.object(jobs, "scan_now", return_value=True):
             self.check("POST /api/mailboxes/{id}/scan", mailboxes.api_mailbox_scan(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
+            self.check("POST /api/mailboxes/{id}/reread", mailboxes.api_mailbox_reread(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
         with mock.patch.object(gmail, "_post", return_value={}):
             self.check("DELETE /api/mailboxes/{id}", mailboxes.api_mailbox_disconnect(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
 
@@ -175,6 +176,10 @@ class Replies(DbCase):
         self.check("GET /api/review", listed)
         self.check("POST /api/review/who/{id}", review_api.api_review_who(self.c, {}, {"person_id": me.person_id}, str(listed["who"][0]["id"])))
         self.check("POST /api/review/{id}/ignore", review_api.api_review_ignore(self.c, {}, {}, str(listed["items"][0]["id"])))
+        with mock.patch.object(scan, "preview", return_value=("Hello.", False)):
+            self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][1]["id"])))
+        with mock.patch.object(scan, "suggest_now"):
+            self.check("POST /api/review/{id}/suggest", review_api.api_review_suggest(None, {}, {}, str(listed["items"][1]["id"])))
         self.check("DELETE /api/review/{id}", review_api.api_review_dismiss(self.c, {}, {}, str(listed["items"][1]["id"])))
 
     def test_ai(self):
@@ -274,6 +279,8 @@ class Replies(DbCase):
                                                 "end_local": "2026-06-08T10:00"})
         self.check("GET /api/stats", stats_api.api_stats(self.c, {}, {}))
         self.check("GET /api/stats", stats_api.api_stats(self.c, {"person": ["all"], "year": ["2026"]}, {}))
+        self.check("GET /api/distance-unit", stats_api.api_distance_unit(self.c, {}, {}))
+        self.check("POST /api/distance-unit", stats_api.api_distance_unit_save(self.c, {}, {"distance_unit": "km"}))
 
     def test_flight_status(self):
         _current.user = {"name": None, "email": None, "local": True}
@@ -301,7 +308,7 @@ class Mismatches(unittest.TestCase):
 
     def test_a_renamed_field_a_wrong_type_and_a_missing_one(self):
         st = {"version": "dev", "database": "sqlite", "user": {"name": None, "email": None, "local": True},
-              "last_backup": None, "review_count": 0}
+              "last_backup": None, "review_count": 0, "person_id": None}
         schema = reply_schema("GET /api/state")
         self.assertEqual(problems(st, schema), [])
         renamed = {("backed_up" if k == "last_backup" else k): v for k, v in st.items()}
@@ -322,8 +329,10 @@ class Generated(unittest.TestCase):
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
                                      "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan",
+                                     "POST /api/mailboxes/{id}/reread",
                                      "GET /api/ai", "POST /api/ai",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "DELETE /api/review/{id}",
+                                     "GET /api/review/{id}/preview", "POST /api/review/{id}/suggest",
                                      "GET /api/people", "POST /api/people",
                                      "POST /api/people/{id}", "DELETE /api/people/{id}", "POST /api/people/{id}/claim",
                                      "GET /api/people/claim-suggestions", "POST /api/people/claim-suggestions/dismiss",
@@ -332,7 +341,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
                                      "DELETE /api/segments/{id}", "GET /api/airports/{id}",
                                      "POST /api/import/preview", "POST /api/import",
-                                     "GET /api/stats", "GET /api/flight-status", "POST /api/flight-status/{id}",
+                                     "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
                                      "POST /api/loyalty/{id}/reveal",
                                      "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",

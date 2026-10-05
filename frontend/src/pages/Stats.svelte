@@ -1,0 +1,175 @@
+<script lang="ts">
+  import { errMsg } from "$lib/act";
+  import { app, route, setQuery } from "$lib/app.svelte";
+  import { apiCall } from "$lib/contract";
+  import type { Person, Stats } from "$lib/api-types";
+  import { Alert, AlertDescription } from "$lib/components/ui/alert";
+  import { Button } from "$lib/components/ui/button";
+  import TopList, { type Row } from "$lib/components/stats/TopList.svelte";
+  import { comparisons, count, countryName, distance, duration, monthLabel, parseSelection, selectionQuery, share, statsPath } from "$lib/stats";
+  import { dateLabel } from "$lib/trips";
+
+  // Travel stats for one person or everyone, in one year or all time. The choice lives in the address (#stats?who=2&year=2025).
+  // What was loaded is kept with the choice it answers, so numbers for another choice are never drawn as current; a failed
+  // load says so, leaves the pickers working and offers Try again.
+  const me = $derived(app.state?.person_id ?? null);
+  const sel = $derived(parseSelection(route.query, me));
+  const key = $derived(`${sel.who}/${sel.year}`);
+
+  let people = $state<Person[]>([]);
+  let loaded = $state<{ key: string; stats: Stats } | null>(null);
+  let years = $state<number[]>([]);   // the last years list the server gave, so the picker stays put while the next load runs
+  let failed = $state<{ key: string; message: string } | null>(null);
+  let attempt = 0;
+
+  async function load(want: string, path: ReturnType<typeof statsPath>) {
+    const mine = ++attempt;
+    try {
+      const s = await apiCall<"GET /api/stats">(path);
+      if (mine !== attempt) return;
+      loaded = { key: want, stats: s }; years = s.years; failed = null;
+    } catch (err) { if (mine === attempt) { loaded = null; failed = { key: want, message: errMsg(err) }; } }
+  }
+  $effect(() => { void load(key, statsPath(sel)); });
+  $effect(() => {
+    // The names for the picker: if they don't load, Everyone and your own numbers still work.
+    apiCall<"GET /api/people">("/api/people").then((p) => { people = p.people; }).catch(() => { people = []; });   // (the picker falls back to Everyone)
+  });
+
+  const current = $derived(loaded && loaded.key === key ? loaded.stats : null);
+  const problem = $derived(failed && failed.key === key ? failed.message : "");
+  const yearChoices = $derived(sel.year !== null && !years.includes(sel.year) ? [sel.year, ...years] : years);
+  const pick = (who: number | "all", year: number | null) => setQuery(selectionQuery({ who, year }, me));
+  const whoName = $derived(sel.who === "all" ? "Everyone" : people.find((p) => p.id === sel.who)?.display_name ?? "this person");
+  const unit = $derived(current?.distance_unit ?? "mi");
+
+  const f = $derived(current?.flights);
+  const empty = $derived(!!current && current.flights.count === 0 && current.stays.nights === 0 && current.cars.days === 0);
+  const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
+  const tiles = $derived(current && f ? [
+    { label: "Flights", value: count(f.count) },
+    { label: "Distance", value: distance(f.distance_km, unit), note: comparisons(f) },
+    { label: "In the air", value: duration(f.air_seconds) },
+    { label: "Airports", value: count(f.airports.length) },
+    { label: "Airlines", value: count(f.airlines.length) },
+    { label: "Countries", value: count(current.places.countries.length) },
+    { label: "Nights away", value: count(current.stays.nights) },
+  ] : []);
+
+  const named = (rows: { name: string; count: number }[], unitWord: string): Row[] => rows.map((r) => ({ key: r.name, name: r.name, value: plural(r.count, unitWord) }));
+  const lists = $derived<{ title: string; rows: Row[] }[]>(current && f ? [
+    { title: "Routes", rows: f.routes.map((r) => ({ key: `${r.a}-${r.b}`, name: `${r.a} – ${r.b}`, sub: r.distance_km === null ? null : distance(r.distance_km, unit), value: plural(r.flights, "flight") })) },
+    { title: "Airports", rows: f.airports.map((a) => ({ key: a.code, name: a.code, sub: [a.name === a.code ? null : a.name, a.city].filter(Boolean).join(", ") || null, value: plural(a.visits, "visit") })) },
+    { title: "Airlines", rows: f.airlines.map((a) => ({ key: `${a.code}/${a.name}`, name: a.name, value: plural(a.flights, "flight") })) },
+    { title: "Countries", rows: current.places.countries.map((c) => ({ key: c.name, name: countryName(c.name), sub: `First visit ${dateLabel(c.first_visit)}`, value: plural(c.visits, "visit") })) },
+    { title: "Hotel chains", rows: named(current.stays.chains, "stay") },
+    { title: "Rental companies", rows: named(current.cars.companies, "rental") },
+  ] : []);
+
+  const airportName = (code: string) => f?.airports.find((a) => a.code === code);
+  const record = (r: NonNullable<Stats["flights"]["longest"]>) => ({ value: `${r.origin} – ${r.destination}`, detail: `${distance(r.distance_km, unit)} · ${dateLabel(r.start_local.slice(0, 10))}` });
+  type Record_ = { label: string; value: string; detail: string };
+  const records = $derived<Record_[]>(f ? [
+    f.longest && { label: "Longest flight", ...record(f.longest) },
+    f.shortest && { label: "Shortest flight", ...record(f.shortest) },
+    f.most_visited_airport && { label: "Most-visited airport", value: f.most_visited_airport, detail: airportName(f.most_visited_airport)?.name ?? "" },
+    f.busiest_month && { label: "Busiest month", value: monthLabel(f.busiest_month), detail: "" },
+  ].filter((r) => !!r) as Record_[] : []);
+
+  const cabinTotal = $derived(f ? f.cabins.reduce((n, c) => n + c.count, 0) : 0);
+  const seatTotal = $derived(f ? f.seat_positions.window + f.seat_positions.aisle + f.seat_positions.middle : 0);
+  const seatBars = $derived(f ? [["Window", f.seat_positions.window], ["Aisle", f.seat_positions.aisle], ["Middle", f.seat_positions.middle]] as [string, number][] : []);
+  const selectClass = "border-input bg-background dark:bg-input/40 w-full rounded-lg border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
+</script>
+
+{#snippet bars(title: string, rows: [string, number][], whole: number)}
+  <div class="space-y-2">
+    <h4 class="text-sm font-medium">{title}</h4>
+    <ul class="space-y-2">
+      {#each rows as [name, n] (name)}
+        <li>
+          <div class="flex justify-between text-sm"><span>{name}</span><span class="tabular-nums text-muted-foreground">{share(n, whole)}% · {count(n)}</span></div>
+          <div class="mt-1 h-2 rounded-full bg-muted" aria-hidden="true"><div class="h-2 rounded-full bg-primary" style:width="{share(n, whole)}%"></div></div>
+        </li>
+      {/each}
+    </ul>
+  </div>
+{/snippet}
+
+<h1 class="mb-6 text-3xl font-semibold tracking-tight">Stats</h1>
+
+<div class="mb-6 grid grid-cols-2 gap-3">
+  <label class="space-y-1 text-sm font-medium">Who
+    <select class={selectClass} value={String(sel.who)} onchange={(e) => pick(e.currentTarget.value === "all" ? "all" : Number(e.currentTarget.value), sel.year)}>
+      <option value="all">Everyone</option>
+      {#each people as p (p.id)}<option value={String(p.id)}>{p.id === me ? `${p.display_name} (you)` : p.display_name}</option>{/each}
+      {#if typeof sel.who === "number" && !people.some((p) => p.id === sel.who)}<option value={String(sel.who)}>{whoName}</option>{/if}
+    </select>
+  </label>
+  <label class="space-y-1 text-sm font-medium">When
+    <select class={selectClass} value={String(sel.year ?? "all")} onchange={(e) => pick(sel.who, e.currentTarget.value === "all" ? null : Number(e.currentTarget.value))}>
+      <option value="all">All time</option>
+      {#each yearChoices as y (y)}<option value={String(y)}>{y}</option>{/each}
+    </select>
+  </label>
+</div>
+
+{#if problem}
+  <Alert role="alert"><AlertDescription class="flex flex-wrap items-center justify-between gap-3"><span>Couldn’t load the stats: {problem}</span><Button variant="outline" size="sm" onclick={() => load(key, statsPath(sel))}>Try again</Button></AlertDescription></Alert>
+{:else if !current}
+  <div class="space-y-4" aria-busy="true" aria-label="Loading">
+    <div class="h-28 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"></div>
+    <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"></div>
+  </div>
+{:else if empty}
+  <div class="rows" data-testid="stats-empty">
+    <div class="row flex-col items-start gap-3 py-6">
+      <p class="font-medium">{whoName === "Everyone" ? "Nothing finished" : `Nothing finished for ${whoName}`}{sel.year ? ` in ${sel.year}` : " yet"}.</p>
+      <p class="text-sm text-muted-foreground">Stats count flights, stays and rentals once they’re over.</p>
+      <div class="flex flex-wrap gap-2"><Button href="#trips">Add a trip</Button><Button variant="outline" href="#settings">Import past flights</Button></div>
+    </div>
+  </div>
+{:else if f}
+  <div class="space-y-8">
+    <section aria-label="Totals">
+      <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        {#each tiles as t (t.label)}
+          <div class="rounded-2xl border bg-card p-4 shadow-sm {t.note ? 'col-span-2 sm:col-span-1' : ''}">
+            <dt class="eyebrow">{t.label}</dt>
+            <dd class="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{t.value}</dd>
+            {#if t.note}{#each t.note as line (line)}<dd class="text-sm text-muted-foreground">{line}</dd>{/each}{/if}
+          </div>
+        {/each}
+      </dl>
+    </section>
+
+    <!-- The map (#30) goes here, between the totals and the lists: replace this placeholder with its component. -->
+    <section aria-label="Map" id="stats-map-slot" data-testid="stats-map-slot" class="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+      The map of where you’ve been is coming.
+    </section>
+
+    {#each lists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
+
+    {#if records.length}
+      <section aria-labelledby="records-title" class="space-y-2">
+        <h3 id="records-title" class="eyebrow px-1">Records</h3>
+        <dl class="rows">
+          {#each records as r (r.label)}
+            <div class="row"><dt class="text-muted-foreground">{r.label}</dt><dd class="text-right font-medium">{r.value}{#if r.detail}<span class="block text-sm font-normal text-muted-foreground">{r.detail}</span>{/if}</dd></div>
+          {/each}
+        </dl>
+      </section>
+    {/if}
+
+    {#if cabinTotal || seatTotal}
+      <section aria-labelledby="seats-title" class="space-y-3">
+        <h3 id="seats-title" class="eyebrow px-1">Seats</h3>
+        <div class="rows"><div class="row flex-col items-stretch gap-5 py-4">
+          {#if cabinTotal}{@render bars("Cabin", f.cabins.map((c) => [c.name, c.count]), cabinTotal)}{/if}
+          {#if seatTotal}{@render bars("Where you sit", seatBars, seatTotal)}{/if}
+          {#if f.top_seat}<p class="text-sm"><span class="text-muted-foreground">Top seat</span> <span class="font-medium">{f.top_seat}</span></p>{/if}
+        </div></div>
+      </section>
+    {/if}
+  </div>
+{/if}

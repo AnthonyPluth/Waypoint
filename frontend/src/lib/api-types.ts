@@ -65,6 +65,14 @@ export interface Disconnected {
   revoked: boolean;
 }
 
+export interface DistanceUnit {
+  distance_unit: "mi" | "km";
+}
+
+export interface DistanceUnitBody {
+  distance_unit: "mi" | "km";
+}
+
 export interface FeedMade {
   url: string;
 }
@@ -255,6 +263,15 @@ export interface PersonLink {
   on: string;
 }
 
+/**
+ * A review item's message as plain text, fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps
+ * none of it.
+ */
+export interface Preview {
+  text: string;
+  truncated: boolean;
+}
+
 /** A browser or phone that gets this member's notifications. */
 export interface ReminderDevice {
   id: number;
@@ -292,6 +309,7 @@ export interface Revealed {
 export interface Review {
   items: ReviewItem[];
   who: WhoIsThis[];
+  ai: boolean;
 }
 
 /**
@@ -335,6 +353,7 @@ export interface Segment {
   source: "manual" | "email" | "import";
   booked_by: number | null;
   locked_fields: string[];
+  check_times: boolean;
   travelers: Traveler[];
   links: SegmentLinks;
 }
@@ -405,9 +424,11 @@ export interface State {
   user: SignedIn | null;
   last_backup: string | null;
   review_count: number;
+  person_id: number | null;
 }
 
 export interface Stats {
+  years: number[];
   person: number | null;
   year: number | null;
   distance_unit: "mi" | "km";
@@ -590,6 +611,8 @@ export interface Endpoints {
   "POST /api/import/preview": { body: never; reply: ImportPreview };
   "POST /api/import": { body: ImportBody; reply: Imported };
   "GET /api/stats": { body: never; reply: Stats };
+  "GET /api/distance-unit": { body: never; reply: DistanceUnit };
+  "POST /api/distance-unit": { body: DistanceUnitBody; reply: DistanceUnit };
   "GET /api/flight-status": { body: never; reply: FlightStatusList };
   "POST /api/flight-status/{id}": { body: never; reply: FlightStatusList };
   "GET /api/loyalty": { body: never; reply: LoyaltyList };
@@ -601,6 +624,7 @@ export interface Endpoints {
   "POST /api/mailboxes/connect": { body: never; reply: Started };
   "DELETE /api/mailboxes/{id}": { body: never; reply: Disconnected };
   "POST /api/mailboxes/{id}/scan": { body: never; reply: ScanStarted };
+  "POST /api/mailboxes/{id}/reread": { body: never; reply: ScanStarted };
   "GET /api/reminders": { body: never; reply: Reminders };
   "POST /api/reminders": { body: RemindersBody; reply: Reminders };
   "POST /api/reminders/devices": { body: DeviceBody; reply: ReminderDevice };
@@ -610,6 +634,8 @@ export interface Endpoints {
   "GET /api/review": { body: never; reply: Review };
   "POST /api/review/who/{id}": { body: WhoBody; reply: Matched };
   "POST /api/review/{id}/ignore": { body: never; reply: Ok };
+  "GET /api/review/{id}/preview": { body: never; reply: Preview };
+  "POST /api/review/{id}/suggest": { body: never; reply: Ok };
   "DELETE /api/review/{id}": { body: never; reply: Ok };
   "GET /api/state": { body: never; reply: State };
 }

@@ -94,3 +94,13 @@ def api_mailbox_scan(conn, _q, _b, mailbox_id: str) -> ScanStarted:
     if not any(m["id"] == n for m in gmail.listing(conn, owner())):
         raise ApiError("Not found", 404)
     return {"started": jobs.scan_now(n)}
+
+
+def api_mailbox_reread(conn, _q, _b, mailbox_id: str) -> ScanStarted:
+    """Read bookings again: read once more the messages this mailbox already found that made bookings (no new search), so
+    bookings stored from an earlier reading are corrected; what a person edited is kept. It runs in the background, and
+    Settings shows how it went. Someone else's mailbox is a 404, as one that isn't there."""
+    n = row_id(mailbox_id)
+    if not any(m["id"] == n for m in gmail.listing(conn, owner())):
+        raise ApiError("Not found", 404)
+    return {"started": jobs.scan_now(n, again=True)}
