@@ -40,6 +40,11 @@ def start(stop: threading.Event) -> list[threading.Thread]:
             job()
             if stop.wait(seconds):
                 return
+    try:
+        with db.session() as conn:
+            flightstatus.forget_key_pause(conn)
+    except Exception as e:   # never the details (they may name a row)
+        monitoring.report(e, values=False)
     threads = [threading.Thread(target=every, args=(SWEEP_EVERY, sweep_lapsed), daemon=True, name="gmail-lapse-sweep"),
                threading.Thread(target=every, args=(FLIGHT_STATUS_EVERY, check_flights), daemon=True, name="flight-status")]
     for t in threads:

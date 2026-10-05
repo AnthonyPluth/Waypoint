@@ -15,7 +15,9 @@ export async function loadFlightStatus(): Promise<void> {
 /** Fetch this segment's status now (the server holds a recent answer, and counts a call when it fetches); the reply
  *  carries this segment's status and the month's count, which replace what's held. Throws what the server said. */
 export async function refreshFlightStatus(segmentId: number): Promise<void> {
-  const got = await apiCall<"POST /api/flight-status/{id}">(`/api/flight-status/${segmentId}`, { method: "POST", failed: "Couldn’t refresh the status" });
+  let got: FlightStatusList;
+  try { got = await apiCall<"POST /api/flight-status/{id}">(`/api/flight-status/${segmentId}`, { method: "POST", failed: "Couldn’t refresh the status" }); }
+  catch (err) { await loadFlightStatus(); throw err; }   // a rate limit or a refused key paused fetching: show it
   const others = (flightStatus.list?.statuses ?? []).filter((s) => s.segment_id !== segmentId);
   flightStatus.list = { ...got, statuses: [...others, ...got.statuses] };
 }

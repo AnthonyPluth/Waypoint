@@ -172,6 +172,7 @@ flight_status = Table(
     Column('arr_terminal', Text),
     Column('arr_gate', Text),
     Column('fetched_at', Float, nullable=False),
+    Column('attempted_at', Float),
     info={'doc': "the last live status answer for a flight number on a local departure date (a cache shared by everyone on the flight, with no personal data; not part of a backup)"},
 )
 

@@ -27,7 +27,7 @@ const list = (extra: Partial<FlightStatusList> = {}): FlightStatusList =>
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-20T09:00:00-05:00"));   // ten hours before it leaves
-  vi.mocked(api).mockReset(); vi.mocked(toast.error).mockReset(); flightStatus.list = list();
+  vi.mocked(api).mockReset(); vi.mocked(toast.error).mockReset(); vi.mocked(toast).mockReset(); flightStatus.list = list();
 });
 afterEach(() => { vi.useRealTimers(); flightStatus.list = null; });
 
@@ -118,6 +118,22 @@ describe("a flight’s live status", () => {
     await waitFor(() => expect(screen.getByTestId("flight-status")).toHaveTextContent("Departed"));
     expect(flightStatus.list?.used).toBe(13);
     expect(flightStatus.list?.statuses.map((x) => x.segment_id).sort()).toEqual([7, 8]);   // the other flight’s kept
+  });
+
+  it("says so when the service has no status for the flight", async () => {
+    vi.mocked(api).mockResolvedValue(list({ statuses: [] }));
+    flightStatus.list = list({ statuses: [] });
+    render(FlightStatus, { segment: seg });
+    await userEvent.click(screen.getByRole("button", { name: "Check live status" }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("No live status found for this flight yet."));
+  });
+
+  it("reloads the list after a refused refresh, so a pause shows", async () => {
+    const paused = list({ paused: { until: "2026-11-20T10:00:00-05:00", reason: "rate" } });
+    vi.mocked(api).mockImplementation(async (path: string) => { if (path === "/api/flight-status") return paused; throw new Error("too many requests"); });
+    render(FlightStatus, { segment: seg });
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("(rate limit)"));
   });
 
   it("says what went wrong when the refresh fails, and keeps what it had", async () => {

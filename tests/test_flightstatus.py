@@ -59,7 +59,6 @@ class FakeService(HTTPServer):
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *a):
                 pass
-
             def do_GET(self):
                 self.server.calls.append({"path": self.path, "headers": dict(self.headers)})   # type: ignore[attr-defined]
                 code, body = self.server.answer   # type: ignore[attr-defined]
@@ -314,7 +313,6 @@ class Household(DbCase):
     def setUp(self):
         super().setUp()
         self.fake = serve_fake(self)
-        flightstatus._attempts.clear()
         for sub, name in (("u-jane", "Jane Doe"), ("u-sam", "Sam Doe")):
             oidc.remember_user(self.c, sub, f"{sub}@example.com", name, None)
         self.jane = Viewer(people.person_for_sub(self.c, "u-jane"))
@@ -489,7 +487,8 @@ class BudgetTests(Household):
         self.assertEqual(flightstatus.run_due(self.c, now + timedelta(minutes=59)), 0)
         self.assertEqual(len(self.fake.calls), 1)
         self.assertIsNone(flightstatus.usage(self.c, now + timedelta(hours=1, seconds=1)).paused)
-        self.assertEqual(flightstatus.run_due(self.c, now + timedelta(hours=1, minutes=1)), 1)   # and then it carries on
+        self.assertEqual(flightstatus.run_due(self.c, now + timedelta(hours=1, minutes=1)), 0)   # the refused check is used up
+        self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)   # and the next one carries on
         self.assertEqual(self.cached().state, "scheduled")   # type: ignore[union-attr]
 
     def test_a_key_rapidapi_refuses_pauses_too_and_a_garbled_pause_is_none(self):
@@ -503,7 +502,7 @@ class BudgetTests(Household):
             db.set_setting(self.c, sk.FLIGHT_STATUS_PAUSED, junk)
             self.assertIsNone(flightstatus.usage(self.c, now).paused, junk)
 
-    def test_a_failed_call_still_counts_and_is_retried_after_ten_minutes_not_every_round(self):
+    def test_a_failed_call_still_counts_and_uses_up_its_check(self):
         self.fake.answer = (500, {"message": "oops"})
         now = self.when("3h")
         out, err = _captured(lambda: flightstatus.run_due(self.c, now))
@@ -511,12 +510,29 @@ class BudgetTests(Household):
         self.assertEqual(self.used(), 1)
         self.assertIn("Flight status: The flight status service had a problem.", out)
         self.assertNotIn("EX101", out + err)   # never which flight
-        self.assertIsNone(self.cached())   # nothing kept, so the old answer (here none) isn't replaced by a bad one
-        self.assertEqual(flightstatus.run_due(self.c, now + timedelta(minutes=5)), 0)
+        self.assertEqual(self.cached().state, "unknown")   # type: ignore[union-attr]
+        for minutes in (5, 10, 60):   # not tried again until the next check, however long the outage
+            self.assertEqual(flightstatus.run_due(self.c, now + timedelta(minutes=minutes)), 0)
         self.fake.answer = (200, fixture("on_time"))
-        self.assertEqual(flightstatus.run_due(self.c, now + timedelta(minutes=10)), 1)
+        self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)   # the next check goes ahead
         self.assertEqual(self.cached().state, "scheduled")   # type: ignore[union-attr]
         self.assertEqual(self.used(), 2)
+
+    def test_a_failed_call_keeps_the_answer_held(self):
+        self.assertEqual(flightstatus.run_due(self.c, self.when("24h")), 1)
+        self.fake.answer = (500, {})
+        self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 1)
+        self.assertEqual(self.cached().state, "delayed")   # type: ignore[union-attr]
+        self.assertEqual(flightstatus.run_due(self.c, self.when("3h", timedelta(minutes=30))), 0)
+
+    def test_a_long_outage_costs_no_more_than_the_five_checks_and_survives_a_restart(self):
+        self.fake.answer = (500, {"message": "down"})
+        now = EARLY
+        while now < ARRIVES + timedelta(hours=8):
+            _captured(lambda: flightstatus.run_due(self.c, now))
+            now += timedelta(minutes=5)
+        self.assertEqual(len(self.fake.calls), 5)
+        self.assertEqual(self.used(ARRIVES), 5)
 
 
 def _captured(fn):
@@ -696,6 +712,18 @@ class JobTests(Household):
         self.assertNotIn(secret, out + err)
         self.assertIn("RuntimeError", err)
 
+    def test_a_refused_key_stops_pausing_fetching_when_waypoint_starts_again(self):
+        flightstatus._pause(self.c, self.when("3h"), "key")
+        self.assertIsNotNone(flightstatus.usage(self.c, self.when("3h")).paused)
+        flightstatus.forget_key_pause(self.c)
+        self.assertIsNone(flightstatus.usage(self.c, self.when("3h")).paused)
+        flightstatus._pause(self.c, self.when("3h"), "rate")   # a rate limit is Waypoint's to wait out
+        flightstatus.forget_key_pause(self.c)
+        self.assertEqual(flightstatus.usage(self.c, self.when("3h")).paused.reason, "rate")   # type: ignore[union-attr]
+        for junk in ("", "{", "[1]"):
+            db.set_setting(self.c, sk.FLIGHT_STATUS_PAUSED, junk)
+            flightstatus.forget_key_pause(self.c)
+
     def test_the_jobs_start_and_stop(self):
         stop = threading.Event()
         stop.set()
@@ -714,7 +742,6 @@ class StatusRoutes(RouteCase):
 
     def setUp(self):
         super().setUp()
-        flightstatus._attempts.clear()
         with db.session() as conn:
             conn.execute(FlightStatus.__table__.delete())
             for k in (sk.FLIGHT_STATUS_CALLS, sk.FLIGHT_STATUS_MONTH, sk.FLIGHT_STATUS_PAUSED):

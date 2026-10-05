@@ -19,6 +19,7 @@
   import { Button } from "$lib/components/ui/button";
   import { flightStatus, refreshFlightStatus, statusFor } from "$lib/flightstatus.svelte";
   import { endAt } from "$lib/trips";
+  import { toast } from "svelte-sonner";
 
   // The live status of one flight segment, beside its booked times (which it never changes): the state, the time the flight
   // is now expected, the gate and terminal, when the answer came, and a Refresh. Nothing without RAPIDAPI_KEY. A parent
@@ -51,7 +52,10 @@
     return `Live status paused until ${time} (${p.reason === "rate" ? "rate limit" : "RapidAPI didn’t accept the key"})`;
   }
 
-  const refresh = () => act(() => refreshFlightStatus(segment.id), { busy: (on) => (busy = on) });
+  async function refresh() {
+    const ok = await act(() => refreshFlightStatus(segment.id), { busy: (on) => (busy = on) });
+    if (ok && !statusFor(segment.id) && !flightStatus.list?.paused) toast("No live status found for this flight yet.");
+  }
 </script>
 
 {#if list?.enabled && (s || !over)}

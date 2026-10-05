@@ -151,7 +151,8 @@ class FlightStatus(Base):
     arr_zone: Mapped[str | None]
     arr_terminal: Mapped[str | None]
     arr_gate: Mapped[str | None]
-    fetched_at: Mapped[float]        # when the answer came, seconds since the epoch
+    fetched_at: Mapped[float]        # when the answer came, seconds since the epoch (0 when no call has succeeded)
+    attempted_at: Mapped[float | None]   # when a call for it was last made, which used up that check whether or not it worked
 
 
 class Setting(Base):

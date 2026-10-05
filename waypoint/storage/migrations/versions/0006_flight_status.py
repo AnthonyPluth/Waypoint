@@ -33,6 +33,7 @@ def upgrade() -> None:
         sa.Column('arr_terminal', sa.Text()),
         sa.Column('arr_gate', sa.Text()),
         sa.Column('fetched_at', sa.Float(), nullable=False),
+        sa.Column('attempted_at', sa.Float()),
     )
 
 

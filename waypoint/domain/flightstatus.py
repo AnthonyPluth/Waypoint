@@ -7,7 +7,9 @@ answers for everyone on a flight, and for every segment that names it.
 When a flight is checked (`due`), a pure rule on the booked times, so it can be tested without a clock or a service:
   * at fixed points before the booked departure (CHECKS: 24 h, 3 h, 1 h and 20 min) and once at the booked arrival, at most
     five calls a flight; nothing for a flight more than 24 h out, one that has landed, was cancelled or diverted, or one
-    that arrived LATE ago. If Waypoint was off, it makes up only the latest check it missed.
+    that arrived LATE ago. If Waypoint was off, it makes up only the latest check it missed. A call that fails still
+    uses up its check (it's recorded as attempted, in the database), so an outage costs at most one call per check,
+    never a retry every few minutes.
   * from 90% of the monthly limit, only the 1 h check; at the limit, none; a "Refresh" press (`refresh`) is the viewer's
     to make and costs a call too, unless the answer is under REFRESH_AFTER old. A 429, or a key RapidAPI refuses, pauses
     fetching for an hour. The month is the machine's local month (TZ).
@@ -42,7 +44,6 @@ ONE_HOUR = "1h"                                 # the check that survives the 90
 REFRESH_AFTER = timedelta(minutes=15)           # a cached answer this young is what Refresh shows
 LATE = timedelta(hours=6)                       # checks stop this long after the booked arrival
 PAUSE = timedelta(hours=1)                      # after a 429, or a key RapidAPI refuses
-RETRY_AFTER = timedelta(minutes=10)             # before a check that failed is tried again
 KEEP_DAYS = 7                                   # cached answers go this long after the flight
 OVER = (service.LANDED, service.CANCELLED, service.DIVERTED)   # states with nothing more to learn
 
@@ -50,7 +51,6 @@ Reason = Literal["limit", "rate", "key"]
 Shown = Literal["scheduled", "delayed", "departed", "landed", "cancelled", "diverted"]   # (an unknown flight shows nothing)
 
 _lock = threading.Lock()
-_attempts: dict[tuple[str, str], datetime] = {}   # when each flight's last check was made, for RETRY_AFTER
 
 
 class NotAFlight(ValueError):
@@ -186,6 +186,16 @@ def _spend(conn: db.Connection, now: datetime) -> None:
         conn.commit()
 
 
+def forget_key_pause(conn: db.Connection) -> None:
+    """At startup: a pause for a refused key ends, so fixing RAPIDAPI_KEY and restarting takes effect at once."""
+    try:
+        refused = json.loads(db.get_setting(conn, sk.FLIGHT_STATUS_PAUSED) or "null")["reason"] == "key"
+    except (ValueError, TypeError, KeyError):
+        refused = False
+    if refused:
+        db.set_setting(conn, sk.FLIGHT_STATUS_PAUSED, None)
+
+
 def _pause(conn: db.Connection, now: datetime, reason: Reason) -> None:
     db.set_setting(conn, sk.FLIGHT_STATUS_PAUSED, json.dumps({"until": (now + PAUSE).timestamp(), "reason": reason}))
     conn.commit()
@@ -226,9 +236,16 @@ def _fetched(row: FlightStatus) -> datetime:
     return datetime.fromtimestamp(row.fetched_at, UTC)
 
 
+def _last_call(row: FlightStatus | None) -> datetime | None:
+    """When the flight's last call was made, whether it worked or not: what a check is measured against."""
+    if row is None:
+        return None
+    return datetime.fromtimestamp(max(row.fetched_at, row.attempted_at or 0.0), UTC)
+
+
 def _store(conn: db.Connection, flight: Flight, found: service.Status | None, now: datetime) -> None:
     """Keep the answer (an unknown flight is kept as one, so it isn't asked about again until the next check)."""
-    values = {"flight_number": flight.number, "date": flight.day, "fetched_at": now.timestamp(),
+    values = {"flight_number": flight.number, "date": flight.day, "fetched_at": now.timestamp(), "attempted_at": now.timestamp(),
               **{k: getattr(found or service.Status(service.UNKNOWN), k) for k in service.Status.__dataclass_fields__}}
     db.upsert(conn, FlightStatus, values, key=["flight_number", "date"])
 
@@ -238,17 +255,27 @@ def purge(conn: db.Connection, now: datetime) -> None:
     conn.execute(delete(FlightStatus).where(FlightStatus.date <= (now.astimezone().date() - timedelta(days=KEEP_DAYS)).isoformat()))
 
 
+def _note_failure(conn: db.Connection, flight: Flight, now: datetime) -> None:
+    """Record that a call was made and failed, so this check isn't made again (the answer held, if any, stays)."""
+    if (row := _cached(conn, flight.number, flight.day)) is not None:
+        row.attempted_at = now.timestamp()
+    else:   # (nothing to show: an unknown flight, as far as anyone can tell)
+        db.upsert(conn, FlightStatus, {"flight_number": flight.number, "date": flight.day, "state": service.UNKNOWN,
+                                       "fetched_at": 0.0, "attempted_at": now.timestamp()}, key=["flight_number", "date"])
+    conn.commit()
+
+
 def _check(conn: db.Connection, flight: Flight, now: datetime) -> None:
     """One call for the flight, kept. Raises what the provider raises; a rate limit or a refused key pauses fetching first."""
     _spend(conn, now)
-    _attempts[flight.number, flight.day] = now
     try:
         found = service.fetch(flight.number, flight.day, flight.origin)
-    except service.RateLimited:
-        _pause(conn, now, "rate")
-        raise
-    except service.Refused:
-        _pause(conn, now, "key")
+    except service.FlightStatusError as e:
+        _note_failure(conn, flight, now)
+        if isinstance(e, service.RateLimited):
+            _pause(conn, now, "rate")
+        elif isinstance(e, service.Refused):
+            _pause(conn, now, "key")
         raise
     _store(conn, flight, found, now)
     conn.commit()
@@ -266,9 +293,7 @@ def run_due(conn: db.Connection, now: datetime) -> int:
         if spent.paused:
             break
         row = _cached(conn, flight.number, flight.day)
-        if not due(flight, now, _fetched(row) if row else None, row.state if row else None, spent.reduced):
-            continue
-        if (tried := _attempts.get((flight.number, flight.day))) and now - tried < RETRY_AFTER:
+        if not due(flight, now, _last_call(row), row.state if row else None, spent.reduced):
             continue
         try:
             _check(conn, flight, now)
