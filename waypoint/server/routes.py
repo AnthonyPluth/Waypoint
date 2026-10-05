@@ -17,7 +17,8 @@ from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_e
 from .api.flight_import import api_import, api_import_preview
 from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
 from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loyalty_remove, api_loyalty_reveal
-from .api.people import api_people, api_person_add, api_person_edit, api_person_remove
+from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, api_person_add, api_person_claim,
+                          api_person_edit, api_person_remove)
 from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_scan, api_mailboxes
 from .api.reminders import (api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
                             api_reminders_set)
@@ -38,6 +39,9 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/people", api_person_add),
     ("POST", "/api/people/{id}", api_person_edit),
     ("DELETE", "/api/people/{id}", api_person_remove),
+    ("POST", "/api/people/{id}/claim", api_person_claim),
+    ("GET", "/api/people/claim-suggestions", api_claim_suggestions),
+    ("POST", "/api/people/claim-suggestions/dismiss", api_claim_dismiss),
     ("GET", "/api/trips", api_trips),
     ("POST", "/api/trips", api_trip_add),
     ("GET", "/api/trips/{id}", api_trip),

@@ -73,6 +73,8 @@ people = Table(
     Column('legal_name', Text),
     Column('aliases', Text),
     Column('user_sub', Text, refers('people', 'user_sub', 'users.sub', 'SET NULL')),
+    Column('links', Text),
+    Column('claim_dismissed', Boolean),
     Index('ux_people_user_sub', 'user_sub', unique=True),
     info={'doc': 'everyone who travels: household members (linked to their sign-in) and guests with no login'},
 )

@@ -8,7 +8,7 @@ from typing import Any
 from ... import validate
 from ...domain import loyalty
 from ..common import ApiError, row_id
-from ..contract import LoyaltyBody, LoyaltyEntry, LoyaltyList, Ok, Revealed
+from ..contract import LoyaltyBody, LoyaltyConflict, LoyaltyEntry, LoyaltyList, Ok, Revealed
 
 NUMBER_LIMIT = 64
 TEXT_LIMIT = 100
@@ -40,6 +40,7 @@ def fields(body: Mapping[str, Any], *, need_number: bool) -> loyalty.Fields:
 def api_loyalty(conn, _q, _b) -> LoyaltyList:
     """Every membership with its number masked, and the programs to choose from for each kind."""
     return {"loyalty": [LoyaltyEntry(**e) for e in loyalty.everyone(conn)],
+            "conflicts": [LoyaltyConflict(**c) for c in loyalty.conflicts(conn)],
             "programs": {k: list(p) for k, p in loyalty.PROGRAMS.items()}}
 
 

@@ -3,12 +3,13 @@ edited (People page)."""
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import date
 from typing import Any
 
 from ... import validate
 from ...domain import people
-from ..common import ApiError, row_id
-from ..contract import Ok, People, Person, PersonBody
+from ..common import ApiError, _current, row_id
+from ..contract import ClaimSuggestions, Ok, People, Person, PersonBody
 
 NAME_LIMIT = 100
 MAX_ALIASES = 20
@@ -39,6 +40,16 @@ def fields(body: Mapping[str, Any]) -> people.Fields:
             "aliases": aliases}
 
 
+def signed_in_member(conn) -> tuple[int | None, str | None]:
+    """The signed-in member's person and the name their sign-in gave: (None, None) without a login (your own machine, or
+    someone with no person yet)."""
+    user = getattr(_current, "user", None) or {}
+    sub = user.get("sub")
+    if user.get("local") or not sub:
+        return None, None
+    return people.person_for_sub(conn, str(sub)), user.get("name")
+
+
 def api_people(conn, _q, _b) -> People:
     """Everyone who travels: members first, then guests."""
     return {"people": [Person(**p) for p in people.everyone(conn)]}
@@ -64,4 +75,35 @@ def api_person_remove(conn, _q, _b, person_id) -> Ok:
             raise ApiError("No such person", 404)
     except people.MemberRemoval:
         raise ApiError("A member can’t be removed here: they’re part of the household because they sign in.", 409) from None
+    return {"ok": True}
+
+
+def api_person_claim(conn, _q, _b, person_id) -> Person:
+    """"This is me": the signed-in member claims a guest as themselves, and the guest's trips, numbers and names become
+    theirs. Only for themselves: the request names the guest, never who claims it."""
+    member, _ = signed_in_member(conn)
+    if member is None:
+        raise ApiError("Sign in as a household member to link a guest to yourself.", 403)
+    try:
+        return Person(**people.claim_guest(conn, member, row_id(person_id, "No such person"), date.today().isoformat()))
+    except people.NoSuchGuest:
+        raise ApiError("No such person", 404) from None
+    except people.NotAGuest:
+        raise ApiError("That person is a household member, not a guest.", 409) from None
+    except people.NotAMember:
+        raise ApiError("Sign in as a household member to link a guest to yourself.", 403) from None
+
+
+def api_claim_suggestions(conn, _q, _b) -> ClaimSuggestions:
+    """The guests the signed-in member may be: their name matches and they have no trips yet."""
+    member, name = signed_in_member(conn)
+    found = people.claim_suggestions(conn, member, name) if member is not None else []
+    return {"guests": [Person(**g) for g in found]}
+
+
+def api_claim_dismiss(conn, _q, _b) -> Ok:
+    """"None of these": stop suggesting guests to the signed-in member."""
+    member, _ = signed_in_member(conn)
+    if member is not None:
+        people.dismiss_claims(conn, member)
     return {"ok": True}

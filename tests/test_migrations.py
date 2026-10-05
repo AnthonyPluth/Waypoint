@@ -295,6 +295,7 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0009")
             self.assertNotIn("airlines", sa.inspect(c).get_table_names())
             command.upgrade(db.alembic_config(c), "0010")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:
             a = schema.airlines.c
@@ -307,6 +308,24 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0009")
             self.assertNotIn("airlines", sa.inspect(c).get_table_names())
             self.assertIn("scanned_messages", sa.inspect(c).get_table_names())
+
+    def test_0011_adds_the_claim_columns_to_people_and_takes_them_away(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0010")
+            self.assertNotIn("links", {col["name"] for col in sa.inspect(c).get_columns("people")})
+            c.execute(insert(schema.people).values(display_name="Mia Doe"))
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:   # someone from before has no links and hasn't turned the suggestion down
+            row = conn.execute(select(schema.people.c.links, schema.people.c.claim_dismissed)).fetchone()
+            self.assertEqual((row[0], row[1]), (None, None))
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0010")
+            names = {col["name"] for col in sa.inspect(c).get_columns("people")}
+            self.assertEqual(names & {"links", "claim_dismissed"}, set())
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.people)).scalar(), 1)
 
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating

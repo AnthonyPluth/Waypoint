@@ -25,7 +25,8 @@ const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: 
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] }); vi.mocked(api).mockReset(); });
 afterEach(() => { vi.useRealTimers(); flightStatus.list = null; });
 
-const serve = (trips: unknown[]) => vi.mocked(api).mockResolvedValue({ trips });
+const serve = (trips: unknown[], guests: unknown[] = []) =>
+  vi.mocked(api).mockImplementation(async (path) => (path === "/api/people/claim-suggestions" ? { guests } : { trips }));
 const at = (iso: string) => vi.setSystemTime(new Date(iso));
 
 describe("Upcoming", () => {
@@ -34,6 +35,36 @@ describe("Upcoming", () => {
     render(Upcoming);
     expect(screen.getByRole("heading", { name: "Upcoming" })).toBeInTheDocument();
     expect(await screen.findByText(/No trips yet — they’ll appear here once Waypoint can read your confirmation emails, or when you add one\./)).toBeInTheDocument();
+  });
+
+  it("asks a member with no trips whether they are one of the matching guests, and links the one they pick", async () => {
+    const mia = { id: 2, display_name: "Mia Doe", first_name: null, legal_name: null, aliases: [], member: false, links: [] };
+    serve([], [mia]);
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: "Are you one of these?" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "This is me: Mia Doe" }));
+    const dialog = await screen.findByRole("dialog", { name: "Link Mia Doe to you?" });
+    expect(dialog).toHaveTextContent(/can’t be undone in Waypoint/);
+    serve([london], []);
+    await userEvent.click(within(dialog).getByRole("button", { name: "This is me" }));
+    expect(api).toHaveBeenCalledWith("/api/people/2/claim", { method: "POST" });
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Are you one of these?" })).toBeNull());
+  });
+
+  it("None of these hides the suggestion", async () => {
+    serve([], [{ id: 2, display_name: "Mia Doe", first_name: null, legal_name: null, aliases: [], member: false, links: [] }]);
+    render(Upcoming);
+    await userEvent.click(await screen.findByRole("button", { name: "None of these" }));
+    expect(api).toHaveBeenCalledWith("/api/people/claim-suggestions/dismiss", { method: "POST" });
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Are you one of these?" })).toBeNull());
+    expect(screen.getByRole("heading", { name: "No trips yet" })).toBeInTheDocument();
+  });
+
+  it("offers nothing when no guest matches, or when there are trips", async () => {
+    serve([]);
+    render(Upcoming);
+    await screen.findByRole("heading", { name: "No trips yet" });
+    expect(screen.queryByRole("heading", { name: "Are you one of these?" })).toBeNull();
   });
 
   it("leads with the next segment: countdown, flight, departure time, terminal, and a code to tap and copy", async () => {

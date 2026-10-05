@@ -17,8 +17,8 @@ const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
   start_local: "2026-12-08T08:00", start_zone: "America/New_York", ...extra });
-const mia: Person = { id: 2, display_name: "Mia Doe", first_name: null, legal_name: null, aliases: [], member: false };
-const jane: Person = { id: 1, display_name: "Jane Doe", first_name: null, legal_name: null, aliases: [], member: true };
+const mia: Person = { id: 2, display_name: "Mia Doe", first_name: null, legal_name: null, aliases: [], member: false, links: [] };
+const jane: Person = { id: 1, display_name: "Jane Doe", first_name: null, legal_name: null, aliases: [], member: true, links: [] };
 
 /** The server, with what's waiting kept in `held`: answers the calls the page makes. */
 let held: Review;

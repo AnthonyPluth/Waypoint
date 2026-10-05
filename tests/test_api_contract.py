@@ -193,6 +193,14 @@ class Replies(DbCase):
         pid = listed["people"][1]["id"]
         self.check("POST /api/people/{id}", people.api_person_edit(self.c, {}, {"display_name": "Mia D.", "legal_name": "Mia Rose Doe"}, str(pid)))
         self.check("DELETE /api/people/{id}", people.api_person_remove(self.c, {}, {}, str(pid)))
+        oidc.remember_user(self.c, "u9", "nell@example.com", "Nell Example")
+        _current.user = {"sub": "u9", "name": "Nell Example", "email": "nell@example.com"}
+        people.api_person_add(self.c, {}, {"display_name": "Nell Example"})
+        self.check("GET /api/people/claim-suggestions", people.api_claim_suggestions(self.c, {}, {}))
+        found = people.api_claim_suggestions(self.c, {}, {})["guests"]
+        self.assertEqual(len(found), 1)
+        self.check("POST /api/people/claim-suggestions/dismiss", people.api_claim_dismiss(self.c, {}, {}))
+        self.check("POST /api/people/{id}/claim", people.api_person_claim(self.c, {}, {}, str(found[0]["id"])))
 
     def test_import(self):
         _current.user = {"name": None, "email": None, "local": True}
@@ -210,6 +218,9 @@ class Replies(DbCase):
         body = {"person_id": who, "kind": "airline", "program": "American AAdvantage", "number": "DEMO1234567", "expiry": "2029-01-31"}
         added = loyalty.api_loyalty_add(self.c, {}, body)
         self.check("POST /api/loyalty", added)
+        self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))
+        loyalty.api_loyalty_add(self.c, {}, {**body, "number": "DEMO7654321"})   # a second number for the program: flagged
+        self.assertEqual(len(loyalty.api_loyalty(self.c, {}, {})["conflicts"]), 1)
         self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))
         self.check("POST /api/loyalty/{id}", loyalty.api_loyalty_edit(self.c, {}, {**body, "number": None}, str(added["id"])))
         self.check("POST /api/loyalty/{id}/reveal", loyalty.api_loyalty_reveal(self.c, {}, {}, str(added["id"])))
@@ -314,7 +325,8 @@ class Generated(unittest.TestCase):
                                      "GET /api/ai", "POST /api/ai",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "DELETE /api/review/{id}",
                                      "GET /api/people", "POST /api/people",
-                                     "POST /api/people/{id}", "DELETE /api/people/{id}",
+                                     "POST /api/people/{id}", "DELETE /api/people/{id}", "POST /api/people/{id}/claim",
+                                     "GET /api/people/claim-suggestions", "POST /api/people/claim-suggestions/dismiss",
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",

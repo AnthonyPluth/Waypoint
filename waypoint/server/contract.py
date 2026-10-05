@@ -177,10 +177,23 @@ class Person(TypedDict):
     legal_name: str | None         # as on an ID
     aliases: list[str]             # how airlines print the name ("DOE/JANE MS")
     member: bool
+    links: list[PersonLink]        # the guests this member claimed ("This is me"), oldest first
+
+
+class PersonLink(TypedDict):
+    """A guest a member claimed: their name, the member who claimed it and the day (YYYY-MM-DD)."""
+    guest: str
+    by: str
+    on: str
 
 
 class People(TypedDict):
     people: list[Person]            # members first, then guests
+
+
+class ClaimSuggestions(TypedDict):
+    """Guests the signed-in member may be (their name matches, and they have no trips yet), for "Are you one of these?"."""
+    guests: list[Person]
 
 
 class PersonBody(TypedDict):
@@ -414,8 +427,16 @@ class LoyaltyEntry(TypedDict):
     notes: str | None
 
 
+class LoyaltyConflict(TypedDict):
+    """A person with two different numbers for one program (both are kept); People says so."""
+    person_id: int
+    kind: str
+    program: str
+
+
 class LoyaltyList(TypedDict):
     loyalty: list[LoyaltyEntry]
+    conflicts: list[LoyaltyConflict]
     programs: dict[str, list[str]]  # the programs to choose from, by kind
 
 

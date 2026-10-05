@@ -149,6 +149,52 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/api/people/{id}/claim",
+      "handler": "waypoint/server/api/people.py:api_person_claim",
+      "web": [
+        "frontend/src/pages/People.svelte",
+        "frontend/src/pages/Upcoming.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_people.py"
+      ],
+      "docs": [
+        "start/people"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/people/claim-suggestions",
+      "handler": "waypoint/server/api/people.py:api_claim_suggestions",
+      "web": [
+        "frontend/src/pages/Upcoming.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_people.py"
+      ],
+      "docs": [
+        "start/people"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/people/claim-suggestions/dismiss",
+      "handler": "waypoint/server/api/people.py:api_claim_dismiss",
+      "web": [
+        "frontend/src/pages/Upcoming.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_people.py"
+      ],
+      "docs": [
+        "start/people"
+      ]
+    },
+    {
       "method": "GET",
       "path": "/api/trips",
       "handler": "waypoint/server/api/trips.py:api_trips",

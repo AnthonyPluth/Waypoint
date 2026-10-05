@@ -7,11 +7,13 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
-import type { LoyaltyEntry, Person } from "$lib/api-types";
+import type { LoyaltyEntry, LoyaltyList, Person } from "$lib/api-types";
+import { app } from "$lib/app.svelte";
+import { state } from "../test/fixtures";
 import People from "./People.svelte";
 
-const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true };
-const mia: Person = { id: 2, display_name: "Mia Doe", first_name: "Mia", legal_name: "Mia Rose Doe", aliases: ["DOE/MIA MISS"], member: false };
+const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
+const mia: Person = { id: 2, display_name: "Mia Doe", first_name: "Mia", legal_name: "Mia Rose Doe", aliases: ["DOE/MIA MISS"], member: false, links: [] };
 
 const PROGRAMS = { airline: ["American AAdvantage", "Other"], hotel: ["Marriott Bonvoy", "Other"], car: ["Other"], known_traveler: ["TSA PreCheck", "Other"], redress: ["DHS TRIP", "Other"] };
 const aa: LoyaltyEntry = { id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, tier: "Gold", expiry: null, notes: null };
@@ -20,9 +22,10 @@ const tsa: LoyaltyEntry = { id: 12, person_id: 1, kind: "known_traveler", progra
 /** The server, with its people kept in `held` and their memberships in `ids`: answers the calls the page makes. */
 let held: Person[];
 let ids: LoyaltyEntry[];
+let conflicts: LoyaltyList["conflicts"];
 function serve() {
   vi.mocked(api).mockImplementation(async (path, opts) => {
-    if (path === "/api/loyalty" && !opts) return { loyalty: ids, programs: PROGRAMS };
+    if (path === "/api/loyalty" && !opts) return { loyalty: ids, programs: PROGRAMS, conflicts };
     if (path.startsWith("/api/loyalty")) {
       const id = Number(path.split("/")[3]);
       if (path.endsWith("/reveal")) return { number: "DEMO1234567" };
@@ -34,11 +37,16 @@ function serve() {
       return next;
     }
     const id = Number(path.split("/")[3]);
+    if (path.endsWith("/claim")) {   // the signed-in member (Jane) takes the guest
+      const guest = held.find((p) => p.id === id)!;
+      held = held.filter((p) => p.id !== id).map((p) => (p.id === 1 ? { ...p, links: [{ guest: guest.display_name, by: p.display_name, on: "2026-10-05" }] } : p));
+      return held[0];
+    }
     if (opts?.method === "DELETE") { held = held.filter((p) => p.id !== id); return { ok: true }; }
     if (opts?.method === "POST") {
       const b = opts.body as { display_name: string; first_name: string; legal_name: string; aliases: string[] };
       const next: Person = { id: id || 9, display_name: b.display_name, first_name: b.first_name || null, legal_name: b.legal_name || null,
-        aliases: b.aliases.filter(Boolean), member: held.find((p) => p.id === id)?.member ?? false };
+        aliases: b.aliases.filter(Boolean), member: held.find((p) => p.id === id)?.member ?? false, links: [] };
       held = id ? held.map((p) => (p.id === id ? next : p)) : [...held, next];
       return next;
     }
@@ -46,7 +54,7 @@ function serve() {
   });
 }
 
-beforeEach(() => { vi.mocked(api).mockReset(); held = [jane, mia]; ids = [aa, tsa]; serve(); });
+beforeEach(() => { vi.mocked(api).mockReset(); held = [jane, mia]; ids = [aa, tsa]; conflicts = []; app.state = state(); serve(); });
 
 describe("People", () => {
   it("lists members and guests, with the names an airline matches", async () => {
@@ -63,6 +71,45 @@ describe("People", () => {
     expect(screen.getByRole("button", { name: "Remove Mia Doe" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove Jane Doe" })).toBeNull();
     expect(screen.getByRole("button", { name: "Edit Jane Doe" })).toBeInTheDocument();
+  });
+
+  it("offers This is me on a guest to a signed-in member, never on a member, and not without sign-in", async () => {
+    render(People);
+    await screen.findByRole("list", { name: "People" });
+    expect(screen.getByRole("button", { name: "This is me: Mia Doe" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "This is me: Jane Doe" })).toBeNull();
+  });
+
+  it("hides This is me on your own machine, where nobody signs in", async () => {
+    app.state = state({ user: { name: null, email: null, local: true } });
+    render(People);
+    await screen.findByRole("list", { name: "People" });
+    expect(screen.queryByRole("button", { name: /This is me/ })).toBeNull();
+  });
+
+  it("says it can't be undone, links the guest once confirmed and shows the link", async () => {
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "This is me: Mia Doe" }));
+    const dialog = await screen.findByRole("dialog", { name: "Link Mia Doe to you?" });
+    expect(dialog).toHaveTextContent(/can’t be undone in Waypoint: restoring a backup is the way back/);
+    await userEvent.click(within(dialog).getByRole("button", { name: "This is me" }));
+    expect(api).toHaveBeenCalledWith("/api/people/2/claim", { method: "POST" });
+    expect(await screen.findByText("Linked from guest Mia Doe by Jane Doe on 2026-10-05")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /This is me/ })).toBeNull();
+  });
+
+  it("Cancel keeps the guest unlinked", async () => {
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "This is me: Mia Doe" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(api).not.toHaveBeenCalledWith("/api/people/2/claim", expect.anything());
+  });
+
+  it("flags two numbers for one program rather than picking one", async () => {
+    conflicts = [{ person_id: 1, kind: "airline", program: "American AAdvantage" }];
+    render(People);
+    expect(await screen.findByText(/Two numbers for American AAdvantage/)).toBeInTheDocument();
   });
 
   it("adds a guest, with its aliases one to a line", async () => {

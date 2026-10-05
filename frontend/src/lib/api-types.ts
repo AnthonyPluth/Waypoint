@@ -48,6 +48,11 @@ export interface BackupContents {
   database: "sqlite" | "postgres";
 }
 
+/** Guests the signed-in member may be (their name matches, and they have no trips yet), for "Are you one of these?". */
+export interface ClaimSuggestions {
+  guests: Person[];
+}
+
 /** A browser's push subscription (`PushSubscription.toJSON()`). */
 export interface DeviceBody {
   endpoint: string;
@@ -162,6 +167,13 @@ export interface LoyaltyBody {
   notes?: string | null;
 }
 
+/** A person with two different numbers for one program (both are kept); People says so. */
+export interface LoyaltyConflict {
+  person_id: number;
+  kind: string;
+  program: string;
+}
+
 /** One membership. The number comes only masked (its last four characters); `POST /api/loyalty/{id}/reveal` gives it. */
 export interface LoyaltyEntry {
   id: number;
@@ -177,6 +189,7 @@ export interface LoyaltyEntry {
 
 export interface LoyaltyList {
   loyalty: LoyaltyEntry[];
+  conflicts: LoyaltyConflict[];
   programs: Record<string, string[]>;
 }
 
@@ -221,6 +234,7 @@ export interface Person {
   legal_name: string | null;
   aliases: string[];
   member: boolean;
+  links: PersonLink[];
 }
 
 /**
@@ -232,6 +246,13 @@ export interface PersonBody {
   first_name?: string | null;
   legal_name?: string | null;
   aliases?: string[];
+}
+
+/** A guest a member claimed: their name, the member who claimed it and the day (YYYY-MM-DD). */
+export interface PersonLink {
+  guest: string;
+  by: string;
+  on: string;
 }
 
 /** A browser or phone that gets this member's notifications. */
@@ -551,6 +572,9 @@ export interface Endpoints {
   "POST /api/people": { body: PersonBody; reply: Person };
   "POST /api/people/{id}": { body: PersonBody; reply: Person };
   "DELETE /api/people/{id}": { body: never; reply: Ok };
+  "POST /api/people/{id}/claim": { body: never; reply: Person };
+  "GET /api/people/claim-suggestions": { body: never; reply: ClaimSuggestions };
+  "POST /api/people/claim-suggestions/dismiss": { body: never; reply: Ok };
   "GET /api/trips": { body: never; reply: TripList };
   "POST /api/trips": { body: TripBody; reply: Trip };
   "GET /api/trips/{id}": { body: never; reply: Trip };
