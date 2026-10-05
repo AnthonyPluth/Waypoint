@@ -69,6 +69,14 @@ def _family_now(today: date) -> list[trips.SegmentIn]:
     ]
 
 
+# Grandma Joan flies home on the same flight as the family, on a reservation of her own: the trip shows that flight once, with a
+# block for each booking.
+def _joan_home(today: date) -> trips.SegmentIn:
+    return {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": _at(today, 4, "11:30"), "end_local": _at(today, 4, "14:35"),
+            "confirmation": "MW5T9Z", "provider": "American Airlines", "details": {"flight_number": "AA 102", "terminal": "3"},
+            "manage_url": "https://example.com/manage/MW5T9Z"}
+
+
 def _jane_alone(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": _at(today, 20, "08:00"), "end_local": _at(today, 20, "11:20"),
@@ -123,8 +131,11 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
         people.ensure_member(conn, sub, name, first)
     guests = [people.add_guest(conn, guest)["id"] for guest in GUESTS]
     jane, sam = (Viewer(people.person_for_sub(conn, sub)) for sub in ("demo-jane", "demo-sam"))
+    family_trip = None
     for fields in (*_family_past(today), *_family_now(today)):
-        trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0])})
+        added = trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0])})
+        family_trip = added["trip_id"] if added and (fields.get("details") or {}).get("flight_number") == "AA 102" else family_trip
+    trips.add_segment(conn, jane, {**_joan_home(today), "travelers": _on(guests[1])}, family_trip)
     for fields in _jane_alone(today):
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id)})
     for fields in _sam_alone(today):

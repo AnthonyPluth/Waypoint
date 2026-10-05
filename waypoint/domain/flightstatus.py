@@ -207,7 +207,8 @@ def _flight(seg: Segment) -> Flight | None:
     """The flight a segment is, when it's one that can be asked about."""
     if seg.kind != "flight" or seg.status == "cancelled":
         return None
-    number = service.normalize(trips.decode_details(seg.details).get("flight_number"))
+    raw = trips.decode_details(seg.details).get("flight_number")
+    number = service.normalize(trips.flight_key(raw) or raw)   # (AA04001 and AA 4001 are one flight: one call)
     if not number:
         return None
     return Flight(number, seg.start_local[:10], seg.origin, trips.instant(seg.start_local, seg.start_zone),

@@ -35,3 +35,9 @@ class DemoTests(DbCase):
 
     def test_keeps_its_trips_around_today_across_a_year_end(self):
         self.check_dates(date(2026, 12, 30))
+
+    def test_the_family_flight_home_is_on_two_bookings_one_flight(self):
+        demo.seed(self.c, date(2026, 10, 5))
+        found = [s for t in trips.listing(self.c, Viewer(None, household=True)) for s in t["segments"] if s["details"].get("flight_number") == "AA 102"]
+        self.assertEqual(len({s["confirmation"] for s in found}), 2)
+        self.assertEqual([len(g) for g in trips.flight_groups(found)], [2])

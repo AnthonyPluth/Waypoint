@@ -15,12 +15,13 @@
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, subline } from "$lib/trips";
+  import { bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, subline } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Plus from "@lucide/svelte/icons/plus";
   import { toast } from "svelte-sonner";
 
-  // One trip: each booking as a card, with its local times, travellers and the number each would use. A failed load leaves
+  // One trip: each booking as a card (a flight on two bookings is one card, with a block for each booking), with its local times,
+  // travellers and the number each would use. A failed load leaves
   // nothing drawn that could pass for current, with a Try again.
   let trip = $state<Trip | null>(null);
   let people = $state<Person[]>([]);
@@ -48,6 +49,7 @@
   }
   $effect(() => { void id; form = null; void load(); });
 
+  const cards = $derived(trip ? bookingCards(trip.segments) : []);
   const kindName = (s: Segment) => KINDS.find(([k]) => k === s.kind)?.[1] ?? s.kind;
   const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
 
@@ -94,58 +96,116 @@
     <p class="text-muted-foreground">Nothing booked on this trip yet.</p>
   {/if}
   <ul class="flex flex-col gap-4" aria-label="Bookings">
-    {#each t.segments as s (s.id)}
-      {@const live = s.status !== "cancelled"}
-      <li class="pass" class:opacity-70={s.status === "cancelled"}>
-        <div class="flex flex-col gap-2 p-5 md:p-6">
-          <p class="flex flex-wrap items-center gap-2"><span class="eyebrow">{kindName(s)}</span>
-            {#if s.status !== "confirmed"}<Badge variant={s.status === "cancelled" ? "destructive" : "secondary"}>{s.status === "cancelled" ? "Cancelled" : "Changed"}</Badge>{/if}
-            {#if s.locked_fields.length}<Badge variant="outline" title="A later email won’t change what you edited">Edited by you</Badge>{/if}</p>
-          <h2 class="break-words text-xl font-semibold tracking-tight" class:line-through={s.status === "cancelled"}>{headline(s)}</h2>
-          {#if subline(s)}<p class="break-words text-sm text-muted-foreground">{subline(s)}</p>{/if}
-          {#if s.kind === "flight" && s.status !== "cancelled"}<FlightStatus segment={s} />{/if}
-          <dl class="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-            <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
-              <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, <PlaceTime local={s.start_local} zone={s.start_zone} /></dd></div>
-            <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
-              <dd class="mt-1 text-base font-medium">{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} /></dd></div>
-            {#if s.confirmation}<div><dt class="eyebrow">Confirmation</dt><dd class="mt-1 text-lg"><CopyCode code={s.confirmation} /></dd></div>{/if}
-          </dl>
-          {#if s.links.app || (live && (s.links.directions || s.links.call || ios))}
-            <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
-              {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord}</Button>{/if}
-              {#if live && ios}<Button variant="outline" size="sm" href="shoebox://">Wallet</Button>{/if}
-              {#if live && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
-              {#if live && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
-            </div>
-          {/if}
-        </div>
-        <div class="pass-tear" aria-hidden="true"></div>
-        <div class="flex flex-col gap-3 p-5 md:p-6">
-          <h3 class="eyebrow">Travellers</h3>
-          {#if s.travelers.length === 0}<p class="text-sm text-muted-foreground">Nobody is listed on this booking.</p>{/if}
-          <ul class="flex flex-col gap-2">
-            {#each s.travelers as who (who.id)}
-              {@const m = membershipFor(s, who, loyalty)}
-              <li class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-                <span class="break-words font-medium">{who.name}</span>
-                <span class="text-muted-foreground">
-                  {#if m?.state === "found"}{m.entry.program} <LoyaltyNumber entry={m.entry} />
-                  {:else if m?.state === "none"}No {m.program} number yet · <a class="underline" href="#people">add one in People</a>
-                  {:else if m?.state === "unmatched"}Not matched to a person in <a class="underline" href="#people">People</a>{/if}
-                </span>
-              </li>
-            {/each}
-          </ul>
-          <div class="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" aria-label={`Edit ${headline(s)}`} onclick={() => (form = draftOf(s))}>Edit</Button>
-            <Button variant="outline" size="sm" aria-label={`Remove ${headline(s)}`} onclick={() => { removing = s; asking = true; }}>Remove</Button>
+    {#each cards as card (card.id)}
+      {@const s = card.lead}
+      {@const live = !card.cancelled}
+      {#if card.segments.length === 1}
+        <li class="pass" class:opacity-70={s.status === "cancelled"}>
+          <div class="flex flex-col gap-2 p-5 md:p-6">
+            {@render heading(s)}
+            {#if s.kind === "flight" && s.status !== "cancelled"}<FlightStatus segment={s} />{/if}
+            <dl class="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              {@render times(s)}
+              {#if s.confirmation}<div><dt class="eyebrow">Confirmation</dt><dd class="mt-1 text-lg"><CopyCode code={s.confirmation} /></dd></div>{/if}
+            </dl>
+            {@render links(s)}
           </div>
-        </div>
-      </li>
+          <div class="pass-tear" aria-hidden="true"></div>
+          <div class="flex flex-col gap-3 p-5 md:p-6">
+            <h3 class="eyebrow">Travellers</h3>
+            {@render travellerList(s)}
+            {@render buttons(s, headline(s))}
+          </div>
+        </li>
+      {:else}
+        <!-- One flight on several bookings: the flight once, then a block for each booking. -->
+        <li class="pass" class:opacity-70={card.cancelled} aria-label={`${headline(s)}, on ${card.segments.length} bookings`}>
+          <div class="flex flex-col gap-2 p-5 md:p-6">
+            {@render heading(s, card.cancelled)}
+            {#if live}<FlightStatus segment={s} />{/if}
+            {#if card.timesDiffer}
+              <p class="mt-2 text-sm font-medium" data-times-differ><Badge variant="secondary">Times differ between bookings</Badge> <span class="text-muted-foreground">Each booking’s times are below.</span></p>
+            {:else}
+              <dl class="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render times(s)}</dl>
+            {/if}
+          </div>
+          <div class="pass-tear" aria-hidden="true"></div>
+          <div class="flex flex-col gap-4 p-5 md:p-6">
+            <h3 class="eyebrow">Bookings</h3>
+            <ul class="flex flex-col gap-4" aria-label={`Bookings of ${headline(s)}`}>
+              {#each card.segments as b (b.id)}
+                {@const name = `${headline(b)} booking${b.confirmation ? ` ${b.confirmation}` : ""}`}
+                <li class="flex flex-col gap-3 rounded-xl border border-border p-4" class:opacity-70={b.status === "cancelled"} data-booking>
+                  <p class="flex flex-wrap items-center gap-2">
+                    {#if b.confirmation}<span class="text-lg"><CopyCode code={b.confirmation} /></span>{:else}<span class="text-muted-foreground">No confirmation code</span>{/if}
+                    {#if b.status !== "confirmed"}<Badge variant={b.status === "cancelled" ? "destructive" : "secondary"}>{b.status === "cancelled" ? "Cancelled" : "Changed"}</Badge>{/if}
+                    {#if b.locked_fields.length}<Badge variant="outline" title="A later email won’t change what you edited">Edited by you</Badge>{/if}</p>
+                  {#if card.timesDiffer && b.status !== "cancelled"}
+                    <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render times(b)}</dl>
+                  {/if}
+                  {@render links(b)}
+                  <h4 class="eyebrow">Travellers</h4>
+                  {@render travellerList(b)}
+                  {@render buttons(b, name)}
+                </li>
+              {/each}
+            </ul>
+          </div>
+        </li>
+      {/if}
     {/each}
   </ul>
 {/if}
+
+{#snippet heading(s: Segment, cancelled: boolean = s.status === "cancelled")}
+  <p class="flex flex-wrap items-center gap-2"><span class="eyebrow">{kindName(s)}</span>
+    {#if cancelled}<Badge variant="destructive">Cancelled</Badge>{:else if s.status !== "confirmed"}<Badge variant="secondary">Changed</Badge>{/if}
+    {#if s.locked_fields.length}<Badge variant="outline" title="A later email won’t change what you edited">Edited by you</Badge>{/if}</p>
+  <h2 class="break-words text-xl font-semibold tracking-tight" class:line-through={cancelled}>{headline(s)}</h2>
+  {#if subline(s)}<p class="break-words text-sm text-muted-foreground">{subline(s)}</p>{/if}
+{/snippet}
+
+{#snippet times(s: Segment)}
+  <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
+    <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, <PlaceTime local={s.start_local} zone={s.start_zone} /></dd></div>
+  <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
+    <dd class="mt-1 text-base font-medium">{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} /></dd></div>
+{/snippet}
+
+{#snippet links(s: Segment)}
+  {#if s.links.app || (s.status !== "cancelled" && (s.links.directions || s.links.call || ios))}
+    <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
+      {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord}</Button>{/if}
+      {#if s.status !== "cancelled" && ios}<Button variant="outline" size="sm" href="shoebox://">Wallet</Button>{/if}
+      {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
+      {#if s.status !== "cancelled" && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet travellerList(s: Segment)}
+  {#if s.travelers.length === 0}<p class="text-sm text-muted-foreground">Nobody is listed on this booking.</p>{/if}
+  <ul class="flex flex-col gap-2">
+    {#each s.travelers as who (who.id)}
+      {@const m = membershipFor(s, who, loyalty)}
+      <li class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+        <span class="break-words font-medium">{who.name}</span>
+        <span class="text-muted-foreground">
+          {#if m?.state === "found"}{m.entry.program} <LoyaltyNumber entry={m.entry} />
+          {:else if m?.state === "none"}No {m.program} number yet · <a class="underline" href="#people">add one in People</a>
+          {:else if m?.state === "unmatched"}Not matched to a person in <a class="underline" href="#people">People</a>{/if}
+        </span>
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
+{#snippet buttons(s: Segment, name: string)}
+  <div class="flex flex-wrap gap-2">
+    <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => (form = draftOf(s))}>Edit</Button>
+    <Button variant="outline" size="sm" aria-label={`Remove ${name}`} onclick={() => { removing = s; asking = true; }}>Remove</Button>
+  </div>
+{/snippet}
 
 <ConfirmDialog bind:open={asking} title={`Remove ${removing ? headline(removing) : "this booking"}?`} confirmLabel="Remove" busyLabel="Removing…" destructive
   description="It’s deleted from the trip. This can’t be undone."

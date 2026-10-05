@@ -138,6 +138,16 @@ segment_travelers = Table(
     info={'doc': 'who a segment is for: a person, or until matched to one, the name as printed on the booking'},
 )
 
+segment_recipients = Table(
+    'segment_recipients', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('segment_id', Integer, refers('segment_recipients', 'segment_id', 'segments.id', 'CASCADE'), nullable=False),
+    Column('person_id', Integer, refers('segment_recipients', 'person_id', 'people.id', 'CASCADE'), nullable=False),
+    UniqueConstraint('segment_id', 'person_id', name='uq_segment_recipients_segment_person'),
+    Index('ix_segment_recipients_person_id', 'person_id'),
+    info={'doc': "who got a booking's confirmation in their own mailbox without being on it (the same email in two household members' mailboxes): they see its trip"},
+)
+
 loyalty_ids = Table(
     'loyalty_ids', metadata,
     Column('id', Integer, primary_key=True, autoincrement=True),

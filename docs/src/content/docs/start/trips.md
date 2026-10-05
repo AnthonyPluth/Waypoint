@@ -21,7 +21,7 @@ A segment’s time is always shown as it is at the place. When your own time zon
 
 ## Who sees a trip
 
-You see a trip when you are travelling on any of its segments, or when you booked it (the trip, or any of its segments). Nobody else sees it, however they ask: its address answers “not found”, the same as a trip that doesn’t exist. A solo work trip stays its traveller’s. If you book a trip for a guest (a child, a grandparent), you see it because you booked it. Add someone as a traveller on a segment and the whole trip is shared with them.
+You see a trip when you are travelling on any of its segments, when you booked it (the trip, or any of its segments), or when the confirmation of one of its bookings came to your own connected mailbox (see [One booking, one segment](#one-booking-one-segment)). Nobody else sees it, however they ask: its address answers “not found”, the same as a trip that doesn’t exist. A solo work trip stays its traveller’s. If you book a trip for a guest (a child, a grandparent), you see it because you booked it. Add someone as a traveller on a segment and the whole trip is shared with them.
 
 Without sign-in, on your own machine, everyone is the one local household, which sees every trip.
 
@@ -49,6 +49,14 @@ A trip’s dates are the local dates of its first and last segments.
 ## How segments are grouped
 
 Without a trip named, a new segment joins an existing grouped trip when it is within two days of it, the trip hasn’t already got back to where it began before the segment starts, and everyone the segment involves (its travellers and whoever booked it) is already on the trip. Otherwise it starts a trip of its own, so one person’s solo trip never takes in another person’s booking. You can **rename** a trip, **merge** two of yours into one and **split** some segments off into a new one; a trip you merged or split is yours from then on, and grouping leaves it alone. A merge is refused unless the same people are on both trips, so nobody is shown a segment of a trip they aren’t on.
+
+## One flight, one card
+
+When the same flight is booked on two reservations (a family split across two confirmation codes), each booking stays its own segment, so its change and cancellation emails, its manage link and your edits land on the right one. Waypoint shows them together: **one card per flight** (the same flight number, local departure date and airports) with the route, times and live status once, then a **Bookings** section with a block for each confirmation code: the code to tap and copy, its travellers with their loyalty numbers, and its own Edit and Remove. If the bookings disagree on the times (one was changed and the other not yet), the card says **Times differ between bookings** and shows each booking’s times in its block instead of picking one. Upcoming shows the flight once, with every code. The calendar feed has one event for the flight, listing every booking’s code, and the check-in and day-of reminders and the flight-status check count it once. Hotels and rental cars are never grouped.
+
+## One booking, one segment
+
+A confirmation email that arrives twice (in one mailbox, or in two household members’ mailboxes) makes one segment, not two. Waypoint matches a booking across the whole household by its kind, confirmation code (ignoring case and spaces), places and date, and its flight number however it is written (`AA 4001`, `AA4001` and `AA04001` are one flight) and the provider after tidying its name (“American Airlines Inc.” and “American Airlines” are the same). A different confirmation code on the same flight is another booking. When the email came to someone who isn’t on the booking’s trip, they are noted as having received its confirmation and see that trip: the email is already in their own mailbox, so this shows them nothing new, and nobody else gains access.
 
 ## What your edits keep
 

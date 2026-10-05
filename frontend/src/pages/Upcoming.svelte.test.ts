@@ -121,4 +121,29 @@ describe("Upcoming", () => {
     expect(await screen.findByRole("heading", { name: "JFK → LHR" })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("Waypoint is unreachable")).toBeNull());
   });
+
+  it("shows a flight on two bookings once, with each booking’s code to copy", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const second = segment({ id: 10, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe" }] });
+    serve([trip([outbound, second, stay, home])]);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR", level: 2 })).closest("section")!;
+    expect(within(card).getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Copy confirmation code BBBBBB" })).toBeInTheDocument();
+    expect(within(card).queryByText("Times differ between bookings")).toBeNull();
+    const days = screen.getByRole("list", { name: "Trip to London, day by day" });
+    expect(within(days).getAllByText("JFK → LHR")).toHaveLength(1);   // (one row for the flight, not one per booking)
+    expect(within(days).getByText("2 bookings")).toBeInTheDocument();
+  });
+
+  it("says when the bookings of a flight disagree on its times, and gives each booking’s", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const moved = segment({ id: 10, confirmation: "BBBBBB", start_local: "2026-11-20T21:30", details: { flight_number: "AA 101" } });
+    serve([trip([outbound, moved, stay, home])]);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR", level: 2 })).closest("section")!;
+    expect(within(card).getByText("Times differ between bookings")).toBeInTheDocument();
+    expect(within(card).getByText(/^KQ7M2X: departs/)).toHaveTextContent(/departs Fri, Nov 20, 7:00 PM.*arrives Sat, Nov 21, 7:10 AM/);
+    expect(within(card).getByText(/^BBBBBB: departs/)).toHaveTextContent(/departs Fri, Nov 20, 9:30 PM/);
+  });
 });

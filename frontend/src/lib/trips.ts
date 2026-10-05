@@ -75,13 +75,65 @@ export function until(ms: number): string {
 export const startAt = (s: Segment): number => instant(s.start_local, s.start_zone);
 export const endAt = (s: Segment): number => instant(s.end_local, s.end_zone);
 
-export type NextUp = { trip: Trip; segment: Segment; state: "now" | "next" };
+// ------------------------------------------------------------------------------------------ one card per flight
+
+const FLIGHT_NUMBER = /^([A-Z0-9]{2,3}?)0*(\d{1,4}[A-Z]?)$/;
+
+/** A flight number as one flight has it however it's written (carrier code and number, no spaces or leading zeros, upper
+ *  case), as the server's `flight_key`: "AA 4001", "aa4001" and "AA04001" are all AA4001. Null for text that isn't one. */
+export function flightKey(number: string | undefined | null): string | null {
+  const found = FLIGHT_NUMBER.exec((number ?? "").replace(/[\s-]/g, "").toUpperCase());
+  return found ? `${found[1]}${found[2]}` : null;
+}
+
+/** One card on a screen: a booking, or the bookings of one flight (each keeps its own segment, with its code, travellers
+ *  and edits). `lead` is the one whose details the card shows: the first that isn't cancelled. */
+export type Card = { id: string; segments: Segment[]; lead: Segment; cancelled: boolean; timesDiffer: boolean };
+
+const groupKey = (s: Segment): string | null => {
+  const number = s.kind === "flight" ? flightKey(s.details.flight_number) : null;
+  return number ? [number, s.start_local.slice(0, 10), (s.origin ?? "").toUpperCase(), (s.destination ?? "").toUpperCase()].join("|") : null;
+};
+
+/** Whether the bookings that aren't cancelled don't agree on when the flight leaves or lands. */
+export const timesDiffer = (bookings: Segment[]): boolean =>
+  new Set(bookings.filter((s) => s.status !== "cancelled").map((s) => `${s.start_local}|${s.end_local}`)).size > 1;
+
+/** A trip's segments as cards: the bookings of one flight (the same flight number, local departure date and airports) are one
+ *  card; a stay, a rental, a train, a flight with no number or one nobody else booked is a card of its own. In the order the
+ *  segments come. `timesDiffer`: the bookings that aren't cancelled don't agree on when it leaves or lands, so the card
+ *  shows each booking's times rather than picking one. */
+export function bookingCards(segments: Segment[]): Card[] {
+  const cards: Card[] = [];
+  const byKey = new Map<string, Segment[]>();
+  for (const segment of segments) {
+    const key = groupKey(segment);
+    const into = key ? byKey.get(key) : undefined;
+    if (into) { into.push(segment); continue; }
+    const group = [segment];
+    if (key) byKey.set(key, group);
+    cards.push({ id: String(segment.id), segments: group, lead: segment, cancelled: false, timesDiffer: false });
+  }
+  for (const card of cards) {
+    const live = card.segments.filter((s) => s.status !== "cancelled");
+    card.lead = live[0] ?? card.segments[0];
+    card.cancelled = live.length === 0;
+    card.timesDiffer = timesDiffer(card.segments);
+  }
+  return cards;
+}
+
+export type NextUp = { trip: Trip; segment: Segment; bookings: Segment[]; state: "now" | "next" };
 
 /** The segment the Upcoming page leads with, among every trip you can see. One under way (a flight in the air, a rental
  *  out) leads: "now". Otherwise the one that starts soonest: "next". A hotel stay under way doesn't push the day's flight
- *  aside; it leads only when nothing else is left. Cancelled segments and ones that are over never lead. */
+ *  aside; it leads only when nothing else is left. Cancelled segments and ones that are over never lead. A flight on
+ *  several bookings is one: `segment` is the first, `bookings` all of them. */
 export function nextUp(trips: Trip[], now: number): NextUp | null {
-  const live = trips.flatMap((trip) => trip.segments.filter((s) => s.status !== "cancelled" && endAt(s) > now).map((segment) => ({ trip, segment })));
+  const live = trips.flatMap((trip) => bookingCards(trip.segments).flatMap((card) => {
+    const bookings = card.segments.filter((s) => s.status !== "cancelled" && endAt(s) > now);
+    return bookings.length ? [{ trip, segment: bookings[0], bookings }] : [];
+  }));
   const by = (a: { segment: Segment }, b: { segment: Segment }) => startAt(a.segment) - startAt(b.segment);
   const started = live.filter((x) => startAt(x.segment) <= now).sort(by);
   const going = started.find((x) => x.segment.kind !== "hotel");
@@ -106,18 +158,19 @@ export function splitTrips(trips: Trip[], today: string): { upcoming: Trip[]; pa
 export const featuredTrip = (trips: Trip[], next: NextUp | null, today: string): Trip | null =>
   next?.trip ?? splitTrips(trips, today).upcoming[0] ?? null;
 
-export type DayItem = { segment: Segment; role: "start" | "end" };
+export type DayItem = { segment: Segment; bookings: Segment[]; role: "start" | "end" };
 export type Day = { date: string; items: DayItem[] };
 
-/** A trip's days, in order, each with what happens on it: a segment on its start day, and a stay or rental's end on its
- *  last. Days with nothing on them are left out. Cancelled segments stay (struck through on the page). */
+/** A trip's days, in order, each with what happens on it: a card on its start day (a flight on two bookings once, with
+ *  `bookings` naming both), and a stay or rental's end on its last. Days with nothing on them are left out. Cancelled
+ *  segments stay (struck through on the page). */
 export function tripDays(trip: Trip): Day[] {
   const days = new Map<string, DayItem[]>();
   const put = (date: string, item: DayItem) => days.set(date, [...(days.get(date) ?? []), item]);
-  for (const segment of trip.segments) {
-    put(segment.start_local.slice(0, 10), { segment, role: "start" });
+  for (const { lead: segment, segments: bookings } of bookingCards(trip.segments)) {
+    put(segment.start_local.slice(0, 10), { segment, bookings, role: "start" });
     if ((segment.kind === "hotel" || segment.kind === "car") && segment.end_local.slice(0, 10) !== segment.start_local.slice(0, 10)) {
-      put(segment.end_local.slice(0, 10), { segment, role: "end" });
+      put(segment.end_local.slice(0, 10), { segment, bookings, role: "end" });
     }
   }
   return [...days].sort(([a], [b]) => a.localeCompare(b)).map(([date, items]) => ({

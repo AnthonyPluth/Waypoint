@@ -355,15 +355,20 @@ class MergeTests(ScanCase):
         [seg] = self.segments()
         self.assertEqual((seg["status"], seg["start_local"]), ("cancelled", "2026-11-20T21:30"))
 
-    def test_a_segment_the_owner_cannot_see_is_never_merged_into(self):
-        # Sam's mailbox gets the same email (for Mia): Jane's segment isn't Sam's to see, so he gets one of his own, and Jane
-        # still sees only hers; Mia is on both.
+    def test_the_same_confirmation_in_two_household_mailboxes_is_one_segment_both_owners_see(self):
+        # Sam's mailbox gets the same email Jane's did (the fake Gmail serves the same mail to both): it is the one booking, so
+        # Sam is noted as a recipient and sees Jane's trip, and Mia (a traveller on it) still sees one segment.
         self.put("flight_microdata")
         self.scan()
         sam_box = self.connect("u-sam", "sam@gmail.example", "refresh-sam-1")
-        self.scan(sam_box)   # (the fake Gmail serves the same mail to both)
-        self.assertEqual((len(self.segments(self.jane)), len(self.segments(self.sam)), len(self.segments(Viewer(self.mia)))), (1, 1, 2))
-        self.assertNotEqual(self.segments(self.jane)[0]["id"], self.segments(self.sam)[0]["id"])
+        self.scan(sam_box)
+        self.assertEqual((len(self.segments(self.jane)), len(self.segments(self.sam)), len(self.segments(Viewer(self.mia)))), (1, 1, 1))
+        self.assertEqual(self.segments(self.jane)[0]["id"], self.segments(self.sam)[0]["id"])
+
+    def test_a_segment_nobody_got_the_confirmation_for_stays_unseen(self):
+        self.put("flight_microdata")
+        self.scan()
+        self.assertEqual(len(self.segments(self.sam)), 0)
 
     def test_a_booking_without_a_confirmation_code_is_never_taken_for_another_segment(self):
         no_code = eml("hotel_jsonld").replace(b'  "reservationNumber": "H88231",\n', b"")
@@ -499,6 +504,58 @@ class ReviewTests(ScanCase):
         with mock.patch.object(gmail, "_post", return_value={}):
             self.read(lambda conn: gmail.disconnect(conn, self.mailbox, "u-jane"))
         self.assertEqual((self.items(), self.scanned()), ([], {}))
+
+
+class ConcurrentScanTests(ScanCase):
+    def test_a_second_scan_of_a_mailbox_that_is_being_scanned_is_busy_and_files_nothing_twice(self):
+        # (a scheduled scan and "Scan now" at once)
+        self.put("flight_jsonld")
+        inside, leave = threading.Event(), threading.Event()
+        real = gmail.search
+
+        def slow(*args, **kwargs):
+            inside.set()
+            leave.wait(5)
+            return real(*args, **kwargs)
+        results: list[scan.Result] = []
+        with mock.patch.object(gmail, "search", slow):
+            first = threading.Thread(target=lambda: results.append(self.scan()))
+            first.start()
+            self.assertTrue(inside.wait(5))
+            self.assertEqual(self.scan().state, "busy")
+            self.assertTrue(scan.running(self.mailbox))
+            leave.set()
+            first.join(10)
+        self.assertEqual([r.state for r in results], ["done"])
+        self.assertEqual(len(self.segments()), 1)
+        self.assertFalse(scan.running(self.mailbox))
+
+    def test_two_mailboxes_scanned_at_once_with_the_same_confirmation_make_one_segment(self):
+        self.put("flight_jsonld")
+        sam_box = self.connect("u-sam", "sam@gmail.example", "refresh-sam-1")
+        real, lock = ingest.file_booking, threading.Lock()
+        inside, most = [0], [0]
+
+        def watched(*args, **kwargs):
+            with lock:
+                inside[0] += 1
+                most[0] = max(most[0], inside[0])
+            time.sleep(0.3)   # (long enough for the other scan to arrive)
+            try:
+                return real(*args, **kwargs)
+            finally:
+                with lock:
+                    inside[0] -= 1
+        with mock.patch.object(ingest, "file_booking", watched):
+            threads = [threading.Thread(target=self.scan, args=(box,)) for box in (self.mailbox, sam_box)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(20)
+        self.assertEqual(most[0], 1)   # one booking is filed at a time, so the second finds the first
+        segs = self.read(lambda conn: conn.orm.scalars(select(Segment)).all())
+        self.assertEqual(len(segs), 1)
+        self.assertEqual((len(self.segments(self.jane)), len(self.segments(self.sam))), (1, 1))
 
 
 class LaterScanTests(ScanCase):

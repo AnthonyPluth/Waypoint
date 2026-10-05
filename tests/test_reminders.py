@@ -287,7 +287,7 @@ class SendingTests(Reminders):
         self.device()
         for i in range(7):
             self.add(self.jane, {**SAM_FLIGHT, "start_local": f"2026-11-20T0{i}:30", "end_local": f"2026-11-20T0{i}:50",
-                                 "confirmation": f"X{i}"}, self.out["trip_id"], travelers=self.on(self.jane.person_id))
+                                 "confirmation": f"X{i}", "details": {"flight_number": f"EX {70 + i}"}}, self.out["trip_id"], travelers=self.on(self.jane.person_id))
         self.due(LATER, hour=8)
         lines = next(m["body"] for _i, m in self.sent if m["title"] == "Today").split("\n")
         self.assertEqual((len(lines), lines[-1]), (6, "and 3 more"))

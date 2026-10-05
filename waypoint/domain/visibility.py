@@ -1,6 +1,6 @@
 """Who sees which trips (AGENTS.md, "You see the trips you're on"): a trip is visible to the people travelling on any of its
-segments and to whoever booked it (the trip, or any of its segments); nobody else, by any route. A segment is visible
-with its trip. This module is the only way trips and segments are read for a request: Semgrep's
+segments, to whoever booked it (the trip, or any of its segments) and to whoever got the confirmation of one of its
+bookings in their own mailbox (`segment_recipients`); nobody else, by any route. A segment is visible with its trip. This module is the only way trips and segments are read for a request: Semgrep's
 `waypoint-trip-visibility` keeps `select(Trip…)` and the rest out of waypoint/server/, so a route goes through these
 functions, and a trip or segment that isn't visible is answered as one that doesn't exist (a 404).
 
@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from sqlalchemy import ColumnElement, false, or_, select, true
 
 from ..storage import db
-from ..storage.models import Segment, SegmentTraveler, Trip
+from ..storage.models import Segment, SegmentRecipient, SegmentTraveler, Trip
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,9 @@ def can_see(viewer: Viewer) -> ColumnElement[bool]:
     travelling = select(Segment.trip_id).join(SegmentTraveler, SegmentTraveler.segment_id == Segment.id) \
         .where(SegmentTraveler.person_id == me)
     booked_a_segment = select(Segment.trip_id).where(Segment.booked_by == me)
-    return or_(Trip.booked_by == me, Trip.id.in_(travelling), Trip.id.in_(booked_a_segment))
+    received = select(Segment.trip_id).join(SegmentRecipient, SegmentRecipient.segment_id == Segment.id) \
+        .where(SegmentRecipient.person_id == me)
+    return or_(Trip.booked_by == me, Trip.id.in_(travelling), Trip.id.in_(booked_a_segment), Trip.id.in_(received))
 
 
 def visible_trips(conn: db.Connection, viewer: Viewer) -> list[Trip]:
@@ -82,3 +84,22 @@ def visible_unmatched(conn: db.Connection, viewer: Viewer) -> list[SegmentTravel
         select(SegmentTraveler).join(Segment, Segment.id == SegmentTraveler.segment_id)
         .join(Trip, Trip.id == Segment.trip_id).where(can_see(viewer), SegmentTraveler.person_id.is_(None))
         .order_by(SegmentTraveler.id)).all())
+
+
+def household_segments(conn: db.Connection, kind: str) -> list[Segment]:
+    """Every segment of this kind that has a confirmation code, whoever sees it. For the mail scan alone, to find the booking a
+    copy of an email is about when it's already on a trip the mailbox's owner isn't on; what it finds is never shown on its
+    own (`note_recipient` is what lets the owner see it), and nothing in waypoint/server/ calls it."""
+    return list(conn.orm.scalars(select(Segment).where(Segment.kind == kind, Segment.confirmation.is_not(None))
+                                 .order_by(Segment.id)).all())
+
+
+def note_recipient(conn: db.Connection, viewer: Viewer, segment: Segment) -> bool:
+    """The viewer got this booking's confirmation in their own mailbox, so they see its trip from now on: the email is
+    already theirs, and this shows them nothing else. Does nothing when they see the trip already (or aren't someone who
+    can be noted). True when it noted them."""
+    if viewer.household or viewer.person_id is None or visible_segment(conn, viewer, segment.id) is not None:
+        return False
+    db.insert_ignore(conn, SegmentRecipient, {"segment_id": segment.id, "person_id": viewer.person_id},
+                     key=["segment_id", "person_id"])
+    return True

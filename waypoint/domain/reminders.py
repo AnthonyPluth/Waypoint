@@ -16,7 +16,7 @@ import ipaddress
 import secrets
 import time
 import urllib.parse
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Literal, TypedDict
@@ -262,6 +262,11 @@ def _sent(conn: db.Connection, owner: str, kind: Kind, ref: str) -> bool:
                                                        ReminderSent.ref == ref)).fetchone() is not None
 
 
+def _live(segs: Sequence[SegmentOut]) -> list[SegmentOut]:
+    """The segments worth a reminder, a flight on several bookings once (the first one that isn't cancelled)."""
+    return [live[0] for group in trips.flight_groups(segs) if (live := [s for s in group if s["status"] != "cancelled"])]
+
+
 def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Send) -> int:
     """Send the reminders that are due, to the devices of members who may still sign in. `now` is a moment (aware);
     `today` and `hour` are the machine's local day and hour (the day-of summary's). Each reminder goes out once. Returns
@@ -276,9 +281,7 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
         mine = trips.listing(conn, viewer_for(conn, owner))
         if chosen["check_in"]:
             for trip in mine:
-                for seg in trip["segments"]:
-                    if seg["kind"] != "flight" or seg["status"] == "cancelled":
-                        continue
+                for seg in (s for s in _live(trip["segments"]) if s["kind"] == "flight"):
                     leaves = trips.instant(seg["start_local"], seg["start_zone"])
                     ref = f"{seg['id']}@{seg['start_local']}"   # a flight moved to another time gets its own reminder
                     if leaves - CHECK_IN_AHEAD <= now < leaves and not _sent(conn, owner, "check_in", ref) \
@@ -287,7 +290,7 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
                         sent += 1
         day = today.isoformat()
         if chosen["day_of"] and hour >= DAY_OF_HOUR and not _sent(conn, owner, "day_of", day):
-            starting = [(s, t) for t in mine for s in t["segments"] if s["status"] != "cancelled" and s["start_local"][:10] == day]
+            starting = [(s, t) for t in mine for s in _live(t["segments"]) if s["start_local"][:10] == day]
             if starting and _deliver(conn, owner, day_of_message(starting, day), send):
                 _record(conn, owner, "day_of", day, stamp)
                 sent += 1
