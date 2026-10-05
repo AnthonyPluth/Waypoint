@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from .trips import SegmentOut, TripOut
+from .trips import SegmentOut, TripOut, untimed
 
 PRODID = "-//Waypoint//Trips//EN"
 FOLD = 75   # a line's most octets (RFC 5545, 3.1)
@@ -126,10 +126,18 @@ def _description(seg: SegmentOut, trip: TripOut) -> str:
     return "\n".join(lines)
 
 
+def _times(seg: SegmentOut) -> list[str]:
+    """An event's start and end. A segment whose times are unknown (an imported flight with none) is an all-day event on
+    its day, not a time that was never given."""
+    if untimed(seg["details"]):
+        day = datetime.fromisoformat(seg["start_local"]).date()
+        return [f"DTSTART;VALUE=DATE:{day:%Y%m%d}", f"DTEND;VALUE=DATE:{day + timedelta(days=1):%Y%m%d}"]
+    return [f"DTSTART;TZID={seg['start_zone']}:{stamp(seg['start_local'])}", f"DTEND;TZID={seg['end_zone']}:{stamp(seg['end_local'])}"]
+
+
 def _event(seg: SegmentOut, trip: TripOut, now: datetime) -> list[str]:
     lines = ["BEGIN:VEVENT", f"UID:segment-{seg['id']}@waypoint", f"DTSTAMP:{now.astimezone(UTC):%Y%m%dT%H%M%SZ}",
-             f"DTSTART;TZID={seg['start_zone']}:{stamp(seg['start_local'])}",
-             f"DTEND;TZID={seg['end_zone']}:{stamp(seg['end_local'])}",
+             *_times(seg),
              f"SUMMARY:{escape(_title(seg))}", f"DESCRIPTION:{escape(_description(seg, trip))}"]
     place = seg["origin"] if seg["kind"] in ("hotel", "car") else None
     if place:
@@ -144,6 +152,8 @@ def feed(trips: Sequence[TripOut], now: datetime) -> str:
     pairs = [(seg, trip) for trip in trips for seg in trip["segments"]]
     spans: dict[str, tuple[date, date]] = {}
     for seg, _trip in pairs:
+        if untimed(seg["details"]):
+            continue
         for zone, local in ((seg["start_zone"], seg["start_local"]), (seg["end_zone"], seg["end_local"])):
             day = datetime.fromisoformat(local).date()
             low, high = spans.get(zone, (day, day))

@@ -212,6 +212,11 @@ def _day(local: str) -> str:
     return f"{t:%a} {t.day} {t:%b}"
 
 
+def _when(seg: SegmentOut) -> str:
+    """When a segment starts, as the day's summary says it: its clock time, or that none was recorded."""
+    return "Time not recorded" if trips.untimed(seg["details"]) else _clock(seg["start_local"])
+
+
 def _label(seg: SegmentOut) -> str:
     where = " → ".join(p for p in (seg["origin"], seg["destination"]) if p)
     number = seg["details"].get("flight_number")
@@ -226,7 +231,7 @@ def check_in_message(seg: SegmentOut) -> dict[str, Any]:
 
 def day_of_message(today_trips: list[tuple[SegmentOut, TripOut]], day: str) -> dict[str, Any]:
     items = sorted(today_trips, key=lambda p: p[0]["start_local"])
-    lines = [f"{_clock(s['start_local'])} {_label(s)}" for s, _t in items[:MAX_ITEMS]]
+    lines = [f"{_when(s)} {_label(s)}" for s, _t in items[:MAX_ITEMS]]
     if len(items) > MAX_ITEMS:
         lines.append(f"and {len(items) - MAX_ITEMS} more")
     first = items[0][1]["id"]
@@ -277,8 +282,8 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
         if chosen["check_in"]:
             for trip in mine:
                 for seg in trip["segments"]:
-                    if seg["kind"] != "flight" or seg["status"] == "cancelled":
-                        continue
+                    if seg["kind"] != "flight" or seg["status"] == "cancelled" or trips.untimed(seg["details"]):
+                        continue   # (no check-in from a time that was never given)
                     leaves = trips.instant(seg["start_local"], seg["start_zone"])
                     ref = f"{seg['id']}@{seg['start_local']}"   # a flight moved to another time gets its own reminder
                     if leaves - CHECK_IN_AHEAD <= now < leaves and not _sent(conn, owner, "check_in", ref) \

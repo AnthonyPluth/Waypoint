@@ -42,7 +42,7 @@ Importing the same file again adds nothing.
 
 A flight’s times are the times at its airports, as everywhere in Waypoint. A time that comes with an offset (Flighty writes ISO times with one) is put at its airport’s own zone; one without is taken to be the airport’s already. An arrival that gives only a time of day (myFlightRadar24) is put on the first day it can be after the departure.
 
-When the file has no times for a flight, they’re left empty: the flight shows its day and “time not recorded”, and counts toward distance (it has airports) but not toward time in the air.
+When the file has no times for a flight, they’re left empty: the flight shows its day and “time not recorded”, and counts toward distance (it has airports) but not toward time in the air. In the calendar feed it is an all-day event, it gets no check-in reminder, the day-of summary says “Time not recorded”, and live flight status skips it.
 
 ## The file isn’t kept
 

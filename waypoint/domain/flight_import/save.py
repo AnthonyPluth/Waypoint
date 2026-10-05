@@ -155,7 +155,7 @@ def _segment(flight: FlightIn, zones: Mapping[str, str]) -> trips.SegmentIn:
         origin, destination = zones.get(flight["origin"].upper()), zones.get(flight["destination"].upper())
         if origin and destination:
             end = datetime.fromisoformat(start).replace(tzinfo=ZoneInfo(origin)).astimezone(ZoneInfo(destination)).strftime("%Y-%m-%dT%H:%M")
-        details["time_unknown"] = "yes"
+        details[trips.TIME_UNKNOWN] = "yes"
     return {"kind": "flight", "origin": flight["origin"], "destination": flight["destination"], "start_local": start,
             "end_local": end, "provider": flight.get("airline"), "details": details}
 

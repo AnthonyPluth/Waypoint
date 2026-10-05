@@ -30,9 +30,18 @@ Kind = Literal["flight", "hotel", "car", "train"]
 Status = Literal["confirmed", "changed", "cancelled"]
 KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train")
 STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
+TIME_UNKNOWN = "time_unknown"
 # What a segment's details may hold (the rest of a booking has a field of its own), each a text. `time_unknown` ("yes") marks an
 # imported flight whose file gave no times: it starts and ends at midnight of its day and counts in distance, not time.
-DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone", "time_unknown")
+DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone", TIME_UNKNOWN)
+
+
+def untimed(details: Mapping[str, str]) -> bool:
+    """Whether a segment's times are unknown (an imported flight whose file gave none): its start and end are only a
+    placeholder at midnight of its day, so nothing may show them as real times or schedule anything from them."""
+    return details.get(TIME_UNKNOWN) == "yes"
+
+
 # A person's edit locks the fields it changes; these are the names a lock can have.
 FIELDS = ("kind", "status", "confirmation", "provider", "start_local", "start_zone", "end_local", "end_zone", "origin",
           "destination", "details", "manage_url", "travelers")
