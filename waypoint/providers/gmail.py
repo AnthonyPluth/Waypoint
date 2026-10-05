@@ -10,7 +10,7 @@ made in its own Google Cloud project (docs/src/content/docs/start/gmail.md). The
 <WAYPOINT_PUBLIC_URL>/api/mailboxes/callback.
 
 A connection belongs to the member who made it and ends when they can no longer sign in (oidc.access_lapsed), checked
-before every use (access_token). Scanning itself comes later.
+before every use (access_token) and by a sweep (end_lapsed), so a connection nothing uses ends too. Scanning itself comes later.
 """
 from __future__ import annotations
 
@@ -292,6 +292,19 @@ def end(conn: db.Connection, mailbox_id: int) -> bool:
     conn.execute(delete(Mailbox).where(Mailbox.id == mailbox_id))
     conn.commit()
     return _revoke(token)
+
+
+def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
+    """End every connection whose owner can no longer sign in (revoked at Google when it can be, then deleted), without
+    waiting for something to use it. Returns how many ended."""
+    now = time.time() if now is None else now
+    ended = 0
+    for m in db.rows(conn.execute(select(Mailbox.id, Mailbox.owner_sub))):
+        email = conn.execute(select(User.email).where(User.sub == m["owner_sub"])).scalar()
+        if oidc.access_lapsed(conn, m["owner_sub"], email, now):
+            end(conn, m["id"])
+            ended += 1
+    return ended
 
 
 def disconnect(conn: db.Connection, mailbox_id: int, owner: str) -> bool:

@@ -20,7 +20,11 @@ def owner() -> str:
 def redirect_uri() -> str:
     """Where Google sends the browser back: <WAYPOINT_PUBLIC_URL>/api/mailboxes/callback (the address the Google client
     allows), or this request's own address when none is set (on your own machine)."""
-    base = oidc.config()["public_url"] or f"http://{getattr(_current, 'host', None) or 'localhost'}"
+    base = oidc.config()["public_url"]
+    if not base:
+        if oidc.enabled():   # a client-chosen Host header isn't an address to send a sign-in's mailbox back to
+            raise ApiError("Gmail needs WAYPOINT_PUBLIC_URL to be set.")
+        base = f"http://{getattr(_current, 'host', None) or 'localhost'}"   # on your own machine, without sign-in
     return base + "/api/mailboxes/callback"
 
 
@@ -30,6 +34,7 @@ def _when(t: float | None) -> str | None:
 
 def api_mailboxes(conn, _q, _b) -> MailboxList:
     """The signed-in member's own connected mailboxes, and whether Google's client is set up for connecting more."""
+    gmail.end_lapsed(conn)   # anyone's that lost access: they can't open Settings to disconnect it
     return {"configured": gmail.configured(),
             "mailboxes": [{"id": m["id"], "address": m["address"], "status": m["status"], "last_error": m["last_error"],
                            "last_scan": _when(m["last_scan"])} for m in gmail.listing(conn, owner())]}

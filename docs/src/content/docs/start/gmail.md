@@ -43,7 +43,7 @@ Each member opens **Settings → Gmail** and chooses **Connect Gmail**, picks th
 
 - **Reconnect.** If Google stops honouring a connection (you removed Waypoint at [myaccount.google.com/permissions](https://myaccount.google.com/permissions), the grant expired, or Waypoint’s secret key changed), its row says **Reconnect**. Choosing it connects the same address again.
 - **Disconnect.** Waypoint tells Google to revoke its access, then deletes the connection. If Google can’t be reached it keeps the connection and says so, rather than showing it gone while it still works; try again, or remove Waypoint at the Google permissions page.
-- **When someone loses access.** A connection ends when the person who made it can no longer sign in to Waypoint (taken off `OIDC_ALLOWED_EMAILS`, or past their sign-in with `OIDC_ALLOWED_GROUPS`): Waypoint checks before every use, revokes the token at Google and deletes it.
+- **When someone loses access.** A connection ends when the person who made it can no longer sign in to Waypoint (taken off `OIDC_ALLOWED_EMAILS`, or past their sign-in with `OIDC_ALLOWED_GROUPS`): Waypoint checks before every use and once an hour (and whenever anyone opens Settings), revokes the token at Google and deletes it.
 
 ## What Waypoint keeps
 

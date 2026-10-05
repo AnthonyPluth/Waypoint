@@ -406,6 +406,30 @@ class LapseTests(GoogleCase):
                 self.use()
         self.assertEqual(self.stored(), [])
 
+    def test_the_sweep_ends_a_lapsed_owners_connection_without_anything_using_it(self):
+        self.connect("ana", "ana@gmail.example", "refresh-ana")
+        with mock.patch.dict(os.environ, {"OIDC_ALLOWED_EMAILS": "ana@example.com"}):
+            with db.session() as conn:
+                self.assertEqual(gmail.end_lapsed(conn), 1)   # Ben's; Ana may still sign in
+            self.assertEqual([r["owner_sub"] for r in self.stored()], ["sub-ana"])
+        self.assertEqual(self.google.revoked, ["refresh-ben"])
+        with db.session() as conn:
+            self.assertEqual(gmail.end_lapsed(conn), 0)
+
+    def test_listing_mailboxes_also_ends_anyones_lapsed_connection(self):
+        with mock.patch.dict(os.environ, {"OIDC_ALLOWED_EMAILS": "ana@example.com"}):
+            self.assertEqual(self.mailboxes("ana"), [])
+        self.assertEqual(self.stored(), [])
+        self.assertEqual(self.google.revoked, ["refresh-ben"])
+
+    def test_the_hourly_job_runs_the_sweep_and_survives_a_failure(self):
+        from waypoint.server import jobs
+        with mock.patch.dict(os.environ, {"OIDC_ALLOWED_EMAILS": "ana@example.com"}):
+            jobs.sweep_lapsed()
+        self.assertEqual(self.stored(), [])
+        with mock.patch.object(gmail, "end_lapsed", side_effect=RuntimeError("boom")):
+            jobs.sweep_lapsed()   # reported without its text, not raised
+
     def test_a_lapsed_owners_connection_is_ended_even_if_google_cant_be_told(self):
         self.google.revoke_status = 503
         with mock.patch.dict(os.environ, {"OIDC_ALLOWED_EMAILS": "ana@example.com"}):
@@ -444,6 +468,14 @@ class NothingLeaksTests(GoogleCase):
 
     def path_to_database(self) -> str:
         return os.path.join(os.environ["WAYPOINT_DATA"], "waypoint.db")
+
+
+class RedirectTests(GoogleCase):
+    def test_with_sign_in_a_missing_public_url_is_an_error_not_the_host_header(self):
+        with mock.patch.dict(os.environ, {"WAYPOINT_PUBLIC_URL": ""}):
+            status, body = self.call("ana", "POST", "/api/mailboxes/connect", {})
+        self.assertEqual(status, 400)
+        self.assertIn("WAYPOINT_PUBLIC_URL", body["error"])
 
 
 class LocalTests(ServerCase):
