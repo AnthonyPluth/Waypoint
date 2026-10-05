@@ -39,3 +39,9 @@ A flight’s airline comes from the two-character code its flight number starts 
 The Stats page draws a world map of everywhere you have flown, for the same person and year as the rest of the page: an arc for each route (thicker for more flights), a dot for each airport (bigger for more visits), and the countries that hold one of your airports shaded. Tap or hover a dot or an arc for its name and count; drag, pinch or use the buttons to zoom, and Reset to see the whole world again. Hotel cities without an airport aren’t plotted, and neither is an airport Waypoint doesn’t have coordinates for.
 
 The map is drawn on your device from country outlines bundled with the app ([Natural Earth](https://www.naturalearthdata.com/), public domain, through the `world-atlas` package). It loads no tiles and calls no map service, so no one outside learns where the household goes. Its code and outlines are downloaded only when you open the Stats page.
+
+## Year in review
+
+Pick a person and a year and the Stats page offers **See your year in review**: a short run of full-screen cards (distance and how it compares, flights and time in the air, countries and the ones new that year, the top route and airport, nights away, the map) and a last card to share. It is offered from December 1 for the current year, and any time for past years.
+
+The picture to share is made on your device, drawn to an image in the browser, and handed to your phone’s share sheet (or saved to your downloads where the browser can’t share a file). Nothing is uploaded. It shows the year, the totals, the top route as airport codes, the countries and the map, and leaves out names, confirmation codes, loyalty numbers, exact dates and hotel names. The first name of the person whose year it is appears on it only if you tick **Show the first name**.

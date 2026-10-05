@@ -1,6 +1,8 @@
 // The travel map's maths: turning /api/stats' airports and routes into dots and arcs on a projection, with no map
 // service involved. The country outlines are bundled (world-atlas, Natural Earth, public domain) and drawn by the component.
-import { geoEqualEarth, geoPath, type GeoProjection } from "d3-geo";
+import { geoContains, geoEqualEarth, geoPath, type GeoProjection } from "d3-geo";
+import type { Feature, FeatureCollection, Geometry } from "geojson";
+import type { GeometryCollection, Topology } from "topojson-specification";
 import type { StatsAirport, StatsFlights, StatsRoute } from "./api-types";
 
 export const MAP_WIDTH = 960;
@@ -97,4 +99,20 @@ export function visitedFeatureIds<F extends { id?: string | number }>(
     if (f?.id !== undefined) out.add(f.id);
   }
   return out;
+}
+
+export type Country = Feature<Geometry, { name?: string }> & { id?: string | number };
+
+/** The bundled country outlines, fetched as a separate download (the world-atlas data and topojson-client are big). */
+export async function loadCountries(): Promise<Country[]> {
+  const [{ feature }, atlas] = await Promise.all([import("topojson-client"), import("world-atlas/countries-110m.json")]);
+  const topology = atlas.default as unknown as Topology<{ countries: GeometryCollection<{ name?: string }> }>;
+  return (feature(topology, topology.objects.countries) as FeatureCollection<Geometry, { name?: string }>).features as Country[];
+}
+
+/** Each country's outline as an SVG path, with whether one of these airports is in it. */
+export function outlinePaths(countries: Country[], airports: StatsAirport[], projection: GeoProjection): { d: string; visited: boolean }[] {
+  const path = geoPath(projection);
+  const visited = visitedFeatureIds(airports, countries, (f, p) => geoContains(f, p));
+  return countries.map((c) => ({ d: path(c) ?? "", visited: visited.has(c.id ?? "") }));
 }

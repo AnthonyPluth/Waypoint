@@ -1,11 +1,9 @@
 <script lang="ts">
   import { geoContains, geoPath } from "d3-geo";
-  import type { Topology, GeometryCollection } from "topojson-specification";
-  import type { Feature, FeatureCollection, Geometry } from "geojson";
   import { errMsg } from "$lib/act";
   import type { StatsFlights } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
-  import { clampPan, IDENTITY, MAP_HEIGHT, MAP_WIDTH, mapData, visitedFeatureIds, worldProjection, zoomAt, type Transform } from "$lib/map";
+  import { clampPan, IDENTITY, loadCountries, MAP_HEIGHT, MAP_WIDTH, mapData, visitedFeatureIds, worldProjection, zoomAt, type Country, type Transform } from "$lib/map";
   import Minus from "@lucide/svelte/icons/minus";
   import Plus from "@lucide/svelte/icons/plus";
 
@@ -14,18 +12,12 @@
   // and count; drag, pinch or use the buttons to zoom, and Reset to see the whole world again.
   let { flights }: { flights: StatsFlights } = $props();
 
-  type Country = Feature<Geometry, { name?: string }> & { id?: string | number };
   let countries = $state<Country[] | null>(null);
   let loadError = $state("");
 
   async function loadOutlines() {
     loadError = "";
-    try {
-      const [{ feature }, atlas] = await Promise.all([import("topojson-client"), import("world-atlas/countries-110m.json")]);
-      const topology = atlas.default as unknown as Topology<{ countries: GeometryCollection<{ name?: string }> }>;
-      const collection = feature(topology, topology.objects.countries) as FeatureCollection<Geometry, { name?: string }>;
-      countries = collection.features as Country[];
-    } catch (err) { loadError = errMsg(err); }
+    try { countries = await loadCountries(); } catch (err) { loadError = errMsg(err); }
   }
   $effect(() => { void loadOutlines(); });
 

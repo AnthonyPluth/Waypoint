@@ -15,6 +15,11 @@ describe("flowProblems", () => {
     expect(bad[2]).toMatch(/step 3 must have exactly one of/);
   });
 
+  it("takes an option to select by its position", () => {
+    expect(flowProblems({ ...ok, steps: [{ select: { selector: "select", index: 2 } }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ select: "x" }] })).toEqual(["step 1: select takes a object"]);
+  });
+
   it("takes a file to upload and an element to scroll to", () => {
     const steps = [{ upload: { selector: "input[type=file]", file: "tests/fixtures/flight_import/flighty.csv" } }, { scroll_to: "#import-title" }];
     expect(flowProblems({ ...ok, steps })).toEqual([]);
