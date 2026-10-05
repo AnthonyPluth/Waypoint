@@ -1,5 +1,5 @@
 """Review: mail Waypoint thought was a booking and couldn't read (visible only to the member whose mailbox it came from,
-with Open in Gmail, a preview, Ask the AI, Add by hand and Ignore this sender), and the names on bookings that aren't matched
+with Open in Gmail, Ask AI, Add by hand and Ignore this sender), and the names on bookings that aren't matched
 to a person yet ("Who is this?": any traveller on a trip the member sees). A message's text is shown only by the preview, to its
 mailbox's owner, fetched from Gmail when asked and kept nowhere."""
 from __future__ import annotations
