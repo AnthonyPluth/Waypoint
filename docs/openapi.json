@@ -1868,48 +1868,6 @@
         }
       }
     },
-    "/api/mcp-settings/ids": {
-      "post": {
-        "operationId": "api_mcp_ids",
-        "x-handler": "waypoint/server/api/mcp.py:api_mcp_ids",
-        "parameters": [
-          {
-            "name": "X-Waypoint",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "const": "1"
-            },
-            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/McpIdsBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/McpIdsBody"
-                }
-              }
-            }
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
-      }
-    },
     "/api/mcp-settings/writes": {
       "post": {
         "operationId": "api_mcp_writes",
@@ -2983,24 +2941,9 @@
         ],
         "additionalProperties": false
       },
-      "McpIdsBody": {
-        "type": "object",
-        "properties": {
-          "allow": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "allow"
-        ],
-        "additionalProperties": false
-      },
       "McpSettings": {
         "type": "object",
         "properties": {
-          "allow_ids": {
-            "type": "boolean"
-          },
           "allow_writes": {
             "type": "boolean"
           },
@@ -3027,7 +2970,6 @@
           }
         },
         "required": [
-          "allow_ids",
           "allow_writes",
           "oauth",
           "url",

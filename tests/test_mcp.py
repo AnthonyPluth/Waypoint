@@ -1,6 +1,6 @@
 """The MCP server's promises, against a real Waypoint with sign-in on and two members: an assistant sees exactly what its
-approver sees (visibility, by every tool and by call_endpoint), full ID numbers come only with "ids:read" and its switch
-(masking, with canary numbers over every read tool's output), changes need "write" and its switch, and nothing BLOCKED is
+approver sees (visibility, by every tool and by call_endpoint), no loyalty number reaches an assistant, by any
+tool or route (with canary numbers over every tool's output), changes need "write" and its switch, and nothing BLOCKED is
 reachable. OAuth itself is tested in tests/test_mcp_oauth.py and tests/test_mcp_oauth_http.py, the protocol in
 tests/test_mcp_protocol.py and the route list in tests/test_mcp_routes.py. Names, codes and numbers are made up."""
 import base64
@@ -26,9 +26,8 @@ CALLBACK = "http://127.0.0.1:1/cb"
 JANE_NUMBER = "CANARY-JANE-48271936"     # made-up numbers, long enough that they can't match by chance
 SAM_NUMBER = "CANARY-SAM-90417253"
 READ = ("read",)
-IDS = ("read", "ids:read")
 WRITE = ("read", "write")
-ALL = ("read", "ids:read", "write")
+ALL = WRITE
 OUT = {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-10-01T19:00",
        "end_local": "2026-10-02T07:10", "confirmation": "ZQ4PXD", "details": {"flight_number": "BA112"}}
 HOTEL = {"kind": "hotel", "origin": "Harbour Hotel", "start_local": "2026-10-02T15:00", "end_local": "2026-10-08T10:00",
@@ -81,15 +80,11 @@ class Assistants(ServerCase):
     def forget(self):
         with db.session() as conn:
             conn.execute(delete(OAuthGrant))   # (cascades to their codes and tokens)
-            mcp_access.set_allow_ids(conn, False)
             mcp_access.set_allow_writes(conn, False)
 
-    def switch(self, ids: bool | None = None, writes: bool | None = None):
+    def switch(self, writes: bool):
         with db.session() as conn:
-            if ids is not None:
-                mcp_access.set_allow_ids(conn, ids)
-            if writes is not None:
-                mcp_access.set_allow_writes(conn, writes)
+            mcp_access.set_allow_writes(conn, writes)
 
     def access(self, scopes=READ, sub="u-jane") -> mcp_access.Access:
         """What a connection approved by `sub` for `scopes` may do, as mcp_http.local_fetch is given it."""
@@ -125,7 +120,7 @@ class PagesTests(Assistants):
     """What mcp_http.local_fetch (the tools' way into Waypoint) reaches, as an assistant."""
 
     def test_reads_the_listed_pages_as_the_approver(self):
-        for path in ("trips", "people", "loyalty", "stats", "distance-unit", "flight-status"):
+        for path in ("trips", "people", "stats", "distance-unit", "flight-status"):
             with self.subTest(page=path):
                 mcp_http.local_fetch(path, {}, None, self.access())
         got = mcp_http.local_fetch("trips", {}, None, self.access())
@@ -165,7 +160,7 @@ class VisibilityTests(Assistants):
 
     def setUp(self):
         super().setUp()
-        self.switch(ids=True, writes=True)
+        self.switch(True)
 
     def sams(self):
         with db.session() as conn:
@@ -226,98 +221,51 @@ class VisibilityTests(Assistants):
         self.assertEqual(self.sams()[1], "Rome")
 
 
-class MaskingTests(Assistants):
-    """"IDs are for the household": full numbers only with "ids:read" and its switch, and never in a log; checked with canary
-    numbers over every read tool's output."""
+class LoyaltyTests(Assistants):
+    """"IDs are for the household": an assistant has no access to loyalty numbers at all (not even the masked listing), by any
+    tool or route, with every scope and switch on; checked with canary numbers over every tool's output."""
 
-    def read_everything(self, scopes):
-        """Every read tool, with the arguments that reach a membership, and call_endpoint's GET /api/loyalty: their texts."""
-        out = {}
-        for tool in mcp_server.TOOLS:
-            for args in ({}, {"person_id": self.jane.person_id}, {"loyalty_id": self.jane_loyalty}, {"trip_id": self.jane_trip["id"]}):
-                out[(tool["name"], json.dumps(args))] = json.dumps(self.tool(scopes, tool["name"], args))
-        out["endpoint"] = json.dumps(self.tool((*scopes, "write"), "call_endpoint", {"method": "GET", "path": "/api/loyalty"}))
-        return out
+    ROUTES = (("GET", "/api/loyalty"), ("POST", "/api/loyalty"), ("POST", "/api/loyalty/{id}"), ("DELETE", "/api/loyalty/{id}"),
+              ("POST", "/api/loyalty/{id}/reveal"))
 
-    def test_without_ids_read_no_read_tool_has_a_full_number(self):
-        for scopes in (READ, WRITE):
-            self.switch(ids=True, writes=True)          # (the switches alone don't reveal anything)
-            for where, text in self.read_everything(scopes).items():
-                with self.subTest(scopes=scopes, where=where):
-                    self.assertNotIn(JANE_NUMBER, text)
-                    self.assertNotIn(SAM_NUMBER, text)
-                    self.assertNotIn(JANE_NUMBER[-8:], text)
-        masked = json.dumps(self.tool(READ, "get_loyalty_ids"), ensure_ascii=False)
-        self.assertIn(loyalty.mask(JANE_NUMBER), masked)       # the last four are what it gets
+    def setUp(self):
+        super().setUp()
+        self.switch(True)
 
-    def test_revealing_needs_the_scope_and_then_the_switch(self):
-        args = {"person_id": self.jane.person_id, "reveal": True}
-        self.assertIn("reconnect", self.refused(READ, "get_loyalty_ids", args))   # not allowed when it connected
-        self.assertIn("reconnect", self.refused(WRITE, "get_loyalty_ids", args))
-        self.switch(ids=False)
-        self.assertIn("switched off", self.refused(IDS, "get_loyalty_ids", args))   # allowed, but the household's switch is off
-        self.switch(ids=True)
-        got = self.tool(IDS, "get_loyalty_ids", args)
-        self.assertEqual([r["number"] for r in got["loyalty"]], [JANE_NUMBER])
-        self.switch(ids=False)                                                        # off: the very next call
-        self.assertIn("switched off", self.refused(IDS, "get_loyalty_ids", args))
+    def test_no_tool_output_has_a_number_or_its_last_four(self):
+        with no_leaks(self, JANE_NUMBER, SAM_NUMBER, database=self.path):
+            for tool in mcp_server.ALL_TOOLS:
+                if tool["name"] in ("call_endpoint",):
+                    continue
+                for args in ({}, {"person_id": self.jane.person_id}, {"trip_id": self.jane_trip["id"]}):
+                    text = json.dumps(self.tool(ALL, tool["name"], args), ensure_ascii=False)
+                    self.assertNotIn(JANE_NUMBER, text, tool["name"])
+                    self.assertNotIn(SAM_NUMBER, text, tool["name"])
+                    self.assertNotIn(JANE_NUMBER[-4:], text, tool["name"])
+                    self.assertNotIn("masked", text, tool["name"])
 
-    def test_the_reveal_request_itself_is_gated_too(self):
-        path = f"loyalty/{self.jane_loyalty}/reveal"
-        for scopes in (READ, WRITE):
-            self.switch(ids=True)
-            with self.assertRaises(mcp_server.ToolError):
-                mcp_http.local_fetch(path, {}, {}, self.access(scopes))
-        self.switch(ids=False)
-        with self.assertRaisesRegex(mcp_server.ToolError, "switched off"):
-            mcp_http.local_fetch(path, {}, {}, self.access(IDS))
-        self.switch(ids=True)
-        self.assertEqual(mcp_http.local_fetch(path, {}, {}, self.access(IDS)), {"number": JANE_NUMBER})
+    def test_there_is_no_tool_for_memberships(self):
+        names = {t["name"] for t in mcp_server.ALL_TOOLS}
+        self.assertEqual({n for n in names if "loyalty" in n or "id_number" in n}, set())
 
-    def test_ids_are_whole_numbers_even_when_sent_as_text_and_anything_else_is_told(self):
-        self.switch(ids=True)
-        got = self.tool(IDS, "get_loyalty_ids", {"person_id": str(self.jane.person_id), "reveal": True})
-        self.assertEqual([r["number"] for r in got["loyalty"]], [JANE_NUMBER])
-        self.assertIn("whole number", self.refused(IDS, "get_loyalty_ids", {"person_id": "abc"}))
+    def test_no_loyalty_route_is_reachable_by_call_endpoint_or_local_fetch(self):
+        for method, pattern in self.ROUTES:
+            path = pattern.replace("{id}", str(self.jane_loyalty))
+            with self.subTest(route=f"{method} {pattern}"):
+                self.assertIn("can't reach", self.refused(ALL, "call_endpoint", {"method": method, "path": path, "body": {}}))
+                with self.assertRaises(mcp_server.ToolError):
+                    mcp_http.local_fetch(path[len("/api/"):], {}, {} if method != "GET" else None, self.access(ALL), method)
+                self.assertIsNone(mcp_http.needs(method, pattern))
 
-    def test_only_a_real_true_reveals(self):
-        self.switch(ids=True)
-        for sent in ("false", "true", 1, "yes"):
-            got = self.tool(IDS, "get_loyalty_ids", {"person_id": self.jane.person_id, "reveal": sent})
-            self.assertNotIn(JANE_NUMBER, json.dumps(got), sent)
-
-    def test_flight_status_takes_a_segment_id_sent_as_text(self):
-        self.assertEqual(self.tool(READ, "flight_status", {"segment_id": "12"})["statuses"], [])
-        self.assertIn("whole number", self.refused(READ, "flight_status", {"segment_id": "x"}))
-
-    def test_a_reveal_wants_to_know_whose(self):
-        self.switch(ids=True)
-        self.assertIn("whose", self.refused(IDS, "get_loyalty_ids", {"reveal": True}))
-
-    def test_a_reveal_is_logged_by_membership_and_connection_never_the_number(self):
-        self.switch(ids=True)
-        with no_leaks(self, JANE_NUMBER, SAM_NUMBER, database=self.path), mock.patch("builtins.print") as printed:
-            mcp_http.local_fetch(f"loyalty/{self.jane_loyalty}/reveal", {}, {}, mcp_access.Access(frozenset(IDS), 7, "u-jane", "jane@example.com"))
-        lines = " ".join(str(c.args[0]) for c in printed.call_args_list)
-        self.assertIn(f"membership {self.jane_loyalty}", lines)
-        self.assertIn("connection 7", lines)
-        self.assertNotIn(JANE_NUMBER, lines)
-
-    def test_the_household_s_numbers_are_everyone_s_but_only_through_the_gate(self):
-        self.switch(ids=True)
-        got = self.tool(IDS, "get_loyalty_ids", {"person_id": self.sam.person_id, "reveal": True})
-        self.assertEqual([r["number"] for r in got["loyalty"]], [SAM_NUMBER])   # (the household's: anyone can book for anyone)
-
-    def test_adding_a_membership_takes_ids_read_as_well_as_write(self):
-        self.switch(ids=True, writes=True)
-        fields = {"person_id": self.jane.person_id, "kind": "hotel", "program": "Hilton Honors", "number": "CANARY-HHONORS-5550"}
-        self.assertIn("reconnect", self.refused(WRITE, "add_loyalty_id", {"fields": fields}))    # write isn't enough
-        with no_leaks(self, "CANARY-HHONORS-5550", database=self.path):
-            got = self.tool(ALL, "add_loyalty_id", {"fields": fields})
-        self.assertEqual(got["masked"], loyalty.mask("CANARY-HHONORS-5550"))                     # the reply is masked
-        self.assertIn("reconnect", self.refused(WRITE, "update_loyalty_id", {"loyalty_id": got["id"], "fields": {**fields, "tier": "Gold"}}))
-        self.assertEqual(self.tool(ALL, "update_loyalty_id", {"loyalty_id": got["id"], "fields": {**fields, "number": None, "tier": "Gold"}})["tier"], "Gold")
-        self.assertEqual(self.tool(WRITE, "remove_loyalty_id", {"loyalty_id": got["id"]}), {"ok": True})   # (removing takes no number)
+    def test_a_number_is_still_the_household_s_in_the_app(self):
+        from waypoint.server.api import loyalty as api
+        from waypoint.server.common import _current
+        _current.user = {"sub": "u-jane"}
+        try:
+            with db.session() as conn:
+                self.assertEqual(api.api_loyalty_reveal(conn, {}, {}, str(self.sam_loyalty)), {"number": SAM_NUMBER})
+        finally:
+            _current.user = None
 
 
 class WriteTests(Assistants):
@@ -332,31 +280,31 @@ class WriteTests(Assistants):
             return conn.execute(select(func.count()).select_from(Segment)).scalar()
 
     def test_refused_without_the_scope_with_a_reconnect_message(self):
-        self.switch(writes=True)
+        self.switch(True)
         before = self.count()
         for name, args in (("add_segment", {"fields": self.SEGMENT}), ("create_trip", {"fields": {"name": "Nope"}}),
                            ("add_guest", {"fields": person("Nobody")}), ("remove_segment", {"segment_id": self.jane_trip["segment"]}),
                            ("call_endpoint", {"method": "POST", "path": "/api/trips", "body": {"name": "Nope"}})):
             with self.subTest(tool=name):
-                self.assertIn("reconnect", self.refused((*READ, "ids:read"), name, args))
+                self.assertIn("reconnect", self.refused(READ, name, args))
         self.assertEqual(self.count(), before)
 
     def test_refused_while_the_switch_is_off_and_allowed_the_moment_it_is_on(self):
         before = self.count()
         self.assertIn("switched off", self.refused(WRITE, "add_segment", {"fields": self.SEGMENT}))
         self.assertEqual(self.count(), before)
-        self.switch(writes=True)
+        self.switch(True)
         got = self.tool(WRITE, "add_segment", {"fields": self.SEGMENT})
         self.assertEqual(got["kind"], "hotel")
         self.assertEqual(self.count(), before + 1)
-        self.switch(writes=False)
+        self.switch(False)
         self.assertIn("switched off", self.refused(WRITE, "remove_segment", {"segment_id": got["id"]}))
         self.assertEqual(self.count(), before + 1)
-        self.switch(writes=True)
+        self.switch(True)
         self.assertEqual(self.tool(WRITE, "remove_segment", {"segment_id": got["id"]}), {"ok": True})
 
     def test_every_changing_tool_works_with_both(self):
-        self.switch(writes=True)
+        self.switch(True)
         trip = self.tool(WRITE, "create_trip", {"fields": {"name": "Lisbon", "start_date": "2026-11-01", "end_date": "2026-11-05"}})
         self.assertEqual(trip["name"], "Lisbon")
         renamed = self.tool(WRITE, "update_trip", {"trip_id": trip["id"], "fields": {"name": "Lisbon long weekend"}})
@@ -373,7 +321,7 @@ class WriteTests(Assistants):
         self.assertEqual(self.tool(WRITE, "remove_segment", {"segment_id": seg["id"]}), {"ok": True})
 
     def test_call_endpoint_reaches_the_rest_of_what_write_allows(self):
-        self.switch(writes=True)
+        self.switch(True)
         listed = self.tool(WRITE, "list_endpoints")
         self.assertIn("POST /api/trips/{id}/split (destructive)", listed["trips"])
         self.assertIn("DELETE /api/trips/{id} (destructive)", listed["trips"])
@@ -383,13 +331,13 @@ class WriteTests(Assistants):
                          {"distance_unit": "mi"})
 
     def test_list_endpoints_names_nothing_blocked(self):
-        self.switch(writes=True)
+        self.switch(True)
         areas = set(self.tool(WRITE, "list_endpoints"))
         self.assertEqual(areas & {"mailboxes", "review", "backup", "restore", "reminders", "feed", "mcp-settings", "ai", "state", "import"}, set())
         self.assertNotIn("/api/flight-status/{id}", json.dumps(self.tool(WRITE, "list_endpoints")))
 
     def test_a_blocked_route_is_refused_whatever_the_scope_or_switch(self):
-        self.switch(ids=True, writes=True)
+        self.switch(True)
         for method, pattern in self.blocked_routes():
             path = pattern.replace("{id}", "1")
             with self.subTest(route=f"{method} {pattern}"):
@@ -407,11 +355,10 @@ class WriteTests(Assistants):
 
     def test_changes_that_fold_or_remove_are_marked_destructive_and_the_rest_are_not(self):
         marked = {t["name"]: t for t in mcp_server.WRITE_TOOLS}
-        for name in ("remove_segment", "remove_loyalty_id", "merge_trips"):
+        for name in ("remove_segment", "merge_trips"):
             self.assertTrue(marked[name]["destructive"], name)
             self.assertIn("Destructive", marked[name]["description"])
-        for name in ("add_segment", "update_segment", "create_trip", "update_trip", "add_guest", "update_person", "add_loyalty_id",
-                     "update_loyalty_id"):
+        for name in ("add_segment", "update_segment", "create_trip", "update_trip", "add_guest", "update_person"):
             self.assertFalse(marked[name]["destructive"], name)
         for t in marked.values():
             self.assertIn("Ask the person", t["description"])

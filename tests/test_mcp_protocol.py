@@ -70,7 +70,7 @@ class StreamableHttpTests(Assistants):
         read = json.loads(self.rpc(init, self.make_token())[2])["result"]
         self.assertEqual((read["protocolVersion"], read["serverInfo"]["name"]), ("2025-06-18", "waypoint"))
         self.assertIn("read-only", read["instructions"])
-        self.switch(writes=True)
+        self.switch(True)
         write = json.loads(self.rpc(init, self.make_token(*WRITE))[2])["result"]["instructions"]
         self.assertIn("wait for the person's explicit yes", write)
         self.assertIn("destructive", write)
@@ -83,19 +83,15 @@ class StreamableHttpTests(Assistants):
         reads = [t["name"] for t in mcp_server.TOOLS]
         names = lambda key: [t["name"] for t in self.tools(key)]
         self.assertEqual(names(self.make_token(*ALL)), reads)                     # switches off: reads only
-        self.switch(writes=True)
+        self.switch(True)
         self.assertEqual(names(self.make_token(*READ)), reads)                    # (a connection that wasn't allowed it)
         with_write = names(self.make_token(*WRITE))
         self.assertIn("add_segment", with_write)
         self.assertIn("call_endpoint", with_write)
-        self.assertNotIn("add_loyalty_id", with_write)                            # needs ids:read as well
-        self.assertNotIn("update_loyalty_id", with_write)
-        self.switch(ids=True)
-        self.assertIn("add_loyalty_id", names(self.make_token(*ALL)))
-        self.assertNotIn("add_loyalty_id", names(self.make_token(*WRITE)))
+        self.assertEqual([n for n in with_write if "loyalty" in n], [])           # no tool touches a number, whatever it's allowed
 
     def test_write_tools_carry_mcp_s_annotations(self):
-        self.switch(writes=True, ids=True)
+        self.switch(True)
         by_name = {t["name"]: t["annotations"] for t in self.tools(self.make_token(*ALL))}
         self.assertEqual(by_name["upcoming"], {"readOnlyHint": True, "openWorldHint": False})
         self.assertEqual(by_name["remove_segment"], {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False, "openWorldHint": False})
@@ -122,7 +118,7 @@ class StreamableHttpTests(Assistants):
         result = self.call(key, "add_guest", args)
         self.assertTrue(result["isError"])
         self.assertIn("switched off", result["content"][0]["text"])
-        self.switch(writes=True)
+        self.switch(True)
         added = self.call(key, "add_guest", args)
         self.assertNotIn("isError", added)
         self.assertEqual(json.loads(added["content"][0]["text"])["display_name"], "Joan Doe")
@@ -135,6 +131,11 @@ class StreamableHttpTests(Assistants):
                            ("get_stats", {"person": "x"}), ("get_stats", {"year": "20x"})):
             with self.subTest(name=name, args=args):
                 self.assertTrue(self.call(key, name, args)["isError"])
+        self.switch(True)
+        wide = self.make_token(*WRITE)
+        for sent in (2.7, "2.7", "2e0x"):
+            with self.subTest(sent=sent):
+                self.assertTrue(self.call(wide, "remove_segment", {"segment_id": sent})["isError"])   # not segment 2
         _status, _, body = self.rpc({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": 5}}, key)
         self.assertEqual(json.loads(body)["error"]["code"], -32602)
 
@@ -175,7 +176,6 @@ class SettingsRoutes(ServerCase):
         with db.session() as conn:
             for (grant,) in conn.execute(select(OAuthGrant.id)).fetchall():
                 mcp_oauth.revoke_grant(conn, grant, "test")
-            mcp_access.set_allow_ids(conn, False)
             mcp_access.set_allow_writes(conn, False)
 
     def connect(self, *scopes, name=None) -> int:
@@ -192,7 +192,7 @@ class SettingsRoutes(ServerCase):
     def test_settings_say_where_to_connect_and_start_with_everything_off(self):
         status, got = self.req("GET", "/api/mcp-settings")
         self.assertEqual(status, 200)
-        self.assertEqual((got["allow_ids"], got["allow_writes"], got["oauth"], got["url"]), (False, False, True, self.base + "/mcp"))
+        self.assertEqual((got["allow_writes"], got["oauth"], got["url"]), (False, True, self.base + "/mcp"))
         self.assertIsNone(got["reason"])
 
     def test_without_an_address_that_oauth_can_use_it_says_why(self):
@@ -201,15 +201,14 @@ class SettingsRoutes(ServerCase):
         self.assertEqual((got["oauth"], got["url"]), (False, None))
         self.assertIn("WAYPOINT_PUBLIC_URL", got["reason"])
 
-    def test_the_switches_turn_on_and_off_and_are_separate(self):
-        self.assertEqual(self.req("POST", "/api/mcp-settings/ids", {"allow": True}), (200, {"allow": True}))
-        self.assertEqual(self.req("GET", "/api/mcp-settings")[1]["allow_writes"], False)
+    def test_the_switch_turns_on_and_off(self):
         self.assertEqual(self.req("POST", "/api/mcp-settings/writes", {"allow": True}), (200, {"allow": True}))
-        self.assertEqual(self.req("POST", "/api/mcp-settings/ids", {"allow": False}), (200, {"allow": False}))
-        got = self.req("GET", "/api/mcp-settings")[1]
-        self.assertEqual((got["allow_ids"], got["allow_writes"]), (False, True))
+        self.assertEqual(self.req("GET", "/api/mcp-settings")[1]["allow_writes"], True)
         with db.session() as conn:
-            self.assertEqual((mcp_access.allow_ids(conn), mcp_access.allow_writes(conn)), (False, True))
+            self.assertTrue(mcp_access.allow_writes(conn))
+        self.assertEqual(self.req("POST", "/api/mcp-settings/writes", {"allow": False}), (200, {"allow": False}))
+        self.assertEqual(self.req("GET", "/api/mcp-settings")[1]["allow_writes"], False)
+        self.assertEqual(self.req("POST", "/api/mcp-settings/ids", {"allow": True})[0], 404)   # (there is no switch for numbers)
 
     def test_connected_assistants_are_listed_with_who_approved_them_and_disconnect_ends_them_at_once(self):
         grant = self.connect("read", "write", name="Claude " + self.tag)
@@ -224,8 +223,8 @@ class SettingsRoutes(ServerCase):
             self.assertEqual(conn.execute(select(OAuthToken.token_hash).where(OAuthToken.grant_id == grant)).fetchall(), [])
 
     def test_the_settings_routes_are_not_reachable_from_mcp(self):
-        full = mcp_access.Access(frozenset({"read", "ids:read", "write"}), None, None, None)
-        for path, method in (("mcp-settings", "GET"), ("mcp-settings/writes", "POST"), ("mcp-settings/ids", "POST"),
+        full = mcp_access.Access(frozenset({"read", "write"}), None, None, None)
+        for path, method in (("mcp-settings", "GET"), ("mcp-settings/writes", "POST"),
                              ("mcp-settings/connections/1", "DELETE")):
             with self.subTest(path=path), self.assertRaises(mcp_server.ToolError):
                 with db.session() as conn:

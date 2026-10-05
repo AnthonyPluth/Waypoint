@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-59 routes; 0 have no test yet.
+58 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -45,10 +45,10 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/flight-status` | `flightstatus.py:api_flight_statuses` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py`, `test_mcp_routes.py` | [start/flight-status](/waypoint/start/flight-status/) |
 | `POST /api/flight-status/{id}` | `flightstatus.py:api_flight_status_refresh` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py`, `test_mcp.py` | [start/flight-status](/waypoint/start/flight-status/) |
 | `GET /api/loyalty` | `loyalty.py:api_loyalty` | `pages/People.svelte`, `pages/Trip.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp.py`, `test_mcp_routes.py` | [start/loyalty](/waypoint/start/loyalty/) |
-| `POST /api/loyalty` | `loyalty.py:api_loyalty_add` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp_routes.py` | [start/loyalty](/waypoint/start/loyalty/) |
-| `POST /api/loyalty/{id}` | `loyalty.py:api_loyalty_edit` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |
-| `DELETE /api/loyalty/{id}` | `loyalty.py:api_loyalty_remove` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp_routes.py` | [start/loyalty](/waypoint/start/loyalty/) |
-| `POST /api/loyalty/{id}/reveal` | `loyalty.py:api_loyalty_reveal` | `lib/components/LoyaltyNumber.svelte`, `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |
+| `POST /api/loyalty` | `loyalty.py:api_loyalty_add` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp.py`, `test_mcp_routes.py` | [start/loyalty](/waypoint/start/loyalty/) |
+| `POST /api/loyalty/{id}` | `loyalty.py:api_loyalty_edit` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp.py` | [start/loyalty](/waypoint/start/loyalty/) |
+| `DELETE /api/loyalty/{id}` | `loyalty.py:api_loyalty_remove` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp.py` | [start/loyalty](/waypoint/start/loyalty/) |
+| `POST /api/loyalty/{id}/reveal` | `loyalty.py:api_loyalty_reveal` | `lib/components/LoyaltyNumber.svelte`, `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp.py`, `test_mcp_routes.py` | [start/loyalty](/waypoint/start/loyalty/) |
 | `GET /api/mailboxes` | `mailboxes.py:api_mailboxes` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
 | `POST /api/mailboxes/connect` | `mailboxes.py:api_mailbox_connect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
 | `GET /api/mailboxes/callback` | `mailboxes.py:api_mailbox_callback` | - | `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
@@ -68,7 +68,6 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/review/{id}/suggest` | `review.py:api_review_suggest` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
 | `DELETE /api/review/{id}` | `review.py:api_review_dismiss` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
 | `GET /api/mcp-settings` | `mcp.py:api_mcp_settings` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py` | [start/mcp](/waypoint/start/mcp/) |
-| `POST /api/mcp-settings/ids` | `mcp.py:api_mcp_ids` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py` | [start/mcp](/waypoint/start/mcp/) |
 | `POST /api/mcp-settings/writes` | `mcp.py:api_mcp_writes` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py` | [start/mcp](/waypoint/start/mcp/) |
 | `DELETE /api/mcp-settings/connections/{id}` | `mcp.py:api_mcp_revoke` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py` | [start/mcp](/waypoint/start/mcp/) |
 | `GET /api/state` | `state.py:api_state` | `lib/app.svelte.ts` | `test_api_contract.py`, `test_api_state.py`, `test_backup.py`, `test_http_pinned.py`, `test_http_server.py`, `test_mail_scan.py`, `test_monitoring.py`, `test_security.py`, `test_server.py`, `test_server_errors.py` | [start/docker](/waypoint/start/docker/) |

@@ -13,7 +13,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from .. import monitoring, oidc
+from .. import oidc
 from ..storage import db
 from ..storage.models import User
 from . import mcp_access, routes
@@ -30,13 +30,10 @@ ANYTHING = frozenset(mcp_access.writable_routes(routes.ROUTES))
 WRITES_OFF = "Changes are switched off. Turn on “Let assistants change trips” in Waypoint under Settings."
 READ_ONLY = ("This connection can only read. To let the assistant change trips, reconnect Waypoint in the assistant and "
              "allow “Change trips” when Waypoint asks.")
-IDS_OFF = "Full ID numbers are switched off. Turn on “Let assistants see full ID numbers” in Waypoint under Settings."
-NO_IDS = ("This connection sees only the last four characters of ID numbers. To let the assistant see full numbers, "
-          "reconnect Waypoint in the assistant and allow “See full ID numbers” when Waypoint asks.")
 # Why a call of each scope can't be made: (the connection wasn't allowed it, the switch is off).
-REFUSALS = {mcp_access.WRITE: (READ_ONLY, WRITES_OFF), mcp_access.IDS: (NO_IDS, IDS_OFF)}
-OUT_OF_REACH = ("Not found: assistants can't reach mailboxes, the “Couldn’t read” queue, AI settings, backups, sign-in, the "
-                "calendar feed, notifications or the assistant settings. Change those in Waypoint itself.")
+REFUSALS = {mcp_access.WRITE: (READ_ONLY, WRITES_OFF)}
+OUT_OF_REACH = ("Not found: assistants can't reach mailboxes, the “Couldn’t read” queue, AI settings, backups, loyalty and Known "
+                "Traveler numbers, sign-in, the calendar feed, notifications or the assistant settings. Use Waypoint itself for those.")
 METHODS = ("GET", "POST", "DELETE")
 
 
@@ -54,18 +51,15 @@ def authorized(conn, authorization: str | None, resource: str | None = None) -> 
 
 
 def needs(method: str, pattern: str) -> tuple[str, ...] | None:
-    """The scopes a route needs: "read", or "ids:read" and "write" (a change that takes a number needs both). None for
-    anything an assistant may never use."""
+    """The scope a route needs: "read" or "write". None for anything an assistant may never use."""
     if mcp_access.blocked(pattern):
         return None
     if method == "GET":
         if pattern in mcp_access.READABLE:
             return (mcp_access.READ,)
         return (mcp_access.WRITE,) if pattern in mcp_access.WRITE_READABLE else None
-    if (method, pattern) in mcp_access.REVEALS:
-        return (mcp_access.IDS,)
     if (method, pattern) in ANYTHING:
-        return (mcp_access.WRITE, mcp_access.IDS) if (method, pattern) in mcp_access.NEEDS_IDS else (mcp_access.WRITE,)
+        return (mcp_access.WRITE,)
     return None
 
 
@@ -123,7 +117,7 @@ def local_fetch(path: str, params: dict[str, Any], body: dict | None, access: mc
     found = routes.match(method, full)
     if found is None:
         raise ToolError("Not found")
-    pattern, args = found.route.pattern, found.params
+    pattern = found.route.pattern
     if mcp_access.blocked(pattern):
         raise ToolError(OUT_OF_REACH)
     scopes = needs(method, pattern)
@@ -146,6 +140,4 @@ def local_fetch(path: str, params: dict[str, Any], body: dict | None, access: mc
         _current.user = None
     if isinstance(result, Response):   # a download or a stream is the web app's (BLOCKED keeps them out anyway)
         raise ToolError("Not found")
-    if (method, pattern) in mcp_access.REVEALS:   # which membership and which connection, never the number
-        monitoring.log(f"[mcp] full ID number revealed: membership {args[0]}, connection {access.grant_id}")
     return result

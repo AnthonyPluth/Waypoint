@@ -101,7 +101,7 @@ class IssuerTests(unittest.TestCase):
 
     def test_metadata(self):
         self.assertEqual(mcp_oauth.protected_resource_metadata(ISS), {
-            "resource": RES, "authorization_servers": [ISS], "scopes_supported": ["read", "ids:read", "write"],
+            "resource": RES, "authorization_servers": [ISS], "scopes_supported": ["read", "write"],
             "bearer_methods_supported": ["header"]})
         m = mcp_oauth.authorization_server_metadata(ISS)
         self.assertEqual((m["issuer"], m["authorization_endpoint"], m["token_endpoint"], m["registration_endpoint"], m["revocation_endpoint"]),
@@ -140,26 +140,20 @@ class ValueTests(unittest.TestCase):
                 self.assertFalse(mcp_oauth.redirect_matches(reg, bad))
 
     def test_what_the_consent_page_says_each_opt_in_allows(self):
-        self.assertEqual(set(mcp_oauth.CONSENT), {"ids:read", "write"})
-        label, note, off = mcp_oauth.CONSENT["ids:read"]
-        self.assertEqual(label, "See full ID numbers")
-        self.assertIn("Loyalty, Known Traveler and redress numbers in full", note)
-        self.assertIn("never the number", note)
-        self.assertIn("Let assistants see full ID numbers", off)
+        self.assertEqual(set(mcp_oauth.CONSENT), {"write"})   # nothing opens full ID numbers to an assistant
         label, note, off = mcp_oauth.CONSENT["write"]
         self.assertEqual(label, "Change trips")
-        for words in ("Add, change and remove trips, bookings, travellers, people, guests and loyalty entries",
-                      "Never mailboxes", "AI settings, backups, sign-in or these assistant settings"):
+        for words in ("Add, change and remove trips, bookings, travellers, people and guests, and the distance unit",
+                      "Never mailboxes", "AI settings, backups, loyalty numbers, sign-in or these assistant settings"):
             self.assertIn(words, note)
         self.assertIn("Let assistants change trips", off)
 
     def test_scopes(self):
         self.assertEqual(mcp_oauth.parse_scope(None), {"read"})
         self.assertEqual(mcp_oauth.parse_scope(""), {"read"})
-        self.assertEqual(mcp_oauth.parse_scope("ids:read"), {"read", "ids:read"})
-        self.assertEqual(mcp_oauth.scope_text(mcp_oauth.parse_scope("write ids:read")), "read ids:read write")
+        self.assertEqual(mcp_oauth.parse_scope("write"), {"read", "write"})
         self.assertEqual(mcp_oauth.scope_text(mcp_oauth.parse_scope("write read")), "read write")
-        for bad in ("writes", "write:all", "read admin", "openid", "churning:write", "categorize:write", 5):
+        for bad in ("writes", "write:all", "read admin", "openid", "ids:read", "read ids:read", "churning:write", "categorize:write", 5):
             with self.subTest(scope=bad), self.assertRaises(OAuthError) as e:
                 mcp_oauth.parse_scope(bad)
             self.assertEqual(e.exception.error, "invalid_scope")
@@ -221,6 +215,12 @@ class RegistrationTests(Db):
             mcp_oauth.register(self.conn, ["not", "an", "object"])
         with self.assertRaises(OAuthError):
             mcp_oauth.register(self.conn, {"client_name": "no redirect uris"})
+        self.assertEqual(self.count(OAuthClient), 0)
+
+    def test_ids_read_is_not_a_scope_to_register_for(self):
+        with self.assertRaises(OAuthError) as e:
+            self.client(scope="read ids:read")
+        self.assertEqual(e.exception.error, "invalid_client_metadata")
         self.assertEqual(self.count(OAuthClient), 0)
 
     def test_at_most_fifty_unapproved_apps_at_once(self):
@@ -287,8 +287,8 @@ class AuthorizeTests(Db):
     """The authorization request, and the consent form's token (kept once, for ten minutes)."""
     def test_a_good_request(self):
         c = self.client()
-        req = self.request(c, scope="ids:read", resource=RES + "/")
-        self.assertEqual((req.client_id, req.scope, req.state, req.resource), (c["client_id"], {"read", "ids:read"}, "st", RES))
+        req = self.request(c, scope="write", resource=RES + "/")
+        self.assertEqual((req.client_id, req.scope, req.state, req.resource), (c["client_id"], {"read", "write"}, "st", RES))
 
     def test_the_app_and_its_redirect_must_be_known_or_nothing_is_sent_back(self):
         c = self.client()
@@ -303,7 +303,7 @@ class AuthorizeTests(Db):
         c = self.client()
         for over, error in (({"response_type": "token"}, "unsupported_response_type"), ({"code_challenge_method": None}, "invalid_request"),
                             ({"code_challenge_method": "plain"}, "invalid_request"), ({"code_challenge": None}, "invalid_request"),
-                            ({"code_challenge": "short"}, "invalid_request"), ({"scope": "admin"}, "invalid_scope"),
+                            ({"code_challenge": "short"}, "invalid_request"), ({"scope": "admin"}, "invalid_scope"), ({"scope": "read ids:read"}, "invalid_scope"),
                             ({"resource": "https://other.example/mcp"}, "invalid_target")):
             with self.subTest(over=over), self.assertRaises(RedirectError) as e:
                 self.request(c, **over)
@@ -329,16 +329,16 @@ class TokenTests(Db):
 
     def test_code_for_tokens(self):
         c = self.client()
-        code, _ = self.code(c, frozenset({"read", "ids:read"}))
+        code, _ = self.code(c, frozenset({"read", "write"}))
         self.assertTrue(code.startswith("wpo_"))
         out = self.exchange(c["client_id"], code, resource=RES)
-        self.assertEqual((out["token_type"], out["expires_in"], out["scope"]), ("Bearer", 3600, "read ids:read"))
+        self.assertEqual((out["token_type"], out["expires_in"], out["scope"]), ("Bearer", 3600, "read write"))
         self.assertTrue(out["access_token"].startswith("wpa_") and out["refresh_token"].startswith("wpr_"))
         stored = json.dumps([list(r) for r in self.conn.execute(select(OAuthToken))] + [list(r) for r in self.conn.execute(select(OAuthCode))])
         for secret in (out["access_token"], out["refresh_token"], code):
             self.assertNotIn(secret, stored)
         access = mcp_access.resolve_bearer(self.conn, "Bearer " + out["access_token"], RES)
-        self.assertEqual((access.scopes, access.sub, access.email), ({"read", "ids:read"}, "sub-1", "me@example.com"))
+        self.assertEqual((access.scopes, access.sub, access.email), ({"read", "write"}, "sub-1", "me@example.com"))
 
     def test_code_refusals(self):
         c = self.client()
@@ -402,11 +402,14 @@ class TokenTests(Db):
     def test_refresh_refusals(self):
         c, other = self.client(), self.client()
         out = self.tokens(c)
-        for client_id, over in ((other["client_id"], {}), (c["client_id"], {"scope": "read ids:read"}), (c["client_id"], {"scope": "write"}),
+        for client_id, over in ((other["client_id"], {}), (c["client_id"], {"scope": "write"}),
                                 (c["client_id"], {"resource": "https://other.example/mcp"}), (c["client_id"], {"refresh_token": "wpr_nope"}),
                                 (c["client_id"], {"refresh_token": out["access_token"]})):
             with self.subTest(over=over), self.assertRaises(OAuthError):
                 self.refresh(client_id, out["refresh_token"], **over)
+        with self.assertRaises(OAuthError) as e:                                  # ids:read is no scope at all
+            self.refresh(c["client_id"], out["refresh_token"], scope="read ids:read")
+        self.assertEqual(e.exception.error, "invalid_scope")
         again = self.refresh(c["client_id"], out["refresh_token"], scope="read")
         self.conn.execute(update(OAuthToken)
                           .where(OAuthToken.consumed.is_(None), OAuthToken.kind == "refresh").values(expires=1))
@@ -450,10 +453,10 @@ class TokenTests(Db):
 
     def test_connections(self):
         c = self.client()
-        self.tokens(c, frozenset({"read", "ids:read"}))
+        self.tokens(c, frozenset({"read", "write"}))
         self.code(c)
         got = mcp_oauth.connections(self.conn)
-        self.assertEqual([(g["client"], g["who"], g["scope"]) for g in got], [("Claude", "me@example.com", ["read", "ids:read"])])
+        self.assertEqual([(g["client"], g["who"], g["scope"]) for g in got], [("Claude", "me@example.com", ["read", "write"])])
         self.assertTrue(mcp_oauth.revoke_grant(self.conn, got[0]["id"], "revoked_in_settings"))
         self.assertFalse(mcp_oauth.revoke_grant(self.conn, got[0]["id"], "revoked_in_settings"))
         self.assertEqual(mcp_oauth.connections(self.conn), [])

@@ -22,7 +22,7 @@ MAX_TEXT = 200_000   # characters in one reply: enough for years of trips, not e
 
 Fetch = Callable[..., Any]   # fetch(path, query) reads; fetch(path, query, body) POSTs a change; fetch(path, query, body, "DELETE") deletes
 
-READ, IDS, WRITE = mcp_access.READ, mcp_access.IDS, mcp_access.WRITE
+READ, WRITE = mcp_access.READ, mcp_access.WRITE
 
 
 class ToolError(Exception):
@@ -43,7 +43,6 @@ _DAY = {"type": "string", "description": "A day, like 2026-09-30."}
 _TRIP_ID = {**_ID, "description": "A trip's id (from list_trips)."}
 _SEGMENT_ID = {**_ID, "description": "A segment's id (from get_trip or upcoming)."}
 _PERSON_ID = {**_ID, "description": "A person's id (from list_people)."}
-_LOYALTY_ID = {**_ID, "description": "A membership's id (from get_loyalty_ids)."}
 
 
 def _need(a: dict, name: str) -> int:
@@ -51,6 +50,8 @@ def _need(a: dict, name: str) -> int:
     if raw in (None, "") or isinstance(raw, bool):
         raise ToolError(f"Give a {name}.")
     try:
+        if isinstance(raw, float) and not raw.is_integer():
+            raise ValueError(raw)   # (2.7 isn't segment 2)
         return int(raw)
     except (TypeError, ValueError):
         raise ToolError(f"{name} must be a whole number.") from None
@@ -100,20 +101,6 @@ def upcoming(fetch: Fetch, a: dict) -> Any:
     return {"today": today.isoformat(), "from": start.isoformat(), "through": last.isoformat(), "segments": out}
 
 
-def get_loyalty_ids(fetch: Fetch, a: dict) -> Any:
-    """Memberships with their numbers masked (last four characters); with `reveal` and a person or a membership, in full
-    (needs "ids:read" and its switch; each is logged by Waypoint, never the number)."""
-    person = _need(a, "person_id") if a.get("person_id") not in (None, "") else None
-    which = _need(a, "loyalty_id") if a.get("loyalty_id") not in (None, "") else None
-    listing = fetch("loyalty", {})
-    rows = [r for r in listing["loyalty"] if (person is None or r["person_id"] == person) and (which is None or r["id"] == which)]
-    if a.get("reveal") is True:
-        if person is None and which is None:
-            raise ToolError("To see full numbers, say whose (person_id) or which membership (loyalty_id).")
-        rows = [{**r, "number": fetch(f"loyalty/{r['id']}/reveal", {}, {})["number"]} for r in rows if r["readable"]]
-    return {"loyalty": rows, "conflicts": listing["conflicts"], "programs": listing["programs"]}
-
-
 def flight_status(fetch: Fetch, a: dict) -> Any:
     """What's already held (Waypoint doesn't fetch anything new for an assistant)."""
     out = fetch("flight-status", {})
@@ -137,12 +124,6 @@ TOOLS: list[dict[str, Any]] = [
      "run": lambda fetch, a: fetch(f"trips/{_need(a, 'trip_id')}", {}), "needs": (READ,)},
     {"name": "list_people", "description": "Everyone who travels: household members, then guests, with the names airlines print.",
      "inputSchema": _schema(), "run": lambda fetch, _a: fetch("people", {}), "needs": (READ,)},
-    {"name": "get_loyalty_ids", "description": "Loyalty, Known Traveler and redress memberships: program, tier, expiry and the number's "
-     "last four characters. To see a full number (to fill in a booking), set reveal with a person_id or loyalty_id: that needs "
-     "the connection to be allowed full ID numbers and the household's switch on, and Waypoint notes each reveal in its log.",
-     "inputSchema": _schema({"person_id": _PERSON_ID, "loyalty_id": _LOYALTY_ID,
-                             "reveal": {"type": "boolean", "description": "true gives the full numbers (default false: last four only)."}}),
-     "run": get_loyalty_ids, "needs": (READ,)},
     {"name": "get_stats", "description": "Travel stats over the trips you can see: flights, distance, airports, airlines, stays, cars and places, "
      "for one person or everyone, for a year or all time.",
      "inputSchema": _schema({"person": {"type": "string", "description": "A person's id from list_people, or all (default)."},
@@ -155,12 +136,12 @@ TOOLS: list[dict[str, Any]] = [
 
 # ------------------------------------------------------------------------------------------------ changes (opt-in)
 
-_SWITCHES = {WRITE: "Let assistants change trips", IDS: "Let assistants see full ID numbers"}
+_SWITCHES = {WRITE: "Let assistants change trips"}
 # What an assistant allowed "write" is told when it connects: it reads these, the person doesn't.
 WRITE_RULES = (
     "You can change the household's travel: the changing tools, and call_endpoint (list_endpoints) for anything else. Rules: "
     "1) Before every change, say in plain words what you'll change and wait for the person's explicit yes. "
-    "2) A destructive change (removing a trip, segment, person or membership, merging or splitting trips; such tools are marked "
+    "2) A destructive change (removing a trip, segment or person, merging or splitting trips; such tools are marked "
     "destructive) also needs the person to confirm what will be lost, separately from any other yes. Ask for each change on its own, "
     "never under one blanket yes for several. "
     "3) Times are wall-clock times at the place (start_local in start_zone); never convert them. "
@@ -208,12 +189,12 @@ def _fields(description: str) -> dict:
 
 
 def _write_tool(name: str, description: str, run: Callable[[Fetch, dict], Any], props: dict, required: list[str], *,
-                route: tuple[str, str], idempotent: bool = False, ids: bool = False) -> dict:
-    """A tool that changes something: offered, and run, only while this connection may make changes (and, for a number,
-    see full ones). Destructive as mcp_access.destructive says of its route."""
+                route: tuple[str, str], idempotent: bool = False) -> dict:
+    """A tool that changes something: offered, and run, only while this connection may make changes. Destructive as
+    mcp_access.destructive says of its route."""
     harm = mcp_access.destructive(*route)
     return {"name": name, "description": f"{description} {ASK}" + (f" {DESTRUCTIVE}" if harm else ""),
-            "inputSchema": _schema(props, required), "run": run, "needs": (WRITE, IDS) if ids else (WRITE,),
+            "inputSchema": _schema(props, required), "run": run, "needs": (WRITE,),
             "write": True, "idempotent": idempotent, "destructive": harm}
 
 
@@ -225,9 +206,6 @@ _SEGMENT_FIELDS = _fields("kind (flight, hotel, car or train), start_local and e
 _TRIP_FIELDS = _fields("name, and optionally destination, notes; start_date and end_date (YYYY-MM-DD) for a trip with no segments yet.")
 _PERSON_FIELDS = _fields("display_name, and optionally first_name, legal_name (as on an ID) and aliases (a list of how airlines print the "
                          "name). Changing replaces all of them: send every name to keep.")
-_LOYALTY_FIELDS = _fields("person_id, kind (airline, hotel, car, known_traveler or redress), program (one of get_loyalty_ids' programs "
-                          "for the kind, Other if it isn't there), number, and optionally tier, expiry (YYYY-MM-DD) and notes. "
-                          "Changing: leave number out to keep the one saved.")
 
 WRITE_TOOLS: list[dict[str, Any]] = [
     _write_tool("add_segment", "Add a flight, stay, rental or train. Without a trip_id it goes into the trip it falls into (one is "
@@ -251,14 +229,6 @@ WRITE_TOOLS: list[dict[str, Any]] = [
     _write_tool("update_person", "Change a person's names (a guest's or a member's).", _change("people/{id}", "person_id", True),
                 {"person_id": _PERSON_ID, "fields": _PERSON_FIELDS}, ["person_id", "fields"], route=("POST", "/api/people/{id}"),
                 idempotent=True),
-    _write_tool("add_loyalty_id", "Save a loyalty, Known Traveler or redress membership for a member or a guest. The number is "
-                "kept encrypted and shown masked afterwards. Needs the connection to be allowed full ID numbers too.",
-                _change("loyalty", None, True), {"fields": _LOYALTY_FIELDS}, ["fields"], route=("POST", "/api/loyalty"), ids=True),
-    _write_tool("update_loyalty_id", "Change a membership; leave number out to keep the one saved. Needs the connection to be allowed "
-                "full ID numbers too.", _change("loyalty/{id}", "loyalty_id", True), {"loyalty_id": _LOYALTY_ID, "fields": _LOYALTY_FIELDS},
-                ["loyalty_id", "fields"], route=("POST", "/api/loyalty/{id}"), idempotent=True, ids=True),
-    _write_tool("remove_loyalty_id", "Remove a membership.", _change("loyalty/{id}", "loyalty_id", method="DELETE"), {"loyalty_id": _LOYALTY_ID},
-                ["loyalty_id"], route=("DELETE", "/api/loyalty/{id}")),
 ]
 
 
@@ -321,7 +291,7 @@ def call_tool(name: str, args: dict, fetch: Fetch) -> str:
 
 def _about(fetch: Fetch) -> str:
     about = ("Access to a Waypoint travel app, as the member who connected you: the trips they are on (flights, stays, rentals, "
-             "trains), the people who travel, loyalty and Known Traveler numbers (shown by their last four characters), stats and "
+             "trains), the people who travel, stats and "
              "live flight status. Times are wall-clock times at the place, with its zone.")
     if allowed(fetch, (WRITE,)):
         return f"{about} {WRITE_RULES}"

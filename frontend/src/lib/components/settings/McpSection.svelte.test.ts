@@ -13,7 +13,7 @@ import McpSection from "./McpSection.svelte";
 
 const URL_ = "https://trips.example.com/mcp";
 const view = (extra: Partial<McpSettings> = {}): McpSettings =>
-  ({ allow_ids: false, allow_writes: false, oauth: true, url: URL_, reason: null, connections: [], ...extra });
+  ({ allow_writes: false, oauth: true, url: URL_, reason: null, connections: [], ...extra });
 const conn = (extra: Partial<McpConnection> = {}): McpConnection =>
   ({ id: 1, client: "Claude", who: "ana@example.com", scope: ["read"], created: "2026-09-01T10:00:00+00:00", last_used: null, ...extra });
 
@@ -72,41 +72,35 @@ describe("Settings → AI assistants (MCP)", () => {
     expect(await screen.findByText(/Set WAYPOINT_PUBLIC_URL/)).toBeInTheDocument();
     expect(screen.queryByLabelText("MCP address")).toBeNull();
     expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
-    expect(screen.getByRole("checkbox", { name: /Let assistants change trips/ })).toBeInTheDocument();   // the switches stay
+    expect(screen.getByRole("checkbox", { name: /Let assistants change trips/ })).toBeInTheDocument();   // the switch stays
   });
 
-  it("starts with both switches off and says what each allows", async () => {
+  it("starts with the switch off and says what it allows", async () => {
     serve(() => view());
     render(McpSection);
-    const ids = await screen.findByRole("checkbox", { name: /Let assistants see full ID numbers/ });
-    const writes = screen.getByRole("checkbox", { name: /Let assistants change trips/ });
-    expect(ids).not.toBeChecked();
+    const writes = await screen.findByRole("checkbox", { name: /Let assistants change trips/ });
     expect(writes).not.toBeChecked();
-    expect(ids).toHaveAccessibleDescription(/never the number/);
     expect(writes).toHaveAccessibleDescription(/ask before each change/);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(1);
+    expect(screen.queryByText(/full ID numbers/i)).toBeNull();
   });
 
-  it.each([
-    ["ids", /Let assistants see full ID numbers/],
-    ["writes", /Let assistants change trips/],
-  ])("switches %s on and off, and shows what the server kept", async (route, name) => {
+  it("switches changing trips on and off, and shows what the server kept", async () => {
     let now = view();
     serve(() => now, (path, opts) => {
-      if (path !== `/api/mcp-settings/${route}`) return undefined;
-      now = { ...now, [route === "ids" ? "allow_ids" : "allow_writes"]: !!opts?.body?.allow };
+      if (path !== "/api/mcp-settings/writes") return undefined;
+      now = { ...now, allow_writes: !!opts?.body?.allow };
       return { allow: !!opts?.body?.allow };
     });
     render(McpSection);
-    const box = await screen.findByRole("checkbox", { name });
+    const box = await screen.findByRole("checkbox", { name: /Let assistants change trips/ });
     await userEvent.click(box);
-    await waitFor(() => expect(posts(`/api/mcp-settings/${route}`)).toEqual([{ allow: true }]));
+    await waitFor(() => expect(posts("/api/mcp-settings/writes")).toEqual([{ allow: true }]));
     await waitFor(() => expect(box).toBeChecked());
-    expect(vi.mocked(api)).toHaveBeenCalledWith(`/api/mcp-settings/${route}`, expect.objectContaining({ method: "POST" }));
-    const other = screen.getByRole("checkbox", { name: route === "ids" ? /change trips/ : /full ID numbers/ });
-    expect(other).not.toBeChecked();   // apart from each other
+    expect(vi.mocked(api)).toHaveBeenCalledWith("/api/mcp-settings/writes", expect.objectContaining({ method: "POST" }));
     await waitFor(() => expect(box).toBeEnabled());
     await userEvent.click(box);
-    await waitFor(() => expect(posts(`/api/mcp-settings/${route}`)).toEqual([{ allow: true }, { allow: false }]));
+    await waitFor(() => expect(posts("/api/mcp-settings/writes")).toEqual([{ allow: true }, { allow: false }]));
     await waitFor(() => expect(box).not.toBeChecked());
   });
 
@@ -119,25 +113,22 @@ describe("Settings → AI assistants (MCP)", () => {
     await waitFor(() => expect(box).not.toBeChecked());
   });
 
-  it.each([
-    ["ids", /Let assistants see full ID numbers/, false],
-    ["writes", /Let assistants change trips/, true],
-  ])("puts the %s switch back and says why when the server refuses", async (route, name, wasOn) => {
-    const now = view({ allow_ids: wasOn, allow_writes: wasOn });
-    serve(() => now, (path) => { if (path === `/api/mcp-settings/${route}`) throw new Error("Waypoint is busy"); return undefined; });
+  it("puts the switch back and says why when the server refuses", async () => {
+    const now = view({ allow_writes: true });
+    serve(() => now, (path) => { if (path === "/api/mcp-settings/writes") throw new Error("Waypoint is busy"); return undefined; });
     render(McpSection);
-    const box = (await screen.findByRole("checkbox", { name })) as HTMLInputElement;
-    expect(box.checked).toBe(wasOn);
+    const box = (await screen.findByRole("checkbox", { name: /Let assistants change trips/ })) as HTMLInputElement;
+    expect(box.checked).toBe(true);
     await userEvent.click(box);
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Waypoint is busy"));
-    await waitFor(() => expect(box.checked).toBe(wasOn));
+    await waitFor(() => expect(box.checked).toBe(true));
     await waitFor(() => expect(box).toBeEnabled());
   });
 
   it("lists each connected assistant with who approved it, when it was last used and what it may do", async () => {
     serve(() => view({ connections: [
       conn({ scope: ["read"] }),
-      conn({ id: 2, client: null, who: null, scope: ["read", "ids:read", "write"], last_used: "2026-09-03T10:00:00+00:00" }),
+      conn({ id: 2, client: null, who: null, scope: ["read", "write"], last_used: "2026-09-03T10:00:00+00:00" }),
     ] }));
     render(McpSection);
     expect(await screen.findByText("Claude")).toBeInTheDocument();
@@ -147,7 +138,6 @@ describe("Settings → AI assistants (MCP)", () => {
     expect(first).toHaveTextContent("Read");
     expect(first).not.toHaveTextContent("Change trips");
     expect(second).toHaveTextContent(/Last used .*2026.*\./);
-    expect(second).toHaveTextContent("Full ID numbers");
     expect(second).toHaveTextContent("Change trips");
     expect(second).not.toHaveTextContent("by ");
   });

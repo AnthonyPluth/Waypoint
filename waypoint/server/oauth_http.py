@@ -130,7 +130,6 @@ def _consent_ask(h: Handler, url, iss: str) -> None:
         except mcp_oauth.RedirectError as e:
             return h._redirect(mcp_oauth.with_params(e.redirect_uri, {
                 "error": e.error, "error_description": e.description, "state": e.state, "iss": iss}))
-        ids_on = mcp_access.allow_ids(conn)
         writes_on = mcp_access.allow_writes(conn)
         token = mcp_oauth.start_consent(conn, {**req.params(), "sub": user.get("sub")})
     target = urllib.parse.urlsplit(req.redirect_uri)
@@ -144,11 +143,11 @@ def _consent_ask(h: Handler, url, iss: str) -> None:
            f"form-action 'self' {back}; base-uri 'none'; frame-ancestors 'none'")
     cookie = h._cookie_header("waypoint_consent", token, mcp_oauth.CONSENT_TTL, "/oauth")
     page = h._page_html(f"{name} wants to connect to Waypoint",
-                        consent_page(req.scope, target, token, user, ids_on, writes_on), center=False)
+                        consent_page(req.scope, target, token, user, writes_on), center=False)
     h._send(200, page, "text/html; charset=utf-8", extra={"Set-Cookie": cookie}, csp=csp)
 
 
-def consent_page(scope, target, token: str, user: dict, ids_on: bool, writes_on: bool) -> str:
+def consent_page(scope, target, token: str, user: dict, writes_on: bool) -> str:
     """The consent page's form (inside the page's card): who's approving, where the answer goes, and a box for each
     scope the app asked for. A box can be ticked only while its switch is on, and is never ticked for you: allowing more
     than reading is a choice made here, each time."""
@@ -156,7 +155,7 @@ def consent_page(scope, target, token: str, user: dict, ids_on: bool, writes_on:
     signed_in = (f"You're signed in as <b>{html.escape(who)}</b>. The assistant will see what you see: the trips you're on, nothing more."
                  if who else "This Waypoint has no sign-in of its own, so anyone who can open it can approve apps.")
     boxes = ""
-    for name, field, on in (("ids:read", "ids", ids_on), ("write", "write", writes_on)):
+    for name, field, on in (("write", "write", writes_on),):
         if name not in scope:
             continue
         label, note, off = mcp_oauth.CONSENT[name]
@@ -168,8 +167,7 @@ def consent_page(scope, target, token: str, user: dict, ids_on: bool, writes_on:
 <form method="post" action="/oauth/authorize">
 <input type="hidden" name="consent" value="{html.escape(token)}">
 <label class="choice"><input type="checkbox" checked disabled><span><b>Read your travel</b><span class="help">Upcoming
-flights and stays, trips, who is on them, people and guests, stats and live flight status. ID numbers show only their last four
-characters. Never your email, mailboxes, backups or settings.</span></span></label>
+flights and stays, trips, who is on them, people and guests, stats and live flight status. Never your email, mailboxes, loyalty numbers, backups or settings.</span></span></label>
 {boxes}<div class="actions"><button class="btn primary" type="submit" name="decision" value="allow">Allow</button>
 <button class="btn" type="submit" name="decision" value="deny">Deny</button></div>
 </form>"""
@@ -200,8 +198,6 @@ def _consent_answer(h: Handler, iss: str) -> None:
         if decision == "allow":
             scope = {"read"}
             asked = params["scope"].split()
-            if "ids:read" in asked and form.get("ids") == "1" and mcp_access.allow_ids(conn):
-                scope.add("ids:read")
             if "write" in asked and form.get("write") == "1" and mcp_access.allow_writes(conn):
                 scope.add("write")
             code = mcp_oauth.approve(conn, params, frozenset(scope), user.get("sub"), user.get("email"))

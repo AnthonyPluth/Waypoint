@@ -25,8 +25,7 @@ AI_OLLAMA_MODEL = "ai_ollama_model"
 AI_OPENROUTER_MODEL = "ai_openrouter_model"
 AI_OPENROUTER_KEY = "ai_openrouter_key"
 
-# AI assistants (waypoint/server/mcp_access.py): the household's switches, off until turned on ("1" is on)
-MCP_ALLOW_IDS = "mcp_allow_ids"       # "Let assistants see full ID numbers"
+# AI assistants (waypoint/server/mcp_access.py): the household's switch, off until turned on ("1" is on)
 MCP_ALLOW_WRITES = "mcp_allow_writes"   # "Let assistants change trips"
 
 VAPID_PRIVATE_KEY = "vapid_private_key"   # web push signing key, made on first use

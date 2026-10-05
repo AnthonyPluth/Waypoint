@@ -9,8 +9,8 @@
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
 
-  // Settings → AI assistants (MCP): the address an assistant is given, the two household switches that decide what an
-  // assistant may be allowed (each assistant is approved on Waypoint’s own page, where the person ticks what it gets),
+  // Settings → AI assistants (MCP): the address an assistant is given, the household switch that decides whether an
+  // assistant may be allowed to change trips (each assistant is approved on Waypoint’s own page, where the person ticks what it gets),
   // and the assistants connected, each with Disconnect.
   let list = $state<McpSettings | null>(null);
   let problem = $state("");
@@ -25,17 +25,14 @@
   }
   onMount(load);
 
-  // A switch shows what the server kept. If the server refuses, the box goes back to where it was and the toast says why.
-  async function choose(e: Event, route: "ids" | "writes") {
+  // The switch shows what the server kept. If the server refuses, the box goes back to where it was and the toast says why.
+  async function choose(e: Event) {
     const box = e.currentTarget as HTMLInputElement, allow = box.checked;
-    const failed = "Couldn’t save that";
     await act(async () => {
-      const r = route === "ids"
-        ? await apiCall<"POST /api/mcp-settings/ids">("/api/mcp-settings/ids", { method: "POST", body: { allow }, failed })
-        : await apiCall<"POST /api/mcp-settings/writes">("/api/mcp-settings/writes", { method: "POST", body: { allow }, failed });
-      if (list) list = route === "ids" ? { ...list, allow_ids: r.allow } : { ...list, allow_writes: r.allow };
+      const r = await apiCall<"POST /api/mcp-settings/writes">("/api/mcp-settings/writes", { method: "POST", body: { allow }, failed: "Couldn’t save that" });
+      if (list) list = { ...list, allow_writes: r.allow };
     }, { busy: (on) => (saving = on) });
-    if (list) box.checked = route === "ids" ? list.allow_ids : list.allow_writes;   // as the server has it (after a refusal, as it was)
+    if (list) box.checked = list.allow_writes;   // as the server has it (after a refusal, as it was)
   }
 
   async function copy() {
@@ -54,7 +51,7 @@
     });
   }
 
-  const SCOPES: Record<string, string> = { read: "Read", "ids:read": "Full ID numbers", write: "Change trips" };
+  const SCOPES: Record<string, string> = { read: "Read", write: "Change trips" };
   /** What an approval allows, as words: read always, then whatever else it was given. */
   const access = (scope: string[]) => Object.keys(SCOPES).filter((s) => s === "read" || scope.includes(s)).map((s) => SCOPES[s]);
 
@@ -92,17 +89,10 @@
       </div>
       <label class="row cursor-pointer flex-nowrap">
         <span class="min-w-0">
-          <span class="block font-medium">Let assistants see full ID numbers</span>
-          <span id="mcp-ids-help" class="block text-sm text-muted-foreground">Full loyalty, Known Traveler and redress numbers, only for connections allowed it. Each reveal is noted in the log, never the number.</span>
-        </span>
-        <input type="checkbox" class="size-5 shrink-0" aria-describedby="mcp-ids-help" checked={list.allow_ids} disabled={saving} onchange={(e) => choose(e, "ids")} />
-      </label>
-      <label class="row cursor-pointer flex-nowrap">
-        <span class="min-w-0">
           <span class="block font-medium">Let assistants change trips</span>
           <span id="mcp-writes-help" class="block text-sm text-muted-foreground">Add, change and remove trips, bookings, people and loyalty entries. The assistant is told to ask before each change. Never mailboxes, email, AI settings, backups or sign-in.</span>
         </span>
-        <input type="checkbox" class="size-5 shrink-0" aria-describedby="mcp-writes-help" checked={list.allow_writes} disabled={saving} onchange={(e) => choose(e, "writes")} />
+        <input type="checkbox" class="size-5 shrink-0" aria-describedby="mcp-writes-help" checked={list.allow_writes} disabled={saving} onchange={choose} />
       </label>
       {#each list.connections as c (c.id)}
         <div class="row" data-testid="assistant">

@@ -5,9 +5,9 @@ and the assistant then acts as that member (what they see, nothing more). The pi
 authorization-server metadata (RFC 8414), dynamic client registration (RFC 7591, without the management API of RFC 7592),
 the authorization code flow with PKCE (S256 only), refresh tokens that rotate, with a replayed one revoking its grant,
 revocation (RFC 7009), resource indicators (RFC 8707) and the iss parameter on redirects (RFC 9207). Scopes: "read"
-(always), "ids:read" (opt-in, full ID numbers, and only effective while "Let assistants see full ID numbers" is on:
-mcp_access.allow_ids) and "write" (opt-in, any change outside mcp_access.BLOCKED, only while "Let assistants change trips"
-is on: mcp_access.allow_writes). What the consent page says each opt-in allows is CONSENT.
+(always) and "write" (opt-in, any change outside mcp_access.BLOCKED, only while "Let assistants change trips" is on:
+mcp_access.allow_writes). What the consent page says the opt-in allows is CONSENT. Loyalty and Known Traveler numbers are
+out of an assistant's reach whatever it is allowed (mcp_access.BLOCKED).
 
 A grant is one approval on the consent page: the unit Settings lists and revokes. Codes and tokens are random
 (secrets.token_urlsafe(32), with a prefix) and only their sha256 is stored; revoke_grant() ends everything under a
@@ -41,17 +41,12 @@ from sqlalchemy import delete, exists, insert, or_, select, true, update
 from .. import oidc
 from ..storage.models import OAuthClient, OAuthCode, OAuthConsent, OAuthGrant, OAuthToken
 
-SCOPES = ("read", "ids:read", "write")
+SCOPES = ("read", "write")
 # What the consent page says ticking each opt-in scope lets the assistant do (and, switched off, what to do first).
 CONSENT = {
-    "ids:read": ("See full ID numbers",
-                 "Loyalty, Known Traveler and redress numbers in full, so it can fill in a booking. Without this it sees only "
-                 "the last four characters. Each time it asks for one, Waypoint's log notes which membership and which "
-                 "connection, never the number.",
-                 "Turn on Let assistants see full ID numbers in Settings first. Until then this connection sees only the last four."),
     "write": ("Change trips",
-              "Add, change and remove trips, bookings, travellers, people, guests and loyalty entries, and the distance unit. "
-              "Never mailboxes, the “Couldn’t read” queue, AI settings, backups, sign-in or these assistant settings. It's told "
+              "Add, change and remove trips, bookings, travellers, people and guests, and the distance unit. "
+              "Never mailboxes, the “Couldn’t read” queue, AI settings, backups, loyalty numbers, sign-in or these assistant settings. It's told "
               "to ask you before every change.",
               "Turn on Let assistants change trips in Settings first. Until then this connection can't make changes."),
 }

@@ -252,7 +252,6 @@ class Replies(DbCase):
     def test_mcp_settings(self):
         _current.host = "localhost:8765"
         self.check("GET /api/mcp-settings", mcp_api.api_mcp_settings(self.c, {}, {}))   # nobody connected
-        self.check("POST /api/mcp-settings/ids", mcp_api.api_mcp_ids(self.c, {}, {"allow": True}))
         self.check("POST /api/mcp-settings/writes", mcp_api.api_mcp_writes(self.c, {}, {"allow": True}))
         client = mcp_oauth.register(self.c, {"client_name": "Claude", "redirect_uris": ["http://127.0.0.1:1/cb"]})
         mcp_oauth.approve(self.c, {"client_id": client["client_id"], "redirect_uri": "http://127.0.0.1:1/cb", "code_challenge": "c" * 43,
@@ -365,7 +364,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/loyalty/{id}/reveal",
                                      "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",
                                      "DELETE /api/reminders/devices/{id}", "POST /api/feed", "DELETE /api/feed",
-                                     "GET /api/mcp-settings", "POST /api/mcp-settings/ids", "POST /api/mcp-settings/writes",
+                                     "GET /api/mcp-settings", "POST /api/mcp-settings/writes",
                                      "DELETE /api/mcp-settings/connections/{id}"})
         self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)
         self.assertNotIn("GET /api/mailboxes/callback", covered())   # and this one as a redirect

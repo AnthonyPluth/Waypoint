@@ -528,6 +528,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_loyalty.py",
+        "tests/test_mcp.py",
         "tests/test_mcp_routes.py"
       ],
       "docs": [
@@ -543,7 +544,8 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_loyalty.py"
+        "tests/test_loyalty.py",
+        "tests/test_mcp.py"
       ],
       "docs": [
         "start/loyalty"
@@ -559,7 +561,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_loyalty.py",
-        "tests/test_mcp_routes.py"
+        "tests/test_mcp.py"
       ],
       "docs": [
         "start/loyalty"
@@ -575,7 +577,9 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_loyalty.py"
+        "tests/test_loyalty.py",
+        "tests/test_mcp.py",
+        "tests/test_mcp_routes.py"
       ],
       "docs": [
         "start/loyalty"
@@ -854,21 +858,6 @@
       "method": "GET",
       "path": "/api/mcp-settings",
       "handler": "waypoint/server/api/mcp.py:api_mcp_settings",
-      "web": [
-        "frontend/src/lib/components/settings/McpSection.svelte"
-      ],
-      "tests": [
-        "tests/test_api_contract.py",
-        "tests/test_mcp_protocol.py"
-      ],
-      "docs": [
-        "start/mcp"
-      ]
-    },
-    {
-      "method": "POST",
-      "path": "/api/mcp-settings/ids",
-      "handler": "waypoint/server/api/mcp.py:api_mcp_ids",
       "web": [
         "frontend/src/lib/components/settings/McpSection.svelte"
       ],

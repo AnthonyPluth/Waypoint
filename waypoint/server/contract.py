@@ -616,22 +616,17 @@ class McpConnection(TypedDict):
     id: int
     client: str | None              # the app's name, as it registered
     who: str | None                 # the member who approved it: it sees what they see
-    scope: list[str]                # read, and what they allowed besides: ids:read, write
+    scope: list[str]                # read, and write when they allowed changes
     created: str | None             # with its UTC offset
     last_used: str | None
 
 
 class McpSettings(TypedDict):
-    allow_ids: bool                 # "Let assistants see full ID numbers"
     allow_writes: bool              # "Let assistants change trips"
     oauth: bool                     # assistants can connect (the address is one OAuth can use)
     url: str | None                 # what to add to the assistant; none when `oauth` is false
     reason: str | None              # why not
     connections: list[McpConnection]
-
-
-class McpIdsBody(TypedDict):
-    allow: bool
 
 
 class McpWritesBody(TypedDict):

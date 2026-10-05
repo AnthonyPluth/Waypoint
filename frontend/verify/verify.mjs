@@ -67,7 +67,7 @@ export async function seedAssistants(browser, base) {
     const post = (path, options) => ctx.request.post(`${base}${path}`, { headers: { "X-Waypoint": "1", Origin: base }, ...options });
     const register = async (name) => (await (await post("/oauth/register", { data: { client_name: name, redirect_uris: [REDIRECT] } })).json()).client_id;
     const askUrl = (clientId, challenge) => `${base}/oauth/authorize?` + new URLSearchParams({ response_type: "code", client_id: clientId,
-      redirect_uri: REDIRECT, scope: "read ids:read write", state: "demo", code_challenge: challenge, code_challenge_method: "S256", resource: `${base}/mcp` });
+      redirect_uri: REDIRECT, scope: "read write", state: "demo", code_challenge: challenge, code_challenge_method: "S256", resource: `${base}/mcp` });
     await post("/api/mcp-settings/writes", { data: { allow: true } });
     for (const [name, change] of [["Claude", true], ["Claude Code", false]]) {
       const { verifier, challenge } = pkce();

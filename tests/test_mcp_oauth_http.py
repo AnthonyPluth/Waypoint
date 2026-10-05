@@ -87,7 +87,6 @@ class OAuthServer(ServerCase):
             forget_oauth(conn, self.clients)
             conn.execute(delete(Trip).where(Trip.name == self.trip["name"]))
             mcp_access.set_allow_writes(conn, False)
-            mcp_access.set_allow_ids(conn, False)
 
     def mine(self, stmt):
         """The first column of this statement's first row (`.in_(self.clients)` picks "this test's clients")."""
@@ -182,10 +181,6 @@ class OAuthServer(ServerCase):
         with db.session() as conn:
             mcp_access.set_allow_writes(conn, on)
 
-    def ids(self, on):
-        with db.session() as conn:
-            mcp_access.set_allow_ids(conn, on)
-
 
 class MetadataTests(OAuthServer):
     """The two metadata documents, and which address Waypoint says it is (WAYPOINT_PUBLIC_URL, never the Host header)."""
@@ -196,7 +191,7 @@ class MetadataTests(OAuthServer):
                 r = self.http("GET", path)
                 self.assertEqual(r.status, 200)
                 self.assertEqual(r.json, {"resource": self.resource, "authorization_servers": [self.iss],
-                                          "scopes_supported": ["read", "ids:read", "write"], "bearer_methods_supported": ["header"]})
+                                          "scopes_supported": ["read", "write"], "bearer_methods_supported": ["header"]})
                 self.assertIsNone(r.headers.get("Access-Control-Allow-Origin"))   # no CORS
         m = self.http("GET", "/.well-known/oauth-authorization-server").json
         self.assertEqual(m, mcp_oauth.authorization_server_metadata(self.iss))
@@ -300,7 +295,7 @@ class RegistrationTests(OAuthServer):
 
 class ConsentTests(OAuthServer):
     """The consent page: a request it can't trust is shown here, one it can goes back to the app, the boxes for
-    ids:read and write, and the answer's checks."""
+    write, and the answer's checks."""
 
     def test_a_bad_app_or_redirect_is_shown_here_never_redirected(self):
         c = self.client()
@@ -344,23 +339,16 @@ class ConsentTests(OAuthServer):
         self.assertEqual((ck["path"], ck["httponly"], ck["samesite"]), ("/oauth", True, "Lax"))
         self.assertEqual(ck.value, self.consent_token(r))
 
-    def test_the_ids_box_follows_its_switch_and_is_never_ticked_for_you(self):
+    def test_ids_read_is_not_a_scope_so_there_is_no_box_for_it(self):
         c = self.client()
-        page = self.authorize(c, scope="read ids:read").body.decode()             # asked, switch off: shown, off, and why
-        self.assertIn('type="checkbox" disabled><span><b>See full ID numbers', page)
-        self.assertIn("Turn on Let assistants see full ID numbers in Settings first", page)
-        self.assertNotIn('name="ids"', page)
-        self.assertEqual(self.granted(c, self.authorize(c, scope="read ids:read"), ids=True), "read")   # ticked by a script: no
-        self.ids(True)
-        page = self.authorize(c, scope="read ids:read")
-        body = page.body.decode()
-        self.assertIn('<input type="checkbox" name="ids" value="1"><span><b>See full ID numbers', body)   # on, not ticked
-        self.assertNotIn("checked><span><b>See full ID numbers", body)
-        self.assertIn("Loyalty, Known Traveler and redress numbers in full", body)
-        self.assertEqual(self.granted(c, page), "read")                           # left unticked: read only
-        self.assertEqual(self.granted(c, self.authorize(c, scope="read ids:read"), ids=True), "read ids:read")
-        self.assertNotIn("See full ID numbers", self.authorize(c, scope="read write").body.decode())   # not asked: not there
-        self.assertEqual(self.granted(c, self.authorize(c, scope="read write"), ids=True), "read")     # nor granted
+        r = self.authorize(c, scope="read ids:read")                              # sent back to the app, never a page
+        self.assertEqual((r.status, r.query()["error"], r.query()["state"]), (302, "invalid_scope", "xyz/+&="))
+        self.assertNotIn("code", r.query())
+        page = self.authorize(c, scope="read write")
+        self.assertNotIn("ID numbers", page.body.decode())
+        self.assertNotIn('name="ids"', page.body.decode())
+        self.writes(True)
+        self.assertEqual(self.granted(c, self.authorize(c, scope="read write"), ids=True), "read")   # a forged box grants nothing
 
     def test_the_write_box_follows_its_switch_and_is_never_ticked_for_you(self):
         c = self.client()
@@ -373,39 +361,20 @@ class ConsentTests(OAuthServer):
         page = self.authorize(c, scope="read write")
         body = page.body.decode()
         self.assertIn('<input type="checkbox" name="write" value="1"><span><b>Change trips', body)   # on, not ticked
-        self.assertIn("Add, change and remove trips, bookings, travellers, people, guests and loyalty entries", body)
-        self.assertIn("AI settings, backups, sign-in or these assistant settings", body)
+        self.assertIn("Add, change and remove trips, bookings, travellers, people and guests, and the distance unit", body)
+        self.assertIn("AI settings, backups, loyalty numbers, sign-in or these assistant settings", body)
         self.assertEqual(self.granted(c, page), "read")                           # left unticked: read only
         self.assertEqual(self.granted(c, self.authorize(c, scope="read write"), write=True), "read write")
-        self.assertNotIn("Change trips", self.authorize(c, scope="read ids:read").body.decode())   # not asked: not there
-        self.assertEqual(self.granted(c, self.authorize(c, scope="read ids:read"), write=True), "read")   # nor granted
-
-    def test_each_box_has_its_own_switch(self):
-        c = self.client()
-        self.writes(True)                                                         # the write switch isn't the ids one
-        page = self.authorize(c, scope="read ids:read write")
-        body = page.body.decode()
-        self.assertIn('type="checkbox" disabled><span><b>See full ID numbers', body)
-        self.assertIn('name="write" value="1"', body)
-        self.assertEqual(self.granted(c, page, ids=True, write=True), "read write")
-        self.writes(False)
-        self.ids(True)
-        page = self.authorize(c, scope="read ids:read write")
-        self.assertEqual(self.granted(c, page, ids=True, write=True), "read ids:read")
-        self.writes(True)
-        page = self.authorize(c, scope="read ids:read write")
-        self.assertEqual(self.granted(c, page, ids=True, write=True), "read ids:read write")
-        page = self.authorize(c, scope="read ids:read write")
-        self.assertEqual(self.granted(c, page, write=True), "read write")        # you unticked ids
+        page = self.authorize(c, scope="read")
+        self.assertNotIn("Change trips", page.body.decode())                      # not asked: not there
+        self.assertEqual(self.granted(c, page, write=True), "read")               # nor granted
 
     def test_the_switch_is_read_again_when_you_answer(self):
         c = self.client()
         self.writes(True)
-        self.ids(True)
-        page = self.authorize(c, scope="read ids:read write")
+        page = self.authorize(c, scope="read write")
         self.writes(False)
-        self.ids(False)
-        self.assertEqual(self.granted(c, page, ids=True, write=True), "read")     # turned off while the page was open
+        self.assertEqual(self.granted(c, page, write=True), "read")               # turned off while the page was open
         self.writes(True)
         page = self.authorize(c, scope="read write")
         self.assertEqual(self.granted(c, page, write=False), "read")             # you unticked it
@@ -540,7 +509,7 @@ class TokenTests(OAuthServer):
         self.assertEqual(self.rpc(second["access_token"], "ping").status, 200)
         self.assertEqual(self.rpc(first["access_token"], "ping").status, 200)     # the old access token lives out its hour
         r = self.form("/oauth/token", {"grant_type": "refresh_token", "refresh_token": second["refresh_token"], "client_id": c["client_id"],
-                                       "scope": "read ids:read"})                 # a refresh can't add scopes
+                                       "scope": "read ids:read"})                 # not a scope at all
         self.assertEqual((r.status, r.json["error"]), (400, "invalid_scope"))
         r = self.form("/oauth/token", {"grant_type": "refresh_token", "refresh_token": first["refresh_token"], "client_id": c["client_id"]})
         self.assertEqual((r.status, r.json["error"]), (400, "invalid_grant"))     # the spent one again: revoke it all
@@ -631,14 +600,10 @@ class McpTests(OAuthServer):
     def test_a_read_only_connection_is_told_to_reconnect(self):
         t = self.tokens()
         self.writes(True)
-        self.ids(True)
         self.assertEqual(self.tool_names(t["access_token"]), {x["name"] for x in mcp_server.TOOLS})
-        for name, args, words in (("create_trip", {"fields": self.trip}, "reconnect"),
-                                  ("add_loyalty_id", {"fields": {}}, "reconnect")):
-            with self.subTest(tool=name):
-                result = self.call(t["access_token"], name, args)
-                self.assertTrue(result["isError"])
-                self.assertIn(words, result["content"][0]["text"])
+        result = self.call(t["access_token"], "create_trip", {"fields": self.trip})
+        self.assertTrue(result["isError"])
+        self.assertIn("reconnect", result["content"][0]["text"])
         self.assertNotIn("isError", self.call(t["access_token"], "list_trips"))
         self.assertEqual(self.trips_made(), 0)
 
@@ -647,7 +612,7 @@ class McpTests(OAuthServer):
         t = self.tokens(scope="read write", write=True)
         self.assertEqual(t["scope"], "read write")
         token = t["access_token"]
-        offered = {x["name"] for x in mcp_server.ALL_TOOLS if mcp_access.IDS not in x["needs"]}
+        offered = {x["name"] for x in mcp_server.ALL_TOOLS}
         self.assertEqual(self.tool_names(token), offered)
         self.assertIn("create_trip", offered)
         self.assertNotIn("isError", self.call(token, "create_trip", {"fields": self.trip}))
@@ -660,23 +625,17 @@ class McpTests(OAuthServer):
         self.assertEqual(self.rpc(token, "ping").status, 200)
         self.assertEqual(self.trips_made(), 1)                                    # the refused call changed nothing
 
-    def test_a_number_needs_ids_read_and_its_own_switch(self):
+    def test_no_tool_reaches_a_loyalty_number(self):
         self.writes(True)
-        self.ids(True)
-        write_only = self.tokens(scope="read write", write=True)["access_token"]
-        self.assertNotIn("add_loyalty_id", self.tool_names(write_only))           # the scope, not just the switch
-        result = self.call(write_only, "add_loyalty_id", {"fields": {}})
-        self.assertTrue(result["isError"])
-        self.assertIn("reconnect", result["content"][0]["text"])
-        both = self.tokens(scope="read write ids:read", write=True, ids=True)
-        self.assertEqual(both["scope"], "read ids:read write")
-        self.assertIn("add_loyalty_id", self.tool_names(both["access_token"]))
-        self.ids(False)                                                           # the switch, at once
-        self.assertNotIn("add_loyalty_id", self.tool_names(both["access_token"]))
-        self.assertIn("create_trip", self.tool_names(both["access_token"]))
-        result = self.call(both["access_token"], "add_loyalty_id", {"fields": {}})
-        self.assertTrue(result["isError"])
-        self.assertIn("Full ID numbers are switched off", result["content"][0]["text"])
+        t = self.tokens(scope="read write", write=True)["access_token"]
+        names = self.tool_names(t)
+        self.assertIn("create_trip", names)
+        for gone in ("get_loyalty_ids", "add_loyalty_id", "update_loyalty_id", "remove_loyalty_id"):
+            with self.subTest(tool=gone):
+                self.assertNotIn(gone, names)
+                result = self.call(t, gone, {})
+                self.assertTrue(result["isError"])                                # unknown to the server, whatever the scope
+                self.assertIn("Unknown tool", result["content"][0]["text"])
 
 
 class EndToEndTests(OAuthServer):

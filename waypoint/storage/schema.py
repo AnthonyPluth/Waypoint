@@ -325,7 +325,7 @@ oauth_grants = Table(
     Column('client_id', Text, refers('oauth_grants', 'client_id', 'oauth_clients.id', 'CASCADE'), nullable=False),
     Column('sub', Text, doc='the member who approved it: the assistant sees what they see'),
     Column('email', Text),
-    Column('scope', Text, nullable=False, doc='space-separated: read, ids:read, write'),
+    Column('scope', Text, nullable=False, doc='space-separated: read, write'),
     Column('resource', Text, nullable=False, doc='the /mcp address its tokens are for'),
     Column('created', Float, nullable=False),
     Column('last_used', Float),

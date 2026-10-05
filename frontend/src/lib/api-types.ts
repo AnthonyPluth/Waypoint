@@ -232,12 +232,7 @@ export interface McpConnection {
   last_used: string | null;
 }
 
-export interface McpIdsBody {
-  allow: boolean;
-}
-
 export interface McpSettings {
-  allow_ids: boolean;
   allow_writes: boolean;
   oauth: boolean;
   url: string | null;
@@ -665,7 +660,6 @@ export interface Endpoints {
   "POST /api/review/{id}/suggest": { body: never; reply: Ok };
   "DELETE /api/review/{id}": { body: never; reply: Ok };
   "GET /api/mcp-settings": { body: never; reply: McpSettings };
-  "POST /api/mcp-settings/ids": { body: McpIdsBody; reply: McpIdsBody };
   "POST /api/mcp-settings/writes": { body: McpWritesBody; reply: McpWritesBody };
   "DELETE /api/mcp-settings/connections/{id}": { body: never; reply: Ok };
   "GET /api/state": { body: never; reply: State };
