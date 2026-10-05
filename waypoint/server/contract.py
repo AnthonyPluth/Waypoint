@@ -56,3 +56,27 @@ class Restored(TypedDict):
     counts: dict[str, int]
     safety_copy: str | None
     unreadable_secrets: list[str]
+
+
+# People
+
+class Person(TypedDict):
+    """Someone who travels: a household member (`member`, linked to their sign-in) or a guest with no login."""
+    id: int
+    display_name: str
+    first_name: str | None
+    legal_name: str | None         # as on an ID
+    aliases: list[str]             # how airlines print the name ("DOE/JANE MS")
+    member: bool
+
+
+class People(TypedDict):
+    people: list[Person]            # members first, then guests
+
+
+class PersonBody(TypedDict):
+    """A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed)."""
+    display_name: str
+    first_name: NotRequired[str | None]
+    legal_name: NotRequired[str | None]
+    aliases: NotRequired[list[str]]

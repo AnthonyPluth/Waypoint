@@ -37,6 +37,7 @@ import urllib.request
 import jwt
 from sqlalchemy import delete, insert, select, update
 
+from .domain import people
 from .storage import db, secretbox
 from . import tls
 from .storage.models import AuthPending, AuthSession, User
@@ -261,8 +262,10 @@ def remember_user(conn, sub, email, name, given=None, when=None) -> None:
     """Keep a list of people who've signed in, so accounts can be assigned to them."""
     if not sub:
         return
-    db.upsert(conn, User, {"sub": sub, "email": email, "name": name, "first_name": first_name(name, email, given),
+    first = first_name(name, email, given)
+    db.upsert(conn, User, {"sub": sub, "email": email, "name": name, "first_name": first,
                            "last_seen": when or time.time()}, key=["sub"])
+    people.ensure_member(conn, sub, name or email or sub, first)
 
 
 def authorize(info: dict) -> dict:

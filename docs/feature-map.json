@@ -53,6 +53,66 @@
     },
     {
       "method": "GET",
+      "path": "/api/people",
+      "handler": "waypoint/server/api/people.py:api_people",
+      "web": [
+        "frontend/src/pages/People.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_people.py"
+      ],
+      "docs": [
+        "start/people"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/people",
+      "handler": "waypoint/server/api/people.py:api_person_add",
+      "web": [
+        "frontend/src/pages/People.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_people.py"
+      ],
+      "docs": [
+        "start/people"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/people/{id}",
+      "handler": "waypoint/server/api/people.py:api_person_edit",
+      "web": [
+        "frontend/src/pages/People.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_people.py"
+      ],
+      "docs": [
+        "start/people"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/people/{id}",
+      "handler": "waypoint/server/api/people.py:api_person_remove",
+      "web": [
+        "frontend/src/pages/People.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_people.py"
+      ],
+      "docs": [
+        "start/people"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/state",
       "handler": "waypoint/server/api/state.py:api_state",
       "web": [

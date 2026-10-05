@@ -58,6 +58,16 @@ class User(Base):
     last_seen: Mapped[float | None]
 
 
+class Person(Base):
+    __table__ = schema.people
+    id: Mapped[int]
+    display_name: Mapped[str]
+    first_name: Mapped[str | None]
+    legal_name: Mapped[str | None]
+    aliases: Mapped[str | None]   # a JSON list of the ways an airline prints the name (waypoint/domain/people.py)
+    user_sub: Mapped[str | None]
+
+
 class Setting(Base):
     __table__ = schema.settings
     key: Mapped[str]

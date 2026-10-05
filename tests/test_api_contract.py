@@ -9,7 +9,8 @@ from pathlib import Path
 
 from waypoint.storage import backup, db
 from waypoint.storage import settings_keys as sk
-from waypoint.server.api import backups, state
+from waypoint import oidc
+from waypoint.server.api import backups, people, state
 from waypoint.server.common import _current
 from tests.shared import DbCase
 
@@ -90,6 +91,7 @@ class Replies(DbCase):
     def test_every_covered_route_is_checked(self):
         self.test_state()
         self.test_backups()
+        self.test_people()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
 
     def test_state(self):
@@ -109,6 +111,17 @@ class Replies(DbCase):
         restored = backups.api_restore(None, {}, raw)
         self.assertTrue(restored["ok"])
         self.check("POST /api/restore", restored)
+
+    def test_people(self):
+        self.check("GET /api/people", people.api_people(self.c, {}, {}))   # nobody yet
+        self.check("POST /api/people", people.api_person_add(self.c, {}, {"display_name": "Mia Doe", "aliases": ["DOE/MIA MISS"]}))
+        oidc.remember_user(self.c, "u1", "jane.doe@example.com", "Jane Doe")
+        listed = people.api_people(self.c, {}, {})
+        self.check("GET /api/people", listed)
+        self.assertEqual([p["member"] for p in listed["people"]], [True, False])
+        pid = listed["people"][1]["id"]
+        self.check("POST /api/people/{id}", people.api_person_edit(self.c, {}, {"display_name": "Mia D.", "legal_name": "Mia Rose Doe"}, str(pid)))
+        self.check("DELETE /api/people/{id}", people.api_person_remove(self.c, {}, {}, str(pid)))
 
 
 class Mismatches(unittest.TestCase):
@@ -135,7 +148,8 @@ class Generated(unittest.TestCase):
         self.assertEqual(contract.TS_OUT.read_text(), contract.render_ts(doc), "run `make api-contract`")
 
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
-        self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore"})
+        self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/people", "POST /api/people",
+                                    "POST /api/people/{id}", "DELETE /api/people/{id}"})
         self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)
 
     def describe(self, annotation: str) -> str:
