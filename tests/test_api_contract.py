@@ -16,7 +16,9 @@ from sqlalchemy import insert
 
 from waypoint import oidc
 from waypoint.providers import gmail
-from waypoint.server.api import backups, loyalty, mailboxes, people, state
+from waypoint.server.api import backups, mailboxes, people, state
+from waypoint.server.api import trips as trips_api
+from waypoint.server.api import loyalty
 from waypoint.server.common import _current
 from tests.shared import DbCase
 
@@ -99,6 +101,7 @@ class Replies(DbCase):
         self.test_backups()
         self.test_mailboxes()
         self.test_people()
+        self.test_trips()
         self.test_loyalty()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
 
@@ -159,6 +162,30 @@ class Replies(DbCase):
         self.check("DELETE /api/loyalty/{id}", loyalty.api_loyalty_remove(self.c, {}, {}, str(added["id"])))
 
 
+    def test_trips(self):
+        _current.user = {"name": None, "email": None, "local": True}
+        self.check("GET /api/trips", trips_api.api_trips(self.c, {}, {}))   # none yet
+        made = trips_api.api_trip_add(self.c, {}, {"name": "Cabin weekend"})
+        self.check("POST /api/trips", made)
+        seg = trips_api.api_segment_add(self.c, {}, {"kind": "flight", "origin": "AKL", "destination": "LAX",
+                                                      "start_local": "2026-03-01T22:15", "end_local": "2026-03-01T15:10",
+                                                      "details": {"seat": "34K"}, "travelers": [{"name": "DOE/JANE MS"}]})
+        self.check("POST /api/segments", seg)
+        self.check("GET /api/segments/{id}", trips_api.api_segment(self.c, {}, {}, str(seg["id"])))
+        self.check("POST /api/segments/{id}", trips_api.api_segment_edit(self.c, {}, {"status": "changed"}, str(seg["id"])))
+        self.check("GET /api/trips", trips_api.api_trips(self.c, {}, {}))
+        self.check("GET /api/trips/{id}", trips_api.api_trip(self.c, {}, {}, str(seg["trip_id"])))
+        self.check("POST /api/trips/{id}", trips_api.api_trip_edit(self.c, {}, {"notes": "Skates"}, str(made["id"])))
+        self.check("POST /api/trips/{id}/merge", trips_api.api_trip_merge(self.c, {}, {"merge": seg["trip_id"]}, str(made["id"])))
+        other = trips_api.api_segment_add(self.c, {}, {"kind": "hotel", "origin": "Harbour Hotel", "start_zone": "Europe/London",
+                                                        "end_zone": "Europe/London", "start_local": "2026-06-02T15:00",
+                                                        "end_local": "2026-06-08T10:00", "trip_id": made["id"]})
+        self.check("POST /api/trips/{id}/split", trips_api.api_trip_split(self.c, {}, {"segment_ids": [other["id"]]}, str(made["id"])))
+        self.check("DELETE /api/segments/{id}", trips_api.api_segment_remove(self.c, {}, {}, str(other["id"])))
+        self.check("DELETE /api/trips/{id}", trips_api.api_trip_remove(self.c, {}, {}, str(made["id"])))
+        self.check("GET /api/airports/{id}", trips_api.api_airport(self.c, {}, {}, "AKL"))
+
+
 class Mismatches(unittest.TestCase):
     """The check above notices a reply that isn't the contract's."""
 
@@ -186,6 +213,10 @@ class Generated(unittest.TestCase):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
                                      "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "GET /api/people", "POST /api/people",
                                      "POST /api/people/{id}", "DELETE /api/people/{id}",
+                                     "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
+                                     "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
+                                     "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
+                                     "DELETE /api/segments/{id}", "GET /api/airports/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
                                      "POST /api/loyalty/{id}/reveal"})
         self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)

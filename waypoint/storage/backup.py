@@ -42,8 +42,9 @@ from .models import LoyaltyId, Mailbox, Setting
 
 FORMAT = "waypoint-backup"
 VERSION = 1
-# Sign-ins (and Gmail connections still at Google) don't travel: sign in again after a restore.
-SKIP = {"auth_sessions", "auth_pending", "mailbox_pending"}
+# Sign-ins (and Gmail connections still at Google) don't travel: sign in again after a restore. Nor do the airports: they're
+# reference data every database is given by its migrations, and no row refers to them.
+SKIP = {"auth_sessions", "auth_pending", "mailbox_pending", "airports"}
 NEWER = "That backup is from a newer version of Waypoint. Update Waypoint first."
 
 

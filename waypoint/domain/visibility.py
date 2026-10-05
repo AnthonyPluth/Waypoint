@@ -1,0 +1,69 @@
+"""Who sees which trips (AGENTS.md, "You see the trips you're on"): a trip is visible to the people travelling on any of its
+segments and to whoever booked it (the trip, or any of its segments); nobody else, by any route. A segment is visible
+with its trip. This module is the only way trips and segments are read for a request: Semgrep's
+`waypoint-trip-visibility` keeps `select(Trip…)` and the rest out of waypoint/server/, so a route goes through these
+functions, and a trip or segment that isn't visible is answered as one that doesn't exist (a 404).
+
+`viewer` is the person asking. Without sign-in (on your own machine, where everyone is the one local household) the
+viewer is the household, which sees every trip."""
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import dataclass
+
+from sqlalchemy import ColumnElement, false, or_, select, true
+
+from ..storage import db
+from ..storage.models import Segment, SegmentTraveler, Trip
+
+
+@dataclass(frozen=True)
+class Viewer:
+    person_id: int | None   # None: signed in as someone with no person row, who sees only what's nobody's
+    household: bool = False  # no sign-in: the local household, which sees everything
+
+
+def can_see(viewer: Viewer) -> ColumnElement[bool]:
+    """The condition on `Trip` that the viewer can see the trip."""
+    if viewer.household:
+        return true()
+    if viewer.person_id is None:
+        return false()
+    me = viewer.person_id
+    travelling = select(Segment.trip_id).join(SegmentTraveler, SegmentTraveler.segment_id == Segment.id) \
+        .where(SegmentTraveler.person_id == me)
+    booked_a_segment = select(Segment.trip_id).where(Segment.booked_by == me)
+    return or_(Trip.booked_by == me, Trip.id.in_(travelling), Trip.id.in_(booked_a_segment))
+
+
+def visible_trips(conn: db.Connection, viewer: Viewer) -> list[Trip]:
+    """The viewer's trips, by start date (undated last)."""
+    return list(conn.orm.scalars(select(Trip).where(can_see(viewer))
+                                 .order_by(Trip.start_date.is_(None), Trip.start_date, Trip.id)).all())
+
+
+def visible_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> Trip | None:
+    """The trip, or None when there's none by that id or the viewer can't see it."""
+    return conn.orm.scalars(select(Trip).where(Trip.id == trip_id, can_see(viewer))).first()
+
+
+def visible_segments(conn: db.Connection, viewer: Viewer, trip_ids: Sequence[int] | None = None) -> list[Segment]:
+    """The segments of the viewer's trips (of these trips, when given), by id."""
+    q = select(Segment).join(Trip, Trip.id == Segment.trip_id).where(can_see(viewer))
+    if trip_ids is not None:
+        q = q.where(Segment.trip_id.in_(list(trip_ids)))
+    return list(conn.orm.scalars(q.order_by(Segment.id)).all())
+
+
+def visible_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> Segment | None:
+    """The segment, or None when there's none by that id or its trip isn't the viewer's."""
+    return conn.orm.scalars(select(Segment).join(Trip, Trip.id == Segment.trip_id)
+                            .where(Segment.id == segment_id, can_see(viewer))).first()
+
+
+def visible_travelers(conn: db.Connection, viewer: Viewer, segment_ids: Sequence[int]) -> list[SegmentTraveler]:
+    """Who is on these segments, for those among them the viewer can see."""
+    return list(conn.orm.scalars(
+        select(SegmentTraveler).join(Segment, Segment.id == SegmentTraveler.segment_id)
+        .join(Trip, Trip.id == Segment.trip_id).where(can_see(viewer), SegmentTraveler.segment_id.in_(list(segment_ids)))
+        .order_by(SegmentTraveler.id)).all())

@@ -106,6 +106,119 @@ class PersonBody(TypedDict):
     aliases: NotRequired[list[str]]
 
 
+# Trips and segments
+
+class Traveler(TypedDict):
+    id: int
+    person_id: int | None           # null until the printed name is matched to a person
+    name: str                       # the person's name, or the name as printed on the booking
+
+
+class Segment(TypedDict):
+    """One flight leg, hotel stay, car rental or train. Its times are local wall-clock times at the place, never
+    converted: `start_local` is 2026-03-01T22:15 in `start_zone`, whatever zone the server or the viewer is in."""
+    id: int
+    trip_id: int
+    kind: Literal["flight", "hotel", "car", "train"]
+    status: Literal["confirmed", "changed", "cancelled"]
+    confirmation: str | None
+    provider: str | None
+    start_local: str                # a hotel's check-in, a car's pick-up, a flight's departure
+    start_zone: str                 # the IANA zone of the place it starts (Pacific/Auckland)
+    end_local: str
+    end_zone: str
+    origin: str | None              # a flight's airport code; a stay's or a rental's place
+    destination: str | None
+    details: dict[str, str]         # flight_number, terminal, seat, cabin, room, car_class, address, phone
+    manage_url: str | None
+    source: Literal["manual", "email"]
+    booked_by: int | None           # a person
+    locked_fields: list[str]        # what a person edited, which a later email never overwrites
+    travelers: list[Traveler]
+
+
+class Trip(TypedDict):
+    id: int
+    name: str
+    start_date: str | None          # the local dates of its first and last segments
+    end_date: str | None
+    destination: str | None
+    notes: str | None
+    auto: bool                      # grouped by Waypoint; false once made or changed by hand
+    booked_by: int | None
+    segments: list[Segment]         # by start time
+
+
+class TripList(TypedDict):
+    trips: list[Trip]               # the signed-in member's own: the ones they're travelling on or booked
+
+
+class TripBody(TypedDict):
+    """A trip made by hand, or what changes on one (a name, where it goes, notes; its dates come from its segments)."""
+    name: NotRequired[str]
+    destination: NotRequired[str | None]
+    notes: NotRequired[str | None]
+    start_date: NotRequired[str | None]     # when creating one with no segments yet, with end_date
+    end_date: NotRequired[str | None]
+
+
+class MergeBody(TypedDict):
+    merge: int                      # the trip to fold into this one
+
+
+class SplitBody(TypedDict):
+    segment_ids: list[int]          # the segments to move to a new trip
+
+
+class TravelerBody(TypedDict):
+    person_id: NotRequired[int | None]
+    name: NotRequired[str | None]   # as printed on the booking
+
+
+class SegmentBody(TypedDict):
+    """A segment to add; `trip_id` leaves it to Waypoint to group it into a trip. A flight's zones come from its airports
+    unless given."""
+    kind: Literal["flight", "hotel", "car", "train"]
+    start_local: str
+    end_local: str
+    trip_id: NotRequired[int | None]
+    status: NotRequired[Literal["confirmed", "changed", "cancelled"]]
+    confirmation: NotRequired[str | None]
+    provider: NotRequired[str | None]
+    start_zone: NotRequired[str | None]
+    end_zone: NotRequired[str | None]
+    origin: NotRequired[str | None]
+    destination: NotRequired[str | None]
+    details: NotRequired[dict[str, str]]
+    manage_url: NotRequired[str | None]
+    travelers: NotRequired[list[TravelerBody]]   # who it's for; the signed-in member when left out
+
+
+class SegmentEdit(TypedDict):
+    """What to change on a segment: only the fields sent. The ones that end up different are locked."""
+    kind: NotRequired[Literal["flight", "hotel", "car", "train"]]
+    status: NotRequired[Literal["confirmed", "changed", "cancelled"]]
+    confirmation: NotRequired[str | None]
+    provider: NotRequired[str | None]
+    start_local: NotRequired[str]
+    start_zone: NotRequired[str | None]
+    end_local: NotRequired[str]
+    end_zone: NotRequired[str | None]
+    origin: NotRequired[str | None]
+    destination: NotRequired[str | None]
+    details: NotRequired[dict[str, str]]
+    manage_url: NotRequired[str | None]
+    travelers: NotRequired[list[TravelerBody]]   # replaces who it's for
+
+
+class Airport(TypedDict):
+    code: str
+    name: str
+    city: str
+    country: str
+    zone: str                       # IANA
+
+
 # Loyalty and Known Traveler numbers
 
 class LoyaltyEntry(TypedDict):
