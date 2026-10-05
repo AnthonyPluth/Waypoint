@@ -54,6 +54,18 @@ class Household(DbCase):
         return [{"person_id": i, "name": None} for i in ids]
 
 
+class LinkTests(Household):
+    def test_a_card_carries_its_actions_built_by_the_server(self):
+        got = self.add(self.jane, {**HOTEL, "details": {"address": "1 Quay Street, London", "phone": "+44 20 7946 0000"},
+                                   "manage_url": "https://example.com/manage"}, None, self.on(self.jane.person_id))
+        self.assertEqual(got["links"], {"app": "https://example.com/manage", "directions": "https://maps.apple.com/?q=1%20Quay%20Street%2C%20London",
+                                        "call": "tel:+442079460000"})
+
+    def test_a_manage_link_that_isnt_https_is_not_offered(self):
+        got = self.add(self.jane, {**OUT, "manage_url": "http://example.com/manage"}, None, self.on(self.jane.person_id))
+        self.assertEqual(got["links"], {"app": None, "directions": None, "call": None})
+
+
 class VisibilityTests(Household):
     def test_a_traveller_and_the_booker_see_a_trip_and_nobody_else(self):
         seg = self.add(self.jane, OUT, travelers=self.on(self.jane.person_id, self.mia))
