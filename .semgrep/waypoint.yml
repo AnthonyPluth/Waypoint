@@ -119,8 +119,8 @@ rules:
 
   - id: waypoint-print
     message: >-
-      Write to the log through monitoring.log (it scrubs credentials and sends the line to Sentry Logs when that's on),
-      not print(). Never log email content, names, confirmation codes or loyalty numbers (AGENTS.md, "Private data in
+      Write to the log through monitoring.log (one place that also sends the line to Sentry Logs when that's on, with
+      `remote=` for a version safe to send), not print(). Never log email content, names, confirmation codes or loyalty numbers (AGENTS.md, "Private data in
       logs and reports").
     severity: ERROR
     languages: [python]

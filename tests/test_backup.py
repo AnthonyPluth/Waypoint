@@ -1,6 +1,7 @@
 import gzip
 import json
 import os
+import sqlite3
 import stat
 import subprocess
 import sys
@@ -276,6 +277,26 @@ class BackupServerTests(unittest.TestCase):
             self.assertEqual(backup.preview(backup.load(f.read()))["counts"], here)
         with db.session() as c:
             self.assertEqual(c.execute(select(User.email).where(User.sub == "test:bk")).scalar(), "bk@example.com")
+
+
+    def test_a_restore_that_fails_says_why_and_changes_nothing(self):
+        with db.session() as c:
+            c.execute(insert(User).values(sub="test:kept", email="kept@example.com"))
+            raw = backup.dump(c)
+        self.assertEqual(self.post("/api/restore", b""), (400, {"error": "Choose a backup file (up to 200 MB)."}))
+        self.assertEqual(self.post("/api/restore", b"hello"), (400, {"error": "That file isn't a Waypoint backup."}))
+        busy = sqlite3.OperationalError("database is locked")
+        for raised, status, says in ((ValueError("That backup can't be read."), 400, "That backup can't be read."),
+                                     (OSError(28, "No space left on device"), 500, "Couldn’t save a copy of what’s here first (No space left on device), so nothing was restored."),
+                                     (busy, 503, "Waypoint is busy saving something else. Try the restore again in a few seconds.")):
+            with self.subTest(raised=raised), mock.patch.object(backup, "restore_all", side_effect=raised):
+                self.assertEqual(self.post("/api/restore", raw), (status, {"error": says}))
+        with mock.patch.object(backup, "restore_all", side_effect=RuntimeError("a bug")):
+            status, body = self.post("/api/restore", raw)
+        self.assertEqual(status, 500)
+        self.assertNotIn("a bug", body["error"])
+        with db.session() as c:
+            self.assertEqual(c.execute(select(User.email).where(User.sub == "test:kept")).scalar(), "kept@example.com")
 
 
 class RestoreCommandTests(unittest.TestCase):
