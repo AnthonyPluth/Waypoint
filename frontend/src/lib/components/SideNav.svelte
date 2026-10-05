@@ -1,10 +1,10 @@
 <script lang="ts">
   import { route } from "$lib/app.svelte";
   import NavLink from "$lib/components/NavLink.svelte";
-  import { NAV, pageFor } from "$lib/nav";
+  import { NAV, navFor } from "$lib/nav";
 
   // From 1024px up: a slim sidebar under the top bar; TabBar takes over below.
-  const current = $derived(pageFor(route.page));
+  const current = $derived(navFor(route.page));
 </script>
 
 <aside class="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 border-r border-sidebar-border bg-sidebar p-3 lg:block">

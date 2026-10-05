@@ -1,0 +1,102 @@
+<script lang="ts">
+  import { actGet } from "$lib/act";
+  import { apiCall } from "$lib/contract";
+  import type { Person, Segment } from "$lib/api-types";
+  import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import { body, DETAILS, KINDS, problem, type Draft } from "$lib/segment-form";
+
+  // Adding a segment by hand, or editing one. A failed check or save keeps everything typed and says why; what you
+  // change here is locked against later emails (the server does that).
+  let { initial, people, onsaved, oncancel }: { initial: Draft; people: Person[]; onsaved: (s: Segment) => void; oncancel: () => void } = $props();
+  // svelte-ignore state_referenced_locally
+  let d = $state<Draft>({ ...initial, details: { ...initial.details }, people: [...initial.people], printed: [...initial.printed] });
+  let error = $state("");
+  let saving = $state(false);
+
+  const flight = $derived(d.kind === "flight");
+  const editing = $derived(d.id !== null);
+  const zones = (() => { try { return Intl.supportedValuesOf("timeZone"); } catch { return []; } })();   // (an older browser has no list: any name can still be typed)
+
+  async function save(e: SubmitEvent) {
+    e.preventDefault();
+    const msg = problem(d);
+    if (msg) { error = msg; return; }
+    error = "";
+    const saved = await actGet(() => d.id === null
+      ? apiCall<"POST /api/segments">("/api/segments", { method: "POST", body: { ...body(d), trip_id: d.tripId } })
+      : apiCall<"POST /api/segments/{id}">(`/api/segments/${d.id}`, { method: "POST", body: body(d) }),
+    { busy: (on) => (saving = on), onError: (m) => (error = m) });
+    if (saved) onsaved(saved);
+  }
+
+  const selectClass = "border-input bg-background dark:bg-input/40 w-full rounded-lg border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
+  const label = "flex flex-col gap-1.5 text-sm";
+</script>
+
+<form class="rows mb-6" data-editor novalidate onsubmit={save} aria-labelledby="segment-form-title">
+  <div class="row items-stretch">
+    <div class="flex w-full flex-col gap-4">
+      <h2 id="segment-form-title" class="font-medium">{editing ? "Edit this booking" : "Add a booking"}</h2>
+      {#if editing}<p class="text-sm text-muted-foreground">Anything you change here is kept: a later email won’t put it back.</p>{/if}
+      <label class={label}><span class="font-medium">What is it</span>
+        <select bind:value={d.kind} disabled={editing} class={selectClass}>
+          {#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}
+        </select></label>
+      <label class={label}><span class="font-medium">Status</span>
+        <select bind:value={d.status} class={selectClass}>
+          <option value="confirmed">Confirmed</option><option value="changed">Changed</option><option value="cancelled">Cancelled</option>
+        </select></label>
+      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel chain or booking site" : d.kind === "car" ? "Rental company" : d.kind === "train" ? "Railway" : "Airline"}</span>
+        <Input bind:value={d.provider} maxlength={100} autocomplete="off" placeholder={d.kind === "flight" ? "American Airlines" : d.kind === "hotel" ? "Marriott" : ""} /></label>
+      <label class={label}><span class="font-medium">Confirmation code</span>
+        <Input bind:value={d.confirmation} maxlength={50} autocomplete="off" spellcheck={false} /></label>
+      {#if flight}
+        <div class="grid grid-cols-2 gap-3">
+          <label class={label}><span class="font-medium">From (airport)</span>
+            <Input bind:value={d.origin} maxlength={3} autocomplete="off" spellcheck={false} placeholder="JFK" /></label>
+          <label class={label}><span class="font-medium">To (airport)</span>
+            <Input bind:value={d.destination} maxlength={3} autocomplete="off" spellcheck={false} placeholder="LHR" /></label>
+        </div>
+      {:else}
+        <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel name" : d.kind === "car" ? "Pick-up place" : "From"}</span>
+          <Input bind:value={d.origin} maxlength={100} autocomplete="off" /></label>
+        {#if d.kind !== "hotel"}
+          <label class={label}><span class="font-medium">{d.kind === "car" ? "Drop-off place" : "To"}</span>
+            <Input bind:value={d.destination} maxlength={100} autocomplete="off" /></label>
+        {/if}
+      {/if}
+      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "car" ? "Pick-up" : "Departs"}</span>
+        <Input type="datetime-local" bind:value={d.start_local} autocomplete="off" />
+        <span class="text-muted-foreground">The local time at the place.</span></label>
+      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off" : "Arrives"}</span>
+        <Input type="datetime-local" bind:value={d.end_local} autocomplete="off" />
+        <span class="text-muted-foreground">The local time at the place it ends.</span></label>
+      <label class={label}><span class="font-medium">{flight ? "Departure time zone (only if the airport isn’t known)" : "Time zone"}</span>
+        <Input bind:value={d.start_zone} list="segment-zones" autocomplete="off" spellcheck={false} placeholder="America/New_York" /></label>
+      <label class={label}><span class="font-medium">{flight ? "Arrival time zone (only if the airport isn’t known)" : "Time zone at the end (if different)"}</span>
+        <Input bind:value={d.end_zone} list="segment-zones" autocomplete="off" spellcheck={false} /></label>
+      <datalist id="segment-zones">{#each zones as zone (zone)}<option value={zone}></option>{/each}</datalist>
+      {#each DETAILS[d.kind] as [key, name] (key)}
+        <label class={label}><span class="font-medium">{name}</span>
+          <Input value={d.details[key] ?? ""} oninput={(e) => (d.details[key] = e.currentTarget.value)} maxlength={200} autocomplete="off" /></label>
+      {/each}
+      <label class={label}><span class="font-medium">Manage link</span>
+        <Input bind:value={d.manage_url} maxlength={500} autocomplete="off" spellcheck={false} placeholder="https://" /></label>
+      <fieldset class="flex flex-col gap-2 text-sm">
+        <legend class="mb-1.5 font-medium">Who’s travelling</legend>
+        {#each people as p (p.id)}
+          <label class="flex items-center gap-2"><input type="checkbox" value={p.id} bind:group={d.people} class="size-4" /> {p.display_name}</label>
+        {/each}
+        {#each d.printed as name (name)}
+          <label class="flex items-center gap-2"><input type="checkbox" checked onchange={() => (d.printed = d.printed.filter((n) => n !== name))} class="size-4" /> {name} <span class="text-muted-foreground">(name as printed, not in People)</span></label>
+        {/each}
+      </fieldset>
+      {#if error}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{error}</p>{/if}
+      <div class="flex flex-wrap gap-2">
+        <Button type="submit" disabled={saving}>{saving ? "Saving…" : editing ? "Save" : "Add"}</Button>
+        <Button type="button" variant="outline" disabled={saving} onclick={oncancel}>Cancel</Button>
+      </div>
+    </div>
+  </div>
+</form>

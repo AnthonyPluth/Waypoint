@@ -56,7 +56,9 @@
       "path": "/api/people",
       "handler": "waypoint/server/api/people.py:api_people",
       "web": [
-        "frontend/src/pages/People.svelte"
+        "frontend/src/pages/People.svelte",
+        "frontend/src/pages/Trip.svelte",
+        "frontend/src/pages/Trips.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -117,7 +119,10 @@
       "method": "GET",
       "path": "/api/trips",
       "handler": "waypoint/server/api/trips.py:api_trips",
-      "web": [],
+      "web": [
+        "frontend/src/pages/Trips.svelte",
+        "frontend/src/pages/Upcoming.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_routes.py",
@@ -144,7 +149,9 @@
       "method": "GET",
       "path": "/api/trips/{id}",
       "handler": "waypoint/server/api/trips.py:api_trip",
-      "web": [],
+      "web": [
+        "frontend/src/pages/Trip.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_monitoring.py",
@@ -214,7 +221,9 @@
       "method": "POST",
       "path": "/api/segments",
       "handler": "waypoint/server/api/trips.py:api_segment_add",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/SegmentForm.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_trips.py"
@@ -240,7 +249,9 @@
       "method": "POST",
       "path": "/api/segments/{id}",
       "handler": "waypoint/server/api/trips.py:api_segment_edit",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/SegmentForm.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_trips.py"
@@ -253,7 +264,9 @@
       "method": "DELETE",
       "path": "/api/segments/{id}",
       "handler": "waypoint/server/api/trips.py:api_segment_remove",
-      "web": [],
+      "web": [
+        "frontend/src/pages/Trip.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_trips.py"
@@ -280,7 +293,8 @@
       "path": "/api/loyalty",
       "handler": "waypoint/server/api/loyalty.py:api_loyalty",
       "web": [
-        "frontend/src/pages/People.svelte"
+        "frontend/src/pages/People.svelte",
+        "frontend/src/pages/Trip.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -340,6 +354,7 @@
       "path": "/api/loyalty/{id}/reveal",
       "handler": "waypoint/server/api/loyalty.py:api_loyalty_reveal",
       "web": [
+        "frontend/src/lib/components/LoyaltyNumber.svelte",
         "frontend/src/pages/People.svelte"
       ],
       "tests": [
