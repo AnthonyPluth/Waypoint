@@ -53,6 +53,8 @@ class Message:
     unread: int = 0
     broken: bool = False               # the message itself couldn't be decoded
     markup: bool = False               # any reservation markup at all was found
+    gaps: tuple[str, ...] = ()         # what the unread reservations lacked, in a fixed vocabulary (for counting, never for showing text)
+    other_markup: bool = False         # structured data was there, but none of it a reservation
 
 
 # ------------------------------------------------------------------------------------------------ markup
@@ -318,11 +320,36 @@ def _train(res: Mapping[str, Any]) -> Booking | None:
 _BUILD = {"flight": _flight, "hotel": _hotel, "car": _car, "train": _train}
 
 
-def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool]:
-    """The bookings in these markup nodes (each once), how many reservations couldn't be made into one, and whether any
-    reservation markup was there at all."""
+def _gaps(kind: str, res: Mapping[str, Any]) -> list[str]:
+    """What a reservation that couldn't be made into a booking lacks, named from a fixed list (no text from the message)."""
+    trip = _node(res.get("reservationFor"))
+    lacks: list[str] = []
+    if kind == "flight":
+        for label, key in (("origin airport", "departureAirport"), ("destination airport", "arrivalAirport")):
+            if not IATA.fullmatch((_text(_node(trip.get(key)).get("iataCode")) or "").upper()):
+                lacks.append(label)
+        lacks += [label for label, key in (("departure time", "departureTime"), ("arrival time", "arrivalTime")) if not _text(trip.get(key))]
+    elif kind == "hotel":
+        lacks += [label for label, ok in (("hotel name", _text(trip.get("name"))), ("check-in time", _text(res.get("checkinTime"))),
+                                          ("check-out time", _text(res.get("checkoutTime")))) if not ok]
+        if not res.get("checkinTime") and (res.get("checkinDate") or res.get("checkoutDate")):
+            lacks.append("dates without times")
+    elif kind == "car":
+        lacks += [label for label, ok in (("pick-up place", _text(_node(res.get("pickupLocation")).get("name"))),
+                                          ("pick-up time", _text(res.get("pickupTime"))), ("drop-off time", _text(res.get("dropoffTime")))) if not ok]
+    else:
+        lacks += [label for label, ok in (("departure station", _text(_node(trip.get("departureStation")).get("name"))),
+                                          ("arrival station", _text(_node(trip.get("arrivalStation")).get("name"))),
+                                          ("departure time", _text(trip.get("departureTime"))), ("arrival time", _text(trip.get("arrivalTime")))) if not ok]
+    return lacks or ["details"]
+
+
+def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool, list[str]]:
+    """The bookings in these markup nodes (each once), how many reservations couldn't be made into one, whether any
+    reservation markup was there at all, and what the unread ones lacked (`_gaps`)."""
     found: list[Booking] = []
     unread, seen = 0, False
+    gaps: list[str] = []
     for node in nodes[:MAX_NODES]:
         for t in _types(node):
             if t in RESERVATIONS:
@@ -330,11 +357,13 @@ def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool]:
                 made = _BUILD[RESERVATIONS[t]](node)
                 if made is None:
                     unread += 1
+                    gaps += _gaps(RESERVATIONS[t], node)
                 elif made not in found:   # (the same booking in JSON-LD and microdata is one)
                     found.append(made)
             elif t.endswith("Reservation"):   # another kind (a table, a show): seen, not ours to read
                 seen, unread = True, unread + 1
-    return found, unread, seen
+                gaps.append("another kind of reservation")
+    return found, unread, seen, gaps
 
 
 # ------------------------------------------------------------------------------------------------ times
@@ -423,7 +452,8 @@ def read(message: Mapping[str, Any]) -> Message:
         for ld in scanner.jsonld:
             nodes.extend(_jsonld_nodes(ld))
         nodes.extend(scanner.items)
-    bookings, unread, seen = _bookings(nodes)
+    bookings, unread, seen, gaps = _bookings(nodes)
+    other = bool(nodes) and not seen
     parse = parsers.for_sender(sender)
     if parse is not None and not bookings:   # (a sender with a parser, and no markup that gave a booking: read its text)
         try:
@@ -433,7 +463,7 @@ def read(message: Mapping[str, Any]) -> Message:
             found = Parsed(unread=1)
         bookings, unread = list(found.bookings), unread + found.unread
         seen = seen or bool(found.bookings or found.unread)
-    return Message(sender, received, tuple(bookings), unread, markup=seen)
+    return Message(sender, received, tuple(bookings), unread, markup=seen, gaps=tuple(gaps), other_markup=other)
 
 
 # ------------------------------------------------------------------------------------------------ plain text (the optional AI)

@@ -49,6 +49,15 @@ def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
     return out
 
 
+def explain(conn: db.Connection, b: extract.Booking) -> str:
+    """Why `file_booking` couldn't make this booking a segment, from a fixed list (nothing from the message)."""
+    if not _zone(conn, b, b.origin, b.start_place) or not _zone(conn, b, b.destination, b.end_place):
+        return "unknown airport" if b.kind == "flight" else "place's time zone unknown"
+    if fields(conn, b) is None:
+        return "time isn't a date and time"
+    return "rejected as a segment"
+
+
 def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking) -> Literal["added", "updated", "unchanged"] | None:
     """Put one booking among `viewer`'s segments. None: it can't be made into a segment (it goes to the review queue)."""
     found = fields(conn, b)

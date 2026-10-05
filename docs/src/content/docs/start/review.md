@@ -24,6 +24,8 @@ For each one you can:
 
 Items are private to the member whose mailbox they came from: nobody else sees them, or even that they exist. Waypoint keeps the sender’s domain and the day, never the message’s subject or text.
 
+After each scan, Waypoint’s log says how many messages it read and what stopped the others, as counts of fixed phrases (“12 × no structured booking data”, “3 × unknown airport”, “2 × arrival time”), never which messages or anything they said. Most senders put no machine-readable booking in their emails; those are the ones to add by hand, or to ignore.
+
 ## Who is this?
 
 A booking prints each traveller’s name its own way (`DOE/JANE MS`). Waypoint matches a name to a person by the loyalty number on the booking first, then by the person’s display name, legal name or aliases on [People](/waypoint/start/people/); it never picks between two people with the same name. A name nobody matches stays as printed, and the booking is then visible only to whoever’s mailbox it came from.
