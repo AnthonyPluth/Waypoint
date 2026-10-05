@@ -616,6 +616,20 @@ class CouldntStartTests(ScanCase):
         self.scan()
         self.assertIsNone(scan.notice(self.mailbox))
 
+    def test_a_notice_stays_through_a_busy_ask_and_goes_when_the_mailbox_does(self):
+        self.google.refresh_fails = "unavailable"
+        self.scan()
+        with scan._lock:
+            scan._running.add(self.mailbox)
+        try:
+            self.assertEqual(self.scan(), scan.Result("busy"))
+        finally:
+            with scan._lock:
+                scan._running.discard(self.mailbox)
+        self.assertIsNotNone(scan.notice(self.mailbox))
+        scan.forget(self.mailbox)
+        self.assertIsNone(scan.notice(self.mailbox))
+
     def test_a_mailbox_that_isnt_there_isnt_a_failed_scan(self):
         self.assertEqual(self.scan(9999), scan.Result("not_started", scan.GONE))
 
@@ -755,6 +769,12 @@ class MailScanApiTests(GoogleCase):
         status, state = self.call("ana", "GET", "/api/state")
         self.assertEqual((status, state["review_count"]), (200, 2))   # the message to look at, and the name (Jane Doe) to match to someone
         self.assertEqual(self.call("ben", "GET", "/api/state")[1]["review_count"], 0)
+
+    def test_disconnecting_forgets_why_a_scan_couldnt_start(self):
+        scan._notices[self.ana_box] = "Something."
+        with mock.patch.object(gmail, "_post", return_value={}):
+            self.assertEqual(self.call("ana", "DELETE", f"/api/mailboxes/{self.ana_box}")[0], 200)
+        self.assertIsNone(scan.notice(self.ana_box))
 
     def test_a_failed_scan_is_in_the_mailbox_list(self):
         self.put("flight_jsonld")

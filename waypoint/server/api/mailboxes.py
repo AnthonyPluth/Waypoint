@@ -72,6 +72,7 @@ def api_mailbox_disconnect(conn, _q, _b, mailbox_id: str) -> Disconnected:
         raise ApiError("Not found", 404) from None
     except gmail.GmailError as e:
         raise ApiError(str(e), 502) from e
+    scan.forget(n)
     return {"ok": True, "revoked": revoked}
 
 

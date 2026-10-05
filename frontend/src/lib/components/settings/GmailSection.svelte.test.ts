@@ -184,6 +184,31 @@ describe("Settings → Gmail", () => {
     expect(screen.queryByText(/The last scan stopped/)).toBeNull();
   });
 
+  it("looks again for a moment after Scan now, so a scan that couldn’t start says why", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let notice: string | null = null;
+      vi.mocked(api).mockImplementation(async (_path: string, opts?: { method?: string }) =>
+        (opts?.method === "POST" ? { started: true } : list([box({ scan_notice: notice })])) as never);
+      render(GmailSection);
+      await userEvent.click(await screen.findByRole("button", { name: "Scan now" }));
+      notice = "Google refused to refresh the connection just now.";
+      await vi.advanceTimersByTimeAsync(3100);
+      expect(await screen.findByText(/The scan couldn’t start: Google refused/)).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(10_000);   // and stops looking
+      const calls = vi.mocked(api).mock.calls.length;
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(vi.mocked(api).mock.calls.length).toBe(calls);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("doesn’t show a stale notice for a connection that needs reconnecting", async () => {
+    serve(list([box({ status: "reconnect", last_error: "Google no longer lets Waypoint read this mailbox.", scan_notice: "Old." })]));
+    render(GmailSection);
+    await screen.findByRole("button", { name: "Reconnect" });
+    expect(screen.queryByText(/The scan couldn’t start/)).toBeNull();
+  });
+
   it("offers no scan for a connection that needs reconnecting", async () => {
     serve(list([box({ status: "reconnect", last_error: "Google no longer lets Waypoint read this mailbox." })]));
     render(GmailSection);

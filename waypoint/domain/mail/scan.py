@@ -50,7 +50,9 @@ class Result:
 
 _running: set[int] = set()
 _lock = threading.Lock()
-_notices: dict[int, str] = {}   # why a mailbox's last scan couldn't start, until the next one does (never recorded as a failed run)
+# Why a mailbox's last scan couldn't start, until the next one does (never recorded as a failed run). Kept in this process, as a
+# note and not a record: a restart forgets it, and the next scan says it again if it still holds.
+_notices: dict[int, str] = {}
 
 
 def running(mailbox_id: int) -> bool:
@@ -79,9 +81,15 @@ def scan(mailbox_id: int, now: float, today: date) -> Result:
     with _lock:
         if result.state == "not_started" and result.error:
             _notices[mailbox_id] = result.error
-        else:
+        elif result.state != "busy":   # (a scan that was already running says nothing new)
             _notices.pop(mailbox_id, None)
     return result
+
+
+def forget(mailbox_id: int) -> None:
+    """Drop what's noted about a mailbox that was disconnected."""
+    with _lock:
+        _notices.pop(mailbox_id, None)
 
 
 def _viewer(owner: str, conn: db.Connection) -> Viewer | None:
