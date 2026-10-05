@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clock, dayIn, featuredTrip, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, subline, tripDays, until } from "./trips";
+import { when, clock, dayIn, featuredTrip, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, subline, tripDays, until } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -33,6 +33,15 @@ describe("local times across zones", () => {
     expect(clock("2026-03-01T22:15")).toBe("10:15 PM");
   });
   it("tells the day in a zone", () => { expect(dayIn(Date.UTC(2026, 10, 21, 3, 0), NY)).toBe("2026-11-20"); });
+});
+
+describe("when", () => {
+  it("says in how long, and never \"in now\" in the last minute", () => {
+    expect(when("Departs", 5 * 3_600_000)).toBe("Departs in 5 h");
+    expect(when("Departs", 20_000)).toBe("Departing now");
+    expect(when("Arrives", 0)).toBe("Arriving now");
+    expect(when("Check-in", 30_000)).toBe("Check-in now");
+  });
 });
 
 describe("until", () => {
@@ -127,6 +136,11 @@ describe("loyalty on a booking", () => {
     expect(programFor(segment({ provider: "Example Air" }))).toBeNull();
     expect(programFor(segment({ provider: null }))).toBeNull();
     expect(programFor(segment({ kind: "train", provider: "Amtrak" }))).toBeNull();
+    // Only a booking of that kind, and only the whole word: a hotel isn't an airline or a car company.
+    expect(programFor(segment({ kind: "hotel", provider: "International Inn" }))).toBeNull();
+    expect(programFor(segment({ kind: "hotel", provider: "United Suites" }))).toBeNull();
+    expect(programFor(segment({ kind: "car", provider: "National Car Rental" }))).toBe("National Emerald Club");
+    expect(programFor(segment({ provider: "Americana Air" }))).toBeNull();
   });
   it("finds the traveller's number for it, or says they have none, or that the name isn't matched", () => {
     const mine = membership();

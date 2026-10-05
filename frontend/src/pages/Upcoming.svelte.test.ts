@@ -45,6 +45,13 @@ describe("Upcoming", () => {
     expect(await navigator.clipboard.readText()).toBe("KQ7M2X");
   });
 
+  it("says it's departing now, not \"in now\", in the last minute", async () => {
+    at("2026-11-20T18:59:40-05:00");
+    serve([london]);
+    render(Upcoming);
+    expect(await screen.findByText("Departing now")).toBeInTheDocument();
+  });
+
   it("calls a flight in the air under way, and counts down to landing", async () => {
     at("2026-11-21T02:00:00-05:00");   // 7:00 AM in London: ten minutes to land
     serve([london]);

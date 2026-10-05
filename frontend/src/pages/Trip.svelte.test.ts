@@ -86,6 +86,23 @@ describe("Trip", () => {
     expect(screen.queryByRole("heading", { name: "Trip to London" })).toBeNull();
   });
 
+  it("doesn't let a slow earlier load put its trip on screen under a newer address", async () => {
+    let release: (t: TripT) => void = () => {};
+    const slow = new Promise<TripT>((r) => { release = r; });
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "/api/trips/1") return slow;
+      if (path === "/api/trips/2") return trip([flight], { id: 2, name: "Trip to Auckland" });
+      return path === "/api/people" ? { people: [jane, sam] } : { loyalty, programs: {} };
+    });
+    render(TripPage);
+    route.sub = "2";
+    expect(await screen.findByRole("heading", { name: "Trip to Auckland" })).toBeInTheDocument();
+    release(held);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole("heading", { name: "Trip to London" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Trip to Auckland" })).toBeInTheDocument();
+  });
+
   it("doesn't ask the server for a trip with no number in its address", async () => {
     route.sub = "";
     render(TripPage);

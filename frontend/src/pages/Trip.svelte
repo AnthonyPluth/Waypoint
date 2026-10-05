@@ -29,13 +29,16 @@
 
   const id = $derived(route.sub);
 
+  let latest = 0;   // the newest load: an earlier, slower one finishing later must not put its trip on screen
   async function load() {
+    const mine = ++latest;
     loadError = "";
     if (!/^\d+$/.test(id)) { trip = null; loadError = "No such trip"; return; }
     try {
       const [t, p, l] = await Promise.all([apiCall<"GET /api/trips/{id}">(`/api/trips/${id}`), apiCall<"GET /api/people">("/api/people"), apiCall<"GET /api/loyalty">("/api/loyalty")]);
+      if (mine !== latest) return;
       trip = t; people = p.people; loyalty = l.loyalty;
-    } catch (err) { trip = null; loadError = errMsg(err); }
+    } catch (err) { if (mine !== latest) return; trip = null; loadError = errMsg(err); }
   }
   $effect(() => { void id; form = null; void load(); });
 

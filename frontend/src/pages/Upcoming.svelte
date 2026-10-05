@@ -6,7 +6,7 @@
   import { Button } from "$lib/components/ui/button";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
-  import { dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, headline, nextUp, startAt, START_WORD, subline, tripDays, until, viewerZone } from "$lib/trips";
+  import { dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, headline, nextUp, startAt, START_WORD, subline, tripDays, viewerZone, when } from "$lib/trips";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
 
   // The next thing on your trips (a card), then the trip it belongs to, day by day. A failed load leaves nothing drawn that
@@ -60,7 +60,7 @@
         <p class="eyebrow">{next.state === "now" ? "Under way" : "Next up"}</p>
         <h2 id="next-title" class="break-words text-2xl font-semibold tracking-tight">{headline(s)}</h2>
         <p class="text-lg font-medium" data-countdown>
-          {next.state === "now" ? `${END_WORD[s.kind]} in ${until(endAt(s) - now)}` : `${START_WORD[s.kind]} in ${until(startAt(s) - now)}`}
+          {next.state === "now" ? when(END_WORD[s.kind], endAt(s) - now) : when(START_WORD[s.kind], startAt(s) - now)}
         </p>
         {#if subline(s)}<p class="break-words text-muted-foreground">{subline(s)}</p>{/if}
       </div>

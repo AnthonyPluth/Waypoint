@@ -127,23 +127,21 @@ export function tripDays(trip: Trip): Day[] {
 
 // ------------------------------------------------------------------------------------------ loyalty
 
-const BRANDS: [RegExp, string][] = [
-  [/alaska/i, "Alaska Mileage Plan"], [/american/i, "American AAdvantage"], [/delta/i, "Delta SkyMiles"], [/jetblue/i, "JetBlue TrueBlue"],
-  [/southwest/i, "Southwest Rapid Rewards"], [/united/i, "United MileagePlus"],
-  [/hilton/i, "Hilton Honors"], [/hyatt/i, "Hyatt World of Hyatt"], [/ihg|holiday inn|intercontinental|crowne plaza/i, "IHG One Rewards"],
-  [/marriott|bonvoy|sheraton|westin|ritz/i, "Marriott Bonvoy"], [/wyndham/i, "Wyndham Rewards"],
-  [/avis/i, "Avis Preferred"], [/enterprise/i, "Enterprise Plus"], [/hertz/i, "Hertz Gold Plus Rewards"], [/national/i, "National Emerald Club"],
+// [what the booking is, a word of the provider's name, the program]: matched on whole words, and only for that kind of booking.
+const BRANDS: [string, RegExp, string][] = [
+  ["flight", /\balaska\b/i, "Alaska Mileage Plan"], ["flight", /\bamerican\b/i, "American AAdvantage"], ["flight", /\bdelta\b/i, "Delta SkyMiles"],
+  ["flight", /\bjetblue\b/i, "JetBlue TrueBlue"], ["flight", /\bsouthwest\b/i, "Southwest Rapid Rewards"], ["flight", /\bunited\b/i, "United MileagePlus"],
+  ["hotel", /\bhilton\b/i, "Hilton Honors"], ["hotel", /\bhyatt\b/i, "Hyatt World of Hyatt"], ["hotel", /\b(ihg|holiday inn|intercontinental|crowne plaza)\b/i, "IHG One Rewards"],
+  ["hotel", /\b(marriott|bonvoy|sheraton|westin|ritz)\b/i, "Marriott Bonvoy"], ["hotel", /\bwyndham\b/i, "Wyndham Rewards"],
+  ["car", /\bavis\b/i, "Avis Preferred"], ["car", /\benterprise\b/i, "Enterprise Plus"], ["car", /\bhertz\b/i, "Hertz Gold Plus Rewards"], ["car", /\bnational\b/i, "National Emerald Club"],
 ];
-const KIND_OF: Record<string, string> = { flight: "airline", hotel: "hotel", car: "car" };
 
 /** The program a booking's provider belongs to (its name as printed: "American Airlines" → "American AAdvantage"), or null
  *  when Waypoint can't tell (a train, an airline it has no program for). */
 export function programFor(segment: Segment): string | null {
-  const kind = KIND_OF[segment.kind];
   const provider = segment.provider ?? "";
-  if (!kind || !provider) return null;
-  const hit = BRANDS.find(([re]) => re.test(provider));
-  return hit ? hit[1] : null;
+  const hit = provider ? BRANDS.find(([kind, re]) => kind === segment.kind && re.test(provider)) : undefined;
+  return hit ? hit[2] : null;
 }
 
 export type Membership =
@@ -184,3 +182,9 @@ export function subline(s: Segment): string {
 /** What happens at a segment's start and end, in words. */
 export const START_WORD: Record<Segment["kind"], string> = { flight: "Departs", hotel: "Check-in", car: "Pick-up", train: "Departs" };
 export const END_WORD: Record<Segment["kind"], string> = { flight: "Arrives", hotel: "Check-out", car: "Drop-off", train: "Arrives" };
+
+/** "Departs in 5 h", or in the last minute "Departing now" (never "Departs in now"). */
+export function when(word: string, ms: number): string {
+  if (ms >= 60_000) return `${word} in ${until(ms)}`;
+  return word === "Departs" ? "Departing now" : word === "Arrives" ? "Arriving now" : `${word} now`;
+}
