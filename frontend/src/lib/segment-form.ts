@@ -4,7 +4,10 @@ import type { Segment, SegmentBody, SegmentEdit } from "./api-types";
 import { instant, untimed } from "./trips";
 
 export type Kind = Segment["kind"];
-export const KINDS: [Kind, string][] = [["flight", "Flight"], ["hotel", "Hotel"], ["car", "Car rental"], ["train", "Train"]];
+export const KINDS: [Kind, string][] = [["flight", "Flight"], ["hotel", "Hotel"], ["car", "Car rental"], ["train", "Train"], ["cruise", "Cruise"]];
+
+/** The most ports of call a cruise can list (the server holds the same limit). */
+export const MAX_PORTS = 40;
 
 /** The longest address, which keeps its line breaks (the server holds the same limit). */
 export const ADDRESS_LIMIT = 300;
@@ -15,7 +18,11 @@ export const DETAILS: Record<Kind, [string, string][]> = {
   hotel: [["address", "Address"], ["room", "Room"], ["phone", "Phone"]],
   car: [["address", "Pick-up address"], ["car_class", "Car class"], ["phone", "Phone"]],
   train: [["seat", "Seat"], ["cabin", "Class"]],
+  cruise: [["ship", "Ship"], ["room", "Cabin"], ["deck", "Deck"], ["address", "Terminal address"], ["phone", "Phone"]],
 };
+
+/** A port of call in the form: its times are date-and-time fields, empty for none. */
+export type PortDraft = { name: string; zone: string; arrive: string; depart: string };
 
 export type Draft = {
   id: number | null;            // null: a new segment
@@ -31,6 +38,7 @@ export type Draft = {
   start_zone: string;
   end_zone: string;
   details: Record<string, string>;
+  itinerary: PortDraft[];       // a cruise's ports of call, in order
   manage_url: string;
   people: number[];             // travellers who are in People
   printed: string[];            // travellers known only by the name on the booking, kept as they are
@@ -39,7 +47,7 @@ export type Draft = {
 
 export const blank = (tripId: number | null = null): Draft => ({
   id: null, tripId, kind: "flight", status: "confirmed", provider: "", confirmation: "", origin: "", destination: "", start_local: "", end_local: "",
-  start_zone: "", end_zone: "", details: {}, manage_url: "", people: [], printed: [],
+  start_zone: "", end_zone: "", details: {}, itinerary: [], manage_url: "", people: [], printed: [],
 });
 
 /** A draft of what's there, to edit. A flight's zones come from its airports, so they start empty (only what's typed is sent). */
@@ -47,7 +55,7 @@ export const draftOf = (s: Segment): Draft => ({
   id: s.id, tripId: s.trip_id, kind: s.kind, status: s.status, provider: s.provider ?? "", confirmation: s.confirmation ?? "", origin: s.origin ?? "",
   destination: s.destination ?? "", start_local: s.start_local, end_local: s.end_local,
   start_zone: s.kind === "flight" ? "" : s.start_zone, end_zone: s.kind === "flight" ? "" : s.end_zone,
-  details: { ...s.details }, manage_url: s.manage_url ?? "",
+  details: { ...s.details }, itinerary: s.itinerary.map((p) => ({ name: p.name, zone: p.zone, arrive: p.arrive_local ?? "", depart: p.depart_local ?? "" })), manage_url: s.manage_url ?? "",
   people: s.travelers.flatMap((t) => (t.person_id === null ? [] : [t.person_id])),
   printed: s.travelers.flatMap((t) => (t.person_id === null ? [t.name] : [])),
   ...(untimed(s) && { untimed: [s.start_local, s.end_local] as [string, string] }),
@@ -82,6 +90,16 @@ export function problem(d: Draft): string | null {
     return "This ends before it starts (times are compared at their own places’ zones)";
   }
   if ((d.details.address ?? "").trim().length > ADDRESS_LIMIT) return `The address can be at most ${ADDRESS_LIMIT} characters`;
+  if (d.kind === "cruise") {
+    if (d.itinerary.length > MAX_PORTS) return `Add at most ${MAX_PORTS} ports of call`;
+    for (const [i, p] of d.itinerary.entries()) {
+      if (!p.name.trim()) return `Name port ${i + 1}`;
+      if (!p.zone.trim()) return `Enter the time zone of ${p.name.trim().slice(0, 40)} (for example America/Nassau)`;
+      if (!knownZone(p.zone.trim())) return `The time zone “${p.zone.trim().slice(0, 40)}” of ${p.name.trim().slice(0, 40)} isn’t one Waypoint knows (use a name like America/Nassau)`;
+      for (const [word, at] of [["arrival", p.arrive], ["departure", p.depart]]) if (at && !LOCAL.test(at)) return `Enter ${p.name.trim().slice(0, 40)}’s ${word} as a date and time`;
+      if (p.arrive && p.depart && instant(p.depart, p.zone.trim()) < instant(p.arrive, p.zone.trim())) return `${p.name.trim().slice(0, 40)}: the ship can’t leave before it arrives`;
+    }
+  }
   if (d.manage_url.trim() && !/^https?:\/\//i.test(d.manage_url.trim())) return "The manage link must start with https:// or http://";
   if (d.people.length + d.printed.length === 0) return "Choose who’s travelling";
   return null;
@@ -104,6 +122,7 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
     start_local: d.start_local, end_local: d.end_local,
     ...(flight ? { ...(startZone && { start_zone: startZone }), ...(d.end_zone.trim() && { end_zone: d.end_zone.trim() }) } : { start_zone: startZone, end_zone: endZone }),
     details, manage_url: text(d.manage_url),
+    ...(flight || d.kind !== "cruise" ? {} : { itinerary: d.itinerary.map((p) => ({ name: p.name.trim(), zone: p.zone.trim(), arrive_local: p.arrive || null, depart_local: p.depart || null })) }),
     travelers: [...d.people.map((id) => ({ person_id: id })), ...d.printed.map((name) => ({ person_id: null, name }))],
   };
 }

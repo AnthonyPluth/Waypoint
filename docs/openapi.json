@@ -3130,6 +3130,37 @@
         ],
         "additionalProperties": false
       },
+      "Port": {
+        "type": "object",
+        "description": "A cruise's port of call. Its times are local wall-clock times at the port, in its `zone`.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "zone": {
+            "type": "string"
+          },
+          "arrive_local": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "depart_local": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "zone",
+          "arrive_local",
+          "depart_local"
+        ],
+        "additionalProperties": false
+      },
       "Preview": {
         "type": "object",
         "description": "A review item's message as plain text, fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps\nnone of it.",
@@ -3373,7 +3404,7 @@
       },
       "Segment": {
         "type": "object",
-        "description": "One flight leg, hotel stay, car rental or train. Its times are local wall-clock times at the place, never\nconverted: `start_local` is 2026-03-01T22:15 in `start_zone`, whatever zone the server or the viewer is in.",
+        "description": "One flight leg, hotel stay, car rental, train or cruise. Its times are local wall-clock times at the place, never\nconverted: `start_local` is 2026-03-01T22:15 in `start_zone`, whatever zone the server or the viewer is in.",
         "properties": {
           "id": {
             "type": "integer"
@@ -3386,7 +3417,8 @@
               "flight",
               "hotel",
               "car",
-              "train"
+              "train",
+              "cruise"
             ]
           },
           "status": {
@@ -3472,6 +3504,12 @@
               "$ref": "#/components/schemas/Traveler"
             }
           },
+          "itinerary": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            }
+          },
           "links": {
             "$ref": "#/components/schemas/SegmentLinks"
           }
@@ -3496,6 +3534,7 @@
           "locked_fields",
           "check_times",
           "travelers",
+          "itinerary",
           "links"
         ],
         "additionalProperties": false
@@ -3509,7 +3548,8 @@
               "flight",
               "hotel",
               "car",
-              "train"
+              "train",
+              "cruise"
             ]
           },
           "start_local": {
@@ -3584,6 +3624,12 @@
             "items": {
               "$ref": "#/components/schemas/TravelerBody"
             }
+          },
+          "itinerary": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            }
           }
         },
         "required": [
@@ -3602,7 +3648,8 @@
               "flight",
               "hotel",
               "car",
-              "train"
+              "train",
+              "cruise"
             ]
           },
           "status": {
@@ -3670,6 +3717,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TravelerBody"
+            }
+          },
+          "itinerary": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Port"
             }
           }
         },
@@ -3845,6 +3898,9 @@
           "cars": {
             "$ref": "#/components/schemas/StatsCars"
           },
+          "cruises": {
+            "$ref": "#/components/schemas/StatsCruises"
+          },
           "places": {
             "$ref": "#/components/schemas/StatsPlaces"
           }
@@ -3857,6 +3913,7 @@
           "flights",
           "stays",
           "cars",
+          "cruises",
           "places"
         ],
         "additionalProperties": false
@@ -3948,6 +4005,37 @@
         "required": [
           "days",
           "companies"
+        ],
+        "additionalProperties": false
+      },
+      "StatsCruises": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "nights": {
+            "type": "integer"
+          },
+          "sea_days": {
+            "type": "integer"
+          },
+          "ports": {
+            "type": "integer"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsNamed"
+            }
+          }
+        },
+        "required": [
+          "count",
+          "nights",
+          "sea_days",
+          "ports",
+          "lines"
         ],
         "additionalProperties": false
       },
@@ -4451,7 +4539,8 @@
               "flight",
               "hotel",
               "car",
-              "train"
+              "train",
+              "cruise"
             ]
           },
           "provider": {

@@ -18,6 +18,7 @@ export type ReviewFacts = {
   topRoute: { a: string; b: string; flights: number } | null;
   topAirport: string | null;
   nights: number;
+  cruises: { count: number; nights: number; seaDays: number };
   map: { dots: { x: number; y: number; r: number }[]; arcs: { d: string; width: number }[] };
 };
 
@@ -42,6 +43,7 @@ export function reviewFacts(stats: Stats, allTime: Stats | null): ReviewFacts {
     topRoute: f.routes[0] ? { a: f.routes[0].a, b: f.routes[0].b, flights: f.routes[0].flights } : null,
     topAirport: f.most_visited_airport,
     nights: stats.stays.nights,
+    cruises: { count: stats.cruises.count, nights: stats.cruises.nights, seaDays: stats.cruises.sea_days },
     map: { dots: world.dots.map((d) => ({ x: d.x, y: d.y, r: d.r })), arcs: world.arcs.map((a) => ({ d: a.d, width: a.width })) },
   };
 }

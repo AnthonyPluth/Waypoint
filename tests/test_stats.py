@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
-from waypoint.domain import stats
+from waypoint.domain import stats, trips
 from waypoint.domain.visibility import Viewer
 from waypoint.server.api import stats as api
 from waypoint.server.common import ApiError
@@ -181,6 +181,53 @@ class HotelAndCarTests(StatsCase):
                                                                                  ("FR", "2026-06-10")])
         self.assertEqual({c["name"]: c["first_visit"] for c in p["cities"]},
                          {"New York": "2026-06-01", "London": "2026-06-02", "Paris": "2026-06-10"})
+
+
+CRUISE = {"kind": "cruise", "origin": "Miami", "destination": "Miami", "provider": "Example Cruise Line",
+          "start_local": "2026-03-01T16:30", "start_zone": "America/New_York", "end_local": "2026-03-08T07:00", "end_zone": "America/New_York",
+          "itinerary": [{"name": "Nassau", "zone": "America/Nassau", "arrive_local": "2026-03-02T08:00", "depart_local": "2026-03-02T17:00"},
+                        {"name": "Cozumel", "zone": "America/Cancun", "arrive_local": "2026-03-05T08:00", "depart_local": "2026-03-05T17:00"},
+                        {"name": "Nassau", "zone": "America/Nassau", "arrive_local": "2026-03-06T08:00", "depart_local": "2026-03-06T17:00"}]}
+
+
+class CruiseTests(StatsCase):
+    def test_nights_aboard_sea_days_and_ports_of_call(self):
+        self.mine(CRUISE)
+        c = self.stats(self.jane)["cruises"]
+        # nights 1–7 March; days strictly between embarking (1st) and disembarking (8th) are the 2nd–7th; 2nd, 5th and 6th are in port
+        self.assertEqual((c["count"], c["nights"], c["sea_days"], c["ports"]), (1, 7, 3, 2))   # (Nassau twice is one port)
+        self.assertEqual(c["lines"], [{"name": "Example Cruise Line", "count": 1}])
+
+    def test_a_night_in_port_is_not_a_sea_day_and_a_port_with_no_times_adds_a_port_but_no_day(self):
+        overnight = {**CRUISE, "itinerary": [{"name": "Reykjavik", "zone": "Atlantic/Reykjavik", "arrive_local": "2026-03-02T08:00",
+                                              "depart_local": "2026-03-03T17:00"}, {"name": "Akureyri", "zone": "Atlantic/Reykjavik",
+                                                                                     "arrive_local": None, "depart_local": None}]}
+        self.mine(overnight)
+        c = self.stats(self.jane)["cruises"]
+        self.assertEqual((c["nights"], c["sea_days"], c["ports"]), (7, 4, 2))   # 2nd and 3rd in port; 4th–7th at sea
+
+    def test_a_year_takes_its_own_nights_and_sea_days_and_the_years_list_has_the_cruise(self):
+        spanning = {**CRUISE, "start_local": "2025-12-29T16:30", "end_local": "2026-01-03T07:00", "itinerary": []}
+        self.mine(spanning)
+        self.assertEqual(self.stats(self.jane)["years"], [2026, 2025])
+        c25, c26 = (self.stats(self.jane, year=y)["cruises"] for y in (2025, 2026))
+        self.assertEqual((c25["nights"], c25["sea_days"], c26["nights"], c26["sea_days"]), (3, 2, 2, 2))
+        self.assertEqual((c25["count"], c26["count"], self.stats(self.jane, year=2024)["cruises"]["count"]), (1, 1, 0))
+
+    def test_a_cancelled_a_future_and_an_unfinished_cruise_do_not_count(self):
+        self.mine(CRUISE, {**CRUISE, "confirmation": "X", "start_local": "2026-04-01T16:30", "end_local": "2026-04-08T07:00", "itinerary": []})
+        cancelled = self.add(self.jane, {**CRUISE, "confirmation": "Y", "start_local": "2026-05-01T16:30", "end_local": "2026-05-08T07:00",
+                                         "itinerary": []}, travelers=self.on(self.jane.person_id))
+        trips.edit_segment(self.c, self.jane, cancelled["id"], {"status": "cancelled"})
+        before_it_ends = stats.compute(self.c, self.jane, None, None, datetime(2026, 3, 8, 6, 0, tzinfo=UTC))
+        assert before_it_ends
+        self.assertEqual(before_it_ends["cruises"]["count"], 0)
+        self.assertEqual(self.stats(self.jane, now=datetime(2026, 9, 23, 12, 0, tzinfo=UTC))["cruises"]["count"], 3 - 1)
+
+    def test_a_cruise_only_another_member_is_on_stays_out_of_a_partners_stats(self):
+        self.add(self.sam, CRUISE, travelers=self.on(self.sam.person_id))
+        self.assertEqual(self.stats(self.jane)["cruises"]["count"], 0)
+        self.assertEqual(self.stats(self.sam)["cruises"]["count"], 1)
 
 
 class VisibilityTests(StatsCase):

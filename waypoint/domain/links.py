@@ -18,7 +18,7 @@ DIGITS = re.compile(r"\d")
 
 class Links(TypedDict):
     app: str | None          # the provider's manage-trip page: its app opens it if installed, the website if not
-    directions: str | None   # Apple Maps, to the hotel or the rental desk
+    directions: str | None   # Apple Maps, to the hotel, the rental desk or the cruise terminal
     call: str | None         # tel: the provider's number
 
 
@@ -62,7 +62,7 @@ def call_link(phone: str | None) -> str | None:
 
 def segment_links(kind: str, provider: str | None, confirmation: str | None, last_name: str | None, manage_url: str | None,
                   details: dict[str, str], origin: str | None) -> Links:
-    stay = kind in ("hotel", "car")
+    stay = kind in ("hotel", "car", "cruise")
     return {"app": manage_link(provider, confirmation, last_name) or https_only(manage_url),
             "directions": directions_link(details.get("address") or origin) if stay else None,
             "call": call_link(details.get("phone"))}

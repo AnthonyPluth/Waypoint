@@ -1,4 +1,4 @@
-"""Trips and their segments: a trip is a journey, a segment one flight leg, hotel stay, car rental or train in it.
+"""Trips and their segments: a trip is a journey, a segment one flight leg, hotel stay, car rental, train or cruise in it.
 
 A segment's start and end are the wall-clock times where they happen, as typed (2026-03-01T22:15), stored with the IANA
 zone of the place (Pacific/Auckland): nothing here converts one to the server's zone or to UTC, and the zone is never
@@ -22,19 +22,20 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import delete, select, update
 
 from ..storage import db
-from ..storage.models import Segment, SegmentTraveler, Trip
+from ..storage.models import Segment, SegmentPort, SegmentTraveler, Trip
 from . import airports, links, people, visibility
 from .visibility import Viewer
 
-Kind = Literal["flight", "hotel", "car", "train"]
+Kind = Literal["flight", "hotel", "car", "train", "cruise"]
 Status = Literal["confirmed", "changed", "cancelled"]
-KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train")
+KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train", "cruise")
 STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
 TIME_UNKNOWN = "time_unknown"
 # What a segment's details may hold (the rest of a booking has a field of its own), each a text. `time_unknown` ("yes") marks an
 # imported flight whose file gave no times: it starts and ends at midnight of its day and counts in distance, not time.
 ADDRESS_LIMIT = 300   # the longest address kept
-DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone", TIME_UNKNOWN)
+MAX_PORTS = 40       # a cruise's most ports of call
+DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone", "ship", "deck", TIME_UNKNOWN)
 
 
 def untimed(details: Mapping[str, str]) -> bool:
@@ -45,7 +46,7 @@ def untimed(details: Mapping[str, str]) -> bool:
 
 # A person's edit locks the fields it changes; these are the names a lock can have.
 FIELDS = ("kind", "status", "confirmation", "provider", "start_local", "start_zone", "end_local", "end_zone", "origin",
-          "destination", "details", "manage_url", "travelers")
+          "destination", "details", "manage_url", "travelers", "itinerary")
 TIME_FIELDS = ("start_local", "start_zone", "end_local", "end_zone")   # (a person who looks at these has settled them)
 GAP_DAYS = 2    # a segment this many days or fewer from a trip (before or after it) can belong to it
 AWAY_DAYS = 60  # and one that carries on from where an unfinished trip's last leg landed (the way back), this many
@@ -67,6 +68,14 @@ class TravelerIn(TypedDict):
     name: str | None
 
 
+class PortIn(TypedDict):
+    """A port of call, as given: its name and IANA zone, and the local times the ship arrives and leaves (either or both, or none)."""
+    name: str
+    zone: str
+    arrive_local: str | None
+    depart_local: str | None
+
+
 class SegmentIn(TypedDict, total=False):
     """A segment's fields, as far as they are given: all of them for a new one except the status (confirmed unless said)
     and the zones of a flight's known airports (taken from them); only what changes for an edit. Already checked for
@@ -84,6 +93,7 @@ class SegmentIn(TypedDict, total=False):
     details: dict[str, str]
     manage_url: str | None
     travelers: list[TravelerIn]
+    itinerary: list[PortIn]    # a cruise's ports of call, in order
     check_times: bool          # from an email: its times couldn't be settled (not for a person to send)
 
 
@@ -121,6 +131,7 @@ class SegmentOut(TypedDict):
     locked_fields: list[str]
     check_times: bool
     travelers: list[TravelerOut]
+    itinerary: list[PortIn]
     links: links.Links
 
 
@@ -218,6 +229,41 @@ def _local(value: str | None, label: str) -> str:
     return t.isoformat(timespec="minutes" if t.second == 0 else "seconds")
 
 
+def check_itinerary(kind: str, given: Sequence[PortIn], start: tuple[str, str], end: tuple[str, str]) -> list[PortIn]:
+    """A cruise's ports of call, checked: only a cruise has them, at most MAX_PORTS, each with a name and a known zone, its
+    times local ones with the departure not before the arrival, and the ports in order, between the embarkation and the
+    disembarkation (compared as moments at their own zones). `start` and `end` are the cruise's (local time, zone). Raises
+    Invalid."""
+    if not given:
+        return []
+    if kind != "cruise":
+        raise Invalid("Only a cruise has ports of call")
+    if len(given) > MAX_PORTS:
+        raise Invalid(f"Add at most {MAX_PORTS} ports of call")
+    kept: list[PortIn] = []
+    last = instant(*start)
+    for n, port in enumerate(given, 1):
+        name = (port.get("name") or "").strip()
+        if not name:
+            raise Invalid(f"Name port {n}")
+        zone = _zone(port.get("zone"), f"port {n}’s")
+        arrive = _local(port["arrive_local"], f"port {n}’s arrival") if port.get("arrive_local") else None
+        depart = _local(port["depart_local"], f"port {n}’s departure") if port.get("depart_local") else None
+        if arrive and depart and instant(depart, zone) < instant(arrive, zone):
+            raise Invalid(f"{name}: the ship can’t leave before it arrives")
+        for at in (arrive, depart):
+            if at is None:
+                continue
+            moment = instant(at, zone)
+            if moment < last:
+                raise Invalid(f"{name}: list the ports in the order the ship calls at them, after it sets sail")
+            last = moment
+        kept.append({"name": name, "zone": zone, "arrive_local": arrive, "depart_local": depart})
+    if last > instant(*end):
+        raise Invalid("A port of call is after the cruise ends")
+    return kept
+
+
 def decode_details(raw: str | None) -> dict[str, str]:
     try:
         found = json.loads(raw) if raw else {}
@@ -276,9 +322,14 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
             "manage_url": fields.get("manage_url")}
 
 
-def _current(seg: Segment, travelers: list[TravelerIn]) -> SegmentIn:
-    """A stored segment's fields, as `check` takes them."""
-    return {"kind": seg.kind, "status": seg.status, "confirmation": seg.confirmation, "provider": seg.provider,
+def _span(values: Mapping[str, str | None], end: Literal["start", "end"]) -> tuple[str, str]:
+    """A checked segment's start or end as (local time, zone)."""
+    return (values[f"{end}_local"] or "", values[f"{end}_zone"] or "")
+
+
+def _current(seg: Segment, travelers: list[TravelerIn], ports: list[PortIn] | None = None) -> SegmentIn:
+    """A stored segment's fields, as `check` takes them (its ports of call when they are given)."""
+    return {**({"itinerary": ports} if ports is not None else {}), "kind": seg.kind, "status": seg.status, "confirmation": seg.confirmation, "provider": seg.provider,
             "start_local": seg.start_local, "start_zone": seg.start_zone, "end_local": seg.end_local,
             "end_zone": seg.end_zone, "origin": seg.origin, "destination": seg.destination,
             "details": decode_details(seg.details), "manage_url": seg.manage_url, "travelers": travelers}
@@ -288,6 +339,28 @@ def unlocked(incoming: SegmentIn, locked: Iterable[str]) -> SegmentIn:
     """What a later email may change: its fields without the ones a person edited."""
     skip = set(locked)
     return {k: v for k, v in incoming.items() if k not in skip}  # type: ignore[return-value]
+
+
+def _port_in(p: SegmentPort) -> PortIn:
+    return {"name": p.name, "zone": p.zone, "arrive_local": p.arrive_local, "depart_local": p.depart_local}
+
+
+def ports_of(conn: db.Connection, segment_ids: Sequence[int]) -> dict[int, list[PortIn]]:
+    """The ports of call of these segments (ones the caller got through the visibility helper), in order."""
+    found: dict[int, list[PortIn]] = {}
+    if segment_ids:
+        for p in conn.orm.scalars(select(SegmentPort).where(SegmentPort.segment_id.in_(list(segment_ids)))
+                                  .order_by(SegmentPort.segment_id, SegmentPort.position)).all():
+            found.setdefault(p.segment_id, []).append(_port_in(p))
+    return found
+
+
+def _set_ports(conn: db.Connection, segment_id: int, ports: Sequence[PortIn]) -> None:
+    conn.execute(delete(SegmentPort).where(SegmentPort.segment_id == segment_id))
+    for i, p in enumerate(ports):
+        conn.orm.add(SegmentPort(segment_id=segment_id, position=i, name=p["name"], zone=p["zone"],
+                                 arrive_local=p["arrive_local"], depart_local=p["depart_local"]))
+    conn.orm.flush()
 
 
 def _travelers(conn: db.Connection, given: Sequence[TravelerIn]) -> list[TravelerIn]:
@@ -312,6 +385,7 @@ def _travelers(conn: db.Connection, given: Sequence[TravelerIn]) -> list[Travele
 # ------------------------------------------------------------------------------------------------ reading
 
 def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[SegmentTraveler]) -> list[SegmentOut]:
+    ports = ports_of(conn, [s.id for s in segs if s.kind == "cruise"])
     ids = [t.person_id for t in travs if t.person_id is not None]
     names = people.existing(conn, ids)
     by_segment: dict[int, list[TravelerOut]] = {}
@@ -328,6 +402,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
          "end_zone": s.end_zone, "origin": s.origin, "destination": s.destination, "details": decode_details(s.details),
          "manage_url": s.manage_url, "source": cast(Literal["manual", "email", "import"], s.source), "booked_by": s.booked_by,
          "locked_fields": decode_locked(s.locked_fields), "check_times": bool(s.check_times), "travelers": by_segment.get(s.id, []),
+         "itinerary": ports.get(s.id, []),
          "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, decode_details(s.details), s.origin)}
         for s in segs]
     return sorted(out, key=lambda s: (instant(s["start_local"], s["start_zone"]), s["id"]))
@@ -509,6 +584,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
     viewer). Raises Invalid."""
     _needs_person(viewer)
     values = check(conn, fields)
+    ports = check_itinerary(fields.get("kind") or "", fields.get("itinerary") or [], _span(values, "start"), _span(values, "end"))
     given = fields.get("travelers")
     travelers = _travelers(conn, given if given is not None else
                            ([{"person_id": viewer.person_id, "name": None}] if viewer.person_id is not None else []))
@@ -533,6 +609,8 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
     conn.orm.add(seg)
     conn.orm.flush()
     _set_travelers(conn, seg.id, travelers)
+    if ports:
+        _set_ports(conn, seg.id, ports)
     refresh(conn, trip)
     return _after_change(conn, seg)
 
@@ -546,25 +624,33 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         return None
     old: list[TravelerIn] = [{"person_id": t.person_id, "name": t.name} for t in conn.orm.scalars(
         select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id).order_by(SegmentTraveler.id)).all()]
-    before = _current(seg, old)
+    ports_before = ports_of(conn, [seg.id]).get(seg.id, [])
+    before = _current(seg, old, ports_before)
     merged: SegmentIn = {**before, **changes}
     if untimed(before.get("details") or {}):
         # The marker is the server's: it stays until a person gives the segment real times, whatever "details" a client sends.
         retimed = any(k in changes and changes[k] != before.get(k) for k in ("start_local", "end_local"))
         kept = {k: v for k, v in (merged.get("details") or {}).items() if k != TIME_UNKNOWN}
         merged["details"] = kept if retimed else {**kept, TIME_UNKNOWN: "yes"}
+    if merged.get("kind") != "cruise" and "itinerary" not in changes:
+        merged["itinerary"] = []   # (a booking that stops being a cruise has no ports of call: they go, rather than refuse the edit)
     for place, zone in (("origin", "start_zone"), ("destination", "end_zone")):
         # (only an airport gives a zone; a stay's or a rental's is the person's)
         if place in changes and zone not in changes and changes.get(place) != before.get(place) and merged.get("kind") == "flight":
             merged[zone] = None   # type: ignore[literal-required]   # the old place's zone isn't the new one's
     values = check(conn, merged)
+    ports = check_itinerary(merged.get("kind") or "", merged.get("itinerary") or [], _span(values, "start"), _span(values, "end"))
     travelers = _travelers(conn, merged.get("travelers") or [])
     changed = [f for f in FIELDS if f in values and (decode_details(values[f]) != decode_details(seg.details) if f == "details"
                                                     else values[f] != getattr(seg, f))]
     if sorted(map(_key, travelers)) != sorted(map(_key, old)):
         changed.append("travelers")
+    if ports != ports_before:
+        changed.append("itinerary")
     for k, v in values.items():
         setattr(seg, k, v)
+    if "itinerary" in changed:
+        _set_ports(conn, seg.id, ports)
     if "travelers" in changed:
         _set_travelers(conn, seg.id, travelers)
     if any(f in changes for f in TIME_FIELDS):
@@ -648,8 +734,17 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
     changed_values = check(conn, merged)
     changed = [f for f in FIELDS if f in changed_values and (decode_details(changed_values[f]) != decode_details(seg.details)
                                                             if f == "details" else changed_values[f] != getattr(seg, f))]
+    new_ports: list[PortIn] | None = None
+    if fields.get("itinerary") and "itinerary" not in locked and not ports_of(conn, [seg.id]).get(seg.id):
+        try:   # (an email fills the ports of call while there are none; a person's list stays; a list that doesn't check is left out, not a half-made merge)
+            new_ports = check_itinerary(values["kind"] or "", fields["itinerary"], _span(changed_values, "start"), _span(changed_values, "end"))
+        except Invalid:
+            new_ports = None
     for f in changed:
         setattr(seg, f, changed_values[f])
+    if new_ports:
+        _set_ports(conn, seg.id, new_ports)
+        changed.append("itinerary")
     if not set(TIME_FIELDS) & set(locked) and bool(fields.get("check_times")) != bool(seg.check_times):
         seg.check_times = bool(fields.get("check_times"))   # (times a person edited or confirmed stand as they are)
         changed.append("check_times")

@@ -110,7 +110,7 @@ def flight_status(fetch: Fetch, a: dict) -> Any:
 
 
 TOOLS: list[dict[str, Any]] = [
-    {"name": "upcoming", "description": "What's coming up: flights, stays, rentals and trains in the next days (default 60), soonest "
+    {"name": "upcoming", "description": "What's coming up: flights, stays, rentals, trains and cruises in the next days (default 60), soonest "
      "first, with their trip, confirmation code and travellers. Times are the wall-clock times at the place, in the zone each carries.",
      "inputSchema": _schema({"days": {"type": "integer", "minimum": 1, "maximum": 730, "description": "How many days ahead (default 60)."},
                              "from": {**_DAY, "description": "Start from this day instead of today."}}),
@@ -119,7 +119,7 @@ TOOLS: list[dict[str, Any]] = [
      "Use get_trip for one trip's segments.",
      "inputSchema": _schema({"when": {"type": "string", "enum": ["all", "upcoming", "past"], "description": "Which trips (default all)."}}),
      "run": list_trips, "needs": (READ,)},
-    {"name": "get_trip", "description": "One trip with every segment (flights, stays, rentals, trains) and who is travelling.",
+    {"name": "get_trip", "description": "One trip with every segment (flights, stays, rentals, trains, cruises) and who is travelling.",
      "inputSchema": _schema({"trip_id": _TRIP_ID}, ["trip_id"]),
      "run": lambda fetch, a: fetch(f"trips/{_need(a, 'trip_id')}", {}), "needs": (READ,)},
     {"name": "list_people", "description": "Everyone who travels: household members, then guests, with the names airlines print.",
@@ -198,17 +198,18 @@ def _write_tool(name: str, description: str, run: Callable[[Fetch, dict], Any], 
             "write": True, "idempotent": idempotent, "destructive": harm}
 
 
-_SEGMENT_FIELDS = _fields("kind (flight, hotel, car or train), start_local and end_local (YYYY-MM-DDTHH:MM, wall-clock at the "
+_SEGMENT_FIELDS = _fields("kind (flight, hotel, car, train or cruise), start_local and end_local (YYYY-MM-DDTHH:MM, wall-clock at the "
                           "place), and optionally status (confirmed, changed or cancelled), confirmation, provider, origin and "
                           "destination (a flight's airport codes; a stay's or a rental's place), start_zone and end_zone (IANA; a "
                           "flight's come from its airports), details (flight_number, terminal, seat, cabin, room, car_class, "
-                          "address, phone: texts), manage_url and travelers ([{person_id}] or [{name}], the person asking when left out).")
+                          "address, phone, ship, deck: texts), itinerary (a cruise's ports of call in order: [{name, zone, arrive_local, depart_local}], "
+                          "times local to the port or null), manage_url and travelers ([{person_id}] or [{name}], the person asking when left out).")
 _TRIP_FIELDS = _fields("name, and optionally destination, notes; start_date and end_date (YYYY-MM-DD) for a trip with no segments yet.")
 _PERSON_FIELDS = _fields("display_name, and optionally first_name, legal_name (as on an ID) and aliases (a list of how airlines print the "
                          "name). Changing replaces all of them: send every name to keep.")
 
 WRITE_TOOLS: list[dict[str, Any]] = [
-    _write_tool("add_segment", "Add a flight, stay, rental or train. Without a trip_id it goes into the trip it falls into (one is "
+    _write_tool("add_segment", "Add a flight, stay, rental, train or cruise. Without a trip_id it goes into the trip it falls into (one is "
                 "made if none does).", _change("segments", None, True, ("trip_id",)),
                 {"fields": _SEGMENT_FIELDS, "trip_id": _TRIP_ID}, ["fields"], route=("POST", "/api/segments")),
     _write_tool("update_segment", "Change only the fields sent of a segment (what ends up different is locked, so a later email "

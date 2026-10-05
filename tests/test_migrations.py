@@ -429,6 +429,27 @@ class MigrationTests(unittest.TestCase):
             self.assertIsNone(db.get_setting(conn, "mcp_allow_ids"))
             self.assertIsNone(db.get_setting(conn, "mcp_allow_writes"))
 
+    def test_0015_adds_the_ports_table_and_takes_it_away(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            self.assertIn("segment_ports", sa.inspect(c).get_table_names())
+            command.downgrade(db.alembic_config(c), "0014")
+            self.assertNotIn("segment_ports", sa.inspect(c).get_table_names())
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+
+    def test_a_cruises_ports_go_with_the_cruise(self):
+        db.init(self.path)
+        with db.session(self.path) as conn:
+            conn.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
+            conn.execute(insert(schema.segments).values(
+                id=1, trip_id=1, kind="cruise", status="confirmed", start_local="2026-03-01T17:00", start_zone="America/New_York",
+                end_local="2026-03-08T07:00", end_zone="America/New_York", source="manual"))
+            conn.execute(insert(schema.segment_ports).values(segment_id=1, position=0, name="Nassau", zone="America/Nassau"))
+            conn.execute(delete(schema.segments).where(schema.segments.c.id == 1))
+            self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.segment_ports)).scalar(), 0)
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:

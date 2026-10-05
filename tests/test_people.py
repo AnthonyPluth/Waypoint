@@ -5,7 +5,7 @@ from waypoint import oidc
 from waypoint.domain import demo, loyalty, people
 from waypoint.server.api import people as api
 from waypoint.server.common import ApiError, _current
-from waypoint.storage.models import FlightStatus, Person, Segment, SegmentRecipient, SegmentTraveler, Trip, User
+from waypoint.storage.models import FlightStatus, Person, Segment, SegmentPort, SegmentRecipient, SegmentTraveler, Trip, User
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
 
@@ -88,7 +88,7 @@ class PeopleTests(DbCase):
         added = demo.seed(self.c)
         shown = people.everyone(self.c)
         self.assertEqual(added, 2 + len(shown) + len(demo.MEMBERSHIPS) + 1 + len(demo.UNREAD)   # (the demo's mailbox and what it couldn't read)
-                         + sum(self.c.orm.scalar(select(func.count()).select_from(m)) or 0 for m in (Trip, Segment, SegmentTraveler, FlightStatus)))
+                         + sum(self.c.orm.scalar(select(func.count()).select_from(m)) or 0 for m in (Trip, Segment, SegmentPort, SegmentTraveler, FlightStatus)))
         self.assertEqual([p["member"] for p in shown], [True, True, False, False])
         self.assertEqual(self.c.orm.scalar(select(func.count()).select_from(User)), 2)
 

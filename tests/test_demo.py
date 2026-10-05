@@ -25,9 +25,9 @@ class DemoTests(DbCase):
         demo.seed(self.c, today)
         found = trips.listing(self.c, Viewer(None, household=True))
         day = today.isoformat()
-        self.assertEqual(len([t for t in found if (t["end_date"] or "") < day]), 3)   # (two of them older, for Stats' years)
+        self.assertEqual(len([t for t in found if (t["end_date"] or "") < day]), 4)   # (two of them older, for Stats' years, and a finished cruise)
         self.assertEqual(len([t for t in found if (t["start_date"] or "") <= day <= (t["end_date"] or "")]), 1)
-        self.assertEqual(len([t for t in found if (t["start_date"] or "") > day]), 3)   # (one of them read from an email)
+        self.assertEqual(len([t for t in found if (t["start_date"] or "") > day]), 4)   # (one of them read from an email, one a cruise)
         self.assertTrue(all(t["segments"] for t in found))
 
     def test_has_a_past_trip_one_in_progress_and_some_to_come(self):

@@ -125,7 +125,7 @@ class WhoIsThis(TypedDict):
     name: str                       # as printed on the booking
     segment_id: int
     trip_id: int
-    kind: Literal["flight", "hotel", "car", "train"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise"]
     provider: str | None
     origin: str | None
     destination: str | None
@@ -228,12 +228,20 @@ class SegmentLinks(TypedDict):
     call: str | None                # tel:
 
 
+class Port(TypedDict):
+    """A cruise's port of call. Its times are local wall-clock times at the port, in its `zone`."""
+    name: str
+    zone: str
+    arrive_local: str | None
+    depart_local: str | None
+
+
 class Segment(TypedDict):
-    """One flight leg, hotel stay, car rental or train. Its times are local wall-clock times at the place, never
+    """One flight leg, hotel stay, car rental, train or cruise. Its times are local wall-clock times at the place, never
     converted: `start_local` is 2026-03-01T22:15 in `start_zone`, whatever zone the server or the viewer is in."""
     id: int
     trip_id: int
-    kind: Literal["flight", "hotel", "car", "train"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise"]
     status: Literal["confirmed", "changed", "cancelled"]
     confirmation: str | None
     provider: str | None
@@ -243,13 +251,14 @@ class Segment(TypedDict):
     end_zone: str
     origin: str | None              # a flight's airport code; a stay's or a rental's place
     destination: str | None
-    details: dict[str, str]         # flight_number, terminal, seat, cabin, room, car_class, address, phone; time_unknown (an imported flight with no times)
+    details: dict[str, str]         # flight_number, terminal, seat, cabin, room, car_class, address, phone, ship, deck; time_unknown (an imported flight with no times)
     manage_url: str | None
     source: Literal["manual", "email", "import"]
     booked_by: int | None           # a person
     locked_fields: list[str]        # what a person edited, which a later email never overwrites
     check_times: bool               # an email's times couldn't be settled: the card asks for a look, until they're edited or confirmed
     travelers: list[Traveler]
+    itinerary: list[Port]           # a cruise's ports of call in order (empty for anything else)
     links: SegmentLinks              # the card's actions, built by the server
 
 
@@ -294,7 +303,7 @@ class TravelerBody(TypedDict):
 class SegmentBody(TypedDict):
     """A segment to add; `trip_id` leaves it to Waypoint to group it into a trip. A flight's zones come from its airports
     unless given."""
-    kind: Literal["flight", "hotel", "car", "train"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise"]
     start_local: str
     end_local: str
     trip_id: NotRequired[int | None]
@@ -308,11 +317,12 @@ class SegmentBody(TypedDict):
     details: NotRequired[dict[str, str]]
     manage_url: NotRequired[str | None]
     travelers: NotRequired[list[TravelerBody]]   # who it's for; the signed-in member when left out
+    itinerary: NotRequired[list[Port]]           # a cruise's ports of call, in order
 
 
 class SegmentEdit(TypedDict):
     """What to change on a segment: only the fields sent. The ones that end up different are locked."""
-    kind: NotRequired[Literal["flight", "hotel", "car", "train"]]
+    kind: NotRequired[Literal["flight", "hotel", "car", "train", "cruise"]]
     status: NotRequired[Literal["confirmed", "changed", "cancelled"]]
     confirmation: NotRequired[str | None]
     provider: NotRequired[str | None]
@@ -325,6 +335,7 @@ class SegmentEdit(TypedDict):
     details: NotRequired[dict[str, str]]
     manage_url: NotRequired[str | None]
     travelers: NotRequired[list[TravelerBody]]   # replaces who it's for
+    itinerary: NotRequired[list[Port]]           # replaces a cruise's ports of call
 
 
 class Airport(TypedDict):
@@ -551,6 +562,14 @@ class StatsCars(TypedDict):
     companies: list[StatsNamed]
 
 
+class StatsCruises(TypedDict):
+    count: int
+    nights: int                     # nights aboard
+    sea_days: int                   # days between embarking and disembarking with no port of call
+    ports: int                      # different ports of call
+    lines: list[StatsNamed]
+
+
 class StatsPlaces(TypedDict):
     countries: list[StatsPlace]
     cities: list[StatsPlace]
@@ -572,6 +591,7 @@ class Stats(TypedDict):
     flights: StatsFlights
     stays: StatsStays
     cars: StatsCars
+    cruises: StatsCruises
     places: StatsPlaces
 
 

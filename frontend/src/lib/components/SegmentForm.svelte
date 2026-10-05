@@ -5,7 +5,7 @@
   import type { Person, Segment } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
-  import { ADDRESS_LIMIT, body, DETAILS, KINDS, problem, type Draft } from "$lib/segment-form";
+  import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, type Draft } from "$lib/segment-form";
 
   // Adding a segment by hand, or editing one. A failed check or save keeps everything typed and says why; what you
   // change here is locked against later emails (the server does that).
@@ -16,6 +16,13 @@
   let error = $state("");
   let saving = $state(false);
 
+  // A new port starts in the zone of the one before it (or the cruise's own), the usual case for a run of ports.
+  const addPort = () => (d.itinerary = [...d.itinerary, { name: "", zone: d.itinerary.at(-1)?.zone ?? d.start_zone, arrive: "", depart: "" }]);
+  const movePort = (i: number, by: number) => {
+    const next = [...d.itinerary];
+    [next[i], next[i + by]] = [next[i + by], next[i]];
+    d.itinerary = next;
+  };
   onMount(() => { if (focus) document.getElementById(focus)?.focus(); });
 
   const flight = $derived(d.kind === "flight");
@@ -51,7 +58,7 @@
         <select bind:value={d.status} class={selectClass}>
           <option value="confirmed">Confirmed</option><option value="changed">Changed</option><option value="cancelled">Cancelled</option>
         </select></label>
-      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel chain or booking site" : d.kind === "car" ? "Rental company" : d.kind === "train" ? "Railway" : "Airline"}</span>
+      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel chain or booking site" : d.kind === "car" ? "Rental company" : d.kind === "train" ? "Railway" : d.kind === "cruise" ? "Cruise line" : "Airline"}</span>
         <Input bind:value={d.provider} maxlength={100} autocomplete="off" placeholder={d.kind === "flight" ? "American Airlines" : d.kind === "hotel" ? "Marriott" : ""} /></label>
       <label class={label}><span class="font-medium">Confirmation code</span>
         <Input bind:value={d.confirmation} maxlength={50} autocomplete="off" spellcheck={false} /></label>
@@ -63,17 +70,17 @@
             <Input bind:value={d.destination} maxlength={3} autocomplete="off" spellcheck={false} placeholder="LHR" /></label>
         </div>
       {:else}
-        <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel name" : d.kind === "car" ? "Pick-up place" : "From"}</span>
+        <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel name" : d.kind === "car" ? "Pick-up place" : d.kind === "cruise" ? "Embark port" : "From"}</span>
           <Input bind:value={d.origin} maxlength={100} autocomplete="off" /></label>
         {#if d.kind !== "hotel"}
-          <label class={label}><span class="font-medium">{d.kind === "car" ? "Drop-off place" : "To"}</span>
+          <label class={label}><span class="font-medium">{d.kind === "car" ? "Drop-off place" : d.kind === "cruise" ? "Disembark port" : "To"}</span>
             <Input bind:value={d.destination} maxlength={100} autocomplete="off" /></label>
         {/if}
       {/if}
-      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "car" ? "Pick-up" : "Departs"}</span>
+      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "car" ? "Pick-up" : d.kind === "cruise" ? "Embarks" : "Departs"}</span>
         <Input type="datetime-local" bind:value={d.start_local} autocomplete="off" />
         <span class="text-muted-foreground">The local time at the place.</span></label>
-      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off" : "Arrives"}</span>
+      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off" : d.kind === "cruise" ? "Disembarks" : "Arrives"}</span>
         <Input type="datetime-local" bind:value={d.end_local} autocomplete="off" />
         <span class="text-muted-foreground">The local time at the place it ends.</span></label>
       <label class={label}><span class="font-medium">{flight ? "Departure time zone (only if the airport isn’t known)" : "Time zone"}</span>
@@ -90,6 +97,32 @@
             <Input value={d.details[key] ?? ""} oninput={(e) => (d.details[key] = e.currentTarget.value)} maxlength={200} autocomplete="off" />
           {/if}</label>
       {/each}
+      {#if d.kind === "cruise"}
+        <fieldset class="flex flex-col gap-3" data-itinerary>
+          <legend class="mb-1.5 text-sm font-medium">Ports of call</legend>
+          <p class="text-sm text-muted-foreground">In the order the ship calls at them. Times are local to each port; leave them empty if you don’t have them.</p>
+          {#each d.itinerary as port, i (i)}
+            <div class="flex flex-col gap-3 rounded-xl border border-border p-3" data-port>
+              <label class={label}><span class="font-medium">Port {i + 1}</span>
+                <Input bind:value={port.name} maxlength={100} autocomplete="off" aria-label={`Port ${i + 1} name`} /></label>
+              <label class={label}><span class="font-medium">Time zone</span>
+                <Input bind:value={port.zone} list="segment-zones" autocomplete="off" spellcheck={false} placeholder="America/Nassau" aria-label={`Port ${i + 1} time zone`} /></label>
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label class={label}><span class="font-medium">Arrives</span>
+                  <Input type="datetime-local" bind:value={port.arrive} autocomplete="off" aria-label={`Port ${i + 1} arrival`} /></label>
+                <label class={label}><span class="font-medium">Leaves</span>
+                  <Input type="datetime-local" bind:value={port.depart} autocomplete="off" aria-label={`Port ${i + 1} departure`} /></label>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={i === 0} aria-label={`Move port ${i + 1} up`} onclick={() => movePort(i, -1)}>Up</Button>
+                <Button type="button" variant="outline" size="sm" disabled={i === d.itinerary.length - 1} aria-label={`Move port ${i + 1} down`} onclick={() => movePort(i, 1)}>Down</Button>
+                <Button type="button" variant="outline" size="sm" aria-label={`Remove port ${i + 1}`} onclick={() => (d.itinerary = d.itinerary.filter((_, n) => n !== i))}>Remove</Button>
+              </div>
+            </div>
+          {/each}
+          <div><Button type="button" variant="outline" size="sm" disabled={d.itinerary.length >= MAX_PORTS} onclick={addPort}>Add a port</Button></div>
+        </fieldset>
+      {/if}
       <label class={label}><span class="font-medium">Manage link</span>
         <Input bind:value={d.manage_url} maxlength={500} autocomplete="off" spellcheck={false} placeholder="https://" /></label>
       <fieldset class="flex flex-col gap-2 text-sm">

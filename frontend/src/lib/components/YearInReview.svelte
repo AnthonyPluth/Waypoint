@@ -42,6 +42,8 @@
     ...(facts.topRoute ? [{ id: "route", eyebrow: "Top route", big: `${facts.topRoute.a} – ${facts.topRoute.b}`,
       lines: [`${count(facts.topRoute.flights)} ${facts.topRoute.flights === 1 ? "flight" : "flights"}`, ...(facts.topAirport ? [`Most-visited airport: ${facts.topAirport}`] : [])] }] : []),
     ...(facts.nights ? [{ id: "nights", eyebrow: "Away from home", big: `${count(facts.nights)} ${facts.nights === 1 ? "night" : "nights"}`, lines: ["in hotels and rentals"] }] : []),
+    ...(facts.cruises.count ? [{ id: "cruises", eyebrow: "At sea", big: `${count(facts.cruises.count)} ${facts.cruises.count === 1 ? "cruise" : "cruises"}`,
+      lines: [`${count(facts.cruises.nights)} ${facts.cruises.nights === 1 ? "night" : "nights"} aboard`, `${count(facts.cruises.seaDays)} ${facts.cruises.seaDays === 1 ? "sea day" : "sea days"}`] }] : []),
     { id: "map", eyebrow: "Where you went", lines: [] },
     { id: "share", eyebrow: "Share", lines: [] },
   ]);

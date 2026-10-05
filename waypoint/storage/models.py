@@ -105,7 +105,7 @@ class Segment(Base):
     __table__ = schema.segments
     id: Mapped[int]
     trip_id: Mapped[int]
-    kind: Mapped[str]                # flight, hotel, car or train (waypoint/domain/trips.py)
+    kind: Mapped[str]                # flight, hotel, car, train or cruise (waypoint/domain/trips.py)
     status: Mapped[str]              # confirmed, changed or cancelled
     confirmation: Mapped[str | None]
     provider: Mapped[str | None]
@@ -129,6 +129,17 @@ class SegmentTraveler(Base):
     segment_id: Mapped[int]
     person_id: Mapped[int | None]
     name: Mapped[str | None]         # as printed, until it's matched to a person
+
+
+class SegmentPort(Base):
+    __table__ = schema.segment_ports
+    id: Mapped[int]
+    segment_id: Mapped[int]
+    position: Mapped[int]            # the order of the cruise's itinerary
+    name: Mapped[str]
+    zone: Mapped[str]                # the port's IANA zone
+    arrive_local: Mapped[str | None]   # wall-clock times at the port, never converted
+    depart_local: Mapped[str | None]
 
 
 class SegmentRecipient(Base):

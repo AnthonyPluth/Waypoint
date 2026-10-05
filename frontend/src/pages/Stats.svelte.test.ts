@@ -19,7 +19,7 @@ const none: Stats = {
   flights: { count: 0, distance_km: 0, air_seconds: 0, airports: [], airlines: [], countries: [], routes: [], cabins: [], top_seat: null,
     seat_positions: { window: 0, aisle: 0, middle: 0, unknown: 0 }, longest: null, shortest: null, most_visited_airport: null, busiest_month: null,
     times_around_earth: 0, moon_fraction: 0 },
-  stays: { nights: 0, chains: [], cities: [], countries: [] }, cars: { days: 0, companies: [] }, places: { countries: [], cities: [] },
+  stays: { nights: 0, chains: [], cities: [], countries: [] }, cars: { days: 0, companies: [] }, cruises: { count: 0, nights: 0, sea_days: 0, ports: 0, lines: [] }, places: { countries: [], cities: [] },
 };
 const airports = ["JFK", "LHR", "MCO", "SFO", "CDG", "AKL", "LAX"].map((code, i) => ({ code, name: `${code} Airport`, city: `City ${i}`, country: "US", visits: 10 - i, latitude: 1, longitude: 2 }));
 const full: Stats = {
@@ -35,7 +35,7 @@ const full: Stats = {
     shortest: { origin: "JFK", destination: "EWR", distance_km: 28, start_local: "2025-05-02T08:00", flight_number: null },
     most_visited_airport: "JFK", busiest_month: "2026-06", times_around_earth: 1.3, moon_fraction: 0.1353,
   },
-  stays: { nights: 9, chains: [{ name: "Hilton", count: 2 }], cities: [], countries: [] }, cars: { days: 3, companies: [{ name: "Hertz", count: 1 }] },
+  stays: { nights: 9, chains: [{ name: "Hilton", count: 2 }], cities: [], countries: [] }, cars: { days: 3, companies: [{ name: "Hertz", count: 1 }] }, cruises: { count: 2, nights: 10, sea_days: 4, ports: 5, lines: [{ name: "Example Cruise Line", count: 2 }] },
   places: { countries: [{ name: "US", first_visit: "2025-05-02", visits: 3 }, { name: "GB", first_visit: "2026-06-01", visits: 1 }], cities: [] },
 };
 
@@ -71,6 +71,26 @@ describe("Stats", () => {
     expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("1");
     expect(screen.getByRole("option", { name: "Jane Doe (you)" })).toBeInTheDocument();
     expect(screen.getByTestId("stats-map-slot")).toBeInTheDocument();
+  });
+
+  it("counts cruises, nights aboard, sea days and ports, and lists the lines, only when there are cruises", async () => {
+    serve(() => full);
+    render(Stats_);
+    const totals = await screen.findByRole("region", { name: "Totals" });
+    for (const [label, value] of [["Cruises", "2"], ["Nights at sea", "10"], ["Sea days", "4"], ["Ports of call", "5"]]) {
+      const tile = within(totals).getByText(label).closest("div")!;
+      expect(within(tile).getByText(value)).toBeInTheDocument();
+    }
+    expect(screen.getByText("Cruise lines")).toBeInTheDocument();
+    expect(screen.getByText("2 cruises")).toBeInTheDocument();
+  });
+
+  it("shows no cruise tiles for someone who has not been on one", async () => {
+    serve(() => ({ ...full, cruises: none.cruises }));
+    render(Stats_);
+    const totals = await screen.findByRole("region", { name: "Totals" });
+    expect(within(totals).queryByText("Sea days")).toBeNull();
+    expect(screen.queryByText("Cruise lines")).toBeNull();
   });
 
   it("offers the year in review for a past year, and not for all time", async () => {

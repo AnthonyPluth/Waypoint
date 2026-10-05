@@ -285,6 +285,14 @@ export interface PersonLink {
   on: string;
 }
 
+/** A cruise's port of call. Its times are local wall-clock times at the port, in its `zone`. */
+export interface Port {
+  name: string;
+  zone: string;
+  arrive_local: string | null;
+  depart_local: string | null;
+}
+
 /**
  * A review item's message as plain text, fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps
  * none of it.
@@ -354,13 +362,13 @@ export interface ScanStarted {
 }
 
 /**
- * One flight leg, hotel stay, car rental or train. Its times are local wall-clock times at the place, never
+ * One flight leg, hotel stay, car rental, train or cruise. Its times are local wall-clock times at the place, never
  * converted: `start_local` is 2026-03-01T22:15 in `start_zone`, whatever zone the server or the viewer is in.
  */
 export interface Segment {
   id: number;
   trip_id: number;
-  kind: "flight" | "hotel" | "car" | "train";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise";
   status: "confirmed" | "changed" | "cancelled";
   confirmation: string | null;
   provider: string | null;
@@ -377,6 +385,7 @@ export interface Segment {
   locked_fields: string[];
   check_times: boolean;
   travelers: Traveler[];
+  itinerary: Port[];
   links: SegmentLinks;
 }
 
@@ -385,7 +394,7 @@ export interface Segment {
  * unless given.
  */
 export interface SegmentBody {
-  kind: "flight" | "hotel" | "car" | "train";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise";
   start_local: string;
   end_local: string;
   trip_id?: number | null;
@@ -399,11 +408,12 @@ export interface SegmentBody {
   details?: Record<string, string>;
   manage_url?: string | null;
   travelers?: TravelerBody[];
+  itinerary?: Port[];
 }
 
 /** What to change on a segment: only the fields sent. The ones that end up different are locked. */
 export interface SegmentEdit {
-  kind?: "flight" | "hotel" | "car" | "train";
+  kind?: "flight" | "hotel" | "car" | "train" | "cruise";
   status?: "confirmed" | "changed" | "cancelled";
   confirmation?: string | null;
   provider?: string | null;
@@ -416,6 +426,7 @@ export interface SegmentEdit {
   details?: Record<string, string>;
   manage_url?: string | null;
   travelers?: TravelerBody[];
+  itinerary?: Port[];
 }
 
 export interface SegmentLinks {
@@ -457,6 +468,7 @@ export interface Stats {
   flights: StatsFlights;
   stays: StatsStays;
   cars: StatsCars;
+  cruises: StatsCruises;
   places: StatsPlaces;
 }
 
@@ -479,6 +491,14 @@ export interface StatsAirport {
 export interface StatsCars {
   days: number;
   companies: StatsNamed[];
+}
+
+export interface StatsCruises {
+  count: number;
+  nights: number;
+  sea_days: number;
+  ports: number;
+  lines: StatsNamed[];
 }
 
 export interface StatsFlightRecord {
@@ -597,7 +617,7 @@ export interface WhoIsThis {
   name: string;
   segment_id: number;
   trip_id: number;
-  kind: "flight" | "hotel" | "car" | "train";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise";
   provider: string | null;
   origin: string | null;
   destination: string | null;
