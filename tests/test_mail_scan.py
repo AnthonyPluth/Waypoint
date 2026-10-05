@@ -462,7 +462,8 @@ class ReviewTests(ScanCase):
         unknown = eml("flight_jsonld").replace(b'"iataCode": "JFK"', b'"iataCode": "QQQ"')
         self.add_mail("unknown", unknown)
         self.put("no_markup", "incomplete")
-        with mock.patch.object(scan.monitoring, "log") as log:
+        real = scan.monitoring.log
+        with mock.patch.object(scan.monitoring, "log", side_effect=real) as log, no_leaks(self, *CANARIES, database=self.path):
             self.scan()
         said = [c.args[0] for c in log.call_args_list]
         self.assertIn("What stopped messages being read: 1 × arrival time; 1 × departure time; 1 × destination airport; 1 × no structured booking data; 1 × unknown airport.", said)

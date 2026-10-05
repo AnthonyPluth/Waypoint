@@ -482,6 +482,8 @@ def read(message: Mapping[str, Any]) -> Message:
             found = Parsed(unread=1)
         bookings, unread = list(found.bookings), unread + found.unread
         seen = seen or bool(found.bookings or found.unread)
+        if not found.bookings:
+            gaps.append("sender-specific parser found no booking")
     return Message(sender, received, tuple(bookings), unread, markup=seen, gaps=tuple(gaps), other_markup=other)
 
 
