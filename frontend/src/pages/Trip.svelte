@@ -94,6 +94,7 @@
   {/if}
   <ul class="flex flex-col gap-4" aria-label="Bookings">
     {#each t.segments as s (s.id)}
+      {@const live = s.status !== "cancelled"}
       <li class="pass" class:opacity-70={s.status === "cancelled"}>
         <div class="flex flex-col gap-2 p-5 md:p-6">
           <p class="flex flex-wrap items-center gap-2"><span class="eyebrow">{kindName(s)}</span>
@@ -109,12 +110,12 @@
               <dd class="mt-1 text-base font-medium">{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} /></dd></div>
             {#if s.confirmation}<div><dt class="eyebrow">Confirmation</dt><dd class="mt-1 text-lg"><CopyCode code={s.confirmation} /></dd></div>{/if}
           </dl>
-          {#if s.status !== "cancelled" && (s.links.app || s.links.directions || s.links.call || ios)}
+          {#if s.links.app || (live && (s.links.directions || s.links.call || ios))}
             <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
               {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">Open in app</Button>{/if}
-              {#if ios}<Button variant="outline" size="sm" href="shoebox://">Wallet</Button>{/if}
-              {#if s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
-              {#if s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
+              {#if live && ios}<Button variant="outline" size="sm" href="shoebox://">Wallet</Button>{/if}
+              {#if live && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
+              {#if live && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
             </div>
           {/if}
         </div>

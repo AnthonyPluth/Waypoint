@@ -57,14 +57,34 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByTestId("flight-status")).toBeNull();
   });
 
-  it("offers each booking’s actions, and Wallet only on iOS", async () => {
+  it("offers each booking’s actions, and no Wallet off iOS", async () => {
     render(TripPage);
-    const cards = (await screen.findAllByRole("group")).map((g) => within(g));
+    await screen.findByRole("heading", { name: "Trip to London" });
     const hotel = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
     expect(hotel.getByRole("link", { name: "Directions" })).toHaveAttribute("href", "https://maps.apple.com/?q=1%20Quay%20Street%2C%20London");
     expect(hotel.getByRole("link", { name: "Call" })).toHaveAttribute("href", "tel:+442079460000");
     expect(hotel.queryByRole("link", { name: "Open in app" })).toBeNull();
-    expect(cards.every((c) => c.queryByRole("link", { name: "Wallet" }) === null)).toBe(true);
+    expect(screen.queryByRole("link", { name: "Wallet" })).toBeNull();
+  });
+
+  it("shows Wallet, opening shoebox://, on iOS", async () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)");
+    render(TripPage);
+    await screen.findByRole("heading", { name: "Trip to London" });
+    const wallets = screen.getAllByRole("link", { name: "Wallet" });
+    expect(wallets).toHaveLength(2);
+    expect(wallets[0]).toHaveAttribute("href", "shoebox://");
+    vi.restoreAllMocks();
+  });
+
+  it("keeps a cancelled booking’s manage link and drops its other actions", async () => {
+    held = trip([{ ...stay, status: "cancelled", links: { app: "https://example.com/manage", directions: "https://maps.apple.com/?q=x", call: "tel:+442079460000" } }]);
+    render(TripPage);
+    await screen.findByRole("heading", { name: "Trip to London" });
+    const group = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
+    expect(group.getByRole("link", { name: "Open in app" })).toHaveAttribute("href", "https://example.com/manage");
+    expect(group.queryByRole("link", { name: "Directions" })).toBeNull();
+    expect(group.queryByRole("link", { name: "Call" })).toBeNull();
   });
 
   it("shows each booking with its local times, who is on it and the number each would use", async () => {
