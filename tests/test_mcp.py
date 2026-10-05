@@ -280,6 +280,16 @@ class MaskingTests(Assistants):
         self.assertEqual([r["number"] for r in got["loyalty"]], [JANE_NUMBER])
         self.assertIn("whole number", self.refused(IDS, "get_loyalty_ids", {"person_id": "abc"}))
 
+    def test_only_a_real_true_reveals(self):
+        self.switch(ids=True)
+        for sent in ("false", "true", 1, "yes"):
+            got = self.tool(IDS, "get_loyalty_ids", {"person_id": self.jane.person_id, "reveal": sent})
+            self.assertNotIn(JANE_NUMBER, json.dumps(got), sent)
+
+    def test_flight_status_takes_a_segment_id_sent_as_text(self):
+        self.assertEqual(self.tool(READ, "flight_status", {"segment_id": "12"})["statuses"], [])
+        self.assertIn("whole number", self.refused(READ, "flight_status", {"segment_id": "x"}))
+
     def test_a_reveal_wants_to_know_whose(self):
         self.switch(ids=True)
         self.assertIn("whose", self.refused(IDS, "get_loyalty_ids", {"reveal": True}))

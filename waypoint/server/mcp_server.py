@@ -107,7 +107,7 @@ def get_loyalty_ids(fetch: Fetch, a: dict) -> Any:
     which = _need(a, "loyalty_id") if a.get("loyalty_id") not in (None, "") else None
     listing = fetch("loyalty", {})
     rows = [r for r in listing["loyalty"] if (person is None or r["person_id"] == person) and (which is None or r["id"] == which)]
-    if a.get("reveal"):
+    if a.get("reveal") is True:
         if person is None and which is None:
             raise ToolError("To see full numbers, say whose (person_id) or which membership (loyalty_id).")
         rows = [{**r, "number": fetch(f"loyalty/{r['id']}/reveal", {}, {})["number"]} for r in rows if r["readable"]]
@@ -117,7 +117,8 @@ def get_loyalty_ids(fetch: Fetch, a: dict) -> Any:
 def flight_status(fetch: Fetch, a: dict) -> Any:
     """What's already held (Waypoint doesn't fetch anything new for an assistant)."""
     out = fetch("flight-status", {})
-    statuses = [s for s in out["statuses"] if not a.get("segment_id") or s["segment_id"] == a["segment_id"]]
+    which = _need(a, "segment_id") if a.get("segment_id") not in (None, "") else None
+    statuses = [s for s in out["statuses"] if which is None or s["segment_id"] == which]
     return {"enabled": out["enabled"], "paused": out["paused"], "statuses": statuses}
 
 
@@ -140,7 +141,7 @@ TOOLS: list[dict[str, Any]] = [
      "last four characters. To see a full number (to fill in a booking), set reveal with a person_id or loyalty_id: that needs "
      "the connection to be allowed full ID numbers and the household's switch on, and Waypoint notes each reveal in its log.",
      "inputSchema": _schema({"person_id": _PERSON_ID, "loyalty_id": _LOYALTY_ID,
-                             "reveal": {"type": "boolean", "description": "Give the full numbers (default false: last four only)."}}),
+                             "reveal": {"type": "boolean", "description": "true gives the full numbers (default false: last four only)."}}),
      "run": get_loyalty_ids, "needs": (READ,)},
     {"name": "get_stats", "description": "Travel stats over the trips you can see: flights, distance, airports, airlines, stays, cars and places, "
      "for one person or everyone, for a year or all time.",
