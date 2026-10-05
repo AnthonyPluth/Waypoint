@@ -192,6 +192,7 @@ class MigrationTests(unittest.TestCase):
             self.assertNotIn("flight_status", sa.inspect(c).get_table_names())
             self.assertIn("trips", sa.inspect(c).get_table_names())
             command.upgrade(db.alembic_config(c), "0006")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:
             row = dict(flight_number="EX101", date="2026-11-20", state="delayed", fetched_at=1.0)
