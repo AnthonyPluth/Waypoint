@@ -21,7 +21,8 @@ from .api.people import api_people, api_person_add, api_person_edit, api_person_
 from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_scan, api_mailboxes
 from .api.reminders import (api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
                             api_reminders_set)
-from .api.review import api_review, api_review_dismiss, api_review_ignore, api_review_who
+from .api.review import (api_review, api_review_dismiss, api_review_ignore, api_review_preview, api_review_suggest,
+                         api_review_who)
 from .api.state import api_state
 from .api.stats import api_stats
 
@@ -74,6 +75,8 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/review", api_review),
     ("POST", "/api/review/who/{id}", api_review_who),
     ("POST", "/api/review/{id}/ignore", api_review_ignore),
+    ("GET", "/api/review/{id}/preview", api_review_preview),
+    ("POST", "/api/review/{id}/suggest", api_review_suggest),
     ("DELETE", "/api/review/{id}", api_review_dismiss),
     ("GET", "/api/state", api_state),
 ]

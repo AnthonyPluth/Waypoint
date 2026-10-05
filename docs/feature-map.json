@@ -684,6 +684,36 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/review/{id}/preview",
+      "handler": "waypoint/server/api/review.py:api_review_preview",
+      "web": [
+        "frontend/src/pages/Review.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/review/{id}/suggest",
+      "handler": "waypoint/server/api/review.py:api_review_suggest",
+      "web": [
+        "frontend/src/pages/Review.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
       "method": "DELETE",
       "path": "/api/review/{id}",
       "handler": "waypoint/server/api/review.py:api_review_dismiss",

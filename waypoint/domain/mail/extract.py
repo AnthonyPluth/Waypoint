@@ -541,7 +541,7 @@ def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
             if kind not in ("text/plain", "text/html"):
                 continue
             try:
-                (plain if kind == "text/plain" else html).append(str(part.get_content())[:limit])
+                (plain if kind == "text/plain" else html).append(str(part.get_content())[:MAX_PART])
             except (ValueError, LookupError, KeyError):
                 continue
     except (ValueError, LookupError, TypeError):

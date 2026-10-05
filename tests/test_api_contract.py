@@ -18,7 +18,7 @@ from waypoint import oidc
 from waypoint.providers import gmail
 from waypoint.domain import people as people_domain
 from waypoint.domain import trips
-from waypoint.domain.mail import review
+from waypoint.domain.mail import review, scan
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
 from waypoint.server.api import ai as ai_api
@@ -175,6 +175,10 @@ class Replies(DbCase):
         self.check("GET /api/review", listed)
         self.check("POST /api/review/who/{id}", review_api.api_review_who(self.c, {}, {"person_id": me.person_id}, str(listed["who"][0]["id"])))
         self.check("POST /api/review/{id}/ignore", review_api.api_review_ignore(self.c, {}, {}, str(listed["items"][0]["id"])))
+        with mock.patch.object(scan, "preview", return_value=("Hello.", False)):
+            self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][1]["id"])))
+        with mock.patch.object(scan, "suggest_now"):
+            self.check("POST /api/review/{id}/suggest", review_api.api_review_suggest(None, {}, {}, str(listed["items"][1]["id"])))
         self.check("DELETE /api/review/{id}", review_api.api_review_dismiss(self.c, {}, {}, str(listed["items"][1]["id"])))
 
     def test_ai(self):
@@ -313,6 +317,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan",
                                      "GET /api/ai", "POST /api/ai",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "DELETE /api/review/{id}",
+                                     "GET /api/review/{id}/preview", "POST /api/review/{id}/suggest",
                                      "GET /api/people", "POST /api/people",
                                      "POST /api/people/{id}", "DELETE /api/people/{id}",
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
