@@ -62,12 +62,18 @@
   const subject = (i: ReviewItem) => `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
 
   // The form to add one by hand: what the email can tell (who it's from) filled in, the rest typed as on the booking.
-  type Draft = { item: ReviewItem; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string };
+  type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string };
   let draft = $state<Draft | null>(null);
   let formError = $state("");
   let saving = $state(false);
-  const startAdd = (item: ReviewItem) => {
-    draft = { item, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "" };
+  // With the optional AI’s suggestion, the same form starts filled in with it: the person checks every field and adds it (or
+  // edits it first). Nothing is saved until they do.
+  const startAdd = (item: ReviewItem, use = false) => {
+    const s = use ? item.suggestion : null;
+    draft = s
+      ? { item, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
+          destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "" }
+      : { item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "" };
     formError = "";
   };
   const placeLabels = (kind: string) => kind === "flight" ? ["From (airport code)", "To (airport code)"] : kind === "hotel" ? ["Hotel", ""] : kind === "car" ? ["Pick-up", "Drop-off"] : ["From (station)", "To (station)"];
@@ -150,10 +156,12 @@
               <div class="min-w-0 basis-full sm:basis-0 sm:flex-1">
                 <p class="break-words font-medium">{subject(item)}</p>
                 <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, `to ${item.address}`].filter(Boolean).join(" · ")}</p>
-                <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge></p>
+                <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestion} <Badge variant="outline">AI suggestion</Badge>{/if}</p>
+                {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
               </div>
               <div class="flex flex-wrap gap-2">
                 <a class={buttonVariants({ variant: "outline", size: "sm" })} href={item.gmail_url} target="_blank" rel="noopener noreferrer" aria-label={`Open “${subject(item)}” in Gmail`}>Open in Gmail</a>
+                {#if item.suggestion}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={`Check the AI’s suggestion for “${subject(item)}”`}>Check suggestion</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
                 {#if item.sender_domain}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Ignore ${item.sender_domain}`}>Ignore this sender</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={`Dismiss “${subject(item)}”`}>Dismiss</Button>
@@ -164,7 +172,8 @@
               {@const labels = placeLabels(d.kind)}
               <li class="row items-stretch">
                 <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-labelledby={`add-${item.id}`}>
-                  <h3 id={`add-${item.id}`} class="font-medium">Add this booking by hand</h3>
+                  <h3 id={`add-${item.id}`} class="font-medium">{d.suggested ? "Check this suggestion" : "Add this booking by hand"}</h3>
+                  {#if d.suggested}<p class="text-sm text-muted-foreground">An AI read the email and suggested this. It can be wrong: check each field against the booking, change what’s off, then add it.</p>{/if}
                   {#if item.received}<p class="text-sm text-muted-foreground">The email was sent {item.received}. Enter the times as they read on the booking, at the place they happen.</p>{/if}
                   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">What is it?</span>
                     <select bind:value={d.kind} class={selectClass}>{#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}</select></label>

@@ -216,7 +216,7 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(set(sa.inspect(c).get_table_names()) & scan_tables, set())
             self.assertNotIn("scan_error", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
             c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="enc:v1:x", status="connected"))
-            command.upgrade(db.alembic_config(c), "0007")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:
             self.assertIsNone(conn.execute(select(schema.mailboxes.c.scan_error)).scalar())   # a mailbox from before has no scan error
@@ -238,6 +238,27 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(set(sa.inspect(c).get_table_names()) & scan_tables, set())
             self.assertNotIn("scan_error", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
             self.assertIn("mailboxes", sa.inspect(c).get_table_names())
+
+    def test_0008_adds_the_ai_suggestion_columns_and_takes_them_away(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0007")
+            self.assertNotIn("suggestion", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
+            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="enc:v1:x", status="connected"))
+            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m1", sender_domain="air.example",
+                                                         reason="no_markup", created=1.0))
+            command.upgrade(db.alembic_config(c), "0008")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:   # an item from before has no suggestion and no error
+            row = conn.execute(select(schema.review_items.c.suggestion, schema.review_items.c.suggestion_error)).fetchone()
+            self.assertEqual((row[0], row[1]), (None, None))
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0007")
+            names = {col["name"] for col in sa.inspect(c).get_columns("review_items")}
+            self.assertNotIn("suggestion", names)
+            self.assertNotIn("suggestion_error", names)
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)
 
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating

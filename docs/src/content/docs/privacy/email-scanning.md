@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::note[What’s built]
-Members connect a Gmail read-only (see [Google OAuth client for Gmail](/waypoint/start/gmail/)), and Waypoint scans it for bookings in schema.org markup, queuing what it can’t read in [Review](/waypoint/start/review/). Per-vendor parsers and the optional AI suggestions below are still to come.
+Members connect a Gmail read-only (see [Google OAuth client for Gmail](/waypoint/start/gmail/)), and Waypoint scans it for bookings in schema.org markup, queuing what it can’t read in [Review](/waypoint/start/review/). The optional AI suggestions below are built; per-vendor parsers are still to come.
 :::
 
 Waypoint’s main way of learning about a booking is to read the confirmation email in a Gmail account you connect. The rules it keeps:
@@ -27,12 +27,12 @@ Waypoint tries the cheapest, most reliable method first and falls through:
 
 ## Optional AI suggestions
 
-Off by default. If you turn it on, Waypoint can ask a model to suggest the fields of an email the parsers couldn’t read, and you confirm or correct the suggestion in the review queue.
+Off by default (Settings → AI; see [AI suggestions](/waypoint/start/ai/)). If you turn it on, Waypoint can ask a model to suggest the fields of an email in the “Couldn’t read” queue, and you confirm or correct the suggestion there.
 
 - **Local:** an [Ollama](https://ollama.com) on your own network. The email text never leaves it.
-- **Hosted:** [OpenRouter](https://openrouter.ai), restricted to providers with zero data retention.
+- **Hosted:** [OpenRouter](https://openrouter.ai), restricted to providers with zero data retention (every request denies data collection and requires zero retention).
 
-Either way the suggestion is a draft for you to confirm, not something Waypoint saves on its own.
+Only the plain text goes out, with quoted replies, footers and anything that looks like a loyalty, Known Traveler or card number removed. Either way the suggestion is a draft for you to confirm, not something Waypoint saves on its own, and prompts and replies are never logged.
 
 ## What this means for the rest of the setup
 

@@ -227,8 +227,10 @@ review_items = Table(
     Column('received', Text),
     Column('reason', Text, nullable=False),
     Column('created', Float, nullable=False),
+    Column('suggestion', Text),
+    Column('suggestion_error', Text),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_review_items_mailbox_message'),
-    info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner alone; neither its subject nor its body is kept"},
+    info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner alone; neither its subject nor its body is kept; `suggestion` is the booking's fields (JSON) the optional AI read from it, for the person to confirm or edit, and `suggestion_error` why it couldn't (fixed text)"},
 )
 
 ignored_senders = Table(

@@ -91,6 +91,19 @@ class Disconnected(TypedDict):
 
 # Review: mail that looked like a booking and couldn't be read, and names on bookings to match to people
 
+class AiSuggestion(TypedDict):
+    """The booking's fields the AI read, as the Add by hand form has them. A flight has no zones: its airports give them."""
+    kind: Literal["flight", "hotel", "car", "train"]
+    origin: str
+    start_local: str                # YYYY-MM-DDTHH:MM, as written at the place
+    end_local: str
+    provider: NotRequired[str]
+    confirmation: NotRequired[str]
+    destination: NotRequired[str]
+    start_zone: NotRequired[str]
+    end_zone: NotRequired[str]
+
+
 class ReviewItem(TypedDict):
     """One message Waypoint couldn't read, for the member whose mailbox it is. Never its subject or text: only who it
     came from and its day (Open in Gmail shows the message)."""
@@ -100,6 +113,8 @@ class ReviewItem(TypedDict):
     received: str | None            # a day, YYYY-MM-DD
     reason: Literal["no_markup", "incomplete", "broken"]   # no booking details in it; some missing; couldn't be opened
     gmail_url: str                  # opens the message in Gmail
+    suggestion: AiSuggestion | None   # what the optional AI read from it (never its text), pre-filled into Add by hand to confirm or edit
+    suggestion_error: str | None    # why the AI gave none, in fixed text
 
 
 class WhoIsThis(TypedDict):
@@ -130,6 +145,25 @@ class WhoBody(TypedDict):
 class Matched(TypedDict):
     ok: bool
     matched: int                    # how many travellers on bookings became that person (the same printed name is matched everywhere)
+
+
+# AI (optional, off by default)
+
+class AiSettings(TypedDict):
+    mode: Literal["off", "local", "openrouter"]   # off; Ollama on your own network; OpenRouter with zero data retention
+    ollama_url: str
+    ollama_model: str
+    openrouter_model: str
+    key: Literal["env", "saved"] | None            # where the OpenRouter key comes from; the key itself never comes back
+
+
+class AiBody(TypedDict):
+    """Settings → AI. A field left out stays as it was; `openrouter_key: ""` forgets the saved key."""
+    mode: Literal["off", "local", "openrouter"]
+    ollama_url: NotRequired[str]
+    ollama_model: NotRequired[str]
+    openrouter_model: NotRequired[str]
+    openrouter_key: NotRequired[str]
 
 
 # People

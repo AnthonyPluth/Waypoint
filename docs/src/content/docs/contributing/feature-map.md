@@ -7,12 +7,14 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-36 routes; 0 have no test yet.
+38 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
 | Route | Handler | Web app | Tests | Docs |
 | --- | --- | --- | --- | --- |
+| `GET /api/ai` | `ai.py:api_ai` | `lib/components/settings/AiSection.svelte` | `test_api_contract.py`, `test_mail_ai.py` | [start/ai](/waypoint/start/ai/) |
+| `POST /api/ai` | `ai.py:api_ai_save` | `lib/components/settings/AiSection.svelte` | `test_api_contract.py`, `test_mail_ai.py` | [start/ai](/waypoint/start/ai/) |
 | `GET /api/backup` | `backups.py:api_backup` | - | `test_backup.py`, `test_http_pinned.py` | [start/docker](/waypoint/start/docker/) |
 | `POST /api/backup/inspect` | `backups.py:api_backup_inspect` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_http_pinned.py`, `test_monitoring.py`, `test_security.py`, `test_server_errors.py` | [start/docker](/waypoint/start/docker/) |
 | `POST /api/restore` | `backups.py:api_restore` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_hardening.py`, `test_http_pinned.py`, `test_http_server.py`, `test_monitoring.py` | [start/docker](/waypoint/start/docker/) |
@@ -44,7 +46,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/mailboxes/callback` | `mailboxes.py:api_mailbox_callback` | - | `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
 | `DELETE /api/mailboxes/{id}` | `mailboxes.py:api_mailbox_disconnect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/scan` | `mailboxes.py:api_mailbox_scan` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/waypoint/start/gmail/) |
-| `GET /api/review` | `review.py:api_review` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
+| `GET /api/review` | `review.py:api_review` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_ai.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
 | `POST /api/review/who/{id}` | `review.py:api_review_who` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
 | `POST /api/review/{id}/ignore` | `review.py:api_review_ignore` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |
 | `DELETE /api/review/{id}` | `review.py:api_review_dismiss` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/waypoint/start/review/) |

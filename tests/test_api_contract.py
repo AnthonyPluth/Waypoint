@@ -21,6 +21,7 @@ from waypoint.domain import trips
 from waypoint.domain.mail import review
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
+from waypoint.server.api import ai as ai_api
 from waypoint.server.api import backups, flightstatus as flightstatus_api, mailboxes, people, state
 from waypoint.server.api import review as review_api
 from waypoint.providers import flightstatus as flight_service
@@ -108,6 +109,7 @@ class Replies(DbCase):
         self.test_backups()
         self.test_mailboxes()
         self.test_review()
+        self.test_ai()
         self.test_people()
         self.test_trips()
         self.test_flight_status()
@@ -158,6 +160,9 @@ class Replies(DbCase):
                                                     status="connected", created=1.0)).lastrowid
         for n, reason in enumerate(("no_markup", "incomplete", "broken")):
             review.add(self.c, box, f"m{n}", f"air{n}.example", "2026-10-17", reason, 1.0)   # type: ignore[arg-type]
+        review.set_suggestion(self.c, box, "m0", {"kind": "flight", "origin": "BOS", "destination": "DEN", "start_local": "2026-12-02T07:15",
+                                                  "end_local": "2026-12-02T10:05"}, None)
+        review.set_suggestion(self.c, box, "m1", None, "The AI didn’t find a booking in this message.")
         me = Viewer(people_domain.person_for_sub(self.c, "u1"))
         trips.add_segment(self.c, me, {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": "2026-12-08T08:00",
                                        "end_local": "2026-12-08T11:20", "travelers": [{"person_id": None, "name": "DOE/MIA MISS"}]}, source="email")
@@ -167,6 +172,12 @@ class Replies(DbCase):
         self.check("POST /api/review/who/{id}", review_api.api_review_who(self.c, {}, {"person_id": me.person_id}, str(listed["who"][0]["id"])))
         self.check("POST /api/review/{id}/ignore", review_api.api_review_ignore(self.c, {}, {}, str(listed["items"][0]["id"])))
         self.check("DELETE /api/review/{id}", review_api.api_review_dismiss(self.c, {}, {}, str(listed["items"][1]["id"])))
+
+    def test_ai(self):
+        self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))   # off
+        self.check("POST /api/ai", ai_api.api_ai_save(self.c, {}, {"mode": "local", "ollama_url": "http://ollama.example:1234", "ollama_model": "llama3"}))
+        self.check("POST /api/ai", ai_api.api_ai_save(self.c, {}, {"mode": "openrouter", "openrouter_model": "some/model", "openrouter_key": "sk-or-test-1234567"}))
+        self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))
 
     def test_people(self):
         self.check("GET /api/people", people.api_people(self.c, {}, {}))   # nobody yet
@@ -261,6 +272,7 @@ class Generated(unittest.TestCase):
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
                                      "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan",
+                                     "GET /api/ai", "POST /api/ai",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "DELETE /api/review/{id}",
                                      "GET /api/people", "POST /api/people",
                                      "POST /api/people/{id}", "DELETE /api/people/{id}",

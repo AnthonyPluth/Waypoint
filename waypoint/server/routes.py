@@ -10,6 +10,7 @@ from typing import Any
 from ..storage import db
 from .common import ApiError, server_error
 
+from .api.ai import api_ai, api_ai_save
 from .api.backups import api_backup, api_backup_inspect, api_restore
 from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_edit, api_segment_remove, api_trip,
                         api_trip_add, api_trip_edit, api_trip_merge, api_trip_remove, api_trip_split, api_trips)
@@ -24,6 +25,8 @@ from .api.state import api_state
 # (method, path pattern, handler): each handler takes (conn, query, body, *path params) and returns the JSON reply, or
 # a common.Response for anything else (a download, a logo, a stream). A HEAD is answered as its GET, without the body.
 ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
+    ("GET", "/api/ai", api_ai),
+    ("POST", "/api/ai", api_ai_save),
     ("GET", "/api/backup", api_backup),
     ("POST", "/api/backup/inspect", api_backup_inspect),
     ("POST", "/api/restore", api_restore),

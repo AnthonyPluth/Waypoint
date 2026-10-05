@@ -440,3 +440,64 @@ def read(message: Mapping[str, Any]) -> Message:
         nodes.extend(scanner.items)
     bookings, unread, seen = _bookings(nodes)
     return Message(sender, received, tuple(bookings), unread, markup=seen)
+
+
+# ------------------------------------------------------------------------------------------------ plain text (the optional AI)
+
+class _Text(HTMLParser):
+    """An HTML part as lines of text, without its scripts and styles."""
+    BREAKS = {"br", "p", "div", "tr", "li", "table", "h1", "h2", "h3", "h4"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.skip = 0
+
+    def handle_starttag(self, tag: str, attrs: Any) -> None:
+        if tag in ("script", "style", "head"):
+            self.skip += 1
+        elif tag in self.BREAKS:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in ("script", "style", "head"):
+            self.skip = max(0, self.skip - 1)
+        elif tag in self.BREAKS:
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self.skip:
+            self.parts.append(data)
+
+
+def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
+    """The message's readable text, for the optional AI fallback alone (waypoint/domain/mail/ai.py, which strips quoted
+    replies, footers and ID numbers before anything is sent): its text/plain part, else its HTML as text. In memory only;
+    "" for a message that can't be decoded."""
+    data = _decode(message.get("raw"))
+    if data is None:
+        return ""
+    try:
+        parsed = email.message_from_bytes(data, policy=email.policy.default)
+        plain: list[str] = []
+        html: list[str] = []
+        for part in parsed.walk():
+            kind = part.get_content_type()
+            if kind not in ("text/plain", "text/html"):
+                continue
+            try:
+                (plain if kind == "text/plain" else html).append(str(part.get_content())[:limit])
+            except (ValueError, LookupError, KeyError):
+                continue
+    except (ValueError, LookupError, TypeError):
+        return ""
+    if plain:
+        return "\n".join(plain)[:limit]
+    scanner = _Text()
+    for h in html:
+        try:
+            scanner.feed(h)
+            scanner.close()
+        except (ValueError, RecursionError, AssertionError):
+            continue
+    return re.sub(r"\n\s*\n+", "\n", "".join(scanner.parts))[:limit]

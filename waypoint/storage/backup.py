@@ -251,6 +251,7 @@ LOYALTY_LABEL = "loyalty numbers (enter them again on People)"
 # What each secret is called where it's entered again (Settings), for saying which ones a restore couldn't read.
 SECRET_LABELS = {
     sk.VAPID_PRIVATE_KEY: "notifications' signing key (devices sign up for notifications again)",
+    sk.AI_OPENROUTER_KEY: "OpenRouter key (enter it again in Settings → AI)",
 }
 
 

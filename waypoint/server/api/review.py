@@ -4,13 +4,13 @@ with Open in Gmail, Add by hand and Ignore this sender), and the names on bookin
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from ... import validate
 from ...domain import people, trips
 from ...domain.mail import review
 from ..common import ApiError, row_id
-from ..contract import Matched, Ok, Review, WhoBody
+from ..contract import Matched, Ok, Review, ReviewItem, WhoBody
 from .mailboxes import owner
 from .trips import viewer
 
@@ -20,7 +20,7 @@ _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {li
 
 def api_review(conn, _q, _b) -> Review:
     """The signed-in member's review items (their own mailboxes' only) and the names on their trips to match to people."""
-    return {"items": [{**i} for i in review.listing(conn, owner())],
+    return {"items": [cast(ReviewItem, {**i}) for i in review.listing(conn, owner())],
             "who": [{"id": t.id, "name": t.name or "", "segment_id": s["id"], "trip_id": s["trip_id"], "kind": s["kind"],
                      "provider": s["provider"], "origin": s["origin"], "destination": s["destination"],
                      "start_local": s["start_local"], "start_zone": s["start_zone"]}
