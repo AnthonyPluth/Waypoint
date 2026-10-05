@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-47 routes; 0 have no test yet.
+49 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -18,7 +18,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/backup` | `backups.py:api_backup` | - | `test_backup.py`, `test_http_pinned.py` | [start/docker](/waypoint/start/docker/) |
 | `POST /api/backup/inspect` | `backups.py:api_backup_inspect` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_http_pinned.py`, `test_monitoring.py`, `test_security.py`, `test_server_errors.py` | [start/docker](/waypoint/start/docker/) |
 | `POST /api/restore` | `backups.py:api_restore` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_hardening.py`, `test_http_pinned.py`, `test_http_server.py`, `test_monitoring.py` | [start/docker](/waypoint/start/docker/) |
-| `GET /api/people` | `people.py:api_people` | `lib/components/settings/ImportSection.svelte`, `pages/People.svelte`, `pages/Review.svelte`, `pages/Trip.svelte`, `pages/Trips.svelte` | `test_api_contract.py`, `test_mail_scan.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
+| `GET /api/people` | `people.py:api_people` | `lib/components/settings/ImportSection.svelte`, `pages/People.svelte`, `pages/Review.svelte`, `pages/Stats.svelte`, `pages/Trip.svelte`, `pages/Trips.svelte` | `test_api_contract.py`, `test_mail_scan.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
 | `POST /api/people` | `people.py:api_person_add` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_people.py`, `test_trips.py` | [start/people](/waypoint/start/people/) |
 | `POST /api/people/{id}` | `people.py:api_person_edit` | `pages/People.svelte` | `test_api_contract.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
 | `DELETE /api/people/{id}` | `people.py:api_person_remove` | `pages/People.svelte` | `test_api_contract.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
@@ -37,6 +37,8 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/import/preview` | `flight_import.py:api_import_preview` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/waypoint/start/import/) |
 | `POST /api/import` | `flight_import.py:api_import` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/waypoint/start/import/) |
 | `GET /api/stats` | `stats.py:api_stats` | - | `test_api_contract.py`, `test_stats.py` | [start/stats](/waypoint/start/stats/) |
+| `GET /api/distance-unit` | `stats.py:api_distance_unit` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/waypoint/start/stats/) |
+| `POST /api/distance-unit` | `stats.py:api_distance_unit_save` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/waypoint/start/stats/) |
 | `GET /api/flight-status` | `flightstatus.py:api_flight_statuses` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py` | [start/flight-status](/waypoint/start/flight-status/) |
 | `POST /api/flight-status/{id}` | `flightstatus.py:api_flight_status_refresh` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py` | [start/flight-status](/waypoint/start/flight-status/) |
 | `GET /api/loyalty` | `loyalty.py:api_loyalty` | `pages/People.svelte`, `pages/Trip.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |

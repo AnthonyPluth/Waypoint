@@ -3,7 +3,7 @@ import { initials, NAV, navFor, pageFor } from "./nav";
 
 describe("nav", () => {
   it("has Upcoming first, which is where an unknown route goes", () => {
-    expect(NAV.map((n) => n.page)).toEqual(["upcoming", "trips", "people", "review", "settings"]);
+    expect(NAV.map((n) => n.page)).toEqual(["upcoming", "trips", "stats", "people", "review", "settings"]);
     expect(pageFor("settings")).toBe("settings");
     expect(pageFor("budget")).toBe("upcoming");
     expect(pageFor("")).toBe("upcoming");
@@ -18,7 +18,7 @@ describe("nav", () => {
 
   it("shows what's waiting on Review, and nothing on the other pages", () => {
     const review = NAV.find((n) => n.page === "review");
-    const s = { version: "1", database: "sqlite" as const, user: null, last_backup: null, review_count: 3 };
+    const s = { version: "1", database: "sqlite" as const, user: null, last_backup: null, review_count: 3, person_id: null };
     expect(review?.badge?.(s)).toBe(3);
     expect(NAV.filter((n) => n.badge).map((n) => n.page)).toEqual(["review"]);
   });

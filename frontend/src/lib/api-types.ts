@@ -60,6 +60,14 @@ export interface Disconnected {
   revoked: boolean;
 }
 
+export interface DistanceUnit {
+  distance_unit: "mi" | "km";
+}
+
+export interface DistanceUnitBody {
+  distance_unit: "mi" | "km";
+}
+
 export interface FeedMade {
   url: string;
 }
@@ -384,9 +392,11 @@ export interface State {
   user: SignedIn | null;
   last_backup: string | null;
   review_count: number;
+  person_id: number | null;
 }
 
 export interface Stats {
+  years: number[];
   person: number | null;
   year: number | null;
   distance_unit: "mi" | "km";
@@ -566,6 +576,8 @@ export interface Endpoints {
   "POST /api/import/preview": { body: never; reply: ImportPreview };
   "POST /api/import": { body: ImportBody; reply: Imported };
   "GET /api/stats": { body: never; reply: Stats };
+  "GET /api/distance-unit": { body: never; reply: DistanceUnit };
+  "POST /api/distance-unit": { body: DistanceUnitBody; reply: DistanceUnit };
   "GET /api/flight-status": { body: never; reply: FlightStatusList };
   "POST /api/flight-status/{id}": { body: never; reply: FlightStatusList };
   "GET /api/loyalty": { body: never; reply: LoyaltyList };

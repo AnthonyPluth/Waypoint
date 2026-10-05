@@ -263,6 +263,8 @@ class Replies(DbCase):
                                                 "end_local": "2026-06-08T10:00"})
         self.check("GET /api/stats", stats_api.api_stats(self.c, {}, {}))
         self.check("GET /api/stats", stats_api.api_stats(self.c, {"person": ["all"], "year": ["2026"]}, {}))
+        self.check("GET /api/distance-unit", stats_api.api_distance_unit(self.c, {}, {}))
+        self.check("POST /api/distance-unit", stats_api.api_distance_unit_save(self.c, {}, {"distance_unit": "km"}))
 
     def test_flight_status(self):
         _current.user = {"name": None, "email": None, "local": True}
@@ -290,7 +292,7 @@ class Mismatches(unittest.TestCase):
 
     def test_a_renamed_field_a_wrong_type_and_a_missing_one(self):
         st = {"version": "dev", "database": "sqlite", "user": {"name": None, "email": None, "local": True},
-              "last_backup": None, "review_count": 0}
+              "last_backup": None, "review_count": 0, "person_id": None}
         schema = reply_schema("GET /api/state")
         self.assertEqual(problems(st, schema), [])
         renamed = {("backed_up" if k == "last_backup" else k): v for k, v in st.items()}
@@ -320,7 +322,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
                                      "DELETE /api/segments/{id}", "GET /api/airports/{id}",
                                      "POST /api/import/preview", "POST /api/import",
-                                     "GET /api/stats", "GET /api/flight-status", "POST /api/flight-status/{id}",
+                                     "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
                                      "POST /api/loyalty/{id}/reveal",
                                      "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",
