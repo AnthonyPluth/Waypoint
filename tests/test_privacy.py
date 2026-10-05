@@ -1,9 +1,12 @@
 """tests/privacy.py's no_leaks: it catches a canary wherever Waypoint could let one out, and passes when nothing
 escapes (an encrypted value included)."""
+import io
 import logging
 import unittest
+import urllib.request
+from unittest import mock
 
-from waypoint import monitoring
+from waypoint import monitoring, tls
 from waypoint.storage import db
 from waypoint.storage import settings_keys as sk
 from tests.privacy import no_leaks
@@ -37,14 +40,16 @@ class NoLeaksTests(unittest.TestCase):
         self.assertIn("stderr", self.leaks(lambda: monitoring.log(f"read {CANARY}", stderr=True)))
         self.assertIn("Python's logging", self.leaks(lambda: logging.getLogger("x").warning("read %s", CANARY)))
 
-    def test_sentry(self):
-        def report():
-            try:
-                raise ValueError(f"couldn't read {CANARY}")
-            except ValueError:
-                monitoring.report()
-        self.assertIn("what was sent to Sentry", self.leaks(report))
-        self.assertIn("what was sent to Sentry", self.leaks(lambda: monitoring.send_log(f"read {CANARY}")))
+    def test_what_is_sent_to_another_service(self):
+        def send():
+            req = urllib.request.Request("https://api.example.invalid/x", data=f"name={CANARY}".encode())
+            tls.urlopen(req, 1)
+        with mock.patch.object(urllib.request.OpenerDirector, "open", return_value=io.BytesIO(b"{}")):
+            self.assertIn("what was sent to another service", self.leaks(send))
+            self.assertIn("what was sent to another service",
+                          self.leaks(lambda: tls.urlopen(f"https://api.example.invalid/x?q={CANARY}", 1)))
+            with no_leaks(self, CANARY, sent_ok=True):   # the one opt-in path checks its own request
+                send()
 
     def test_the_database(self):
         def store():

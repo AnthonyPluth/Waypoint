@@ -1,4 +1,4 @@
-"""GET /api/state: who's signed in, the version, the database, the web app's error reports and the last backup."""
+"""GET /api/state: who's signed in, the version, the database and the last backup."""
 import os
 from datetime import datetime
 from unittest import mock
@@ -8,9 +8,6 @@ from waypoint.storage import settings_keys as sk
 from waypoint.server.api import state
 from waypoint.server.common import _current
 from tests.shared import DbCase, ServerCase
-
-NO_SENTRY = {"SENTRY_DSN": "", "SENTRY_BROWSER_DSN": ""}
-
 
 class StateTests(DbCase):
     def setUp(self):
@@ -34,12 +31,6 @@ class StateTests(DbCase):
         _current.user = None
         self.assertIsNone(state.api_state(self.c, {}, {})["user"])
 
-    def test_no_error_reports_without_a_dsn(self):
-        with mock.patch.dict(os.environ, NO_SENTRY):
-            self.assertIsNone(state.api_state(self.c, {}, {})["sentry"])
-        with mock.patch.dict(os.environ, {**NO_SENTRY, "SENTRY_DSN": "https://publickey@o123.ingest.us.sentry.io/456"}):
-            self.assertEqual(state.api_state(self.c, {}, {})["sentry"]["dsn"], "https://publickey@o123.ingest.us.sentry.io/456")
-
     def test_the_last_backup_carries_its_offset(self):
         self.assertIsNone(state.api_state(self.c, {}, {})["last_backup"])
         db.set_setting(self.c, sk.LAST_BACKUP, "2026-09-30T07:02:00")
@@ -55,11 +46,11 @@ class StateTests(DbCase):
 
 
 class LocalStateTests(ServerCase):
-    env = {**NO_SENTRY, "WAYPOINT_VERSION": "v9.8.7"}
+    env = {"WAYPOINT_VERSION": "v9.8.7"}
     unset = ("OIDC_ISSUER",)
 
     def test_without_sign_in_everyone_is_local(self):
         code, st = self.req("GET", "/api/state")
         self.assertEqual(code, 200)
         self.assertEqual(st, {"version": "v9.8.7", "database": "postgres" if db.using_postgres() else "sqlite",
-                              "user": {"name": None, "email": None, "local": True}, "sentry": None, "last_backup": None})
+                              "user": {"name": None, "email": None, "local": True}, "last_backup": None})

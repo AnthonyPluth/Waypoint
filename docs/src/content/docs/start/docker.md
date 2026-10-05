@@ -86,14 +86,9 @@ Waypoint is built to be reachable from anywhere, as long as it’s set up like t
 - Back up: Settings → Data → Backup → Download a backup (works for either database), or `run.py backup`.
 - Health check: `<WAYPOINT_PUBLIC_URL>/healthz` answers without signing in.
 
-## Error reports (optional)
+## Errors and logs
 
-Set `SENTRY_DSN` (Sentry → your project → Settings → Client Keys) and Waypoint sends its errors to your Sentry project, from the server and from the web app, tagged with the version. Without it, nothing is sent anywhere.
-
-- A report has the error, its stack trace and the page or API path. It never has request bodies, cookies, headers or query strings.
-- `SENTRY_BROWSER_DSN` sends the web app’s reports to a separate Sentry project; `WAYPOINT_SENTRY_BROWSER=0` keeps the web app from sending any.
-- `SENTRY_ENVIRONMENT` names the environment (default `production`).
-- Waypoint never records sessions or sends replays. If `SENTRY_REPLAY_SAMPLE_RATE` or `SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE` is still set, Waypoint warns at startup that it’s no longer read.
+Waypoint sends nothing about itself anywhere: there's no error-reporting or analytics service. Its log (`docker logs waypoint`) has a line per request (the path, never the query string) and the details of any error. An error the app shows has a reference (`reference 1a2b3c4d`); search the log for it. Credentials, query strings and the values a database error would quote are blanked in the log.
 
 ## Notes
 

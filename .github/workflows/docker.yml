@@ -276,8 +276,7 @@ jobs:
 
   # The image is built while the tests run, and published only once they (and the web app's checks) pass.
   # build: works out the version, builds the image for this runner and checks it starts, then builds it for Intel/AMD
-  # and ARM into the build cache. It has no permission to publish anything; the only thing it sends out is the web app's
-  # source maps, to Sentry (with a SENTRY_AUTH_TOKEN secret; see the Dockerfile).
+  # and ARM into the build cache. It has no permission to publish anything and sends nothing out.
   build:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -311,10 +310,6 @@ jobs:
           tags: waypoint:smoke
           build-args: |
             VERSION=${{ steps.next.outputs.version }}
-            SENTRY_ORG=${{ vars.SENTRY_ORG }}
-            SENTRY_BROWSER_PROJECT=${{ vars.SENTRY_BROWSER_PROJECT || 'waypoint-web' }}
-          secrets: |
-            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           cache-from: type=gha
       - name: Check the image starts
         if: steps.next.outputs.skip != 'true'
@@ -336,10 +331,6 @@ jobs:
           push: false
           build-args: |
             VERSION=${{ steps.next.outputs.version }}
-            SENTRY_ORG=${{ vars.SENTRY_ORG }}
-            SENTRY_BROWSER_PROJECT=${{ vars.SENTRY_BROWSER_PROJECT || 'waypoint-web' }}
-          secrets: |
-            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -356,7 +347,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
         with:
-          fetch-depth: 0       # the commits since the last release, for Sentry's release (below)
           persist-credentials: false
 
       - name: Image name (registry names must be lowercase)
@@ -400,11 +390,6 @@ jobs:
           tags: ${{ steps.tags.outputs.list }}
           build-args: |
             VERSION=${{ needs.build.outputs.version }}
-            SENTRY_ORG=${{ vars.SENTRY_ORG }}
-            SENTRY_BROWSER_PROJECT=${{ vars.SENTRY_BROWSER_PROJECT || 'waypoint-web' }}
-          # The same as the build job's, so a web app rebuilt here (the cache missed) matches the source maps uploaded.
-          secrets: |
-            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -420,30 +405,6 @@ jobs:
           # --target makes GitHub create the tag v1.2.3 on this commit (through the API, so the checkout needs no
           # credentials); a tag that already exists is used as it is.
           gh release create "$VERSION" --target "$GITHUB_SHA" --title "Waypoint $VERSION" --generate-notes
-
-      # The version as a Sentry release in both projects (the server's and the web app's), with the commits it brings,
-      # so an issue shows the release that brought it and its suspect commits. The server and the web app tag what they
-      # send with the same version (WAYPOINT_VERSION). Needs a SENTRY_AUTH_TOKEN secret and a SENTRY_ORG variable (and
-      # SENTRY_PROJECT / SENTRY_BROWSER_PROJECT if the projects aren't waypoint and waypoint-web); without them it's
-      # skipped, and a Sentry problem never fails the release.
-      - name: Sentry release
-        if: needs.build.outputs.new == 'true'
-        continue-on-error: true
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
-          SERVER_PROJECT: ${{ vars.SENTRY_PROJECT || 'waypoint' }}
-          WEB_PROJECT: ${{ vars.SENTRY_BROWSER_PROJECT || 'waypoint-web' }}
-          VERSION: ${{ needs.build.outputs.version }}
-        run: |
-          if [ -z "$SENTRY_AUTH_TOKEN" ] || [ -z "$SENTRY_ORG" ]; then
-            echo "No SENTRY_AUTH_TOKEN secret or SENTRY_ORG variable, so no Sentry release."; exit 0
-          fi
-          cli() { npx --yes @sentry/cli@2.58.6 "$@"; }
-          cli releases new "$VERSION" -p "$SERVER_PROJECT" -p "$WEB_PROJECT"
-          # Commits through Sentry's GitHub integration if it's set up, else from this checkout's history.
-          cli releases set-commits "$VERSION" --auto --ignore-missing || cli releases set-commits "$VERSION" --local --ignore-missing
-          cli releases finalize "$VERSION"
 
   # A third-party action, so it runs on its own with only the permission it needs (no access to the repository).
   cleanup:

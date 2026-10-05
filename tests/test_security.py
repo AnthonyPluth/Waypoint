@@ -147,7 +147,7 @@ class HttpTests(ServerCase):
         # A request that's wrong is a 400 saying what; a handler's own failure, a 500 with only a reference.
         code, _, raw = self.open("/api/backup/inspect", "POST", b"", {"X-Waypoint": "1"})
         self.assertEqual((code, json.loads(raw)["error"]), (400, "Choose a backup file (up to 200 MB)."))
-        with mock.patch.object(state.monitoring, "browser_config", side_effect=RuntimeError("secret detail")):
+        with mock.patch.object(state, "with_offset", side_effect=RuntimeError("secret detail")):
             code, body = self.api("GET", "/api/state")
         self.assertEqual(code, 500)
         self.assertNotIn("secret detail", body["error"])

@@ -31,7 +31,6 @@ export interface State {
   version: string;
   database: "sqlite" | "postgres";
   user: SignedIn | null;
-  sentry: Record<string, unknown> | null;
   last_backup: string | null;
 }
 

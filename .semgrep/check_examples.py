@@ -1,6 +1,6 @@
 """Checks .semgrep/waypoint.yml against the examples in .semgrep/examples/.
 
-Each `# ruleid: <id>` comment in an example says the next line must be flagged by that rule, and each `# ok: <id>`
+Each `# ruleid: <id>` comment (`// ruleid: <id>` in TypeScript) in an example says the next line must be flagged by that rule, and each `# ok: <id>`
 that the next line must not be. A line no comment mentions must not be flagged at all. The examples sit in a tree that
 mirrors the repository (waypoint/server/api/...), because a rule only looks at the paths it names.
 
@@ -18,14 +18,14 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 EXAMPLES = HERE / "examples"
-MARK = re.compile(r"#\s*(ruleid|ok):\s*(\S+)")
+MARK = re.compile(r"(?:#|//)\s*(ruleid|ok):\s*(\S+)")
 
 
 def expected() -> tuple[set[tuple[str, int, str]], set[tuple[str, int, str]]]:
     """The (file, line, rule) triples that must be flagged, and those that must not."""
     flagged: set[tuple[str, int, str]] = set()
     clean: set[tuple[str, int, str]] = set()
-    for path in sorted(EXAMPLES.rglob("*.py")):
+    for path in sorted(p for p in EXAMPLES.rglob("*") if p.suffix in (".py", ".ts")):
         rel = str(path.relative_to(EXAMPLES))
         for n, line in enumerate(path.read_text().split("\n"), 1):
             m = MARK.match(line.strip())

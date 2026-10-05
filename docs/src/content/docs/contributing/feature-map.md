@@ -13,7 +13,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 
 | Route | Handler | Web app | Tests | Docs |
 | --- | --- | --- | --- | --- |
-| `GET /api/backup` | `backups.py:api_backup` | - | `test_backup.py`, `test_http_pinned.py`, `test_monitoring.py` | [start/docker](/waypoint/start/docker/) |
+| `GET /api/backup` | `backups.py:api_backup` | - | `test_backup.py`, `test_http_pinned.py` | [start/docker](/waypoint/start/docker/) |
 | `POST /api/backup/inspect` | `backups.py:api_backup_inspect` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_http_pinned.py`, `test_monitoring.py`, `test_security.py`, `test_server_errors.py` | [start/docker](/waypoint/start/docker/) |
 | `POST /api/restore` | `backups.py:api_restore` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_hardening.py`, `test_http_pinned.py`, `test_http_server.py`, `test_monitoring.py` | [start/docker](/waypoint/start/docker/) |
 | `GET /api/state` | `state.py:api_state` | `lib/app.svelte.ts` | `test_api_contract.py`, `test_api_state.py`, `test_backup.py`, `test_http_pinned.py`, `test_http_server.py`, `test_monitoring.py`, `test_security.py`, `test_server.py`, `test_server_errors.py` | [start/docker](/waypoint/start/docker/) |

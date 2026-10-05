@@ -1,13 +1,11 @@
 """The API contract (waypoint/server/contract.py, docs/openapi.json, frontend/src/lib/api-types.ts): each covered route's
-real reply, plus the cases that add fields (a signed-in person, Sentry on, a last backup), matches docs/openapi.json; the
+real reply, plus the cases that add fields (a signed-in person, a last backup), matches docs/openapi.json; the
 generated files are current; and tools/api_contract.py describes the types it's given."""
 import ast
 import importlib.util
 import json
-import os
 import unittest
 from pathlib import Path
-from unittest import mock
 
 from waypoint.storage import backup, db
 from waypoint.storage import settings_keys as sk
@@ -96,14 +94,10 @@ class Replies(DbCase):
 
     def test_state(self):
         _current.user = {"name": None, "email": None, "local": True}
-        with mock.patch.dict(os.environ, {"SENTRY_DSN": "", "SENTRY_BROWSER_DSN": ""}):
-            self.check("GET /api/state", state.api_state(self.c, {}, {}))
+        self.check("GET /api/state", state.api_state(self.c, {}, {}))
         _current.user = {"sub": "u1", "name": "Rosa Example", "email": "rosa@example.com"}
         db.set_setting(self.c, sk.LAST_BACKUP, "2026-09-30T07:02:00")
-        with mock.patch.dict(os.environ, {"SENTRY_DSN": "https://publickey@o123.ingest.us.sentry.io/456"}):
-            reply = state.api_state(self.c, {}, {})
-        self.assertIsNotNone(reply["sentry"])
-        self.check("GET /api/state", reply)
+        self.check("GET /api/state", state.api_state(self.c, {}, {}))
         _current.user = None
         self.check("GET /api/state", state.api_state(self.c, {}, {}))
 
@@ -121,7 +115,7 @@ class Mismatches(unittest.TestCase):
     """The check above notices a reply that isn't the contract's."""
 
     def test_a_renamed_field_a_wrong_type_and_a_missing_one(self):
-        st = {"version": "dev", "database": "sqlite", "user": {"name": None, "email": None, "local": True}, "sentry": None,
+        st = {"version": "dev", "database": "sqlite", "user": {"name": None, "email": None, "local": True},
               "last_backup": None}
         schema = reply_schema("GET /api/state")
         self.assertEqual(problems(st, schema), [])

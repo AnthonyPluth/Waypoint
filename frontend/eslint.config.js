@@ -71,8 +71,8 @@ export default defineConfig(
       "svelte/prefer-svelte-reactivity": "off",
       "no-restricted-syntax": restrict("errorCast", "fetch", "storage"),
       "waypoint/no-silent-catch": "error",
-      // The browser's console ends up in Sentry's breadcrumbs and in screenshots of bug reports: only errors go there,
-      // never data (a trip, a name, a code) logged to look at.
+      // The browser's console ends up in screenshots of bug reports and in whatever extensions read it: only errors go
+      // there, never data (a trip, a name, a code) logged to look at.
       "no-console": ["error", { allow: ["error", "warn"] }],
     },
     plugins: { waypoint },

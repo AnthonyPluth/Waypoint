@@ -7,8 +7,7 @@
       "web": [],
       "tests": [
         "tests/test_backup.py",
-        "tests/test_http_pinned.py",
-        "tests/test_monitoring.py"
+        "tests/test_http_pinned.py"
       ],
       "docs": [
         "start/docker"

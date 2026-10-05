@@ -119,8 +119,8 @@ rules:
 
   - id: waypoint-print
     message: >-
-      Write to the log through monitoring.log (one place that also sends the line to Sentry Logs when that's on, with
-      `remote=` for a version safe to send), not print(). Never log email content, names, confirmation codes or loyalty numbers (AGENTS.md, "Private data in
+      Write to the log through monitoring.log (the one place lines go out, so what's logged can be found and checked),
+      not print(). Never log email content, names, confirmation codes or loyalty numbers (AGENTS.md, "Private data in
       logs and reports").
     severity: ERROR
     languages: [python]
@@ -218,3 +218,13 @@ rules:
       - pattern: datetime.datetime.fromtimestamp($T)
     paths:
       include: ["/waypoint/domain/", "/waypoint/providers/"]
+
+  - id: waypoint-no-telemetry
+    message: >-
+      Waypoint sends nothing about itself to an outside service: no error reporting, analytics or monitoring SDK (AGENTS.md,
+      "Private data in logs"). Errors go to its own log through waypoint/monitoring.py.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: (?i)(\b(sentry|posthog|mixpanel|datadog|dd-trace|newrelic|new_relic|bugsnag|rollbar|honeybadger|logrocket|fullstory|hotjar|google-analytics|googletagmanager|segment\.(io|com))|\bgtag\s*\()
+    paths:
+      include: ["/waypoint/", "/run.py", "/frontend/src/", "/frontend/index.html", "/frontend/package.json", "/pyproject.toml"]
