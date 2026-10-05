@@ -291,6 +291,14 @@ describe("Review: the message beside the form", () => {
     expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
   });
 
+  it("takes the message off the page when the form is cancelled", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
+    await screen.findByTestId("preview");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByTestId("preview")).toBeNull();
+  });
+
   it("opens the message beside the form when adding by hand", async () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
