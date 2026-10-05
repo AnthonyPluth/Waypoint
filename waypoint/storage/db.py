@@ -118,8 +118,8 @@ def _postgres_engine(url: str, path: str | None) -> Engine:
                 return b"1" if obj else b"0"
             return str(obj).encode()
 
-    # Only a short, stable name for a test's schema, not a secret; changing the hash would orphan existing test schemas.
-    test_schema = None if path is None else "t_" + hashlib.sha1(path.encode(), usedforsecurity=False).hexdigest()[:12]
+    # Only a short, stable name for a test's schema, not a secret (tests/shared.py's drop_schema names it the same way).
+    test_schema = None if path is None else "t_" + hashlib.sha256(path.encode()).hexdigest()[:12]
     # Tests make an engine per database; they don't keep connections open, so they don't run Postgres out of them.
     eng = (create_engine(url, poolclass=NullPool) if test_schema
            else create_engine(url, pool_pre_ping=True, pool_size=10, max_overflow=60))   # up to 64 requests plus syncs at once

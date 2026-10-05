@@ -32,7 +32,7 @@ def drop_schema(path) -> None:
         return
     import psycopg
     from psycopg import sql
-    name = "t_" + hashlib.sha1(path.encode(), usedforsecurity=False).hexdigest()[:12]   # as db._postgres_engine names it
+    name = "t_" + hashlib.sha256(path.encode()).hexdigest()[:12]   # as db._postgres_engine names it
     with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as conn:
         # A connection the test left open (a transaction never ended) holds locks that would make the drop wait forever.
         conn.execute(sql.SQL("SELECT pg_terminate_backend(l.pid) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation "
