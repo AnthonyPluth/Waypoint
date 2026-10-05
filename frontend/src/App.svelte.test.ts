@@ -20,7 +20,7 @@ beforeEach(async () => { vi.mocked(api).mockReset(); vi.mocked(api).mockResolved
 afterEach(() => { app.state = null; });
 
 describe("the shell", () => {
-  it("opens Upcoming, with the brand on top and the pages in the tab bar and the sidebar", () => {
+  it("opens Upcoming, with the brand on top and both pages in the tab bar and the sidebar", () => {
     render(App);
     expect(screen.getByRole("heading", { name: "Upcoming" })).toBeInTheDocument();
     expect(screen.getByRole("banner")).toHaveTextContent("Waypoint");
