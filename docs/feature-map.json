@@ -2,6 +2,36 @@
   "routes": [
     {
       "method": "GET",
+      "path": "/api/ai",
+      "handler": "waypoint/server/api/ai.py:api_ai",
+      "web": [
+        "frontend/src/lib/components/settings/AiSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_ai.py"
+      ],
+      "docs": [
+        "start/ai"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/ai",
+      "handler": "waypoint/server/api/ai.py:api_ai_save",
+      "web": [
+        "frontend/src/lib/components/settings/AiSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_ai.py"
+      ],
+      "docs": [
+        "start/ai"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/backup",
       "handler": "waypoint/server/api/backups.py:api_backup",
       "web": [],
@@ -571,6 +601,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mail_ai.py",
         "tests/test_mail_scan.py"
       ],
       "docs": [

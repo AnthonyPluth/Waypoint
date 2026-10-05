@@ -17,6 +17,7 @@ Settings that belong to the app live in **Settings** and are stored in the datab
 | `OIDC_ALLOW_ANY_USER` | | `1` lets in anyone your provider signs in. Only for a provider you fully control. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | | The OAuth client you create in your own Google Cloud project, so members can connect their Gmail from Settings (read-only). Both are needed; see [Google OAuth client for Gmail](/waypoint/start/gmail/). |
 | `RAPIDAPI_KEY` | | Turns on [live flight status](/waypoint/start/flight-status/): your RapidAPI key, subscribed to AeroDataBox. It stays in the environment and is never saved or logged. Only a flight number and a date are sent. |
+| `OPENROUTER_API_KEY` | | An OpenRouter key for the optional [AI suggestions](/waypoint/start/ai/) (Settings → AI). It wins over a key saved in Settings, and is never logged. |
 | `WAYPOINT_FLIGHT_STATUS_MONTHLY_LIMIT` | `400` | The calls a month your RapidAPI plan allows. At 90% scheduled checks stop except the one-hour check; at 100% nothing is fetched until the 1st. |
 | `WAYPOINT_SESSION_DAYS` | `14` | Days a session lasts unused. Using Waypoint keeps it going, for up to 90 days after signing in. |
 | `WAYPOINT_SECRET_KEY` | | Encrypts the secrets Waypoint saves (at least 32 characters: `openssl rand -base64 32`). Without it, Waypoint makes `secret.key` in `WAYPOINT_DATA`. |

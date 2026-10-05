@@ -4,6 +4,7 @@
   import { app } from "$lib/app.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import AiSection from "$lib/components/settings/AiSection.svelte";
   import DataSection from "$lib/components/settings/DataSection.svelte";
   import GmailSection from "$lib/components/settings/GmailSection.svelte";
   import RemindersSection from "$lib/components/settings/RemindersSection.svelte";
@@ -64,6 +65,8 @@
   </section>
 
   <GmailSection />
+
+  <AiSection />
 
   <RemindersSection />
 
