@@ -201,6 +201,8 @@ class ReviewItem(Base):
     received: Mapped[str | None]     # the day on the message's Date header
     reason: Mapped[str]              # why it couldn't be read: a code (waypoint/domain/mail/review.py)
     created: Mapped[float]
+    suggestion: Mapped[str | None]   # the booking's fields the optional AI read from it (JSON), for a person to confirm or edit
+    suggestion_error: Mapped[str | None]   # why the AI gave none: fixed text
 
 
 class IgnoredSender(Base):

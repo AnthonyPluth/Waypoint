@@ -15,8 +15,16 @@ FLIGHT_STATUS_MONTH = "flight_status_month"
 FLIGHT_STATUS_CALLS = "flight_status_calls"
 FLIGHT_STATUS_PAUSED = "flight_status_paused"
 
+# The optional AI fallback for the "Couldn't read" queue (waypoint/domain/mail/ai.py): off, local (Ollama) or openrouter, with
+# where and which model; the OpenRouter key may instead come from the environment (OPENROUTER_API_KEY)
+AI_MODE = "ai_mode"
+AI_OLLAMA_URL = "ai_ollama_url"
+AI_OLLAMA_MODEL = "ai_ollama_model"
+AI_OPENROUTER_MODEL = "ai_openrouter_model"
+AI_OPENROUTER_KEY = "ai_openrouter_key"
+
 VAPID_PRIVATE_KEY = "vapid_private_key"   # web push signing key, made on first use
 
 # Rows that hold secrets: stored encrypted (waypoint/storage/secretbox.py), and encrypted in backups too
 # (waypoint/storage/backup.py).
-SECRETS = frozenset({VAPID_PRIVATE_KEY})
+SECRETS = frozenset({VAPID_PRIVATE_KEY, AI_OPENROUTER_KEY})

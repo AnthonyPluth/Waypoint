@@ -145,3 +145,15 @@ def person_for_number(conn: db.Connection, number: str) -> int | None:
         if _plain(saved) == wanted:
             found.add(row.person_id)
     return found.pop() if len(found) == 1 else None
+
+
+def known_numbers(conn: db.Connection) -> list[str]:
+    """Every number saved, as typed, so the optional AI fallback can strip exactly these from what it sends (they never go
+    to it: AGENTS.md, "IDs are for the household"). Stays in memory; nothing here is shown, kept or logged."""
+    found: list[str] = []
+    for row in conn.orm.scalars(select(LoyaltyId)).all():
+        try:
+            found.append(secretbox.decrypt(row.number) or "")
+        except secretbox.SecretError:
+            continue
+    return [n for n in found if n.strip()]

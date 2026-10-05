@@ -21,7 +21,7 @@ _QUERY = re.compile(r"(\b[a-z][a-z0-9+.-]*://[^\s?#]*)\?[^\s#]*", re.I)
 _TOKEN = re.compile(r"\b(access|public|link|processor)-(sandbox|development|production)-[0-9a-f-]{8,}", re.I)
 _RAPIDAPI_HEADER = re.compile(r"(x-rapidapi-key['\"]?\s*[:=,]\s*['\"]?)[^\s'\",}]+", re.I)
 # Keys that live in the environment: wherever one turns up in a text (an error that quoted the request), it's blanked.
-SECRET_ENV = ("RAPIDAPI_KEY",)
+SECRET_ENV = ("RAPIDAPI_KEY", "OPENROUTER_API_KEY")
 
 
 def scrub(text):
