@@ -1,14 +1,14 @@
 """People: everyone who travels, household members (linked to their sign-in) and guests with no login. Each user who has
 already signed in gets their person row.
 
-Revision ID: 0002
-Revises: 0001
+Revision ID: 0003
+Revises: 0002
 """
 import sqlalchemy as sa
 from alembic import op
 
-revision = '0002'
-down_revision = '0001'
+revision = '0003'
+down_revision = '0002'
 branch_labels = None
 depends_on = None
 
@@ -26,7 +26,7 @@ def upgrade() -> None:
                                 deferrable=True, initially='IMMEDIATE'),
     )
     op.create_index('ux_people_user_sub', 'people', ['user_sub'], unique=True)
-    # Whoever has signed in is a member: named as they were at sign-in, in the order they first appeared.
+    # Whoever has signed in is a member: named as they were at sign-in, (an order has no meaning here: the list is sorted by name when read).
     op.execute(
         "INSERT INTO people (display_name, first_name, user_sub) "
         "SELECT COALESCE(NULLIF(TRIM(name), ''), NULLIF(TRIM(email), ''), sub), first_name, sub FROM users ORDER BY sub")

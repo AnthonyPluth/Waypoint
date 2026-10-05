@@ -219,6 +219,99 @@
         }
       }
     },
+    "/api/mailboxes": {
+      "get": {
+        "operationId": "api_mailboxes",
+        "x-handler": "waypoint/server/api/mailboxes.py:api_mailboxes",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailboxList"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/mailboxes/connect": {
+      "post": {
+        "operationId": "api_mailbox_connect",
+        "x-handler": "waypoint/server/api/mailboxes.py:api_mailbox_connect",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Started"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/mailboxes/{id}": {
+      "delete": {
+        "operationId": "api_mailbox_disconnect",
+        "x-handler": "waypoint/server/api/mailboxes.py:api_mailbox_disconnect",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Disconnected"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/state": {
       "get": {
         "operationId": "api_state",
@@ -283,6 +376,79 @@
           "counts",
           "current",
           "database"
+        ],
+        "additionalProperties": false
+      },
+      "Disconnected": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "revoked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "revoked"
+        ],
+        "additionalProperties": false
+      },
+      "Mailbox": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "address": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "connected",
+              "reconnect",
+              "error"
+            ]
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_scan": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "address",
+          "status",
+          "last_error",
+          "last_scan"
+        ],
+        "additionalProperties": false
+      },
+      "MailboxList": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "mailboxes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mailbox"
+            }
+          }
+        },
+        "required": [
+          "configured",
+          "mailboxes"
         ],
         "additionalProperties": false
       },
@@ -459,6 +625,18 @@
         "required": [
           "name",
           "email"
+        ],
+        "additionalProperties": false
+      },
+      "Started": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
         ],
         "additionalProperties": false
       },

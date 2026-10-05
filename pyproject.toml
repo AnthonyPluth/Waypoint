@@ -96,7 +96,13 @@ ignore_imports = [
 broken_contract_guidance = "Make the request with waypoint.tls.urlopen instead of opening the connection yourself."
 
 # A provider doesn't import another one: each new provider module (Gmail, a flight-status service) gets a contract of
-# its own here naming the others, as soon as there are two. What two of them share belongs in a module of its own.
+# its own here naming the others. What two of them share belongs in a module of its own.
+
+[[tool.importlinter.contracts]]
+id = "gmail-alone"
+name = "The Gmail provider imports no other provider, and none imports it"
+type = "independence"
+modules = ["waypoint.providers.gmail", "waypoint.providers.webpush"]
 
 [[tool.importlinter.contracts]]
 id = "storage-at-the-bottom"

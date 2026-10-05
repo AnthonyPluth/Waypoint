@@ -5,6 +5,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import DataSection from "$lib/components/settings/DataSection.svelte";
+  import GmailSection from "$lib/components/settings/GmailSection.svelte";
 
   const s = $derived(app.state);
   const user = $derived(s?.user);
@@ -50,6 +51,8 @@
       <div class="row"><dt class="text-muted-foreground">Database</dt><dd class="font-medium">{s?.database === "postgres" ? "Postgres" : "SQLite"}</dd></div>
     </dl>
   </section>
+
+  <GmailSection />
 
   <DataSection />
 </div>

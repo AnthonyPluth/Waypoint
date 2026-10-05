@@ -27,7 +27,7 @@ from sqlalchemy import select, update
 
 from .. import monitoring
 from . import settings_keys
-from .models import Setting
+from .models import Mailbox, Setting
 
 PREFIX = "enc:v1:"
 KEY_FILE = "secret.key"
@@ -35,6 +35,8 @@ MIN_KEY_LENGTH = 32
 
 # settings rows that hold secrets (the rest of the settings table is ordinary preferences)
 SECRET_SETTINGS = settings_keys.SECRETS
+# columns that hold secrets: table -> column (a mailbox's refresh token)
+SECRET_COLUMNS = {"mailboxes": "token"}
 
 _lock = threading.Lock()
 _cache: dict[tuple, MultiFernet] = {}
@@ -173,5 +175,14 @@ def encrypt_stored(conn) -> int:
             continue
         if new != r["value"]:
             conn.execute(update(Setting).where(Setting.key == r["key"]).values(value=new))
+            changed += 1
+    for m in conn.execute(select(Mailbox.id, Mailbox.token)).fetchall():
+        try:
+            new = reencrypt(m["token"])
+        except InvalidToken:
+            monitoring.log("Warning: a saved Gmail connection can't be decrypted with the current key; connect it again in Settings.", "warning")
+            continue
+        if new != m["token"]:
+            conn.execute(update(Mailbox).where(Mailbox.id == m["id"]).values(token=new))
             changed += 1
     return changed

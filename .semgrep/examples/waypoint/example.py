@@ -72,6 +72,10 @@ monitoring.log("Scanned the mailbox.")
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 # ruleid: waypoint-google-hosts
 LIST = "https://gmail.googleapis.com/gmail/v1/users/me/messages"
+# ruleid: waypoint-google-hosts
+REVOKE = "https://oauth2.googleapis.com/revoke"
+# ruleid: waypoint-google-hosts
+CONSENT = "https://accounts.google.com/o/oauth2/v2/auth"
 # ok: waypoint-google-hosts
 gmail.list_messages(conn, mailbox, query)
 

@@ -19,7 +19,7 @@ from typing import Any
 
 from ..storage import db, secretbox
 from .. import monitoring, oidc
-from . import routes, static
+from . import jobs, routes, static
 from .common import NOT_READ, ApiError, BadJson, Response, _current, header_value, host_allowed, server_error
 
 # Files anyone may fetch: the sign-in pages' look, and what a phone needs to install Waypoint (it fetches the manifest
@@ -531,6 +531,7 @@ def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
                          "(or WAYPOINT_ALLOW_NO_AUTH=1 if a proxy in front of Waypoint already handles sign-in).")
     db.init()   # migrations included
     httpd = Server((host, port), Handler)
+    jobs.start(httpd._closed)   # (set when the server closes)
     where = f"http://localhost:{port}" if host in ("127.0.0.1", "localhost") else f"port {port} on all network addresses"
     monitoring.log(f"Waypoint is running at {where}  (data: {db.describe()})"
                    f"{'  · sign-in via ' + oidc.config()['issuer'] if oidc.enabled() else ''}")

@@ -10,6 +10,24 @@ export interface BackupContents {
   database: "sqlite" | "postgres";
 }
 
+export interface Disconnected {
+  ok: boolean;
+  revoked: boolean;
+}
+
+export interface Mailbox {
+  id: number;
+  address: string;
+  status: "connected" | "reconnect" | "error";
+  last_error: string | null;
+  last_scan: string | null;
+}
+
+export interface MailboxList {
+  configured: boolean;
+  mailboxes: Mailbox[];
+}
+
 export interface Ok {
   ok: boolean;
 }
@@ -53,6 +71,10 @@ export interface SignedIn {
   local?: boolean;
 }
 
+export interface Started {
+  url: string;
+}
+
 export interface State {
   version: string;
   database: "sqlite" | "postgres";
@@ -68,5 +90,8 @@ export interface Endpoints {
   "POST /api/people": { body: PersonBody; reply: Person };
   "POST /api/people/{id}": { body: PersonBody; reply: Person };
   "DELETE /api/people/{id}": { body: never; reply: Ok };
+  "GET /api/mailboxes": { body: never; reply: MailboxList };
+  "POST /api/mailboxes/connect": { body: never; reply: Started };
+  "DELETE /api/mailboxes/{id}": { body: never; reply: Disconnected };
   "GET /api/state": { body: never; reply: State };
 }

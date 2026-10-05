@@ -17,6 +17,7 @@ import re
 import sqlite3
 import threading
 from contextlib import contextmanager
+from typing import Any
 from urllib.parse import urlsplit
 
 from alembic import command
@@ -164,7 +165,7 @@ class Result:
     def rowcount(self) -> int:
         return self._res.rowcount if self._res is not None else 0
 
-    def fetchone(self):
+    def fetchone(self) -> Any:   # a Row, or None
         if self._rows is not None:
             return self._rows.pop(0) if self._rows else None
         if self._make is None:
@@ -183,7 +184,7 @@ class Result:
     def __iter__(self):
         return iter(self.fetchall())
 
-    def scalar(self):
+    def scalar(self) -> Any:
         """The first column of the first row, or None if there are no rows (`SELECT COUNT(*) ...` -> the count)."""
         row = self.fetchone()
         return row[0] if row is not None else None

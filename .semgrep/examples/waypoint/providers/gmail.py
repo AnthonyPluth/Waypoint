@@ -4,6 +4,10 @@ from datetime import datetime as dt
 
 # ok: waypoint-google-hosts
 TOKEN_URL = "https://oauth2.googleapis.com/token"
+# ok: waypoint-google-hosts
+REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+# ok: waypoint-google-hosts
+API = "https://gmail.googleapis.com/gmail/v1/users/me"
 # ok: waypoint-decrypt
 token = secretbox.decrypt(row["refresh_token"])
 

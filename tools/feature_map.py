@@ -29,7 +29,8 @@ DOCS = ROOT / "docs/src/content/docs"
 
 # The docs page for each area (an address's second segment), for a route no page names.
 AREA_DOCS = {
-    "state": "start/docker", "backup": "start/docker", "restore": "start/docker", "people": "start/people",
+    "state": "start/docker", "mailboxes": "start/gmail", "backup": "start/docker", "restore": "start/docker",
+    "people": "start/people",
 }
 
 CALL = re.compile(r"\b(?:apiCall|api|fetch|EventSource)\s*(?:<[^>(]*>)?\(\s*([`\"'])(/api/[^`\"']*)\1")

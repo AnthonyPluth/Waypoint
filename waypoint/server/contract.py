@@ -58,6 +58,30 @@ class Restored(TypedDict):
     unreadable_secrets: list[str]
 
 
+# Gmail connections
+
+class Mailbox(TypedDict):
+    id: int
+    address: str
+    status: Literal["connected", "reconnect", "error"]   # reconnect: Google no longer honours it; error: it couldn't be reached
+    last_error: str | None
+    last_scan: str | None           # with its UTC offset
+
+
+class MailboxList(TypedDict):
+    configured: bool                # GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set
+    mailboxes: list[Mailbox]        # the signed-in member's own
+
+
+class Started(TypedDict):
+    url: str                        # Google's consent screen, to send the browser to
+
+
+class Disconnected(TypedDict):
+    ok: bool
+    revoked: bool                   # false when Waypoint couldn't unlock the saved token to revoke it: remove it at Google
+
+
 # People
 
 class Person(TypedDict):
