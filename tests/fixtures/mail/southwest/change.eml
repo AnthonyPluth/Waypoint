@@ -1,0 +1,24 @@
+From: Southwest Airlines <southwestairlines@luv.southwest.com>
+To: traveller@gmail.example
+Subject: Your itinerary has changed (K7QW2N)
+Date: Thu, 05 Nov 2026 08:00:00 -0600
+Message-ID: <fx-sw-change@luv.southwest.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head><title>x</title><style>td { color: red }</style></head><body>
+<p>Your flight time has changed. CANARY-BODY-SOUTHWEST-CHANGE-9H3T</p>
+<table>
+<tr><td>Confirmation #:</td><td>K7QW2N</td></tr>
+<tr><td>Passenger:</td><td>JANE DOE</td></tr>
+</table>
+<h3>DEPART</h3>
+<div>Flight 1234 Mon, Nov 16, 2026</div>
+<div>Dallas (Love Field), TX (DAL) 9:30 AM</div>
+<div>Houston (Hobby), TX (HOU) 10:35 AM</div>
+<h3>RETURN</h3>
+<div>Flight 2210 Fri, Nov 20, 2026</div>
+<div>Houston (Hobby), TX (HOU) 11:50 PM</div>
+<div>Dallas (Love Field), TX (DAL) 12:55 AM (+1 day)</div>
+<p>Thanks for choosing the invented airline emails of this fixture.</p>
+</body></html>

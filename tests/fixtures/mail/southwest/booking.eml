@@ -1,0 +1,25 @@
+From: Southwest Airlines <southwestairlines@luv.southwest.com>
+To: traveller@gmail.example
+Subject: Your trip is confirmed (K7QW2N)
+Date: Tue, 06 Oct 2026 10:00:00 -0500
+Message-ID: <fx-sw-booking@luv.southwest.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head><title>x</title><style>td { color: red }</style></head><body>
+<p>Your trip is confirmed. CANARY-BODY-SOUTHWEST-BOOKING-4D8Q</p>
+<table>
+<tr><td>Confirmation #:</td><td>K7QW2N</td></tr>
+<tr><td>Passenger:</td><td>JANE DOE</td></tr>
+<tr><td>Rapid Rewards #:</td><td>55512340011</td></tr>
+</table>
+<h3>DEPART</h3>
+<div>Flight 1234 Mon, Nov 16, 2026</div>
+<div>Dallas (Love Field), TX (DAL) 8:05 AM</div>
+<div>Houston (Hobby), TX (HOU) 9:10 AM</div>
+<h3>RETURN</h3>
+<div>Flight 2210 Fri, Nov 20, 2026</div>
+<div>Houston (Hobby), TX (HOU) 11:50 PM</div>
+<div>Dallas (Love Field), TX (DAL) 12:55 AM (+1 day)</div>
+<p>Thanks for choosing the invented airline emails of this fixture.</p>
+</body></html>

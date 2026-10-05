@@ -58,10 +58,12 @@ def _family_past(today: date) -> list[trips.SegmentIn]:
 def _family_now(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": _at(today, -2, "19:00"), "end_local": _at(today, -1, "07:10"),
-         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy"}},
+         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy"},
+         "manage_url": "https://example.com/manage/KQ7M2X"},
         {"kind": "hotel", "origin": "Harbour Hotel", "start_local": _at(today, -1, "15:00"), "end_local": _at(today, 4, "10:00"),
          "start_zone": "Europe/London", "end_zone": "Europe/London", "confirmation": "H88231", "provider": "Marriott",
-         "details": {"address": "1 Quay Street, London", "room": "Family room"}},
+         "details": {"address": "1 Quay Street, London", "room": "Family room", "phone": "+44 20 7946 0000"},
+         "manage_url": "https://example.com/manage/H88231"},
         {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": _at(today, 4, "11:30"), "end_local": _at(today, 4, "14:35"),
          "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 102", "terminal": "3"}},
     ]
@@ -73,7 +75,7 @@ def _jane_alone(today: date) -> list[trips.SegmentIn]:
          "confirmation": "PL4N9R", "provider": "United Airlines", "details": {"flight_number": "UA 311", "terminal": "7"}},
         {"kind": "car", "origin": "SFO airport", "destination": "SFO airport", "start_local": _at(today, 20, "12:30"), "end_local": _at(today, 22, "16:00"),
          "start_zone": "America/Los_Angeles", "end_zone": "America/Los_Angeles", "confirmation": "C7710", "provider": "Hertz",
-         "details": {"car_class": "Midsize"}},
+         "details": {"car_class": "Midsize", "address": "1 Rental Way, San Francisco", "phone": "+1 415 555 0100"}},
         {"kind": "flight", "origin": "SFO", "destination": "JFK", "start_local": _at(today, 22, "17:00"), "end_local": _at(today, 23, "01:35"),
          "confirmation": "PL4N9R", "provider": "United Airlines", "details": {"flight_number": "UA 318"}},
     ]

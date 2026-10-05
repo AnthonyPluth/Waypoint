@@ -9,6 +9,7 @@
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
+  import { isIOS } from "$lib/platform";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
@@ -30,6 +31,7 @@
   let asking = $state(false);
 
   const id = $derived(route.sub);
+  const ios = isIOS();
 
   let latest = 0;   // the newest load: an earlier, slower one finishing later must not put its trip on screen
   async function load() {
@@ -92,6 +94,7 @@
   {/if}
   <ul class="flex flex-col gap-4" aria-label="Bookings">
     {#each t.segments as s (s.id)}
+      {@const live = s.status !== "cancelled"}
       <li class="pass" class:opacity-70={s.status === "cancelled"}>
         <div class="flex flex-col gap-2 p-5 md:p-6">
           <p class="flex flex-wrap items-center gap-2"><span class="eyebrow">{kindName(s)}</span>
@@ -106,8 +109,15 @@
             <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
               <dd class="mt-1 text-base font-medium">{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} /></dd></div>
             {#if s.confirmation}<div><dt class="eyebrow">Confirmation</dt><dd class="mt-1 text-lg"><CopyCode code={s.confirmation} /></dd></div>{/if}
-            {#if s.manage_url}<div><dt class="eyebrow">Manage</dt><dd class="mt-1"><a class="break-all underline underline-offset-2" href={s.manage_url} target="_blank" rel="noopener noreferrer">Open the booking</a></dd></div>{/if}
           </dl>
+          {#if s.links.app || (live && (s.links.directions || s.links.call || ios))}
+            <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
+              {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">Open in app</Button>{/if}
+              {#if live && ios}<Button variant="outline" size="sm" href="shoebox://">Wallet</Button>{/if}
+              {#if live && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
+              {#if live && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
+            </div>
+          {/if}
         </div>
         <div class="pass-tear" aria-hidden="true"></div>
         <div class="flex flex-col gap-3 p-5 md:p-6">
