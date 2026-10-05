@@ -1847,6 +1847,109 @@
         }
       }
     },
+    "/api/mcp-settings": {
+      "get": {
+        "operationId": "api_mcp_settings",
+        "x-handler": "waypoint/server/api/mcp.py:api_mcp_settings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/mcp-settings/writes": {
+      "post": {
+        "operationId": "api_mcp_writes",
+        "x-handler": "waypoint/server/api/mcp.py:api_mcp_writes",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpWritesBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpWritesBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/mcp-settings/connections/{id}": {
+      "delete": {
+        "operationId": "api_mcp_revoke",
+        "x-handler": "waypoint/server/api/mcp.py:api_mcp_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/state": {
       "get": {
         "operationId": "api_state",
@@ -2787,6 +2890,103 @@
         "required": [
           "ok",
           "matched"
+        ],
+        "additionalProperties": false
+      },
+      "McpConnection": {
+        "type": "object",
+        "description": "An assistant connected with OAuth: one approval, ended by Disconnect or when its approver can no longer sign in.",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "client": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "who": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scope": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_used": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "client",
+          "who",
+          "scope",
+          "created",
+          "last_used"
+        ],
+        "additionalProperties": false
+      },
+      "McpSettings": {
+        "type": "object",
+        "properties": {
+          "allow_writes": {
+            "type": "boolean"
+          },
+          "oauth": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "connections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/McpConnection"
+            }
+          }
+        },
+        "required": [
+          "allow_writes",
+          "oauth",
+          "url",
+          "reason",
+          "connections"
+        ],
+        "additionalProperties": false
+      },
+      "McpWritesBody": {
+        "type": "object",
+        "properties": {
+          "allow": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "allow"
         ],
         "additionalProperties": false
       },

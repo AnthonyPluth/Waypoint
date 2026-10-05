@@ -45,9 +45,12 @@ VERSION = 1
 # Sign-ins (and Gmail connections still at Google) don't travel: sign in again after a restore. Nor do the airports: they're
 # reference data every database is given by its migrations, and no row refers to them. The flight status cache is refetched.
 # Devices belong to the browsers that made them and feeds to the addresses that were handed out: both are set up again after
-# a restore (what was already sent isn't sent twice, but a restored database may be on another day's flights).
+# a restore (what was already sent isn't sent twice, but a restored database may be on another day's flights). Nor do the
+# AI assistants connected with OAuth, their approvals and tokens: a restore ends every connection (restore deletes them), so
+# they connect again; an approval made before it never acts on the restored household's data.
 SKIP = {"auth_sessions", "auth_pending", "mailbox_pending", "airports", "airlines", "flight_status", "push_devices", "calendar_feeds",
-        "reminders_sent"}
+        "reminders_sent", "oauth_clients", "oauth_grants", "oauth_codes", "oauth_tokens", "oauth_consents"}
+ASSISTANT_TABLES = ("oauth_tokens", "oauth_codes", "oauth_consents", "oauth_grants", "oauth_clients")
 NEWER = "That backup is from a newer version of Waypoint. Update Waypoint first."
 
 
@@ -397,6 +400,8 @@ def restore(conn, data: dict) -> dict:
         monitoring.log(f"Restore: left out {n} row{'s' if n != 1 else ''} of {t} referring to something the backup doesn't have.",
                        "warning")
     for t in reversed(tables()):
+        conn.execute(delete(schema.metadata.tables[t]))
+    for t in ASSISTANT_TABLES:   # (children first)
         conn.execute(delete(schema.metadata.tables[t]))
     # Rows can refer to rows of their own table restored after them: checked when the restore commits, not row by row.
     conn.sa.exec_driver_sql("SET CONSTRAINTS ALL DEFERRED" if conn.postgres else "PRAGMA defer_foreign_keys = ON")

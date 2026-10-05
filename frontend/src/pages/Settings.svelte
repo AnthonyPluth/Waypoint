@@ -9,6 +9,7 @@
   import DataSection from "$lib/components/settings/DataSection.svelte";
   import GmailSection from "$lib/components/settings/GmailSection.svelte";
   import ImportSection from "$lib/components/settings/ImportSection.svelte";
+  import McpSection from "$lib/components/settings/McpSection.svelte";
   import RemindersSection from "$lib/components/settings/RemindersSection.svelte";
   import { flightStatus, loadFlightStatus } from "$lib/flightstatus.svelte";
   import { onMount } from "svelte";
@@ -75,6 +76,8 @@
   <AiSection />
 
   <RemindersSection />
+
+  <McpSection />
 
   <DataSection />
 </div>

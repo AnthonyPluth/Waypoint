@@ -29,6 +29,8 @@ the sender’s domain and the day. A report about a way around any of those is a
 The secrets Waypoint saves (such as the refresh token for that mailbox access) are encrypted with
 `WAYPOINT_SECRET_KEY`, and so are the copies in backups. Backups also hold everything else in the database, so keep them private.
 
+An AI assistant (Claude and the like) can connect to Waypoint's `/mcp` endpoint with OAuth, as the member who approved it: it sees what they see, never a loyalty or Known Traveler number (nothing under them is reachable from it), and changes nothing unless the household turned on "Let assistants change trips". Mailboxes, email content, the review queue, AI settings, backup and restore, sign-in, the calendar feed and push devices are never reachable from it, and a connection ends when its approver can no longer sign in. See the [AI assistants](https://anthonypluth.github.io/waypoint/start/mcp/) page.
+
 ## One household, not one account per person
 
 Waypoint has no accounts of its own: sign-in decides who gets in, and everyone who gets in (`OIDC_ALLOWED_EMAILS`,

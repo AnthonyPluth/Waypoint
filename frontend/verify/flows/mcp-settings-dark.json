@@ -1,0 +1,11 @@
+{
+  "name": "mcp-settings-dark",
+  "page": "settings",
+  "scheme": "dark",
+  "steps": [
+    { "wait_for": "#mcp-title" },
+    { "wait_for": "[data-testid=assistant]" },
+    { "scroll_to": "#mcp-title" },
+    { "screenshot": "card" }
+  ]
+}

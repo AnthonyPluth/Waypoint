@@ -40,7 +40,7 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, scheme: "sepia" })).toEqual(["unknown scheme sepia"]);
   });
 
-  it("has the app's pages", () => expect(PAGES).toEqual(["upcoming", "trips", "stats", "people", "review", "settings"]));
+  it("has the app's pages", () => expect(PAGES).toEqual(["upcoming", "trips", "stats", "people", "review", "settings", "oauth-approve"]));
 });
 
 describe("screenshotFiles", () => {

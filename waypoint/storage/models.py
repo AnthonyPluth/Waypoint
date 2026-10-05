@@ -261,3 +261,60 @@ class CalendarFeed(Base):
     owner_sub: Mapped[str]
     key_hash: Mapped[str]            # SHA-256 of the key in the feed's address; the key itself is never kept
     created: Mapped[float]
+
+
+class OAuthClient(Base):
+    __table__ = schema.oauth_clients
+    id: Mapped[str]
+    name: Mapped[str | None]
+    redirect_uris: Mapped[str]
+    auth_method: Mapped[str]
+    secret_hash: Mapped[str | None]
+    kind: Mapped[str]
+    metadata_url: Mapped[str | None]
+    created: Mapped[float]
+    last_used: Mapped[float | None]
+
+
+class OAuthGrant(Base):
+    __table__ = schema.oauth_grants
+    id: Mapped[int]
+    client_id: Mapped[str]
+    sub: Mapped[str | None]
+    email: Mapped[str | None]
+    scope: Mapped[str]
+    resource: Mapped[str]
+    created: Mapped[float]
+    last_used: Mapped[float | None]
+    revoked: Mapped[float | None]
+    revoked_reason: Mapped[str | None]
+
+
+class OAuthCode(Base):
+    __table__ = schema.oauth_codes
+    code_hash: Mapped[str]
+    client_id: Mapped[str]
+    grant_id: Mapped[int]
+    redirect_uri: Mapped[str]
+    code_challenge: Mapped[str]
+    resource: Mapped[str]
+    created: Mapped[float]
+    used: Mapped[float | None]
+
+
+class OAuthToken(Base):
+    __table__ = schema.oauth_tokens
+    token_hash: Mapped[str]
+    kind: Mapped[str]
+    grant_id: Mapped[int]
+    created: Mapped[float]
+    expires: Mapped[float]
+    consumed: Mapped[float | None]
+    replaced_by: Mapped[str | None]
+
+
+class OAuthConsent(Base):
+    __table__ = schema.oauth_consents
+    token_hash: Mapped[str]
+    params: Mapped[str]
+    created: Mapped[float]

@@ -1,5 +1,5 @@
 """Waypoint's database schema, for SQLite and Postgres alike. Alembic migrations (waypoint/storage/migrations) create and change it."""
-from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, MetaData, Table, Text, UniqueConstraint, false
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, MetaData, Table, Text, UniqueConstraint, false, text
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 
@@ -303,6 +303,72 @@ calendar_feeds = Table(
     Column('created', Float, nullable=False),
     UniqueConstraint('key_hash', name='uq_calendar_feeds_key_hash'),
     info={'doc': "a member's private calendar feed: only the hash of the random key in its address is kept; ends when its owner can no longer sign in, and doesn't travel in a backup"},
+)
+
+oauth_clients = Table(
+    'oauth_clients', metadata,
+    Column('id', Text, primary_key=True, doc='wpc_...'),
+    Column('name', Text),
+    Column('redirect_uris', Text, nullable=False, doc='JSON list'),
+    Column('auth_method', Text, nullable=False, doc='none | client_secret_post | client_secret_basic'),
+    Column('secret_hash', Text, doc='sha256 of the client secret, for the two secret methods'),
+    Column('kind', Text, nullable=False, server_default=text("'dcr'"), doc='dcr: registered at /oauth/register'),
+    Column('metadata_url', Text, doc='reserved for client ID metadata documents; unused'),
+    Column('created', Float, nullable=False),
+    Column('last_used', Float),
+    info={'doc': 'AI assistants registered to connect to /mcp with OAuth; not in a backup'},
+)
+
+oauth_grants = Table(
+    'oauth_grants', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('client_id', Text, refers('oauth_grants', 'client_id', 'oauth_clients.id', 'CASCADE'), nullable=False),
+    Column('sub', Text, doc='the member who approved it: the assistant sees what they see'),
+    Column('email', Text),
+    Column('scope', Text, nullable=False, doc='space-separated: read, write'),
+    Column('resource', Text, nullable=False, doc='the /mcp address its tokens are for'),
+    Column('created', Float, nullable=False),
+    Column('last_used', Float),
+    Column('revoked', Float),
+    Column('revoked_reason', Text),
+    Index('ix_oauth_grants_client_id', 'client_id'),
+    sqlite_autoincrement=True,
+    info={'doc': 'one approval of an assistant on the consent page; its codes and tokens die with it, and it ends when its approver can no longer sign in; not in a backup'},
+)
+
+oauth_codes = Table(
+    'oauth_codes', metadata,
+    Column('code_hash', Text, primary_key=True),
+    Column('client_id', Text, refers('oauth_codes', 'client_id', 'oauth_clients.id', 'CASCADE'), nullable=False),
+    Column('grant_id', Integer, refers('oauth_codes', 'grant_id', 'oauth_grants.id', 'CASCADE'), nullable=False),
+    Column('redirect_uri', Text, nullable=False),
+    Column('code_challenge', Text, nullable=False, doc='PKCE, S256'),
+    Column('resource', Text, nullable=False),
+    Column('created', Float, nullable=False),
+    Column('used', Float),
+    Index('ix_oauth_codes_grant_id', 'grant_id'),
+    info={'doc': 'authorization codes (only a hash of each is kept), single use, for 10 minutes; not in a backup'},
+)
+
+oauth_tokens = Table(
+    'oauth_tokens', metadata,
+    Column('token_hash', Text, primary_key=True),
+    Column('kind', Text, nullable=False, doc='access | refresh'),
+    Column('grant_id', Integer, refers('oauth_tokens', 'grant_id', 'oauth_grants.id', 'CASCADE'), nullable=False),
+    Column('created', Float, nullable=False),
+    Column('expires', Float, nullable=False),
+    Column('consumed', Float, doc='refresh: when it was traded for a new one'),
+    Column('replaced_by', Text, doc='refresh: the hash of the one it was traded for'),
+    Index('ix_oauth_tokens_grant_id', 'grant_id'),
+    info={'doc': 'access and refresh tokens (only a hash of each is kept); not in a backup'},
+)
+
+oauth_consents = Table(
+    'oauth_consents', metadata,
+    Column('token_hash', Text, primary_key=True),
+    Column('params', Text, nullable=False, doc='JSON: the checked authorization request, and who was signed in'),
+    Column('created', Float, nullable=False),
+    info={'doc': 'consent pages shown and not yet answered (10 minutes); not in a backup'},
 )
 
 # Tables whose integer id is assigned by the database.
