@@ -103,7 +103,7 @@
             {#if s.locked_fields.length}<Badge variant="outline" title="A later email won’t change what you edited">Edited by you</Badge>{/if}</p>
           <h2 class="break-words text-xl font-semibold tracking-tight" class:line-through={s.status === "cancelled"}>{headline(s)}</h2>
           {#if subline(s)}<p class="break-words text-sm text-muted-foreground">{subline(s)}</p>{/if}
-          {#if s.kind === "flight" && s.status !== "cancelled"}<FlightStatus segment={s} />{/if}
+          {#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}
           <dl class="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
               <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} zone={s.start_zone} />{/if}</dd></div>

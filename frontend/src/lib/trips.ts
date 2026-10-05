@@ -82,9 +82,9 @@ export type NextUp = { trip: Trip; segment: Segment; state: "now" | "next" };
 
 /** The segment the Upcoming page leads with, among every trip you can see. One under way (a flight in the air, a rental
  *  out) leads: "now". Otherwise the one that starts soonest: "next". A hotel stay under way doesn't push the day's flight
- *  aside; it leads only when nothing else is left. Cancelled segments and ones that are over never lead. */
+ *  aside; it leads only when nothing else is left. Cancelled segments, ones that are over and ones with no times (there's nothing to count down to) never lead. */
 export function nextUp(trips: Trip[], now: number): NextUp | null {
-  const live = trips.flatMap((trip) => trip.segments.filter((s) => s.status !== "cancelled" && endAt(s) > now).map((segment) => ({ trip, segment })));
+  const live = trips.flatMap((trip) => trip.segments.filter((s) => s.status !== "cancelled" && !untimed(s) && endAt(s) > now).map((segment) => ({ trip, segment })));
   const by = (a: { segment: Segment }, b: { segment: Segment }) => startAt(a.segment) - startAt(b.segment);
   const started = live.filter((x) => startAt(x.segment) <= now).sort(by);
   const going = started.find((x) => x.segment.kind !== "hotel");

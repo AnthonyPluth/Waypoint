@@ -285,7 +285,7 @@ class SaveTests(Importer):
     def test_giving_an_untimed_flight_real_times_makes_them_real(self):
         self.save_new("flighty")
         seg = next(s for s in self.segments(self.jane) if s.origin == "LAX")
-        trips.edit_segment(self.c, self.jane, seg.id, {"details": {"seat": "3A", "time_unknown": "yes"}})   # not the times: still untimed
+        trips.edit_segment(self.c, self.jane, seg.id, {"details": {"seat": "3A"}})   # not the times, and no marker sent: still untimed
         self.assertEqual(trips.decode_details(self.c.orm.get(Segment, seg.id).details).get("time_unknown"), "yes")
         got = trips.edit_segment(self.c, self.jane, seg.id, {"start_local": "2025-03-08T09:00", "end_local": "2025-03-08T17:30"})
         assert got is not None

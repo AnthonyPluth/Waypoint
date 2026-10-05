@@ -109,7 +109,7 @@ describe("Settings → Import past flights", () => {
     expect(api).not.toHaveBeenCalled();
   });
 
-  it("has nothing to add when every flight is already here, and a failed save says so and keeps the preview", async () => {
+  it("has nothing to add when every flight is already here", async () => {
     serve(preview([row(2, { status: "exists", reason: "Already in Waypoint" })]));
     render(ImportSection);
     await choose(csv());
