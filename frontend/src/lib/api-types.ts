@@ -266,6 +266,7 @@ export interface Segment {
   source: "manual" | "email";
   booked_by: number | null;
   locked_fields: string[];
+  check_times: boolean;
   travelers: Traveler[];
   links: SegmentLinks;
 }
@@ -427,6 +428,7 @@ export interface Endpoints {
   "POST /api/mailboxes/connect": { body: never; reply: Started };
   "DELETE /api/mailboxes/{id}": { body: never; reply: Disconnected };
   "POST /api/mailboxes/{id}/scan": { body: never; reply: ScanStarted };
+  "POST /api/mailboxes/{id}/reread": { body: never; reply: ScanStarted };
   "GET /api/reminders": { body: never; reply: Reminders };
   "POST /api/reminders": { body: RemindersBody; reply: Reminders };
   "POST /api/reminders/devices": { body: DeviceBody; reply: ReminderDevice };

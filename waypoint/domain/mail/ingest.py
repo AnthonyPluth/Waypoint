@@ -37,24 +37,28 @@ def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
     start_zone, end_zone = _zone(conn, b, b.origin, b.start_place), _zone(conn, b, b.destination, b.end_place)
     if not start_zone or not end_zone:
         return None
-    start, end = extract.wall_clock(b.start, start_zone), extract.wall_clock(b.end, end_zone)
+    when = extract.times(b, start_zone, end_zone)
+    start, end = when.start, when.end
     if not start or not end:
         return None
     out: trips.SegmentIn = {"kind": b.kind, "status": b.status, "confirmation": b.confirmation, "provider": b.provider,
                             "start_local": start, "start_zone": start_zone, "end_local": end, "end_zone": end_zone,
                             "origin": b.origin, "destination": b.destination,
-                            "details": {k: v for k, v in b.details if k in trips.DETAIL_KEYS}, "manage_url": b.manage_url}
+                            "details": {k: v for k, v in b.details if k in trips.DETAIL_KEYS}, "manage_url": b.manage_url,
+                            "check_times": when.check}
     if b.passengers:
         out["travelers"] = travelers(conn, b.passengers)
     return out
 
 
-def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking) -> Literal["added", "updated", "unchanged"] | None:
-    """Put one booking among `viewer`'s segments. None: it can't be made into a segment (it goes to the review queue)."""
+def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking,
+                 again: bool = False) -> Literal["added", "updated", "unchanged"] | None:
+    """Put one booking among `viewer`'s segments (`again`: from a message read again). None: it can't be made into a segment
+    (it goes to the review queue)."""
     found = fields(conn, b)
     if found is None:
         return None
     try:
-        return trips.merge_email_segment(conn, viewer, found)   # (it checks everything before it writes anything)
+        return trips.merge_email_segment(conn, viewer, found, again)   # (it checks everything before it writes anything)
     except trips.Invalid:
         return None

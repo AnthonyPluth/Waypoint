@@ -57,6 +57,14 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByTestId("flight-status")).toBeNull();
   });
 
+  it("asks for a look at the times of a booking whose times couldn’t be settled, and only that one", async () => {
+    held = trip([{ ...flight, check_times: true }, stay]);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+    expect(within(cards[0]).getByRole("note")).toHaveTextContent(/Check the times/);
+    expect(within(cards[1]).queryByRole("note")).toBeNull();
+  });
+
   it("offers each booking’s actions, and no Wallet off iOS", async () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });

@@ -54,6 +54,14 @@ Waypoint scans each connected mailbox in the background, every few hours (by the
 
 Each mailbox in Settings shows when its last scan finished. If a scan couldn’t start (the connection needs reconnecting, Google couldn’t be reached for the sign-in, or the mailbox’s owner hasn’t signed in yet), Settings says why under the mailbox (“The scan couldn’t start: …”) until one does; that isn’t counted as a failed scan. A scan that stops halfway (Google couldn’t be reached) keeps what it had read, leaves the last good state as it was, and says what failed there; the next one carries on. Waypoint remembers each message it has read by Gmail’s id, with nothing of its content, so no message is read twice. A stay or a rental needs a time zone: Waypoint works it out from the city and country in the booking, and when it can’t, the booking goes to Review rather than being given a guess.
 
+### Times marked UTC
+
+Some airlines write a flight’s times as UTC (`…T09:00:00Z`) when they mean the airport’s own clock. Waypoint settles which from the message itself, in memory: it looks for both readings of the times (as written, and moved to the airport’s zone) among the times of day the email shows (`9:00 AM`, `9:00am`, `09:00`, `9:00`). If only the as-written times appear, they are the local times; if only the moved ones appear, the markup really was UTC; the same reading applies to the departure and the arrival together. If both or neither appear, Waypoint keeps the move and the booking’s card says **Check the times** until you edit or confirm them (saving the times, even unchanged, confirms them). A time with a real offset (`-06:00`) is never second-guessed. Only the times of day are kept from the text, and only while the message is read.
+
+### Read bookings again
+
+**Read bookings again**, under each connected mailbox in Settings, reads once more the messages Waypoint already found that made bookings (it doesn’t search again, and it doesn’t move the last scan’s end), so bookings stored from an earlier reading, with wrong times say, are corrected. It updates the fields you haven’t edited, never adds a second copy of a booking, and doesn’t mark a corrected time as a schedule change.
+
 What Waypoint can’t do yet: read mail with no booking markup from a sender that has no parser yet (they come one vendor at a time; the rest goes to Review), and any sender outside its list.
 
 ## What Waypoint keeps

@@ -35,6 +35,7 @@ DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class"
 # A person's edit locks the fields it changes; these are the names a lock can have.
 FIELDS = ("kind", "status", "confirmation", "provider", "start_local", "start_zone", "end_local", "end_zone", "origin",
           "destination", "details", "manage_url", "travelers")
+TIME_FIELDS = ("start_local", "start_zone", "end_local", "end_zone")   # (a person who looks at these has settled them)
 GAP_DAYS = 2    # a segment this many days or fewer from a trip (before or after it) can belong to it
 AWAY_DAYS = 60  # and one that carries on from where an unfinished trip's last leg landed (the way back), this many
 LOCAL_TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d(:\d\d)?")
@@ -69,6 +70,7 @@ class SegmentIn(TypedDict, total=False):
     details: dict[str, str]
     manage_url: str | None
     travelers: list[TravelerIn]
+    check_times: bool          # from an email: its times couldn't be settled (not for a person to send)
 
 
 class TripIn(TypedDict, total=False):
@@ -103,6 +105,7 @@ class SegmentOut(TypedDict):
     source: Literal["manual", "email"]
     booked_by: int | None
     locked_fields: list[str]
+    check_times: bool
     travelers: list[TravelerOut]
     links: links.Links
 
@@ -254,7 +257,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
          "provider": s.provider, "start_local": s.start_local, "start_zone": s.start_zone, "end_local": s.end_local,
          "end_zone": s.end_zone, "origin": s.origin, "destination": s.destination, "details": decode_details(s.details),
          "manage_url": s.manage_url, "source": cast(Literal["manual", "email"], s.source), "booked_by": s.booked_by,
-         "locked_fields": decode_locked(s.locked_fields), "travelers": by_segment.get(s.id, []),
+         "locked_fields": decode_locked(s.locked_fields), "check_times": bool(s.check_times), "travelers": by_segment.get(s.id, []),
          "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, decode_details(s.details), s.origin)}
         for s in segs]
     return sorted(out, key=lambda s: (instant(s["start_local"], s["start_zone"]), s["id"]))
@@ -455,7 +458,8 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
                         booked_by=viewer.person_id)
             conn.orm.add(trip)
             conn.orm.flush()
-    seg = Segment(**values, trip_id=trip.id, source=source, booked_by=viewer.person_id, locked_fields=None)
+    seg = Segment(**values, trip_id=trip.id, source=source, booked_by=viewer.person_id, locked_fields=None,
+                  check_times=bool(fields.get("check_times")))
     conn.orm.add(seg)
     conn.orm.flush()
     _set_travelers(conn, seg.id, travelers)
@@ -488,6 +492,10 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         setattr(seg, k, v)
     if "travelers" in changed:
         _set_travelers(conn, seg.id, travelers)
+    if any(f in changes for f in TIME_FIELDS):
+        if seg.check_times:   # (saving the times, even as they were, says they are right: a later email won't ask again)
+            changed += [f for f in ("start_local", "end_local") if f not in changed]
+        seg.check_times = False
     if changed:
         seg.locked_fields = json.dumps(sorted(set(decode_locked(seg.locked_fields)) | set(changed)))
     conn.orm.flush()
@@ -515,12 +523,15 @@ def _same_leg(seg: Segment, values: Mapping[str, str | None], details: Mapping[s
             and same(seg.origin, values["origin"]) and same(seg.destination, values["destination"]))
 
 
-def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn) -> Literal["added", "updated", "unchanged"]:
+def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
+                        again: bool = False) -> Literal["added", "updated", "unchanged"]:
     """Put a booking read from the viewer's mail among their segments: the segment of the same (kind, provider,
     confirmation, leg) that they can see takes what the email says, except the fields a person edited (`locked_fields`);
     when there is none, a new one is added as the viewer's, grouped into a trip as `add_segment` does. A booking whose
-    times moved is marked changed, one the email cancels cancelled; the people on it are added, never removed. Raises
-    Invalid when the booking can't be a segment."""
+    times moved is marked changed, one the email cancels cancelled; the people on it are added, never removed. `again`: the
+    message was read again (Read bookings again), so a time that differs is the reading corrected, not the airline's change. A
+    booking whose times couldn't be settled (`check_times`) is flagged, until a person edits or confirms them. Raises Invalid
+    when the booking can't be a segment."""
     values = check(conn, fields)
     day = (values["start_local"] or "")[:10]
     found = sorted((s for s in visibility.visible_segments(conn, viewer) if _same_leg(s, values, fields.get("details") or {})),
@@ -537,7 +548,7 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn) 
     incoming = unlocked({**fields, "details": {**decode_details(seg.details), **(fields.get("details") or {})}}, locked)
     if "status" not in locked and incoming.get("status") != "cancelled":
         moved = any(values[f] != getattr(seg, f) for f in ("start_local", "start_zone", "end_local", "end_zone", "origin", "destination"))
-        if moved and "start_local" not in locked and "end_local" not in locked:
+        if moved and not again and "start_local" not in locked and "end_local" not in locked:
             incoming["status"] = "changed"
         else:
             incoming["status"] = cast(Status, seg.status)   # (a confirmation again changes nothing)
@@ -547,6 +558,9 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn) 
                                                             if f == "details" else changed_values[f] != getattr(seg, f))]
     for f in changed:
         setattr(seg, f, changed_values[f])
+    if not set(TIME_FIELDS) & set(locked) and bool(fields.get("check_times")) != bool(seg.check_times):
+        seg.check_times = bool(fields.get("check_times"))   # (times a person edited or confirmed stand as they are)
+        changed.append("check_times")
     if "travelers" not in locked:
         have = {_key(t) for t in old}
         extra = [t for t in _travelers(conn, fields.get("travelers") or []) if _key(t) not in have

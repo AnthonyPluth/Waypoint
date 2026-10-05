@@ -19,7 +19,7 @@ import email.utils
 import json
 import re
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from typing import Any
@@ -39,6 +39,7 @@ RESERVATIONS: dict[str, Kind] = {"FlightReservation": "flight", "LodgingReservat
 MAX_PART = 2_000_000    # characters of one HTML part read (a booking's markup is far smaller)
 MAX_NODES = 200         # reservations considered in one message
 IATA = re.compile(r"[A-Z]{3}")
+CLOCK = re.compile(r"(?<![\d:.])(\d{1,2}):(\d{2})(?::\d{2})?(?!\d)(?:\s*([AaPp])\.?[Mm]\.?)?")
 BASE64URL = re.compile(r"[A-Za-z0-9_=-]+")
 VOID = {"meta", "link", "img", "source", "area", "br", "hr", "input", "wbr", "col", "embed", "track", "base"}
 
@@ -363,6 +364,62 @@ def wall_clock(text: str, zone: str | None = None) -> str | None:
     return t.replace(tzinfo=None).isoformat(timespec="seconds")
 
 
+@dataclass(frozen=True)
+class Times:
+    """A booking's start and end as wall-clock times at their places (None: one that can't be settled), and whether they are
+    a guess a person should look at: marked UTC, and the message's text doesn't settle which reading is meant."""
+    start: str | None
+    end: str | None
+    check: bool = False
+
+
+def _utc_marked(text: str) -> bool:
+    try:
+        t = datetime.fromisoformat(text.strip())
+    except ValueError:
+        return False
+    return t.tzinfo is not None and t.utcoffset() == timedelta(0)
+
+
+def _as_written(text: str) -> str:
+    """A time marked UTC with its mark dropped: the clock reading it carries, 2026-03-01T09:15:00."""
+    return datetime.fromisoformat(text.strip()).replace(tzinfo=None).isoformat(timespec="seconds")
+
+
+def clock_times(text: str) -> frozenset[str]:
+    """The times of day a text shows, as HH:MM on the 24-hour clock: 9:00 AM, 9:00am, 09:00 and 9:00 are all 09:00."""
+    found: set[str] = set()
+    for m in CLOCK.finditer(text):
+        hour, minute, half = int(m.group(1)), int(m.group(2)), (m.group(3) or "").lower()
+        if half:
+            if not 1 <= hour <= 12:
+                continue
+            hour = hour % 12 + (12 if half == "p" else 0)
+        if hour < 24 and minute < 60:
+            found.add(f"{hour:02d}:{minute:02d}")
+    return frozenset(found)
+
+
+def times(b: Booking, start_zone: str, end_zone: str) -> Times:
+    """A booking's start and end at their places (`wall_clock`), settling the ones an airline marked UTC although they mean the
+    place's own clock. A time marked UTC for a place that isn't is read both ways, as written and moved to the place's zone,
+    and the message's own text (`b.clock_times`) says which: only the as-written times in it, they are local; only the moved
+    ones, they were UTC; both or neither, the move stands and `check` is set. The reading holds for the start and the end
+    together, so a duration never comes out negative or absurd. Times with a real offset are never second-guessed."""
+    moved = (wall_clock(b.start, start_zone), wall_clock(b.end, end_zone))
+    marked = [(t, m) for t, m in zip((b.start, b.end), moved, strict=True) if _utc_marked(t)]
+    written = [_as_written(t)[11:16] for t, _ in marked]
+    converted = [m[11:16] for _, m in marked if m]
+    if not marked or len(converted) < len(marked) or written == converted:
+        return Times(*moved)   # (nothing marked UTC, a time that can't be placed, or a place whose clock is UTC's)
+    local = all(w in b.clock_times for w in written)
+    utc = all(c in b.clock_times for c in converted)
+    if local and not utc:
+        start, end = (_as_written(t) if _utc_marked(t) else m for t, m in zip((b.start, b.end), moved, strict=True))
+        return Times(start, end)
+    return Times(*moved, check=local == utc)
+
+
 # ------------------------------------------------------------------------------------------------ the message
 
 def _decode(raw: Any) -> bytes | None:
@@ -433,6 +490,9 @@ def read(message: Mapping[str, Any]) -> Message:
             found = Parsed(unread=1)
         bookings, unread = list(found.bookings), unread + found.unread
         seen = seen or bool(found.bookings or found.unread)
+    if any(_utc_marked(t) for b in bookings for t in (b.start, b.end)):
+        shown = clock_times(_visible(htmls, texts))   # (kept as times of day alone, and only for a booking that needs them)
+        bookings = [replace(b, clock_times=shown) if _utc_marked(b.start) or _utc_marked(b.end) else b for b in bookings]
     return Message(sender, received, tuple(bookings), unread, markup=seen)
 
 
@@ -462,6 +522,18 @@ class _Text(HTMLParser):
     def handle_data(self, data: str) -> None:
         if not self.skip:
             self.parts.append(data)
+
+
+def _visible(htmls: list[str], texts: list[str]) -> str:
+    """What a reader of the message sees: its text parts and its HTML parts without tags, scripts and styles."""
+    scanner = _Text()
+    for h in htmls:
+        try:
+            scanner.feed(h)
+            scanner.close()
+        except (ValueError, RecursionError, AssertionError):
+            continue
+    return "\n".join([*texts, "".join(scanner.parts)])
 
 
 def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:

@@ -173,6 +173,82 @@ class MarkupTests(unittest.TestCase):
         self.assertEqual(self.read(eml("<div>" * 3000 + "</div>" * 3000)).bookings, ())
 
 
+class UtcMarkedTimesTests(unittest.TestCase):
+    """An airline that writes local times with a Z: the message's own visible text settles which reading is meant."""
+    CHI, DEN = "America/Chicago", "America/Denver"
+
+    def times(self, name, start=CHI, end=DEN):
+        [b] = fixture(name).bookings
+        return extract.times(b, start, end)
+
+    def test_times_marked_utc_that_the_text_shows_as_local_are_local(self):
+        self.assertEqual(self.times("utc_marked_local_in_text"), extract.Times("2026-12-04T09:00:00", "2026-12-04T11:10:00"))
+
+    def test_times_marked_utc_that_the_text_shows_converted_are_converted(self):
+        self.assertEqual(self.times("utc_marked_converted_in_text"), extract.Times("2026-12-04T09:00:00", "2026-12-04T11:10:00"))
+
+    def test_times_marked_utc_with_no_times_in_the_text_are_converted_and_to_check(self):
+        self.assertEqual(self.times("utc_marked_no_times_in_text"), extract.Times("2026-12-04T03:00:00", "2026-12-04T04:10:00", True))
+
+    def test_a_real_offset_is_never_second_guessed(self):
+        # (the text shows other times entirely: it is not consulted)
+        self.assertEqual(self.times("offset_marked_times"), extract.Times("2026-12-04T09:00:00", "2026-12-04T11:10:00"))
+
+    def test_an_overnight_flight_across_zones_keeps_a_sane_duration(self):
+        t = self.times("utc_marked_overnight", "America/Los_Angeles", "America/New_York")
+        self.assertEqual((t.start, t.end, t.check), ("2026-12-10T22:30:00", "2026-12-11T06:55:00", False))
+        [b] = fixture("utc_marked_overnight").bookings
+        hours = (trips_instant(t.end, "America/New_York") - trips_instant(t.start, "America/Los_Angeles")).total_seconds() / 3600
+        self.assertTrue(4 < hours < 7, hours)
+        self.assertEqual(b.start, "2026-12-10T22:30:00Z")   # (as the airline wrote it)
+
+    def test_both_readings_in_the_text_or_neither_keep_the_conversion_and_ask_for_a_check(self):
+        both = eml(f'<html><head><script type="application/ld+json">{UTC_FLIGHT}</script></head>'
+                   "<body><p>Leaves 9:00 AM. Local time at home: 3:00 AM. Arrives 11:10 AM (4:10 AM).</p></body></html>")
+        [b] = extract.read(message(both)).bookings
+        self.assertEqual(extract.times(b, self.CHI, self.DEN), extract.Times("2026-12-04T03:00:00", "2026-12-04T04:10:00", True))
+
+    def test_the_readings_must_hold_for_departure_and_arrival_together(self):
+        # 9:00 AM is shown but the arrival's 11:10 AM is not, so the as-written reading isn't confirmed: converted, to check
+        half = eml(f'<html><head><script type="application/ld+json">{UTC_FLIGHT}</script></head><body><p>Leaves 9:00 AM</p></body></html>')
+        [b] = extract.read(message(half)).bookings
+        self.assertEqual(extract.times(b, self.CHI, self.DEN), extract.Times("2026-12-04T03:00:00", "2026-12-04T04:10:00", True))
+
+    def test_the_usual_forms_of_a_time_are_found(self):
+        for shown in ("9:00 AM", "9:00am", "09:00", "9:00", "9:00 a.m."):
+            with self.subTest(shown=shown):
+                page = eml(f'<html><head><script type="application/ld+json">{UTC_FLIGHT}</script></head>'
+                           f"<body><p>Leaves {shown}, arrives 11:10 AM.</p></body></html>")
+                [b] = extract.read(message(page)).bookings
+                self.assertEqual(extract.times(b, self.CHI, self.DEN), extract.Times("2026-12-04T09:00:00", "2026-12-04T11:10:00"))
+
+    def test_a_place_that_is_utc_that_day_has_nothing_to_settle(self):
+        london = UTC_FLIGHT.replace("2026-12-04T09:00:00Z", "2026-12-04T09:00:00+00:00")
+        [b] = extract.read(message(eml(f'<html><head><script type="application/ld+json">{london}</script></head><body>x</body></html>'))).bookings
+        self.assertEqual(extract.times(b, "Europe/London", "Europe/London"), extract.Times("2026-12-04T09:00:00", "2026-12-04T11:10:00"))
+
+    def test_nothing_is_kept_of_the_text_but_the_times_it_shows(self):
+        [b] = fixture("utc_marked_local_in_text").bookings
+        self.assertEqual(b.clock_times, frozenset({"09:00", "11:10"}))
+        [plain] = fixture("offset_marked_times").bookings
+        self.assertEqual(plain.clock_times, frozenset())   # (read only for a booking with a time marked UTC)
+
+    def test_a_time_that_cannot_be_placed_is_none(self):
+        [b] = fixture("utc_marked_local_in_text").bookings
+        self.assertEqual(extract.times(b, "Not/AZone", self.DEN), extract.Times(None, "2026-12-04T04:10:00"))
+
+
+UTC_FLIGHT = ('{"@type":"FlightReservation","reservationNumber":"LK4T7Q","underName":{"name":"Alex Rivera"},'
+              '"reservationFor":{"@type":"Flight","flightNumber":"301","airline":{"iataCode":"EX","name":"Example Air"},'
+              '"departureAirport":{"iataCode":"ORD"},"departureTime":"2026-12-04T09:00:00Z",'
+              '"arrivalAirport":{"iataCode":"DEN"},"arrivalTime":"2026-12-04T11:10:00Z"}}')
+
+
+def trips_instant(local, zone):
+    from waypoint.domain import trips
+    return trips.instant(local, zone)
+
+
 class WallClockTests(unittest.TestCase):
     def test_a_time_with_its_places_offset_keeps_what_is_written(self):
         self.assertEqual(extract.wall_clock("2026-03-01T22:15:00+13:00"), "2026-03-01T22:15:00")
