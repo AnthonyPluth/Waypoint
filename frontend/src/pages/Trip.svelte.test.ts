@@ -9,6 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 import { api } from "$lib/api";
 import type { LoyaltyEntry, Person, Trip as TripT } from "$lib/api-types";
 import { route } from "$lib/app.svelte";
+import { flightStatus } from "$lib/flightstatus.svelte";
 import { membership, segment, trip } from "../test/fixtures";
 import TripPage from "./Trip.svelte";
 
@@ -18,6 +19,10 @@ const flight = segment({ id: 1, locked_fields: ["terminal"], manage_url: "https:
   travelers: [{ id: 1, person_id: 1, name: "Jane Doe" }, { id: 2, person_id: 2, name: "Sam Doe" }, { id: 3, person_id: null, name: "DOE/MIA MISS" }] });
 const stay = segment({ id: 2, kind: "hotel", provider: "Marriott", origin: "Harbour Hotel", destination: null, start_local: "2026-11-21T15:00", start_zone: "Europe/London",
   end_local: "2026-11-27T10:00", end_zone: "Europe/London", confirmation: "H88231", details: { address: "1 Quay Street, London" }, status: "changed", travelers: [{ id: 4, person_id: 1, name: "Jane Doe" }] });
+const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: null, statuses: [{
+  segment_id: 1, state: "delayed", origin: "JFK", destination: "LHR", dep_scheduled: "2026-11-20T19:00", dep_estimated: "2026-11-20T19:50",
+  dep_actual: null, dep_zone: "America/New_York", dep_terminal: "7", dep_gate: "B24", arr_scheduled: "2026-11-21T07:10", arr_estimated: "2026-11-21T08:05",
+  arr_actual: null, arr_zone: "Europe/London", arr_terminal: null, arr_gate: null, delay_minutes: 50, fetched_at: "2026-11-20T14:05:00+00:00" }] };
 let held: TripT;
 let loyalty: LoyaltyEntry[];
 
@@ -39,9 +44,18 @@ beforeEach(() => {
   route.page = "trip"; route.sub = "1"; location.hash = "#trip/1";
   serve();
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => { vi.useRealTimers(); flightStatus.list = null; });
 
 describe("Trip", () => {
+  it("shows a flight’s live status on its card and none on a stay", async () => {
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? delayed : answer(path, opts)) as never);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+    expect(await within(cards[0]).findByTestId("flight-status")).toHaveTextContent("Delayed 50 min");
+    expect(within(cards[1]).queryByTestId("flight-status")).toBeNull();
+  });
+
   it("shows each booking with its local times, who is on it and the number each would use", async () => {
     render(TripPage);
     expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();

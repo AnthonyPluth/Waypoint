@@ -31,7 +31,7 @@ DOCS = ROOT / "docs/src/content/docs"
 AREA_DOCS = {
     "state": "start/docker", "mailboxes": "start/gmail", "backup": "start/docker", "restore": "start/docker",
     "people": "start/people", "loyalty": "start/loyalty",
-    "trips": "start/trips", "segments": "start/trips", "airports": "start/trips",
+    "trips": "start/trips", "segments": "start/trips", "airports": "start/trips", "flight-status": "start/flight-status",
 }
 
 CALL = re.compile(r"\b(?:apiCall|api|fetch|EventSource)\s*(?:<[^>(]*>)?\(\s*([`\"'])(/api/[^`\"']*)\1")

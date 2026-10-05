@@ -5,6 +5,8 @@
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
   import CopyCode from "$lib/components/CopyCode.svelte";
+  import FlightStatus from "$lib/components/FlightStatus.svelte";
+  import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import { dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, headline, nextUp, startAt, START_WORD, subline, tripDays, viewerZone, when } from "$lib/trips";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
@@ -17,7 +19,7 @@
 
   async function load() {
     loadError = "";
-    try { trips = (await apiCall<"GET /api/trips">("/api/trips")).trips; }
+    try { trips = (await apiCall<"GET /api/trips">("/api/trips")).trips; void loadFlightStatus(); }
     catch (err) { trips = null; loadError = errMsg(err); }
   }
   $effect(() => {
@@ -63,6 +65,7 @@
           {next.state === "now" ? when(END_WORD[s.kind], endAt(s) - now) : when(START_WORD[s.kind], startAt(s) - now)}
         </p>
         {#if subline(s)}<p class="break-words text-muted-foreground">{subline(s)}</p>{/if}
+        {#if s.kind === "flight" && s.status !== "cancelled"}<FlightStatus segment={s} />{/if}
       </div>
       <div class="pass-tear" aria-hidden="true"></div>
       <dl class="grid grid-cols-2 gap-x-4 gap-y-3 p-6 text-sm md:p-8">

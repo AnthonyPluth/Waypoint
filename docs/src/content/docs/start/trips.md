@@ -45,6 +45,10 @@ Without a trip named, a new segment joins an existing grouped trip when it is wi
 
 When you change a field of a segment, Waypoint remembers it was you and a later email never overwrites it. A segment you have edited is marked **Edited by you** on its card.
 
+## Live status
+
+With a RapidAPI key set, a flight’s card also shows its live status (delays, gate, terminal) beside the booked times, which it never changes. See [Live flight status](/waypoint/start/flight-status/).
+
 ## In a backup
 
 Trips, segments and their travellers are part of a [backup](/waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list isn’t: every Waypoint has it already.

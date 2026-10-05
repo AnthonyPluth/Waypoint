@@ -140,6 +140,18 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/gmail.py"]
 
+  - id: waypoint-flightstatus-hosts
+    message: >-
+      Only waypoint/providers/flightstatus.py talks to the flight status service (RapidAPI's AeroDataBox), so what a
+      request carries (a flight number and a date, nothing else) and the key stay in one place (AGENTS.md, "Email stays
+      on the server"): call it rather than naming its hosts elsewhere.
+    severity: ERROR
+    languages: [python]
+    pattern-regex: (?i)(rapidapi\.com|aerodatabox\.)
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/providers/flightstatus.py"]
+
   - id: waypoint-ai-hosts
     message: >-
       Only waypoint/domain/mail/ai.py may send anything to an AI service, and only when the household turned the AI

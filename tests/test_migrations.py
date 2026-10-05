@@ -157,7 +157,7 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0004")
             self.assertEqual(set(sa.inspect(c).get_table_names()) & {"airports", "trips", "segments", "segment_travelers"}, set())
             c.execute(insert(schema.people).values(id=1, display_name="Jane Doe"))
-            command.upgrade(db.alembic_config(c), "0005")
+            command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:
             zones = dict(conn.execute(select(schema.airports.c.code, schema.airports.c.zone)
@@ -183,6 +183,28 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(set(sa.inspect(c).get_table_names()) & {"airports", "trips", "segments", "segment_travelers"}, set())
             self.assertIn("people", sa.inspect(c).get_table_names())
             self.assertIn("loyalty_ids", sa.inspect(c).get_table_names())
+
+    def test_0006_makes_the_flight_status_cache_and_takes_it_away(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0005")
+            self.assertNotIn("flight_status", sa.inspect(c).get_table_names())
+            self.assertIn("trips", sa.inspect(c).get_table_names())
+            command.upgrade(db.alembic_config(c), "0006")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:
+            row = dict(flight_number="EX101", date="2026-11-20", state="delayed", fetched_at=1.0)
+            conn.execute(insert(schema.flight_status).values(**row))
+            conn.execute(insert(schema.flight_status).values(**{**row, "date": "2026-11-21"}))   # one a day, for each flight number
+        for values in (row,   # a flight and date have one answer
+                       dict(flight_number="EX9", date="2026-11-20", state="landed")):   # which always says when it came
+            with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:   # (each in a session of its own: Postgres ends a transaction at an error)
+                conn.execute(insert(schema.flight_status).values(**values))
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0005")
+            self.assertNotIn("flight_status", sa.inspect(c).get_table_names())
+            self.assertIn("trips", sa.inspect(c).get_table_names())
 
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating

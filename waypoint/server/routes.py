@@ -13,6 +13,7 @@ from .common import ApiError, server_error
 from .api.backups import api_backup, api_backup_inspect, api_restore
 from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_edit, api_segment_remove, api_trip,
                         api_trip_add, api_trip_edit, api_trip_merge, api_trip_remove, api_trip_split, api_trips)
+from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
 from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loyalty_remove, api_loyalty_reveal
 from .api.people import api_people, api_person_add, api_person_edit, api_person_remove
 from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailboxes
@@ -41,6 +42,8 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/segments/{id}", api_segment_edit),
     ("DELETE", "/api/segments/{id}", api_segment_remove),
     ("GET", "/api/airports/{id}", api_airport),
+    ("GET", "/api/flight-status", api_flight_statuses),
+    ("POST", "/api/flight-status/{id}", api_flight_status_refresh),
     ("GET", "/api/loyalty", api_loyalty),
     ("POST", "/api/loyalty", api_loyalty_add),
     ("POST", "/api/loyalty/{id}", api_loyalty_edit),
