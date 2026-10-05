@@ -19,15 +19,21 @@ def owner() -> str:
     return str((getattr(_current, "user", None) or {}).get("sub") or "local")
 
 
+def public_base(needed_by: str) -> str:
+    """The address people open Waypoint at: WAYPOINT_PUBLIC_URL, or this request's own address when none is set (on your
+    own machine, without sign-in). With sign-in on, a client-chosen Host header isn't an address to hand out."""
+    base = oidc.config()["public_url"]
+    if not base:
+        if oidc.enabled():
+            raise ApiError(f"{needed_by} needs WAYPOINT_PUBLIC_URL to be set.")
+        base = f"http://{getattr(_current, 'host', None) or 'localhost'}"
+    return str(base)
+
+
 def redirect_uri() -> str:
     """Where Google sends the browser back: <WAYPOINT_PUBLIC_URL>/api/mailboxes/callback (the address the Google client
     allows), or this request's own address when none is set (on your own machine)."""
-    base = oidc.config()["public_url"]
-    if not base:
-        if oidc.enabled():   # a client-chosen Host header isn't an address to send a sign-in's mailbox back to
-            raise ApiError("Gmail needs WAYPOINT_PUBLIC_URL to be set.")
-        base = f"http://{getattr(_current, 'host', None) or 'localhost'}"   # on your own machine, without sign-in
-    return base + "/api/mailboxes/callback"
+    return public_base("Gmail") + "/api/mailboxes/callback"
 
 
 def _when(t: float | None) -> str | None:

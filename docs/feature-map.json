@@ -229,6 +229,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_reminders.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -468,6 +469,90 @@
       ],
       "docs": [
         "start/gmail"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/reminders",
+      "handler": "waypoint/server/api/reminders.py:api_reminders",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/reminders",
+      "handler": "waypoint/server/api/reminders.py:api_reminders_set",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/reminders/devices",
+      "handler": "waypoint/server/api/reminders.py:api_device_add",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/reminders/devices/{id}",
+      "handler": "waypoint/server/api/reminders.py:api_device_remove",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/feed",
+      "handler": "waypoint/server/api/reminders.py:api_feed_make",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/feed",
+      "handler": "waypoint/server/api/reminders.py:api_feed_off",
+      "web": [
+        "frontend/src/lib/components/settings/RemindersSection.svelte"
+      ],
+      "tests": [
+        "tests/test_reminders.py"
+      ],
+      "docs": [
+        "start/reminders"
       ]
     },
     {

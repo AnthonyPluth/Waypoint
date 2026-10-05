@@ -217,6 +217,7 @@ class MigrationTests(unittest.TestCase):
             self.assertNotIn("scan_error", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
             c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="enc:v1:x", status="connected"))
             command.upgrade(db.alembic_config(c), "0007")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:
             self.assertIsNone(conn.execute(select(schema.mailboxes.c.scan_error)).scalar())   # a mailbox from before has no scan error
@@ -238,6 +239,33 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(set(sa.inspect(c).get_table_names()) & scan_tables, set())
             self.assertNotIn("scan_error", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
             self.assertIn("mailboxes", sa.inspect(c).get_table_names())
+
+    def test_0008_makes_the_reminder_and_feed_tables_and_takes_them_away(self):
+        from alembic import command
+        db.init(self.path)
+        tables = {"push_devices", "reminder_prefs", "reminders_sent", "calendar_feeds"}
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0007")
+            self.assertEqual(set(sa.inspect(c).get_table_names()) & tables, set())
+            command.upgrade(db.alembic_config(c), "0008")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:
+            conn.execute(insert(schema.push_devices).values(owner_sub="u", endpoint="https://push.example.com/a", p256dh="k",
+                                                            auth="a", created=1.0))
+            conn.execute(insert(schema.reminder_prefs).values(owner_sub="u", check_in=True, day_of=False))
+            conn.execute(insert(schema.reminders_sent).values(owner_sub="u", kind="check_in", ref="1@2026-11-20T19:00", sent=1.0))
+            conn.execute(insert(schema.calendar_feeds).values(owner_sub="u", key_hash="h1", created=1.0))
+        for table, values in ((schema.push_devices, dict(owner_sub="v", endpoint="https://push.example.com/a", p256dh="k", auth="a", created=2.0)),
+                              (schema.reminder_prefs, dict(owner_sub="u", check_in=True, day_of=True)),   # one choice per member
+                              (schema.reminders_sent, dict(owner_sub="u", kind="check_in", ref="1@2026-11-20T19:00", sent=2.0)),
+                              (schema.calendar_feeds, dict(owner_sub="u", key_hash="h2", created=2.0)),   # one feed per member
+                              (schema.calendar_feeds, dict(owner_sub="w", key_hash="h1", created=2.0))):   # and one key per feed
+            with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:   # (each in a session of its own: Postgres ends a transaction at an error)
+                conn.execute(insert(table).values(**values))
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0007")
+            self.assertEqual(set(sa.inspect(c).get_table_names()) & tables, set())
+            self.assertIn("scanned_messages", sa.inspect(c).get_table_names())
 
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating

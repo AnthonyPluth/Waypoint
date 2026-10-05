@@ -18,9 +18,20 @@ export interface BackupContents {
   database: "sqlite" | "postgres";
 }
 
+/** A browser's push subscription (`PushSubscription.toJSON()`). */
+export interface DeviceBody {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
 export interface Disconnected {
   ok: boolean;
   revoked: boolean;
+}
+
+export interface FeedMade {
+  url: string;
 }
 
 /**
@@ -142,6 +153,27 @@ export interface PersonBody {
   first_name?: string | null;
   legal_name?: string | null;
   aliases?: string[];
+}
+
+/** A browser or phone that gets this member's notifications. */
+export interface ReminderDevice {
+  id: number;
+  service: string;
+  created: number;
+}
+
+/** The signed-in member's own: which reminders they get, their devices, and whether they have a calendar feed. */
+export interface Reminders {
+  public_key: string;
+  check_in: boolean;
+  day_of: boolean;
+  devices: ReminderDevice[];
+  feed: boolean;
+}
+
+export interface RemindersBody {
+  check_in: boolean;
+  day_of: boolean;
 }
 
 export interface Restored {
@@ -353,6 +385,12 @@ export interface Endpoints {
   "POST /api/mailboxes/connect": { body: never; reply: Started };
   "DELETE /api/mailboxes/{id}": { body: never; reply: Disconnected };
   "POST /api/mailboxes/{id}/scan": { body: never; reply: ScanStarted };
+  "GET /api/reminders": { body: never; reply: Reminders };
+  "POST /api/reminders": { body: RemindersBody; reply: Reminders };
+  "POST /api/reminders/devices": { body: DeviceBody; reply: ReminderDevice };
+  "DELETE /api/reminders/devices/{id}": { body: never; reply: Ok };
+  "POST /api/feed": { body: never; reply: FeedMade };
+  "DELETE /api/feed": { body: never; reply: Ok };
   "GET /api/review": { body: never; reply: Review };
   "POST /api/review/who/{id}": { body: WhoBody; reply: Matched };
   "POST /api/review/{id}/ignore": { body: never; reply: Ok };
