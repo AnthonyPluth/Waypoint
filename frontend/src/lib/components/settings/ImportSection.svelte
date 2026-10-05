@@ -52,7 +52,9 @@
   }
 
   async function add() {
-    const rows = preview?.rows.filter((r) => r.status === "new") ?? [];
+    // In date order, so the trips they're grouped into don't depend on the file's order or on where the batches split.
+    const rows = (preview?.rows.filter((r) => r.status === "new") ?? [])
+      .sort((a, b) => (a.day! + (a.start_local ?? "")).localeCompare(b.day! + (b.start_local ?? "")) || a.line - b.line);
     let added = 0, existing = 0;
     const ok = await act(async () => {
       for (let i = 0; i < rows.length; i += BATCH) {

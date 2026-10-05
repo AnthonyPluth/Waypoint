@@ -264,10 +264,33 @@ class SaveTests(Importer):
     def test_a_flight_with_no_times_counts_in_distance_but_not_in_time(self):
         self.save_new("flighty")
         seg = next(s for s in self.segments(self.jane) if s.origin == "LAX")
-        self.assertEqual((seg.start_local, seg.end_local), ("2025-03-08T00:00", "2025-03-08T03:00"))   # no duration: the same moment
+        self.assertEqual((seg.start_local, seg.end_local), ("2025-03-08T00:00", "2025-03-08T03:00"))   # the same moment: no duration
         self.assertEqual(trips.decode_details(seg.details)["time_unknown"], "yes")
         self.assertEqual((seg.origin, seg.destination), ("LAX", "JFK"))   # the places, so the distance
         self.assertEqual(trips.instant(seg.end_local, seg.end_zone), trips.instant(seg.start_local, seg.start_zone))
+
+    def test_a_flight_with_no_times_is_on_one_day_at_both_airports_whichever_way_it_flies(self):
+        for origin, destination in (("JFK", "LAX"), ("LAX", "JFK"), ("SYD", "LAX"), ("LAX", "SYD"), ("JFK", "JFK")):
+            with self.subTest(route=f"{origin}-{destination}"):
+                done = flight_import.save(self.c, self.jane, [{"day": "2025-06-10", "origin": origin, "destination": destination}],
+                                          self.on(self.jane.person_id))
+                self.assertEqual(done.added, 1)
+                seg = next(s for s in self.segments(self.jane) if (s.origin, s.destination) == (origin, destination))
+                self.assertEqual((seg.start_local[:10], seg.end_local[:10]), ("2025-06-10", "2025-06-10"))
+                self.assertEqual(trips.instant(seg.start_local, seg.start_zone), trips.instant(seg.end_local, seg.end_zone))
+                trip = next(t for t in trips.listing(self.c, self.jane) if t["id"] == seg.trip_id)
+                self.assertEqual((trip["start_date"], trip["end_date"]), ("2025-06-10", "2025-06-10"))
+                trips.delete_segment(self.c, self.jane, seg.id)
+
+    def test_giving_an_untimed_flight_real_times_makes_them_real(self):
+        self.save_new("flighty")
+        seg = next(s for s in self.segments(self.jane) if s.origin == "LAX")
+        trips.edit_segment(self.c, self.jane, seg.id, {"details": {"seat": "3A", "time_unknown": "yes"}})   # not the times: still untimed
+        self.assertEqual(trips.decode_details(self.c.orm.get(Segment, seg.id).details).get("time_unknown"), "yes")
+        got = trips.edit_segment(self.c, self.jane, seg.id, {"start_local": "2025-03-08T09:00", "end_local": "2025-03-08T17:30"})
+        assert got is not None
+        self.assertNotIn("time_unknown", got["details"])
+        self.assertEqual(got["details"]["seat"], "3A")
 
     def test_the_importer_picks_who_was_on_them(self):
         self.save_new("appintheair", travelers=self.on(self.jane.person_id, self.mia))

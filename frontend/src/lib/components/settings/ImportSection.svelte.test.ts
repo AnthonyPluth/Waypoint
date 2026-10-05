@@ -69,6 +69,18 @@ describe("Settings → Import past flights", () => {
     await waitFor(() => expect(screen.queryByTestId("import-preview")).toBeNull());
   });
 
+  it("sends the new flights in date order, whatever order the file had", async () => {
+    const saved = vi.fn(() => ({ added: 3, existing: 0 }));
+    serve(preview([row(2, { day: "2025-05-01", origin: "SEA" }), row(3, { day: "2025-03-01", origin: "JFK" }), row(4, { day: "2025-04-01", origin: "ORD" })]), saved);
+    render(ImportSection);
+    await choose(csv());
+    await screen.findByTestId("import-preview");
+    await userEvent.click(screen.getByRole("button", { name: "Add 3 flights" }));
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+    const sent = saved.mock.calls[0] as unknown as [{ flights: { origin: string }[] }];
+    expect(sent[0].flights.map((f) => f.origin)).toEqual(["JFK", "ORD", "SEA"]);
+  });
+
   it("sends a long file back a thousand flights at a time", async () => {
     const saved = vi.fn((b: { flights: unknown[] }) => ({ added: b.flights.length, existing: 0 }));
     serve(preview(Array.from({ length: 2300 }, (_, i) => row(i + 2, { origin: "JFK", day: "2025-03-01" }))), saved);

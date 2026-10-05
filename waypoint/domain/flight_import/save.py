@@ -5,7 +5,7 @@ Times are wall-clock times at the airports (AGENTS.md, "Times are where they hap
 (or in UTC) is put at its airport's zone, one without is taken to be the airport's already, and nothing is converted to
 the server's zone. An arrival that gives only a time of day is on the day it first can be after the departure. A flight
 the file gives no (or no usable) times for keeps none: it counts in distance but not in time in the air (its segment
-says `time_unknown` and starts and ends at the same moment, midnight at its origin, so it has no duration)."""
+says `time_unknown` and starts and ends at the same moment, on its day at both airports, so it has no duration)."""
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -149,12 +149,15 @@ def _segment(flight: FlightIn, zones: Mapping[str, str]) -> trips.SegmentIn:
     details = {k: v for k, v in (("flight_number", flight.get("flight_number")), ("seat", flight.get("seat")),
                                  ("cabin", flight.get("cabin"))) if v}
     if not (start and end):
-        # No times: it starts at midnight of its day and ends at that same moment (at the other airport's clock), so it has
-        # no duration, and says so.
-        start, end = f"{flight['day']}T00:00", f"{flight['day']}T00:00"
+        # No times: one moment on its day (the later of the day's two midnights, so it's still that day at both airports),
+        # written at each airport's clock. It has no duration, and both ends are on the same date whichever way it flies.
+        day = datetime.fromisoformat(f"{flight['day']}T00:00")
+        start = end = f"{flight['day']}T00:00"
         origin, destination = zones.get(flight["origin"].upper()), zones.get(flight["destination"].upper())
         if origin and destination:
-            end = datetime.fromisoformat(start).replace(tzinfo=ZoneInfo(origin)).astimezone(ZoneInfo(destination)).strftime("%Y-%m-%dT%H:%M")
+            moment = max(day.replace(tzinfo=ZoneInfo(origin)), day.replace(tzinfo=ZoneInfo(destination)))
+            start = moment.astimezone(ZoneInfo(origin)).strftime("%Y-%m-%dT%H:%M")
+            end = moment.astimezone(ZoneInfo(destination)).strftime("%Y-%m-%dT%H:%M")
         details[trips.TIME_UNKNOWN] = "yes"
     return {"kind": "flight", "origin": flight["origin"], "destination": flight["destination"], "start_local": start,
             "end_local": end, "provider": flight.get("airline"), "details": details}

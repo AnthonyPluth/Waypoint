@@ -484,6 +484,9 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id).order_by(SegmentTraveler.id)).all()]
     before = _current(seg, old)
     merged: SegmentIn = {**before, **changes}
+    if untimed(before.get("details") or {}) and any(k in changes and changes[k] != before.get(k) for k in ("start_local", "end_local")):
+        # (a person who gives an untimed segment real times has made them real)
+        merged["details"] = {k: v for k, v in (merged.get("details") or {}).items() if k != TIME_UNKNOWN}
     for place, zone in (("origin", "start_zone"), ("destination", "end_zone")):
         # (only an airport gives a zone; a stay's or a rental's is the person's)
         if place in changes and zone not in changes and changes.get(place) != before.get(place) and merged.get("kind") == "flight":
