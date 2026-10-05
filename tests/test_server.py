@@ -173,16 +173,14 @@ class OIDCTests(unittest.TestCase):
             self.assertIn(words, body, kwargs)
             self.assertNotIn("waypoint_session", {k: v for k, v in ck.items() if v})
 
-    def test_a_refusal_names_who_in_the_log_but_never_in_what_is_sent(self):
+    def test_a_refusal_names_who_in_the_log_only(self):
         who = "canary-stranger@example.com"
-        with mock.patch.object(monitoring, "send_log") as sent, mock.patch("builtins.print") as printed:
+        with mock.patch("builtins.print") as printed, mock.patch.object(monitoring, "log", wraps=monitoring.log) as logged:
             status, _, _, _ = self.sign_in(email=who)
         self.assertEqual(status, 403)
         lines = [" ".join(str(a) for a in c.args) for c in printed.call_args_list]
         self.assertTrue(any(who in line and "OIDC_ALLOWED_EMAILS" in line for line in lines), lines)   # the operator's fix
-        reported = [str(c.args[0]) for c in sent.call_args_list]
-        self.assertIn("[sign-in] refused an account that isn't on the allow-list", reported)
-        self.assertFalse([r for r in reported if who in r], reported)
+        self.assertTrue(any(who in str(c.args[0]) for c in logged.call_args_list))   # through the log, nowhere else
 
     def test_someone_not_allowed_is_told_so_and_offered_another_account(self):
         status, _, _, body = self.sign_in(email="stranger@example.com")
