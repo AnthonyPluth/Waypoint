@@ -15,7 +15,7 @@ from ..contract import Airport, MergeBody, Ok, Segment, SegmentBody, SegmentEdit
 
 NAME_LIMIT = 100
 NOTES_LIMIT = 4000
-ADDRESS_LIMIT = 300
+ADDRESS_LIMIT = trips.ADDRESS_LIMIT
 MAX_TRAVELERS = 20
 MAX_SEGMENTS_MOVED = 200
 _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {limit} characters)")

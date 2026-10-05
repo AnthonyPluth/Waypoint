@@ -45,7 +45,7 @@ beforeEach(() => {
   route.page = "trip"; route.sub = "1"; location.hash = "#trip/1";
   serve();
 });
-afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); flightStatus.list = null; });
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); flightStatus.list = null; });
 
 describe("Trip", () => {
   it("shows a flight’s live status on its card and none on a stay", async () => {
@@ -314,7 +314,6 @@ describe("Trip", () => {
       expect(writeText).toHaveBeenCalledWith("1 Quay Street\nLondon E1 0AA");
       expect(screen.queryByRole("button", { name: /Add address/ })).toBeNull();
       expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", stay.links.directions!);
-      vi.unstubAllGlobals();
     });
 
     it("offers Add address only when there is none, and opens the form at the address field", async () => {

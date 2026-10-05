@@ -270,6 +270,10 @@ class SegmentTests(Household):
         self.assertEqual(trips.merge_email_segment(self.c, self.jane, mail), "unchanged")
         self.assertEqual(trips.get_segment(self.c, self.jane, empty["id"])["details"], {"address": "2 Dock Road"})
 
+    def test_an_address_from_an_email_is_cut_to_the_limit_so_the_booking_can_still_be_edited(self):
+        seg = self.add(self.jane, {**HOTEL, "details": {"address": "x" * 400}})
+        self.assertEqual(len(seg["details"]["address"]), 300)
+
     def test_moving_a_flights_airport_takes_its_zone_along_unless_given(self):
         seg = self.add(self.jane, OUT)
         moved = trips.edit_segment(self.c, self.jane, seg["id"], {"origin": "ORD", "start_local": "2026-06-01T18:00"})
