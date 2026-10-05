@@ -55,8 +55,12 @@
       "method": "GET",
       "path": "/api/mailboxes",
       "handler": "waypoint/server/api/mailboxes.py:api_mailboxes",
-      "web": [],
-      "tests": [],
+      "web": [
+        "frontend/src/lib/components/settings/GmailSection.svelte"
+      ],
+      "tests": [
+        "tests/test_gmail.py"
+      ],
       "docs": [
         "start/gmail"
       ]
@@ -65,8 +69,12 @@
       "method": "POST",
       "path": "/api/mailboxes/connect",
       "handler": "waypoint/server/api/mailboxes.py:api_mailbox_connect",
-      "web": [],
-      "tests": [],
+      "web": [
+        "frontend/src/lib/components/settings/GmailSection.svelte"
+      ],
+      "tests": [
+        "tests/test_gmail.py"
+      ],
       "docs": [
         "start/gmail"
       ]
@@ -76,7 +84,9 @@
       "path": "/api/mailboxes/callback",
       "handler": "waypoint/server/api/mailboxes.py:api_mailbox_callback",
       "web": [],
-      "tests": [],
+      "tests": [
+        "tests/test_gmail.py"
+      ],
       "docs": [
         "start/gmail"
       ]
@@ -85,8 +95,12 @@
       "method": "DELETE",
       "path": "/api/mailboxes/{id}",
       "handler": "waypoint/server/api/mailboxes.py:api_mailbox_disconnect",
-      "web": [],
-      "tests": [],
+      "web": [
+        "frontend/src/lib/components/settings/GmailSection.svelte"
+      ],
+      "tests": [
+        "tests/test_gmail.py"
+      ],
       "docs": [
         "start/gmail"
       ]
