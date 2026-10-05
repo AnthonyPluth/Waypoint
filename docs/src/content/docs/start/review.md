@@ -9,7 +9,7 @@ sidebar:
 
 ## Couldn’t read
 
-When a message looks like a booking (it’s from an airline, hotel, rental company, railway or booking site, and it has a confirmation word in it) but Waypoint can’t get a booking out of it, the message lands here instead of being guessed at or dropped. Each item shows who it came from, its subject and the day it was sent, and why:
+When a message looks like a booking (it’s from an airline, hotel, rental company, railway or booking site, and it has a confirmation word in it) but Waypoint can’t get a booking out of it, the message lands here instead of being guessed at or dropped. Each item shows who it came from, the day it was sent and why (not its subject: that is email content, which Waypoint doesn’t keep):
 
 - **No booking details found**: the email carries no machine-readable booking, and Waypoint doesn’t have a parser for that sender yet.
 - **Some details missing**: it has booking markup, but not enough to make a segment (no arrival time, an airport Waypoint doesn’t know, a hotel whose time zone Waypoint can’t work out).
@@ -22,7 +22,7 @@ For each one you can:
 - **Ignore this sender**: later scans skip that sender’s mail for this mailbox, and its other items leave the list.
 - **Dismiss**: it isn’t a booking, so take it off. Waypoint remembers it has read the message, so it doesn’t come back.
 
-Items are private to the member whose mailbox they came from: nobody else sees them, or even that they exist. Waypoint keeps the sender’s domain, the day, and the subject (encrypted with `WAYPOINT_SECRET_KEY`, like a mailbox’s token), never the message’s text.
+Items are private to the member whose mailbox they came from: nobody else sees them, or even that they exist. Waypoint keeps the sender’s domain and the day, never the message’s subject or text.
 
 ## Who is this?
 

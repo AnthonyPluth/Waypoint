@@ -38,7 +38,6 @@ class FixtureTests(unittest.TestCase):
         m = fixture("flight_jsonld")
         self.assertEqual((m.sender_domain, m.received, m.unread, m.broken, m.markup),
                          ("example-air.example", "2026-10-12", 0, False, True))
-        self.assertIn("e-ticket", m.subject)
         [b] = m.bookings
         self.assertEqual((b.kind, b.status, b.confirmation, b.provider, b.origin, b.destination),
                          ("flight", "confirmed", "QX7M2K", "Example Air", "JFK", "LHR"))
@@ -73,7 +72,6 @@ class FixtureTests(unittest.TestCase):
     def test_mail_with_no_markup_has_no_bookings(self):
         m = fixture("no_markup")
         self.assertEqual((m.bookings, m.unread, m.markup, m.broken), ((), 0, False, False))
-        self.assertIn("CANARY-SUBJECT-NOMARKUP", m.subject)   # (a label for the review queue; the body is never kept)
 
     def test_a_reservation_missing_what_it_needs_is_counted_not_guessed(self):
         m = fixture("incomplete")
@@ -158,7 +156,7 @@ class MarkupTests(unittest.TestCase):
 
     def test_the_sender_and_the_day_as_written(self):
         m = self.read(eml("<p>x</p>", sender='"Example, Air" <No-Reply@Mail.Example-Air.example>', subject="Hi"))
-        self.assertEqual((m.sender_domain, m.received, m.subject), ("mail.example-air.example", "2026-10-12", "Hi"))
+        self.assertEqual((m.sender_domain, m.received), ("mail.example-air.example", "2026-10-12"))
         none = self.read(b"Subject: x\n\n")
         self.assertEqual((none.sender_domain, none.received), (None, None))
         bad_date = self.read(b"From: a@example.com\nDate: not a date\n\nx")
@@ -178,12 +176,16 @@ class MarkupTests(unittest.TestCase):
 class WallClockTests(unittest.TestCase):
     def test_a_time_with_its_places_offset_keeps_what_is_written(self):
         self.assertEqual(extract.wall_clock("2026-03-01T22:15:00+13:00"), "2026-03-01T22:15:00")
-        self.assertEqual(extract.wall_clock("2026-03-01T22:15:00+00:00", "Europe/London"), "2026-03-01T22:15:00")
+        self.assertEqual(extract.wall_clock("2026-03-01T22:15:00+13:00", "Pacific/Auckland"), "2026-03-01T22:15:00")
+        self.assertEqual(extract.wall_clock("2026-03-01T22:15:00+00:00", "Europe/London"), "2026-03-01T22:15:00")   # (London in March is UTC)
         self.assertEqual(extract.wall_clock("2026-03-01T22:15"), "2026-03-01T22:15:00")
         self.assertEqual(extract.wall_clock("2026-03-01 22:15:00"), "2026-03-01T22:15:00")
 
-    def test_a_time_in_utc_is_moved_into_the_places_own_zone_and_needs_one(self):
+    def test_a_time_in_utc_or_another_offset_than_the_places_is_moved_into_its_own_zone_and_needs_one(self):
         self.assertEqual(extract.wall_clock("2026-03-01T09:15:00Z", "Pacific/Auckland"), "2026-03-01T22:15:00")
+        self.assertEqual(extract.wall_clock("2026-03-01T09:15:00+00:00", "Pacific/Auckland"), "2026-03-01T22:15:00")
+        self.assertEqual(extract.wall_clock("2026-07-01T12:00:00+00:00", "Europe/London"), "2026-07-01T13:00:00")   # (BST)
+        self.assertIsNone(extract.wall_clock("2026-03-01T09:15:00+00:00"))
         self.assertIsNone(extract.wall_clock("2026-03-01T09:15:00Z"))
         self.assertIsNone(extract.wall_clock("2026-03-01T09:15:00Z", "Not/AZone"))
 

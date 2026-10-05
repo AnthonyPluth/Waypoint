@@ -92,12 +92,11 @@ class Disconnected(TypedDict):
 # Review: mail that looked like a booking and couldn't be read, and names on bookings to match to people
 
 class ReviewItem(TypedDict):
-    """One message Waypoint couldn't read, for the member whose mailbox it is. Never its text: who it came from, its
-    subject and its day."""
+    """One message Waypoint couldn't read, for the member whose mailbox it is. Never its subject or text: only who it
+    came from and its day (Open in Gmail shows the message)."""
     id: int
     address: str                    # the mailbox it came from
     sender_domain: str              # empty when the message didn't say
-    subject: str | None             # null when Waypoint can't unlock it any more (its key changed)
     received: str | None            # a day, YYYY-MM-DD
     reason: Literal["no_markup", "incomplete", "broken"]   # no booking details in it; some missing; couldn't be opened
     gmail_url: str                  # opens the message in Gmail

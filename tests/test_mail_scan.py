@@ -372,24 +372,17 @@ class ReviewTests(ScanCase):
         self.assertEqual({(i["reason"], i["sender_domain"], i["received"]) for i in items},
                          {("no_markup", "example-air.example", "2026-10-17"), ("incomplete", "example-air.example", "2026-10-18")})
         nomarkup = next(i for i in items if i["reason"] == "no_markup")
-        self.assertEqual((nomarkup["subject"], nomarkup["address"]), ("Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F", ADDRESS))
+        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "sender_domain", "received", "reason", "gmail_url"}))
         self.assertEqual(nomarkup["gmail_url"], "https://mail.google.com/mail/u/jane@gmail.example/#all/msg-no_markup")
         self.assertEqual(self.items("u-sam"), [])
         self.assertEqual(self.scanned(), {"msg-no_markup": "unreadable", "msg-incomplete": "unreadable", "msg-flight_jsonld": "booking"})
 
-    def test_the_subject_is_encrypted_and_the_body_never_kept(self):
+    def test_neither_the_subject_nor_the_body_is_kept(self):
         self.put("no_markup")
         self.scan()
-        stored = self.read(lambda conn: conn.execute(select(ReviewItem.subject, ReviewItem.sender_domain, ReviewItem.received)).fetchone())
-        self.assertTrue(secretbox.is_encrypted(stored["subject"]))
-        self.assertNotIn("CANARY", stored["subject"])
+        stored = self.read(lambda conn: dict(conn.execute(select(ReviewItem)).fetchone()))
+        self.assertEqual(sorted(stored), ["created", "id", "mailbox_id", "message_id", "reason", "received", "sender_domain"])
         self.assertEqual((stored["sender_domain"], stored["received"]), ("example-air.example", "2026-10-17"))
-
-    def test_a_subject_that_cannot_be_unlocked_is_shown_as_none(self):
-        self.put("no_markup")
-        self.scan()
-        self.read(lambda conn: conn.execute(update(ReviewItem).values(subject=secretbox.PREFIX + "bad")))
-        self.assertIsNone(self.items()[0]["subject"])
 
     def test_a_message_that_cannot_be_decoded_is_queued_as_broken(self):
         self.google.mail["bad"] = b""
@@ -397,7 +390,7 @@ class ReviewTests(ScanCase):
         with mock.patch("waypoint.domain.mail.extract._decode", return_value=None):
             self.scan()
         [item] = self.items()
-        self.assertEqual((item["reason"], item["sender_domain"], item["subject"]), ("broken", "", ""))
+        self.assertEqual((item["reason"], item["sender_domain"]), ("broken", ""))
         self.assertEqual(self.read(lambda conn: review.ignore_sender(conn, "u-jane", item["id"])), None)   # no sender to ignore
 
     def test_a_booking_that_cannot_be_placed_is_queued_not_guessed(self):
@@ -748,7 +741,7 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(status, 200)
         self.assertEqual(sorted(i["reason"] for i in mine["items"]), ["incomplete", "no_markup"])
         item = next(i for i in mine["items"] if i["reason"] == "no_markup")
-        self.assertEqual((item["address"], item["sender_domain"], item["subject"].startswith("Your itinerary")), ("ana@gmail.example", "example-air.example", True))
+        self.assertEqual((item["address"], item["sender_domain"], item["received"]), ("ana@gmail.example", "example-air.example", "2026-10-17"))
         self.assertEqual(self.call("ben", "GET", "/api/review")[1], {"items": [], "who": []})
         for method, path in (("DELETE", f"/api/review/{item['id']}"), ("POST", f"/api/review/{item['id']}/ignore")):
             status, body = self.call("ben", method, path, {} if method == "POST" else None)

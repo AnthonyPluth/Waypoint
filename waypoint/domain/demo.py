@@ -62,10 +62,10 @@ READ_FROM_EMAIL: trips.SegmentIn = {
     "kind": "flight", "origin": "JFK", "destination": "ORD", "start_local": "2027-02-03T07:00", "end_local": "2027-02-03T08:45",
     "confirmation": "CH3K5P", "provider": "Example Air", "details": {"flight_number": "EX 410"}}
 
-# The household's one connected mailbox, and two messages Waypoint couldn't read (sender's domain, subject, day, why).
+# The household's one connected mailbox, and two messages Waypoint couldn't read (sender's domain, day, why).
 DEMO_MAILBOX = "jane.doe@gmail.example"
-UNREAD: list[tuple[str, str, str, review.Reason]] = [("example-air.example", "Your itinerary and receipt", "2026-09-14", "no_markup"),
-          ("example-stays.example", "Reservation confirmation", "2026-09-20", "incomplete")]
+UNREAD: list[tuple[str, str, review.Reason]] = [("example-air.example", "2026-09-14", "no_markup"),
+                                                  ("example-stays.example", "2026-09-20", "incomplete")]
 
 
 def _on(*ids: int | None) -> list[trips.TravelerIn]:
@@ -92,8 +92,8 @@ def seed(conn: db.Connection) -> int:
                   status="connected", created=0.0, last_scan=1_790_000_000.0)
     conn.orm.add(box)
     conn.orm.flush()
-    for domain, subject, day, reason in UNREAD:
-        review.add(conn, box.id, f"demo-{domain}", domain, subject, day, reason, 0.0)
+    for domain, day, reason in UNREAD:
+        review.add(conn, box.id, f"demo-{domain}", domain, day, reason, 0.0)
     by_name = {p["display_name"]: p["id"] for p in people.everyone(conn)}
     for who, kind, program, number, tier, expiry, notes in MEMBERSHIPS:
         loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number, "tier": tier,

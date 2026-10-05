@@ -5,7 +5,7 @@ confirmation words, no promotions), so mail that doesn't match is never download
 later ones take what Gmail's history says was added since the last one's end, among the messages that search finds. Each
 message is fetched, read in memory by extract.py and thrown away: what's kept is the booking's fields (as segments, booked
 by the mailbox's owner), the message's id and what came of it (`scanned_messages`, so nothing is read twice) and, for mail
-that looked like a booking but couldn't be read, a review item (its sender's domain, its subject encrypted, its day).
+that looked like a booking but couldn't be read, a review item (its sender's domain and its day; never its subject or text).
 
 Each message is filed and committed on its own, so a scan that stops halfway keeps what it did, and the scan's end (the
 history id and time it resumes from) moves only when it finishes: the last good state stays, and the mailbox says in a
@@ -112,7 +112,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     queued = 0
     if failed or message.unread or not usable:
         reason: review.Reason = "broken" if message.broken else "incomplete" if message.markup or message.bookings else "no_markup"
-        review.add(conn, mailbox_id, message_id, message.sender_domain, message.subject, message.received, reason, now)
+        review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, reason, now)
         queued = 1
     _record(conn, mailbox_id, message_id, BOOKING if usable else UNREADABLE, now)
     return made, queued
@@ -175,8 +175,7 @@ def _scan(mailbox_id: int, now: float, today: date) -> Result:
                 # queue, and the reason is reported (without what it held).
                 monitoring.report(e, values=False)
                 with db.session() as conn:
-                    review.add(conn, mailbox_id, message_id, message.sender_domain, message.subject, message.received,
-                               "incomplete", now)
+                    review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "incomplete", now)
                     _record(conn, mailbox_id, message_id, UNREADABLE, now)
                 a, b = 0, 1
             read, made, queued = read + 1, made + a, queued + b

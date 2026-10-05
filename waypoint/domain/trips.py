@@ -672,6 +672,11 @@ def unmatched(conn: db.Connection, viewer: Viewer) -> list[tuple[SegmentTraveler
     return [(t, outs[t.segment_id]) for t in found if t.segment_id in outs]
 
 
+def unmatched_count(conn: db.Connection, viewer: Viewer) -> int:
+    """How many names on the viewer's segments wait for a person (what `unmatched` lists), without building the list."""
+    return len(visibility.visible_unmatched(conn, viewer))
+
+
 def name_traveler(conn: db.Connection, viewer: Viewer, traveler_id: int, person_id: int) -> int | None:
     """Say who a name on a booking is: this traveller, and every other unmatched traveller the viewer sees with the same
     printed name, become the person (a person already on the segment isn't added twice), and the printed name is kept

@@ -1,8 +1,8 @@
 """The "Couldn't read" queue: mail that looked like a booking and couldn't be read, and the senders a person stopped
 reviewing. Each item belongs to its mailbox's owner and is visible to no one else: every read and change here starts from
 the owner (a mailbox that isn't theirs answers as one that isn't there). An item holds the message's id, its sender's
-domain, its day and its subject, encrypted (this is one of the places that decrypts, with `waypoint-decrypt`'s
-allowance); never the message's text. A person opens the message in Gmail, adds the booking by hand, or ignores the sender."""
+domain and its day; never the message's subject or text (those are email content: AGENTS.md, "Email stays on the
+server"). A person opens the message in Gmail, adds the booking by hand, or ignores the sender."""
 from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
@@ -10,7 +10,7 @@ from typing import Any, Literal, TypedDict
 from sqlalchemy import delete, func, select
 
 from ...providers import gmail
-from ...storage import db, secretbox
+from ...storage import db
 from ...storage.models import IgnoredSender, Mailbox, ReviewItem
 
 Reason = Literal["no_markup", "incomplete", "broken"]
@@ -21,36 +21,27 @@ class ItemOut(TypedDict):
     id: int
     address: str                  # the mailbox it came from
     sender_domain: str
-    subject: str | None           # None: Waypoint can't unlock it (the key changed)
     received: str | None
     reason: Reason
     gmail_url: str
 
 
-def add(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: str | None, subject: str,
-        received: str | None, reason: Reason, now: float) -> None:
+def add(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: str | None, received: str | None,
+        reason: Reason, now: float) -> None:
     """Queue a message for review (once: asking again for a message already there changes nothing)."""
     db.insert_ignore(conn, ReviewItem, {"mailbox_id": mailbox_id, "message_id": message_id,
                                         "sender_domain": sender_domain or UNKNOWN_SENDER,
-                                        "subject": secretbox.encrypt(subject) if subject else None,
                                         "received": received, "reason": reason, "created": now},
                      key=["mailbox_id", "message_id"])
 
 
-def _subject(stored: str | None) -> str | None:
-    try:
-        return secretbox.decrypt(stored) or ""
-    except secretbox.SecretError:
-        return None
-
-
 def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
     """`owner`'s own items, newest message first."""
-    rows = conn.execute(select(ReviewItem.id, ReviewItem.message_id, ReviewItem.sender_domain, ReviewItem.subject,
+    rows = conn.execute(select(ReviewItem.id, ReviewItem.message_id, ReviewItem.sender_domain,
                                ReviewItem.received, ReviewItem.reason, Mailbox.address)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(Mailbox.owner_sub == owner)
                         .order_by(ReviewItem.received.is_(None), ReviewItem.received.desc(), ReviewItem.id.desc())).fetchall()
-    return [{"id": r["id"], "address": r["address"], "sender_domain": r["sender_domain"], "subject": _subject(r["subject"]),
+    return [{"id": r["id"], "address": r["address"], "sender_domain": r["sender_domain"],
              "received": r["received"], "reason": r["reason"], "gmail_url": gmail.open_url(r["address"], r["message_id"])}
             for r in rows]
 

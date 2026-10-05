@@ -181,9 +181,8 @@ rules:
   - id: waypoint-decrypt
     message: >-
       Secrets are decrypted only where they're used: the storage layer (settings), waypoint/oidc.py (a session's ID
-      token, for signing out), waypoint/domain/loyalty.py (loyalty and Known Traveler numbers),
-      waypoint/domain/mail/review.py (the subject of mail Waypoint couldn't read) and waypoint/providers/gmail.py
-      (mailbox tokens). Anywhere else, ask one of those.
+      token, for signing out), waypoint/domain/loyalty.py (loyalty and Known Traveler numbers) and
+      waypoint/providers/gmail.py (mailbox tokens). Anywhere else, ask one of those.
     severity: ERROR
     languages: [python]
     pattern-either:
@@ -192,8 +191,7 @@ rules:
       - pattern-regex: \bfrom\s+[.\w]*secretbox\s+import\b[^\n]*\bdecrypt\b
     paths:
       include: ["/waypoint/", "/run.py"]
-      exclude: ["/waypoint/storage/", "/waypoint/oidc.py", "/waypoint/domain/loyalty.py", "/waypoint/domain/mail/review.py",
-                "/waypoint/providers/gmail.py"]
+      exclude: ["/waypoint/storage/", "/waypoint/oidc.py", "/waypoint/domain/loyalty.py", "/waypoint/providers/gmail.py"]
 
   - id: waypoint-trip-visibility
     message: >-

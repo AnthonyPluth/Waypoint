@@ -36,7 +36,6 @@ def upgrade() -> None:
         sa.Column('mailbox_id', sa.Integer(), nullable=False),
         sa.Column('message_id', sa.Text(), nullable=False),
         sa.Column('sender_domain', sa.Text(), nullable=False),
-        sa.Column('subject', sa.Text()),
         sa.Column('received', sa.Text()),
         sa.Column('reason', sa.Text(), nullable=False),
         sa.Column('created', sa.Float(), nullable=False),

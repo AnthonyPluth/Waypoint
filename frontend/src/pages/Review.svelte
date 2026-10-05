@@ -57,8 +57,9 @@
   const selectClass = "border-input bg-background dark:bg-input/40 w-full rounded-lg border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
   // ------------------------------------------------------------------------------------------ Couldn't read
-  const subject = (i: ReviewItem) => (i.subject === null ? "Subject can’t be shown (Waypoint’s key changed)" : i.subject || "(no subject)");
+  // An item is named by who it came from and when: Waypoint keeps neither the subject nor the text of an email.
   const sender = (i: ReviewItem) => i.sender_domain || "Unknown sender";
+  const subject = (i: ReviewItem) => `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
 
   // The form to add one by hand: what the email can tell (who it's from) filled in, the rest typed as on the booking.
   type Draft = { item: ReviewItem; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string };
@@ -142,13 +143,13 @@
     {#if review.items.length}
       <section aria-labelledby="unread-title" class="space-y-2">
         <h2 id="unread-title" class="eyebrow px-1">Couldn’t read</h2>
-        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see them, and Waypoint never shows an email’s text: open it in Gmail to read it.</p>
+        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see them, and Waypoint never shows an email’s text: open it in Gmail to read it. Waypoint doesn’t keep their subjects either.</p>
         <ul class="rows" aria-label="Couldn’t read">
           {#each review.items as item (item.id)}
             <li class="row items-start" data-testid="review-item">
               <div class="min-w-0 basis-full sm:basis-0 sm:flex-1">
                 <p class="break-words font-medium">{subject(item)}</p>
-                <p class="break-words text-sm text-muted-foreground">{[sender(item), item.received && `Sent ${item.received}`, item.address].filter(Boolean).join(" · ")}</p>
+                <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, `to ${item.address}`].filter(Boolean).join(" · ")}</p>
                 <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge></p>
               </div>
               <div class="flex flex-wrap gap-2">

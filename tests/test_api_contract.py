@@ -155,7 +155,7 @@ class Replies(DbCase):
         box = self.c.execute(insert(Mailbox).values(owner_sub="u1", address="rosa@gmail.example", token=secretbox.encrypt("t"),
                                                     status="connected", created=1.0)).lastrowid
         for n, reason in enumerate(("no_markup", "incomplete", "broken")):
-            review.add(self.c, box, f"m{n}", f"air{n}.example", "Your itinerary", "2026-10-17", reason, 1.0)   # type: ignore[arg-type]
+            review.add(self.c, box, f"m{n}", f"air{n}.example", "2026-10-17", reason, 1.0)   # type: ignore[arg-type]
         me = Viewer(people_domain.person_for_sub(self.c, "u1"))
         trips.add_segment(self.c, me, {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": "2026-12-08T08:00",
                                        "end_local": "2026-12-08T11:20", "travelers": [{"person_id": None, "name": "DOE/MIA MISS"}]}, source="email")

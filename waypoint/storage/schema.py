@@ -200,12 +200,11 @@ review_items = Table(
     Column('mailbox_id', Integer, refers('review_items', 'mailbox_id', 'mailboxes.id', 'CASCADE'), nullable=False),
     Column('message_id', Text, nullable=False),
     Column('sender_domain', Text, nullable=False),
-    Column('subject', Text),
     Column('received', Text),
     Column('reason', Text, nullable=False),
     Column('created', Float, nullable=False),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_review_items_mailbox_message'),
-    info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner alone; the subject is encrypted, the body is never kept"},
+    info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner alone; neither its subject nor its body is kept"},
 )
 
 ignored_senders = Table(

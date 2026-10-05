@@ -4,9 +4,8 @@ the server"), so the body is read here, in memory, and what comes out is only th
 
 A booking is found in the markup airlines, hotels and rental companies add for Gmail's own cards: schema.org JSON-LD and
 microdata (`FlightReservation`, `LodgingReservation`, `RentalCarReservation`, `TrainReservation`). `read` returns the
-bookings, who the message is from and what it's about (its sender's domain, its subject and its day: the review queue's
-labels, never its text). Times come out as the markup wrote them (`wall_clock` turns one into the place's wall-clock
-time); the zone of a place is the scan's to find, since this module touches no database."""
+bookings, who the message is from and when (its sender's domain and its day: the review queue's labels, never its text). Times come out as the markup wrote them
+(`wall_clock` turns one into the place's wall-clock time); the zone of a place is the scan's to find, since this module touches no database."""
 from __future__ import annotations
 
 import base64
@@ -18,7 +17,7 @@ import json
 import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from typing import Any, Literal
 from urllib.parse import urlsplit
@@ -71,7 +70,6 @@ class Message:
     """What a scan keeps in mind about one message, none of its text. `unread`: reservations in it that were found but
     couldn't be made into a booking (a missing time or place)."""
     sender_domain: str | None
-    subject: str
     received: str | None               # the day on its Date header, as written
     bookings: tuple[Booking, ...] = ()
     unread: int = 0
@@ -364,9 +362,11 @@ def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool]:
 # ------------------------------------------------------------------------------------------------ times
 
 def wall_clock(text: str, zone: str | None = None) -> str | None:
-    """The wall-clock time a booking's time says, as 2026-03-01T22:15:00 with no offset: a time written with its place's
-    offset keeps what's written (that is the local time there). Only a time in UTC ('Z') is moved, into the place's own
-    zone, which it needs (None without one). None when it isn't a date and time."""
+    """The wall-clock time a booking's time says, as 2026-03-01T22:15:00 with no offset, at its place. A time with an offset is
+    an instant, so it is put into the place's own zone (it needs one): when the offset is the place's own that is what is
+    written, and a time in UTC ('Z' or +00:00) for a place that isn't, moves to the place's clock. Without a zone, an offset
+    that isn't UTC is the place's own, so what is written is kept. None when it isn't a date and time, or needs a zone it
+    hasn't."""
     text = text.strip()
     if "T" not in text.upper() and " " not in text:
         return None   # a date alone isn't a time
@@ -374,13 +374,14 @@ def wall_clock(text: str, zone: str | None = None) -> str | None:
         t = datetime.fromisoformat(text)
     except ValueError:
         return None
-    if t.tzinfo is not None and text.upper().endswith("Z"):
-        if not zone:
-            return None
-        try:
-            t = t.astimezone(ZoneInfo(zone))
-        except (ZoneInfoNotFoundError, ValueError, OSError):
-            return None
+    if t.tzinfo is not None:
+        if zone:
+            try:
+                t = t.astimezone(ZoneInfo(zone))
+            except (ZoneInfoNotFoundError, ValueError, OSError):
+                return None
+        elif t.utcoffset() == timedelta(0):
+            return None   # UTC says nothing of the place's clock
     return t.replace(tzinfo=None).isoformat(timespec="seconds")
 
 
@@ -414,12 +415,12 @@ def read(message: Mapping[str, Any]) -> Message:
     for what a message holds: one that can't be decoded comes back `broken`."""
     data = _decode(message.get("raw"))
     if data is None:
-        return Message(None, "", None, broken=True)
+        return Message(None, None, broken=True)
     try:
         parsed = email.message_from_bytes(data, policy=email.policy.default)
-        sender, subject, received = _domain(parsed.get("From")), str(parsed.get("Subject") or ""), _day(parsed.get("Date"))
+        sender, received = _domain(parsed.get("From")), _day(parsed.get("Date"))
     except (ValueError, LookupError, TypeError):
-        return Message(None, "", None, broken=True)
+        return Message(None, None, broken=True)
     nodes: list[dict[str, Any]] = []
     for part in parsed.walk():
         if part.get_content_type() != "text/html":
@@ -438,4 +439,4 @@ def read(message: Mapping[str, Any]) -> Message:
             nodes.extend(_jsonld_nodes(ld))
         nodes.extend(scanner.items)
     bookings, unread, seen = _bookings(nodes)
-    return Message(sender, subject, received, tuple(bookings), unread, markup=seen)
+    return Message(sender, received, tuple(bookings), unread, markup=seen)

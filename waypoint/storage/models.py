@@ -175,7 +175,6 @@ class ReviewItem(Base):
     mailbox_id: Mapped[int]
     message_id: Mapped[str]
     sender_domain: Mapped[str]
-    subject: Mapped[str | None]      # encrypted: read only through waypoint/domain/mail/review.py
     received: Mapped[str | None]     # the day on the message's Date header
     reason: Mapped[str]              # why it couldn't be read: a code (waypoint/domain/mail/review.py)
     created: Mapped[float]

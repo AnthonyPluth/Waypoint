@@ -1,6 +1,6 @@
 """Review: mail Waypoint thought was a booking and couldn't read (visible only to the member whose mailbox it came from,
 with Open in Gmail, Add by hand and Ignore this sender), and the names on bookings that aren't matched to a person yet
-("Who is this?": any traveller on a trip the member sees). Mail is never shown, only who it came from, its subject and its day."""
+("Who is this?": any traveller on a trip the member sees). Mail is never shown, only who it came from and its day."""
 from __future__ import annotations
 
 from collections.abc import Mapping

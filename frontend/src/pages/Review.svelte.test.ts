@@ -12,7 +12,7 @@ import { toast } from "svelte-sonner";
 import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
 
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
-  id: 1, address: "ana@gmail.example", sender_domain: "example-air.example", subject: "Your itinerary", received: "2026-10-17",
+  id: 1, address: "ana@gmail.example", sender_domain: "example-air.example", received: "2026-10-17",
   reason: "no_markup", gmail_url: "https://mail.google.com/mail/u/ana@gmail.example/#all/abc", ...extra });
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
@@ -43,28 +43,28 @@ describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
     render(ReviewPage);
     const list = await screen.findByRole("list", { name: "Couldn’t read" });
-    expect(within(list).getByText("Your itinerary")).toBeInTheDocument();
-    expect(within(list).getByText("example-air.example · Sent 2026-10-17 · ana@gmail.example")).toBeInTheDocument();
+    expect(within(list).getByText("example-air.example")).toBeInTheDocument();
+    expect(within(list).getByText("Mail from example-air.example on 2026-10-17")).toBeInTheDocument();
+    expect(within(list).getByText("Sent 2026-10-17 · to ana@gmail.example")).toBeInTheDocument();
     expect(within(list).getByText(REASONS.no_markup)).toBeInTheDocument();
-    const open = within(list).getByRole("link", { name: /Open “Your itinerary” in Gmail/ });
+    const open = within(list).getByRole("link", { name: /Open .Mail from example-air.example on 2026-10-17. in Gmail/ });
     expect(open).toHaveAttribute("href", "https://mail.google.com/mail/u/ana@gmail.example/#all/abc");
     expect(open).toHaveAttribute("rel", "noopener noreferrer");
     expect(open).toHaveAttribute("target", "_blank");
   });
 
-  it("says what it can when the subject or sender isn’t there", async () => {
-    held = { items: [item({ id: 1, subject: null, reason: "broken", sender_domain: "", received: null }), item({ id: 2, subject: "" })], who: [] };
+  it("says what it can when the sender or the day isn’t there", async () => {
+    held = { items: [item({ id: 1, reason: "broken", sender_domain: "", received: null }), item({ id: 2 })], who: [] };
     render(ReviewPage);
-    expect(await screen.findByText(/Subject can’t be shown/)).toBeInTheDocument();
-    expect(screen.getByText("Unknown sender · ana@gmail.example")).toBeInTheDocument();
-    expect(screen.getByText("(no subject)")).toBeInTheDocument();
+    expect(await screen.findByText("Mail from an unknown sender")).toBeInTheDocument();
+    expect(screen.getByText("to ana@gmail.example")).toBeInTheDocument();
     expect(screen.getByText(REASONS.broken)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /Ignore/ })).toHaveLength(1);   // nothing to ignore for no sender
   });
 
   it("dismisses an item", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Dismiss “Your itinerary”/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss .Mail from example-air.example/ }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
     expect(toast.success).toHaveBeenCalledWith("Dismissed");
     await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
@@ -82,7 +82,7 @@ describe("Review", () => {
 
   it("adds a booking by hand with the provider filled in, then takes the item off the list", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add “Your itinerary” by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
     expect(screen.getByLabelText("Provider")).toHaveValue("Example Air");
     await userEvent.type(screen.getByLabelText("Confirmation code"), "ZZ9Y8X");
     await userEvent.type(screen.getByLabelText("From (airport code)"), "BOS");
@@ -101,7 +101,7 @@ describe("Review", () => {
 
   it("asks for a stay’s time zones, which an airport can’t give", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add “Your itinerary” by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
     await userEvent.selectOptions(screen.getByLabelText("What is it?"), "hotel");
     expect(screen.getByLabelText("Hotel")).toBeInTheDocument();
     expect(screen.queryByLabelText("To (airport code)")).toBeNull();
@@ -117,7 +117,7 @@ describe("Review", () => {
   it("shows why a booking wasn’t added, and keeps what was typed", async () => {
     serve("/api/segments");
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add “Your itinerary” by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
     await userEvent.type(screen.getByLabelText("From (airport code)"), "BOS");
     await userEvent.type(screen.getByLabelText("To (airport code)"), "DEN");
     await userEvent.type(screen.getByLabelText("Departs"), "2027-01-02T07:15");
@@ -133,7 +133,7 @@ describe("Review", () => {
   it("says when a booking was added but its item couldn’t be taken off the list", async () => {
     serve("/api/review/1");
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add “Your itinerary” by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
     await userEvent.type(screen.getByLabelText("From (airport code)"), "BOS");
     await userEvent.type(screen.getByLabelText("To (airport code)"), "DEN");
     await userEvent.type(screen.getByLabelText("Departs"), "2027-01-02T07:15");

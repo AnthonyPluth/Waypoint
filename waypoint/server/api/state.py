@@ -21,7 +21,7 @@ def api_state(conn, _q, _b) -> State:
         "database": "postgres" if db.using_postgres() else "sqlite",
         "user": user,
         "last_backup": with_offset(db.get_setting(conn, sk.LAST_BACKUP)),   # the last backup downloaded from Settings
-        "review_count": review.count(conn, owner()) + len(trips.unmatched(conn, viewer(conn))),
+        "review_count": review.count(conn, owner()) + trips.unmatched_count(conn, viewer(conn)),
     }
 
 

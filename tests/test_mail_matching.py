@@ -1,17 +1,13 @@
 """What a scan matches a booking to: people by the name printed on it or by loyalty number, a time zone for a place with no
-airport code, and what is kept encrypted about mail it couldn't read (names, codes and numbers here are made up)."""
-import os
+airport code, (names, codes and numbers here are made up)."""
 import unittest
-from unittest import mock
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import update
 
-from tests.shared import DbCase, add_database
-from waypoint import oidc
+from tests.shared import DbCase
 from waypoint.domain import airports, loyalty, people
-from waypoint.domain.mail import review
-from waypoint.storage import backup, db, secretbox
-from waypoint.storage.models import LoyaltyId, Mailbox, ReviewItem
+from waypoint.storage import secretbox
+from waypoint.storage.models import LoyaltyId
 
 
 def person(c, name, *aliases, legal=None):
@@ -100,61 +96,6 @@ class PlaceZoneTests(DbCase):
         self.assertIsNone(airports.zone_for_place(self.c, "Nowhereville", "US"))
         self.assertIsNone(airports.zone_for_place(self.c, None, None))
         self.assertIsNone(airports.zone_for_place(self.c, "  ", ""))
-
-
-class SubjectTests(DbCase):
-    """The subject of mail that couldn't be read is kept encrypted, with the rest of a backup, and moves with the key."""
-    SUBJECT = "Your itinerary CANARY-SUBJECT-KEEP-5J2M"
-
-    def setUp(self):
-        super().setUp()
-        oidc.remember_user(self.c, "u-jane", "jane@example.com", "Jane Doe", None)
-        self.box = self.c.execute(insert(Mailbox).values(owner_sub="u-jane", address="jane@gmail.example", token=secretbox.encrypt("t"),
-                                                         status="connected", created=1.0)).lastrowid
-        review.add(self.c, self.box, "m1", "example-air.example", self.SUBJECT, "2026-10-17", "no_markup", 1.0)
-        review.add(self.c, self.box, "m2", "example-air.example", "", "2026-10-18", "broken", 1.0)   # no subject at all
-        self.c.commit()
-
-    def stored(self, c=None):
-        return [r["subject"] for r in (c or self.c).execute(select(ReviewItem.subject).order_by(ReviewItem.message_id)).fetchall()]
-
-    def test_it_is_stored_encrypted_and_a_missing_one_is_not(self):
-        first, second = self.stored()
-        self.assertTrue(secretbox.is_encrypted(first))
-        self.assertNotIn("CANARY", first)
-        self.assertIsNone(second)
-
-    def test_asking_again_for_the_same_message_changes_nothing(self):
-        review.add(self.c, self.box, "m1", "other.example", "A different subject", "2026-01-01", "incomplete", 2.0)
-        self.assertEqual(len(self.stored()), 2)
-        self.assertEqual({i["subject"] for i in review.listing(self.c, "u-jane")}, {self.SUBJECT, ""})
-
-    def test_a_backup_holds_it_encrypted_and_restores_it(self):
-        raw = backup.dump(self.c)
-        self.assertNotIn(b"CANARY-SUBJECT-KEEP", raw)
-        import gzip
-        self.assertNotIn(b"CANARY-SUBJECT-KEEP", gzip.decompress(raw))
-        other = add_database(self, os.path.join(os.path.dirname(self.path), "restored.db"))
-        with db.session(other) as c2:
-            backup.restore(c2, backup.load(raw))
-        with db.session(other) as c2:
-            self.assertEqual({i["subject"] for i in review.listing(c2, "u-jane")}, {self.SUBJECT, ""})
-
-    def test_it_moves_to_a_new_key_with_the_rest_of_the_secrets(self):
-        old = os.environ.get("WAYPOINT_SECRET_KEY", "")
-        new = "a-brand-new-key-abcdefghijklmnopqrstuvwxyz"
-        with mock.patch.dict(os.environ, {"WAYPOINT_SECRET_KEY": new, **({"WAYPOINT_SECRET_KEY_OLD": old} if old else {})}):
-            self.assertGreaterEqual(secretbox.encrypt_stored(self.c), 1)
-            self.assertEqual(secretbox.encrypt_stored(self.c), 0)
-        self.c.commit()
-        with mock.patch.dict(os.environ, {"WAYPOINT_SECRET_KEY": new}):
-            self.assertEqual({i["subject"] for i in review.listing(self.c, "u-jane")}, {self.SUBJECT, ""})
-
-    def test_one_it_cannot_unlock_is_left_alone_at_start(self):
-        self.c.execute(update(ReviewItem).where(ReviewItem.message_id == "m1").values(subject=secretbox.PREFIX + "bad"))
-        secretbox.encrypt_stored(self.c)
-        self.assertEqual(self.stored()[0], secretbox.PREFIX + "bad")
-        self.assertIsNone(next(i for i in review.listing(self.c, "u-jane") if i["gmail_url"].endswith("m1"))["subject"])
 
 
 if __name__ == "__main__":
