@@ -461,12 +461,14 @@ class ReviewTests(ScanCase):
     def test_the_log_says_what_stopped_messages_being_read_in_fixed_words_and_counts(self):
         unknown = eml("flight_jsonld").replace(b'"iataCode": "JFK"', b'"iataCode": "QQQ"')
         self.add_mail("unknown", unknown)
+        other = eml("no_markup").replace(b"<html><body>", b'<html><head><script type="application/ld+json">{"@type":"EmailMessage"}</script></head><body>')
+        self.add_mail("other", other)
         self.put("no_markup", "incomplete")
         real = scan.monitoring.log
         with mock.patch.object(scan.monitoring, "log", side_effect=real) as log, no_leaks(self, *CANARIES, database=self.path):
             self.scan()
         said = [c.args[0] for c in log.call_args_list]
-        self.assertIn("What stopped messages being read: 1 × arrival time; 1 × departure time; 1 × destination airport; 1 × no structured booking data; 1 × unknown airport.", said)
+        self.assertIn("What stopped messages being read: 1 × arrival time; 1 × departure time; 1 × destination airport; 1 × no structured booking data; 1 × structured data, but no reservation; 1 × unknown airport.", said)
 
     def test_a_message_with_one_booking_read_and_one_not_does_both(self):
         both = eml("flight_jsonld").replace(b"</script></head>", b"</script><script type=\"application/ld+json\">"

@@ -137,6 +137,14 @@ class TimesTests(DbCase):
         # Written as a departure at midnight and an arrival at 07:10: only as UTC is that a believable flight (7 hours 10).
         self.assertEqual(self.times("2026-11-21T00:00:00Z", "2026-11-21T07:10:00Z"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
 
+    def test_a_short_hop_is_judged_the_same_way_and_what_both_readings_fit_is_taken_as_written(self):
+        # Dallas Love Field to Houston Hobby is about 350 km: an hour or so, in the airports' own zone (Central).
+        hop = dict(origin="DAL", destination="HOU")
+        self.assertEqual(self.times("2026-11-16T08:05:00Z", "2026-11-16T09:10:00Z", **hop), ("2026-11-16T08:05:00", "2026-11-16T09:10:00"))
+        # Really in UTC, 14:05 to 15:10 is 8:05 to 9:10 there; but as written it is an hour's flight too, and nothing tells the
+        # two apart, so it is taken as written (what a sender printing local time with a UTC mark does).
+        self.assertEqual(self.times("2026-11-16T14:05:00Z", "2026-11-16T15:10:00Z", **hop), ("2026-11-16T14:05:00", "2026-11-16T15:10:00"))
+
     def test_times_with_no_offset_are_as_written_and_so_are_a_stays_whatever_its_offsets(self):
         self.assertEqual(self.times("2026-11-20T19:00:00", "2026-11-21T07:10:00"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
         stay = ingest.fields(self.c, self.booking(kind="hotel", origin="Harbour Hotel", destination=None, start="2026-11-21T15:00:00Z",
