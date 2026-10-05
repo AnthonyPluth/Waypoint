@@ -1,9 +1,6 @@
 {
   "name": "year-in-review-dark",
   "page": "stats",
-  "viewports": [
-    "phone"
-  ],
   "steps": [
     {
       "expect_text": {

@@ -107,6 +107,30 @@ describe("YearInReview", () => {
     expect(screen.getByText(/country outlines couldn’t load/)).toBeTruthy();
   });
 
+  it("moves focus into the dialog, keeps Tab inside it, and gives focus back on close", async () => {
+    const opener = document.createElement("button");
+    document.body.append(opener); opener.focus();
+    const { unmount } = render(YearInReview, { stats: stats(2026), person: 1, onclose: () => {} });
+    const dialog = screen.getByRole("dialog");
+    expect(document.activeElement).toBe(dialog);
+    await userEvent.tab({ shift: true });   // from the dialog itself, back to its last control
+    expect(dialog.contains(document.activeElement) && document.activeElement !== dialog).toBe(true);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Next" }));
+    await userEvent.tab();   // past the last control, round to the first
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
+    unmount();
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
+  });
+
+  it("steps with the arrow keys only while the dialog itself has focus", async () => {
+    render(YearInReview, { stats: stats(2026), person: 1, onclose: () => {} });
+    await userEvent.keyboard("{ArrowRight}");
+    expect(screen.getByText("12 flights")).toBeTruthy();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(screen.getByText("32,311 mi")).toBeTruthy();
+  });
+
   it("leaves out the new-countries line when the all-time numbers don't load, and closes on Escape", async () => {
     vi.mocked(api).mockRejectedValue(new Error("offline"));
     const onclose = vi.fn();

@@ -26,6 +26,26 @@
     loadCountries().then((c) => { countries = c; }).catch(() => { countries = []; outlinesFailed = true; });   // (the map is drawn without outlines, and says so)
   });
 
+  // A dialog: focus moves in when it opens, Tab stays inside it, and focus goes back to what opened it on close.
+  let dialog = $state<HTMLDivElement>();
+  $effect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog?.focus();
+    return () => opener?.focus();
+  });
+  function keys(e: KeyboardEvent) {
+    if (e.key === "Escape") onclose();
+    else if (e.key === "ArrowRight" && !last && e.target === dialog) step++;
+    else if (e.key === "ArrowLeft" && step > 0 && e.target === dialog) step--;
+    else if (e.key === "Tab" && dialog) {
+      const items = [...dialog.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), a[href]")];
+      if (!items.length) return;
+      const [first, end] = [items[0], items[items.length - 1]];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { e.preventDefault(); end.focus(); }
+      else if (!e.shiftKey && document.activeElement === end) { e.preventDefault(); first.focus(); }
+    }
+  }
+
   const facts = $derived(reviewFacts(stats, allTime));
   const outlines = $derived(countries ? outlinesFor(countries, stats) : []);
   const mine = $derived(person === "all" ? null : firstName(name));
@@ -57,9 +77,7 @@
   }
 </script>
 
-<svelte:window onkeydown={(e) => { if (e.key === "Escape") onclose(); else if (e.key === "ArrowRight" && !last) step++; else if (e.key === "ArrowLeft" && step > 0) step--; }} />
-
-<div class="fixed inset-0 z-50 flex flex-col bg-background" role="dialog" aria-modal="true" aria-label="{facts.year} in review" data-testid="year-in-review">
+<div bind:this={dialog} tabindex="-1" onkeydown={keys} class="fixed inset-0 z-50 flex flex-col bg-background outline-none" role="dialog" aria-modal="true" aria-label="{facts.year} in review" data-testid="year-in-review">
   <div class="flex items-center justify-between gap-3 px-4 py-3">
     <ol class="flex gap-1.5" aria-label="Card {step + 1} of {cards.length}">
       {#each cards as c, i (c.id)}<li class="h-1.5 w-6 rounded-full {i <= step ? 'bg-primary' : 'bg-muted'}"></li>{/each}

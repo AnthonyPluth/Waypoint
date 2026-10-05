@@ -73,7 +73,7 @@ export const CARD_WIDTH = 1080, CARD_HEIGHT = 1350;
 export function cardSvg(facts: ReviewFacts, outlines: { d: string; visited: boolean }[], name: string | null): string {
   const text = (x: number, y: number, size: number, fill: string, body: string, weight = 400, anchor = "start") =>
     `<text x="${x}" y="${y}" font-family="${FONT}" font-size="${size}" font-weight="${weight}" fill="${fill}" text-anchor="${anchor}">${escape(body)}</text>`;
-  const stat = (x: number, y: number, value: string, label: string) => text(x, y, 72, INK, value, 700) + text(x, y + 44, 28, MUTED, label.toUpperCase(), 600);
+  const stat = (x: number, y: number, value: string, label: string) => text(x, y, 62, INK, value, 700) + text(x, y + 44, 28, MUTED, label.toUpperCase(), 600);
   const countries = facts.countries.length;
   const route = facts.topRoute ? `${facts.topRoute.a} – ${facts.topRoute.b}` : "—";
   const places = [...facts.countries.slice(0, 8)].join(" · ") + (countries > 8 ? ` · +${countries - 8} more` : "");
