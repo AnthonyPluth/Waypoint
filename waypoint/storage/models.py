@@ -62,3 +62,24 @@ class Setting(Base):
     __table__ = schema.settings
     key: Mapped[str]
     value: Mapped[str | None]
+
+
+class Mailbox(Base):
+    __table__ = schema.mailboxes
+    id: Mapped[int]
+    owner_sub: Mapped[str]
+    address: Mapped[str]
+    token: Mapped[str]
+    history_id: Mapped[str | None]
+    last_scan: Mapped[float | None]
+    status: Mapped[str]
+    last_error: Mapped[str | None]
+    created: Mapped[float | None]
+
+
+class MailboxPending(Base):
+    __table__ = schema.mailbox_pending
+    state: Mapped[str]
+    owner_sub: Mapped[str]
+    verifier: Mapped[str]
+    created: Mapped[float]

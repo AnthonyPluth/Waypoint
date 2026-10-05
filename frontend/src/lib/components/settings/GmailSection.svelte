@@ -1,0 +1,124 @@
+<script lang="ts" module>
+  // What Google's return says (?gmail=<code>, set by the server's callback), as words. Only these fixed codes come back,
+  // never anything Google said.
+  const OUTCOMES: Record<string, { ok: boolean; text: string }> = {
+    connected: { ok: true, text: "Gmail connected." },
+    denied: { ok: false, text: "Google didn’t connect it: access wasn’t allowed." },
+    scope: { ok: false, text: "Waypoint needs permission to read your email, and Google didn’t give it. Connect again and leave the box ticked." },
+    refused: { ok: false, text: "That connection didn’t start here, or took too long. Choose Connect again." },
+    failed: { ok: false, text: "Google couldn’t connect it. Try again in a moment." },
+  };
+</script>
+
+<script lang="ts">
+  import { act, errMsg } from "$lib/act";
+  import type { Mailbox, MailboxList } from "$lib/api-types";
+  import { Alert, AlertDescription } from "$lib/components/ui/alert";
+  import { Badge } from "$lib/components/ui/badge";
+  import { Button } from "$lib/components/ui/button";
+  import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
+  import { apiCall } from "$lib/contract";
+  import { toast } from "svelte-sonner";
+  import { onMount } from "svelte";
+
+  // Settings → Gmail: this member's own connected Gmail accounts (each member sees only theirs). Connecting sends the
+  // browser to Google for read-only access and comes back here; Disconnect revokes the access at Google first.
+  let list = $state<MailboxList | null>(null);
+  let problem = $state("");
+  let notice = $state<{ ok: boolean; text: string } | null>(null);
+  let connecting = $state(false);
+  let leaving = $state<Mailbox | null>(null);
+  let asking = $state(false);
+
+  async function load() {
+    try { list = await apiCall<"GET /api/mailboxes">("/api/mailboxes"); problem = ""; }
+    catch (err) { problem = errMsg(err); }
+  }
+
+  onMount(() => {
+    const code = new URLSearchParams(location.search).get("gmail");
+    if (code && OUTCOMES[code]) {
+      notice = OUTCOMES[code];
+      history.replaceState(null, "", location.pathname + location.hash);   // so reloading doesn't say it again
+    }
+    load();
+  });
+
+  // Google's consent screen is another site: the server makes the address (with this connection's state), the browser goes.
+  const connect = () => act(async () => {
+    const r = await apiCall<"POST /api/mailboxes/connect">("/api/mailboxes/connect", { method: "POST" });
+    location.href = r.url;
+  }, { busy: (on) => (connecting = on) });
+
+  async function disconnect() {
+    const m = leaving;
+    if (!m) return false;
+    return act(async () => {
+      const r = await apiCall<"DELETE /api/mailboxes/{id}">(`/api/mailboxes/${m.id}`, { method: "DELETE", failed: "Couldn’t disconnect" });
+      if (r.revoked) toast.success("Disconnected");
+      else toast.warning("Disconnected, but Waypoint couldn’t unlock its saved access to tell Google. Remove Waypoint at myaccount.google.com/permissions.");
+      await load();
+    });
+  }
+
+  const label = (m: Mailbox) => (m.status === "connected" ? "Connected" : m.status === "reconnect" ? "Reconnect" : "Couldn’t reach Google");
+</script>
+
+<section aria-labelledby="gmail-title" class="space-y-2">
+  <h2 id="gmail-title" class="eyebrow px-1">Gmail</h2>
+  {#if notice}
+    <Alert variant={notice.ok ? "default" : "destructive"} class="pr-11">
+      <AlertDescription>{notice.text}</AlertDescription>
+    </Alert>
+  {/if}
+  <div class="rows">
+    {#if problem}
+      <div class="row"><p class="text-sm text-signal-ink" role="status">{problem}</p><Button variant="outline" onclick={load}>Try again</Button></div>
+    {:else if !list}
+      <div class="row"><p class="text-sm text-muted-foreground">Loading…</p></div>
+    {:else}
+      {#each list.mailboxes as m (m.id)}
+        <div class="row" data-testid="mailbox">
+          <div class="min-w-0">
+            <p class="truncate font-medium">{m.address}</p>
+            <p class="text-sm text-muted-foreground">
+              {#if m.status === "connected"}Waypoint can read this mailbox, read-only.{:else}{m.last_error ?? "Waypoint can’t read this mailbox right now."}{/if}
+            </p>
+          </div>
+          <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <Badge variant={m.status === "connected" ? "outline" : "secondary"}>{label(m)}</Badge>
+            {#if m.status === "reconnect"}<Button disabled={connecting} onclick={connect}>Reconnect</Button>{/if}
+            <Button variant="outline" onclick={() => { leaving = m; asking = true; }}>Disconnect</Button>
+          </div>
+        </div>
+      {/each}
+      {#if !list.configured}
+        <div class="row">
+          <div>
+            <p class="font-medium">Gmail isn’t set up</p>
+            <p class="text-sm text-muted-foreground">
+              Whoever runs Waypoint creates a Google client and sets <code class="code rounded bg-muted px-1 normal-case tracking-normal">GOOGLE_CLIENT_ID</code>
+              and <code class="code rounded bg-muted px-1 normal-case tracking-normal">GOOGLE_CLIENT_SECRET</code>.
+              <a class="underline underline-offset-2" href="https://anthonypluth.github.io/waypoint/start/gmail/" target="_blank" rel="noopener noreferrer">How</a>
+            </p>
+          </div>
+        </div>
+      {:else}
+        <div class="row">
+          <div>
+            <p class="font-medium">{list.mailboxes.length ? "Add another Gmail" : "Connect your Gmail"}</p>
+            <p class="text-sm text-muted-foreground">Read-only: Waypoint can’t send, delete or change anything. Only you see what you connect.</p>
+          </div>
+          <Button disabled={connecting} onclick={connect}>{connecting ? "Opening Google…" : list.mailboxes.length ? "Connect another" : "Connect Gmail"}</Button>
+        </div>
+      {/if}
+    {/if}
+  </div>
+</section>
+
+<ConfirmDialog bind:open={asking} title={`Disconnect ${leaving?.address ?? "this Gmail"}?`} confirmLabel="Disconnect" busyLabel="Disconnecting…" destructive
+  onconfirm={disconnect}>
+  {#snippet description()}
+    <p>Waypoint tells Google to end its access, then forgets the connection. You can connect it again later.</p>
+  {/snippet}
+</ConfirmDialog>

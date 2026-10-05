@@ -1,0 +1,149 @@
+// @vitest-environment jsdom
+import { render, screen, waitFor } from "@testing-library/svelte";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
+vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }) }));
+
+import { api } from "$lib/api";
+import type { Mailbox, MailboxList } from "$lib/api-types";
+import { toast } from "svelte-sonner";
+import GmailSection from "./GmailSection.svelte";
+
+const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, ...extra });
+const list = (mailboxes: Mailbox[] = [], configured = true): MailboxList => ({ configured, mailboxes });
+/** Answers GET /api/mailboxes with `reply`; other calls with what `others` says. */
+const serve = (reply: MailboxList, others: (path: string) => unknown = () => ({})) =>
+  vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/mailboxes" ? reply : others(path)) as never);
+
+beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.warning).mockReset(); });
+afterEach(() => { vi.unstubAllGlobals(); history.replaceState(null, "", "/"); });
+
+describe("Settings → Gmail", () => {
+  it("says Gmail isn’t set up, and offers no Connect, until the server has Google’s client", async () => {
+    serve(list([], false));
+    render(GmailSection);
+    expect(await screen.findByText("Gmail isn’t set up")).toBeInTheDocument();
+    expect(screen.getByText("GOOGLE_CLIENT_ID")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Connect/ })).toBeNull();
+  });
+
+  it("connects by sending the browser to Google’s address", async () => {
+    const where = { href: "", pathname: "/", search: "", hash: "#settings" };
+    vi.stubGlobal("location", where);
+    serve(list(), (path) => (path === "/api/mailboxes/connect" ? { url: "https://accounts.example/consent?state=s1" } : {}));
+    render(GmailSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Connect Gmail" }));
+    expect(api).toHaveBeenCalledWith("/api/mailboxes/connect", { method: "POST" });
+    await waitFor(() => expect(where.href).toBe("https://accounts.example/consent?state=s1"));
+  });
+
+  it("lists the member’s own Gmail accounts, each connected, and offers to add another", async () => {
+    serve(list([box(), box({ id: 2, address: "work@gmail.example" })]));
+    render(GmailSection);
+    expect(await screen.findByText("ana@gmail.example")).toBeInTheDocument();
+    expect(screen.getByText("work@gmail.example")).toBeInTheDocument();
+    expect(screen.getAllByText("Connected")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Connect another" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reconnect" })).toBeNull();
+  });
+
+  it("shows a grant Google dropped as Reconnect, with what happened, not as an error", async () => {
+    const where = { href: "", pathname: "/", search: "", hash: "" };
+    vi.stubGlobal("location", where);
+    serve(list([box({ status: "reconnect", last_error: "Google no longer lets Waypoint read this mailbox." })]),
+      () => ({ url: "https://accounts.example/consent" }));
+    render(GmailSection);
+    expect(await screen.findByText("Google no longer lets Waypoint read this mailbox.")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Reconnect" }));
+    await waitFor(() => expect(where.href).toBe("https://accounts.example/consent"));
+  });
+
+  it("says when Google couldn’t be reached, without asking for a reconnect", async () => {
+    serve(list([box({ status: "error", last_error: "Couldn’t reach Google just now." })]));
+    render(GmailSection);
+    expect(await screen.findByText("Couldn’t reach Google")).toBeInTheDocument();
+    expect(screen.getByText("Couldn’t reach Google just now.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reconnect" })).toBeNull();
+  });
+
+  it("disconnects after asking, then lists again", async () => {
+    let mailboxes = [box()];
+    vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string }) => {
+      if (opts?.method === "DELETE") { mailboxes = []; return { ok: true, revoked: true } as never; }
+      return list(mailboxes) as never;
+    });
+    render(GmailSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    expect(await screen.findByText("Disconnect ana@gmail.example?")).toBeInTheDocument();
+    expect(api).not.toHaveBeenCalledWith("/api/mailboxes/1", expect.anything());   // not until confirmed
+    await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/mailboxes/1", { method: "DELETE", failed: "Couldn’t disconnect" }));
+    await waitFor(() => expect(screen.queryByText("ana@gmail.example")).toBeNull());
+    expect(toast.success).toHaveBeenCalledWith("Disconnected");
+  });
+
+  it("says when a connection was removed without being able to tell Google", async () => {
+    let mailboxes = [box()];
+    vi.mocked(api).mockImplementation(async (_path: string, opts?: { method?: string }) => {
+      if (opts?.method === "DELETE") { mailboxes = []; return { ok: true, revoked: false } as never; }
+      return list(mailboxes) as never;
+    });
+    render(GmailSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining("myaccount.google.com/permissions")));
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("keeps the connection on screen when disconnecting fails", async () => {
+    vi.mocked(api).mockImplementation(async (_path: string, opts?: { method?: string }) => {
+      if (opts?.method === "DELETE") throw new Error("Couldn’t reach Google to revoke Waypoint’s access, so the mailbox is still connected.");
+      return list([box()]) as never;
+    });
+    render(GmailSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("still connected")));
+    expect(screen.getByText("ana@gmail.example")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["connected", "Gmail connected."],
+    ["denied", "access wasn’t allowed"],
+    ["scope", "Waypoint needs permission to read your email"],
+    ["refused", "didn’t start here"],
+    ["failed", "couldn’t connect it"],
+  ])("says how Google’s return went (%s), once", async (code, words) => {
+    history.replaceState(null, "", `/?gmail=${code}#settings`);
+    serve(list());
+    render(GmailSection);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(words));
+    expect(location.search).toBe("");   // a reload doesn’t say it again
+    expect(location.hash).toBe("#settings");
+  });
+
+  it("ignores a return code it doesn’t know", async () => {
+    history.replaceState(null, "", "/?gmail=<b>hi</b>#settings");
+    serve(list());
+    render(GmailSection);
+    await screen.findByRole("button", { name: "Connect Gmail" });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says when the list can’t be loaded, and tries again", async () => {
+    let up = false;
+    vi.mocked(api).mockImplementation(async () => {
+      if (!up) throw new Error("Waypoint is restarting or unreachable.");
+      return list([box()]) as never;
+    });
+    render(GmailSection);
+    expect(await screen.findByText("Waypoint is restarting or unreachable.")).toBeInTheDocument();
+    up = true;
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("ana@gmail.example")).toBeInTheDocument();
+    expect(screen.queryByText("Waypoint is restarting or unreachable.")).toBeNull();
+  });
+});

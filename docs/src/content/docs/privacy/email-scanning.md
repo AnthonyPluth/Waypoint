@@ -1,12 +1,12 @@
 ---
 title: Email scanning
-description: What Waypoint will and won’t do with your mailbox. Planned for Phase 3; none of it is built yet.
+description: What Waypoint will and won’t do with your mailbox. Connecting a Gmail works today; scanning it is planned.
 sidebar:
   order: 1
 ---
 
-:::caution[Planned, not built yet]
-Waypoint can’t read email today. This page is the promise the feature is being designed to keep, so you can judge it, and hold it to it, before it exists.
+:::caution[Connecting works; scanning is planned]
+Members can connect a Gmail read-only today (see [Google OAuth client for Gmail](/waypoint/start/gmail/)), but Waypoint doesn’t read any email yet. This page is the promise scanning is being designed to keep, so you can judge it, and hold it to it, before it exists.
 :::
 
 Waypoint’s main way of learning about a booking is to read the confirmation email in a Gmail account you connect. The design rules:
@@ -36,5 +36,5 @@ Either way the suggestion is a draft for you to confirm, not something Waypoint 
 
 ## What this means for the rest of the setup
 
-- The Google OAuth client and its refresh token are stored encrypted with `WAYPOINT_SECRET_KEY`, and backups hold them encrypted too ([Configuration](/waypoint/reference/configuration/)).
-- Everyone you let in can see the household’s settings, including the connection to the mailbox. See [SECURITY.md](https://github.com/AnthonyPluth/waypoint/blob/main/SECURITY.md).
+- The Google OAuth client’s ID and secret are set in `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`); each connected mailbox’s refresh token is stored encrypted with `WAYPOINT_SECRET_KEY`, and backups hold it encrypted too ([Configuration](/waypoint/reference/configuration/)).
+- Each member connects their own Gmail in Settings and sees only their own connections. A connection ends when its owner can no longer sign in. Anyone you let in can still download a backup, which holds the encrypted tokens. See [SECURITY.md](https://github.com/AnthonyPluth/waypoint/blob/main/SECURITY.md).

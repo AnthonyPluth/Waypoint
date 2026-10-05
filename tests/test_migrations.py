@@ -77,6 +77,31 @@ class MigrationTests(unittest.TestCase):
         with db.session(self.path) as conn:
             self.assertEqual(conn.execute(select(User.sub)).scalars(), [])
 
+    def test_0002_makes_the_mailbox_tables_and_takes_them_away(self):
+        from alembic import command
+        from sqlalchemy.exc import IntegrityError
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0001")
+            self.assertNotIn("mailboxes", sa.inspect(c).get_table_names())
+            command.upgrade(db.alembic_config(c), "0002")
+            tables = sa.inspect(c)
+            self.assertEqual([col["name"] for col in tables.get_columns("mailboxes")],
+                             ["id", "owner_sub", "address", "token", "history_id", "last_scan", "status", "last_error", "created"])
+            self.assertEqual([col["name"] for col in tables.get_columns("mailbox_pending")], ["state", "owner_sub", "verifier", "created"])
+        self.assertEqual(drift(self.path), [])
+        row = dict(owner_sub="sub-1", address="ana@gmail.example", token="enc:v1:x", status="connected")
+        with db.session(self.path) as conn:   # numbered by the database, one row for each address of a member
+            conn.execute(sa.insert(schema.mailboxes).values(row))
+            conn.execute(sa.insert(schema.mailboxes).values({**row, "owner_sub": "sub-2"}))
+        with self.assertRaises(IntegrityError), db.session(self.path) as conn:
+            conn.execute(sa.insert(schema.mailboxes).values(row))
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0001")
+            self.assertEqual(set(sa.inspect(c).get_table_names()) - {"alembic_version"}, {"auth_pending", "auth_sessions", "users", "settings"})
+        db.migrate(self.path)
+        self.assertEqual(drift(self.path), [])
+
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating
         # alembic_version ("duplicate key value violates unique constraint pg_type_typname_nsp_index").

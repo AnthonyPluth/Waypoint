@@ -38,12 +38,12 @@ from sqlalchemy.schema import CreateColumn
 from . import db, schema, secretbox
 from .. import monitoring
 from . import settings_keys as sk
-from .models import Setting
+from .models import Mailbox, Setting
 
 FORMAT = "waypoint-backup"
 VERSION = 1
-# Sign-ins don't travel (sign in again after a restore).
-SKIP = {"auth_sessions", "auth_pending"}
+# Sign-ins (and Gmail connections still at Google) don't travel: sign in again after a restore.
+SKIP = {"auth_sessions", "auth_pending", "mailbox_pending"}
 NEWER = "That backup is from a newer version of Waypoint. Update Waypoint first."
 
 
@@ -67,6 +67,9 @@ def _secret_columns(table: str, cols: list[str]):
     if table == "settings" and "key" in cols and "value" in cols:
         k, v = cols.index("key"), cols.index("value")
         return lambda row: [v] if row[k] in secretbox.SECRET_SETTINGS else []
+    if table in secretbox.SECRET_COLUMNS and secretbox.SECRET_COLUMNS[table] in cols:
+        i = cols.index(secretbox.SECRET_COLUMNS[table])
+        return lambda row: [i]
     return None
 
 
@@ -224,11 +227,23 @@ def unreadable_secrets(conn) -> list[str]:
             secretbox.decrypt(r["value"])
         except secretbox.SecretError:
             out.append(r["key"])
+    if any(not _readable(token) for token in conn.execute(select(Mailbox.token)).scalars()):
+        out.append(MAILBOXES)
     return out
 
 
+def _readable(token: str) -> bool:
+    try:
+        secretbox.decrypt(token)
+    except secretbox.SecretError:
+        return False
+    return True
+
+
 # What each secret is called where it's entered again (Settings), for saying which ones a restore couldn't read.
+MAILBOXES = "mailboxes"   # not a setting: the Gmail connections' refresh tokens
 SECRET_LABELS = {
+    MAILBOXES: "Gmail connections (connect them again in Settings)",
     sk.VAPID_PRIVATE_KEY: "notifications' signing key (devices sign up for notifications again)",
 }
 
