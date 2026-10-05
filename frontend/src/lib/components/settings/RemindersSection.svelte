@@ -87,11 +87,11 @@
     {:else if !list}
       <div class="row"><p class="text-sm text-muted-foreground">Loading…</p></div>
     {:else}
-      <label class="row cursor-pointer">
+      <label class="row cursor-pointer flex-nowrap">
         <span class="min-w-0"><span class="block font-medium">Check-in opens</span><span class="block text-sm text-muted-foreground">24 hours before each flight.</span></span>
         <input type="checkbox" class="size-5 shrink-0" checked={list.check_in} disabled={busy} onchange={(e) => choose({ check_in: e.currentTarget.checked })} />
       </label>
-      <label class="row cursor-pointer">
+      <label class="row cursor-pointer flex-nowrap">
         <span class="min-w-0"><span class="block font-medium">Day-of summary</span><span class="block text-sm text-muted-foreground">What starts today, from 7:00 on Waypoint’s clock.</span></span>
         <input type="checkbox" class="size-5 shrink-0" checked={list.day_of} disabled={busy} onchange={(e) => choose({ day_of: e.currentTarget.checked })} />
       </label>
