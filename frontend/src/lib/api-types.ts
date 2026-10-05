@@ -110,6 +110,7 @@ export interface Mailbox {
   last_scan: string | null;
   scan_error: string | null;
   scanning: boolean;
+  scan_notice: string | null;
 }
 
 export interface MailboxList {

@@ -450,7 +450,8 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_gmail.py"
+        "tests/test_gmail.py",
+        "tests/test_mail_scan.py"
       ],
       "docs": [
         "start/gmail"

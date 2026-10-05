@@ -490,12 +490,20 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
     return _after_change(conn, seg)
 
 
-def _same_leg(seg: Segment, values: Mapping[str, str | None]) -> bool:
-    """Whether a stored segment is the booking's leg: the same kind and confirmation code, the same provider when both
-    have one, and the same places (a flight's airports, a stay's hotel)."""
+EMAIL_MERGE_DAYS = 3   # an email updates a segment whose start is this many days or fewer from its own (a schedule change)
+
+
+def _same_leg(seg: Segment, values: Mapping[str, str | None], details: Mapping[str, str]) -> bool:
+    """Whether a stored segment is the booking's leg: the same kind and a confirmation code that both have, the same provider
+    when both have one, the same places (a flight's airports, a stay's hotel), the same flight number when both have one,
+    and a start within EMAIL_MERGE_DAYS of its own. A booking with no code is never taken for another segment."""
     def same(a: str | None, b: str | None) -> bool:
         return (a or "").casefold() == (b or "").casefold()
-    return (seg.kind == values["kind"] and same(seg.confirmation, values["confirmation"])
+    mine = decode_details(seg.details).get("flight_number")
+    theirs = details.get("flight_number")
+    near = abs((date.fromisoformat(seg.start_local[:10]) - date.fromisoformat((values["start_local"] or "")[:10])).days) <= EMAIL_MERGE_DAYS
+    return (bool(values["confirmation"]) and near and seg.kind == values["kind"] and same(seg.confirmation, values["confirmation"])
+            and (not mine or not theirs or same(mine.replace(" ", ""), theirs.replace(" ", "")))
             and (not seg.provider or not values["provider"] or same(seg.provider, values["provider"]))
             and same(seg.origin, values["origin"]) and same(seg.destination, values["destination"]))
 
@@ -508,7 +516,7 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn) 
     Invalid when the booking can't be a segment."""
     values = check(conn, fields)
     day = (values["start_local"] or "")[:10]
-    found = sorted((s for s in visibility.visible_segments(conn, viewer) if _same_leg(s, values)),
+    found = sorted((s for s in visibility.visible_segments(conn, viewer) if _same_leg(s, values, fields.get("details") or {})),
                    key=lambda s: abs((date.fromisoformat(s.start_local[:10]) - date.fromisoformat(day)).days))
     if not found:
         added = add_segment(conn, viewer, fields, source="email")

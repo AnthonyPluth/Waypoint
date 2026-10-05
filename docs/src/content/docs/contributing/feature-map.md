@@ -42,7 +42,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/mailboxes` | `mailboxes.py:api_mailboxes` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
 | `POST /api/mailboxes/connect` | `mailboxes.py:api_mailbox_connect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
 | `GET /api/mailboxes/callback` | `mailboxes.py:api_mailbox_callback` | - | `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
-| `DELETE /api/mailboxes/{id}` | `mailboxes.py:api_mailbox_disconnect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/waypoint/start/gmail/) |
+| `DELETE /api/mailboxes/{id}` | `mailboxes.py:api_mailbox_disconnect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py`, `test_mail_scan.py` | [start/gmail](/waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/scan` | `mailboxes.py:api_mailbox_scan` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/waypoint/start/gmail/) |
 | `GET /api/reminders` | `reminders.py:api_reminders` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
 | `POST /api/reminders` | `reminders.py:api_reminders_set` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |

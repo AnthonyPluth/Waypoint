@@ -45,7 +45,8 @@ def api_mailboxes(conn, _q, _b) -> MailboxList:
     gmail.end_lapsed(conn)   # anyone's that lost access: they can't open Settings to disconnect it
     return {"configured": gmail.configured(),
             "mailboxes": [{"id": m["id"], "address": m["address"], "status": m["status"], "last_error": m["last_error"],
-                           "last_scan": _when(m["last_scan"]), "scan_error": m["scan_error"], "scanning": scan.running(m["id"])}
+                           "last_scan": _when(m["last_scan"]), "scan_error": m["scan_error"], "scanning": scan.running(m["id"]),
+                           "scan_notice": scan.notice(m["id"])}
                           for m in gmail.listing(conn, owner())]}
 
 
@@ -61,7 +62,10 @@ def api_mailbox_callback(conn, q, _b) -> Response:
     """Google's return: keep the connection, then back to Settings with how it went (?gmail=connected, denied, ...)."""
     params = {k: v[0] for k, v in q.items() if v}
     try:
-        gmail.finish(conn, owner(), params, redirect_uri())
+        address = gmail.finish(conn, owner(), params, redirect_uri())
+        for m in gmail.listing(conn, owner()):
+            if m["address"] == address:
+                scan.forget(m["id"])   # (connected again: what the last scan said no longer holds)
         outcome = "connected"
     except gmail.GmailError as e:
         outcome = next((code for kind, code in BACK.items() if isinstance(e, kind)), "failed")
@@ -77,6 +81,7 @@ def api_mailbox_disconnect(conn, _q, _b, mailbox_id: str) -> Disconnected:
         raise ApiError("Not found", 404) from None
     except gmail.GmailError as e:
         raise ApiError(str(e), 502) from e
+    scan.forget(n)
     return {"ok": True, "revoked": revoked}
 
 
