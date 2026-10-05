@@ -253,21 +253,21 @@ describe("Review: the AI’s suggestion", () => {
 });
 
 describe("Review: the message beside the form", () => {
-  it("previews the message as plain text and hides it again", async () => {
+  it("shows the message as plain text beside the form, and has no separate Preview button", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Preview .Mail from example-air.example/ }));
+    await screen.findByTestId("review-item");
+    expect(screen.queryByRole("button", { name: /Preview/ })).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     const region = await screen.findByTestId("preview");
     expect(region).toHaveTextContent("Your flight EX 410 leaves Boston at 7:15 am on 2 January.");
     expect(calls).toContainEqual(["/api/review/1/preview", undefined, undefined]);
-    await userEvent.click(screen.getByRole("button", { name: /Hide .Mail from/ }));
-    expect(screen.queryByTestId("preview")).toBeNull();
   });
 
   it("shows the message as text, never as markup", async () => {
     const hostile = "<img src=x onerror=alert(1)><script>alert(2)</script> Hello";
     vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview") ? { text: hostile, truncated: false } : path === "/api/people" ? { people: [] } : held) as never);
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     const region = await screen.findByTestId("preview");
     expect(region).toHaveTextContent(hostile);
     expect(region.querySelector("img, script")).toBeNull();
@@ -276,19 +276,27 @@ describe("Review: the message beside the form", () => {
   it("says when it was cut short, and when the message has no text", async () => {
     truncated = true;
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     expect(await screen.findByText(/Cut short here: open it in Gmail for the rest/)).toBeInTheDocument();
   });
 
   it("says why it couldn’t be fetched, and tries again when asked again", async () => {
     previewFails = "That message is no longer in Gmail.";
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("That message is no longer in Gmail.");
     previewFails = "";
-    await userEvent.click(screen.getByRole("button", { name: /Hide/ }));
-    await userEvent.click(screen.getByRole("button", { name: /Preview/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: /by hand/ }));
     expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
+  });
+
+  it("takes the message off the page when the form is cancelled", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
+    await screen.findByTestId("preview");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByTestId("preview")).toBeNull();
   });
 
   it("opens the message beside the form when adding by hand", async () => {
@@ -302,34 +310,51 @@ describe("Review: the message beside the form", () => {
     const stored: string[] = [];
     vi.spyOn(Storage.prototype, "setItem").mockImplementation((_k: string, v: string) => { stored.push(v); });   // (both of the browser's stores)
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     await screen.findByTestId("preview");
     expect(stored).toEqual([]);
     vi.restoreAllMocks();
   });
 });
 
-describe("Review: Ask the AI", () => {
+describe("Review: Ask AI", () => {
   it("is offered only when the AI is on", async () => {
     render(ReviewPage);
     await screen.findByTestId("review-item");
-    expect(screen.queryByRole("button", { name: /Ask the AI/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ask AI/ })).toBeNull();
   });
 
   it("asks the AI, then offers its suggestion to check", async () => {
     held = { items: [item()], who: [], ai: true };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Ask the AI about/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Ask AI about/ }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1/suggest", "POST", undefined]));
     expect(await screen.findByRole("button", { name: /Check the AI.s suggestion/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Ask the AI about/ })).toHaveTextContent("Ask again");
+    expect(screen.getByRole("button", { name: /Ask AI about/ })).toHaveTextContent("Ask again");
   });
 
   it("says when the AI couldn’t be asked", async () => {
     held = { items: [item()], who: [], ai: true };
     suggestFails = "Turn on AI suggestions in Settings first.";
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Ask the AI about/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Ask AI about/ }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Turn on AI suggestions in Settings first."));
+  });
+
+  it("asks about every message without a suggestion at once", async () => {
+    held = { items: [item(), item({ id: 2 }), item({ id: 3, suggestion: null })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 3" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 3 messages"));
+    expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest", "/api/review/2/suggest", "/api/review/3/suggest"]);
+  });
+
+  it("stops the bulk ask at the first failure and says how far it got", async () => {
+    held = { items: [item(), item({ id: 2 })], who: [], ai: true };
+    suggestFails = "Turn on AI suggestions in Settings first.";
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Asked about 0 of 2: Turn on AI suggestions in Settings first."));
+    expect(calls.filter((c) => c[0].endsWith("/suggest"))).toHaveLength(1);
   });
 });

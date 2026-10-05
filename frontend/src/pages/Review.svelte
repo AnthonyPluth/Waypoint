@@ -81,8 +81,8 @@
   // the browser's storage), and for this member's own items alone.
   type Peek = { state: "loading" } | { state: "ready"; text: string; truncated: boolean } | { state: "error"; message: string };
   let peeks = $state<Record<number, Peek>>({});
-  async function peek(item: ReviewItem, toggle = false) {
-    if (peeks[item.id]) { if (toggle) delete peeks[item.id]; if (toggle || peeks[item.id]?.state !== "error") return; }
+  async function peek(item: ReviewItem) {
+    if (peeks[item.id] && peeks[item.id]?.state !== "error") return;
     peeks[item.id] = { state: "loading" };
     try {
       const r = await apiCall<"GET /api/review/{id}/preview">(`/api/review/${item.id}/preview`);
@@ -96,7 +96,29 @@
     await settle();
   }, { busy: (on) => (asking_ai = on ? item.id : null) });
 
+  let asking_all = $state(false);
+  const unasked = $derived(review?.ai ? review.items.filter((i) => !i.suggestion) : []);
+  const askAll = (items: ReviewItem[]) => act(async () => {
+    let done = 0;
+    try {
+      for (const item of items) {
+        await apiCall<"POST /api/review/{id}/suggest">(`/api/review/${item.id}/suggest`, { method: "POST" });
+        done++;
+      }
+    } catch (err) {
+      await settle();
+      throw new Error(`Asked about ${done} of ${items.length}: ${errMsg(err)}`, { cause: err });
+    }
+    await settle();
+    toast.success(`Asked the AI about ${done} ${done === 1 ? "message" : "messages"}`);
+  }, { busy: (on) => (asking_all = on) });
+
   const placeLabels = (kind: string) => kind === "flight" ? ["From (airport code)", "To (airport code)"] : kind === "hotel" ? ["Hotel", ""] : kind === "car" ? ["Pick-up", "Drop-off"] : ["From (station)", "To (station)"];
+
+  const closeForm = () => {
+    if (draft) delete peeks[draft.item.id];
+    draft = null;
+  };
 
   async function add(e: SubmitEvent) {
     e.preventDefault();
@@ -112,8 +134,8 @@
       added = true;
       await apiCall<"DELETE /api/review/{id}">(`/api/review/${d.item.id}`, { method: "DELETE" });
     }, { busy: (on) => (saving = on), onError: (m) => (formError = added ? `Added, but couldn’t take it off this list: ${m}` : m) });
-    if (!ok) { if (added) { draft = null; await settle(); } return; }
-    draft = null;
+    if (!ok) { if (added) { closeForm(); await settle(); } return; }
+    closeForm();
     toast.success("Added to your trips");
     await settle();
   }
@@ -169,27 +191,29 @@
     {#if review.items.length}
       <section aria-labelledby="unread-title" class="space-y-2">
         <h2 id="unread-title" class="eyebrow px-1">Couldn’t read</h2>
-        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see them. Open one in Gmail, or Preview it here to read it beside the form (Waypoint fetches it from Gmail when you ask, and keeps none of its text or subject).</p>
+        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see them. Open one in Gmail, or choose Add by hand to read it beside the form (Waypoint fetches it from Gmail when you ask, and keeps none of its text or subject).</p>
+        {#if unasked.length > 1}
+          <div class="px-1"><Button variant="outline" size="sm" disabled={asking_all || asking_ai !== null} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : `Ask AI about all ${unasked.length}`}</Button></div>
+        {/if}
         <ul class="rows" aria-label="Couldn’t read">
           {#each review.items as item (item.id)}
             <li class="row items-start" data-testid="review-item">
-              <div class="min-w-0 basis-full sm:basis-0 sm:flex-1">
+              <div class="min-w-0 basis-full">
                 <p class="break-words font-medium">{subject(item)}</p>
                 <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, `to ${item.address}`].filter(Boolean).join(" · ")}</p>
                 <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestion} <Badge variant="outline">AI suggestion</Badge>{/if}</p>
                 {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
               </div>
-              <div class="flex flex-wrap gap-2">
+              <div class="flex basis-full flex-wrap gap-2">
                 <a class={buttonVariants({ variant: "outline", size: "sm" })} href={item.gmail_url} target="_blank" rel="noopener noreferrer" aria-label={`Open “${subject(item)}” in Gmail`}>Open in Gmail</a>
-                <Button variant="outline" size="sm" onclick={() => peek(item, true)} aria-label={`${peeks[item.id] ? "Hide" : "Preview"} “${subject(item)}”`}>{peeks[item.id] ? "Hide preview" : "Preview"}</Button>
-                {#if review.ai}<Button variant="outline" size="sm" disabled={asking_ai === item.id} onclick={() => askAi(item)} aria-label={`Ask the AI about “${subject(item)}”`}>{asking_ai === item.id ? "Asking…" : item.suggestion ? "Ask again" : "Ask the AI"}</Button>{/if}
+                {#if review.ai}<Button variant="outline" size="sm" disabled={asking_all || asking_ai === item.id} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai === item.id ? "Asking…" : item.suggestion ? "Ask again" : "Ask AI"}</Button>{/if}
                 {#if item.suggestion}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={`Check the AI’s suggestion for “${subject(item)}”`}>Check suggestion</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
                 {#if item.sender_domain}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Ignore ${item.sender_domain}`}>Ignore this sender</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={`Dismiss “${subject(item)}”`}>Dismiss</Button>
               </div>
             </li>
-            {#if peeks[item.id]}
+            {#if peeks[item.id] && draft?.item.id === item.id}
               {@const p = peeks[item.id]}
               <li class="row items-stretch" data-testid="preview">
                 <div class="w-full min-w-0 space-y-2" aria-label={`The message from ${sender(item)}`} role="region">
@@ -237,7 +261,7 @@
                   {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
                   <div class="flex flex-wrap gap-2">
                     <Button type="submit" disabled={saving}>{saving ? "Adding…" : "Add to my trips"}</Button>
-                    <Button type="button" variant="outline" disabled={saving} onclick={() => (draft = null)}>Cancel</Button>
+                    <Button type="button" variant="outline" disabled={saving} onclick={closeForm}>Cancel</Button>
                   </div>
                 </form>
               </li>
