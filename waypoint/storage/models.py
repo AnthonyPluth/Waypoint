@@ -105,9 +105,9 @@ class Segment(Base):
     end_zone: Mapped[str]
     origin: Mapped[str | None]
     destination: Mapped[str | None]
-    details: Mapped[str | None]      # a JSON object: flight number, terminal, seat, cabin, room, car class, address, phone
+    details: Mapped[str | None]      # a JSON object: flight number, terminal, seat, cabin, room, car class, address, phone, time_unknown
     manage_url: Mapped[str | None]
-    source: Mapped[str]              # manual or email
+    source: Mapped[str]              # manual, email or import
     booked_by: Mapped[int | None]    # a person
     locked_fields: Mapped[str | None]   # a JSON list of the fields a person edited, which a later email never overwrites
 

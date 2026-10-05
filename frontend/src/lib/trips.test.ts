@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { when, clock, dayIn, featuredTrip, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, subline, tripDays, until } from "./trips";
+import { untimed, when, clock, dayIn, featuredTrip, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, subline, tripDays, until } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -148,5 +148,12 @@ describe("loyalty on a booking", () => {
     expect(membershipFor(out, jane, [membership({ program: "Delta SkyMiles" })])).toEqual({ state: "none", program: "American AAdvantage" });
     expect(membershipFor(out, { id: 2, person_id: null, name: "DOE/MIA MISS" }, [mine])).toEqual({ state: "unmatched" });
     expect(membershipFor(segment({ provider: "Example Air" }), jane, [mine])).toBeNull();
+  });
+});
+
+describe("untimed", () => {
+  it("is an imported flight whose file gave no times", () => {
+    expect(untimed(segment({ details: { time_unknown: "yes" } }))).toBe(true);
+    expect(untimed(segment({ details: { flight_number: "DL1001" } }))).toBe(false);
   });
 });

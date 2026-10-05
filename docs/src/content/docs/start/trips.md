@@ -29,7 +29,7 @@ Without sign-in, on your own machine, everyone is the one local household, which
 
 Each segment has a kind (flight, hotel, car or train), a status (confirmed, changed or cancelled), a confirmation code, the provider, a start and an end, where it starts and ends, a link to manage the booking, and details: flight number, terminal, seat, cabin, room, car class, address and phone. The **travellers** are people from [People](/waypoint/start/people/), or, until a name on a booking is matched to a person, the name as printed.
 
-A segment is added to a trip you name, or without one: Waypoint puts it in the trip it belongs to (see below) or makes a new trip.
+A segment is added to a trip you name, or without one: Waypoint puts it in the trip it belongs to (see below) or makes a new trip. Flights from before Waypoint can be [imported from another app’s CSV export](/waypoint/start/import/).
 
 ## Times are where they happen
 

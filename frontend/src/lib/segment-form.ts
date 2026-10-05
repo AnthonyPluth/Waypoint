@@ -1,7 +1,7 @@
 // The form for adding or editing a segment by hand: what it holds, what it checks before anything is sent (in the words
 // the person reads), and the request it makes. The server checks again; this is so a slip is caught before a round trip.
 import type { Segment, SegmentBody, SegmentEdit } from "./api-types";
-import { instant } from "./trips";
+import { instant, untimed } from "./trips";
 
 export type Kind = Segment["kind"];
 export const KINDS: [Kind, string][] = [["flight", "Flight"], ["hotel", "Hotel"], ["car", "Car rental"], ["train", "Train"]];
@@ -31,6 +31,7 @@ export type Draft = {
   manage_url: string;
   people: number[];             // travellers who are in People
   printed: string[];            // travellers known only by the name on the booking, kept as they are
+  untimed?: [string, string];   // the start and end an imported flight with no times was saved with: it stays untimed while they're unchanged
 };
 
 export const blank = (tripId: number | null = null): Draft => ({
@@ -46,6 +47,7 @@ export const draftOf = (s: Segment): Draft => ({
   details: { ...s.details }, manage_url: s.manage_url ?? "",
   people: s.travelers.flatMap((t) => (t.person_id === null ? [] : [t.person_id])),
   printed: s.travelers.flatMap((t) => (t.person_id === null ? [t.name] : [])),
+  ...(untimed(s) && { untimed: [s.start_local, s.end_local] as [string, string] }),
 });
 
 const AIRPORT = /^[A-Za-z]{3}$/;
@@ -89,6 +91,8 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
   const shown = new Set(DETAILS[d.kind].map(([key]) => key));
   const details: Record<string, string> = Object.fromEntries(Object.entries(d.details).filter(([key]) => !shown.has(key)));   // an email's other details stay as they are
   for (const [key] of DETAILS[d.kind]) if (d.details[key]?.trim()) details[key] = d.details[key].trim();
+  if (d.untimed && d.untimed[0] === d.start_local && d.untimed[1] === d.end_local) details.time_unknown = "yes";   // a person who sets its times takes it off
+  else delete details.time_unknown;
   const startZone = d.start_zone.trim(), endZone = d.end_zone.trim() || startZone;
   return {
     kind: d.kind, status: d.status, provider: text(d.provider), confirmation: text(d.confirmation),

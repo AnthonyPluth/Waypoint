@@ -30,8 +30,9 @@ Kind = Literal["flight", "hotel", "car", "train"]
 Status = Literal["confirmed", "changed", "cancelled"]
 KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train")
 STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
-# What a segment's details may hold (the rest of a booking has a field of its own), each a text.
-DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone")
+# What a segment's details may hold (the rest of a booking has a field of its own), each a text. `time_unknown` ("yes") marks an
+# imported flight whose file gave no times: it starts and ends at midnight of its day and counts in distance, not time.
+DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone", "time_unknown")
 # A person's edit locks the fields it changes; these are the names a lock can have.
 FIELDS = ("kind", "status", "confirmation", "provider", "start_local", "start_zone", "end_local", "end_zone", "origin",
           "destination", "details", "manage_url", "travelers")
@@ -100,7 +101,7 @@ class SegmentOut(TypedDict):
     destination: str | None
     details: dict[str, str]
     manage_url: str | None
-    source: Literal["manual", "email"]
+    source: Literal["manual", "email", "import"]
     booked_by: int | None
     locked_fields: list[str]
     travelers: list[TravelerOut]
@@ -248,7 +249,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
         {"id": s.id, "trip_id": s.trip_id, "kind": cast(Kind, s.kind), "status": cast(Status, s.status), "confirmation": s.confirmation,
          "provider": s.provider, "start_local": s.start_local, "start_zone": s.start_zone, "end_local": s.end_local,
          "end_zone": s.end_zone, "origin": s.origin, "destination": s.destination, "details": decode_details(s.details),
-         "manage_url": s.manage_url, "source": cast(Literal["manual", "email"], s.source), "booked_by": s.booked_by,
+         "manage_url": s.manage_url, "source": cast(Literal["manual", "email", "import"], s.source), "booked_by": s.booked_by,
          "locked_fields": decode_locked(s.locked_fields), "travelers": by_segment.get(s.id, [])} for s in segs]
     return sorted(out, key=lambda s: (instant(s["start_local"], s["start_zone"]), s["id"]))
 
@@ -423,7 +424,7 @@ def _needs_person(viewer: Viewer) -> None:
 
 
 def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id: int | None = None,
-                source: Literal["manual", "email"] = "manual") -> SegmentOut | None:
+                source: Literal["manual", "email", "import"] = "manual") -> SegmentOut | None:
     """Add a segment the viewer booked, to this trip, or (without one) to the trip it belongs to or a new one. Travellers
     default to the viewer. `source`: where it came from (a scanned email, or the person). None: no such trip (for the
     viewer). Raises Invalid."""

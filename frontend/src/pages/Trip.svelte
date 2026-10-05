@@ -14,7 +14,7 @@
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, subline } from "$lib/trips";
+  import { dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, subline, untimed } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Plus from "@lucide/svelte/icons/plus";
   import { toast } from "svelte-sonner";
@@ -102,9 +102,9 @@
           {#if s.kind === "flight" && s.status !== "cancelled"}<FlightStatus segment={s} />{/if}
           <dl class="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
-              <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, <PlaceTime local={s.start_local} zone={s.start_zone} /></dd></div>
+              <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} zone={s.start_zone} />{/if}</dd></div>
             <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
-              <dd class="mt-1 text-base font-medium">{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} /></dd></div>
+              <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</dd></div>
             {#if s.confirmation}<div><dt class="eyebrow">Confirmation</dt><dd class="mt-1 text-lg"><CopyCode code={s.confirmation} /></dd></div>{/if}
             {#if s.manage_url}<div><dt class="eyebrow">Manage</dt><dd class="mt-1"><a class="break-all underline underline-offset-2" href={s.manage_url} target="_blank" rel="noopener noreferrer">Open the booking</a></dd></div>{/if}
           </dl>

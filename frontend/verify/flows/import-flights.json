@@ -1,0 +1,11 @@
+{
+  "name": "import-flights",
+  "page": "settings",
+  "steps": [
+    { "upload": { "selector": "[aria-labelledby=import-title] input[type=file]", "file": "tests/fixtures/flight_import/flighty.csv" } },
+    { "wait_for": "[data-testid=import-preview]" },
+    { "expect_text": { "selector": "[data-testid=import-preview]", "text": "Flighty export" } },
+    { "scroll_to": "#import-title" },
+    { "screenshot": "preview" }
+  ]
+}

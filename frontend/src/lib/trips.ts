@@ -72,6 +72,9 @@ export function until(ms: number): string {
   return `${days} day${days === 1 ? "" : "s"}${hours % 24 ? ` ${hours % 24} h` : ""}`;
 }
 
+/** An imported flight whose file gave no times: it has a day but no times, and no duration. */
+export const untimed = (s: Segment): boolean => s.details.time_unknown === "yes";
+
 export const startAt = (s: Segment): number => instant(s.start_local, s.start_zone);
 export const endAt = (s: Segment): number => instant(s.end_local, s.end_zone);
 

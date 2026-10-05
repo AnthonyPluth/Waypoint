@@ -92,7 +92,7 @@ describe("Settings data", () => {
     const { container } = render(Settings);
     const restore = screen.getByRole("button", { name: "Restore…" });
     expect(restore).toBeDisabled();
-    await userEvent.upload(container.querySelector("input[type=file]")!, file());
+    await userEvent.upload(container.querySelector("[aria-labelledby=data-title] input[type=file]")!, file());
     const summary = await screen.findByTestId("backup-summary");
     expect(summary).toHaveTextContent("5 rows");
     expect(summary).toHaveTextContent("loyalty ids");
@@ -103,7 +103,7 @@ describe("Settings data", () => {
   it("says why a file can't be read", async () => {
     vi.mocked(api).mockRejectedValue(new Error("Couldn’t read that backup (400)"));
     const { container } = render(Settings);
-    await userEvent.upload(container.querySelector("input[type=file]")!, file());
+    await userEvent.upload(container.querySelector("[aria-labelledby=data-title] input[type=file]")!, file());
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn’t read that backup");
     expect(screen.getByRole("button", { name: "Restore…" })).toBeDisabled();
   });
@@ -113,7 +113,7 @@ describe("Settings data", () => {
       ? { ok: true, created: "2026-09-01T10:00:00Z", source: "sqlite", counts: {}, safety_copy: "/data/before-restore.gz", unreadable_secrets: ["mail_password"] }
       : path === "/api/state" ? state() : inspected) as never);
     const { container } = render(Settings);
-    await userEvent.upload(container.querySelector("input[type=file]")!, file());
+    await userEvent.upload(container.querySelector("[aria-labelledby=data-title] input[type=file]")!, file());
     await userEvent.click(await screen.findByRole("button", { name: "Restore…" }));
     const go = await screen.findByRole("button", { name: "Restore" });
     expect(go).toBeDisabled();
