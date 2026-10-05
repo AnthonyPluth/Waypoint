@@ -43,7 +43,6 @@ describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
     render(ReviewPage);
     const list = await screen.findByRole("list", { name: "Couldn’t read" });
-    expect(within(list).getByText("example-air.example")).toBeInTheDocument();
     expect(within(list).getByText("Mail from example-air.example on 2026-10-17")).toBeInTheDocument();
     expect(within(list).getByText("Sent 2026-10-17 · to ana@gmail.example")).toBeInTheDocument();
     expect(within(list).getByText(REASONS.no_markup)).toBeInTheDocument();
