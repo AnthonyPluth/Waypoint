@@ -14,8 +14,9 @@ from unittest import mock
 
 from sqlalchemy import insert
 
+from waypoint import oidc
 from waypoint.providers import gmail
-from waypoint.server.api import backups, mailboxes, state
+from waypoint.server.api import backups, mailboxes, people, state
 from waypoint.server.common import _current
 from tests.shared import DbCase
 
@@ -97,6 +98,7 @@ class Replies(DbCase):
         self.test_state()
         self.test_backups()
         self.test_mailboxes()
+        self.test_people()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
 
     def test_state(self):
@@ -133,6 +135,17 @@ class Replies(DbCase):
         with mock.patch.object(gmail, "_post", return_value={}):
             self.check("DELETE /api/mailboxes/{id}", mailboxes.api_mailbox_disconnect(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
 
+    def test_people(self):
+        self.check("GET /api/people", people.api_people(self.c, {}, {}))   # nobody yet
+        self.check("POST /api/people", people.api_person_add(self.c, {}, {"display_name": "Mia Doe", "aliases": ["DOE/MIA MISS"]}))
+        oidc.remember_user(self.c, "u1", "jane.doe@example.com", "Jane Doe")
+        listed = people.api_people(self.c, {}, {})
+        self.check("GET /api/people", listed)
+        self.assertEqual([p["member"] for p in listed["people"]], [True, False])
+        pid = listed["people"][1]["id"]
+        self.check("POST /api/people/{id}", people.api_person_edit(self.c, {}, {"display_name": "Mia D.", "legal_name": "Mia Rose Doe"}, str(pid)))
+        self.check("DELETE /api/people/{id}", people.api_person_remove(self.c, {}, {}, str(pid)))
+
 
 class Mismatches(unittest.TestCase):
     """The check above notices a reply that isn't the contract's."""
@@ -159,7 +172,8 @@ class Generated(unittest.TestCase):
 
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
-                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}"})
+                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "GET /api/people", "POST /api/people",
+                                     "POST /api/people/{id}", "DELETE /api/people/{id}"})
         self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)
         self.assertNotIn("GET /api/mailboxes/callback", covered())   # and this one as a redirect
 

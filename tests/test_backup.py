@@ -17,7 +17,7 @@ from sqlalchemy import func, insert, select, update
 from waypoint.storage import backup, db
 from waypoint import server
 from waypoint.storage import settings_keys as sk
-from waypoint.storage.models import AuthSession, Setting, User
+from waypoint.storage.models import AuthSession, Person, Setting, User
 from tests.shared import add_database, fetch, own_database, serve
 
 db_session = db.session
@@ -63,6 +63,9 @@ class BackupTests(unittest.TestCase):
         c.execute(insert(User).values(sub="a:1|’", email="o'brien+tag@example.com", name="Ünïcödé 🐶 %s :name \\ back\nslash",
                                       first_name="", last_seen=-0.0))
         c.execute(insert(User).values(sub="z", email=None, name="Line one\nline two\ttab " + "x" * 5000, last_seen=1e-9))
+        c.execute(insert(Person).values(display_name="Zoë O’Brien-Ünï 🐶", first_name="", legal_name="  Zoë  \"Z\" O'Brien\n",
+                                        aliases='["O\'BRIEN/ZOE MS", "OBRIEN/ZOE🐶 MS", ""]', user_sub="a:1|’"))
+        c.execute(insert(Person).values(display_name="Grandpa Ño %s \\ 50%", first_name=None, legal_name=None, aliases=None))
         c.execute(insert(Setting).values(key="%_LIKE_%", value='{"json": "inside", "n": 0.1}'))
         c.execute(insert(Setting).values(key="empty", value=""))
         db.set_setting(c, sk.VAPID_PRIVATE_KEY, "secret ’ 🐶")
@@ -86,6 +89,19 @@ class BackupTests(unittest.TestCase):
             rows["settings"] = [(k, secretbox_plain(v) if k == sk.VAPID_PRIVATE_KEY else v) for k, v in rows["settings"]]
         self.assertEqual(exported, want)
         self.assertEqual(db.get_setting(dst, sk.VAPID_PRIVATE_KEY), "secret ’ 🐶")
+        src.close(); dst.close()
+
+    def test_people_come_back_exactly_with_their_links(self):
+        src = db.connect(self.a)
+        self.awkward(src)
+        src.commit()
+        dst = db.connect(self.b)
+        backup.restore(dst, backup.load(backup.dump(src)))
+        dst.commit()
+        want = sorted((p.display_name, p.first_name, p.legal_name, p.aliases, p.user_sub) for p in src.orm.scalars(select(Person)))
+        got = sorted((p.display_name, p.first_name, p.legal_name, p.aliases, p.user_sub) for p in dst.orm.scalars(select(Person)))
+        self.assertEqual(len(want), 2)
+        self.assertEqual(got, want)
         src.close(); dst.close()
 
     def test_a_backup_through_the_migrations_from_the_first_revision(self):

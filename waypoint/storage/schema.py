@@ -1,5 +1,5 @@
 """Waypoint's database schema, for SQLite and Postgres alike. Alembic migrations (waypoint/storage/migrations) create and change it."""
-from sqlalchemy import Column, Float, ForeignKey, Integer, MetaData, Table, Text, UniqueConstraint
+from sqlalchemy import Column, Float, ForeignKey, Index, Integer, MetaData, Table, Text, UniqueConstraint
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 
@@ -63,6 +63,18 @@ users = Table(
     Column('first_name', Text),
     Column('last_seen', Float),
     info={'doc': 'people who have signed in (the household)'},
+)
+
+people = Table(
+    'people', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('display_name', Text, nullable=False),
+    Column('first_name', Text),
+    Column('legal_name', Text),
+    Column('aliases', Text),
+    Column('user_sub', Text, refers('people', 'user_sub', 'users.sub', 'SET NULL')),
+    Index('ux_people_user_sub', 'user_sub', unique=True),
+    info={'doc': 'everyone who travels: household members (linked to their sign-in) and guests with no login'},
 )
 
 settings = Table(

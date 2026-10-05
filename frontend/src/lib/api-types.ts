@@ -28,6 +28,32 @@ export interface MailboxList {
   mailboxes: Mailbox[];
 }
 
+export interface Ok {
+  ok: boolean;
+}
+
+export interface People {
+  people: Person[];
+}
+
+/** Someone who travels: a household member (`member`, linked to their sign-in) or a guest with no login. */
+export interface Person {
+  id: number;
+  display_name: string;
+  first_name: string | null;
+  legal_name: string | null;
+  aliases: string[];
+  member: boolean;
+}
+
+/** A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed). */
+export interface PersonBody {
+  display_name: string;
+  first_name?: string | null;
+  legal_name?: string | null;
+  aliases?: string[];
+}
+
 export interface Restored {
   ok: boolean;
   created: string | null;
@@ -60,6 +86,10 @@ export interface State {
 export interface Endpoints {
   "POST /api/backup/inspect": { body: never; reply: BackupContents };
   "POST /api/restore": { body: never; reply: Restored };
+  "GET /api/people": { body: never; reply: People };
+  "POST /api/people": { body: PersonBody; reply: Person };
+  "POST /api/people/{id}": { body: PersonBody; reply: Person };
+  "DELETE /api/people/{id}": { body: never; reply: Ok };
   "GET /api/mailboxes": { body: never; reply: MailboxList };
   "POST /api/mailboxes/connect": { body: never; reply: Started };
   "DELETE /api/mailboxes/{id}": { body: never; reply: Disconnected };

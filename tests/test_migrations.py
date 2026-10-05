@@ -89,6 +89,7 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual([col["name"] for col in tables.get_columns("mailboxes")],
                              ["id", "owner_sub", "address", "token", "history_id", "last_scan", "status", "last_error", "created"])
             self.assertEqual([col["name"] for col in tables.get_columns("mailbox_pending")], ["state", "owner_sub", "verifier", "created"])
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         row = dict(owner_sub="sub-1", address="ana@gmail.example", token="enc:v1:x", status="connected")
         with db.session(self.path) as conn:   # numbered by the database, one row for each address of a member
@@ -101,6 +102,29 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(set(sa.inspect(c).get_table_names()) - {"alembic_version"}, {"auth_pending", "auth_sessions", "users", "settings"})
         db.migrate(self.path)
         self.assertEqual(drift(self.path), [])
+
+    def test_0003_makes_people_from_the_users_who_signed_in_and_takes_them_away(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0002")
+            self.assertNotIn("people", sa.inspect(c).get_table_names())
+            c.execute(insert(User), [
+                {"sub": "b", "email": "bo@example.com", "name": "Bo Example", "first_name": "Bo"},
+                {"sub": "a", "email": "ana@example.com", "name": None, "first_name": "Ana"},
+                {"sub": "c", "email": None, "name": " ", "first_name": None}])
+            command.upgrade(db.alembic_config(c), "0003")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:
+            made = [tuple(r) for r in conn.execute(select(schema.people.c.display_name, schema.people.c.first_name,
+                                                          schema.people.c.user_sub).order_by(schema.people.c.user_sub))]
+            self.assertEqual(made, [("ana@example.com", "Ana", "a"), ("Bo Example", "Bo", "b"), ("c", None, "c")])
+            with self.assertRaises(sa.exc.IntegrityError):   # one person to a login
+                conn.execute(insert(schema.people).values(display_name="Again", user_sub="a"))
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0002")
+            self.assertNotIn("people", sa.inspect(c).get_table_names())
+            self.assertEqual(c.execute(select(User.sub)).scalars().all().__len__(), 3)   # the users stay
 
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating
