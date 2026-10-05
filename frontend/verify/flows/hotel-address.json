@@ -1,9 +1,6 @@
 {
   "name": "hotel-address",
   "page": "trips",
-  "viewports": [
-    "phone"
-  ],
   "steps": [
     {
       "expect_text": {
