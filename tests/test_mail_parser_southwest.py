@@ -52,6 +52,13 @@ class ParserTests(unittest.TestCase):
         self.assertEqual([(b.status, b.confirmation, b.start) for b in found],
                          [("cancelled", "K7QW2N", "2026-11-16T09:30:00"), ("cancelled", "K7QW2N", RETURN)])
 
+    def test_cancellation_words_in_a_footer_dont_cancel_a_booking(self):
+        text = ("Your trip is confirmed\nConfirmation #: K7QW2N\nPassenger: JANE DOE\nFlight 77 Mon, Nov 16, 2026\n"
+                "Dallas (Love Field), TX (DAL) 8:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM\n"
+                "If your flight has been canceled, we will rebook you.\nCancellation confirmation numbers are sent separately.\n")
+        [b] = read(mail(text, ctype="text/plain")).bookings
+        self.assertEqual(b.status, "confirmed")
+
     def test_a_plain_text_email_is_read_the_same_way(self):
         text = ("Your reservation has been canceled.\nConfirmation #: K7QW2N\nPassenger: JANE DOE\nFlight 77 Mon, Nov 16, 2026\n"
                 "Dallas (Love Field), TX (DAL) 8:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM\n")
