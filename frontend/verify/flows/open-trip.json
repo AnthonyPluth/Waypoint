@@ -1,0 +1,11 @@
+{
+  "name": "open-trip",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/'] >> visible=true" },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "expect_text": { "selector": "main", "text": "Jane Doe" } },
+    { "screenshot": "trip" }
+  ]
+}

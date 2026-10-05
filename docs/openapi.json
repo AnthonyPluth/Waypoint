@@ -1594,7 +1594,7 @@
       },
       "PersonBody": {
         "type": "object",
-        "description": "A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed).",
+        "description": "A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed). Changing\nreplaces all of them, so send every name to keep: one left out is cleared.",
         "properties": {
           "display_name": {
             "type": "string"

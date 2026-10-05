@@ -126,7 +126,10 @@ export interface Person {
   member: boolean;
 }
 
-/** A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed). */
+/**
+ * A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed). Changing
+ * replaces all of them, so send every name to keep: one left out is cleared.
+ */
 export interface PersonBody {
   display_name: string;
   first_name?: string | null;
