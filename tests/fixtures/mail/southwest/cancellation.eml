@@ -1,0 +1,23 @@
+From: Southwest Airlines <southwestairlines@luv.southwest.com>
+To: traveller@gmail.example
+Subject: Your trip has been canceled (K7QW2N)
+Date: Sat, 14 Nov 2026 12:00:00 -0600
+Message-ID: <fx-sw-cancellation@luv.southwest.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head><title>x</title><style>td { color: red }</style></head><body>
+<p>Your reservation has been canceled. CANARY-BODY-SOUTHWEST-CANCEL-2M6V</p>
+<table>
+<tr><td>Confirmation #:</td><td>K7QW2N</td></tr>
+<tr><td>Passenger:</td><td>JANE DOE</td></tr>
+</table>
+<h3>CANCELED FLIGHTS</h3>
+<div>Flight 1234 Mon, Nov 16, 2026</div>
+<div>Dallas (Love Field), TX (DAL) 9:30 AM</div>
+<div>Houston (Hobby), TX (HOU) 10:35 AM</div>
+<div>Flight 2210 Fri, Nov 20, 2026</div>
+<div>Houston (Hobby), TX (HOU) 11:50 PM</div>
+<div>Dallas (Love Field), TX (DAL) 12:55 AM (+1 day)</div>
+<p>Thanks for choosing the invented airline emails of this fixture.</p>
+</body></html>
