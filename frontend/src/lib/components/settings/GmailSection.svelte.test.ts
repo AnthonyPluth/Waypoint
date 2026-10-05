@@ -11,7 +11,7 @@ import type { Mailbox, MailboxList } from "$lib/api-types";
 import { toast } from "svelte-sonner";
 import GmailSection from "./GmailSection.svelte";
 
-const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, ...extra });
+const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, scan_notice: null, ...extra });
 const list = (mailboxes: Mailbox[] = [], configured = true): MailboxList => ({ configured, mailboxes });
 /** Answers GET /api/mailboxes with `reply`; other calls with what `others` says. */
 const serve = (reply: MailboxList, others: (path: string) => unknown = () => ({})) =>
@@ -175,6 +175,13 @@ describe("Settings → Gmail", () => {
     serve(list([box({ scan_error: "Couldn’t reach Google while reading the mailbox." })]));
     render(GmailSection);
     expect(await screen.findByText(/The last scan stopped: Couldn’t reach Google while reading the mailbox\. What it had read is kept/)).toBeInTheDocument();
+  });
+
+  it("says why a scan couldn’t start, which isn’t a failed scan", async () => {
+    serve(list([box({ scan_notice: "Google refused to refresh the connection just now." })]));
+    render(GmailSection);
+    expect(await screen.findByText("The scan couldn’t start: Google refused to refresh the connection just now.")).toBeInTheDocument();
+    expect(screen.queryByText(/The last scan stopped/)).toBeNull();
   });
 
   it("offers no scan for a connection that needs reconnecting", async () => {

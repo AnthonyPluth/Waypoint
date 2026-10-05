@@ -39,7 +39,8 @@ def api_mailboxes(conn, _q, _b) -> MailboxList:
     gmail.end_lapsed(conn)   # anyone's that lost access: they can't open Settings to disconnect it
     return {"configured": gmail.configured(),
             "mailboxes": [{"id": m["id"], "address": m["address"], "status": m["status"], "last_error": m["last_error"],
-                           "last_scan": _when(m["last_scan"]), "scan_error": m["scan_error"], "scanning": scan.running(m["id"])}
+                           "last_scan": _when(m["last_scan"]), "scan_error": m["scan_error"], "scanning": scan.running(m["id"]),
+                           "scan_notice": scan.notice(m["id"])}
                           for m in gmail.listing(conn, owner())]}
 
 

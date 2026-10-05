@@ -124,6 +124,7 @@ class ScanCase(DbCase):
     def setUp(self):
         super().setUp()
         reset(self.google)
+        scan._notices.clear()
         for sub, name in (("u-jane", "Jane Doe"), ("u-sam", "Sam Doe")):
             oidc.remember_user(self.c, sub, f"{sub}@example.com", name, None)
         self.jane = Viewer(people.person_for_sub(self.c, "u-jane"))
@@ -352,6 +353,34 @@ class MergeTests(ScanCase):
         self.assertEqual((len(self.segments(self.jane)), len(self.segments(self.sam)), len(self.segments(Viewer(self.mia)))), (1, 1, 2))
         self.assertNotEqual(self.segments(self.jane)[0]["id"], self.segments(self.sam)[0]["id"])
 
+    def test_a_booking_without_a_confirmation_code_is_never_taken_for_another_segment(self):
+        no_code = eml("hotel_jsonld").replace(b'  "reservationNumber": "H88231",\n', b"")
+        self.assertNotEqual(no_code, eml("hotel_jsonld"))
+        self.add_mail("first", no_code)
+        self.scan()
+        later = no_code.replace(b"2026-11-21T15:00", b"2026-11-21T16:00")   # (the same hotel, the same dates, still no code)
+        self.add_mail("second", later)
+        self.scan(now=NOW + 3600)
+        self.assertEqual([s["confirmation"] for s in self.segments()], [None, None])
+
+    def test_the_same_leg_on_another_date_is_a_new_segment_not_a_rewrite_of_the_old(self):
+        self.put("flight_jsonld")
+        self.scan()
+        repeat = eml("flight_jsonld").replace(b"2026-11-20T19:00:00-05:00", b"2026-12-20T19:00:00-05:00").replace(
+            b"2026-11-21T07:10:00+00:00", b"2026-12-21T07:10:00+00:00")
+        self.add_mail("repeat", repeat)   # (one confirmation, the same airports, a month later)
+        self.scan(now=NOW + 3600)
+        segs = self.segments()
+        self.assertEqual(sorted((s["start_local"], s["status"]) for s in segs), [("2026-11-20T19:00", "confirmed"), ("2026-12-20T19:00", "confirmed")])
+
+    def test_another_flight_number_on_the_same_day_is_another_leg(self):
+        self.put("flight_jsonld")
+        self.scan()
+        other = eml("flight_jsonld").replace(b'"flightNumber": "101"', b'"flightNumber": "909"')
+        self.add_mail("other", other)
+        self.scan(now=NOW + 3600)
+        self.assertEqual(sorted(s["details"]["flight_number"] for s in self.segments()), ["EX 101", "EX 909"])
+
     def test_a_manual_segment_is_updated_by_the_email_about_it(self):
         seg = self.read(lambda conn: trips.add_segment(conn, self.jane, {
             "kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-11-20T18:00", "end_local": "2026-11-21T06:00",
@@ -575,6 +604,17 @@ class CouldntStartTests(ScanCase):
         result = self.scan(other)
         self.assertEqual((result.state, result.error), ("not_started", scan.NO_PERSON))
         self.assertEqual(self.google.queries, [])
+
+    def test_why_a_scan_couldnt_start_is_told_until_one_does(self):
+        self.google.refresh_fails = "unavailable"
+        self.assertEqual(scan.notice(self.mailbox), None)
+        self.scan()
+        self.assertEqual(scan.notice(self.mailbox), "Google refused to refresh the connection just now.")
+        [m] = self.read(lambda conn: gmail.listing(conn, "u-jane"))
+        self.assertIsNone(m["scan_error"])   # (not a failed scan)
+        self.google.refresh_fails = None
+        self.scan()
+        self.assertIsNone(scan.notice(self.mailbox))
 
     def test_a_mailbox_that_isnt_there_isnt_a_failed_scan(self):
         self.assertEqual(self.scan(9999), scan.Result("not_started", scan.GONE))

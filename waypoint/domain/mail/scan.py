@@ -50,11 +50,18 @@ class Result:
 
 _running: set[int] = set()
 _lock = threading.Lock()
+_notices: dict[int, str] = {}   # why a mailbox's last scan couldn't start, until the next one does (never recorded as a failed run)
 
 
 def running(mailbox_id: int) -> bool:
     with _lock:
         return mailbox_id in _running
+
+
+def notice(mailbox_id: int) -> str | None:
+    """Why the last scan of this mailbox couldn't start, for Settings to say (fixed text); None once one has."""
+    with _lock:
+        return _notices.get(mailbox_id)
 
 
 def scan(mailbox_id: int, now: float, today: date) -> Result:
@@ -65,10 +72,16 @@ def scan(mailbox_id: int, now: float, today: date) -> Result:
             return Result("busy")
         _running.add(mailbox_id)
     try:
-        return _scan(mailbox_id, now, today)
+        result = _scan(mailbox_id, now, today)
     finally:
         with _lock:
             _running.discard(mailbox_id)
+    with _lock:
+        if result.state == "not_started" and result.error:
+            _notices[mailbox_id] = result.error
+        else:
+            _notices.pop(mailbox_id, None)
+    return result
 
 
 def _viewer(owner: str, conn: db.Connection) -> Viewer | None:

@@ -63,6 +63,7 @@
     const r = await apiCall<"POST /api/mailboxes/{id}/scan">(`/api/mailboxes/${m.id}/scan`, { method: "POST", failed: "Couldn’t start the scan" });
     if (!r.started) toast("A scan of this mailbox is already running.");
     await load();
+    setTimeout(load, 1500);   // a scan that can't start ends at once: pick up why
   }, { busy: (on) => (starting = on ? m.id : null) });
 
   async function disconnect() {
@@ -107,6 +108,7 @@
             {:else if m.status !== "reconnect"}
               <p class="text-sm text-muted-foreground">{scanned(m) ? `Last scanned ${scanned(m)}.` : "Not scanned yet."}</p>
             {/if}
+            {#if m.scan_notice && !m.scanning}<p class="text-sm text-muted-foreground" role="status">The scan couldn’t start: {m.scan_notice}</p>{/if}
             {#if m.scan_error}<p class="text-sm text-signal-ink" role="status">The last scan stopped: {m.scan_error} What it had read is kept, and the next scan carries on.</p>{/if}
           </div>
           <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
