@@ -68,6 +68,58 @@ class Person(Base):
     user_sub: Mapped[str | None]
 
 
+class Airport(Base):
+    __table__ = schema.airports
+    code: Mapped[str]
+    name: Mapped[str]
+    city: Mapped[str]
+    country: Mapped[str]
+    zone: Mapped[str]
+    latitude: Mapped[float]
+    longitude: Mapped[float]
+
+
+class Trip(Base):
+    __table__ = schema.trips
+    id: Mapped[int]
+    name: Mapped[str]
+    start_date: Mapped[str | None]   # the first segment's local date
+    end_date: Mapped[str | None]     # the last segment's local date
+    destination: Mapped[str | None]
+    notes: Mapped[str | None]
+    auto: Mapped[bool]               # grouped by Waypoint (False: made by hand, or changed by a person)
+    booked_by: Mapped[int | None]    # a person
+
+
+class Segment(Base):
+    __table__ = schema.segments
+    id: Mapped[int]
+    trip_id: Mapped[int]
+    kind: Mapped[str]                # flight, hotel, car or train (waypoint/domain/trips.py)
+    status: Mapped[str]              # confirmed, changed or cancelled
+    confirmation: Mapped[str | None]
+    provider: Mapped[str | None]
+    start_local: Mapped[str]         # wall-clock time at the start's place, 2026-03-01T22:15:00, never converted
+    start_zone: Mapped[str]          # that place's IANA zone
+    end_local: Mapped[str]
+    end_zone: Mapped[str]
+    origin: Mapped[str | None]
+    destination: Mapped[str | None]
+    details: Mapped[str | None]      # a JSON object: flight number, terminal, seat, cabin, room, car class, address, phone
+    manage_url: Mapped[str | None]
+    source: Mapped[str]              # manual or email
+    booked_by: Mapped[int | None]    # a person
+    locked_fields: Mapped[str | None]   # a JSON list of the fields a person edited, which a later email never overwrites
+
+
+class SegmentTraveler(Base):
+    __table__ = schema.segment_travelers
+    id: Mapped[int]
+    segment_id: Mapped[int]
+    person_id: Mapped[int | None]
+    name: Mapped[str | None]         # as printed, until it's matched to a person
+
+
 class Setting(Base):
     __table__ = schema.settings
     key: Mapped[str]

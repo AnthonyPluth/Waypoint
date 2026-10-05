@@ -7,8 +7,9 @@ from __future__ import annotations
 from sqlalchemy import func, select
 
 from ..storage import db
-from ..storage.models import Person, User
-from . import people
+from ..storage.models import Person, Segment, SegmentTraveler, Trip, User
+from . import people, trips
+from .visibility import Viewer
 
 # A household of two who have signed in (sub, email, name, first name), and two guests who haven't a login.
 MEMBERS = [("demo-jane", "jane.doe@example.com", "Jane Doe", "Jane"),
@@ -19,6 +20,33 @@ GUESTS: list[people.Fields] = [
 ]
 
 
+# Three trips: the family's (Jane booked it for Jane, Sam and Mia) and one each for Jane and Sam alone, so each member sees
+# two and the other's solo trip isn't among them (AGENTS.md, "You see the trips you're on").
+FAMILY: list[trips.SegmentIn] = [
+    {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-11-20T19:00", "end_local": "2026-11-21T07:10",
+     "confirmation": "KQ7M2X", "provider": "Example Air", "details": {"flight_number": "EX 101", "terminal": "7", "cabin": "Economy"}},
+    {"kind": "hotel", "origin": "Harbour Hotel", "start_local": "2026-11-21T15:00", "end_local": "2026-11-27T10:00",
+     "start_zone": "Europe/London", "end_zone": "Europe/London", "confirmation": "H88231",
+     "details": {"address": "1 Quay Street, London", "room": "Family room"}},
+    {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": "2026-11-27T11:30", "end_local": "2026-11-27T14:35",
+     "confirmation": "KQ7M2X", "provider": "Example Air", "details": {"flight_number": "EX 102"}},
+]
+JANE_ALONE: list[trips.SegmentIn] = [
+    {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": "2026-12-08T08:00", "end_local": "2026-12-08T11:20",
+     "confirmation": "PL4N9R", "provider": "Example Air", "details": {"flight_number": "EX 311"}},
+    {"kind": "flight", "origin": "SFO", "destination": "JFK", "start_local": "2026-12-10T17:00", "end_local": "2026-12-11T01:35",
+     "confirmation": "PL4N9R", "provider": "Example Air", "details": {"flight_number": "EX 318"}},
+]
+SAM_ALONE: list[trips.SegmentIn] = [
+    {"kind": "flight", "origin": "JFK", "destination": "AKL", "start_local": "2027-01-14T21:00", "end_local": "2027-01-16T06:30",
+     "confirmation": "ST2V7W", "provider": "Example Air", "details": {"flight_number": "EX 5"}},
+]
+
+
+def _on(*ids: int | None) -> list[trips.TravelerIn]:
+    return [{"person_id": i, "name": None} for i in ids]
+
+
 def seed(conn: db.Connection) -> int:
     """Fill an empty database with sample data. Returns how many rows it added."""
     before = _rows(conn)
@@ -26,10 +54,16 @@ def seed(conn: db.Connection) -> int:
         db.insert_ignore(conn, User, {"sub": sub, "email": email, "name": name, "first_name": first, "last_seen": 0.0},
                          key=["sub"])
         people.ensure_member(conn, sub, name, first)
-    for guest in GUESTS:
-        people.add_guest(conn, guest)
+    guests = [people.add_guest(conn, guest)["id"] for guest in GUESTS]
+    jane, sam = (Viewer(people.person_for_sub(conn, sub)) for sub in ("demo-jane", "demo-sam"))
+    for fields in FAMILY:
+        trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0])})
+    for fields in JANE_ALONE:
+        trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id)})
+    for fields in SAM_ALONE:
+        trips.add_segment(conn, sam, {**fields, "travelers": _on(sam.person_id)})
     return _rows(conn) - before
 
 
 def _rows(conn: db.Connection) -> int:
-    return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0 for m in (User, Person))
+    return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0 for m in (User, Person, Trip, Segment, SegmentTraveler))

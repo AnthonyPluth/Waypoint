@@ -5,7 +5,7 @@ from waypoint import oidc
 from waypoint.domain import demo, people
 from waypoint.server.api import people as api
 from waypoint.server.common import ApiError
-from waypoint.storage.models import Person, User
+from waypoint.storage.models import Person, Segment, SegmentTraveler, Trip, User
 from tests.shared import DbCase, ServerCase
 
 
@@ -86,7 +86,8 @@ class PeopleTests(DbCase):
     def test_the_demo_household(self):
         added = demo.seed(self.c)
         shown = people.everyone(self.c)
-        self.assertEqual(added, 2 + len(shown))
+        self.assertEqual(added, 2 + len(shown) + sum(self.c.orm.scalar(select(func.count()).select_from(m)) or 0
+                                                       for m in (Trip, Segment, SegmentTraveler)))
         self.assertEqual([p["member"] for p in shown], [True, True, False, False])
         self.assertEqual(self.c.orm.scalar(select(func.count()).select_from(User)), 2)
 

@@ -113,7 +113,7 @@ class MigrationTests(unittest.TestCase):
                 {"sub": "b", "email": "bo@example.com", "name": "Bo Example", "first_name": "Bo"},
                 {"sub": "a", "email": "ana@example.com", "name": None, "first_name": "Ana"},
                 {"sub": "c", "email": None, "name": " ", "first_name": None}])
-            command.upgrade(db.alembic_config(c), "0003")
+            command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:
             made = [tuple(r) for r in conn.execute(select(schema.people.c.display_name, schema.people.c.first_name,
@@ -125,6 +125,39 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0002")
             self.assertNotIn("people", sa.inspect(c).get_table_names())
             self.assertEqual(c.execute(select(User.sub)).scalars().all().__len__(), 3)   # the users stay
+
+    def test_0004_makes_trips_with_the_airports_and_takes_them_away(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0003")
+            self.assertEqual(set(sa.inspect(c).get_table_names()) & {"airports", "trips", "segments", "segment_travelers"}, set())
+            c.execute(insert(schema.people).values(id=1, display_name="Jane Doe"))
+            command.upgrade(db.alembic_config(c), "0004")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:
+            zones = dict(conn.execute(select(schema.airports.c.code, schema.airports.c.zone)
+                                      .where(schema.airports.c.code.in_(["AKL", "LAX", "LHR"]))).fetchall())
+            self.assertEqual(zones, {"AKL": "Pacific/Auckland", "LAX": "America/Los_Angeles", "LHR": "Europe/London"})
+            self.assertGreater(conn.execute(sa.select(sa.func.count()).select_from(schema.airports)).scalar(), 5000)
+            conn.execute(insert(schema.trips).values(id=1, name="Spring", auto=True, booked_by=1))
+            conn.execute(insert(schema.segments).values(
+                id=1, trip_id=1, kind="flight", status="confirmed", start_local="2026-03-01T22:15:00",
+                start_zone="Pacific/Auckland", end_local="2026-03-01T15:10:00", end_zone="America/Los_Angeles",
+                source="manual", booked_by=1))
+            conn.execute(insert(schema.segment_travelers).values(segment_id=1, person_id=1))
+            conn.execute(insert(schema.segment_travelers).values(segment_id=1, name="DOE/GUEST MR"))
+            conn.execute(sa.delete(schema.people).where(schema.people.c.id == 1))   # takes the person's own row, lets go of the booking
+            self.assertEqual(conn.execute(select(schema.trips.c.booked_by)).scalar(), None)
+            self.assertEqual(conn.execute(select(schema.segments.c.booked_by)).scalar(), None)
+            self.assertEqual(conn.execute(select(schema.segment_travelers.c.name)).scalars(), ["DOE/GUEST MR"])
+            conn.execute(sa.delete(schema.trips))   # a trip takes its segments, and they their travellers
+            self.assertEqual(conn.execute(sa.select(sa.func.count()).select_from(schema.segments)).scalar(), 0)
+            self.assertEqual(conn.execute(sa.select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 0)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0003")
+            self.assertEqual(set(sa.inspect(c).get_table_names()) & {"airports", "trips", "segments", "segment_travelers"}, set())
+            self.assertIn("people", sa.inspect(c).get_table_names())
 
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating

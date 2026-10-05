@@ -219,6 +219,474 @@
         }
       }
     },
+    "/api/trips": {
+      "get": {
+        "operationId": "api_trips",
+        "x-handler": "waypoint/server/api/trips.py:api_trips",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripList"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_trip_add",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_add",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TripBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trip"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}": {
+      "get": {
+        "operationId": "api_trip",
+        "x-handler": "waypoint/server/api/trips.py:api_trip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trip"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_trip_edit",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_edit",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TripBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trip"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "api_trip_remove",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/merge": {
+      "post": {
+        "operationId": "api_trip_merge",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_merge",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trip"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/split": {
+      "post": {
+        "operationId": "api_trip_split",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_split",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SplitBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trip"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/segments": {
+      "post": {
+        "operationId": "api_segment_add",
+        "x-handler": "waypoint/server/api/trips.py:api_segment_add",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/segments/{id}": {
+      "get": {
+        "operationId": "api_segment",
+        "x-handler": "waypoint/server/api/trips.py:api_segment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_segment_edit",
+        "x-handler": "waypoint/server/api/trips.py:api_segment_edit",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "api_segment_remove",
+        "x-handler": "waypoint/server/api/trips.py:api_segment_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/airports/{id}": {
+      "get": {
+        "operationId": "api_airport",
+        "x-handler": "waypoint/server/api/trips.py:api_airport",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airport"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/mailboxes": {
       "get": {
         "operationId": "api_mailboxes",
@@ -336,6 +804,34 @@
   },
   "components": {
     "schemas": {
+      "Airport": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "zone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "city",
+          "country",
+          "zone"
+        ],
+        "additionalProperties": false
+      },
       "BackupContents": {
         "type": "object",
         "properties": {
@@ -449,6 +945,18 @@
         "required": [
           "configured",
           "mailboxes"
+        ],
+        "additionalProperties": false
+      },
+      "MergeBody": {
+        "type": "object",
+        "properties": {
+          "merge": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "merge"
         ],
         "additionalProperties": false
       },
@@ -599,6 +1107,302 @@
         ],
         "additionalProperties": false
       },
+      "Segment": {
+        "type": "object",
+        "description": "One flight leg, hotel stay, car rental or train. Its times are local wall-clock times at the place, never\nconverted: `start_local` is 2026-03-01T22:15 in `start_zone`, whatever zone the server or the viewer is in.",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "trip_id": {
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "flight",
+              "hotel",
+              "car",
+              "train"
+            ]
+          },
+          "status": {
+            "enum": [
+              "confirmed",
+              "changed",
+              "cancelled"
+            ]
+          },
+          "confirmation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "start_zone": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "end_zone": {
+            "type": "string"
+          },
+          "origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "manage_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "enum": [
+              "manual",
+              "email"
+            ]
+          },
+          "booked_by": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "locked_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "travelers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Traveler"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "trip_id",
+          "kind",
+          "status",
+          "confirmation",
+          "provider",
+          "start_local",
+          "start_zone",
+          "end_local",
+          "end_zone",
+          "origin",
+          "destination",
+          "details",
+          "manage_url",
+          "source",
+          "booked_by",
+          "locked_fields",
+          "travelers"
+        ],
+        "additionalProperties": false
+      },
+      "SegmentBody": {
+        "type": "object",
+        "description": "A segment to add; `trip_id` leaves it to Waypoint to group it into a trip. A flight's zones come from its airports\nunless given.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "flight",
+              "hotel",
+              "car",
+              "train"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "trip_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "confirmed",
+              "changed",
+              "cancelled"
+            ]
+          },
+          "confirmation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_zone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_zone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "manage_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "travelers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TravelerBody"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "start_local",
+          "end_local"
+        ],
+        "additionalProperties": false
+      },
+      "SegmentEdit": {
+        "type": "object",
+        "description": "What to change on a segment: only the fields sent. The ones that end up different are locked.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "flight",
+              "hotel",
+              "car",
+              "train"
+            ]
+          },
+          "status": {
+            "enum": [
+              "confirmed",
+              "changed",
+              "cancelled"
+            ]
+          },
+          "confirmation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "start_zone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "end_zone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "manage_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "travelers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TravelerBody"
+            }
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
       "SignedIn": {
         "type": "object",
         "description": "Who's signed in. Without sign-in configured (on your own machine), everyone is `local`.",
@@ -625,6 +1429,21 @@
         "required": [
           "name",
           "email"
+        ],
+        "additionalProperties": false
+      },
+      "SplitBody": {
+        "type": "object",
+        "properties": {
+          "segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": [
+          "segment_ids"
         ],
         "additionalProperties": false
       },
@@ -674,6 +1493,160 @@
           "database",
           "user",
           "last_backup"
+        ],
+        "additionalProperties": false
+      },
+      "Traveler": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "person_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "TravelerBody": {
+        "type": "object",
+        "properties": {
+          "person_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "Trip": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auto": {
+            "type": "boolean"
+          },
+          "booked_by": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "start_date",
+          "end_date",
+          "destination",
+          "notes",
+          "auto",
+          "booked_by",
+          "segments"
+        ],
+        "additionalProperties": false
+      },
+      "TripBody": {
+        "type": "object",
+        "description": "A trip made by hand, or what changes on one (a name, where it goes, notes; its dates come from its segments).",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "TripList": {
+        "type": "object",
+        "properties": {
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Trip"
+            }
+          }
+        },
+        "required": [
+          "trips"
         ],
         "additionalProperties": false
       }

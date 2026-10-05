@@ -129,7 +129,7 @@ class LogTests(unittest.TestCase):
 class RouteNameTests(unittest.TestCase):
     def test_a_failure_is_logged_by_its_route(self):
         cases = {"/api/state": "/api/state", "/api/backup/inspect": "/api/backup/inspect", "/api/restore": "/api/restore",
-                 "/api/nope/secret-name": "/api/*", "/api/trips/kyoto%20spring": "/api/*",
+                 "/api/nope/secret-name": "/api/*", "/api/trips/kyoto%20spring": "/api/trips/{id}", "/api/things/kyoto%20spring": "/api/*",
                  "/": "/", "/trips/kyoto": "/", "/auth/callback": "/auth/callback", "/auth/login": "/auth/login",
                  "/auth/whatever": "/"}
         for path, name in cases.items():

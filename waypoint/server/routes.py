@@ -11,6 +11,8 @@ from ..storage import db
 from .common import ApiError, server_error
 
 from .api.backups import api_backup, api_backup_inspect, api_restore
+from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_edit, api_segment_remove, api_trip,
+                        api_trip_add, api_trip_edit, api_trip_merge, api_trip_remove, api_trip_split, api_trips)
 from .api.people import api_people, api_person_add, api_person_edit, api_person_remove
 from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailboxes
 from .api.state import api_state
@@ -26,6 +28,18 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/people", api_person_add),
     ("POST", "/api/people/{id}", api_person_edit),
     ("DELETE", "/api/people/{id}", api_person_remove),
+    ("GET", "/api/trips", api_trips),
+    ("POST", "/api/trips", api_trip_add),
+    ("GET", "/api/trips/{id}", api_trip),
+    ("POST", "/api/trips/{id}", api_trip_edit),
+    ("DELETE", "/api/trips/{id}", api_trip_remove),
+    ("POST", "/api/trips/{id}/merge", api_trip_merge),
+    ("POST", "/api/trips/{id}/split", api_trip_split),
+    ("POST", "/api/segments", api_segment_add),
+    ("GET", "/api/segments/{id}", api_segment),
+    ("POST", "/api/segments/{id}", api_segment_edit),
+    ("DELETE", "/api/segments/{id}", api_segment_remove),
+    ("GET", "/api/airports/{id}", api_airport),
     ("GET", "/api/mailboxes", api_mailboxes),
     ("POST", "/api/mailboxes/connect", api_mailbox_connect),
     ("GET", "/api/mailboxes/callback", api_mailbox_callback),

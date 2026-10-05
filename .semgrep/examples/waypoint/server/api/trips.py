@@ -25,8 +25,16 @@ def api_trip(conn, _q, _b, trip_id):
     table = schema.trips
     # ruleid: waypoint-trip-visibility
     raw = "SELECT * FROM trips WHERE id = :id"
+    # ruleid: waypoint-trip-visibility
+    who = conn.execute(select(SegmentTraveler.person_id).where(SegmentTraveler.segment_id == trip_id)).fetchall()
+    # ruleid: waypoint-trip-visibility
+    legs = conn.orm.scalars(select(Segment).where(Segment.kind == "flight")).all()
     # ok: waypoint-trip-visibility
-    trip = visibility.trip(conn, person, trip_id)
+    trip = visibility.visible_trip(conn, viewer, trip_id)
+    # ok: waypoint-trip-visibility
+    mine = visibility.visible_trips(conn, viewer)
+    # ok: waypoint-trip-visibility
+    shown = trips.get(conn, viewer, trip_id)
     # ok: waypoint-trip-visibility
     label = "Trips you're on"
     # ok: waypoint-trip-visibility

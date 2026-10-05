@@ -59,6 +59,16 @@ def everyone(conn: db.Connection) -> list[Listed]:
     return [listed(p) for p in sorted(found, key=lambda p: (p.user_sub is None, p.display_name.casefold(), p.id))]
 
 
+def person_for_sub(conn: db.Connection, sub: str) -> int | None:
+    """The person a sign-in belongs to (made at their first sign-in), or None."""
+    return conn.orm.scalars(select(Person.id).where(Person.user_sub == sub)).first()
+
+
+def existing(conn: db.Connection, ids: list[int]) -> dict[int, str]:
+    """The display name of each of these people that exists."""
+    return dict(conn.execute(select(Person.id, Person.display_name).where(Person.id.in_(ids))).fetchall())
+
+
 def ensure_member(conn: db.Connection, sub: str, display_name: str, first_name: str | None) -> None:
     """Signing in makes the member's person on the first time. Later sign-ins leave it alone: the person's names may have
     been edited since, and what the sign-in provider says doesn't win over that."""

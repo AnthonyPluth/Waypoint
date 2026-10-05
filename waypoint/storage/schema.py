@@ -1,5 +1,5 @@
 """Waypoint's database schema, for SQLite and Postgres alike. Alembic migrations (waypoint/storage/migrations) create and change it."""
-from sqlalchemy import Column, Float, ForeignKey, Index, Integer, MetaData, Table, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, MetaData, Table, Text, UniqueConstraint
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 
@@ -75,6 +75,67 @@ people = Table(
     Column('user_sub', Text, refers('people', 'user_sub', 'users.sub', 'SET NULL')),
     Index('ux_people_user_sub', 'user_sub', unique=True),
     info={'doc': 'everyone who travels: household members (linked to their sign-in) and guests with no login'},
+)
+
+airports = Table(
+    'airports', metadata,
+    Column('code', Text, primary_key=True),
+    Column('name', Text, nullable=False),
+    Column('city', Text, nullable=False),
+    Column('country', Text, nullable=False),
+    Column('zone', Text, nullable=False),
+    Column('latitude', Float, nullable=False),
+    Column('longitude', Float, nullable=False),
+    info={'doc': 'airports by IATA code, with their IANA time zone (seeded from waypoint/storage/airports.tsv.gz; reference data, not part of a backup)'},
+)
+
+trips = Table(
+    'trips', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('name', Text, nullable=False),
+    Column('start_date', Text),
+    Column('end_date', Text),
+    Column('destination', Text),
+    Column('notes', Text),
+    Column('auto', Boolean, nullable=False),
+    Column('booked_by', Integer, refers('trips', 'booked_by', 'people.id', 'SET NULL')),
+    Index('ix_trips_booked_by', 'booked_by'),
+    info={'doc': 'a journey: its segments, grouped by Waypoint (auto) or made by hand; its dates are its local dates'},
+)
+
+segments = Table(
+    'segments', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('trip_id', Integer, refers('segments', 'trip_id', 'trips.id', 'CASCADE'), nullable=False),
+    Column('kind', Text, nullable=False),
+    Column('status', Text, nullable=False),
+    Column('confirmation', Text),
+    Column('provider', Text),
+    Column('start_local', Text, nullable=False),
+    Column('start_zone', Text, nullable=False),
+    Column('end_local', Text, nullable=False),
+    Column('end_zone', Text, nullable=False),
+    Column('origin', Text),
+    Column('destination', Text),
+    Column('details', Text),
+    Column('manage_url', Text),
+    Column('source', Text, nullable=False),
+    Column('booked_by', Integer, refers('segments', 'booked_by', 'people.id', 'SET NULL')),
+    Column('locked_fields', Text),
+    Index('ix_segments_trip_id', 'trip_id'),
+    Index('ix_segments_booked_by', 'booked_by'),
+    info={'doc': "one flight leg, hotel stay, car rental or train; times are local wall-clock times with the place's IANA zone"},
+)
+
+segment_travelers = Table(
+    'segment_travelers', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('segment_id', Integer, refers('segment_travelers', 'segment_id', 'segments.id', 'CASCADE'), nullable=False),
+    Column('person_id', Integer, refers('segment_travelers', 'person_id', 'people.id', 'CASCADE')),
+    Column('name', Text),
+    Index('ix_segment_travelers_segment_id', 'segment_id'),
+    Index('ix_segment_travelers_person_id', 'person_id'),
+    info={'doc': 'who a segment is for: a person, or until matched to one, the name as printed on the booking'},
 )
 
 settings = Table(
