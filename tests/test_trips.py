@@ -334,6 +334,63 @@ class SegmentTests(Household):
         self.assertEqual(trips.decode_locked('["a", 1, "b"]'), ["a", "b"])
 
 
+CRUISE = {"kind": "cruise", "origin": "Miami", "destination": "Miami", "provider": "Example Cruise Line",
+          "start_local": "2026-03-01T16:30", "start_zone": "America/New_York", "end_local": "2026-03-08T07:00", "end_zone": "America/New_York",
+          "details": {"ship": "Example Voyager", "deck": "9"}}
+PORTS = [{"name": "Nassau", "zone": "America/Nassau", "arrive_local": "2026-03-02T08:00", "depart_local": "2026-03-02T17:00"},
+         {"name": "Cozumel", "zone": "America/Cancun", "arrive_local": "2026-03-05T08:00", "depart_local": "2026-03-05T17:00"}]
+
+
+class CruiseTests(Household):
+    def test_a_cruise_keeps_its_ports_in_order_with_their_own_zones(self):
+        seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS})
+        self.assertEqual(seg["itinerary"], PORTS)
+        self.assertEqual(trips.get_segment(self.c, self.jane, seg["id"])["itinerary"], PORTS)   # (times as typed, never converted)
+        self.assertEqual(self.add(self.jane, {**CRUISE, "confirmation": "NOPORTS"})["itinerary"], [])
+
+    def test_a_cruise_with_a_bad_itinerary_is_refused_and_says_why(self):
+        for ports, why in (([{**PORTS[0], "name": " "}], "Name port 1"), ([{**PORTS[0], "zone": "Nowhere/Land"}], "port 1"),
+                           ([{**PORTS[0], "arrive_local": "soon"}], "arrival"),
+                           ([{**PORTS[0], "depart_local": "2026-03-02T07:00"}], "before it arrives"),
+                           ([PORTS[1], PORTS[0]], "in the order"),
+                           ([{**PORTS[0], "arrive_local": "2026-02-28T08:00", "depart_local": None}], "in the order"),
+                           ([{**PORTS[0], "arrive_local": "2026-03-09T08:00", "depart_local": None}], "after the cruise ends"),
+                           ([PORTS[0]] * 41, "at most 40")):
+            with self.subTest(why=why), self.assertRaisesRegex(trips.Invalid, why):
+                self.add(self.jane, {**CRUISE, "itinerary": ports})
+        with self.assertRaisesRegex(trips.Invalid, "Only a cruise"):
+            self.add(self.jane, {**HOTEL, "itinerary": PORTS})
+
+    def test_editing_the_ports_locks_them_and_a_later_email_leaves_them_alone_but_fills_an_empty_list(self):
+        mail = {**CRUISE, "confirmation": "CR1234", "itinerary": [PORTS[0]]}
+        empty = self.add(self.jane, {**CRUISE, "confirmation": "CR1234"})
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, mail), "updated")   # (nothing was listed: the email fills it)
+        self.assertEqual(trips.get_segment(self.c, self.jane, empty["id"])["itinerary"], [PORTS[0]])
+        edited = trips.edit_segment(self.c, self.jane, empty["id"], {"itinerary": PORTS})
+        assert edited
+        self.assertEqual((edited["itinerary"], edited["locked_fields"]), (PORTS, ["itinerary"]))
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, {**mail, "itinerary": [PORTS[1]]}), "unchanged")
+        self.assertEqual(trips.get_segment(self.c, self.jane, empty["id"])["itinerary"], PORTS)
+        same = trips.edit_segment(self.c, self.jane, empty["id"], {"itinerary": PORTS})
+        assert same
+        cleared = trips.edit_segment(self.c, self.jane, empty["id"], {"itinerary": []})
+        assert cleared
+        self.assertEqual(cleared["itinerary"], [])
+
+    def test_an_edit_that_leaves_the_ports_alone_keeps_them_and_removing_the_cruise_removes_them(self):
+        seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS})
+        edited = trips.edit_segment(self.c, self.jane, seg["id"], {"provider": "Another Line"})
+        assert edited
+        self.assertEqual((edited["itinerary"], edited["locked_fields"]), (PORTS, ["provider"]))
+        self.assertTrue(trips.delete_segment(self.c, self.jane, seg["id"]))
+        self.assertEqual(trips.ports_of(self.c, [seg["id"]]), {})
+
+    def test_the_ports_are_only_the_viewers_to_see(self):
+        seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS}, travelers=self.on(self.jane.person_id))
+        self.assertIsNone(trips.get_segment(self.c, self.sam, seg["id"]))
+        self.assertEqual([s["itinerary"] for t in trips.listing(self.c, self.sam) for s in t["segments"]], [])
+
+
 class TripTests(Household):
     def test_a_trip_made_by_hand(self):
         made = trips.create_trip(self.c, self.jane, {"name": "Cabin weekend", "destination": "Lake", "notes": "Bring skates",
@@ -522,9 +579,9 @@ class DemoTests(DbCase):
         jane = Viewer(people.person_for_sub(self.c, "demo-jane"))
         sam = Viewer(people.person_for_sub(self.c, "demo-sam"))
         names = {who: [t["name"] for t in trips.listing(self.c, who)] for who in (jane, sam)}
-        self.assertEqual(len(names[jane]), 6)   # the family's four trips (two of them older), her own, and the one read from an email for a name nobody matches
-        self.assertEqual(len(names[sam]), 5)
-        self.assertEqual(len(set(names[jane]) & set(names[sam])), 4)   # the family's four trips are both's; each has a solo one
+        self.assertEqual(len(names[jane]), 8)   # the family's four trips (two of them older), two cruises, her own, and the one read from an email for a name nobody matches
+        self.assertEqual(len(names[sam]), 7)
+        self.assertEqual(len(set(names[jane]) & set(names[sam])), 6)   # the family's four trips and the cruises are both's; each has a solo one
         for t in trips.listing(self.c, Viewer(None, household=True)):
             for s in t["segments"]:
                 self.assertTrue(s["start_zone"] and s["end_zone"])
@@ -748,6 +805,23 @@ class LocalHouseholdTests(ServerCase):
         self.assertEqual(status, 200)
         self.assertIn(seg["trip_id"], [t["id"] for t in listing["trips"]])
         self.assertEqual(self.req("DELETE", f"/api/trips/{seg['trip_id']}"), (200, {"ok": True}))
+
+
+class CruiseRouteTests(RouteCase):
+    def test_a_cruise_round_trips_through_the_routes_and_a_bad_port_is_a_400(self):
+        body = {**CRUISE, "itinerary": PORTS}
+        seg = self.ok("ana", "POST", "/api/segments", body)
+        self.assertEqual((seg["kind"], seg["itinerary"], seg["details"]), ("cruise", PORTS, {"ship": "Example Voyager", "deck": "9"}))
+        self.assertEqual(self.ok("ana", "GET", f"/api/segments/{seg['id']}")["itinerary"], PORTS)
+        edited = self.ok("ana", "POST", f"/api/segments/{seg['id']}", {"itinerary": [{**PORTS[0], "name": " Nassau "}]})
+        self.assertEqual((edited["itinerary"], edited["locked_fields"]), ([PORTS[0]], ["itinerary"]))
+        for bad, why in (("ports", "list of ports"), ([5], "list of ports"), ([{"zone": "Europe/London"}], "name"),
+                         ([{**PORTS[0], "name": "x" * 101}], "too long"), ([{**PORTS[0], "zone": 4}], "as text")):
+            with self.subTest(bad=str(bad)[:30]):
+                status, got = self.call("ana", "POST", f"/api/segments/{seg['id']}", {"itinerary": bad})
+                self.assertEqual(status, 400, got)
+                self.assertIn(why, got["error"])
+        self.assertEqual(self.call("ben", "GET", f"/api/segments/{seg['id']}")[0], 404)   # (ben isn't on it)
 
 
 class ApiFieldTests(unittest.TestCase):

@@ -108,6 +108,7 @@
               {@render times(s)}
               {#if s.confirmation}<div><dt class="eyebrow">Confirmation</dt><dd class="mt-1 text-lg"><CopyCode code={s.confirmation} /></dd></div>{/if}
             </dl>
+            {@render ports(s)}
             {@render links(s)}
           </div>
           <div class="pass-tear" aria-hidden="true"></div>
@@ -174,9 +175,9 @@
 
 {#snippet links(s: Segment)}
   {#if s.check_times}<p class="text-sm text-signal-ink" role="note">Check the times: the email gave them in UTC and Waypoint couldn’t tell which clock they mean. Edit the booking to correct or confirm them.</p>{/if}
-  {#if s.kind === "hotel" || s.kind === "car"}
+  {#if s.kind === "hotel" || s.kind === "car" || s.kind === "cruise"}
     {#if s.details.address}
-      <div class="mt-2 text-sm"><p class="eyebrow">{s.kind === "car" ? "Pick-up address" : "Address"}</p>
+      <div class="mt-2 text-sm"><p class="eyebrow">{s.kind === "car" ? "Pick-up address" : s.kind === "cruise" ? "Terminal address" : "Address"}</p>
         <CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" /></div>
     {:else if s.status !== "cancelled"}
       <p class="mt-2 text-sm"><button type="button" class="underline underline-offset-2" onclick={() => { focus = "segment-address"; form = draftOf(s); }}
@@ -188,6 +189,26 @@
       {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord}</Button>{/if}
       {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
       {#if s.status !== "cancelled" && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet ports(s: Segment)}
+  {#if s.itinerary.length}
+    <div class="mt-2 text-sm" data-itinerary>
+      <p class="eyebrow">Ports of call</p>
+      <ol class="mt-1 flex flex-col gap-2">
+        {#each s.itinerary as p, i (i)}
+          <li class="flex flex-wrap items-baseline justify-between gap-x-3">
+            <span class="break-words font-medium">{p.name}</span>
+            <span class="text-muted-foreground">
+              {#if p.arrive_local}{dayLabel(p.arrive_local)}, arrives <PlaceTime local={p.arrive_local} zone={p.zone} />{#if p.depart_local}, leaves <PlaceTime local={p.depart_local} zone={p.zone} />{/if}
+              {:else if p.depart_local}{dayLabel(p.depart_local)}, leaves <PlaceTime local={p.depart_local} zone={p.zone} />
+              {:else}Time not recorded{/if}
+            </span>
+          </li>
+        {/each}
+      </ol>
     </div>
   {/if}
 {/snippet}

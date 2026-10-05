@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import func, select
 
 from ..storage import db, secretbox
-from ..storage.models import FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentTraveler, Trip, User
+from ..storage.models import FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentPort, SegmentTraveler, Trip, User
 from . import loyalty, people, trips
 from .mail import review
 from .visibility import Viewer
@@ -99,6 +99,28 @@ def _family_two_years_ago(today: date) -> list[trips.SegmentIn]:
     ]
 
 
+def _port(name: str, zone: str, day: int, arrive: str | None, leave: str | None, today: date) -> trips.PortIn:
+    return {"name": name, "zone": zone, "arrive_local": _at(today, day, arrive) if arrive else None,
+            "depart_local": _at(today, day, leave) if leave else None}
+
+
+# Two sailings: one finished (Stats counts its nights, sea days and ports) and one to come, with its terminal's address.
+def _cruises(today: date) -> list[trips.SegmentIn]:
+    new_york, bahamas, cayman = "America/New_York", "America/Nassau", "America/Cayman"
+    return [
+        {"kind": "cruise", "origin": "Miami", "destination": "Miami", "start_local": _at(today, -250, "16:30"), "end_local": _at(today, -243, "07:00"),
+         "start_zone": new_york, "end_zone": new_york, "confirmation": "CR48210", "provider": "Example Cruise Line",
+         "details": {"ship": "Example Voyager", "room": "Balcony 9214", "deck": "9"},
+         "itinerary": [_port("Nassau", bahamas, -249, "08:00", "17:00", today), _port("Grand Cayman", cayman, -246, "07:00", "16:00", today),
+                       _port("Cozumel", "America/Cancun", -245, "08:00", "17:00", today)]},
+        {"kind": "cruise", "origin": "Seattle", "destination": "Seattle", "start_local": _at(today, 75, "16:00"), "end_local": _at(today, 82, "06:30"),
+         "start_zone": "America/Los_Angeles", "end_zone": "America/Los_Angeles", "confirmation": "CR90377", "provider": "Example Cruise Line",
+         "details": {"ship": "Example Explorer", "room": "Oceanview 6118", "deck": "6", "address": "2001 Terminal Way\nSeattle, WA 98100"},
+         "itinerary": [_port("Juneau", "America/Juneau", 78, "07:00", "18:00", today), _port("Skagway", "America/Juneau", 79, "07:00", "20:00", today),
+                       _port("Victoria", "America/Vancouver", 81, "18:00", "23:00", today)]},
+    ]
+
+
 # Grandma Joan flies with the family on the same flights, on a reservation of her own: the trip shows each flight once, with a block
 # for each booking.
 def _joan(today: date) -> list[trips.SegmentIn]:
@@ -172,6 +194,8 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     for fields in (*_family_two_years_ago(today), *_family_last_year(today), *_family_past(today), *_family_now(today)):
         added = trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0])})
         now_trip = added["trip_id"] if added and (fields.get("details") or {}).get("flight_number") == "AA 102" else now_trip
+    for fields in _cruises(today):
+        trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id)})
     for fields in _joan(today):
         trips.add_segment(conn, jane, {**fields, "travelers": _on(guests[1])}, now_trip)
     for fields in _jane_alone(today):
@@ -195,4 +219,4 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
 
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
-               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentTraveler, FlightStatus, Mailbox, ReviewItem))
+               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem))

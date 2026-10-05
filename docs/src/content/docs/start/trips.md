@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-A **trip** is a journey. It holds **segments**: one flight leg, hotel stay, car rental or train each. You can add them by hand, and Waypoint adds them from the booking emails in a connected Gmail (see [Scanning](/waypoint/start/gmail/#scanning)).
+A **trip** is a journey. It holds **segments**: one flight leg, hotel stay, car rental, train or cruise each. You can add them by hand, and Waypoint adds them from the booking emails in a connected Gmail (see [Scanning](/waypoint/start/gmail/#scanning)).
 
 ## The pages
 
@@ -27,7 +27,7 @@ Without sign-in, on your own machine, everyone is the one local household, which
 
 ## Segments
 
-Each segment has a kind (flight, hotel, car or train), a status (confirmed, changed or cancelled), a confirmation code, the provider, a start and an end, where it starts and ends, a link to manage the booking, and details: flight number, terminal, seat, cabin, room, car class, address and phone. The **travellers** are people from [People](/waypoint/start/people/), or, until a name on a booking is matched to a person, the name as printed.
+Each segment has a kind (flight, hotel, car, train or cruise), a status (confirmed, changed or cancelled), a confirmation code, the provider, a start and an end, where it starts and ends, a link to manage the booking, and details: flight number, terminal, seat, cabin, room, car class, address and phone. The **travellers** are people from [People](/waypoint/start/people/), or, until a name on a booking is matched to a person, the name as printed.
 
 A segment is added to a trip you name, or without one: Waypoint puts it in the trip it belongs to (see below) or makes a new trip. Flights from before Waypoint can be [imported from another app’s CSV export](/waypoint/start/import/).
 
@@ -37,6 +37,7 @@ Each booking card has buttons for what you'd do next:
 
 - **Open in app**: the booking's manage link (from the email, or one you entered). It's a link on the provider's own website; on an iPhone or Android phone it says **Open in app** and the provider's app opens it if installed; on a computer it says **Manage booking** and opens the provider's website. Only https links are offered. A cancelled booking keeps this one (you may need it for a refund) and loses the others. Waypoint doesn't build prefilled manage links for any provider yet, because it only adds one once its URL is confirmed from the provider's public site.
 - **Address**: a hotel's or rental's address shows under its times, as written (up to 300 characters, over several lines if you like). Tap it to copy. With none, the card says **Add address**, which opens the edit form at that field. Editing a booking's details (address, room, phone and the rest) keeps them as a set: a later email won't replace them, but it fills the address while you haven't edited any of them. An address over 300 characters in an email is shortened to fit. Waypoint never looks addresses up; it has only what an email or you gave it, and the calendar feed carries it as the event's location.
+- **Ports of call**: a cruise keeps the ports the ship calls at, in order, each with its name, its own time zone and the local times the ship arrives and leaves (either, both or neither). Add, move and remove them in the booking’s edit form; the card lists them with their times where they happen. The list is checked as you save: a departure can’t be before the arrival, and the ports must follow one another between embarking and disembarking. Editing the list keeps it like any other edit: a later email won’t replace it, and fills it only while it is empty. The terminal’s address works like a hotel’s, and the calendar feed carries the sailing as one event with the itinerary in its description.
 - **Directions**: an Apple Maps link to a hotel's or rental's address (or its place name when there's no address). Your device hands the text to Apple Maps when you tap it; nothing is sent from the server.
 - **Call**: dials the phone number on the booking, when it has one.
 

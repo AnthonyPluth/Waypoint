@@ -53,6 +53,7 @@ class Seg:
     destination: str | None
     provider: str | None
     details: Mapping[str, str] = field(default_factory=dict)
+    ports: Sequence[trips.PortIn] = ()   # a cruise's ports of call
 
 
 class Named(TypedDict):
@@ -139,6 +140,14 @@ class CarStats(TypedDict):
     companies: list[Named]
 
 
+class CruiseStats(TypedDict):
+    count: int
+    nights: int                # nights aboard, each night once however many cruises overlap it
+    sea_days: int              # dates strictly between embarking and disembarking with no port of call that day, each once
+    ports: int                 # different ports of call (by name)
+    lines: list[Named]         # cruises by the booking's provider
+
+
 class PlaceStats(TypedDict):
     countries: list[Place]     # flights' and hotels' together, earliest first
     cities: list[Place]
@@ -149,6 +158,7 @@ class Stats(TypedDict):
     flights: FlightStats
     stays: StayStats
     cars: CarStats
+    cruises: CruiseStats
     places: PlaceStats
 
 
@@ -301,6 +311,33 @@ def _cars(cars: Sequence[Seg], year: int | None) -> CarStats:
     return {"days": len(days), "companies": _ranked(companies)}
 
 
+def _port_days(port: trips.PortIn) -> set[date]:
+    """The local dates the ship is at a port: from its arrival's date to its departure's (either alone is one day)."""
+    days = [date.fromisoformat(t[:10]) for t in (port["arrive_local"], port["depart_local"]) if t]
+    return {days[0] + timedelta(days=i) for i in range((max(days) - min(days)).days + 1)} if days else set()
+
+
+def _cruises(cruises: Sequence[Seg], year: int | None) -> CruiseStats:
+    nights: set[date] = set()
+    sea: set[date] = set()
+    ports: set[str] = set()
+    lines: Counter[str] = Counter()
+    for s in cruises:
+        aboard = {d for d in _nights(s) if _in(d, year)}
+        nights |= aboard
+        in_port = set().union(*(_port_days(p) for p in s.ports)) if s.ports else set()
+        first = date.fromisoformat(s.start_local[:10])
+        sea |= {d for d in _nights(s) if d > first and d not in in_port and _in(d, year)}
+        if not aboard:
+            continue
+        ports |= {p["name"].strip().casefold() for p in s.ports
+                  if year is None or not (days := _port_days(p)) or any(_in(d, year) for d in days)}
+        if s.provider:
+            lines[s.provider] += 1
+    counted = [s for s in cruises if any(_in(d, year) for d in _nights(s))]
+    return {"count": len(counted), "nights": len(nights), "sea_days": len(sea), "ports": len(ports), "lines": _ranked(lines)}
+
+
 def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Airport],
             city_countries: Mapping[str, str]) -> PlaceStats:
     countries: dict[str, list[str]] = {}
@@ -336,6 +373,8 @@ def _years(live: Sequence[Seg]) -> list[int]:
             found.update(d.year for d in _nights(s))
         elif s.kind == "car":
             found.update(d.year for d in _days(s))
+        elif s.kind == "cruise":
+            found.update(d.year for d in _nights(s))
     return sorted(found, reverse=True)
 
 
@@ -347,9 +386,10 @@ def build(segments: Iterable[Seg], known: Mapping[str, Airport], airlines: Mappi
     flights = [s for s in live if s.kind == "flight" and (year is None or int(s.start_local[:4]) == year)]
     stays = [s for s in live if s.kind == "hotel"]
     cars = [s for s in live if s.kind == "car"]
+    cruises = [s for s in live if s.kind == "cruise"]
     stays_in = [s for s in stays if year is None or any(_in(d, year) for d in _nights(s))]
     return {"years": _years(live), "flights": _flights(flights, known, airlines), "stays": _stays(stays_in, year, city_countries),
-            "cars": _cars(cars, year), "places": _places(flights, stays_in, known, city_countries)}
+            "cars": _cars(cars, year), "cruises": _cruises(cruises, year), "places": _places(flights, stays_in, known, city_countries)}
 
 
 def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: int | None, now: datetime) -> Stats | None:
@@ -361,8 +401,9 @@ def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: in
         on = {t.segment_id for t in visibility.visible_travelers(conn, viewer, [s.id for s in segments])
               if t.person_id == person_id}
         segments = [s for s in segments if s.id in on]
+    ports = trips.ports_of(conn, [s.id for s in segments if s.kind == "cruise"])
     seen = [Seg(s.kind, s.start_local, s.start_zone, s.end_local, s.end_zone, s.origin, s.destination, s.provider,
-                trips.decode_details(s.details)) for s in segments]
+                trips.decode_details(s.details), ports.get(s.id, [])) for s in segments]
     codes = {(p or "").upper() for s in seen if s.kind == "flight" for p in (s.origin, s.destination)}
     known = {a.code: a for a in conn.orm.scalars(select(Airport).where(Airport.code.in_(sorted(codes)))).all()}
     prefixes = {c for s in seen if s.kind == "flight" and (c := _airline_code(s))}

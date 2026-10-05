@@ -172,7 +172,7 @@ export function tripDays(trip: Trip): Day[] {
   const put = (date: string, item: DayItem) => days.set(date, [...(days.get(date) ?? []), item]);
   for (const { lead: segment, segments: bookings } of bookingCards(trip.segments)) {
     put(segment.start_local.slice(0, 10), { segment, bookings, role: "start" });
-    if ((segment.kind === "hotel" || segment.kind === "car") && segment.end_local.slice(0, 10) !== segment.start_local.slice(0, 10)) {
+    if ((segment.kind === "hotel" || segment.kind === "car" || segment.kind === "cruise") && segment.end_local.slice(0, 10) !== segment.start_local.slice(0, 10)) {
       put(segment.end_local.slice(0, 10), { segment, bookings, role: "end" });
     }
   }
@@ -223,6 +223,7 @@ export function headline(s: Segment): string {
   if (s.kind === "flight") return route || "Flight";
   if (s.kind === "train") return route || "Train";
   if (s.kind === "hotel") return s.origin || s.provider || "Hotel stay";
+  if (s.kind === "cruise") return [s.details.ship || s.provider, s.origin].filter(Boolean).join(" · ") || "Cruise";
   return [s.provider, s.origin].filter(Boolean).join(" · ") || "Car rental";
 }
 
@@ -231,13 +232,13 @@ export function subline(s: Segment): string {
   const d = s.details;
   const parts = s.kind === "flight" ? [[s.provider, d.flight_number].filter(Boolean).join(" "), d.terminal && `Terminal ${d.terminal}`, d.seat && `Seat ${d.seat}`, d.cabin]
     : s.kind === "hotel" ? [d.address, d.room]
-      : s.kind === "car" ? [d.car_class, d.address] : [s.provider, d.seat && `Seat ${d.seat}`, d.cabin];
+      : s.kind === "car" ? [d.car_class, d.address] : s.kind === "cruise" ? [s.details.ship ? s.provider : null, d.room && `Cabin ${d.room}`, d.deck && `Deck ${d.deck}`] : [s.provider, d.seat && `Seat ${d.seat}`, d.cabin];
   return parts.filter(Boolean).join(" · ");
 }
 
 /** What happens at a segment's start and end, in words. */
-export const START_WORD: Record<Segment["kind"], string> = { flight: "Departs", hotel: "Check-in", car: "Pick-up", train: "Departs" };
-export const END_WORD: Record<Segment["kind"], string> = { flight: "Arrives", hotel: "Check-out", car: "Drop-off", train: "Arrives" };
+export const START_WORD: Record<Segment["kind"], string> = { flight: "Departs", hotel: "Check-in", car: "Pick-up", train: "Departs", cruise: "Embarks" };
+export const END_WORD: Record<Segment["kind"], string> = { flight: "Arrives", hotel: "Check-out", car: "Drop-off", train: "Arrives", cruise: "Disembarks" };
 
 /** "Departs in 5 h", or in the last minute "Departing now" (never "Departs in now"). */
 export function when(word: string, ms: number): string {

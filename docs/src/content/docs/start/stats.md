@@ -1,6 +1,6 @@
 ---
 title: Travel stats
-description: What Waypoint counts for a person or the household (flights, distance, airlines, hotel nights, rental days, places), and what it leaves out.
+description: What Waypoint counts for a person or the household (flights, distance, airlines, hotel nights, rental days, cruises, places), and what it leaves out.
 sidebar:
   order: 6
 ---
@@ -26,6 +26,7 @@ Miles or kilometres is a household setting, under **Settings → Distances** (`G
 - **Seats**: the letter places a seat on the common layouts: A, F and K are by the window, C, D, G and H are aisle seats, B, E and J are in the middle. Any seat that rule can’t place is “unknown”.
 - **Hotels**: nights away (each night once, however many stays overlap it), the chains (the booking’s provider), and the cities and countries stayed in when the booking names a place Waypoint can find.
 - **Rental cars**: days with a car out, each day once, and the companies.
+- **Cruises**: how many, the nights aboard (each night once, however many cruises overlap it), the **sea days** and the ports of call, and the cruise lines. A sea day is a date strictly between embarking and disembarking on which the ship has no port arrival, so a day in port (from the date it arrives to the date it leaves) isn’t one, and neither are the days of embarking and disembarking. A port with no times is counted as a port but takes no day out of the sea days. A cruise counts in the year its nights fall in, once it has finished.
 - **Places**: the countries and cities from flights and hotels together, with the date of the first visit.
 
 Distances are worked out in kilometres. The household’s display unit is a setting (`distance_unit`, miles unless it is `km`), which the reply carries for the page to apply.

@@ -123,7 +123,7 @@
             <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</dd></div>
         {/if}
         {#if s.details.terminal}<div><dt class="eyebrow">Terminal</dt><dd class="mt-1 text-base font-medium">{s.details.terminal}</dd></div>{/if}
-        {#if s.kind === "hotel" && s.details.address}<div class="col-span-2"><dt class="eyebrow">Address</dt><dd class="mt-1 break-words text-base font-medium">{s.details.address}</dd></div>{/if}
+        {#if (s.kind === "hotel" || s.kind === "cruise") && s.details.address}<div class="col-span-2"><dt class="eyebrow">Address</dt><dd class="mt-1 break-words text-base font-medium">{s.details.address}</dd></div>{/if}
         {#if next.bookings.some((b) => b.confirmation)}
           <div><dt class="eyebrow">{next.bookings.length > 1 ? "Confirmations" : "Confirmation"}</dt>
             <dd class="mt-1 flex flex-wrap gap-x-3 text-lg">{#each next.bookings as b (b.id)}{#if b.confirmation}<CopyCode code={b.confirmation} />{/if}{/each}</dd></div>

@@ -150,6 +150,19 @@ segment_travelers = Table(
     info={'doc': 'who a segment is for: a person, or until matched to one, the name as printed on the booking'},
 )
 
+segment_ports = Table(
+    'segment_ports', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('segment_id', Integer, refers('segment_ports', 'segment_id', 'segments.id', 'CASCADE'), nullable=False),
+    Column('position', Integer, nullable=False),
+    Column('name', Text, nullable=False),
+    Column('zone', Text, nullable=False),
+    Column('arrive_local', Text),
+    Column('depart_local', Text),
+    Index('ix_segment_ports_segment_id', 'segment_id'),
+    info={'doc': "a cruise's ports of call in order: the port's name and IANA zone, and the local times the ship arrives and leaves (none for a port without times)"},
+)
+
 segment_recipients = Table(
     'segment_recipients', metadata,
     Column('id', Integer, primary_key=True, autoincrement=True),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingCards, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, subline, tripDays, untimed, until, when } from "./trips";
+import { bookingCards, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -130,6 +130,11 @@ describe("wording", () => {
     expect(headline(segment({ kind: "car", provider: "Hertz", origin: "SFO airport" }))).toBe("Hertz · SFO airport");
     expect(headline(segment({ kind: "train", origin: "NYP", destination: "BOS" }))).toBe("NYP → BOS");
     expect(headline(segment({ kind: "hotel", origin: null, provider: null }))).toBe("Hotel stay");
+    const ship = segment({ kind: "cruise", provider: "Example Cruise Line", origin: "Miami", details: { ship: "Example Voyager", room: "9214", deck: "9" } });
+    expect(headline(ship)).toBe("Example Voyager · Miami");
+    expect(subline(ship)).toBe("Example Cruise Line · Cabin 9214 · Deck 9");
+    expect(headline(segment({ kind: "cruise", origin: null, provider: null, details: {} }))).toBe("Cruise");
+    expect([START_WORD.cruise, END_WORD.cruise]).toEqual(["Embarks", "Disembarks"]);
   });
 });
 

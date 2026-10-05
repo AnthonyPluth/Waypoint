@@ -161,7 +161,7 @@
   let chosen = $state<Record<number, string>>({});
   let guestName = $state<Record<number, string>>({});
   let matching = $state<number | null>(null);
-  const what = (w: WhoIsThis) => `${w.kind === "hotel" ? "Stay" : w.kind === "car" ? "Rental" : w.kind === "train" ? "Train" : "Flight"}${w.origin ? ` ${w.origin}${w.destination ? ` → ${w.destination}` : ""}` : ""} on ${w.start_local.slice(0, 10)}${w.provider ? ` (${w.provider})` : ""}`;
+  const what = (w: WhoIsThis) => `${w.kind === "hotel" ? "Stay" : w.kind === "car" ? "Rental" : w.kind === "train" ? "Train" : w.kind === "cruise" ? "Cruise" : "Flight"}${w.origin ? ` ${w.origin}${w.destination ? ` → ${w.destination}` : ""}` : ""} on ${w.start_local.slice(0, 10)}${w.provider ? ` (${w.provider})` : ""}`;
 
   async function match(w: WhoIsThis) {
     const pick = chosen[w.id];

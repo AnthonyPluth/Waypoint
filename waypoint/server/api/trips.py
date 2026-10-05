@@ -59,6 +59,16 @@ def _details(raw: Any) -> dict[str, str]:
     return {k: kept for k, v in raw.items() if (kept := _v.text(v.replace("\r\n", "\n").replace("\r", "\n"), f"detail “{k[:30]}”", limits.get(k, 200)))}
 
 
+def _itinerary(raw: Any) -> list[trips.PortIn]:
+    if not isinstance(raw, list) or not all(isinstance(p, dict) for p in raw):
+        raise ApiError('Send "itinerary" as a list of ports')
+    if len(raw) > trips.MAX_PORTS:
+        raise ApiError(f"Add at most {trips.MAX_PORTS} ports of call")
+    return [{"name": _text(p, "name", "port’s name", NAME_LIMIT, required=True) or "", "zone": _text(p, "zone", "port’s time zone", 60) or "",
+             "arrive_local": _text(p, "arrive_local", "arrival", 30), "depart_local": _text(p, "depart_local", "departure", 30)}
+            for p in raw]
+
+
 def _travelers(raw: Any) -> list[trips.TravelerIn]:
     if not isinstance(raw, list) or not all(isinstance(t, dict) for t in raw):
         raise ApiError('Send "travelers" as a list of people')
@@ -90,6 +100,8 @@ def segment_fields(body: Mapping[str, Any]) -> trips.SegmentIn:
         out["details"] = _details(body["details"])
     if "travelers" in body:
         out["travelers"] = _travelers(body["travelers"])
+    if "itinerary" in body:
+        out["itinerary"] = _itinerary(body["itinerary"])
     return out
 
 

@@ -42,7 +42,7 @@ def segment(**over):
     base = {"id": 1, "trip_id": 1, "kind": "flight", "status": "confirmed", "confirmation": None, "provider": None,
             "start_local": "2026-03-01T22:15:00", "start_zone": "Pacific/Auckland", "end_local": "2026-03-01T15:10:00",
             "end_zone": "America/Los_Angeles", "origin": "AKL", "destination": "LAX", "details": {"flight_number": "NZ 6"},
-            "manage_url": None, "source": "manual", "booked_by": None, "locked_fields": [], "travelers": []}
+            "manage_url": None, "source": "manual", "booked_by": None, "locked_fields": [], "travelers": [], "itinerary": []}
     return {**base, **over}
 
 
@@ -99,6 +99,19 @@ class CalendarTests(unittest.TestCase):
         car = segment(**{**base, "kind": "car", "origin": "Airport desk"}, details={"address": "5 Depot Way"})
         self.assertIn("LOCATION:5 Depot Way", self.lines(car))
         self.assertFalse([l for l in self.lines(segment()) if l.startswith("LOCATION")])   # (a flight has none)
+
+    def test_a_cruise_is_one_event_with_its_itinerary_and_the_terminals_address(self):
+        ports = [{"name": "Nassau", "zone": "America/Nassau", "arrive_local": "2026-03-02T08:00", "depart_local": "2026-03-02T17:00"},
+                 {"name": "At sea", "zone": "America/Nassau", "arrive_local": None, "depart_local": None}]
+        cruise = segment(kind="cruise", origin="Miami", destination="Miami", start_local="2026-03-01T16:30", end_local="2026-03-08T07:00",
+                         start_zone="America/New_York", end_zone="America/New_York", provider="Example Cruise Line",
+                         details={"ship": "Example Voyager", "address": "1 Port Boulevard\nMiami"}, itinerary=ports)
+        lines = self.lines(cruise)
+        self.assertIn("SUMMARY:Cruise (Example Voyager) Miami → Miami", lines)
+        self.assertIn("LOCATION:1 Port Boulevard\\nMiami", lines)
+        self.assertIn("DTSTART;TZID=America/New_York:20260301T163000", lines)
+        text = "\n".join(lines)
+        self.assertIn("Itinerary:\\nNassau: arrives 2026-03-02 08:00\\, leaves 2026-03-02 17:00\\nAt sea: in port", text)
 
     def test_a_flight_changes_zone_between_its_ends_and_each_zone_is_described(self):
         lines = self.lines(segment(origin="JFK", destination="LHR", start_local="2026-11-20T19:00:00",

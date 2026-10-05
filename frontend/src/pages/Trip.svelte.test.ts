@@ -339,4 +339,68 @@ describe("Trip", () => {
       expect((post[1] as { body: { details: Record<string, string> } }).body.details.address).toBe("7 Mill Lane\nLondon N1 1AA");
     });
   });
+
+  describe("a cruise", () => {
+    const ship = segment({ id: 5, kind: "cruise", provider: "Example Cruise Line", origin: "Miami", destination: "Miami", start_zone: "America/New_York", end_zone: "America/New_York",
+      start_local: "2026-03-01T16:30", end_local: "2026-03-08T07:00", confirmation: "CR48210", details: { ship: "Example Voyager", room: "9214", address: "1 Port Boulevard\nMiami" },
+      links: { app: null, directions: "https://maps.apple.com/?q=1%20Port%20Boulevard%20Miami", call: null },
+      itinerary: [{ name: "Nassau", zone: "America/Nassau", arrive_local: "2026-03-02T08:00", depart_local: "2026-03-02T17:00" },
+                  { name: "Cozumel", zone: "America/Cancun", arrive_local: null, depart_local: null }] });
+
+    it("lists its ports of call with their local times, its terminal address, and Directions to it", async () => {
+      held = trip([ship]);
+      render(TripPage);
+      const ports = (await screen.findByText("Ports of call")).closest("[data-itinerary]") as HTMLElement;
+      const rows = within(ports).getAllByRole("listitem");
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toHaveTextContent("Nassau");
+      expect(rows[0]).toHaveTextContent(/arrives .*8:00 AM.*leaves .*5:00 PM/);
+      expect(rows[1]).toHaveTextContent("Cozumel");
+      expect(rows[1]).toHaveTextContent("Time not recorded");
+      expect(screen.getByText("Terminal address")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", ship.links.directions!);
+      expect(screen.getByText("Embarks")).toBeInTheDocument();
+    });
+
+    it("shows no ports section for a cruise without any", async () => {
+      held = trip([{ ...ship, itinerary: [] }]);
+      render(TripPage);
+      await screen.findByRole("heading", { name: "Example Voyager · Miami" });
+      expect(screen.queryByText("Ports of call")).toBeNull();
+    });
+
+    it("edits the ports: adds one in the last one’s zone, moves, removes, and sends them in order", async () => {
+      held = trip([ship]);
+      const u = userEvent.setup();
+      render(TripPage);
+      await u.click(await screen.findByRole("button", { name: "Edit Example Voyager · Miami" }));
+      expect(screen.getByLabelText("Port 1 name")).toHaveValue("Nassau");
+      await u.click(screen.getByRole("button", { name: "Add a port" }));
+      expect(screen.getByLabelText("Port 3 time zone")).toHaveValue("America/Cancun");
+      await u.type(screen.getByLabelText("Port 3 name"), "Grand Cayman");
+      await u.click(screen.getByRole("button", { name: "Move port 3 up" }));
+      expect(screen.getByLabelText("Port 2 name")).toHaveValue("Grand Cayman");
+      await u.click(screen.getByRole("button", { name: "Remove port 1" }));
+      expect(screen.getByLabelText("Port 1 name")).toHaveValue("Grand Cayman");
+      expect(screen.queryByLabelText("Port 3 name")).toBeNull();
+      await u.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/5", { method: "POST", body: expect.objectContaining({
+        kind: "cruise", itinerary: [{ name: "Grand Cayman", zone: "America/Cancun", arrive_local: null, depart_local: null },
+                                    { name: "Cozumel", zone: "America/Cancun", arrive_local: null, depart_local: null }] }) }));
+    });
+
+    it("says what is wrong with a port without sending, and shows the ports section only for a cruise", async () => {
+      held = trip([ship, flight]);
+      const u = userEvent.setup();
+      render(TripPage);
+      await u.click(await screen.findByRole("button", { name: "Edit Example Voyager · Miami" }));
+      await u.clear(screen.getByLabelText("Port 1 name"));
+      await u.click(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Name port 1");
+      expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
+      await u.click(screen.getByRole("button", { name: "Cancel" }));
+      await u.click(screen.getByRole("button", { name: "Edit JFK → LHR" }));
+      expect(screen.queryByText("Ports of call", { selector: "legend" })).toBeNull();
+    });
+  });
 });

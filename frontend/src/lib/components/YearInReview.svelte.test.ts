@@ -18,7 +18,7 @@ const stats = (year: number | null): Stats => ({
     airlines: [], routes: [{ a: "JFK", b: "LHR", flights: 4, distance_km: 5540, a_latitude: 40.64, a_longitude: -73.78, b_latitude: 51.47, b_longitude: -0.45 }],
     longest: null, shortest: null, most_visited_airport: "JFK", busiest_month: null, times_around_earth: 1.3, moon_fraction: 0.1,
   },
-  stays: { nights: 9, chains: [{ name: "Hotel Canarios", count: 2 }], cities: [], countries: [] }, cars: { days: 0, companies: [] },
+  stays: { nights: 9, chains: [{ name: "Hotel Canarios", count: 2 }], cities: [], countries: [] }, cars: { days: 0, companies: [] }, cruises: { count: 0, nights: 0, sea_days: 0, ports: 0, lines: [] },
   places: { countries: [{ name: "US", first_visit: year ? "2019-05-01" : "2019-05-01", visits: 3 }, { name: "GB", first_visit: "2026-03-14", visits: 1 }], cities: [] },
 });
 
@@ -40,6 +40,15 @@ describe("YearInReview", () => {
     expect(await screen.findByTestId("share-card")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Next" }).hasAttribute("disabled")).toBe(true);
     expect(vi.mocked(api).mock.calls.map((c) => c[0])).toContain("/api/stats?person=1&year=all");
+  });
+
+  it("adds a card for cruises, with the nights aboard and the sea days, only when there were cruises", async () => {
+    const withCruise = { ...stats(2026), cruises: { count: 2, nights: 10, sea_days: 1, ports: 3, lines: [] } };
+    render(YearInReview, { stats: withCruise, person: 1, name: null, onclose: () => {} });
+    await next(5);
+    expect(screen.getByText("2 cruises")).toBeTruthy();
+    expect(screen.getByText("10 nights aboard")).toBeTruthy();
+    expect(screen.getByText("1 sea day")).toBeTruthy();
   });
 
   it("puts the first name on the card only when 'Show the first name' is ticked", async () => {

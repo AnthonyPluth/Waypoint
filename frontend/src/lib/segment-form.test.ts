@@ -78,11 +78,43 @@ describe("the request the form makes", () => {
   });
 });
 
+describe("a cruise", () => {
+  const cruise = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), kind: "cruise", origin: "Miami", destination: "Miami", start_local: "2026-03-01T16:30",
+    end_local: "2026-03-08T07:00", start_zone: "America/New_York", people: [1], ...extra });
+  const nassau = { name: " Nassau ", zone: "America/Nassau", arrive: "2026-03-02T08:00", depart: "2026-03-02T17:00" };
+
+  it("is sent with its ports in order, trimmed, and none for a time left empty", () => {
+    const sent = body(cruise({ itinerary: [nassau, { name: "Cozumel", zone: "America/Cancun", arrive: "", depart: "" }], details: { ship: "Example Voyager" } }));
+    expect(sent.itinerary).toEqual([{ name: "Nassau", zone: "America/Nassau", arrive_local: "2026-03-02T08:00", depart_local: "2026-03-02T17:00" },
+      { name: "Cozumel", zone: "America/Cancun", arrive_local: null, depart_local: null }]);
+    expect(sent.details).toEqual({ ship: "Example Voyager" });
+    expect(body(flight()).itinerary).toBeUndefined();
+  });
+
+  it("round-trips what the server gave", () => {
+    const d = draftOf(segment({ kind: "cruise", origin: "Miami", destination: "Miami", start_zone: "America/New_York", end_zone: "America/New_York",
+      itinerary: [{ name: "Nassau", zone: "America/Nassau", arrive_local: "2026-03-02T08:00", depart_local: null }], travelers: [{ id: 1, person_id: 1, name: "Jane Doe" }] }));
+    expect(d.itinerary).toEqual([{ name: "Nassau", zone: "America/Nassau", arrive: "2026-03-02T08:00", depart: "" }]);
+    expect(body(d).itinerary).toEqual([{ name: "Nassau", zone: "America/Nassau", arrive_local: "2026-03-02T08:00", depart_local: null }]);
+  });
+
+  it("says what is wrong with a port", () => {
+    expect(problem(cruise({ itinerary: [nassau] }))).toBeNull();
+    expect(problem(cruise({ itinerary: [{ ...nassau, name: " " }] }))).toBe("Name port 1");
+    expect(problem(cruise({ itinerary: [{ ...nassau, zone: "" }] }))).toMatch(/Enter the time zone of Nassau/);
+    expect(problem(cruise({ itinerary: [{ ...nassau, zone: "Nowhere/Land" }] }))).toMatch(/isn’t one Waypoint knows/);
+    expect(problem(cruise({ itinerary: [{ ...nassau, arrive: "soon" }] }))).toBe("Enter Nassau’s arrival as a date and time");
+    expect(problem(cruise({ itinerary: [{ ...nassau, depart: "2026-03-02T07:00" }] }))).toMatch(/can’t leave before it arrives/);
+    expect(problem(cruise({ itinerary: Array.from({ length: 41 }, () => nassau) }))).toBe("Add at most 40 ports of call");
+  });
+});
+
 describe("the fields each kind shows", () => {
   it("has the address, phone and room for a hotel, the pick-up address, phone and class for a car, and terminal, seat and cabin for a flight", () => {
     const names = (k: Kind) => DETAILS[k].map(([, label]) => label);
     expect(names("hotel")).toEqual(["Address", "Room", "Phone"]);
     expect(names("car")).toEqual(["Pick-up address", "Car class", "Phone"]);
+    expect(names("cruise")).toEqual(["Ship", "Cabin", "Deck", "Terminal address", "Phone"]);
     expect(names("flight")).toEqual(expect.arrayContaining(["Terminal", "Seat", "Cabin"]));
   });
 

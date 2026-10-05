@@ -60,7 +60,7 @@
   const reviewName = $derived(sel.who === "all" ? null : people.find((p) => p.id === sel.who)?.first_name ?? people.find((p) => p.id === sel.who)?.display_name ?? null);
 
   const f = $derived(current?.flights);
-  const empty = $derived(!!current && current.flights.count === 0 && current.stays.nights === 0 && current.cars.days === 0);
+  const empty = $derived(!!current && current.flights.count === 0 && current.stays.nights === 0 && current.cars.days === 0 && current.cruises.count === 0);
   const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
   const tiles = $derived(current && f ? [
     { label: "Flights", value: count(f.count) },
@@ -70,6 +70,12 @@
     { label: "Airlines", value: count(f.airlines.length) },
     { label: "Countries", value: count(current.places.countries.length) },
     { label: "Nights away", value: count(current.stays.nights) },
+    ...(current.cruises.count ? [
+      { label: "Cruises", value: count(current.cruises.count) },
+      { label: "Nights at sea", value: count(current.cruises.nights) },
+      { label: "Sea days", value: count(current.cruises.sea_days) },
+      { label: "Ports of call", value: count(current.cruises.ports) },
+    ] : []),
   ] : []);
 
   const named = (rows: { name: string; count: number }[], unitWord: string): Row[] => rows.map((r) => ({ key: r.name, name: r.name, value: plural(r.count, unitWord) }));
@@ -80,6 +86,7 @@
     { title: "Countries", rows: current.places.countries.map((c) => ({ key: c.name, name: countryName(c.name), sub: `First visit ${dateLabel(c.first_visit)}`, value: plural(c.visits, "visit") })) },
     { title: "Hotel chains", rows: named(current.stays.chains, "stay") },
     { title: "Rental companies", rows: named(current.cars.companies, "rental") },
+    { title: "Cruise lines", rows: named(current.cruises.lines, "cruise") },
   ] : []);
 
   const airportName = (code: string) => f?.airports.find((a) => a.code === code);
@@ -141,7 +148,7 @@
   <div class="rows" data-testid="stats-empty">
     <div class="row flex-col items-start gap-3 py-6">
       <p class="font-medium">{whoName === "Everyone" ? "Nothing finished" : `Nothing finished for ${whoName}`}{sel.year ? ` in ${sel.year}` : " yet"}.</p>
-      <p class="text-sm text-muted-foreground">Stats count flights, stays and rentals once they’re over.</p>
+      <p class="text-sm text-muted-foreground">Stats count flights, stays, rentals and cruises once they’re over.</p>
       <div class="flex flex-wrap gap-2"><Button href="#trips">Add a trip</Button><Button variant="outline" href="#settings">Import past flights</Button></div>
     </div>
   </div>

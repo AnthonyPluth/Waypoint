@@ -1,0 +1,43 @@
+{
+  "name": "cruise-dark",
+  "page": "trips",
+  "scheme": "dark",
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Trips"
+      }
+    },
+    {
+      "click": "a[href^='#trip/']:has-text('Seattle') >> visible=true"
+    },
+    {
+      "wait_for": "[data-itinerary]"
+    },
+    {
+      "expect_text": {
+        "selector": "main",
+        "text": "Skagway"
+      }
+    },
+    {
+      "scroll_to": "[data-itinerary]"
+    },
+    {
+      "screenshot": "itinerary"
+    },
+    {
+      "click": "button:has-text('Edit') >> visible=true"
+    },
+    {
+      "wait_for": "fieldset[data-itinerary]"
+    },
+    {
+      "scroll_to": "fieldset[data-itinerary]"
+    },
+    {
+      "screenshot": "ports-form"
+    }
+  ]
+}

@@ -14,12 +14,12 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from .trips import SegmentOut, TripOut, flight_groups, untimed
+from .trips import PortIn, SegmentOut, TripOut, flight_groups, untimed
 
 PRODID = "-//Waypoint//Trips//EN"
 FOLD = 75   # a line's most octets (RFC 5545, 3.1)
 DETAILS = (("flight_number", "Flight"), ("terminal", "Terminal"), ("seat", "Seat"), ("cabin", "Cabin"), ("room", "Room"),
-           ("car_class", "Car"), ("address", "Address"), ("phone", "Phone"))
+           ("car_class", "Car"), ("address", "Address"), ("phone", "Phone"), ("ship", "Ship"), ("deck", "Deck"))
 
 
 def escape(text: str) -> str:
@@ -111,6 +111,9 @@ def _title(seg: SegmentOut) -> str:
         return f"Hotel: {seg['origin']}" if seg["origin"] else "Hotel"
     if seg["kind"] == "car":
         return f"Car: {where}" if where else "Car"
+    if seg["kind"] == "cruise":
+        ship = seg["details"].get("ship")
+        return " ".join(p for p in ("Cruise", f"({ship})" if ship else None, where) if p)
     return f"Train: {where}" if where else "Train"
 
 
@@ -135,11 +138,20 @@ def _description(group: Sequence[SegmentOut], trip: TripOut) -> str:
         lines.append("Times differ between bookings:")
         lines += [f"{g['confirmation'] or 'Booking'}: departs {_clock(g['start_local'])}, arrives {_clock(g['end_local'])}" for g in live]
     lines += [f"{label}: {seg['details'][key]}" for key, label in DETAILS if seg["details"].get(key) and key != "flight_number"]
+    if seg["itinerary"]:
+        lines.append("Itinerary:")
+        lines += [f"{p['name']}: {_stop(p)}" for p in seg["itinerary"]]
     for g in group:
         if g["manage_url"]:
             which = f" ({g['confirmation']})" if len(group) > 1 and g["confirmation"] else ""
             lines.append(f"Manage{which}: {g['manage_url']}")
     return "\n".join(lines)
+
+
+def _stop(port: PortIn) -> str:
+    """A port of call as the event's description says it: when the ship arrives and leaves, by the port's clock."""
+    parts = [f"{label} {at[:10]} {_clock(at)}" for label, at in (("arrives", port["arrive_local"]), ("leaves", port["depart_local"])) if at]
+    return ", ".join(parts) or "in port"
 
 
 def _times(seg: SegmentOut) -> list[str]:
@@ -158,7 +170,7 @@ def _event(group: Sequence[SegmentOut], trip: TripOut, now: datetime) -> list[st
     lines = ["BEGIN:VEVENT", f"UID:segment-{group[0]['id']}@waypoint", f"DTSTAMP:{now.astimezone(UTC):%Y%m%dT%H%M%SZ}",
              *_times(seg),
              f"SUMMARY:{escape(_title(seg))}", f"DESCRIPTION:{escape(_description(group, trip))}"]
-    place = (seg["details"].get("address") or seg["origin"]) if seg["kind"] in ("hotel", "car") else None   # (the address a person or the email gave, else the place's name)
+    place = (seg["details"].get("address") or seg["origin"]) if seg["kind"] in ("hotel", "car", "cruise") else None   # (the address a person or the email gave, else the place's name)
     if place:
         lines.append(f"LOCATION:{escape(place)}")
     cancelled = all(g["status"] == "cancelled" for g in group)
