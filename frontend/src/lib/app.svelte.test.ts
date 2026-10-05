@@ -2,15 +2,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./api", () => ({ api: vi.fn(), newPage: vi.fn() }));
-vi.mock("./monitoring", () => ({ startMonitoring: vi.fn().mockResolvedValue(undefined) }));
 
 import { api, newPage } from "./api";
-import { startMonitoring } from "./monitoring";
 import { app, boot, checkIn, editing, refreshState, route, setQuery, whenBooted } from "./app.svelte";
 import type { AppState } from "./types";
 
 const state = (extra: Partial<AppState> = {}): AppState =>
-  ({ version: "1.0", database: "sqlite", user: null, sentry: null, last_backup: null, ...extra });
+  ({ version: "1.0", database: "sqlite", user: null, last_backup: null, ...extra });
 beforeEach(() => {
   vi.mocked(api).mockReset(); vi.mocked(newPage).mockClear();
   app.state = null; app.bootError = ""; app.sessionExpired = false;
@@ -96,23 +94,21 @@ describe("boot", () => {
     vi.mocked(api).mockRejectedValue(new Error("Failed to fetch"));
     await boot();
     expect(app.bootError).toBe("Failed to fetch");
-    expect(startMonitoring).not.toHaveBeenCalled();
   });
 
-  it("loads state and error reporting once, and runs whenBooted callbacks", async () => {
-    vi.mocked(api).mockResolvedValue(state({ sentry: { dsn: "d", environment: "e", release: "r" } }));
+  it("loads state once, and runs whenBooted callbacks", async () => {
+    vi.mocked(api).mockResolvedValue(state());
     const early = vi.fn();
     whenBooted(early);
     expect(early).not.toHaveBeenCalled();
     await boot();
     expect(app.bootError).toBe("");
-    expect(startMonitoring).toHaveBeenCalledWith({ dsn: "d", environment: "e", release: "r" });
     expect(early).toHaveBeenCalledOnce();
     const late = vi.fn();
     whenBooted(late);
     expect(late).toHaveBeenCalledOnce();
     await boot();
-    expect(startMonitoring).toHaveBeenCalledOnce();
+    expect(early).toHaveBeenCalledOnce();
   });
 });
 

@@ -1,6 +1,5 @@
 // What the whole app shares: Waypoint's state (/api/state) and the current page.
 import { api, newPage } from "./api";
-import { startMonitoring } from "./monitoring";
 import type { AppState } from "./types";
 import { errMsg } from "./act";
 
@@ -66,7 +65,6 @@ export async function boot(): Promise<void> {
   catch (err) { console.error(err); app.bootError = errMsg(err); return; }
   if (booted) return;
   booted = true;
-  startMonitoring(app.state?.sentry).catch((err) => console.error(err));   // error reports, if Waypoint sends them
   onBoot.splice(0).forEach((fn) => fn());
 }
 window.addEventListener("online", () => { if (!booted) boot(); });

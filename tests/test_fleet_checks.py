@@ -133,9 +133,6 @@ class Workflows(unittest.TestCase):
         self.assertIn("without --paginate", fc.check_workflow("x.yml", self.GOOD.replace("--paginate ", ""))[0])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class Tests(unittest.TestCase):
     """A test that's removed or skipped needs a trailer saying why."""
@@ -180,6 +177,11 @@ class Tests(unittest.TestCase):
         other = "refactor: x\n\nRemoves-Test: test_hidden_trip — a different test whose name is part of this one's\n"
         self.assertTrue(self.check(removed=[gone], messages=[other]))
 
+    def test_a_vitest_title_is_named_up_to_the_dash(self):
+        gone = "frontend/src/lib/app.test.ts::shows a trip, then its legs"
+        self.assertEqual(self.check(removed=[gone], messages=["x\n\nRemoves-Test: shows a trip, then its legs — merged into one\n"]), [])
+        self.assertTrue(self.check(removed=[gone], messages=["x\n\nRemoves-Test: shows — merged\n"]))
+
     def test_each_skip_needs_its_own_trailer(self):
         added = [("tests/test_trips.py", "test_a", "@unittest.skip('later')"),
                  ("tests/test_trips.py", "test_b", "self.skipTest('flaky')")]
@@ -202,3 +204,7 @@ class Tests(unittest.TestCase):
             self.skipTest("no origin/main here to compare with")
         found = fc.commits(f"{base}..HEAD")
         self.assertEqual(fc.check_tests(fc._git("merge-base", base, "HEAD").strip(), [m for _, m in found]), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

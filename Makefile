@@ -37,7 +37,7 @@ python-lint:
 # those (.semgrep/examples/), then the code. The ESLint rules' examples are frontend/src/lint-rules.test.ts.
 semgrep:
 	$(PYTHON) .semgrep/check_examples.py $(SEMGREP)
-	$(SEMGREP) scan --metrics=off --disable-version-check --error --config .semgrep/waypoint.yml waypoint run.py
+	$(SEMGREP) scan --metrics=off --disable-version-check --error --config .semgrep/waypoint.yml waypoint run.py frontend/src frontend/index.html frontend/package.json pyproject.toml
 
 test:
 	$(PYTHON) -m unittest discover tests

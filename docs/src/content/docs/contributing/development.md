@@ -74,7 +74,7 @@ make docs          # http://localhost:4321/waypoint/, reloading as you edit
 make docs-build    # builds it into docs/dist and fails on a broken link between pages
 ```
 
-Link to another page by its address, base included: `[Configuration](/waypoint/reference/configuration/)`, or `/waypoint/start/docker/#error-reports-optional` for a heading. Link to files in the repository with their GitHub address.
+Link to another page by its address, base included: `[Configuration](/waypoint/reference/configuration/)`, or `/waypoint/start/docker/#errors-and-logs` for a heading. Link to files in the repository with their GitHub address.
 
 ## Verifying a change in the real app
 
@@ -128,7 +128,7 @@ Waypoint applies it on its next start. Queries, in the app and in the tests, are
 | `waypoint/storage/db.py`, `schema.py`, `models.py`, `settings_keys.py`, `secretbox.py`, `backup.py` | Database connections (SQLite or Postgres), the schema and its ORM models, the settings’ names, secrets encrypted at rest, backups |
 | `waypoint/storage/migrations/`, `alembic.ini` | Alembic migrations, applied on start-up (with foreign keys off on SQLite while they run: batch mode remakes tables). Repairs for data saved by older versions are migrations too, run once, not code run at every start. A migration that removes data saves a backup first |
 | `waypoint/tls.py`, `validate.py` | The only module that opens outbound connections (every https request goes through it); checking numbers and other input |
-| `waypoint/dates.py`, `monitoring.py`, `oidc.py` | Date helpers; logs and Sentry; OpenID Connect sign-in |
+| `waypoint/dates.py`, `monitoring.py`, `oidc.py` | Date helpers; the log (scrubbed); OpenID Connect sign-in |
 | `waypoint/verify.py` | The `run.py verify` browser check |
 | `frontend/` | The web app (Svelte): `src/pages/` one file per page, `src/lib/` the API client, formatting and components |
 | `waypoint/static/` | Files Waypoint serves beside the app: the service worker (`sw.js`), manifest, fonts, icons, and `page.css` for the sign-in pages; the web app builds into `waypoint/static/app/` |
@@ -182,7 +182,7 @@ A pull request is ready when its **Merge gate** status passes: every check on it
 - **Fleet checks** (`tools/fleet_checks.py`, `make fleet-checks`): one Alembic head, a test for each new migration, the workflows' conventions (bash by default, actions pinned by SHA with their version in a comment, `gh api` lists paginated), and that each commit an AI agent wrote names its model in a trailer, `Co-Authored-By: Claude <Model> <version> <noreply@anthropic.com>`. A test that was on `main` and is gone, or a line that skips a test or runs only some, needs a `Removes-Test: <name> — <why>` or `Skips-Test: <name> — <why>` trailer on one of the branch's commits.
 - **Coverage floors**: the Python tests must cover 85% of the backend and 90% of each module in `waypoint/domain/`, `waypoint/providers/` and `waypoint/server/api/` (`tools/coverage_floor.py`, run by `make test-parallel` and CI); the web app's, the thresholds in `frontend/vite.config.ts`. Raise them as coverage grows.
 - **Every route** (`tests/test_every_route.py`): each route in the table needs sign-in, refuses a change without the app's header or from another site, has its reply typed in the API contract, and has a docs page, with no test of its own needed for those.
-- **Privacy** (`tests/privacy.py`): run code that handles mail, names or loyalty numbers inside `no_leaks(self, "CANARY-…", database=path)`, which fails if a canary value turns up in the clear in the log, Python's logging, what was sent to Sentry, or any table.
+- **Privacy** (`tests/privacy.py`): run code that handles mail, names or loyalty numbers inside `no_leaks(self, "CANARY-…", database=path)`, which fails if a canary value turns up in the clear in the log, Python's logging, a request sent to another service (through `tls.urlopen`), or any table.
 - **Agent review** (`.github/workflows/agent-review.yml`): a pull request an agent wrote (its commits carry a `Claude-Session:` or Claude `Co-Authored-By:` trailer) is reviewed by a fresh Claude Code session that has no access to the one that wrote it. It reads the change against `AGENTS.md` with only Read, Grep and Glob, confined to the review's directory, and loads no settings, hooks, skills, plugins, MCP servers or `CLAUDE.md` (`.github/scripts/agent-review-run.sh`). It posts its findings as a comment and sets the **Agent review** status: a blocking finding fails it, and with it the merge gate, until a new push is reviewed clean. It runs main's copy of the workflow and prompt, so a pull request can't change how it is reviewed. Anyone else's pull request gets a passing status saying it isn't an agent's.
 
   It needs one of two repository secrets (**Settings → Secrets and variables → Actions**): `CLAUDE_CODE_OAUTH_TOKEN`, for a Claude Pro or Max subscription (run `claude setup-token` and paste the token it prints), or `ANTHROPIC_API_KEY`, an API key from the Claude Console, which is used when both are set. The `AGENT_REVIEW_MODEL` and `AGENT_REVIEW_BUDGET_USD` variables set the model and the most one review may spend, as Claude Code estimates it (`opus`, 5).

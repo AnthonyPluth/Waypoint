@@ -1,14 +1,12 @@
 """What a request is told when its handler fails, through routes.dispatch: a value it can't use is a 400 saying which;
-the database busy with something else is a 503; anything else is a bug, a 500 with only a reference, logged and reported
-to Sentry without what the error said."""
+the database busy with something else is a 503; anything else is a bug, a 500 with only a reference, logged
+without what the error said."""
 import contextlib
 import io
 import json
-import os
 from unittest import mock
 
 import psycopg.errors
-import sentry_sdk
 from sqlalchemy.exc import OperationalError
 
 from waypoint import monitoring
@@ -16,7 +14,6 @@ from waypoint.server import routes
 from waypoint.server.api import state
 from waypoint.server.common import ApiError
 from tests.shared import ServerCase, fetch
-from tests.test_monitoring import DSN, Capture
 
 PRIVATE = "Acme Coffee 12.34"
 FAILURES = (KeyError(PRIVATE), TypeError(f"unsupported operand type(s) for +: 'NoneType' and '{PRIVATE}'"),
@@ -56,7 +53,7 @@ class ErrorTests(ServerCase):
                 self.assertEqual(status, 500)
                 ref = reply["error"].split("reference ")[1].split(";")[0]
                 self.assertEqual(reply["error"], f"Something went wrong on Waypoint's side (reference {ref}; the details are in its log).")
-                log.assert_any_call(f"[error {ref}] GET /api/state", "error", ref=ref)
+                log.assert_any_call(f"[error {ref}] GET /api/state", "error")
                 self.assertReported(ref, type(e).__name__)
 
     def test_a_busy_database_is_a_503(self):
@@ -68,30 +65,19 @@ class ErrorTests(ServerCase):
         with mock.patch.object(state, "with_offset", side_effect=ApiError("Not today", 409)):
             self.assertEqual(self.api("/api/state"), (409, {"error": "Not today"}))
 
-    def test_what_sentry_is_sent(self):
-        with mock.patch.dict(os.environ, {"SENTRY_DSN": DSN}), mock.patch("builtins.print"):
-            self.assertTrue(monitoring.init())
-        transport = Capture()
-        sentry_sdk.get_client().transport = transport
-        self.addCleanup(self.sentry_off)
+    def test_what_is_logged(self):
         found = routes.match("GET", "/api/state")
-        with mock.patch.object(state, "with_offset", side_effect=FAILURES[2]), self.assertRaises(ApiError) as cm:
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(state, "with_offset", side_effect=FAILURES[2]), self.assertRaises(ApiError) as cm, \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             routes.dispatch(found, {}, {})
-        sentry_sdk.flush()
         self.assertEqual(cm.exception.status, 500)
-        (event,) = transport.events
-        exc = event["exception"]["values"][-1]
-        self.assertEqual((exc["type"], exc["value"]), ("ValueError", "[Filtered]"))
-        self.assertIn(event["tags"]["ref"], str(cm.exception))
-        self.assertTrue(any(f.get("function") == "api_state" for f in exc["stacktrace"]["frames"]))
-        self.assertNotIn("Acme", json.dumps(event))
-        self.assertNotIn("12.34", json.dumps(event))
-
-    @staticmethod
-    def sentry_off():
-        sentry_sdk.get_client().close()
-        sentry_sdk.init(dsn=None)
-        monitoring._enabled = False
+        ref = str(cm.exception).split("reference ", 1)[1].split(";", 1)[0]
+        self.assertIn(f"[error {ref}] GET /api/state", out.getvalue())   # the route, never the address
+        self.assertIn("builtins.ValueError: [Filtered]", err.getvalue())
+        self.assertIn("in api_state", err.getvalue())                     # where it was raised
+        for private in ("Acme", "12.34"):
+            self.assertNotIn(private, out.getvalue() + err.getvalue())
 
 
 class DatabaseErrorTests(ServerCase):

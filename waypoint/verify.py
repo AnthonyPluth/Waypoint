@@ -24,9 +24,9 @@ OUT = os.path.join(ROOT, "artifacts", "verify")
 
 def clean_env(data: str, base: dict[str, str] | None = None) -> dict[str, str]:
     """The environment for the demo server: its own folder and SQLite database, nothing from the caller's setup that
-    could point it at real data (Postgres, sign-in, error reports)."""
+    could point it at real data (Postgres, sign-in)."""
     env = {k: v for k, v in (os.environ if base is None else base).items()
-           if not k.startswith(("OIDC_", "SENTRY", "WAYPOINT_SECRET_KEY"))
+           if not k.startswith(("OIDC_", "WAYPOINT_SECRET_KEY"))
            and k not in ("DATABASE_URL", "WAYPOINT_PUBLIC_URL", "WAYPOINT_ALLOW_NO_AUTH")}
     env.update(WAYPOINT_DATA=data, PYTHONUNBUFFERED="1")
     return env

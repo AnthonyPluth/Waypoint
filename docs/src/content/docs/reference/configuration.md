@@ -25,7 +25,7 @@ Settings that belong to the app live in **Settings** and are stored in the datab
 | `WAYPOINT_HOST` / `WAYPOINT_PORT` | `127.0.0.1` / `8765` | Address and port to listen on (`0.0.0.0` in Docker). |
 | `TZ` | America/New_York (Docker image); the system’s otherwise | The time zone Waypoint uses for “today” and for its logs. |
 
-Reporting to Sentry is off unless you set `SENTRY_DSN` (your own Sentry project’s key). `SENTRY_BROWSER_DSN` sends the web app’s reports to a separate project, `WAYPOINT_SENTRY_BROWSER=0` stops the web app sending any, and `SENTRY_ENVIRONMENT` names the environment (default `production`). See [Error reports](/waypoint/start/docker/#error-reports-optional).
+Waypoint has no error-reporting service: errors go to its own log. See [Errors and logs](/waypoint/start/docker/#errors-and-logs).
 
 With no `OIDC_ISSUER`, Waypoint refuses to listen beyond `localhost` unless `WAYPOINT_ALLOW_NO_AUTH` is set. See [Install with Docker](/waypoint/start/docker/) and [SECURITY.md](https://github.com/AnthonyPluth/waypoint/blob/main/SECURITY.md).
 

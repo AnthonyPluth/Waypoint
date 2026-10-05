@@ -212,8 +212,14 @@ def added_skips(base: str) -> list[tuple[str, str, str]]:
 
 
 def _names(declared: list[str]) -> set[str]:
-    """What each trailer names: its first word (a test, `Class.test`, or `file::test`), before the reason."""
-    return {re.split(r"\s+[—–-]\s+|\s", d.strip(), maxsplit=1)[0] for d in declared if d.strip()}
+    """What each trailer names, before its reason: everything up to " — " (a Vitest title has spaces), or else the
+    first word (a test, `Class.test`, or `file::test`)."""
+    out = set()
+    for d in (d.strip() for d in declared):
+        if d:
+            parts = re.split(r"\s+[—–]\s+", d, maxsplit=1)
+            out.add(parts[0].strip() if len(parts) == 2 else d.split()[0])
+    return out
 
 
 def check_tests(base: str, messages: list[str]) -> list[str]:

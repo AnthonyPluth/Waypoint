@@ -47,7 +47,7 @@ def content_security_policy(nonce: str | None = None) -> str:
             f"script-src {scripts}; "
             "style-src 'self' 'unsafe-inline'; "     # inline style attributes need this
             "img-src 'self' data:; font-src 'self'; "
-            f"connect-src 'self'{' ' + origin if (origin := monitoring.browser_origin()) else ''}; "
+            "connect-src 'self'; "
             "frame-src 'none'; worker-src 'self'; manifest-src 'self'; "
             "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 
@@ -55,22 +55,15 @@ def content_security_policy(nonce: str | None = None) -> str:
 AUTH_PATHS = {"/auth/login", "/auth/callback", "/auth/logout", "/auth/signed-out"}
 
 
-def trace_name(path: str) -> str:
-    """A request's name in Sentry: its route (/api/trips/{id}), never the ids, names or searches in the address, so
-    requests group together and nothing of yours is in the name."""
+def route_name(path: str) -> str:
+    """A request's name in the log when it fails: its route (/api/trips/{id}), never the ids, names or searches in the
+    address, so nothing of yours is in the line."""
     if path.startswith("/api/"):
         found = routes.match(None, path)   # the route table's own pattern (by any method)
         return found.route.pattern if found else "/api/*"   # nothing answers it (a 404)
     if path in AUTH_PATHS:
         return path
     return "/"   # the web app's page
-
-
-def _traced(path: str) -> bool:
-    """Requests worth a trace: not the health check or plain files."""
-    if path == "/healthz" or path in PUBLIC_FILES:
-        return False
-    return path.startswith(("/api/", "/auth/")) or "." not in path.rsplit("/", 1)[-1]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -111,12 +104,7 @@ class Handler(BaseHTTPRequestHandler):
             return   # the container health check, every minute
         started = getattr(self, "_started", None)
         ms = f" {int((time.monotonic() - started) * 1000)}ms" if started else ""
-        print(f"{self.client_address[0]} {getattr(self, 'command', '-')} {path} {code}{ms}", flush=True)   # nosemgrep: waypoint-print -- the access log: path only, and Sentry gets the route below
-        if _traced(path):   # Sentry Logs get the route (no ids, no address), not files or the health check
-            method, route = getattr(self, "command", "-"), trace_name(path)
-            monitoring.send_log(f"{method} {route} {code}{ms}", "info", **{
-                "http.request.method": method, "http.route": route, "http.response.status_code": str(code),
-                **({"duration_ms": int((time.monotonic() - started) * 1000)} if started else {})})
+        monitoring.log(f"{self.client_address[0]} {getattr(self, 'command', '-')} {path} {code}{ms}")
 
     def _security_headers(self, nonce: str | None = None, csp: str | None = None) -> None:
         self.send_header("X-Content-Type-Options", "nosniff")
@@ -144,7 +132,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _error(self, e: BaseException) -> None:
         """An unexpected failure: log the details, show only a reference to them (common.server_error)."""
-        err = server_error(e, self.command, trace_name(urllib.parse.urlsplit(self.path).path))
+        err = server_error(e, self.command, route_name(urllib.parse.urlsplit(self.path).path))
         self._json(err.status, {"error": str(err)})
 
     def _body_length(self, limit: int) -> int | None:
@@ -331,7 +319,7 @@ class Handler(BaseHTTPRequestHandler):
         back in, so the way out is choosing another account (or signing out at the provider). The fix for the operator
         goes to the log, not to whoever was refused."""
         monitoring.log(f"[sign-in] refused {who!r}: not in OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS (add them there to let "
-                       "them in)", "warning", remote="[sign-in] refused an account that isn't on the allow-list")
+                       "them in)", "warning")
         c = oidc.config()
         end = oidc.provider_sign_out(c)
         provider = urllib.parse.urlsplit(c["issuer"]).hostname or "your sign-in provider"
@@ -357,13 +345,7 @@ class Handler(BaseHTTPRequestHandler):
         self._deadline(None)   # the headers are in
         self._started, self._responded = time.monotonic(), False
         self._set_cookies = []
-        path = urllib.parse.urlsplit(self.path).path
-        if not _traced(path):
-            return self._handle(method)
-        with monitoring.request(method, trace_name(path), self.headers) as tx:
-            self._handle(method)
-            if tx is not None and getattr(self, "_status", None):
-                tx.set_http_status(self._status)
+        self._handle(method)
 
     def _handle(self, method: str) -> None:
         try:
@@ -419,7 +401,6 @@ class Handler(BaseHTTPRequestHandler):
         # The look of the sign-in pages is public; everything else needs you signed in.
         if url.path not in PUBLIC_FILES:
             self.user = self._user(renew=url.path.startswith("/api/"))   # API answers are never cached, so a new cookie is safe there
-            monitoring.set_user(self.user)   # its reports and traces say who (as a code; see monitoring.user_id)
             if not self.user:
                 if url.path.startswith("/api/"):
                     return self._json(401, {"error": "You've been signed out.", "login": "/auth/login"})
@@ -533,7 +514,6 @@ class Server(ThreadingHTTPServer):
 
 
 def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
-    monitoring.init()   # reports to Sentry, when SENTRY_DSN is set
     problems = secretbox.check_config()
     if problems:
         raise SystemExit("\n".join(problems))

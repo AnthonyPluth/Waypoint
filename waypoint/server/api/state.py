@@ -5,7 +5,6 @@ import os
 from datetime import UTC, datetime
 
 from ...storage import db
-from ... import monitoring
 from ...storage import settings_keys as sk
 from ..common import _current
 from ..contract import State
@@ -17,7 +16,6 @@ def api_state(conn, _q, _b) -> State:
         "version": os.environ.get("WAYPOINT_VERSION") or "dev",
         "database": "postgres" if db.using_postgres() else "sqlite",
         "user": user,
-        "sentry": monitoring.browser_config(user),   # the web app's error reports (waypoint/monitoring.py), or None
         "last_backup": with_offset(db.get_setting(conn, sk.LAST_BACKUP)),   # the last backup downloaded from Settings
     }
 
