@@ -1,12 +1,12 @@
 """Waypoint's MCP server: the tools that let an AI assistant (Claude and the like) read the household's travel, and, only if
-the household switched it on in Settings and the member allowed it when connecting, see full ID numbers or change trips.
+the household switched it on in Settings and the member allowed it when connecting, change trips. Loyalty and Known Traveler
+numbers are out of its reach altogether.
 
 Waypoint serves it at POST /mcp (waypoint/server/handler.py), to an assistant connected with OAuth (waypoint/server/mcp_oauth.py).
 The assistant is the member who approved it: handle() answers one JSON-RPC message, and every page it reads or change it
 makes goes through the `fetch` it's given (mcp_http.fetch_for), which runs it as that member through the same routes the web
-app uses, allows only the pages and changes mcp_access opens, and checks the connection's scopes and their switches ("Let
-assistants see full ID numbers", "Let assistants change trips") on every call, so turning a switch off takes effect at
-once. Every changing tool tells the assistant to ask first.
+app uses, allows only the pages and changes mcp_access opens, and checks the connection's scope and its switch ("Let
+assistants change trips") on every call, so turning the switch off takes effect at once. Every changing tool tells the assistant to ask first.
 """
 from __future__ import annotations
 
@@ -90,7 +90,7 @@ def upcoming(fetch: Fetch, a: dict) -> Any:
     """The next segments (flights, stays, rentals, trains) of every trip, soonest first. Times are wall-clock at the place."""
     today = date.today()
     start = _day(a, "from", today)
-    days = min(max(int(a.get("days") or 60), 1), 730)
+    days = min(max(_need(a, "days") if a.get("days") not in (None, "") else 60, 1), 730)
     last = start + timedelta(days=days)
     out = []
     for t in fetch("trips", {})["trips"]:
@@ -331,6 +331,6 @@ def handle(msg: Any, fetch: Fetch) -> dict | None:
             return ok({"content": [{"type": "text", "text": call_tool(name, args, fetch)}]})
         except ToolError as e:
             return ok({"content": [{"type": "text", "text": str(e)}], "isError": True})
-        except (ValueError, TypeError, KeyError) as e:   # an argument of the wrong kind, or a reply that isn't Waypoint's
+        except (ValueError, TypeError, KeyError, OverflowError) as e:   # an argument of the wrong kind, or a reply that isn't Waypoint's
             return ok({"content": [{"type": "text", "text": f"That didn't work: {type(e).__name__}"}], "isError": True})
     return fail(-32601, f"Method not found: {method}")

@@ -90,7 +90,7 @@
       <label class="row cursor-pointer flex-nowrap">
         <span class="min-w-0">
           <span class="block font-medium">Let assistants change trips</span>
-          <span id="mcp-writes-help" class="block text-sm text-muted-foreground">Add, change and remove trips, bookings, people and loyalty entries. The assistant is told to ask before each change. Never mailboxes, email, AI settings, backups or sign-in.</span>
+          <span id="mcp-writes-help" class="block text-sm text-muted-foreground">Add, change and remove trips, bookings and people. The assistant is told to ask before each change. Never mailboxes, email, loyalty numbers, AI settings, backups or sign-in.</span>
         </span>
         <input type="checkbox" class="size-5 shrink-0" aria-describedby="mcp-writes-help" checked={list.allow_writes} disabled={saving} onchange={choose} />
       </label>

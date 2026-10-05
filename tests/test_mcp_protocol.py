@@ -131,6 +131,11 @@ class StreamableHttpTests(Assistants):
                            ("get_stats", {"person": "x"}), ("get_stats", {"year": "20x"})):
             with self.subTest(name=name, args=args):
                 self.assertTrue(self.call(key, name, args)["isError"])
+        for days in ("soon", float("inf"), 1e400):
+            with self.subTest(days=days):
+                self.assertTrue(self.call(key, "upcoming", {"days": days})["isError"])
+        self.assertTrue(self.rpc({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "upcoming", "arguments": {"days": 1}}}, key,
+                                 raw=b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"upcoming","arguments":{"days":Infinity}}}')[0] == 200)
         self.switch(True)
         wide = self.make_token(*WRITE)
         for sent in (2.7, "2.7", "2e0x"):

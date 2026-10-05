@@ -5,7 +5,7 @@ sidebar:
   order: 7
 ---
 
-Waypoint serves a [Model Context Protocol](https://modelcontextprotocol.io) endpoint, so an assistant like Claude can answer questions about your travel (what’s coming up, who is on a trip, which loyalty program someone has, your stats) and, if you allow it, change it. It never sees your email, mailboxes, loyalty or Known Traveler numbers, backups or settings.
+Waypoint serves a [Model Context Protocol](https://modelcontextprotocol.io) endpoint, so an assistant like Claude can answer questions about your travel (what’s coming up, who is on a trip, your stats) and, if you allow it, change it. It never sees your email, mailboxes, loyalty or Known Traveler numbers, backups or settings.
 
 **The assistant is the member who approved it.** It sees exactly what that member sees in the app: the trips they’re on, and nothing of a trip only someone else is on. A trip it can’t see is “No such trip”, the same as one that doesn’t exist.
 
@@ -42,7 +42,7 @@ Waypoint tells the assistant to describe every change and wait for your yes, and
 
 ## What it can never reach
 
-Whatever it was allowed and whatever the switches say, Loyalty and Known Traveler numbers (an assistant has no need of one, so not even their last four characters, nor the list of memberships), Gmail mailboxes and scanning, the “Couldn’t read” queue, the AI settings, backup and restore, sign-in and who’s signed in, the calendar feed and notification devices, the flight-status refresh (it spends the monthly budget and uses the key), importing past flights from a file, and these assistant settings themselves. **Nothing from your email is reachable**: no body, subject or review item. A flight read from an email is a segment like any other, which is the household’s own data. The list is `BLOCKED` in `waypoint/server/mcp_access.py`, and a test lists every route as reachable or blocked, so a new route has to be decided on.
+Whatever it was allowed and whatever the switch says, an assistant can never reach: loyalty and Known Traveler numbers (an assistant has no need of one, so not even their last four characters, nor the list of memberships), Gmail mailboxes and scanning, the “Couldn’t read” queue, the AI settings, backup and restore, sign-in and who’s signed in, the calendar feed and notification devices, the flight-status refresh (it spends the monthly budget and uses the key), importing past flights from a file, and these assistant settings themselves. **Nothing from your email is reachable**: no body, subject or review item. A flight read from an email is a segment like any other, which is the household’s own data. The list is `BLOCKED` in `waypoint/server/mcp_access.py`, and a test lists every route as reachable or blocked, so a new route has to be decided on.
 
 ## Endpoints
 
