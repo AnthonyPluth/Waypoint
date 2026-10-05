@@ -287,9 +287,9 @@ def _blank_values(event, said: dict[str, str]):
 # ------------------------------------------------------------------------------------------------ logs and metrics
 
 def log(message: str, level: str = "info", *, remote: str | None = None, stderr: bool = False, **attrs) -> None:
-    """Print a line to Waypoint's log, and send it to Sentry Logs when reporting is on: `remote` instead of the line when the
-    line itself holds more than Sentry should see."""
-    print(message, file=sys.stderr if stderr else sys.stdout, flush=True)
+    """Print a line to Waypoint's log (credentials scrubbed), and send it to Sentry Logs when reporting is on: `remote`
+    instead of the line when the line itself holds more than Sentry should see."""
+    print(scrub(message), file=sys.stderr if stderr else sys.stdout, flush=True)
     send_log(remote if remote is not None else message, level, **attrs)
 
 

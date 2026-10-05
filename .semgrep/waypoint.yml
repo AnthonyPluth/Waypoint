@@ -112,3 +112,93 @@ rules:
     paths:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/dates.py", "/waypoint/storage/migrations/"]
+
+  # ---------------------------------------------------------------- Waypoint's promises (AGENTS.md)
+  # These guard code that doesn't exist yet as well as code that does: the rule is in place before the feature, so the
+  # first pull request that adds a trip query, a Gmail call or a loyalty number is held to it.
+
+  - id: waypoint-print
+    message: >-
+      Write to the log through monitoring.log (it scrubs credentials and sends the line to Sentry Logs when that's on),
+      not print(). Never log email content, names, confirmation codes or loyalty numbers (AGENTS.md, "Private data in
+      logs and reports").
+    severity: ERROR
+    languages: [python]
+    pattern: print(...)
+    paths:
+      include: ["/waypoint/"]
+      exclude: ["/waypoint/monitoring.py", "/waypoint/verify.py"]
+
+  - id: waypoint-google-hosts
+    message: >-
+      Only waypoint/providers/gmail.py talks to Google's mail and OAuth services (AGENTS.md, "Email stays on the
+      server"): call it rather than naming Google's hosts elsewhere.
+    severity: ERROR
+    languages: [python]
+    pattern-regex: (gmail\.googleapis\.com|oauth2\.googleapis\.com|accounts\.google\.com|www\.googleapis\.com)
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/providers/gmail.py"]
+
+  - id: waypoint-ai-hosts
+    message: >-
+      Only waypoint/domain/mail/ai.py may send anything to an AI service, and only when the household turned the AI
+      fallback on (AGENTS.md, "Email stays on the server").
+    severity: ERROR
+    languages: [python]
+    pattern-regex: (openrouter\.ai|api\.anthropic\.com|api\.openai\.com|/api/chat\b|/api/generate\b|11434)
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/domain/mail/ai.py"]
+
+  - id: waypoint-decrypt
+    message: >-
+      Secrets are decrypted only where they're used: the storage layer (settings), waypoint/oidc.py (a session's ID
+      token, for signing out), waypoint/domain/loyalty.py (loyalty and Known Traveler numbers) and
+      waypoint/providers/gmail.py (mailbox tokens). Anywhere else, ask one of those.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: secretbox.decrypt(...)
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/storage/", "/waypoint/oidc.py", "/waypoint/domain/loyalty.py", "/waypoint/providers/gmail.py"]
+
+  - id: waypoint-trip-visibility
+    message: >-
+      Trips and segments are read for a request only through the visibility helper (waypoint/domain/visibility.py), so
+      nobody sees a trip they aren't on and didn't book (AGENTS.md, "You see the trips you're on"). A trip or segment
+      id that isn't visible answers 404.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: select(..., Trip, ...)
+      - pattern: select(..., Segment, ...)
+      - pattern: select(..., Trip.$C, ...)
+      - pattern: select(..., Segment.$C, ...)
+      - pattern: select(..., SegmentTraveler, ...)
+      - pattern: select(..., SegmentTraveler.$C, ...)
+      - pattern: $CONN.orm.get(Trip, ...)
+      - pattern: $CONN.orm.get(Segment, ...)
+      - pattern: update(Trip)
+      - pattern: update(Segment)
+      - pattern: delete(Trip)
+      - pattern: delete(Segment)
+    paths:
+      include: ["/waypoint/server/"]
+
+  - id: waypoint-naive-now
+    message: >-
+      A booking's times carry their zone (AGENTS.md, "Times are where they happen"): use datetime.now(zone) or the
+      `now` you were given, never a naive datetime.now() or datetime.today() in domain or provider code.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: datetime.now()
+      - pattern: datetime.datetime.now()
+      - pattern: datetime.today()
+      - pattern: datetime.datetime.today()
+      - pattern: datetime.fromtimestamp($T)
+      - pattern: datetime.datetime.fromtimestamp($T)
+    paths:
+      include: ["/waypoint/domain/", "/waypoint/providers/"]

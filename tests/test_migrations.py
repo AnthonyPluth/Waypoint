@@ -41,6 +41,22 @@ class MigrationTests(unittest.TestCase):
         db.init(self.path)   # starting again changes nothing
         self.assertEqual(drift(self.path), [])
 
+    def test_every_migration_goes_down_and_up_again(self):
+        # Each revision's downgrade undoes its upgrade: stepping down one at a time to the start and back up to the head
+        # leaves the schema matching schema.py, with nothing left over on the way.
+        from alembic import command
+        db.init(self.path)
+        revisions = [r.revision for r in ScriptDirectory.from_config(db.alembic_config()).walk_revisions()]
+        with db.engine(self.path).begin() as c:
+            for rev in revisions:
+                with self.subTest(down_from=rev):
+                    command.downgrade(db.alembic_config(c), "-1")
+            self.assertEqual(set(sa.inspect(c).get_table_names()) - {"alembic_version"}, set())
+            for rev in reversed(revisions):
+                with self.subTest(up_to=rev):
+                    command.upgrade(db.alembic_config(c), "+1")
+        self.assertEqual(drift(self.path), [])
+
     def test_a_database_with_tables_but_no_history_is_refused(self):
         with db.engine(self.path).begin() as c:
             c.exec_driver_sql("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)")

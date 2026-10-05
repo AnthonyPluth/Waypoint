@@ -56,9 +56,12 @@ export default defineConfig({
       include: ["src/**/*.{ts,svelte}"],
       exclude: ["src/**/*.test.ts", "src/**/*.d.ts", "src/main.ts", "src/test/**"],
       reporter: ["text-summary", "lcovonly"],
+      // The floor (`make check` and CI fail below it): new screens come with tests that render them. Raise it as
+      // coverage grows; lowering it needs a reason in the pull request.
+      thresholds: { statements: 85, lines: 85, functions: 80, branches: 75 },
     },
   },
   server: {
-    proxy: Object.fromEntries(["/api", "/auth", "/banks", "/logos", "/fonts", "/logo.svg", "/logo-180.png", "/sw.js", "/manifest.webmanifest", "/icon-192.png"].map((p) => [p, "http://127.0.0.1:8765"])),
+    proxy: Object.fromEntries(["/api", "/auth", "/fonts", "/logo.svg", "/logo-180.png", "/sw.js", "/manifest.webmanifest", "/icon-192.png"].map((p) => [p, "http://127.0.0.1:8765"])),
   },
 });

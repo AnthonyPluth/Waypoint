@@ -147,6 +147,11 @@ jobs:
           disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false   # a Codecov outage never holds up a release
+      - name: Coverage floor (tools/coverage_floor.py)
+        if: matrix.database == 'sqlite'
+        run: |
+          poetry run coverage json -q -o coverage.json
+          poetry run python tools/coverage_floor.py coverage.json
       - name: Upload test results to Codecov
         if: matrix.database == 'sqlite' && !cancelled()
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5   # v7.1.1

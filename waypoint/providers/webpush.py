@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+from typing import Any
 
 import py_vapid
 import requests   # what pywebpush sends with (its own dependency), for a session that doesn't follow redirects
@@ -36,7 +37,7 @@ def valid_public_key(p256dh: str) -> bool:
         return False
 
 
-def vapid_keys(conn) -> tuple[py_vapid.Vapid02, str]:
+def vapid_keys(conn: db.Connection) -> tuple[py_vapid.Vapid02, str]:
     """This server's VAPID key (made once and kept in the database, as 32 raw bytes in hex).
     Returns (key, public key as base64url for the browser's applicationServerKey)."""
     raw = db.get_setting(conn, sk.VAPID_PRIVATE_KEY)
@@ -54,14 +55,14 @@ class Gone(Exception):
 
 
 def _session() -> requests.Session:
-    """A session that follows no redirect: the endpoint's address was checked (notify.push_host_allowed); wherever it
+    """A session that follows no redirect: the endpoint's address was checked before; wherever it
     might send Waypoint on to wasn't."""
     s = requests.Session()
     s.max_redirects = 0
     return s
 
 
-def send(sub: dict, message: dict, vapid: py_vapid.Vapid02, subject: str, ttl: int = 86400,
+def send(sub: dict[str, str], message: dict[str, Any], vapid: py_vapid.Vapid02, subject: str, ttl: int = 86400,
          urgency: str = "normal", timeout: int = 15) -> int:
     """Send one notification. sub = {endpoint, p256dh, auth}. Raises Gone for dead subscriptions."""
     try:
@@ -69,7 +70,7 @@ def send(sub: dict, message: dict, vapid: py_vapid.Vapid02, subject: str, ttl: i
                     data=json.dumps(message, separators=(",", ":")), vapid_private_key=vapid,
                     vapid_claims={"sub": subject}, ttl=ttl, timeout=timeout, headers={"Urgency": urgency},
                     requests_session=_session())
-        return r.status_code
+        return int(r.status_code)
     except requests.TooManyRedirects as e:   # a redirect (not followed): the endpoint isn't a push service's
         raise RuntimeError("the push service redirected; not followed") from e
     except WebPushException as e:

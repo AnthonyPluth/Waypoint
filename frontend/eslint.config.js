@@ -22,6 +22,10 @@ const RESTRICTED = {
     selector: "CallExpression[callee.name='fetch'], CallExpression[callee.object.name=/^(window|globalThis|self)$/][callee.property.name='fetch']",
     message: "Call the server through api() in lib/api.ts (it sends the cookies and headers, and turns a failure into an Error); fetch() belongs only there.",
   },
+  storage: {
+    selector: "Identifier[name=/^(localStorage|sessionStorage|indexedDB)$/]",
+    message: "Browser storage outlives sign-out and is readable by anything on the device: keep trips, names, codes and loyalty numbers on the server (AGENTS.md, \"Waypoint's promises\").",
+  },
 };
 const restrict = (...names) => ["error", ...names.map((n) => RESTRICTED[n])];
 
@@ -65,13 +69,16 @@ export default defineConfig(
       // It flags every Date, Set and URLSearchParams in a Svelte file, but ours are throwaway locals or memos kept
       // non-reactive on purpose; reactive state here is replaced, not mutated in place.
       "svelte/prefer-svelte-reactivity": "off",
-      "no-restricted-syntax": restrict("errorCast", "fetch"),
+      "no-restricted-syntax": restrict("errorCast", "fetch", "storage"),
       "waypoint/no-silent-catch": "error",
+      // The browser's console ends up in Sentry's breadcrumbs and in screenshots of bug reports: only errors go there,
+      // never data (a trip, a name, a code) logged to look at.
+      "no-console": ["error", { allow: ["error", "warn"] }],
     },
     plugins: { waypoint },
   },
   // lib/api.ts is the one place that calls fetch.
-  { files: ["frontend/src/lib/api.ts"], rules: { "no-restricted-syntax": restrict("errorCast") } },
+  { files: ["frontend/src/lib/api.ts"], rules: { "no-restricted-syntax": restrict("errorCast", "storage") } },
   {
     rules: {
       // A leading underscore marks a name that's unused on purpose (a page's unused route props, `catch (_)`).

@@ -8,6 +8,11 @@ one a correction that used to live as prose and now fails `make check` and CI in
 - Commits (`--commits BASE..HEAD`, a pull request's): an agent's commit (one with a `Claude-Session:` trailer, or any
   `Co-Authored-By:` trailer naming Claude) carries exactly one `Co-Authored-By: Claude <Model> <version>
   <noreply@anthropic.com>` trailer naming the model that wrote it.
+- Tests (`--commits BASE..HEAD`): a test that was on BASE and is gone (a Python `def test_…`, or a Vitest `it(…)` or
+  `test(…)` title) needs a `Removes-Test: <name> — <why>` trailer on one of the commits, and a line the range adds
+  that skips a test or runs only some (`unittest.skip`, `skipTest(`, `.skip(`, `.only(`, `xit(`) needs a
+  `Skips-Test: <name> — <why>` trailer. A test isn't deleted or switched off to get CI green (AGENTS.md); when one
+  really goes, the reason is on record for the review.
 - Workflows (.github/workflows/, .github/actions/): each workflow runs bash by default (so steps get -eo pipefail);
   every action pinned by SHA has its version in a comment; and `gh api` with `per_page` paginates.
 
@@ -120,6 +125,85 @@ def commits(revision_range: str) -> list[tuple[str, str]]:
     return [tuple(rec.strip("\n").split("\0", 1)) for rec in out.split("\x1e") if rec.strip()]  # type: ignore[misc]
 
 
+# --- Tests --------------------------------------------------------------------------------------------------------
+
+PY_TEST = re.compile(r"^\s*(?:async\s+)?def\s+(test_\w+)\s*\(", re.MULTILINE)
+PY_CLASS = re.compile(r"^class\s+(\w+)", re.MULTILINE)
+TS_TEST = re.compile(r"""\b(?:it|test)\(\s*(["'`])((?:(?!\1).)+)\1""")
+SKIP = re.compile(r"\b(?:unittest\.skip(?:If|Unless)?\b|skipTest\(|(?:it|test|describe)\.(?:skip|only|todo)\b|xit\(|xdescribe\()")
+REMOVES = re.compile(r"^removes-test:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+SKIPS = re.compile(r"^skips-test:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+
+
+def is_test_file(path: str) -> bool:
+    return (path.startswith("tests/") and path.endswith(".py") and Path(path).name.startswith("test_")) or \
+        (path.startswith("frontend/") and re.search(r"\.test\.(ts|mjs|js)$", path) is not None)
+
+
+def test_names(path: str, text: str) -> set[str]:
+    """The tests a file defines, as 'file::Class.test_name' (Python) or 'file::title' (Vitest)."""
+    if path.endswith(".py"):
+        names = set()
+        cls = ""
+        for line in text.splitlines():
+            if m := PY_CLASS.match(line):
+                cls = m.group(1)
+            elif m := PY_TEST.match(line):
+                names.add(f"{path}::{cls + '.' if cls and line.startswith(' ') else ''}{m.group(1)}")
+        return names
+    return {f"{path}::{m.group(2)}" for m in TS_TEST.finditer(text)}
+
+
+def _git(*args: str) -> str:
+    return subprocess.run(["git", *args], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+
+
+def removed_tests(base: str) -> list[str]:
+    """Tests on `base` that the working tree no longer has."""
+    gone = []
+    for path in _git("ls-tree", "-r", "--name-only", base).splitlines():
+        if not is_test_file(path):
+            continue
+        before = test_names(path, _git("show", f"{base}:{path}"))
+        now_file = ROOT / path
+        now = test_names(path, now_file.read_text()) if now_file.exists() else set()
+        gone += sorted(before - now)
+    return gone
+
+
+STRING = re.compile(r"""(["'`])(?:\\.|(?!\1).)*\1""")
+
+
+def added_skips(base: str) -> list[str]:
+    """Lines the range adds to test files that skip a test or run only some (in code: a string that names one, as an
+    example in a test, doesn't count)."""
+    out = []
+    diff = _git("diff", "--unified=0", f"{base}", "--", "tests", "frontend")
+    path = ""
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            path = line[6:] if line.startswith("+++ b/") else ""
+        elif line.startswith("+") and not line.startswith("+++") and path and is_test_file(path) and SKIP.search(STRING.sub("", line)):
+            out.append(f"{path}: {line[1:].strip()[:100]}")
+    return out
+
+
+def check_tests(base: str, messages: list[str]) -> list[str]:
+    declared_removals = [r.strip() for m in messages for r in REMOVES.findall(m)]
+    declared_skips = [r.strip() for m in messages for r in SKIPS.findall(m)]
+    problems = []
+    for name in removed_tests(base):
+        short = name.split("::", 1)[1]
+        if not any(short in d or name in d for d in declared_removals):
+            problems.append(f"the test {name} is gone: keep it, or say why on a commit with a "
+                            f"'Removes-Test: {short} — <why>' trailer")
+    for where in added_skips(base):
+        if not declared_skips:
+            problems.append(f"a test is skipped or narrowed ({where}): say why on a commit with a "
+                            "'Skips-Test: <name> — <why>' trailer")
+    return problems
+
+
 # --- Workflows ----------------------------------------------------------------------------------------------------
 
 USES = re.compile(r"^[ \t]*(?:-[ \t]*)?uses:[ \t]*([^\s#]+)(.*)$", re.MULTILINE)
@@ -163,12 +247,16 @@ def main(argv: list[str] | None = None) -> int:
     problems = check_migrations(migrations(), MIGRATION_TESTS.read_text())
     problems += check_workflows()
     if args.commits:
-        for sha, message in commits(args.commits):
+        found = commits(args.commits)
+        for sha, message in found:
             problems += check_commit(sha, message)
+        base = _git("merge-base", *args.commits.split("..", 1)).strip() if ".." in args.commits else args.commits
+        problems += check_tests(base, [message for _, message in found])
     for p in problems:
         print(f"::error::{p}" if "GITHUB_ACTIONS" in os.environ else p, file=sys.stderr)
     if not problems:
-        print("Fleet checks passed: one migration head, migrations tested" + (", commit trailers" if args.commits else "")
+        print("Fleet checks passed: one migration head, migrations tested"
+              + (", commit trailers, no test removed or skipped without a reason" if args.commits else "")
               + ", workflow conventions.")
     return 1 if problems else 0
 

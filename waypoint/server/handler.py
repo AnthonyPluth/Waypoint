@@ -111,7 +111,7 @@ class Handler(BaseHTTPRequestHandler):
             return   # the container health check, every minute
         started = getattr(self, "_started", None)
         ms = f" {int((time.monotonic() - started) * 1000)}ms" if started else ""
-        print(f"{self.client_address[0]} {getattr(self, 'command', '-')} {path} {code}{ms}", flush=True)
+        print(f"{self.client_address[0]} {getattr(self, 'command', '-')} {path} {code}{ms}", flush=True)   # nosemgrep: waypoint-print -- the access log: path only, and Sentry gets the route below
         if _traced(path):   # Sentry Logs get the route (no ids, no address), not files or the health check
             method, route = getattr(self, "command", "-"), trace_name(path)
             monitoring.send_log(f"{method} {route} {code}{ms}", "info", **{
@@ -330,8 +330,8 @@ class Handler(BaseHTTPRequestHandler):
         """Signed in at the provider, but not someone Waypoint lets in. Trying again would sign the same account straight
         back in, so the way out is choosing another account (or signing out at the provider). The fix for the operator
         goes to the log, not to whoever was refused."""
-        print(f"[sign-in] refused {who!r}: not in OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS (add them there to let them in)",
-              flush=True)
+        monitoring.log(f"[sign-in] refused {who!r}: not in OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS (add them there to let "
+                       "them in)", "warning", remote="[sign-in] refused an account that isn't on the allow-list")
         c = oidc.config()
         end = oidc.provider_sign_out(c)
         provider = urllib.parse.urlsplit(c["issuer"]).hostname or "your sign-in provider"

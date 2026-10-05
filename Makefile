@@ -42,9 +42,12 @@ semgrep:
 test:
 	$(PYTHON) -m unittest discover tests
 
-# The tests across 4 processes, the command CI runs (about 3x faster than `make test`).
+# The tests across 4 processes, the command CI runs (about 3x faster than `make test`), measuring coverage, and the
+# floor it must meet (tools/coverage_floor.py): new code comes with the tests that run it.
 test-parallel:
-	$(UNITTEST_PARALLEL)
+	$(UNITTEST_PARALLEL) --coverage --coverage-rcfile pyproject.toml
+	poetry run coverage json -q -o coverage.json
+	$(PYTHON) tools/coverage_floor.py coverage.json
 
 # The same, against the Postgres at $$DATABASE_URL (an empty database is fine; see docs/src/content/docs/contributing/development.md).
 test-pg:
@@ -60,7 +63,8 @@ frontend/node_modules: frontend/package-lock.json
 	cd frontend && $(NPM) ci --no-audit --no-fund
 	touch frontend/node_modules
 
-# The web app's type-check, ESLint, Vitest tests and build, as CI runs them.
+# The web app's type-check, ESLint, Vitest tests (with the coverage floor in frontend/vite.config.ts) and build, as CI
+# runs them.
 frontend-check: frontend-typecheck frontend-lint frontend-test frontend-build
 
 frontend-typecheck: frontend/node_modules
@@ -70,7 +74,7 @@ frontend-lint: frontend/node_modules
 	cd frontend && $(NPM) run lint
 
 frontend-test: frontend/node_modules
-	cd frontend && $(NPM) test
+	cd frontend && $(NPM) run coverage
 
 frontend-build: frontend/node_modules
 	cd frontend && $(NPM) run build

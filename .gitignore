@@ -24,6 +24,7 @@ waypoint/static/app/
 # test coverage data (CI sends it to Codecov)
 .coverage
 coverage.xml
+coverage.json
 # test results (CI sends them to Codecov)
 junit/
 frontend/junit.xml
