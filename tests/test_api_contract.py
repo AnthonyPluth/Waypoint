@@ -16,7 +16,8 @@ from sqlalchemy import insert
 
 from waypoint import oidc
 from waypoint.providers import gmail
-from waypoint.server.api import backups, mailboxes, people, state
+from waypoint.providers import flightstatus as flight_service
+from waypoint.server.api import backups, flightstatus as flightstatus_api, mailboxes, people, state
 from waypoint.server.api import trips as trips_api
 from waypoint.server.api import loyalty
 from waypoint.server.common import _current
@@ -102,6 +103,7 @@ class Replies(DbCase):
         self.test_mailboxes()
         self.test_people()
         self.test_trips()
+        self.test_flight_status()
         self.test_loyalty()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
 
@@ -185,6 +187,26 @@ class Replies(DbCase):
         self.check("DELETE /api/trips/{id}", trips_api.api_trip_remove(self.c, {}, {}, str(made["id"])))
         self.check("GET /api/airports/{id}", trips_api.api_airport(self.c, {}, {}, "AKL"))
 
+    def test_flight_status(self):
+        _current.user = {"name": None, "email": None, "local": True}
+        with mock.patch.dict("os.environ", {"RAPIDAPI_KEY": "test-key-12345678"}):
+            self.check("GET /api/flight-status", flightstatus_api.api_flight_statuses(self.c, {}, {}))   # nothing yet
+            seg = trips_api.api_segment_add(self.c, {}, {"kind": "flight", "origin": "JFK", "destination": "LHR",
+                                                          "start_local": "2026-11-20T19:00", "end_local": "2026-11-21T07:10",
+                                                          "details": {"flight_number": "EX 101"}})
+            found = flight_service.Status(state="delayed", origin="JFK", destination="LHR", dep_scheduled="2026-11-20T19:00",
+                                          dep_estimated="2026-11-20T19:50", dep_gate="B24", arr_scheduled="2026-11-21T07:10")
+            with mock.patch.object(flight_service, "fetch", return_value=found):
+                refreshed = flightstatus_api.api_flight_status_refresh(self.c, {}, {}, str(seg["id"]))
+            self.assertEqual([s["state"] for s in refreshed["statuses"]], ["delayed"])
+            self.check("POST /api/flight-status/{id}", refreshed)
+            self.check("GET /api/flight-status", flightstatus_api.api_flight_statuses(self.c, {}, {}))
+        db.set_setting(self.c, sk.FLIGHT_STATUS_PAUSED, '{"until": 4102444800, "reason": "rate"}')   # and the paused reply
+        with mock.patch.dict("os.environ", {"RAPIDAPI_KEY": "test-key-12345678"}):
+            paused = flightstatus_api.api_flight_statuses(self.c, {}, {})
+        self.assertEqual(paused["paused"]["reason"], "rate")   # type: ignore[index]
+        self.check("GET /api/flight-status", paused)
+
 
 class Mismatches(unittest.TestCase):
     """The check above notices a reply that isn't the contract's."""
@@ -217,6 +239,7 @@ class Generated(unittest.TestCase):
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
                                      "DELETE /api/segments/{id}", "GET /api/airports/{id}",
+                                     "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
                                      "POST /api/loyalty/{id}/reveal"})
         self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)

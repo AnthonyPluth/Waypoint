@@ -283,6 +283,7 @@
         "frontend/src/lib/flightstatus.svelte.ts"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_flightstatus.py"
       ],
       "docs": [
@@ -297,6 +298,7 @@
         "frontend/src/lib/flightstatus.svelte.ts"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_flightstatus.py"
       ],
       "docs": [
