@@ -5,7 +5,7 @@ pushed to the orphan branch `pr-screenshots` (never part of a pull request's dif
 (`pr-<n>/`), and the comment embeds them through raw.githubusercontent.com. This script does that and prints the
 markdown to post as the comment.
 
-    python tools/pr_screenshots.py <pr number> [file.png …] [--theme dark] [--trailer "Key: value"]
+    python tools/pr_screenshots.py <pr number> [file.png …] [--theme light] [--trailer "Key: value"]
 
 With no files it takes every `*-top.png` in artifacts/verify/ (the viewport-only screenshots `make verify` saves beside
 the full-page ones, which are thousands of pixels tall). Only ever publish `make verify`'s made-up demo data: the
@@ -89,7 +89,7 @@ def select_files(paths: Sequence[str], verify_dir: Path = VERIFY_DIR) -> list[Pa
     return chosen
 
 
-def comment_markdown(pr: int, names: Sequence[str], theme: str = "dark", slug: str = REPO_SLUG) -> str:
+def comment_markdown(pr: int, names: Sequence[str], theme: str = "light", slug: str = REPO_SLUG) -> str:
     """The PR comment: a heading per width (phone, tablet, desktop; any other file under 'Other'), each image embedded
     from the branch, a line on what it is, and the attribution footer."""
     groups: dict[str, list[str]] = {}
@@ -102,7 +102,7 @@ def comment_markdown(pr: int, names: Sequence[str], theme: str = "dark", slug: s
         out += [f"**{key.capitalize()} ({WIDTHS[key]} px)**" if key in WIDTHS else "**Other**", ""]
         out += [f"![{alt_text(n)}]({raw_url(pr, n, slug)})\n" for n in groups[key]]
     other = OTHER_THEME[theme]
-    out += [f"Not checked: the {other} theme (`make verify` captures dark only).\n" if theme == "dark"
+    out += [f"Not checked: the {other} theme (`make verify` captures light only).\n" if theme == "light"
             else f"Not checked: the {other} theme.\n"]
     out.append(FOOTER)
     return "\n".join(out) + "\n"
@@ -129,7 +129,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser(prog="pr_screenshots.py", description="Publish make verify screenshots for a PR and print its comment.")
     ap.add_argument("pr", type=int, help="the pull request's number")
     ap.add_argument("files", nargs="*", help="screenshots to publish (default: every *-top.png in artifacts/verify/)")
-    ap.add_argument("--theme", choices=sorted(OTHER_THEME), default="dark", help="the theme the screenshots show (default dark)")
+    ap.add_argument("--theme", choices=sorted(OTHER_THEME), default="light", help="the theme the screenshots show (default light)")
     ap.add_argument("--trailer", action="append", default=[], help="a commit trailer, 'Key: value' (repeatable)")
     ap.add_argument("--remote", default="origin", help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
