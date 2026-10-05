@@ -1,5 +1,6 @@
 """The actions on a booking's card: open it in the provider's app, directions, call. Each is a link built here, from a
-booking's own fields, so the web app only draws them. (Wallet needs none: `shoebox://` opens Wallet itself.)"""
+booking's own fields, so the web app only draws them. There's no Wallet button: no link opens one pass, and a
+boarding pass in Wallet already comes up on the lock screen near departure."""
 from __future__ import annotations
 
 import re
