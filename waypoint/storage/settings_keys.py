@@ -9,6 +9,12 @@ from __future__ import annotations
 # General preferences
 LAST_BACKUP = "last_backup"   # when a backup was last downloaded from Settings (ISO, the machine's local time)
 
+# Flight status (waypoint/domain/flightstatus.py): the calls made this month (the month is "YYYY-MM", local time), and
+# when fetching is paused (a JSON object: until, as seconds since the epoch, and why)
+FLIGHT_STATUS_MONTH = "flight_status_month"
+FLIGHT_STATUS_CALLS = "flight_status_calls"
+FLIGHT_STATUS_PAUSED = "flight_status_paused"
+
 VAPID_PRIVATE_KEY = "vapid_private_key"   # web push signing key, made on first use
 
 # Rows that hold secrets: stored encrypted (waypoint/storage/secretbox.py), and encrypted in backups too

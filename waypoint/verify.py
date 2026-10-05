@@ -22,13 +22,20 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "artifacts", "verify")
 
 
+DEMO_KEY = "demo-key-not-real"        # a flight status key that turns the feature on, so its demo status shows; it asks nobody
+NO_OUTSIDE = "http://127.0.0.1:9"     # a proxy nothing listens on: the demo server's own requests to anywhere else fail at once
+
+
 def clean_env(data: str, base: dict[str, str] | None = None) -> dict[str, str]:
     """The environment for the demo server: its own folder and SQLite database, nothing from the caller's setup that
-    could point it at real data (Postgres, sign-in)."""
+    could point it at real data (Postgres, sign-in) or at a real service (the caller's flight status key; any request
+    the demo server makes goes to a proxy that isn't there)."""
     env = {k: v for k, v in (os.environ if base is None else base).items()
            if not k.startswith(("OIDC_", "WAYPOINT_SECRET_KEY"))
            and k not in ("DATABASE_URL", "WAYPOINT_PUBLIC_URL", "WAYPOINT_ALLOW_NO_AUTH")}
-    env.update(WAYPOINT_DATA=data, PYTHONUNBUFFERED="1")
+    env.update(WAYPOINT_DATA=data, PYTHONUNBUFFERED="1", RAPIDAPI_KEY=DEMO_KEY, HTTPS_PROXY=NO_OUTSIDE, https_proxy=NO_OUTSIDE)
+    for name in ("HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"):
+        env.pop(name, None)
     return env
 
 

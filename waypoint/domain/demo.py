@@ -4,12 +4,12 @@ real travel (AGENTS.md, "Personal data in the repo"): names, codes and numbers a
 Each feature that stores something (people, trips) adds its own sample rows here, so `make verify` shows it."""
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, select
 
 from ..storage import db, secretbox
-from ..storage.models import LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentTraveler, Trip, User
+from ..storage.models import FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentTraveler, Trip, User
 from . import loyalty, people, trips
 from .mail import review
 from .visibility import Viewer
@@ -86,6 +86,16 @@ def _sam_alone(today: date) -> list[trips.SegmentIn]:
     ]
 
 
+# The family's flight home is running late, with a gate: what live flight status shows (where the server has a RAPIDAPI_KEY,
+# which `make verify` gives its demo server).
+def _flight_status(today: date) -> dict[str, str]:
+    return {
+        "flight_number": "AA102", "date": f"{today + timedelta(days=4):%Y-%m-%d}", "state": "delayed", "origin": "LHR", "destination": "JFK",
+        "dep_scheduled": _at(today, 4, "11:30"), "dep_estimated": _at(today, 4, "12:20"), "dep_zone": "Europe/London",
+        "dep_terminal": "3", "dep_gate": "A12", "arr_scheduled": _at(today, 4, "14:35"), "arr_estimated": _at(today, 4, "15:25"),
+        "arr_zone": "America/New_York", "arr_terminal": "8",
+    }
+
 # A flight Waypoint read from an email, for a traveller whose printed name nobody matches yet ("Who is this?" in Review).
 def _read_from_email(today: date) -> trips.SegmentIn:
     return {"kind": "flight", "origin": "JFK", "destination": "ORD", "start_local": _at(today, 60, "07:00"), "end_local": _at(today, 60, "08:45"),
@@ -128,9 +138,10 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     for who, kind, program, number, tier, expiry, notes in MEMBERSHIPS:
         loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number, "tier": tier,
                            "expiry": expiry, "notes": notes})
+    db.upsert(conn, FlightStatus, {**_flight_status(today), "fetched_at": datetime.now(UTC).timestamp()}, key=["flight_number", "date"])
     return _rows(conn) - before
 
 
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
-               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentTraveler, Mailbox, ReviewItem))
+               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentTraveler, FlightStatus, Mailbox, ReviewItem))

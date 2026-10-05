@@ -687,6 +687,67 @@
         }
       }
     },
+    "/api/flight-status": {
+      "get": {
+        "operationId": "api_flight_statuses",
+        "x-handler": "waypoint/server/api/flightstatus.py:api_flight_statuses",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlightStatusList"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/flight-status/{id}": {
+      "post": {
+        "operationId": "api_flight_status_refresh",
+        "x-handler": "waypoint/server/api/flightstatus.py:api_flight_status_refresh",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlightStatusList"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/loyalty": {
       "get": {
         "operationId": "api_loyalty",
@@ -1268,6 +1329,195 @@
         "required": [
           "ok",
           "revoked"
+        ],
+        "additionalProperties": false
+      },
+      "FlightStatus": {
+        "type": "object",
+        "description": "A flight's live status, shown beside its booked times (the booking is never changed). Times are `2026-03-01T22:15`\nwall-clock times at the airports, in their zones (`dep_zone`, `arr_zone`), never converted.",
+        "properties": {
+          "segment_id": {
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "scheduled",
+              "delayed",
+              "departed",
+              "landed",
+              "cancelled",
+              "diverted"
+            ]
+          },
+          "origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dep_scheduled": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dep_estimated": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dep_actual": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dep_zone": {
+            "type": "string"
+          },
+          "dep_terminal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dep_gate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arr_scheduled": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arr_estimated": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arr_actual": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arr_zone": {
+            "type": "string"
+          },
+          "arr_terminal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arr_gate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "delay_minutes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "fetched_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "segment_id",
+          "state",
+          "origin",
+          "destination",
+          "dep_scheduled",
+          "dep_estimated",
+          "dep_actual",
+          "dep_zone",
+          "dep_terminal",
+          "dep_gate",
+          "arr_scheduled",
+          "arr_estimated",
+          "arr_actual",
+          "arr_zone",
+          "arr_terminal",
+          "arr_gate",
+          "delay_minutes",
+          "fetched_at"
+        ],
+        "additionalProperties": false
+      },
+      "FlightStatusList": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "month": {
+            "type": "string"
+          },
+          "used": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "paused": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlightStatusPause"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlightStatus"
+            }
+          }
+        },
+        "required": [
+          "enabled",
+          "month",
+          "used",
+          "limit",
+          "paused",
+          "statuses"
+        ],
+        "additionalProperties": false
+      },
+      "FlightStatusPause": {
+        "type": "object",
+        "properties": {
+          "until": {
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "limit",
+              "rate",
+              "key"
+            ]
+          }
+        },
+        "required": [
+          "until",
+          "reason"
         ],
         "additionalProperties": false
       },

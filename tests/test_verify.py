@@ -21,7 +21,15 @@ class CleanEnvTests(unittest.TestCase):
         base = {"PATH": "/bin", "DATABASE_URL": "postgresql://real", "WAYPOINT_DATA": "/real", "OIDC_ISSUER": "https://idp",
                 "WAYPOINT_SECRET_KEY": "real", "WAYPOINT_PUBLIC_URL": "https://r"}
         env = verify.clean_env("/tmp/demo", base)
-        self.assertEqual(env, {"PATH": "/bin", "WAYPOINT_DATA": "/tmp/demo", "PYTHONUNBUFFERED": "1"})
+        self.assertEqual(env, {"PATH": "/bin", "WAYPOINT_DATA": "/tmp/demo", "PYTHONUNBUFFERED": "1",
+                               "RAPIDAPI_KEY": verify.DEMO_KEY, "HTTPS_PROXY": verify.NO_OUTSIDE, "https_proxy": verify.NO_OUTSIDE})
+
+    def test_the_demo_server_has_a_made_up_flight_status_key_and_reaches_nobody(self):
+        base = {"RAPIDAPI_KEY": "real-key-12345678", "HTTPS_PROXY": "http://proxy:3128", "HTTP_PROXY": "http://proxy:3128",
+                "all_proxy": "socks5://proxy"}
+        env = verify.clean_env("/tmp/demo", base)
+        self.assertEqual((env["RAPIDAPI_KEY"], env["HTTPS_PROXY"]), (verify.DEMO_KEY, verify.NO_OUTSIDE))
+        self.assertFalse({"HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"} & set(env))
 
 
 class RunPyFileArgumentTests(unittest.TestCase):

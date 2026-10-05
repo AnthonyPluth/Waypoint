@@ -270,6 +270,45 @@ class Airport(TypedDict):
     zone: str                       # IANA
 
 
+# Live flight status
+
+class FlightStatus(TypedDict):
+    """A flight's live status, shown beside its booked times (the booking is never changed). Times are `2026-03-01T22:15`
+    wall-clock times at the airports, in their zones (`dep_zone`, `arr_zone`), never converted."""
+    segment_id: int
+    state: Literal["scheduled", "delayed", "departed", "landed", "cancelled", "diverted"]
+    origin: str | None              # airport codes, as the service names them
+    destination: str | None
+    dep_scheduled: str | None
+    dep_estimated: str | None
+    dep_actual: str | None
+    dep_zone: str
+    dep_terminal: str | None
+    dep_gate: str | None
+    arr_scheduled: str | None
+    arr_estimated: str | None
+    arr_actual: str | None
+    arr_zone: str
+    arr_terminal: str | None
+    arr_gate: str | None
+    delay_minutes: int | None       # how much later than booked it leaves (or left)
+    fetched_at: str                 # when the answer came, with its UTC offset
+
+
+class FlightStatusPause(TypedDict):
+    until: str                      # with its UTC offset
+    reason: Literal["limit", "rate", "key"]   # the monthly limit (until the 1st), a rate limit, or a key RapidAPI refused (an hour)
+
+
+class FlightStatusList(TypedDict):
+    enabled: bool                   # RAPIDAPI_KEY is set; without it there's nothing to show
+    month: str                      # YYYY-MM, local time: the month `used` counts
+    used: int                       # calls made this month, for the whole household
+    limit: int                      # WAYPOINT_FLIGHT_STATUS_MONTHLY_LIMIT
+    paused: FlightStatusPause | None   # why nothing is fetched now
+    statuses: list[FlightStatus]    # one for each of the viewer's flight segments that has one
+
+
 # Loyalty and Known Traveler numbers
 
 class LoyaltyEntry(TypedDict):

@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-34 routes; 0 have no test yet.
+36 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -32,6 +32,8 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/segments/{id}` | `trips.py:api_segment_edit` | `lib/components/SegmentForm.svelte` | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `DELETE /api/segments/{id}` | `trips.py:api_segment_remove` | `pages/Trip.svelte` | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `GET /api/airports/{id}` | `trips.py:api_airport` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
+| `GET /api/flight-status` | `flightstatus.py:api_flight_statuses` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py` | [start/flight-status](/waypoint/start/flight-status/) |
+| `POST /api/flight-status/{id}` | `flightstatus.py:api_flight_status_refresh` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py` | [start/flight-status](/waypoint/start/flight-status/) |
 | `GET /api/loyalty` | `loyalty.py:api_loyalty` | `pages/People.svelte`, `pages/Trip.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |
 | `POST /api/loyalty` | `loyalty.py:api_loyalty_add` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |
 | `POST /api/loyalty/{id}` | `loyalty.py:api_loyalty_edit` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py` | [start/loyalty](/waypoint/start/loyalty/) |

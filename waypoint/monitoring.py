@@ -9,6 +9,7 @@ the request sent.
 """
 from __future__ import annotations
 
+import os
 import re
 import sys
 import traceback
@@ -18,6 +19,9 @@ from typing import overload
 _USERINFO = re.compile(r"(\b[a-z][a-z0-9+.-]*://)[^/\s@]+@", re.I)
 _QUERY = re.compile(r"(\b[a-z][a-z0-9+.-]*://[^\s?#]*)\?[^\s#]*", re.I)
 _TOKEN = re.compile(r"\b(access|public|link|processor)-(sandbox|development|production)-[0-9a-f-]{8,}", re.I)
+_RAPIDAPI_HEADER = re.compile(r"(x-rapidapi-key['\"]?\s*[:=,]\s*['\"]?)[^\s'\",}]+", re.I)
+# Keys that live in the environment: wherever one turns up in a text (an error that quoted the request), it's blanked.
+SECRET_ENV = ("RAPIDAPI_KEY",)
 
 
 def scrub(text):
@@ -26,6 +30,11 @@ def scrub(text):
     text = _USERINFO.sub(r"\1[Filtered]@", text)
     text = _QUERY.sub(r"\1?[Filtered]", text)
     text = _database_values(text)
+    text = _RAPIDAPI_HEADER.sub(r"\1[Filtered]", text)
+    for name in SECRET_ENV:
+        secret = (os.environ.get(name) or "").strip()
+        if len(secret) >= 8:
+            text = text.replace(secret, "[Filtered]")
     return _TOKEN.sub("[Filtered]", text)
 
 

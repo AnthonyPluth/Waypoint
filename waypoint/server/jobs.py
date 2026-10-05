@@ -1,17 +1,19 @@
-"""Background jobs: the sweep that ends Gmail connections whose owners can no longer sign in, and the mail scan (every few
-hours, and on "Scan now")."""
+"""Background jobs: the sweep that ends Gmail connections whose owners can no longer sign in, the flight status checks, and the
+mail scan (every few hours, and on "Scan now")."""
 from __future__ import annotations
 
 import threading
 import time
-from datetime import date
+from datetime import UTC, date, datetime
 
 from .. import monitoring
+from ..domain import flightstatus
 from ..domain.mail import scan
 from ..providers import gmail
 from ..storage import db
 
 SWEEP_EVERY = 3600   # seconds
+FLIGHT_STATUS_EVERY = 300   # the checks are at set points before a flight (20 minutes is the closest), so a round this often is enough
 SCAN_EVERY = 4 * 3600
 SCAN_FIRST = 300     # the first scan waits this long after Waypoint starts
 
@@ -24,6 +26,15 @@ def sweep_lapsed() -> None:
             ended = gmail.end_lapsed(conn)
         if ended:
             monitoring.log(f"Ended {ended} Gmail connection(s) whose owner can no longer sign in.")
+    except Exception as e:   # the next round tries again; never the details (they may name a row)
+        monitoring.report(e, values=False)
+
+
+def check_flights() -> None:
+    """Fetch the live status of the flights whose check is due, within the month's budget (waypoint/domain/flightstatus.py)."""
+    try:
+        with db.session() as conn:
+            flightstatus.run_due(conn, datetime.now(UTC))
     except Exception as e:   # the next round tries again; never the details (they may name a row)
         monitoring.report(e, values=False)
 
@@ -53,21 +64,21 @@ def scan_now(mailbox_id: int) -> bool:
 
 
 def start(stop: threading.Event) -> list[threading.Thread]:
-    def sweeping() -> None:
-        while True:
-            sweep_lapsed()
-            if stop.wait(SWEEP_EVERY):
-                return
-
-    def scanning() -> None:
-        if stop.wait(SCAN_FIRST):
+    def every(seconds: int, job, first: int = 0) -> None:
+        if first and stop.wait(first):
             return
         while True:
-            scan_mailboxes()
-            if stop.wait(SCAN_EVERY):
+            job()
+            if stop.wait(seconds):
                 return
-    threads = [threading.Thread(target=sweeping, daemon=True, name="gmail-lapse-sweep"),
-               threading.Thread(target=scanning, daemon=True, name="mail-scan")]
+    try:
+        with db.session() as conn:
+            flightstatus.forget_key_pause(conn)
+    except Exception as e:   # never the details (they may name a row)
+        monitoring.report(e, values=False)
+    threads = [threading.Thread(target=every, args=(SWEEP_EVERY, sweep_lapsed), daemon=True, name="gmail-lapse-sweep"),
+               threading.Thread(target=every, args=(FLIGHT_STATUS_EVERY, check_flights), daemon=True, name="flight-status"),
+               threading.Thread(target=every, args=(SCAN_EVERY, scan_mailboxes, SCAN_FIRST), daemon=True, name="mail-scan")]
     for t in threads:
         t.start()
     return threads
