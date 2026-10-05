@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isIOS } from "./platform";
+import { isIOS, isMobile } from "./platform";
 
 const nav = (userAgent: string, platform = "", maxTouchPoints = 0) => ({ userAgent, platform, maxTouchPoints });
 
@@ -12,5 +12,14 @@ describe("isIOS", () => {
     expect(isIOS(nav("Mozilla/5.0 (Macintosh)", "MacIntel", 0))).toBe(false);
     expect(isIOS(nav("Mozilla/5.0 (Linux; Android 14)", "Linux armv8l", 5))).toBe(false);
     expect(isIOS(nav("Mozilla/5.0 (Windows NT 10.0)", "Win32"))).toBe(false);
+  });
+});
+
+describe("isMobile", () => {
+  it("is true on iOS and Android, false on a desktop", () => {
+    expect(isMobile(nav("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"))).toBe(true);
+    expect(isMobile(nav("Mozilla/5.0 (Linux; Android 14)", "Linux armv8l", 5))).toBe(true);
+    expect(isMobile(nav("Mozilla/5.0 (Macintosh)", "MacIntel", 0))).toBe(false);
+    expect(isMobile(nav("Mozilla/5.0 (Windows NT 10.0)", "Win32"))).toBe(false);
   });
 });
