@@ -77,6 +77,20 @@ people = Table(
     info={'doc': 'everyone who travels: household members (linked to their sign-in) and guests with no login'},
 )
 
+loyalty_ids = Table(
+    'loyalty_ids', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('person_id', Integer, refers('loyalty_ids', 'person_id', 'people.id', 'CASCADE'), nullable=False),
+    Column('kind', Text, nullable=False),
+    Column('program', Text, nullable=False),
+    Column('number', Text, nullable=False),
+    Column('tier', Text),
+    Column('expiry', Text),
+    Column('notes', Text),
+    Index('ix_loyalty_ids_person_id', 'person_id'),
+    info={'doc': "loyalty and Known Traveler numbers, one row per membership; the number is encrypted (waypoint/storage/secretbox.py)"},
+)
+
 settings = Table(
     'settings', metadata,
     Column('key', Text, primary_key=True),

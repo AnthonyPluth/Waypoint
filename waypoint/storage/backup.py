@@ -38,7 +38,7 @@ from sqlalchemy.schema import CreateColumn
 from . import db, schema, secretbox
 from .. import monitoring
 from . import settings_keys as sk
-from .models import Mailbox, Setting
+from .models import LoyaltyId, Mailbox, Setting
 
 FORMAT = "waypoint-backup"
 VERSION = 1
@@ -229,6 +229,8 @@ def unreadable_secrets(conn) -> list[str]:
             out.append(r["key"])
     if any(not _readable(token) for token in conn.execute(select(Mailbox.token)).scalars()):
         out.append(MAILBOXES)
+    if any(not _readable(number) for number in conn.execute(select(LoyaltyId.number)).scalars()):
+        out.append(LOYALTY)
     return out
 
 
@@ -242,6 +244,8 @@ def _readable(token: str) -> bool:
 
 MAILBOXES = "mailboxes"   # not a setting: the Gmail connections' refresh tokens
 MAILBOXES_LABEL = "Gmail connections (connect them again in Settings)"
+LOYALTY = "loyalty_ids"   # not a setting: the loyalty and Known Traveler numbers
+LOYALTY_LABEL = "loyalty numbers (enter them again on People)"
 
 # What each secret is called where it's entered again (Settings), for saying which ones a restore couldn't read.
 SECRET_LABELS = {
@@ -252,7 +256,7 @@ SECRET_LABELS = {
 def unreadable_summary(unreadable: list[str]) -> str:
     """unreadable_secrets() for people: each setting by its name in Settings. Only these fixed labels are said, never
     anything read from the rows."""
-    labels = {**SECRET_LABELS, MAILBOXES: MAILBOXES_LABEL}
+    labels = {**SECRET_LABELS, MAILBOXES: MAILBOXES_LABEL, LOYALTY: LOYALTY_LABEL}
     return ", ".join(dict.fromkeys(label for key, label in labels.items() if key in unreadable))
 
 

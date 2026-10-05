@@ -14,10 +14,10 @@ from unittest import mock
 
 from sqlalchemy import func, insert, select, update
 
-from waypoint.storage import backup, db
+from waypoint.storage import backup, db, secretbox
 from waypoint import server
 from waypoint.storage import settings_keys as sk
-from waypoint.storage.models import AuthSession, Person, Setting, User
+from waypoint.storage.models import AuthSession, LoyaltyId, Person, Setting, User
 from tests.shared import add_database, fetch, own_database, serve
 
 db_session = db.session
@@ -103,6 +103,68 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(len(want), 2)
         self.assertEqual(got, want)
         src.close(); dst.close()
+
+    def loyalty_rows(self, c):
+        return sorted((m.person_id, m.kind, m.program, secretbox.decrypt(m.number), m.tier, m.expiry, m.notes)
+                      for m in c.orm.scalars(select(LoyaltyId)))
+
+    def test_loyalty_numbers_come_back_exact_and_stay_encrypted_in_the_file(self):
+        src = db.connect(self.a)
+        pid = 40
+        src.execute(insert(Person).values(id=pid, display_name="Zoë"))
+        for number in ("DEMO ’1234 🐶 %s", "0000012345", "x" * 64):
+            src.execute(insert(LoyaltyId).values(person_id=pid, kind="airline", program="Other", number=secretbox.encrypt(number),
+                                                 tier="", expiry=None, notes="n\nl \\ '"))
+        src.commit()
+        raw = backup.dump(src)
+        self.assertNotIn(b"0000012345", raw)
+        data = backup.load(raw)
+        stored = data["tables"]["loyalty_ids"]
+        i = stored["columns"].index("number")
+        self.assertTrue(all(r[i].startswith("enc:v1:") for r in stored["rows"]))
+        dst = db.connect(self.b)
+        backup.restore(dst, data)
+        dst.commit()
+        self.assertEqual(self.loyalty_rows(dst), self.loyalty_rows(src))
+        self.assertEqual(len(self.loyalty_rows(dst)), 3)
+        self.assertEqual(backup.unreadable_secrets(dst), [])
+        src.close(); dst.close()
+
+    def test_restoring_under_another_key_names_the_loyalty_numbers(self):
+        src = db.connect(self.a)
+        pid = 40
+        src.execute(insert(Person).values(id=pid, display_name="Zoë"))
+        src.execute(insert(LoyaltyId).values(person_id=pid, kind="hotel", program="Other", number=secretbox.encrypt("DEMO123456")))
+        src.commit()
+        data = backup.load(backup.dump(src))
+        with mock.patch.dict(os.environ, {"WAYPOINT_SECRET_KEY": "another-key-" + "k" * 30}):
+            dst = db.connect(self.b)
+            backup.restore(dst, data)
+            dst.commit()
+            unreadable = backup.unreadable_secrets(dst)
+        self.assertEqual(unreadable, [backup.LOYALTY])
+        self.assertIn("loyalty numbers", backup.unreadable_summary(unreadable))
+        src.close(); dst.close()
+
+    def test_the_current_key_re_encrypts_numbers_saved_under_an_old_one(self):
+        old = "old-key-" + "o" * 32
+        with mock.patch.dict(os.environ, {"WAYPOINT_SECRET_KEY": old}):
+            c = db.connect(self.a)
+            pid = 40
+            c.execute(insert(Person).values(id=pid, display_name="Zoë"))
+            c.execute(insert(LoyaltyId).values(person_id=pid, kind="car", program="Other", number=secretbox.encrypt("DEMO777")))
+            c.commit()
+            c.close()
+        new = "new-key-" + "n" * 32
+        with mock.patch.dict(os.environ, {"WAYPOINT_SECRET_KEY": new, "WAYPOINT_SECRET_KEY_OLD": old}):
+            c = db.connect(self.a)
+            self.assertEqual(secretbox.encrypt_stored(c), 1)
+            c.commit()
+            c.close()
+        with mock.patch.dict(os.environ, {"WAYPOINT_SECRET_KEY": new}):
+            c = db.connect(self.a)
+            self.assertEqual(self.loyalty_rows(c)[0][3], "DEMO777")
+            c.close()
 
     def test_a_backup_through_the_migrations_from_the_first_revision(self):
         # A backup made at an older revision is brought up to date in a scratch database first. With one migration so

@@ -7,16 +7,32 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
-import type { Person } from "$lib/api-types";
+import type { LoyaltyEntry, Person } from "$lib/api-types";
 import People from "./People.svelte";
 
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true };
 const mia: Person = { id: 2, display_name: "Mia Doe", first_name: "Mia", legal_name: "Mia Rose Doe", aliases: ["DOE/MIA MISS"], member: false };
 
-/** The server, with its people kept in `held`: answers the calls the page makes. */
+const PROGRAMS = { airline: ["American AAdvantage", "Other"], hotel: ["Marriott Bonvoy", "Other"], car: ["Other"], known_traveler: ["TSA PreCheck", "Other"], redress: ["DHS TRIP", "Other"] };
+const aa: LoyaltyEntry = { id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, tier: "Gold", expiry: null, notes: null };
+const tsa: LoyaltyEntry = { id: 12, person_id: 1, kind: "known_traveler", program: "TSA PreCheck", masked: "••••2345", readable: true, tier: null, expiry: "2029-03-31", notes: null };
+
+/** The server, with its people kept in `held` and their memberships in `ids`: answers the calls the page makes. */
 let held: Person[];
+let ids: LoyaltyEntry[];
 function serve() {
   vi.mocked(api).mockImplementation(async (path, opts) => {
+    if (path === "/api/loyalty" && !opts) return { loyalty: ids, programs: PROGRAMS };
+    if (path.startsWith("/api/loyalty")) {
+      const id = Number(path.split("/")[3]);
+      if (path.endsWith("/reveal")) return { number: "DEMO1234567" };
+      if (opts?.method === "DELETE") { ids = ids.filter((m) => m.id !== id); return { ok: true }; }
+      const b = opts?.body as { person_id: number; kind: string; program: string; number?: string; tier: string; expiry: string; notes: string };
+      const next: LoyaltyEntry = { id: id || 20, person_id: b.person_id, kind: b.kind, program: b.program, masked: b.number ? `••••${b.number.slice(-4)}` : ids.find((m) => m.id === id)?.masked ?? "••••",
+        readable: true, tier: b.tier || null, expiry: b.expiry || null, notes: b.notes || null };
+      ids = id ? ids.map((m) => (m.id === id ? next : m)) : [...ids, next];
+      return next;
+    }
     const id = Number(path.split("/")[3]);
     if (opts?.method === "DELETE") { held = held.filter((p) => p.id !== id); return { ok: true }; }
     if (opts?.method === "POST") {
@@ -30,7 +46,7 @@ function serve() {
   });
 }
 
-beforeEach(() => { vi.mocked(api).mockReset(); held = [jane, mia]; serve(); });
+beforeEach(() => { vi.mocked(api).mockReset(); held = [jane, mia]; ids = [aa, tsa]; serve(); });
 
 describe("People", () => {
   it("lists members and guests, with the names an airline matches", async () => {
@@ -114,5 +130,95 @@ describe("People", () => {
     held = [];
     render(People);
     expect(await screen.findByText(/Nobody yet/)).toBeInTheDocument();
+  });
+
+  it("shows each person's memberships grouped by kind, with the number masked", async () => {
+    render(People);
+    const airline = await screen.findByRole("region", { name: "Jane Doe’s Airline memberships" });
+    expect(within(airline).getByText("American AAdvantage")).toBeInTheDocument();
+    expect(within(airline).getByText("••••4567")).toBeInTheDocument();
+    expect(within(airline).getByText("Gold")).toBeInTheDocument();
+    const kt = screen.getByRole("region", { name: "Jane Doe’s Known Traveler memberships" });
+    expect(within(kt).getByText("Expires 2029-03-31")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /Mia Doe/ })).toBeNull();
+    expect(screen.queryByText(/DEMO1234567/)).toBeNull();   // no number came with the page
+  });
+
+  it("reveals one number on tap, copies it, and hides it on a second tap", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "Show and copy American AAdvantage number" }));
+    expect(api).toHaveBeenCalledWith("/api/loyalty/11/reveal", { method: "POST" });
+    expect(await screen.findByText("DEMO1234567")).toBeInTheDocument();
+    expect(writeText).toHaveBeenCalledWith("DEMO1234567");
+    expect(screen.getByText("••••2345")).toBeInTheDocument();   // the other stays masked
+    await userEvent.click(screen.getByRole("button", { name: "Hide American AAdvantage number" }));
+    expect(screen.queryByText("DEMO1234567")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("still shows the number when it can't be copied", async () => {
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) } });
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "Show and copy American AAdvantage number" }));
+    expect(await screen.findByText("DEMO1234567")).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it("says so when a number can't be read with this key", async () => {
+    ids = [{ ...aa, masked: "••••", readable: false }];
+    render(People);
+    expect(await screen.findByText(/Can’t be read with this key/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show and copy/ })).toBeNull();
+  });
+
+  it("adds a membership for a person, choosing the program from the kind's list", async () => {
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "Add a membership for Mia Doe" }));
+    await userEvent.selectOptions(screen.getByLabelText("Kind"), "hotel");
+    expect(screen.getByLabelText("Program")).toHaveValue("Marriott Bonvoy");
+    await userEvent.type(screen.getByLabelText("Number"), "DEMO55501234");
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(api).toHaveBeenCalledWith("/api/loyalty", { method: "POST", body: { person_id: 2, kind: "hotel", program: "Marriott Bonvoy", number: "DEMO55501234", tier: "", expiry: "", notes: "" } });
+    expect(await screen.findByRole("region", { name: "Mia Doe’s Hotel memberships" })).toBeInTheDocument();
+    expect(screen.queryByRole("form")).toBeNull();
+  });
+
+  it("changes a membership without asking for the number again", async () => {
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Jane Doe’s American AAdvantage" }));
+    expect(screen.getByLabelText("Number")).toHaveAttribute("placeholder", "Leave empty to keep ••••4567");
+    await userEvent.clear(screen.getByLabelText("Tier"));
+    await userEvent.type(screen.getByLabelText("Tier"), "Platinum");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(api).toHaveBeenCalledWith("/api/loyalty/11", expect.objectContaining({ method: "POST", body: expect.objectContaining({ number: "", tier: "Platinum" }) }));
+    expect(await screen.findByText("Platinum")).toBeInTheDocument();
+  });
+
+  it("keeps the membership form open and says why when saving fails", async () => {
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "Add a membership for Jane Doe" }));
+    vi.mocked(api).mockRejectedValueOnce(new Error("The number is too long (at most 64 characters)"));
+    await userEvent.type(screen.getByLabelText("Number"), "DEMO1");
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("too long");
+    expect(screen.getByLabelText("Number")).toHaveValue("DEMO1");
+  });
+
+  it("asks before removing a membership", async () => {
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "Remove Jane Doe’s TSA PreCheck" }));
+    const dialog = await screen.findByRole("dialog", { name: "Remove TSA PreCheck?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+    expect(api).toHaveBeenCalledWith("/api/loyalty/12", { method: "DELETE" });
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Jane Doe’s Known Traveler memberships" })).toBeNull());
+  });
+
+  it("shows nothing that could pass for current when the memberships can't load", async () => {
+    vi.mocked(api).mockImplementation(async (path) => { if (path === "/api/loyalty") throw new Error("Can’t reach Waypoint."); return { people: held }; });
+    render(People);
+    expect(await screen.findByText("Can’t reach Waypoint.")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "People" })).toBeNull();
   });
 });

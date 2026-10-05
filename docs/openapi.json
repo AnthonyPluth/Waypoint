@@ -219,6 +219,195 @@
         }
       }
     },
+    "/api/loyalty": {
+      "get": {
+        "operationId": "api_loyalty",
+        "x-handler": "waypoint/server/api/loyalty.py:api_loyalty",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoyaltyList"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_loyalty_add",
+        "x-handler": "waypoint/server/api/loyalty.py:api_loyalty_add",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoyaltyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoyaltyEntry"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/loyalty/{id}": {
+      "post": {
+        "operationId": "api_loyalty_edit",
+        "x-handler": "waypoint/server/api/loyalty.py:api_loyalty_edit",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoyaltyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoyaltyEntry"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "api_loyalty_remove",
+        "x-handler": "waypoint/server/api/loyalty.py:api_loyalty_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/loyalty/{id}/reveal": {
+      "post": {
+        "operationId": "api_loyalty_reveal",
+        "x-handler": "waypoint/server/api/loyalty.py:api_loyalty_reveal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Revealed"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/mailboxes": {
       "get": {
         "operationId": "api_mailboxes",
@@ -392,6 +581,130 @@
         "required": [
           "ok",
           "revoked"
+        ],
+        "additionalProperties": false
+      },
+      "LoyaltyBody": {
+        "type": "object",
+        "description": "A membership, to save or to change. `number` is needed to save one; left out when changing, the saved one is kept.",
+        "properties": {
+          "person_id": {
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "program": {
+            "type": "string"
+          },
+          "number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "person_id",
+          "kind",
+          "program"
+        ],
+        "additionalProperties": false
+      },
+      "LoyaltyEntry": {
+        "type": "object",
+        "description": "One membership. The number comes only masked (its last four characters); `POST /api/loyalty/{id}/reveal` gives it.",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "person_id": {
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "program": {
+            "type": "string"
+          },
+          "masked": {
+            "type": "string"
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "tier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "kind",
+          "program",
+          "masked",
+          "readable",
+          "tier",
+          "expiry",
+          "notes"
+        ],
+        "additionalProperties": false
+      },
+      "LoyaltyList": {
+        "type": "object",
+        "properties": {
+          "loyalty": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LoyaltyEntry"
+            }
+          },
+          "programs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "loyalty",
+          "programs"
         ],
         "additionalProperties": false
       },
@@ -596,6 +909,18 @@
           "counts",
           "safety_copy",
           "unreadable_secrets"
+        ],
+        "additionalProperties": false
+      },
+      "Revealed": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "number"
         ],
         "additionalProperties": false
       },

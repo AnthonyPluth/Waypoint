@@ -86,7 +86,7 @@ class PeopleTests(DbCase):
     def test_the_demo_household(self):
         added = demo.seed(self.c)
         shown = people.everyone(self.c)
-        self.assertEqual(added, 2 + len(shown))
+        self.assertEqual(added, 2 + len(shown) + len(demo.MEMBERSHIPS))
         self.assertEqual([p["member"] for p in shown], [True, True, False, False])
         self.assertEqual(self.c.orm.scalar(select(func.count()).select_from(User)), 2)
 

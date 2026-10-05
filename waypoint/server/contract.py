@@ -104,3 +104,38 @@ class PersonBody(TypedDict):
     first_name: NotRequired[str | None]
     legal_name: NotRequired[str | None]
     aliases: NotRequired[list[str]]
+
+
+# Loyalty and Known Traveler numbers
+
+class LoyaltyEntry(TypedDict):
+    """One membership. The number comes only masked (its last four characters); `POST /api/loyalty/{id}/reveal` gives it."""
+    id: int
+    person_id: int
+    kind: str                       # airline, hotel, car, known_traveler or redress
+    program: str                    # one of `programs` for the kind
+    masked: str
+    readable: bool                  # false when Waypoint's key can't unlock the number (it has to be entered again)
+    tier: str | None
+    expiry: str | None              # YYYY-MM-DD
+    notes: str | None
+
+
+class LoyaltyList(TypedDict):
+    loyalty: list[LoyaltyEntry]
+    programs: dict[str, list[str]]  # the programs to choose from, by kind
+
+
+class LoyaltyBody(TypedDict):
+    """A membership, to save or to change. `number` is needed to save one; left out when changing, the saved one is kept."""
+    person_id: int
+    kind: str
+    program: str
+    number: NotRequired[str | None]
+    tier: NotRequired[str | None]
+    expiry: NotRequired[str | None]
+    notes: NotRequired[str | None]
+
+
+class Revealed(TypedDict):
+    number: str

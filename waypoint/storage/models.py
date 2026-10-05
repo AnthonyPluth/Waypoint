@@ -68,6 +68,18 @@ class Person(Base):
     user_sub: Mapped[str | None]
 
 
+class LoyaltyId(Base):
+    __table__ = schema.loyalty_ids
+    id: Mapped[int]
+    person_id: Mapped[int]
+    kind: Mapped[str]
+    program: Mapped[str]
+    number: Mapped[str]   # encrypted: read only through waypoint/domain/loyalty.py
+    tier: Mapped[str | None]
+    expiry: Mapped[str | None]   # a day, YYYY-MM-DD
+    notes: Mapped[str | None]
+
+
 class Setting(Base):
     __table__ = schema.settings
     key: Mapped[str]
