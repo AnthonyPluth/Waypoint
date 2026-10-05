@@ -73,6 +73,23 @@ describe("Stats", () => {
     expect(screen.getByTestId("stats-map-slot")).toBeInTheDocument();
   });
 
+  it("offers the year in review for a past year, and not for all time", async () => {
+    serve(() => full);
+    route.query = "year=2024"; location.hash = "#stats?year=2024";   // (the address too: a hashchange re-reads the query from it)
+    render(Stats_);
+    await userEvent.click(await screen.findByRole("button", { name: "See your 2024 in review" }));
+    expect(await screen.findByTestId("year-in-review")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByTestId("year-in-review")).toBeNull();
+  });
+
+  it("has no year in review for all time", async () => {
+    serve(() => full);
+    render(Stats_);
+    await screen.findByRole("region", { name: "Totals" });
+    expect(screen.queryByRole("button", { name: /in review/ })).toBeNull();
+  });
+
   it("draws the map of the airports and routes in its slot", async () => {
     serve(() => full);
     render(Stats_);

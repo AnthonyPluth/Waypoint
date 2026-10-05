@@ -7,6 +7,8 @@
   import { Button } from "$lib/components/ui/button";
   import type { Component } from "svelte";
   import TopList, { type Row } from "$lib/components/stats/TopList.svelte";
+  import YearInReview from "$lib/components/YearInReview.svelte";
+  import { reviewOffered } from "$lib/review";
   import { comparisons, count, countryName, distance, duration, monthLabel, parseSelection, selectionQuery, share, statsPath } from "$lib/stats";
   import { dateLabel } from "$lib/trips";
 
@@ -52,6 +54,10 @@
   const pick = (who: number | "all", year: number | null) => setQuery(selectionQuery({ who, year }, me));
   const whoName = $derived(sel.who === "all" ? "Everyone" : people.find((p) => p.id === sel.who)?.display_name ?? "this person");
   const unit = $derived(current?.distance_unit ?? "mi");
+
+  let reviewing = $state(false);
+  const reviewable = $derived(reviewOffered(sel.year, new Date()));
+  const reviewName = $derived(sel.who === "all" ? null : people.find((p) => p.id === sel.who)?.first_name ?? people.find((p) => p.id === sel.who)?.display_name ?? null);
 
   const f = $derived(current?.flights);
   const empty = $derived(!!current && current.flights.count === 0 && current.stays.nights === 0 && current.cars.days === 0);
@@ -141,6 +147,9 @@
   </div>
 {:else if f}
   <div class="space-y-8">
+    {#if reviewable && sel.year}
+      <Button variant="outline" onclick={() => (reviewing = true)}>See your {sel.year} in review</Button>
+    {/if}
     <section aria-label="Totals">
       <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {#each tiles as t (t.label)}
@@ -188,4 +197,8 @@
       </section>
     {/if}
   </div>
+{/if}
+
+{#if reviewing && current && sel.year}
+  <YearInReview stats={current} person={sel.who} name={reviewName} onclose={() => (reviewing = false)} />
 {/if}

@@ -32,9 +32,9 @@ export function findChromium(env = process.env, exists = existsSync, list = read
  *  that fits in a pull request (`make pr-screenshots`). */
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-/** A flow is { name, page?, viewports?, steps: [ { goto | click | fill | press | upload | scroll_to | wait_for | expect_text | screenshot } ] }:
+/** A flow is { name, page?, viewports?, steps: [ { goto | click | select | fill | press | upload | scroll_to | wait_for | expect_text | screenshot } ] }:
  *  see frontend/verify/flows/README.md. Returns the problems with it, [] when it's well formed. */
-const ACTIONS = { goto: "string", click: "string", fill: "object", press: "object", upload: "object", scroll_to: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", select: "object", fill: "object", press: "object", upload: "object", scroll_to: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const unknownPages = (names) => names.filter((n) => !PAGES.includes(n));
 
@@ -59,6 +59,8 @@ async function runStep(page, step, shot) {
     await page.goto(step.goto.startsWith("#") ? `${page.url().split("#")[0]}${step.goto}` : step.goto);
   } else if ("click" in step) {
     await page.locator(step.click).first().click({ timeout });
+  } else if ("select" in step) {
+    await page.locator(step.select.selector).first().selectOption({ index: step.select.index }, { timeout });
   } else if ("fill" in step) {
     await page.locator(step.fill.selector).first().fill(step.fill.text, { timeout });
   } else if ("press" in step) {

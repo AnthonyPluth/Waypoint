@@ -18,6 +18,7 @@ Each `*.json` file here is a flow that `make verify` runs after visiting the pag
 - `page` is the route the flow starts on (default `upcoming`); `viewports` defaults to all three; `scheme` is `light` (the default) or `dark`, the colour scheme the browser asks for (the app follows it).
 - A step has one action, and an optional `timeout` in milliseconds (default 10000). Selectors are [Playwright selectors](https://playwright.dev/docs/other-locators) (CSS, `text=…`, `role=…`).
   - `{"goto": "#route"}` opens a route of the app (or a full URL).
+  - `{"select": {"selector": "label:has-text('When') select", "index": 2}}` chooses an option of a `<select>` by its position.
   - `{"click": selector}`, `{"fill": {"selector": …, "text": …}}`, `{"press": {"selector": …, "key": "Enter"}}`.
   - `{"upload": {"selector": "input[type=file]", "file": "tests/fixtures/flight_import/flighty.csv"}}` chooses a file of the repository (made-up data) in a file input; `{"scroll_to": selector}` scrolls it to the top of the screen, so the `-top` screenshot shows it.
   - `{"wait_for": selector}` waits for it to appear; `{"expect_text": {"selector": …, "text": …}}` fails unless it contains the text.

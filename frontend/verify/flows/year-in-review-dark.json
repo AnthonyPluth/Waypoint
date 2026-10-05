@@ -1,0 +1,67 @@
+{
+  "name": "year-in-review-dark",
+  "page": "stats",
+  "viewports": [
+    "phone"
+  ],
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Stats"
+      }
+    },
+    {
+      "select": {
+        "selector": "label:has-text('When') select",
+        "index": 2
+      }
+    },
+    {
+      "click": "button:has-text('in review')"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid=year-in-review]",
+        "text": "YOU TRAVELLED"
+      }
+    },
+    {
+      "screenshot": "distance"
+    },
+    {
+      "click": "button:has-text('Next')"
+    },
+    {
+      "click": "button:has-text('Next')"
+    },
+    {
+      "screenshot": "countries"
+    },
+    {
+      "click": "button:has-text('Next')"
+    },
+    {
+      "click": "button:has-text('Next')"
+    },
+    {
+      "click": "button:has-text('Next')"
+    },
+    {
+      "wait_for": "[data-testid=year-in-review] img[alt^='Map of']"
+    },
+    {
+      "screenshot": "map"
+    },
+    {
+      "click": "button:has-text('Next')"
+    },
+    {
+      "wait_for": "[data-testid=share-card]"
+    },
+    {
+      "screenshot": "share-card"
+    }
+  ],
+  "scheme": "dark"
+}
