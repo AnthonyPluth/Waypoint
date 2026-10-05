@@ -1,0 +1,4 @@
+Date,Flight,From,To,Departure,Arrival,Airline,Seat,Class,Notes
+2025-09-12,LH400,FRA,JFK,10:30,13:15,Lufthansa,22K,Economy,CANARY-NOTES-AITA-8V3R
+2025-09-19,LH401,JFK,FRA,17:50,07:25,Lufthansa,,Business,
+2025-09-30,,MUC,ZRH,,,,,,

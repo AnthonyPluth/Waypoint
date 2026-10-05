@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { when, clock, dayIn, featuredTrip, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, subline, tripDays, until } from "./trips";
+import { untimed, when, clock, dayIn, featuredTrip, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, subline, tripDays, until } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -69,6 +69,12 @@ describe("nextUp", () => {
   it("leads with a flight under way (in progress) over what comes later", () => {
     const now = at("2026-11-21T02:00", NY);   // in the air
     expect(nextUp([london], now)).toMatchObject({ state: "now", segment: { id: 1 } });
+  });
+  it("never leads with a flight that has no times: there's nothing to count down to", () => {
+    const now = at("2026-11-18T09:00", NY);
+    const untimedFlight = segment({ id: 9, start_local: "2026-11-19T00:00", end_local: "2026-11-19T00:00", details: { time_unknown: "yes" } });
+    expect(nextUp([trip([untimedFlight, ...london.segments])], now)).toMatchObject({ state: "next", segment: { id: 1 } });
+    expect(nextUp([trip([untimedFlight])], now)).toBeNull();
   });
   it("lets a hotel stay under way give way to the next flight (next, not now)", () => {
     const now = at("2026-11-23T12:00", LON);
@@ -148,5 +154,12 @@ describe("loyalty on a booking", () => {
     expect(membershipFor(out, jane, [membership({ program: "Delta SkyMiles" })])).toEqual({ state: "none", program: "American AAdvantage" });
     expect(membershipFor(out, { id: 2, person_id: null, name: "DOE/MIA MISS" }, [mine])).toEqual({ state: "unmatched" });
     expect(membershipFor(segment({ provider: "Example Air" }), jane, [mine])).toBeNull();
+  });
+});
+
+describe("untimed", () => {
+  it("is an imported flight whose file gave no times", () => {
+    expect(untimed(segment({ details: { time_unknown: "yes" } }))).toBe(true);
+    expect(untimed(segment({ details: { flight_number: "DL1001" } }))).toBe(false);
   });
 });

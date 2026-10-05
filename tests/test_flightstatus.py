@@ -346,6 +346,11 @@ class Household(DbCase):
 
 
 class CheckTests(Household):
+    def test_a_flight_with_no_times_is_not_watched(self):
+        self.book(self.jane, {**OUT, "start_local": "2026-11-20T00:00", "end_local": "2026-11-20T05:00",
+                              "details": {"flight_number": "EX 101", "time_unknown": "yes"}})
+        self.assertEqual(flightstatus.watching(self.c, self.when("3h")), [])
+
     def test_one_call_answers_for_every_traveller_and_segment_on_a_flight(self):
         self.book(self.jane, OUT, travelers=[self.jane.person_id, self.sam.person_id, self.mia])   # a family on one booking
         self.book(self.sam, {**OUT, "confirmation": "ZZ9PLU"})   # Sam's own copy of the same flight, on his own trip

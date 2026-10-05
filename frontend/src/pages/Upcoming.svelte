@@ -8,7 +8,7 @@
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
-  import { dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, headline, nextUp, startAt, START_WORD, subline, tripDays, viewerZone, when } from "$lib/trips";
+  import { dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, headline, nextUp, startAt, START_WORD, subline, tripDays, untimed, viewerZone, when } from "$lib/trips";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
 
   // The next thing on your trips (a card), then the trip it belongs to, day by day. A failed load leaves nothing drawn that
@@ -65,14 +65,14 @@
           {next.state === "now" ? when(END_WORD[s.kind], endAt(s) - now) : when(START_WORD[s.kind], startAt(s) - now)}
         </p>
         {#if subline(s)}<p class="break-words text-muted-foreground">{subline(s)}</p>{/if}
-        {#if s.kind === "flight" && s.status !== "cancelled"}<FlightStatus segment={s} />{/if}
+        {#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}
       </div>
       <div class="pass-tear" aria-hidden="true"></div>
       <dl class="grid grid-cols-2 gap-x-4 gap-y-3 p-6 text-sm md:p-8">
         <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
-          <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, <PlaceTime local={s.start_local} zone={s.start_zone} /></dd></div>
+          <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} zone={s.start_zone} />{/if}</dd></div>
         <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
-          <dd class="mt-1 text-base font-medium">{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} /></dd></div>
+          <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</dd></div>
         {#if s.details.terminal}<div><dt class="eyebrow">Terminal</dt><dd class="mt-1 text-base font-medium">{s.details.terminal}</dd></div>{/if}
         {#if s.kind === "hotel" && s.details.address}<div class="col-span-2"><dt class="eyebrow">Address</dt><dd class="mt-1 break-words text-base font-medium">{s.details.address}</dd></div>{/if}
         {#if s.confirmation}<div><dt class="eyebrow">Confirmation</dt><dd class="mt-1 text-lg"><CopyCode code={s.confirmation} /></dd></div>{/if}
@@ -99,7 +99,8 @@
                   {#if item.role === "start" && subline(seg)}<p class="break-words text-sm text-muted-foreground">{subline(seg)}</p>{/if}
                 </div>
                 <p class="text-sm font-medium">
-                  {#if item.role === "end"}<PlaceTime local={seg.end_local} zone={seg.end_zone} />
+                  {#if untimed(seg)}<span class="text-muted-foreground">time not recorded</span>
+                  {:else if item.role === "end"}<PlaceTime local={seg.end_local} zone={seg.end_zone} />
                   {:else}<PlaceTime local={seg.start_local} zone={seg.start_zone} />{/if}
                 </p>
               </li>
