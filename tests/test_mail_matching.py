@@ -151,6 +151,12 @@ class TimesTests(DbCase):
         # JFK to BOS, 00:00Z to 01:15Z: the same, in one zone.
         self.not_filed("2026-11-21T00:00:00Z", "2026-11-21T01:15:00Z", origin="JFK", destination="BOS")
 
+    def test_one_time_with_its_places_own_non_zero_offset_says_the_other_is_a_real_instant(self):
+        # London is UTC+1 in July: 06:10Z is 07:10 there, and the departure's own -04:00 shows the sender gives real instants.
+        self.assertEqual(self.times("2026-07-20T19:00:00-04:00", "2026-07-21T06:10:00Z"), ("2026-07-20T19:00:00", "2026-07-21T07:10:00"))
+        # A "Z" that merely matches a place at UTC (London in winter) is no such evidence, and a short flight stays undecided.
+        self.not_filed("2026-11-16T08:05:00Z", "2026-11-16T09:10:00Z", origin="DAL", destination="HOU")
+
     def test_a_flight_that_fits_neither_reading_is_not_filed(self):
         self.not_filed("2026-11-20T19:00:00Z", "2026-11-20T19:30:00Z")
 

@@ -49,13 +49,16 @@ def _times(conn: db.Connection, b: extract.Booking, start_zone: str, end_zone: s
     it isn't, the sender either printed the local clock with a UTC mark ("19:00Z" for 19:00 at the airport) or really gave
     UTC. A flight is decided when exactly one of the two readings gives a believable flight time for the distance between
     its airports; everything else (a stay, a rental, a train, a short hop where both fit) is Ambiguous and goes to the
-    review queue, rather than being filed with a time that may be hours off."""
+    review queue, rather than being filed with a time that may be hours off. A sender who gives one time with a non-zero
+    offset that is its place's own is giving real instants, so the other time (a "Z" into London in summer) is converted."""
     start, end = extract.written_clock(b.start), extract.written_clock(b.end)
     if start is None or end is None:
         return None
     moved = extract.wall_clock(b.start, start_zone), extract.wall_clock(b.end, end_zone)
     if moved == (start, end) or not (extract.has_offset(b.start) or extract.has_offset(b.end)):
         return start, end
+    if None not in moved and any(extract.real_offset(t) and m == w for t, m, w in ((b.start, moved[0], start), (b.end, moved[1], end))):
+        return moved[0] or "", moved[1] or ""   # (an offset that is its own place's says the sender gives real instants)
     if b.kind != "flight" or None in moved or not (extract.has_offset(b.start) and extract.has_offset(b.end)):
         raise Ambiguous()
     origin, destination = airports.coords(conn, b.origin or ""), airports.coords(conn, b.destination or "")
