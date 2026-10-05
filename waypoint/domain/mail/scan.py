@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
@@ -121,10 +122,12 @@ def _record(conn: db.Connection, mailbox_id: int, message_id: str, outcome: str,
 
 
 def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str, message: extract.Message,
-          ignored: list[str], now: float, again: bool = False) -> tuple[int, int]:
+          ignored: list[str], now: float, why: Counter[str] | None = None, again: bool = False) -> tuple[int, int]:
     """File what one message held: its bookings among the owner's segments, a review item for what couldn't be read, and
-    the message as seen. Returns (segments added or changed, 1 if queued for review). `again`: it was read before, so what
-    came of it is cleared first and recorded anew."""
+    the message as seen. Returns (segments added or changed, 1 if queued for review). `why` counts, in words from a fixed
+    list, what stopped messages being read (for the log: how many, never which or what they said). `again`: it was read
+    before, so what came of it is cleared first and recorded anew."""
+    why = Counter() if why is None else why
     if again:
         conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id))
     if _ignores(ignored, message.sender_domain):
@@ -135,11 +138,15 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
         filed = ingest.file_booking(conn, viewer, booking, again)
         if filed is None:
             failed += 1
+            why[ingest.explain(conn, booking)] += 1
         elif filed != "unchanged":
             made += 1
     usable = len(message.bookings) - failed
     queued = 0
     if failed or message.unread or not usable:
+        why.update(message.gaps)
+        if not message.bookings and not message.unread:
+            why["no structured booking data" if not message.other_markup else "structured data, but no reservation"] += 1
         reason: review.Reason = "broken" if message.broken else "incomplete" if message.markup or message.bookings else "no_markup"
         review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, reason, now)
         queued = 1
@@ -194,6 +201,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Resu
         ignored = review.ignored(conn, mailbox_id)
     history, last_scan = row["history_id"], row["last_scan"]
     read = made = queued = 0
+    why: Counter[str] = Counter()
     issued = time.monotonic()
     try:
         if again:   # (no search: the messages already found that made bookings, and the scan's end stays where it was)
@@ -229,7 +237,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Resu
                 continue
             try:
                 with db.session() as conn:
-                    a, b = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, again)
+                    a, b = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again)
             except Exception as e:
                 if db.is_busy(e):
                     raise
@@ -254,6 +262,8 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Resu
         return _fail(mailbox_id, FAILED_GENERALLY, (read, made, queued))
     monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Scanned a mailbox'}: {read} message(s) read, "
                    f"{made} booking(s) added or changed, {queued} to review.")
+    if why:   # (words from a fixed list and counts: never which message or what it said)
+        monitoring.log("What stopped messages being read: " + "; ".join(f"{n} × {what}" for what, n in sorted(why.items())) + ".")
     return Result("done", None, read, made, queued)
 
 

@@ -433,7 +433,7 @@ class ReviewTests(ScanCase):
                          {("no_markup", "example-air.example", "2026-10-17"), ("incomplete", "example-air.example", "2026-10-18")})
         nomarkup = next(i for i in items if i["reason"] == "no_markup")
         self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "sender_domain", "received", "reason", "gmail_url", "suggestion", "suggestion_error"}))
-        self.assertEqual(nomarkup["gmail_url"], "https://mail.google.com/mail/u/jane@gmail.example/#all/msg-no_markup")
+        self.assertEqual(nomarkup["gmail_url"], "https://mail.google.com/mail/?authuser=jane%40gmail.example#all/msg-no_markup")
         self.assertEqual(self.items("u-sam"), [])
         self.assertEqual(self.scanned(), {"msg-no_markup": "unreadable", "msg-incomplete": "unreadable", "msg-flight_jsonld": "booking"})
 
@@ -460,6 +460,18 @@ class ReviewTests(ScanCase):
         self.assertEqual(self.scan().review, 1)
         self.assertEqual(self.segments(), [])
         self.assertEqual(self.items()[0]["reason"], "incomplete")
+
+    def test_the_log_says_what_stopped_messages_being_read_in_fixed_words_and_counts(self):
+        unknown = eml("flight_jsonld").replace(b'"iataCode": "JFK"', b'"iataCode": "QQQ"')
+        self.add_mail("unknown", unknown)
+        other = eml("no_markup").replace(b"<html><body>", b'<html><head><script type="application/ld+json">{"@type":"EmailMessage"}</script></head><body>')
+        self.add_mail("other", other)
+        self.put("no_markup", "incomplete")
+        real = scan.monitoring.log
+        with mock.patch.object(scan.monitoring, "log", side_effect=real) as log, no_leaks(self, *CANARIES, database=self.path):
+            self.scan()
+        said = [c.args[0] for c in log.call_args_list]
+        self.assertIn("What stopped messages being read: 1 × arrival time; 1 × departure time; 1 × destination airport; 1 × no structured booking data; 1 × structured data, but no reservation; 1 × unknown airport.", said)
 
     def test_a_message_with_one_booking_read_and_one_not_does_both(self):
         both = eml("flight_jsonld").replace(b"</script></head>", b"</script><script type=\"application/ld+json\">"
@@ -737,9 +749,18 @@ class UtcMarkedTimesTests(ScanCase):
         seg = self.only("utc_marked_converted_in_text")
         self.assertEqual((seg["start_local"], seg["end_local"], seg["check_times"]), ("2026-12-04T09:00", "2026-12-04T11:10", False))
 
-    def test_times_marked_utc_with_no_times_in_the_text_are_converted_and_to_check(self):
-        seg = self.only("utc_marked_no_times_in_text")
-        self.assertEqual((seg["start_local"], seg["end_local"], seg["check_times"]), ("2026-12-04T03:00", "2026-12-04T04:10", True))
+    def test_times_marked_utc_with_no_times_in_the_text_go_to_review_when_distance_cannot_tell_either(self):
+        # (a 3 h 10 min and a 2 h 10 min flight over the same distance both fit: nothing says which, so it isn't guessed)
+        self.put("utc_marked_no_times_in_text")
+        result = self.scan()
+        self.assertEqual((result.bookings, result.review, self.segments()), (0, 1, []))
+
+    def test_times_marked_utc_settled_only_by_distance_are_filed_and_flagged(self):
+        silent = eml("utc_marked_overnight").replace(b"Departs Los Angeles 10:30 PM", b"").replace(b"Arrives New York 6:55 AM", b"")
+        self.add_mail("silent", silent)
+        self.scan()
+        [seg] = self.segments()
+        self.assertEqual((seg["start_local"], seg["end_local"], seg["check_times"]), ("2026-12-10T22:30", "2026-12-11T06:55", True))
 
     def test_a_real_offset_is_kept_and_not_flagged(self):
         seg = self.only("offset_marked_times")
@@ -756,30 +777,37 @@ class UtcMarkedTimesTests(ScanCase):
         self.put(*UTC_FIXTURES)
         self.scan()
         segs = self.segments()
-        self.assertEqual(len(segs), 5)
+        self.assertEqual(len(segs), 4)   # (the fifth, with no times in its text, is queued for review)
         for s in segs:
             hours = (trips.instant(s["end_local"], s["end_zone"]) - trips.instant(s["start_local"], s["start_zone"])).total_seconds() / 3600
             self.assertTrue(0 < hours < 8, (s["confirmation"], hours))
 
-    def test_the_note_stays_until_a_person_edits_or_confirms_the_times(self):
-        seg = self.only("utc_marked_no_times_in_text")
+    def flagged(self) -> trips.SegmentOut:
+        silent = eml("utc_marked_overnight").replace(b"Departs Los Angeles 10:30 PM", b"").replace(b"Arrives New York 6:55 AM", b"")
+        self.add_mail("silent", silent)
+        self.scan()
+        [seg] = self.segments()
         self.assertTrue(seg["check_times"])
+        return seg
+
+    def test_the_note_stays_until_a_person_edits_or_confirms_the_times(self):
+        seg = self.flagged()
         kept = self.read(lambda conn: trips.edit_segment(conn, self.jane, seg["id"], {"details": {"seat": "4B"}}))
         assert kept is not None
         self.assertTrue(kept["check_times"])   # (an edit elsewhere says nothing of the times)
         confirmed = self.read(lambda conn: trips.edit_segment(conn, self.jane, seg["id"], {"start_local": seg["start_local"], "end_local": seg["end_local"]}))
         assert confirmed is not None
-        self.assertEqual((confirmed["check_times"], confirmed["start_local"]), (False, "2026-12-04T03:00"))
+        self.assertEqual((confirmed["check_times"], confirmed["start_local"]), (False, "2026-12-10T22:30"))
         self.assertTrue({"start_local", "end_local"} <= set(confirmed["locked_fields"]))   # (so a later reading doesn't flag them again)
         self.scan(now=NOW + 60, again=True)
         [after] = self.segments()
-        self.assertEqual((after["check_times"], after["start_local"]), (False, "2026-12-04T03:00"))
+        self.assertEqual((after["check_times"], after["start_local"]), (False, "2026-12-10T22:30"))
 
     def test_editing_the_times_clears_the_note(self):
-        seg = self.only("utc_marked_no_times_in_text")
-        edited = self.read(lambda conn: trips.edit_segment(conn, self.jane, seg["id"], {"start_local": "2026-12-04T09:00", "end_local": "2026-12-04T11:10"}))
+        seg = self.flagged()
+        edited = self.read(lambda conn: trips.edit_segment(conn, self.jane, seg["id"], {"start_local": "2026-12-10T22:00"}))
         assert edited is not None
-        self.assertEqual((edited["check_times"], edited["start_local"]), (False, "2026-12-04T09:00"))
+        self.assertEqual((edited["check_times"], edited["start_local"]), (False, "2026-12-10T22:00"))
 
 
 class RereadTests(ScanCase):
@@ -846,7 +874,8 @@ class RereadTests(ScanCase):
         self.assertEqual(self.scanned(), {"msg-utc_marked_local_in_text": "booking"})
 
     def test_a_reading_that_still_cannot_settle_the_times_flags_them(self):
-        self.put("utc_marked_no_times_in_text")
+        silent = eml("utc_marked_overnight").replace(b"Departs Los Angeles 10:30 PM", b"").replace(b"Arrives New York 6:55 AM", b"")
+        self.add_mail("silent", silent)
         self.scan()
         self.read(lambda conn: conn.execute(update(Segment).values(check_times=False)))
         self.scan(now=NOW + 3600, again=True)
@@ -857,10 +886,23 @@ class RereadTests(ScanCase):
         with scan._lock:
             scan._running.add(self.mailbox)
         try:
-            self.assertEqual(self.scan(again=True).state, "busy")
+            self.assertTrue(scan.running(self.mailbox))
+            self.assertEqual(self.scan(), scan.Result("busy"))
+            self.assertFalse(jobs.scan_now(self.mailbox))
         finally:
             with scan._lock:
                 scan._running.discard(self.mailbox)
+        self.assertFalse(scan.running(self.mailbox))
+
+    def test_a_long_scan_gets_a_new_access_token(self):
+        self.put("flight_jsonld", "hotel_jsonld")
+        ticks = iter([0, TOKEN_AFTER, TOKEN_AFTER, TOKEN_AFTER * 2, TOKEN_AFTER * 2, TOKEN_AFTER * 2, TOKEN_AFTER * 2])
+        with mock.patch.object(scan.time, "monotonic", lambda: next(ticks, TOKEN_AFTER * 3)):
+            self.assertEqual(self.scan().state, "done")
+        self.assertGreaterEqual(len([c for c in self.google.calls if c[1].get("grant_type") == "refresh_token"]), 2)
+
+
+TOKEN_AFTER = scan.TOKEN_LIFE + 1
 
 
 class PrivacyTests(ScanCase):
@@ -872,8 +914,8 @@ class PrivacyTests(ScanCase):
         with no_leaks(self, *CANARIES, database=self.path):
             result = self.scan()
             again = self.scan(now=NOW + 60, again=True)   # (the visible text is read here too, in memory)
-        self.assertEqual((result.state, result.messages, result.bookings, result.review), ("done", 12, 10, 2))
-        self.assertEqual((again.state, again.messages, again.review), ("done", 10, 0))
+        self.assertEqual((result.state, result.messages, result.bookings, result.review), ("done", 12, 9, 3))
+        self.assertEqual((again.state, again.messages, again.review), ("done", 9, 0))
 
     def test_what_a_failed_scan_logs_and_says_holds_none_of_it(self):
         self.put("flight_jsonld", "no_markup")

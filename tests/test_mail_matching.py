@@ -6,6 +6,7 @@ from sqlalchemy import update
 
 from tests.shared import DbCase
 from waypoint.domain import airports, loyalty, people
+from waypoint.domain.mail import extract, ingest
 from waypoint.storage import secretbox
 from waypoint.storage.models import LoyaltyId
 
@@ -96,6 +97,73 @@ class PlaceZoneTests(DbCase):
         self.assertIsNone(airports.zone_for_place(self.c, "Nowhereville", "US"))
         self.assertIsNone(airports.zone_for_place(self.c, None, None))
         self.assertIsNone(airports.zone_for_place(self.c, "  ", ""))
+
+
+class ExplainTests(DbCase):
+    """Why a booking can't be a segment, from a fixed list of phrases (for the log)."""
+
+    def booking(self, **kw):
+        base = dict(kind="flight", status="confirmed", confirmation="ABC123", provider="Example Air", start="2026-11-20T19:00:00-05:00",
+                    end="2026-11-21T07:10:00+00:00", origin="JFK", destination="LHR")
+        return extract.Booking(**{**base, **kw})
+
+    def test_each_reason(self):
+        self.assertEqual(ingest.explain(self.c, self.booking(origin="QQQ")), "unknown airport")
+        self.assertEqual(ingest.explain(self.c, self.booking(kind="hotel", origin="Harbour Hotel", destination=None)),
+                         "place's time zone unknown")
+        self.assertEqual(ingest.explain(self.c, self.booking(start="tomorrow")), "time isn't a date and time")
+        self.assertEqual(ingest.explain(self.c, self.booking(end="2026-11-20T10:00:00+00:00")), "rejected as a segment")
+
+
+class TimesTests(DbCase):
+    """A booking's times as wall-clock times at its places: as written when the offsets are the places' own or absent, a flight's
+    decided by which reading gives a believable flight time, and anything that can't be told apart is not filed (it goes to
+    the review queue) rather than filed with a time that may be hours off."""
+    booking = ExplainTests.booking
+
+    def times(self, start, end, **kw):
+        found = ingest.fields(self.c, self.booking(start=start, end=end, **kw))
+        assert found is not None
+        return found["start_local"], found["end_local"]
+
+    def not_filed(self, start, end, **kw):
+        b = self.booking(start=start, end=end, **kw)
+        self.assertIsNone(ingest.fields(self.c, b))
+        self.assertEqual(ingest.explain(self.c, b), "time offset doesn't match its place")
+
+    def test_offsets_that_are_the_places_own_change_nothing(self):
+        self.assertEqual(self.times("2026-11-20T19:00:00-05:00", "2026-11-21T07:10:00+00:00"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
+        self.assertEqual(self.times("2026-11-20T19:00", "2026-11-21T07:10"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
+
+    def test_a_local_clock_marked_as_utc_on_a_long_flight_is_kept_as_written(self):
+        # JFK to LHR (5,540 km): as written 7 h 10, as UTC 12 h 10, which no jet takes.
+        self.assertEqual(self.times("2026-11-20T19:00:00Z", "2026-11-21T07:10:00Z"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
+        self.assertEqual(self.times("2026-11-20T19:00:00+00:00", "2026-11-21T07:10:00+00:00"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
+
+    def test_times_that_are_really_utc_on_a_long_flight_are_moved_to_the_airports_clocks(self):
+        # Written as midnight to 07:10 it would be 2 h 10 across the Atlantic; as UTC it is 7 h 10.
+        self.assertEqual(self.times("2026-11-21T00:00:00Z", "2026-11-21T07:10:00Z"), ("2026-11-20T19:00:00", "2026-11-21T07:10:00"))
+
+    def test_a_short_flight_that_fits_both_readings_is_not_guessed(self):
+        # Dallas to Houston (about 350 km), 08:05 to 09:10 at Central time: an hour as written, an hour as UTC.
+        self.not_filed("2026-11-16T08:05:00Z", "2026-11-16T09:10:00Z", origin="DAL", destination="HOU")
+        self.not_filed("2026-11-16T14:05:00Z", "2026-11-16T15:10:00Z", origin="DAL", destination="HOU")   # (the same flight, really in UTC)
+        # JFK to BOS, 00:00Z to 01:15Z: the same, in one zone.
+        self.not_filed("2026-11-21T00:00:00Z", "2026-11-21T01:15:00Z", origin="JFK", destination="BOS")
+
+    def test_a_flight_that_fits_neither_reading_is_not_filed(self):
+        self.not_filed("2026-11-20T19:00:00Z", "2026-11-20T19:30:00Z")
+
+    def test_a_stay_with_an_offset_that_isnt_its_places_is_not_filed_and_one_that_is_is(self):
+        london = dict(kind="hotel", origin="Harbour Hotel", destination=None, start_place=extract.Place("London", "GB"),
+                      end_place=extract.Place("London", "GB"))
+        self.not_filed("2026-07-21T20:00:00Z", "2026-07-27T10:00:00Z", **london)   # (London is an hour ahead of UTC in July)
+        self.not_filed("2026-11-21T15:00:00+13:00", "2026-11-27T10:00:00+13:00", **london)
+        self.assertEqual(self.times("2026-11-21T15:00:00Z", "2026-11-27T10:00:00Z", **london), ("2026-11-21T15:00:00", "2026-11-27T10:00:00"))   # (in winter it is UTC)
+        self.assertEqual(self.times("2026-07-21T15:00:00+01:00", "2026-07-27T10:00:00+01:00", **london), ("2026-07-21T15:00:00", "2026-07-27T10:00:00"))
+
+    def test_a_flight_with_one_time_offset_and_the_other_not_is_not_guessed(self):
+        self.not_filed("2026-11-20T19:00:00Z", "2026-11-21T07:10")
 
 
 if __name__ == "__main__":

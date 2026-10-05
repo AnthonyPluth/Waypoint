@@ -22,7 +22,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -54,6 +54,8 @@ class Message:
     unread: int = 0
     broken: bool = False               # the message itself couldn't be decoded
     markup: bool = False               # any reservation markup at all was found
+    gaps: tuple[str, ...] = ()         # what the unread reservations lacked, in a fixed vocabulary (for counting, never for showing text)
+    other_markup: bool = False         # structured data was there, but none of it a reservation
 
 
 # ------------------------------------------------------------------------------------------------ markup
@@ -319,11 +321,36 @@ def _train(res: Mapping[str, Any]) -> Booking | None:
 _BUILD = {"flight": _flight, "hotel": _hotel, "car": _car, "train": _train}
 
 
-def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool]:
-    """The bookings in these markup nodes (each once), how many reservations couldn't be made into one, and whether any
-    reservation markup was there at all."""
+def _gaps(kind: str, res: Mapping[str, Any]) -> list[str]:
+    """What a reservation that couldn't be made into a booking lacks, named from a fixed list (no text from the message)."""
+    trip = _node(res.get("reservationFor"))
+    lacks: list[str] = []
+    if kind == "flight":
+        for label, key in (("origin airport", "departureAirport"), ("destination airport", "arrivalAirport")):
+            if not IATA.fullmatch((_text(_node(trip.get(key)).get("iataCode")) or "").upper()):
+                lacks.append(label)
+        lacks += [label for label, key in (("departure time", "departureTime"), ("arrival time", "arrivalTime")) if not _text(trip.get(key))]
+    elif kind == "hotel":
+        lacks += [label for label, ok in (("hotel name", _text(trip.get("name"))), ("check-in time", _text(res.get("checkinTime"))),
+                                          ("check-out time", _text(res.get("checkoutTime")))) if not ok]
+        if not res.get("checkinTime") and (res.get("checkinDate") or res.get("checkoutDate")):
+            lacks.append("dates without times")
+    elif kind == "car":
+        lacks += [label for label, ok in (("pick-up place", _text(_node(res.get("pickupLocation")).get("name"))),
+                                          ("pick-up time", _text(res.get("pickupTime"))), ("drop-off time", _text(res.get("dropoffTime")))) if not ok]
+    else:
+        lacks += [label for label, ok in (("departure station", _text(_node(trip.get("departureStation")).get("name"))),
+                                          ("arrival station", _text(_node(trip.get("arrivalStation")).get("name"))),
+                                          ("departure time", _text(trip.get("departureTime"))), ("arrival time", _text(trip.get("arrivalTime")))) if not ok]
+    return lacks or ["details"]
+
+
+def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool, list[str]]:
+    """The bookings in these markup nodes (each once), how many reservations couldn't be made into one, whether any
+    reservation markup was there at all, and what the unread ones lacked (`_gaps`)."""
     found: list[Booking] = []
     unread, seen = 0, False
+    gaps: list[str] = []
     for node in nodes[:MAX_NODES]:
         for t in _types(node):
             if t in RESERVATIONS:
@@ -331,14 +358,35 @@ def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool]:
                 made = _BUILD[RESERVATIONS[t]](node)
                 if made is None:
                     unread += 1
+                    gaps += _gaps(RESERVATIONS[t], node)
                 elif made not in found:   # (the same booking in JSON-LD and microdata is one)
                     found.append(made)
             elif t.endswith("Reservation"):   # another kind (a table, a show): seen, not ours to read
                 seen, unread = True, unread + 1
-    return found, unread, seen
+                gaps.append("another kind of reservation")
+    return found, unread, seen, gaps
 
 
 # ------------------------------------------------------------------------------------------------ times
+
+def written_clock(text: str) -> str | None:
+    """The date and time exactly as written, whatever offset follows it (the clock a sender printed), or None when it isn't a
+    date and time."""
+    text = text.strip()
+    if "T" not in text.upper() and " " not in text:
+        return None
+    try:
+        return datetime.fromisoformat(text).replace(tzinfo=None).isoformat(timespec="seconds")
+    except ValueError:
+        return None
+
+
+def has_offset(text: str) -> bool:
+    try:
+        return datetime.fromisoformat(text.strip()).tzinfo is not None
+    except ValueError:
+        return False
+
 
 def wall_clock(text: str, zone: str | None = None) -> str | None:
     """The wall-clock time a booking's time says, as 2026-03-01T22:15:00 with no offset, at its place. A time with an offset is
@@ -364,16 +412,7 @@ def wall_clock(text: str, zone: str | None = None) -> str | None:
     return t.replace(tzinfo=None).isoformat(timespec="seconds")
 
 
-@dataclass(frozen=True)
-class Times:
-    """A booking's start and end as wall-clock times at their places (None: one that can't be settled), and whether they are
-    a guess a person should look at: marked UTC, and the message's text doesn't settle which reading is meant."""
-    start: str | None
-    end: str | None
-    check: bool = False
-
-
-def _utc_marked(text: str) -> bool:
+def utc_marked(text: str) -> bool:
     try:
         t = datetime.fromisoformat(text.strip())
     except ValueError:
@@ -400,24 +439,20 @@ def clock_times(text: str) -> frozenset[str]:
     return frozenset(found)
 
 
-def times(b: Booking, start_zone: str, end_zone: str) -> Times:
-    """A booking's start and end at their places (`wall_clock`), settling the ones an airline marked UTC although they mean the
-    place's own clock. A time marked UTC for a place that isn't is read both ways, as written and moved to the place's zone,
-    and the message's own text (`b.clock_times`) says which: only the as-written times in it, they are local; only the moved
-    ones, they were UTC; both or neither, the move stands and `check` is set. The reading holds for the start and the end
-    together, so a duration never comes out negative or absurd. Times with a real offset are never second-guessed."""
+def reading(b: Booking, start_zone: str, end_zone: str) -> Literal["written", "moved"] | None:
+    """Which reading of a booking's times the message itself settles, when they are marked UTC for places that aren't: the
+    clock as written ("written"), or moved to the places' zones ("moved"), or neither (None: the text doesn't say, or shows
+    both). Both readings are looked for among the times of day the message shows (`b.clock_times`); only one appearing
+    settles it, for the start and the end together, so a duration never comes out negative or absurd."""
     moved = (wall_clock(b.start, start_zone), wall_clock(b.end, end_zone))
-    marked = [(t, m) for t, m in zip((b.start, b.end), moved, strict=True) if _utc_marked(t)]
+    marked = [(t, m) for t, m in zip((b.start, b.end), moved, strict=True) if utc_marked(t)]
     written = [_as_written(t)[11:16] for t, _ in marked]
     converted = [m[11:16] for _, m in marked if m]
     if not marked or len(converted) < len(marked) or written == converted:
-        return Times(*moved)   # (nothing marked UTC, a time that can't be placed, or a place whose clock is UTC's)
+        return None   # (nothing marked UTC, a time that can't be placed, or a place whose clock is UTC's: nothing to settle)
     local = all(w in b.clock_times for w in written)
     utc = all(c in b.clock_times for c in converted)
-    if local and not utc:
-        start, end = (_as_written(t) if _utc_marked(t) else m for t, m in zip((b.start, b.end), moved, strict=True))
-        return Times(start, end)
-    return Times(*moved, check=local == utc)
+    return "written" if local and not utc else "moved" if utc and not local else None
 
 
 # ------------------------------------------------------------------------------------------------ the message
@@ -480,7 +515,8 @@ def read(message: Mapping[str, Any]) -> Message:
         for ld in scanner.jsonld:
             nodes.extend(_jsonld_nodes(ld))
         nodes.extend(scanner.items)
-    bookings, unread, seen = _bookings(nodes)
+    bookings, unread, seen, gaps = _bookings(nodes)
+    other = bool(nodes) and not seen
     parse = parsers.for_sender(sender)
     if parse is not None and not bookings:   # (a sender with a parser, and no markup that gave a booking: read its text)
         try:
@@ -490,10 +526,12 @@ def read(message: Mapping[str, Any]) -> Message:
             found = Parsed(unread=1)
         bookings, unread = list(found.bookings), unread + found.unread
         seen = seen or bool(found.bookings or found.unread)
-    if any(_utc_marked(t) for b in bookings for t in (b.start, b.end)):
+        if not found.bookings:
+            gaps.append("sender-specific parser found no booking")
+    if any(utc_marked(t) for b in bookings for t in (b.start, b.end)):
         shown = clock_times(_visible(htmls, texts))   # (kept as times of day alone, and only for a booking that needs them)
-        bookings = [replace(b, clock_times=shown) if _utc_marked(b.start) or _utc_marked(b.end) else b for b in bookings]
-    return Message(sender, received, tuple(bookings), unread, markup=seen)
+        bookings = [replace(b, clock_times=shown) if utc_marked(b.start) or utc_marked(b.end) else b for b in bookings]
+    return Message(sender, received, tuple(bookings), unread, markup=seen, gaps=tuple(gaps), other_markup=other)
 
 
 # ------------------------------------------------------------------------------------------------ plain text (the optional AI)
