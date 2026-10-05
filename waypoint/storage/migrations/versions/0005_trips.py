@@ -1,8 +1,8 @@
 """Trips and segments, with who is on them, and the airports (by IATA code, with their time zone) that fill in a flight's
 zones.
 
-Revision ID: 0004
-Revises: 0003
+Revision ID: 0005
+Revises: 0004
 """
 import gzip
 from pathlib import Path
@@ -10,8 +10,8 @@ from pathlib import Path
 import sqlalchemy as sa
 from alembic import op
 
-revision = '0004'
-down_revision = '0003'
+revision = '0005'
+down_revision = '0004'
 branch_labels = None
 depends_on = None
 

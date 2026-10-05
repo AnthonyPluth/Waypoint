@@ -113,7 +113,8 @@ class MigrationTests(unittest.TestCase):
                 {"sub": "b", "email": "bo@example.com", "name": "Bo Example", "first_name": "Bo"},
                 {"sub": "a", "email": "ana@example.com", "name": None, "first_name": "Ana"},
                 {"sub": "c", "email": None, "name": " ", "first_name": None}])
-            command.upgrade(db.alembic_config(c), "head")
+            command.upgrade(db.alembic_config(c), "0003")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:
             made = [tuple(r) for r in conn.execute(select(schema.people.c.display_name, schema.people.c.first_name,
@@ -126,14 +127,37 @@ class MigrationTests(unittest.TestCase):
             self.assertNotIn("people", sa.inspect(c).get_table_names())
             self.assertEqual(c.execute(select(User.sub)).scalars().all().__len__(), 3)   # the users stay
 
-    def test_0004_makes_trips_with_the_airports_and_takes_them_away(self):
+    def test_0004_makes_the_loyalty_table_and_takes_it_away(self):
         from alembic import command
         db.init(self.path)
         with db.engine(self.path).begin() as c:
             command.downgrade(db.alembic_config(c), "0003")
+            self.assertNotIn("loyalty_ids", sa.inspect(c).get_table_names())
+            command.upgrade(db.alembic_config(c), "0004")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:
+            conn.execute(insert(schema.people).values(id=7, display_name="Mia"))
+            row = dict(person_id=7, kind="airline", program="Other", number="enc:v1:x")
+            conn.execute(insert(schema.loyalty_ids).values(**row))
+            with self.assertRaises(sa.exc.IntegrityError):   # a membership belongs to someone
+                conn.execute(insert(schema.loyalty_ids).values(**{**row, "person_id": 8}))
+        with db.session(self.path) as conn:   # and goes with them
+            conn.execute(sa.delete(schema.people).where(schema.people.c.id == 7))
+            self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.loyalty_ids)).scalar(), 0)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0003")
+            self.assertNotIn("loyalty_ids", sa.inspect(c).get_table_names())
+            self.assertIn("people", sa.inspect(c).get_table_names())
+
+    def test_0005_makes_trips_with_the_airports_and_takes_them_away(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0004")
             self.assertEqual(set(sa.inspect(c).get_table_names()) & {"airports", "trips", "segments", "segment_travelers"}, set())
             c.execute(insert(schema.people).values(id=1, display_name="Jane Doe"))
-            command.upgrade(db.alembic_config(c), "0004")
+            command.upgrade(db.alembic_config(c), "0005")
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:
             zones = dict(conn.execute(select(schema.airports.c.code, schema.airports.c.zone)
@@ -155,9 +179,10 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(conn.execute(sa.select(sa.func.count()).select_from(schema.segments)).scalar(), 0)
             self.assertEqual(conn.execute(sa.select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 0)
         with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0003")
+            command.downgrade(db.alembic_config(c), "0004")
             self.assertEqual(set(sa.inspect(c).get_table_names()) & {"airports", "trips", "segments", "segment_travelers"}, set())
             self.assertIn("people", sa.inspect(c).get_table_names())
+            self.assertIn("loyalty_ids", sa.inspect(c).get_table_names())
 
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating

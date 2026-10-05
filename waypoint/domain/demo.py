@@ -7,8 +7,8 @@ from __future__ import annotations
 from sqlalchemy import func, select
 
 from ..storage import db
-from ..storage.models import Person, Segment, SegmentTraveler, Trip, User
-from . import people, trips
+from ..storage.models import LoyaltyId, Person, Segment, SegmentTraveler, Trip, User
+from . import loyalty, people, trips
 from .visibility import Viewer
 
 # A household of two who have signed in (sub, email, name, first name), and two guests who haven't a login.
@@ -17,6 +17,19 @@ MEMBERS = [("demo-jane", "jane.doe@example.com", "Jane Doe", "Jane"),
 GUESTS: list[people.Fields] = [
     {"display_name": "Mia Doe", "first_name": "Mia", "legal_name": "Mia Rose Doe", "aliases": ["DOE/MIA MISS", "DOE/MIAROSE MISS"]},
     {"display_name": "Grandma Joan", "first_name": "Joan", "legal_name": "Joan Marie O’Hare", "aliases": ["OHARE/JOAN MRS"]},
+]
+
+# Made-up memberships: (person's display name, kind, program, number, tier, expiry, notes).
+MEMBERSHIPS = [
+    ("Jane Doe", "airline", "American AAdvantage", "DEMO1234567", "Gold", None, None),
+    ("Jane Doe", "airline", "United MileagePlus", "DM987654", None, None, None),
+    ("Jane Doe", "hotel", "Marriott Bonvoy", "DEMO55501234", "Platinum Elite", None, None),
+    ("Jane Doe", "known_traveler", "TSA PreCheck", "TT0000012345", None, "2029-03-31", "Known Traveler Number"),
+    ("Sam Doe", "airline", "Delta SkyMiles", "DEMO7654321", "Silver", None, None),
+    ("Sam Doe", "car", "Hertz Gold Plus Rewards", "DEMO8800123", None, None, None),
+    ("Sam Doe", "known_traveler", "Global Entry", "TT0000067890", None, "2028-11-15", None),
+    ("Mia Doe", "known_traveler", "TSA PreCheck", "TT0000099999", None, None, None),
+    ("Mia Doe", "redress", "DHS TRIP", "DEMO0001234", None, None, None),
 ]
 
 
@@ -62,8 +75,13 @@ def seed(conn: db.Connection) -> int:
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id)})
     for fields in SAM_ALONE:
         trips.add_segment(conn, sam, {**fields, "travelers": _on(sam.person_id)})
+    by_name = {p["display_name"]: p["id"] for p in people.everyone(conn)}
+    for who, kind, program, number, tier, expiry, notes in MEMBERSHIPS:
+        loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number, "tier": tier,
+                           "expiry": expiry, "notes": notes})
     return _rows(conn) - before
 
 
 def _rows(conn: db.Connection) -> int:
-    return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0 for m in (User, Person, Trip, Segment, SegmentTraveler))
+    return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
+               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentTraveler))
