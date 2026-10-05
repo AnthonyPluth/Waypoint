@@ -380,6 +380,16 @@ def written_clock(text: str) -> str | None:
         return None
 
 
+def real_offset(text: str) -> bool:
+    """Whether the time carries an offset other than UTC (a sender who writes one is giving real instants: "Z" is also what a
+    sender who only prints the local clock writes)."""
+    try:
+        t = datetime.fromisoformat(text.strip())
+    except ValueError:
+        return False
+    return t.utcoffset() not in (None, timedelta(0))
+
+
 def has_offset(text: str) -> bool:
     try:
         return datetime.fromisoformat(text.strip()).tzinfo is not None
