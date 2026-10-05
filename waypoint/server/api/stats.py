@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Literal
 
 from ...domain import stats
 from ...storage import db
 from ...storage import settings_keys as sk
 from ..common import ApiError
-from ..contract import Stats
+from ..contract import DistanceUnit, DistanceUnitBody, Stats
 from .trips import viewer
 
 YEARS = range(1900, 3000)
@@ -29,5 +30,22 @@ def api_stats(conn, q, _b) -> Stats:
     found = stats.compute(conn, viewer(conn), person_id, year_n, datetime.now(UTC))
     if found is None:
         raise ApiError("No such person", 404)
-    km = db.get_setting(conn, sk.DISTANCE_UNIT) == "km"
-    return {"person": person_id, "year": year_n, "distance_unit": "km" if km else "mi", **found}
+    return {"person": person_id, "year": year_n, "distance_unit": _unit(conn), **found}
+
+
+def _unit(conn) -> Literal["mi", "km"]:
+    return "km" if db.get_setting(conn, sk.DISTANCE_UNIT) == "km" else "mi"
+
+
+def api_distance_unit(conn, _q, _b) -> DistanceUnit:
+    """GET /api/distance-unit: miles unless the household chose kilometres."""
+    return {"distance_unit": _unit(conn)}
+
+
+def api_distance_unit_save(conn, _q, body: DistanceUnitBody) -> DistanceUnit:
+    """POST /api/distance-unit: the household's unit for distances on the Stats page, "mi" or "km"."""
+    unit = body.get("distance_unit")
+    if unit not in ("mi", "km"):
+        raise ApiError("Choose miles or kilometres")
+    db.set_setting(conn, sk.DISTANCE_UNIT, unit)
+    return {"distance_unit": unit}

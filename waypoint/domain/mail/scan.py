@@ -155,6 +155,44 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
 
 
 SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
+PREVIEW_LIMIT = 30_000   # characters of a message shown in the app
+NO_AI = "Turn on AI suggestions in Settings first."
+
+
+class NoAi(Exception):
+    """The optional AI is off (or not set up), so there is nothing to ask."""
+
+
+def _again(owner: str, item_id: int) -> tuple[int, str, dict[str, Any]]:
+    """One of `owner`'s review items' messages, fetched from Gmail again (in memory, for whoever asked): its mailbox and message
+    id, and the message. Raises KeyError for an item that isn't theirs, GmailError (MessageGone: it's no longer there)."""
+    with db.session() as conn:
+        found = review.locate(conn, owner, item_id)
+        if found is None:
+            raise KeyError(item_id)
+        token = gmail.access_token(conn, found[0], time.time())
+    return found[0], found[1], gmail.fetch(token, found[1])
+
+
+def preview(owner: str, item_id: int) -> tuple[str, bool]:
+    """A review item's message as plain text for its mailbox's owner to read beside the form (and whether it was cut at
+    PREVIEW_LIMIT). Fetched when asked, returned to that one request and kept nowhere: not stored, not logged. Raises KeyError,
+    GmailError."""
+    _mailbox, _message, raw = _again(owner, item_id)
+    text = extract.plain_text(raw, PREVIEW_LIMIT + 1)
+    return text[:PREVIEW_LIMIT], len(text) > PREVIEW_LIMIT
+
+
+def suggest_now(owner: str, item_id: int, now: float) -> None:
+    """Ask the optional AI about one review item now, as a scan does for a new one (the same redaction and checks; its answer or
+    why it gave none is kept on the item). Raises NoAi, KeyError, GmailError."""
+    with db.session() as conn:
+        if review.locate(conn, owner, item_id) is None:
+            raise KeyError(item_id)   # (not theirs: the same answer whether or not the AI is on)
+        if ai.config(conn) is None:
+            raise NoAi(NO_AI)
+    mailbox_id, message_id, raw = _again(owner, item_id)
+    _suggest(mailbox_id, message_id, raw, now)
 
 
 def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) -> None:

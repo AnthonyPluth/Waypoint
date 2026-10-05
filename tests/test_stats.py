@@ -256,6 +256,24 @@ class RouteTests(Household):
         self.assertEqual(self.call(person=str(self.jane.person_id), year="2026")["distance_unit"], "km")
         self.assertEqual(self.call(year="2025")["flights"]["count"], 0)
 
+    def test_the_distance_unit_is_miles_until_the_household_chooses(self):
+        self.assertEqual(api.api_distance_unit(self.c, {}, {}), {"distance_unit": "mi"})
+        self.assertEqual(api.api_distance_unit_save(self.c, {}, {"distance_unit": "km"}), {"distance_unit": "km"})
+        self.assertEqual(api.api_distance_unit(self.c, {}, {}), {"distance_unit": "km"})
+        for body in ({}, {"distance_unit": "furlongs"}, {"distance_unit": 5}):
+            with self.subTest(body=body), self.assertRaises(ApiError):
+                api.api_distance_unit_save(self.c, {}, body)
+        self.assertEqual(api.api_distance_unit(self.c, {}, {})["distance_unit"], "km")
+
+    def test_the_years_are_those_with_something_finished_whichever_year_is_asked_about(self):
+        on = self.on(self.jane.person_id)
+        self.add(self.jane, JFK_LHR, travelers=on)
+        self.add(self.jane, {**LHR_JFK, "start_local": "2025-06-08T11:00", "end_local": "2025-06-08T14:05"}, travelers=on)
+        self.add(self.jane, {**HOTEL, "start_local": "2024-12-30T15:00", "end_local": "2025-01-02T10:00"}, travelers=on)
+        for q in ({}, {"year": "2026"}, {"year": "2030"}):
+            with self.subTest(q=q):
+                self.assertEqual(self.call(**q)["years"], [2026, 2025, 2024])
+
     def test_what_isnt_a_person_or_a_year_is_refused(self):
         for q in ({"person": "jane"}, {"person": "-1"}, {"person": "1" * 12}, {"year": "last"}, {"year": "20"}, {"year": "99999"}):
             with self.subTest(q=q), self.assertRaises(ApiError) as e:

@@ -255,6 +255,14 @@ UTC_FLIGHT = ('{"@type":"FlightReservation","reservationNumber":"LK4T7Q","underN
               '"arrivalAirport":{"iataCode":"DEN"},"arrivalTime":"2026-12-04T11:10:00Z"}}')
 
 
+class PlainTextLongTests(unittest.TestCase):
+    def test_a_long_head_doesnt_hide_the_text_and_the_text_is_cut_at_the_limit(self):
+        html = "<html><head><style>" + "p { color: red; }" * 5000 + "</style></head><body><p>Your flight is at seven. " + "x" * 200 + "</p></body></html>"
+        text = extract.plain_text(message(eml(html)), 60)
+        self.assertTrue(text.strip().startswith("Your flight is at seven."))
+        self.assertEqual(len(text), 60)
+
+
 class WallClockTests(unittest.TestCase):
     def test_a_time_with_its_places_offset_keeps_what_is_written(self):
         self.assertEqual(extract.wall_clock("2026-03-01T22:15:00+13:00"), "2026-03-01T22:15:00")

@@ -38,6 +38,7 @@ class State(TypedDict):
     user: SignedIn | None
     last_backup: str | None         # when a backup was last downloaded from Settings, with its UTC offset
     review_count: int               # what waits in Review for the signed-in member: mail Waypoint couldn't read, names to match
+    person_id: int | None           # the signed-in member's own person (whose stats the Stats page opens on); none on your own machine
 
 
 # Backups
@@ -135,6 +136,14 @@ class WhoIsThis(TypedDict):
 class Review(TypedDict):
     items: list[ReviewItem]
     who: list[WhoIsThis]
+    ai: bool                        # the optional AI is on, so Ask the AI works
+
+
+class Preview(TypedDict):
+    """A review item's message as plain text, fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps
+    none of it."""
+    text: str
+    truncated: bool                 # cut at 30,000 characters
 
 
 class WhoBody(TypedDict):
@@ -526,7 +535,16 @@ class StatsPlaces(TypedDict):
     cities: list[StatsPlace]
 
 
+class DistanceUnit(TypedDict):
+    distance_unit: Literal["mi", "km"]   # how the Stats page shows distances (the household's setting)
+
+
+class DistanceUnitBody(TypedDict):
+    distance_unit: Literal["mi", "km"]
+
+
 class Stats(TypedDict):
+    years: list[int]                # the years with something finished, newest first, whatever year was asked about
     person: int | None              # whose; none: the household
     year: int | None                # none: lifetime
     distance_unit: Literal["mi", "km"]   # the household's setting; every distance above is kilometres

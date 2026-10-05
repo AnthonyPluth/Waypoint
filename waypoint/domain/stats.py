@@ -145,6 +145,7 @@ class PlaceStats(TypedDict):
 
 
 class Stats(TypedDict):
+    years: list[int]           # the years with something finished, newest first, whatever year was asked about
     flights: FlightStats
     stays: StayStats
     cars: CarStats
@@ -325,6 +326,19 @@ def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Ai
     return {"countries": listed(countries), "cities": listed(cities)}
 
 
+def _years(live: Sequence[Seg]) -> list[int]:
+    """The years that have something to count: a flight's departure year, the years a stay's nights or a rental's days fall in."""
+    found: set[int] = set()
+    for s in live:
+        if s.kind == "flight":
+            found.add(int(s.start_local[:4]))
+        elif s.kind == "hotel":
+            found.update(d.year for d in _nights(s))
+        elif s.kind == "car":
+            found.update(d.year for d in _days(s))
+    return sorted(found, reverse=True)
+
+
 def build(segments: Iterable[Seg], known: Mapping[str, Airport], airlines: Mapping[str, str],
           city_countries: Mapping[str, str], *, now: datetime, year: int | None = None) -> Stats:
     """The stats of these segments: the finished, uncancelled ones (`segments` already holds only what the person wanted
@@ -334,7 +348,7 @@ def build(segments: Iterable[Seg], known: Mapping[str, Airport], airlines: Mappi
     stays = [s for s in live if s.kind == "hotel"]
     cars = [s for s in live if s.kind == "car"]
     stays_in = [s for s in stays if year is None or any(_in(d, year) for d in _nights(s))]
-    return {"flights": _flights(flights, known, airlines), "stays": _stays(stays_in, year, city_countries),
+    return {"years": _years(live), "flights": _flights(flights, known, airlines), "stays": _stays(stays_in, year, city_countries),
             "cars": _cars(cars, year), "places": _places(flights, stays_in, known, city_countries)}
 
 

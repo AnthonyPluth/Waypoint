@@ -77,7 +77,7 @@ describe("Trip", () => {
     expect(within(card).queryByTestId("flight-status")).toBeNull();
   });
 
-  it("offers each booking’s actions, and no Wallet off iOS", async () => {
+  it("offers each booking’s actions, and no Wallet", async () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
     const hotel = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
@@ -87,13 +87,11 @@ describe("Trip", () => {
     expect(screen.queryByRole("link", { name: "Wallet" })).toBeNull();
   });
 
-  it("shows Wallet, opening shoebox://, on iOS", async () => {
+  it("offers the provider's app, and no Wallet, on iOS", async () => {
     vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)");
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
-    const wallets = screen.getAllByRole("link", { name: "Wallet" });
-    expect(wallets).toHaveLength(2);
-    expect(wallets[0]).toHaveAttribute("href", "shoebox://");
+    expect(screen.queryByRole("link", { name: "Wallet" })).toBeNull();
     expect(screen.getAllByRole("link", { name: "Open in app" })[0]).toHaveAttribute("href", "https://example.com/manage");
   });
 

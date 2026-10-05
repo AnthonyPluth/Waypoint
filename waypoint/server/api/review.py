@@ -1,6 +1,7 @@
 """Review: mail Waypoint thought was a booking and couldn't read (visible only to the member whose mailbox it came from,
-with Open in Gmail, Add by hand and Ignore this sender), and the names on bookings that aren't matched to a person yet
-("Who is this?": any traveller on a trip the member sees). Mail is never shown, only who it came from and its day."""
+with Open in Gmail, a preview, Ask the AI, Add by hand and Ignore this sender), and the names on bookings that aren't matched
+to a person yet ("Who is this?": any traveller on a trip the member sees). A message's text is shown only by the preview, to its
+mailbox's owner, fetched from Gmail when asked and kept nowhere."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -8,9 +9,12 @@ from typing import Any, cast
 
 from ... import validate
 from ...domain import people, trips
-from ...domain.mail import review
-from ..common import ApiError, row_id
-from ..contract import Matched, Ok, Review, ReviewItem, WhoBody
+import time
+
+from ...domain.mail import ai, review, scan
+from ...providers import gmail
+from ..common import ApiError, own_session, row_id
+from ..contract import Matched, Ok, Preview, Review, ReviewItem, WhoBody
 from .mailboxes import owner
 from .trips import viewer
 
@@ -24,7 +28,8 @@ def api_review(conn, _q, _b) -> Review:
             "who": [{"id": t.id, "name": t.name or "", "segment_id": s["id"], "trip_id": s["trip_id"], "kind": s["kind"],
                      "provider": s["provider"], "origin": s["origin"], "destination": s["destination"],
                      "start_local": s["start_local"], "start_zone": s["start_zone"]}
-                    for t, s in trips.unmatched(conn, viewer(conn))]}
+                    for t, s in trips.unmatched(conn, viewer(conn))],
+            "ai": ai.config(conn) is not None}
 
 
 def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
@@ -70,3 +75,37 @@ def api_review_who(conn, _q, body: WhoBody, traveler_id: str) -> Matched:
     if matched is None:
         raise ApiError("No such traveller", 404)
     return {"ok": True, "matched": matched}
+
+
+GONE = "That message is no longer in Gmail."
+
+
+@own_session
+def api_review_preview(_conn, _q, _b, item_id: str) -> Preview:
+    """The item's message as plain text, to read beside the form: fetched from Gmail now, for its mailbox's owner alone, and
+    not kept or logged. Someone else's item is a 404."""
+    try:
+        text, truncated = scan.preview(owner(), row_id(item_id, NO_ITEM))
+    except KeyError:
+        raise ApiError(NO_ITEM, 404) from None
+    except gmail.MessageGone:
+        raise ApiError(GONE, 404) from None
+    except gmail.GmailError as e:
+        raise ApiError(str(e), 502) from e
+    return {"text": text, "truncated": truncated}
+
+
+@own_session
+def api_review_suggest(_conn, _q, _b, item_id: str) -> Ok:
+    """Ask the optional AI about this item now (the answer, or why there is none, shows on the item). 400 when the AI is off."""
+    try:
+        scan.suggest_now(owner(), row_id(item_id, NO_ITEM), time.time())
+    except KeyError:
+        raise ApiError(NO_ITEM, 404) from None
+    except scan.NoAi as e:
+        raise ApiError(str(e)) from e
+    except gmail.MessageGone:
+        raise ApiError(GONE, 404) from None
+    except gmail.GmailError as e:
+        raise ApiError(str(e), 502) from e
+    return {"ok": True}
