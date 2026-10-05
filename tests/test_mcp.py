@@ -274,6 +274,12 @@ class MaskingTests(Assistants):
         self.switch(ids=True)
         self.assertEqual(mcp_http.local_fetch(path, {}, {}, self.access(IDS)), {"number": JANE_NUMBER})
 
+    def test_ids_are_whole_numbers_even_when_sent_as_text_and_anything_else_is_told(self):
+        self.switch(ids=True)
+        got = self.tool(IDS, "get_loyalty_ids", {"person_id": str(self.jane.person_id), "reveal": True})
+        self.assertEqual([r["number"] for r in got["loyalty"]], [JANE_NUMBER])
+        self.assertIn("whole number", self.refused(IDS, "get_loyalty_ids", {"person_id": "abc"}))
+
     def test_a_reveal_wants_to_know_whose(self):
         self.switch(ids=True)
         self.assertIn("whose", self.refused(IDS, "get_loyalty_ids", {"reveal": True}))

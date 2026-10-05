@@ -103,11 +103,12 @@ def upcoming(fetch: Fetch, a: dict) -> Any:
 def get_loyalty_ids(fetch: Fetch, a: dict) -> Any:
     """Memberships with their numbers masked (last four characters); with `reveal` and a person or a membership, in full
     (needs "ids:read" and its switch; each is logged by Waypoint, never the number)."""
+    person = _need(a, "person_id") if a.get("person_id") not in (None, "") else None
+    which = _need(a, "loyalty_id") if a.get("loyalty_id") not in (None, "") else None
     listing = fetch("loyalty", {})
-    rows = [r for r in listing["loyalty"]
-            if (not a.get("person_id") or r["person_id"] == a["person_id"]) and (not a.get("loyalty_id") or r["id"] == a["loyalty_id"])]
+    rows = [r for r in listing["loyalty"] if (person is None or r["person_id"] == person) and (which is None or r["id"] == which)]
     if a.get("reveal"):
-        if not (a.get("person_id") or a.get("loyalty_id")):
+        if person is None and which is None:
             raise ToolError("To see full numbers, say whose (person_id) or which membership (loyalty_id).")
         rows = [{**r, "number": fetch(f"loyalty/{r['id']}/reveal", {}, {})["number"]} for r in rows if r["readable"]]
     return {"loyalty": rows, "conflicts": listing["conflicts"], "programs": listing["programs"]}
