@@ -150,7 +150,7 @@ describe("Stats", () => {
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Who" }), "Jane Doe (you)");
     await waitFor(() => expect(route.query).toBe(""));
     expect(statsCalls().at(-1)).toBe("/api/stats?person=1&year=all");
-  });
+  }, 15_000);   // three picker changes, each re-rendering the page: near Vitest's 5 s default under coverage on CI
 
   it("lists the years that have trips, newest first", async () => {
     serve(() => full);

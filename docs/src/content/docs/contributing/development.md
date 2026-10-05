@@ -169,7 +169,8 @@ CI runs on GitHub's runners unless the repository variable `RUNS_ON` is set (Set
 
 Some jobs always use GitHub's runners, whatever `RUNS_ON` says:
 
-- a pull request from a fork, so code from outside the household never runs on its machines;
+- a pull request that isn't from this repository (a fork's, including one whose fork has since been deleted), so code from outside the household never runs on its machines;
+- Dependabot's pull requests and runs, which run new versions of third-party dependencies;
 - Agent review and the merge gate, which read pull requests' content with secrets in reach;
 - OpenSSF Scorecard, which publishes its results only from GitHub's runners.
 
