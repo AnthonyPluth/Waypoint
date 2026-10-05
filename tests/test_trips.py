@@ -385,6 +385,24 @@ class CruiseTests(Household):
         self.assertTrue(trips.delete_segment(self.c, self.jane, seg["id"]))
         self.assertEqual(trips.ports_of(self.c, [seg["id"]]), {})
 
+    def test_a_cruise_that_changes_kind_loses_its_ports_instead_of_refusing_the_edit(self):
+        seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS})
+        edited = trips.edit_segment(self.c, self.jane, seg["id"], {"kind": "hotel"})
+        assert edited
+        self.assertEqual((edited["kind"], edited["itinerary"], edited["locked_fields"]), ("hotel", [], ["itinerary", "kind"]))
+        self.assertEqual(trips.ports_of(self.c, [seg["id"]]), {})
+        with self.assertRaisesRegex(trips.Invalid, "Only a cruise"):   # (ports sent with the change are still refused)
+            trips.edit_segment(self.c, self.jane, seg["id"], {"itinerary": PORTS})
+
+    def test_a_bad_list_of_ports_in_an_email_is_left_out_without_spoiling_the_merge(self):
+        empty = self.add(self.jane, {**CRUISE, "confirmation": "CR5555"})
+        bad = [{**PORTS[0], "arrive_local": "2030-01-01T08:00", "depart_local": None}]   # after the cruise ends
+        mail = {**CRUISE, "confirmation": "CR5555", "details": {"ship": "Example Voyager II"}, "itinerary": bad}
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, mail), "updated")
+        got = trips.get_segment(self.c, self.jane, empty["id"])
+        assert got
+        self.assertEqual((got["details"], got["itinerary"]), ({"ship": "Example Voyager II", "deck": "9"}, []))
+
     def test_the_ports_are_only_the_viewers_to_see(self):
         seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS}, travelers=self.on(self.jane.person_id))
         self.assertIsNone(trips.get_segment(self.c, self.sam, seg["id"]))

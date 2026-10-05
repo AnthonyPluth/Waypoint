@@ -632,6 +632,8 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         retimed = any(k in changes and changes[k] != before.get(k) for k in ("start_local", "end_local"))
         kept = {k: v for k, v in (merged.get("details") or {}).items() if k != TIME_UNKNOWN}
         merged["details"] = kept if retimed else {**kept, TIME_UNKNOWN: "yes"}
+    if merged.get("kind") != "cruise" and "itinerary" not in changes:
+        merged["itinerary"] = []   # (a booking that stops being a cruise has no ports of call: they go, rather than refuse the edit)
     for place, zone in (("origin", "start_zone"), ("destination", "end_zone")):
         # (only an airport gives a zone; a stay's or a rental's is the person's)
         if place in changes and zone not in changes and changes.get(place) != before.get(place) and merged.get("kind") == "flight":
@@ -732,11 +734,17 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
     changed_values = check(conn, merged)
     changed = [f for f in FIELDS if f in changed_values and (decode_details(changed_values[f]) != decode_details(seg.details)
                                                             if f == "details" else changed_values[f] != getattr(seg, f))]
+    new_ports: list[PortIn] | None = None
+    if fields.get("itinerary") and "itinerary" not in locked and not ports_of(conn, [seg.id]).get(seg.id):
+        try:   # (an email fills the ports of call while there are none; a person's list stays; a list that doesn't check is left out, not a half-made merge)
+            new_ports = check_itinerary(values["kind"] or "", fields["itinerary"], _span(changed_values, "start"), _span(changed_values, "end"))
+        except Invalid:
+            new_ports = None
     for f in changed:
         setattr(seg, f, changed_values[f])
-    if fields.get("itinerary") and "itinerary" not in locked and not ports_of(conn, [seg.id]).get(seg.id):
-        _set_ports(conn, seg.id, check_itinerary(values["kind"] or "", fields["itinerary"], _span(changed_values, "start"), _span(changed_values, "end")))
-        changed.append("itinerary")   # (an email fills the ports of call while there are none; a person's list stays)
+    if new_ports:
+        _set_ports(conn, seg.id, new_ports)
+        changed.append("itinerary")
     if not set(TIME_FIELDS) & set(locked) and bool(fields.get("check_times")) != bool(seg.check_times):
         seg.check_times = bool(fields.get("check_times"))   # (times a person edited or confirmed stand as they are)
         changed.append("check_times")
