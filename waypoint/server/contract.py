@@ -434,6 +434,107 @@ class Revealed(TypedDict):
     number: str
 
 
+# Travel stats
+
+class StatsNamed(TypedDict):
+    name: str
+    count: int
+
+
+class StatsPlace(TypedDict):
+    name: str                       # a country's ISO code or a city's name
+    first_visit: str                # the local date, YYYY-MM-DD
+    visits: int
+
+
+class StatsAirport(TypedDict):
+    code: str
+    name: str                       # the code, for an airport that isn't in the table
+    city: str | None
+    country: str | None
+    visits: int                     # each departure from it and arrival at it
+    latitude: float | None          # for the map; none for an airport that isn't in the table
+    longitude: float | None
+
+
+class StatsAirline(TypedDict):
+    code: str | None
+    name: str                       # the code, for an airline that isn't in the table
+    flights: int
+
+
+class StatsRoute(TypedDict):
+    a: str                          # A–B and B–A are one route
+    b: str
+    flights: int
+    distance_km: float | None
+    a_latitude: float | None
+    a_longitude: float | None
+    b_latitude: float | None
+    b_longitude: float | None
+
+
+class StatsFlightRecord(TypedDict):
+    origin: str
+    destination: str
+    distance_km: float
+    start_local: str
+    flight_number: str | None
+
+
+class StatsSeats(TypedDict):
+    window: int
+    aisle: int
+    middle: int
+    unknown: int
+
+
+class StatsFlights(TypedDict):
+    count: int
+    distance_km: float
+    air_seconds: int                # booked departure to booked arrival, each at its own zone
+    airports: list[StatsAirport]    # most visited first
+    airlines: list[StatsAirline]
+    countries: list[StatsNamed]     # of the airports, by ISO code
+    routes: list[StatsRoute]        # most flown first
+    cabins: list[StatsNamed]
+    top_seat: str | None
+    seat_positions: StatsSeats
+    longest: StatsFlightRecord | None
+    shortest: StatsFlightRecord | None
+    most_visited_airport: str | None
+    busiest_month: str | None       # YYYY-MM
+    times_around_earth: float       # of 40,075 km
+    moon_fraction: float            # of the way to the Moon, 384,400 km
+
+
+class StatsStays(TypedDict):
+    nights: int
+    chains: list[StatsNamed]
+    cities: list[StatsNamed]
+    countries: list[StatsNamed]
+
+
+class StatsCars(TypedDict):
+    days: int
+    companies: list[StatsNamed]
+
+
+class StatsPlaces(TypedDict):
+    countries: list[StatsPlace]
+    cities: list[StatsPlace]
+
+
+class Stats(TypedDict):
+    person: int | None              # whose; none: the household
+    year: int | None                # none: lifetime
+    distance_unit: Literal["mi", "km"]   # the household's setting; every distance above is kilometres
+    flights: StatsFlights
+    stays: StatsStays
+    cars: StatsCars
+    places: StatsPlaces
+
+
 # Reminders and the calendar feed
 
 class ReminderDevice(TypedDict):

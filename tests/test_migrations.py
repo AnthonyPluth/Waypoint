@@ -276,6 +276,7 @@ class MigrationTests(unittest.TestCase):
             c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m1", sender_domain="air.example",
                                                          reason="no_markup", created=1.0))
             command.upgrade(db.alembic_config(c), "0009")
+            command.upgrade(db.alembic_config(c), "head")   # the later migrations too: the schema as a whole matches schema.py
         self.assertEqual(drift(self.path), [])
         with db.session(self.path) as conn:   # an item from before has no suggestion and no error
             row = conn.execute(select(schema.review_items.c.suggestion, schema.review_items.c.suggestion_error)).fetchone()
@@ -286,6 +287,26 @@ class MigrationTests(unittest.TestCase):
             self.assertNotIn("suggestion", names)
             self.assertNotIn("suggestion_error", names)
             self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)
+
+    def test_0010_seeds_the_airlines_and_takes_them_away(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0009")
+            self.assertNotIn("airlines", sa.inspect(c).get_table_names())
+            command.upgrade(db.alembic_config(c), "0010")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:
+            a = schema.airlines.c
+            found = {code: (name, icao, country) for code, name, icao, country in conn.execute(select(a.code, a.name, a.icao, a.country)).fetchall()}
+            self.assertEqual(found["NZ"], ("Air New Zealand", "ANZ", "New Zealand"))
+            self.assertGreater(len(found), 900)
+        with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:   # a code is one airline
+            conn.execute(insert(schema.airlines).values(code="NZ", name="Another"))
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0009")
+            self.assertNotIn("airlines", sa.inspect(c).get_table_names())
+            self.assertIn("scanned_messages", sa.inspect(c).get_table_names())
 
     def test_processes_starting_together_take_turns_migrating(self):
         # Several copies of Waypoint (or parallel tests) starting on one empty Postgres database used to collide creating

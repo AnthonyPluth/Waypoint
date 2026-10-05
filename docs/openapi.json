@@ -822,6 +822,27 @@
         }
       }
     },
+    "/api/stats": {
+      "get": {
+        "operationId": "api_stats",
+        "x-handler": "waypoint/server/api/stats.py:api_stats",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stats"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/flight-status": {
       "get": {
         "operationId": "api_flight_statuses",
@@ -3186,6 +3207,452 @@
           "user",
           "last_backup",
           "review_count"
+        ],
+        "additionalProperties": false
+      },
+      "Stats": {
+        "type": "object",
+        "properties": {
+          "person": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "distance_unit": {
+            "enum": [
+              "mi",
+              "km"
+            ]
+          },
+          "flights": {
+            "$ref": "#/components/schemas/StatsFlights"
+          },
+          "stays": {
+            "$ref": "#/components/schemas/StatsStays"
+          },
+          "cars": {
+            "$ref": "#/components/schemas/StatsCars"
+          },
+          "places": {
+            "$ref": "#/components/schemas/StatsPlaces"
+          }
+        },
+        "required": [
+          "person",
+          "year",
+          "distance_unit",
+          "flights",
+          "stays",
+          "cars",
+          "places"
+        ],
+        "additionalProperties": false
+      },
+      "StatsAirline": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "flights": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "flights"
+        ],
+        "additionalProperties": false
+      },
+      "StatsAirport": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "visits": {
+            "type": "integer"
+          },
+          "latitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "longitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "city",
+          "country",
+          "visits",
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
+      "StatsCars": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer"
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsNamed"
+            }
+          }
+        },
+        "required": [
+          "days",
+          "companies"
+        ],
+        "additionalProperties": false
+      },
+      "StatsFlightRecord": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "distance_km": {
+            "type": "number"
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "flight_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "distance_km",
+          "start_local",
+          "flight_number"
+        ],
+        "additionalProperties": false
+      },
+      "StatsFlights": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "distance_km": {
+            "type": "number"
+          },
+          "air_seconds": {
+            "type": "integer"
+          },
+          "airports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsAirport"
+            }
+          },
+          "airlines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsAirline"
+            }
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsNamed"
+            }
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsRoute"
+            }
+          },
+          "cabins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsNamed"
+            }
+          },
+          "top_seat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seat_positions": {
+            "$ref": "#/components/schemas/StatsSeats"
+          },
+          "longest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatsFlightRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shortest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatsFlightRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "most_visited_airport": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "busiest_month": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "times_around_earth": {
+            "type": "number"
+          },
+          "moon_fraction": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "count",
+          "distance_km",
+          "air_seconds",
+          "airports",
+          "airlines",
+          "countries",
+          "routes",
+          "cabins",
+          "top_seat",
+          "seat_positions",
+          "longest",
+          "shortest",
+          "most_visited_airport",
+          "busiest_month",
+          "times_around_earth",
+          "moon_fraction"
+        ],
+        "additionalProperties": false
+      },
+      "StatsNamed": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "StatsPlace": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "first_visit": {
+            "type": "string"
+          },
+          "visits": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "first_visit",
+          "visits"
+        ],
+        "additionalProperties": false
+      },
+      "StatsPlaces": {
+        "type": "object",
+        "properties": {
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsPlace"
+            }
+          },
+          "cities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsPlace"
+            }
+          }
+        },
+        "required": [
+          "countries",
+          "cities"
+        ],
+        "additionalProperties": false
+      },
+      "StatsRoute": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "string"
+          },
+          "b": {
+            "type": "string"
+          },
+          "flights": {
+            "type": "integer"
+          },
+          "distance_km": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "a_latitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "a_longitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "b_latitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "b_longitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "a",
+          "b",
+          "flights",
+          "distance_km",
+          "a_latitude",
+          "a_longitude",
+          "b_latitude",
+          "b_longitude"
+        ],
+        "additionalProperties": false
+      },
+      "StatsSeats": {
+        "type": "object",
+        "properties": {
+          "window": {
+            "type": "integer"
+          },
+          "aisle": {
+            "type": "integer"
+          },
+          "middle": {
+            "type": "integer"
+          },
+          "unknown": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window",
+          "aisle",
+          "middle",
+          "unknown"
+        ],
+        "additionalProperties": false
+      },
+      "StatsStays": {
+        "type": "object",
+        "properties": {
+          "nights": {
+            "type": "integer"
+          },
+          "chains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsNamed"
+            }
+          },
+          "cities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsNamed"
+            }
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsNamed"
+            }
+          }
+        },
+        "required": [
+          "nights",
+          "chains",
+          "cities",
+          "countries"
         ],
         "additionalProperties": false
       },

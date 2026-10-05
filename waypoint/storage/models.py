@@ -79,6 +79,14 @@ class Airport(Base):
     longitude: Mapped[float]
 
 
+class Airline(Base):
+    __table__ = schema.airlines
+    code: Mapped[str]                # IATA, two characters
+    icao: Mapped[str | None]
+    name: Mapped[str]
+    country: Mapped[str | None]
+
+
 class Trip(Base):
     __table__ = schema.trips
     id: Mapped[int]
