@@ -11,6 +11,7 @@ from ..storage import db
 from .common import ApiError, server_error
 
 from .api.backups import api_backup, api_backup_inspect, api_restore
+from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailboxes
 from .api.state import api_state
 
 
@@ -20,6 +21,10 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/backup", api_backup),
     ("POST", "/api/backup/inspect", api_backup_inspect),
     ("POST", "/api/restore", api_restore),
+    ("GET", "/api/mailboxes", api_mailboxes),
+    ("POST", "/api/mailboxes/connect", api_mailbox_connect),
+    ("GET", "/api/mailboxes/callback", api_mailbox_callback),
+    ("DELETE", "/api/mailboxes/{id}", api_mailbox_disconnect),
     ("GET", "/api/state", api_state),
 ]
 

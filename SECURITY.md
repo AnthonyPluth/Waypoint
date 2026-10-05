@@ -20,19 +20,19 @@ limited to your household, a `WAYPOINT_SECRET_KEY`, and private backups.
 
 ## What Waypoint will hold
 
-Email scanning is planned, not built yet; the promises it is designed to keep are on the
+Members can connect their Gmail read-only (the `gmail.readonly` scope only; the refresh token is kept encrypted, and disconnecting revokes it at Google). Email scanning is planned, not built yet; the promises it is designed to keep are on the
 [Email scanning](https://anthonypluth.github.io/waypoint/privacy/email-scanning/) page: read-only mailbox access,
 messages searched on the server, bodies read in memory and never stored, and nothing sent to a service run by the project.
 Once it exists, a report about a way around any of those is as serious as one about sign-in.
 
-The secrets Waypoint saves (such as the Google credentials for that mailbox access) are encrypted with
+The secrets Waypoint saves (such as the refresh token for that mailbox access) are encrypted with
 `WAYPOINT_SECRET_KEY`, and so are the copies in backups. Backups also hold everything else in the database, so keep them private.
 
 ## One household, not one account per person
 
 Waypoint has no accounts of its own: sign-in decides who gets in, and everyone who gets in (`OIDC_ALLOWED_EMAILS`,
-`OIDC_ALLOWED_GROUPS`) can change settings, including any connected mailbox and saved keys, download the backup (which
-holds the household’s data and its encrypted secrets) and restore one. Which trips a person sees follows who is on them
+`OIDC_ALLOWED_GROUPS`) can change settings and saved keys, download the backup (which
+holds the household’s data and its encrypted secrets, mailbox tokens included) and restore one. Which trips a person sees follows who is on them
 or booked them; that is about what the app shows, not a boundary between people with access to the server or its backups.
 That’s by design: it’s built for one household. Don’t let in anyone you wouldn’t trust with the household’s travel
 details, and don’t share one Waypoint between households.

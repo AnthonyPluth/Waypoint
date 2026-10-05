@@ -17,6 +17,7 @@ FEATURE_MAP = json.loads((ROOT / "docs/feature-map.json").read_text())
 # Routes whose reply isn't JSON, so the API contract can't type it. Only downloads belong here; a new one says why.
 NOT_JSON = {
     "GET /api/backup": "a .json.gz file to keep",
+    "GET /api/mailboxes/callback": "a redirect back to Settings, where Google sends the browser",
 }
 
 

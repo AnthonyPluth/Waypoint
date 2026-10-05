@@ -1,5 +1,5 @@
 """Waypoint's database schema, for SQLite and Postgres alike. Alembic migrations (waypoint/storage/migrations) create and change it."""
-from sqlalchemy import Column, Float, ForeignKey, MetaData, Table, Text
+from sqlalchemy import Column, Float, ForeignKey, Integer, MetaData, Table, Text, UniqueConstraint
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 
@@ -69,6 +69,30 @@ settings = Table(
     'settings', metadata,
     Column('key', Text, primary_key=True),
     Column('value', Text),
+)
+
+mailboxes = Table(
+    'mailboxes', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('owner_sub', Text, nullable=False),
+    Column('address', Text, nullable=False),
+    Column('token', Text, nullable=False),
+    Column('history_id', Text),
+    Column('last_scan', Float),
+    Column('status', Text, nullable=False),
+    Column('last_error', Text),
+    Column('created', Float),
+    UniqueConstraint('owner_sub', 'address', name='uq_mailboxes_owner_address'),
+    info={'doc': "Gmail accounts members connected (read-only); each belongs to the member who connected it, its refresh token is kept encrypted"},
+)
+
+mailbox_pending = Table(
+    'mailbox_pending', metadata,
+    Column('state', Text, primary_key=True),
+    Column('owner_sub', Text, nullable=False),
+    Column('verifier', Text, nullable=False),
+    Column('created', Float, nullable=False),
+    info={'doc': 'Gmail connections in progress at Google'},
 )
 
 # Tables whose integer id is assigned by the database.
