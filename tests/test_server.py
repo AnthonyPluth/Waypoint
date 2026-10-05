@@ -8,12 +8,13 @@ import unittest
 import urllib.error
 import urllib.parse
 import urllib.request
+from unittest import mock
 from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 
 from sqlalchemy import select, update
 
 from waypoint.storage import db
-from waypoint import oidc, server
+from waypoint import monitoring, oidc, server
 from waypoint.storage.models import AuthPending, AuthSession, User
 from tests.shared import NoRedirect, own_database
 
@@ -171,6 +172,17 @@ class OIDCTests(unittest.TestCase):
             self.assertEqual(status, 403, kwargs)
             self.assertIn(words, body, kwargs)
             self.assertNotIn("waypoint_session", {k: v for k, v in ck.items() if v})
+
+    def test_a_refusal_names_who_in_the_log_but_never_in_what_is_sent(self):
+        who = "canary-stranger@example.com"
+        with mock.patch.object(monitoring, "send_log") as sent, mock.patch("builtins.print") as printed:
+            status, _, _, _ = self.sign_in(email=who)
+        self.assertEqual(status, 403)
+        lines = [" ".join(str(a) for a in c.args) for c in printed.call_args_list]
+        self.assertTrue(any(who in line and "OIDC_ALLOWED_EMAILS" in line for line in lines), lines)   # the operator's fix
+        reported = [str(c.args[0]) for c in sent.call_args_list]
+        self.assertIn("[sign-in] refused an account that isn't on the allow-list", reported)
+        self.assertFalse([r for r in reported if who in r], reported)
 
     def test_someone_not_allowed_is_told_so_and_offered_another_account(self):
         status, _, _, body = self.sign_in(email="stranger@example.com")

@@ -133,9 +133,6 @@ class Workflows(unittest.TestCase):
         self.assertIn("without --paginate", fc.check_workflow("x.yml", self.GOOD.replace("--paginate ", ""))[0])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class Tests(unittest.TestCase):
     """A test that's removed or skipped needs a trailer saying why."""
@@ -202,3 +199,7 @@ class Tests(unittest.TestCase):
             self.skipTest("no origin/main here to compare with")
         found = fc.commits(f"{base}..HEAD")
         self.assertEqual(fc.check_tests(fc._git("merge-base", base, "HEAD").strip(), [m for _, m in found]), [])
+
+
+if __name__ == "__main__":
+    unittest.main()
