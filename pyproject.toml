@@ -11,7 +11,6 @@ dependencies = [
     "pyjwt[crypto] (>=2.8,<3.0)",        # verifying sign-in (OIDC) ID tokens
     "pywebpush (>=2.0,<3.0)",            # push notifications (VAPID + encrypted payloads)
     "python-dateutil (>=2.9,<3.0)",      # month arithmetic (waypoint/dates.py)
-    "sentry-sdk (>=2.30,<3.0)",         # error reports to Sentry (only when SENTRY_DSN is set; see waypoint/monitoring.py)
 ]
 
 [tool.poetry]

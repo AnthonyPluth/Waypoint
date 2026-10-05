@@ -10,7 +10,6 @@ import secrets
 import threading
 from typing import TYPE_CHECKING
 
-from .. import monitoring
 from .common import header_value
 
 if TYPE_CHECKING:
@@ -64,11 +63,7 @@ def serve(h: Handler, path: str) -> None:
         nonce = secrets.token_urlsafe(16)
         with open(full, "rb") as f:
             data = f.read().replace(b"<script ", f'<script nonce="{nonce}" '.encode())
-        if meta := monitoring.trace_meta():   # the page-load trace in the browser continues this one
-            data = data.replace(b"</head>", meta.encode() + b"</head>", 1)
-        # The browser's JS profiler only runs on a page that asks for it.
-        extra = {"Document-Policy": "js-profiling"} if monitoring.browser_profiling() else None
-        return send_file(h, data, ctype, "no-store", None, gz_ok, nonce, extra=extra)
+        return send_file(h, data, ctype, "no-store", None, gz_ok, nonce)
     entry = _static_entry(full)
     if h.headers.get("If-None-Match") == entry["etag"]:
         h.send_response(304)

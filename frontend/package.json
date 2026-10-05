@@ -19,7 +19,6 @@
     "@codecov/vite-plugin": "^2.0.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
-    "@sentry/vite-plugin": "^5.4.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
@@ -43,7 +42,6 @@
   },
   "dependencies": {
     "@lucide/svelte": "^1.48.0",
-    "@sentry/browser": "^11.1.0",
     "bits-ui": "^2.19.3",
     "clsx": "^2.1.1",
     "svelte-sonner": "^1.2.1",

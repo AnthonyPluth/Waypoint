@@ -15,7 +15,7 @@ Not every route is covered yet; tools/api_contract.py lists the ones that are.
 """
 from __future__ import annotations
 
-from typing import Any, Literal, NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 
 class Ok(TypedDict):
@@ -36,7 +36,6 @@ class State(TypedDict):
     version: str
     database: Literal["sqlite", "postgres"]
     user: SignedIn | None
-    sentry: dict[str, Any] | None   # the web app's error reports (waypoint/monitoring.py's browser_config), or None
     last_backup: str | None         # when a backup was last downloaded from Settings, with its UTC offset
 
 
