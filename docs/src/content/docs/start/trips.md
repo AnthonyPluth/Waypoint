@@ -36,7 +36,6 @@ A segment is added to a trip you name, or without one: Waypoint puts it in the t
 Each booking card has buttons for what you'd do next:
 
 - **Open in app**: the booking's manage link (from the email, or one you entered). It's a link on the provider's own website; on an iPhone or Android phone it says **Open in app** and the provider's app opens it if installed; on a computer it says **Manage booking** and opens the provider's website. Only https links are offered. A cancelled booking keeps this one (you may need it for a refund) and loses the others. Waypoint doesn't build prefilled manage links for any provider yet, because it only adds one once its URL is confirmed from the provider's public site.
-- **Wallet**: on an iPhone or iPad only. It opens the Wallet app itself; no link opens one pass.
 - **Directions**: an Apple Maps link to a hotel's or rental's address (or its place name when there's no address).
 - **Call**: dials the phone number on the booking, when it has one.
 
