@@ -64,14 +64,15 @@ def scan_mailboxes() -> None:
         monitoring.report(e, values=False)
 
 
-def scan_now(mailbox_id: int) -> bool:
-    """Start a scan of one mailbox in the background (Scan now). False when it is already being scanned."""
+def scan_now(mailbox_id: int, again: bool = False) -> bool:
+    """Start a scan of one mailbox in the background (Scan now), or, with `again`, a reading of the messages it already found
+    that made bookings (Read bookings again). False when it is already being scanned."""
     if scan.running(mailbox_id):
         return False
 
     def run() -> None:
         try:
-            scan.scan(mailbox_id, time.time(), date.today())
+            scan.scan(mailbox_id, time.time(), date.today(), again)
         except Exception as e:
             monitoring.report(e, values=False)
     threading.Thread(target=run, daemon=True, name="mail-scan-now").start()

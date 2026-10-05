@@ -9,7 +9,7 @@
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
-  import { isIOS, isMobile } from "$lib/platform";
+  import { isMobile } from "$lib/platform";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
@@ -32,7 +32,6 @@
   let asking = $state(false);
 
   const id = $derived(route.sub);
-  const ios = isIOS();
   const appWord = isMobile() ? "Open in app" : "Manage booking";   // (a desktop browser has no app to open: it gets the provider’s website)
 
   let latest = 0;   // the newest load: an earlier, slower one finishing later must not put its trip on screen
@@ -173,10 +172,10 @@
 {/snippet}
 
 {#snippet links(s: Segment)}
-  {#if s.links.app || (s.status !== "cancelled" && (s.links.directions || s.links.call || ios))}
+  {#if s.check_times}<p class="text-sm text-signal-ink" role="note">Check the times: the email gave them in UTC and Waypoint couldn’t tell which clock they mean. Edit the booking to correct or confirm them.</p>{/if}
+  {#if s.links.app || (s.status !== "cancelled" && (s.links.directions || s.links.call))}
     <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
       {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord}</Button>{/if}
-      {#if s.status !== "cancelled" && ios}<Button variant="outline" size="sm" href="shoebox://">Wallet</Button>{/if}
       {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
       {#if s.status !== "cancelled" && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
     </div>

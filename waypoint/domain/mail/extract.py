@@ -19,10 +19,10 @@ import email.utils
 import json
 import re
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -39,6 +39,7 @@ RESERVATIONS: dict[str, Kind] = {"FlightReservation": "flight", "LodgingReservat
 MAX_PART = 2_000_000    # characters of one HTML part read (a booking's markup is far smaller)
 MAX_NODES = 200         # reservations considered in one message
 IATA = re.compile(r"[A-Z]{3}")
+CLOCK = re.compile(r"(?<![\d:.])(\d{1,2}):(\d{2})(?::\d{2})?(?!\d)(?:\s*([AaPp])\.?[Mm]\.?)?")
 BASE64URL = re.compile(r"[A-Za-z0-9_=-]+")
 VOID = {"meta", "link", "img", "source", "area", "br", "hr", "input", "wbr", "col", "embed", "track", "base"}
 
@@ -380,6 +381,16 @@ def written_clock(text: str) -> str | None:
         return None
 
 
+def real_offset(text: str) -> bool:
+    """Whether the time carries an offset other than UTC (a sender who writes one is giving real instants: "Z" is also what a
+    sender who only prints the local clock writes)."""
+    try:
+        t = datetime.fromisoformat(text.strip())
+    except ValueError:
+        return False
+    return t.utcoffset() not in (None, timedelta(0))
+
+
 def has_offset(text: str) -> bool:
     try:
         return datetime.fromisoformat(text.strip()).tzinfo is not None
@@ -409,6 +420,49 @@ def wall_clock(text: str, zone: str | None = None) -> str | None:
         elif t.utcoffset() == timedelta(0):
             return None   # UTC says nothing of the place's clock
     return t.replace(tzinfo=None).isoformat(timespec="seconds")
+
+
+def utc_marked(text: str) -> bool:
+    try:
+        t = datetime.fromisoformat(text.strip())
+    except ValueError:
+        return False
+    return t.tzinfo is not None and t.utcoffset() == timedelta(0)
+
+
+def _as_written(text: str) -> str:
+    """A time marked UTC with its mark dropped: the clock reading it carries, 2026-03-01T09:15:00."""
+    return datetime.fromisoformat(text.strip()).replace(tzinfo=None).isoformat(timespec="seconds")
+
+
+def clock_times(text: str) -> frozenset[str]:
+    """The times of day a text shows, as HH:MM on the 24-hour clock: 9:00 AM, 9:00am, 09:00 and 9:00 are all 09:00."""
+    found: set[str] = set()
+    for m in CLOCK.finditer(text):
+        hour, minute, half = int(m.group(1)), int(m.group(2)), (m.group(3) or "").lower()
+        if half:
+            if not 1 <= hour <= 12:
+                continue
+            hour = hour % 12 + (12 if half == "p" else 0)
+        if hour < 24 and minute < 60:
+            found.add(f"{hour:02d}:{minute:02d}")
+    return frozenset(found)
+
+
+def reading(b: Booking, start_zone: str, end_zone: str) -> Literal["written", "moved"] | None:
+    """Which reading of a booking's times the message itself settles, when they are marked UTC for places that aren't: the
+    clock as written ("written"), or moved to the places' zones ("moved"), or neither (None: the text doesn't say, or shows
+    both). Both readings are looked for among the times of day the message shows (`b.clock_times`); only one appearing
+    settles it, for the start and the end together, so a duration never comes out negative or absurd."""
+    moved = (wall_clock(b.start, start_zone), wall_clock(b.end, end_zone))
+    marked = [(t, m) for t, m in zip((b.start, b.end), moved, strict=True) if utc_marked(t)]
+    written = [_as_written(t)[11:16] for t, _ in marked]
+    converted = [m[11:16] for _, m in marked if m]
+    if not marked or len(converted) < len(marked) or written == converted:
+        return None   # (nothing marked UTC, a time that can't be placed, or a place whose clock is UTC's: nothing to settle)
+    local = all(w in b.clock_times for w in written)
+    utc = all(c in b.clock_times for c in converted)
+    return "written" if local and not utc else "moved" if utc and not local else None
 
 
 # ------------------------------------------------------------------------------------------------ the message
@@ -484,6 +538,9 @@ def read(message: Mapping[str, Any]) -> Message:
         seen = seen or bool(found.bookings or found.unread)
         if not found.bookings:
             gaps.append("sender-specific parser found no booking")
+    if any(utc_marked(t) for b in bookings for t in (b.start, b.end)):
+        shown = clock_times(_visible(htmls, texts))   # (kept as times of day alone, and only for a booking that needs them)
+        bookings = [replace(b, clock_times=shown) if utc_marked(b.start) or utc_marked(b.end) else b for b in bookings]
     return Message(sender, received, tuple(bookings), unread, markup=seen, gaps=tuple(gaps), other_markup=other)
 
 
@@ -515,6 +572,18 @@ class _Text(HTMLParser):
             self.parts.append(data)
 
 
+def _visible(htmls: list[str], texts: list[str]) -> str:
+    """What a reader of the message sees: its text parts and its HTML parts without tags, scripts and styles."""
+    scanner = _Text()
+    for h in htmls:
+        try:
+            scanner.feed(h)
+            scanner.close()
+        except (ValueError, RecursionError, AssertionError):
+            continue
+    return "\n".join([*texts, "".join(scanner.parts)])
+
+
 def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
     """The message's readable text, for the optional AI fallback alone (waypoint/domain/mail/ai.py, which strips quoted
     replies, footers and ID numbers before anything is sent): its text/plain part, else its HTML as text. In memory only;
@@ -531,7 +600,7 @@ def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
             if kind not in ("text/plain", "text/html"):
                 continue
             try:
-                (plain if kind == "text/plain" else html).append(str(part.get_content())[:limit])
+                (plain if kind == "text/plain" else html).append(str(part.get_content())[:MAX_PART])
             except (ValueError, LookupError, KeyError):
                 continue
     except (ValueError, LookupError, TypeError):

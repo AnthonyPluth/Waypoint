@@ -89,6 +89,7 @@
         "frontend/src/lib/components/settings/ImportSection.svelte",
         "frontend/src/pages/People.svelte",
         "frontend/src/pages/Review.svelte",
+        "frontend/src/pages/Stats.svelte",
         "frontend/src/pages/Trip.svelte",
         "frontend/src/pages/Trips.svelte"
       ],
@@ -369,6 +370,36 @@
     },
     {
       "method": "GET",
+      "path": "/api/distance-unit",
+      "handler": "waypoint/server/api/stats.py:api_distance_unit",
+      "web": [
+        "frontend/src/lib/components/settings/DistanceSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_stats.py"
+      ],
+      "docs": [
+        "start/stats"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/distance-unit",
+      "handler": "waypoint/server/api/stats.py:api_distance_unit_save",
+      "web": [
+        "frontend/src/lib/components/settings/DistanceSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_stats.py"
+      ],
+      "docs": [
+        "start/stats"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/flight-status",
       "handler": "waypoint/server/api/flightstatus.py:api_flight_statuses",
       "web": [
@@ -548,6 +579,21 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/api/mailboxes/{id}/reread",
+      "handler": "waypoint/server/api/mailboxes.py:api_mailbox_reread",
+      "web": [
+        "frontend/src/lib/components/settings/GmailSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/gmail"
+      ]
+    },
+    {
       "method": "GET",
       "path": "/api/reminders",
       "handler": "waypoint/server/api/reminders.py:api_reminders",
@@ -672,6 +718,36 @@
       "method": "POST",
       "path": "/api/review/{id}/ignore",
       "handler": "waypoint/server/api/review.py:api_review_ignore",
+      "web": [
+        "frontend/src/pages/Review.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/review/{id}/preview",
+      "handler": "waypoint/server/api/review.py:api_review_preview",
+      "web": [
+        "frontend/src/pages/Review.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/review/{id}/suggest",
+      "handler": "waypoint/server/api/review.py:api_review_suggest",
       "web": [
         "frontend/src/pages/Review.svelte"
       ],

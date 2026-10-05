@@ -21,6 +21,12 @@ const mia: Person = { id: 2, display_name: "Mia Doe", first_name: null, legal_na
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: null, legal_name: null, aliases: [], member: true };
 
 /** The server, with what's waiting kept in `held`: answers the calls the page makes. */
+const SUGGESTION = { kind: "flight" as const, provider: "Example Air", confirmation: "QW4R7T", origin: "BOS", destination: "DEN",
+  start_local: "2026-12-02T07:15", end_local: "2026-12-02T10:05" } as unknown as NonNullable<ReviewItem["suggestion"]>;
+const PREVIEW = "Hello Jane,\nYour flight EX 410 leaves Boston at 7:15 am on 2 January.";
+let previewFails = "";
+let suggestFails = "";
+let truncated = false;
 let held: Review;
 let calls: [string, string | undefined, unknown][];
 function serve(failOn?: string) {
@@ -31,13 +37,15 @@ function serve(failOn?: string) {
     if (path === "/api/review") return held as never;
     if (path === "/api/state") return {} as never;
     if (path === "/api/segments") return {} as never;
+    if (path.endsWith("/preview")) { if (previewFails) throw new Error(previewFails); return { text: PREVIEW, truncated } as never; }
+    if (path.endsWith("/suggest")) { if (suggestFails) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestion: SUGGESTION })) }; return { ok: true } as never; }
     if (opts?.method === "DELETE" || path.endsWith("/ignore")) { const id = Number(path.split("/")[3]); held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true } as never; }
     if (path.startsWith("/api/review/who/")) { const id = Number(path.split("/")[4]); held = { ...held, who: held.who.filter((w) => w.id !== id) }; return { ok: true, matched: 2 } as never; }
     throw new Error(`unexpected ${path}`);
   });
 }
 
-beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; held = { items: [item()], who: [who()] }; serve(); });
+beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; previewFails = suggestFails = ""; truncated = false; held = { items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
@@ -53,7 +61,7 @@ describe("Review", () => {
   });
 
   it("says what it can when the sender or the day isn’t there", async () => {
-    held = { items: [item({ id: 1, reason: "broken", sender_domain: "", received: null }), item({ id: 2 })], who: [] };
+    held = { items: [item({ id: 1, reason: "broken", sender_domain: "", received: null }), item({ id: 2 })], who: [], ai: false };
     render(ReviewPage);
     expect(await screen.findByText("Mail from an unknown sender")).toBeInTheDocument();
     expect(screen.getByText("to ana@gmail.example")).toBeInTheDocument();
@@ -169,7 +177,7 @@ describe("Review", () => {
 
   it("describes each kind of booking a name is on", async () => {
     held = { items: [], who: [who({ id: 1, kind: "hotel", origin: "Harbour Hotel", destination: null, provider: null }), who({ id: 2, kind: "car", origin: "SFO", destination: "SFO" }),
-      who({ id: 3, kind: "train", origin: null, destination: null })] };
+      who({ id: 3, kind: "train", origin: null, destination: null })], ai: false };
     render(ReviewPage);
     expect(await screen.findByText("Stay Harbour Hotel on 2026-12-08")).toBeInTheDocument();
     expect(screen.getByText("Rental SFO → SFO on 2026-12-08 (Example Air)")).toBeInTheDocument();
@@ -177,7 +185,7 @@ describe("Review", () => {
   });
 
   it("says when nothing is waiting", async () => {
-    held = { items: [], who: [] };
+    held = { items: [], who: [], ai: false };
     render(ReviewPage);
     expect(await screen.findByText(/Nothing to review/)).toBeInTheDocument();
   });
@@ -218,7 +226,7 @@ describe("Review: the AI’s suggestion", () => {
   });
 
   it("starts the form filled in with it, to confirm or edit, and saves only when added", async () => {
-    held = { items: [item({ suggestion })], who: [] };
+    held = { items: [item({ suggestion })], who: [], ai: false };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
     expect(screen.getByRole("heading", { name: "Check this suggestion" })).toBeInTheDocument();
@@ -235,11 +243,93 @@ describe("Review: the AI’s suggestion", () => {
   });
 
   it("says why there’s none, and still offers adding by hand", async () => {
-    held = { items: [item({ suggestion_error: "The AI didn’t find a booking in this message." })], who: [] };
+    held = { items: [item({ suggestion_error: "The AI didn’t find a booking in this message." })], who: [], ai: false };
     render(ReviewPage);
     expect(await screen.findByText("The AI didn’t find a booking in this message.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Check the AI’s suggestion/ })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /by hand/ }));
     expect(screen.getByRole("heading", { name: "Add this booking by hand" })).toBeInTheDocument();
+  });
+});
+
+describe("Review: the message beside the form", () => {
+  it("previews the message as plain text and hides it again", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Preview .Mail from example-air.example/ }));
+    const region = await screen.findByTestId("preview");
+    expect(region).toHaveTextContent("Your flight EX 410 leaves Boston at 7:15 am on 2 January.");
+    expect(calls).toContainEqual(["/api/review/1/preview", undefined, undefined]);
+    await userEvent.click(screen.getByRole("button", { name: /Hide .Mail from/ }));
+    expect(screen.queryByTestId("preview")).toBeNull();
+  });
+
+  it("shows the message as text, never as markup", async () => {
+    const hostile = "<img src=x onerror=alert(1)><script>alert(2)</script> Hello";
+    vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview") ? { text: hostile, truncated: false } : path === "/api/people" ? { people: [] } : held) as never);
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    const region = await screen.findByTestId("preview");
+    expect(region).toHaveTextContent(hostile);
+    expect(region.querySelector("img, script")).toBeNull();
+  });
+
+  it("says when it was cut short, and when the message has no text", async () => {
+    truncated = true;
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    expect(await screen.findByText(/Cut short here: open it in Gmail for the rest/)).toBeInTheDocument();
+  });
+
+  it("says why it couldn’t be fetched, and tries again when asked again", async () => {
+    previewFails = "That message is no longer in Gmail.";
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("That message is no longer in Gmail.");
+    previewFails = "";
+    await userEvent.click(screen.getByRole("button", { name: /Hide/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Preview/ }));
+    expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
+  });
+
+  it("opens the message beside the form when adding by hand", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
+    expect(screen.getByLabelText("Provider")).toBeInTheDocument();
+  });
+
+  it("keeps the message nowhere but the page", async () => {
+    const stored: string[] = [];
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation((_k: string, v: string) => { stored.push(v); });   // (both of the browser's stores)
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Preview/ }));
+    await screen.findByTestId("preview");
+    expect(stored).toEqual([]);
+    vi.restoreAllMocks();
+  });
+});
+
+describe("Review: Ask the AI", () => {
+  it("is offered only when the AI is on", async () => {
+    render(ReviewPage);
+    await screen.findByTestId("review-item");
+    expect(screen.queryByRole("button", { name: /Ask the AI/ })).toBeNull();
+  });
+
+  it("asks the AI, then offers its suggestion to check", async () => {
+    held = { items: [item()], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Ask the AI about/ }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1/suggest", "POST", undefined]));
+    expect(await screen.findByRole("button", { name: /Check the AI.s suggestion/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Ask the AI about/ })).toHaveTextContent("Ask again");
+  });
+
+  it("says when the AI couldn’t be asked", async () => {
+    held = { items: [item()], who: [], ai: true };
+    suggestFails = "Turn on AI suggestions in Settings first.";
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Ask the AI about/ }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Turn on AI suggestions in Settings first."));
   });
 });

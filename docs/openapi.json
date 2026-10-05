@@ -843,6 +843,67 @@
         }
       }
     },
+    "/api/distance-unit": {
+      "get": {
+        "operationId": "api_distance_unit",
+        "x-handler": "waypoint/server/api/stats.py:api_distance_unit",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistanceUnit"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_distance_unit_save",
+        "x-handler": "waypoint/server/api/stats.py:api_distance_unit_save",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DistanceUnitBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistanceUnit"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/flight-status": {
       "get": {
         "operationId": "api_flight_statuses",
@@ -1226,6 +1287,46 @@
         }
       }
     },
+    "/api/mailboxes/{id}/reread": {
+      "post": {
+        "operationId": "api_mailbox_reread",
+        "x-handler": "waypoint/server/api/mailboxes.py:api_mailbox_reread",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanStarted"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/reminders": {
       "get": {
         "operationId": "api_reminders",
@@ -1542,6 +1643,77 @@
         }
       }
     },
+    "/api/review/{id}/preview": {
+      "get": {
+        "operationId": "api_review_preview",
+        "x-handler": "waypoint/server/api/review.py:api_review_preview",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/review/{id}/suggest": {
+      "post": {
+        "operationId": "api_review_suggest",
+        "x-handler": "waypoint/server/api/review.py:api_review_suggest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/review/{id}": {
       "delete": {
         "operationId": "api_review_dismiss",
@@ -1821,6 +1993,36 @@
         "required": [
           "ok",
           "revoked"
+        ],
+        "additionalProperties": false
+      },
+      "DistanceUnit": {
+        "type": "object",
+        "properties": {
+          "distance_unit": {
+            "enum": [
+              "mi",
+              "km"
+            ]
+          }
+        },
+        "required": [
+          "distance_unit"
+        ],
+        "additionalProperties": false
+      },
+      "DistanceUnitBody": {
+        "type": "object",
+        "properties": {
+          "distance_unit": {
+            "enum": [
+              "mi",
+              "km"
+            ]
+          }
+        },
+        "required": [
+          "distance_unit"
         ],
         "additionalProperties": false
       },
@@ -2563,6 +2765,23 @@
         ],
         "additionalProperties": false
       },
+      "Preview": {
+        "type": "object",
+        "description": "A review item's message as plain text, fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps\nnone of it.",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "text",
+          "truncated"
+        ],
+        "additionalProperties": false
+      },
       "ReminderDevice": {
         "type": "object",
         "description": "A browser or phone that gets this member's notifications.",
@@ -2705,11 +2924,15 @@
             "items": {
               "$ref": "#/components/schemas/WhoIsThis"
             }
+          },
+          "ai": {
+            "type": "boolean"
           }
         },
         "required": [
           "items",
-          "who"
+          "who",
+          "ai"
         ],
         "additionalProperties": false
       },
@@ -2875,6 +3098,9 @@
               "type": "string"
             }
           },
+          "check_times": {
+            "type": "boolean"
+          },
           "travelers": {
             "type": "array",
             "items": {
@@ -2903,6 +3129,7 @@
           "source",
           "booked_by",
           "locked_fields",
+          "check_times",
           "travelers",
           "links"
         ],
@@ -3199,6 +3426,12 @@
           },
           "review_count": {
             "type": "integer"
+          },
+          "person_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "required": [
@@ -3206,13 +3439,20 @@
           "database",
           "user",
           "last_backup",
-          "review_count"
+          "review_count",
+          "person_id"
         ],
         "additionalProperties": false
       },
       "Stats": {
         "type": "object",
         "properties": {
+          "years": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
           "person": {
             "type": [
               "integer",
@@ -3245,6 +3485,7 @@
           }
         },
         "required": [
+          "years",
           "person",
           "year",
           "distance_unit",

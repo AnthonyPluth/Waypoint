@@ -46,19 +46,19 @@ def _at(today: date, days: int, clock: str) -> str:
 def _family_past(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "MCO", "start_local": _at(today, -41, "08:15"), "end_local": _at(today, -41, "11:20"),
-         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 1412", "terminal": "4", "cabin": "Economy"}},
+         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 1412", "terminal": "4", "cabin": "Economy", "seat": "22A"}},
         {"kind": "hotel", "origin": "Lakeside Resort", "start_local": _at(today, -41, "15:00"), "end_local": _at(today, -36, "11:00"),
          "start_zone": "America/New_York", "end_zone": "America/New_York", "confirmation": "H41207", "provider": "Hilton",
          "details": {"address": "100 Lakeshore Drive, Orlando", "room": "Two queens"}},
         {"kind": "flight", "origin": "MCO", "destination": "JFK", "start_local": _at(today, -36, "17:40"), "end_local": _at(today, -36, "20:10"),
-         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 2190"}},
+         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 2190", "cabin": "Economy", "seat": "22C"}},
     ]
 
 
 def _family_now(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": _at(today, -2, "19:00"), "end_local": _at(today, -1, "07:10"),
-         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy"},
+         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy", "seat": "31A"},
          "manage_url": "https://example.com/manage/KQ7M2X"},
         {"kind": "hotel", "origin": "Harbour Hotel", "start_local": _at(today, -1, "15:00"), "end_local": _at(today, 4, "10:00"),
          "start_zone": "Europe/London", "end_zone": "Europe/London", "confirmation": "H88231", "provider": "Marriott",
@@ -67,6 +67,33 @@ def _family_now(today: date) -> list[trips.SegmentIn]:
         {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": _at(today, 4, "11:30"), "end_local": _at(today, 4, "14:35"),
          "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 102", "terminal": "3"}},
     ]
+
+
+# Older trips (a year and two years back), so Stats has years to pick, more airlines, hotel chains and a rental car.
+def _family_last_year(today: date) -> list[trips.SegmentIn]:
+    return [
+        {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": _at(today, -400, "07:30"), "end_local": _at(today, -400, "10:55"),
+         "confirmation": "TV5N2B", "provider": "United Airlines", "details": {"flight_number": "UA 1205", "cabin": "Premium Economy", "seat": "14A"}},
+        {"kind": "car", "origin": "SFO airport", "destination": "SFO airport", "start_local": _at(today, -400, "12:00"), "end_local": _at(today, -396, "12:00"),
+         "start_zone": "America/Los_Angeles", "end_zone": "America/Los_Angeles", "confirmation": "C5521", "provider": "Hertz",
+         "details": {"car_class": "SUV"}},
+        {"kind": "hotel", "origin": "Bayview Inn", "destination": "San Francisco", "start_local": _at(today, -400, "15:00"), "end_local": _at(today, -396, "11:00"),
+         "start_zone": "America/Los_Angeles", "end_zone": "America/Los_Angeles", "confirmation": "H70452", "provider": "Marriott",
+         "details": {"room": "King"}},
+        {"kind": "flight", "origin": "SFO", "destination": "JFK", "start_local": _at(today, -396, "13:00"), "end_local": _at(today, -396, "21:30"),
+         "confirmation": "TV5N2B", "provider": "United Airlines", "details": {"flight_number": "UA 1210", "cabin": "Premium Economy", "seat": "14B"}},
+    ]
+
+
+def _family_two_years_ago(today: date) -> list[trips.SegmentIn]:
+    return [
+        {"kind": "flight", "origin": "JFK", "destination": "CDG", "start_local": _at(today, -800, "18:30"), "end_local": _at(today, -799, "08:00"),
+         "confirmation": "WM8D4P", "provider": "Air France", "details": {"flight_number": "AF 7", "cabin": "Business", "seat": "3D"}},
+        {"kind": "hotel", "origin": "Hôtel du Parc", "destination": "Paris", "start_local": _at(today, -799, "15:00"), "end_local": _at(today, -793, "11:00"),
+         "start_zone": "Europe/Paris", "end_zone": "Europe/Paris", "confirmation": "H12984", "provider": "Hilton",
+         "details": {"room": "Double"}},
+        {"kind": "flight", "origin": "CDG", "destination": "JFK", "start_local": _at(today, -793, "11:15"), "end_local": _at(today, -793, "13:50"),
+         "confirmation": "WM8D4P", "provider": "Air France", "details": {"flight_number": "AF 8", "cabin": "Business", "seat": "3F"}},
 
 
 # Grandma Joan flies with the family on the same flights, on a reservation of her own: the trip shows each flight once, with a block
@@ -137,7 +164,7 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     guests = [people.add_guest(conn, guest)["id"] for guest in GUESTS]
     jane, sam = (Viewer(people.person_for_sub(conn, sub)) for sub in ("demo-jane", "demo-sam"))
     now_trip = None
-    for fields in (*_family_past(today), *_family_now(today)):
+    for fields in (*_family_two_years_ago(today), *_family_last_year(today), *_family_past(today), *_family_now(today)):
         added = trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0])})
         now_trip = added["trip_id"] if added and (fields.get("details") or {}).get("flight_number") == "AA 102" else now_trip
     for fields in _joan(today):

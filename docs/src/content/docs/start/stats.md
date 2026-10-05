@@ -5,7 +5,13 @@ sidebar:
   order: 6
 ---
 
-Waypoint adds up what you have flown, stayed and driven. The numbers come from `GET /api/stats?person=<id|all>&year=<yyyy|all>`; the Stats page and the map that show them come later.
+Waypoint adds up what you have flown, stayed and driven. The numbers come from `GET /api/stats?person=<id|all>&year=<yyyy|all>`; the Stats page (`#stats`) shows them, and the map comes later.
+
+## The Stats page
+
+Pick **who** (you by default, any member or guest, or Everyone) and **when** (All time, or a year that has something to count); the choice is kept in the address, so you can link it. The page shows the big numbers, how far that is around the Earth and toward the Moon, the top five of routes, airports, airlines, countries, hotel chains and rental companies (Show all lists the rest), records, and your cabin and seat split. A person or year with nothing finished says so, with links to add a trip or import past flights.
+
+Miles or kilometres is a household setting, under **Settings → Distances** (`GET` and `POST /api/distance-unit`).
 
 ## Who and when
 

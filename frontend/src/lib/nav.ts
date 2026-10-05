@@ -2,6 +2,7 @@
 import type { Component } from "svelte";
 import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
 import Luggage from "@lucide/svelte/icons/luggage";
+import ChartColumn from "@lucide/svelte/icons/chart-column";
 import Users from "@lucide/svelte/icons/users";
 import Inbox from "@lucide/svelte/icons/inbox";
 import Settings from "@lucide/svelte/icons/settings";
@@ -13,6 +14,7 @@ export type NavItem = { page: string; label: string; icon: Component<{ class?: s
 export const NAV: NavItem[] = [
   { page: "upcoming", label: "Upcoming", icon: PlaneTakeoff },
   { page: "trips", label: "Trips", icon: Luggage },
+  { page: "stats", label: "Stats", icon: ChartColumn },
   { page: "people", label: "People", icon: Users },
   { page: "review", label: "Review", icon: Inbox, badge: (s) => s.review_count },
   { page: "settings", label: "Settings", icon: Settings },

@@ -54,4 +54,4 @@ class LocalStateTests(ServerCase):
         self.assertEqual(code, 200)
         self.assertEqual(st, {"version": "v9.8.7", "database": "postgres" if db.using_postgres() else "sqlite",
                               "user": {"name": None, "email": None, "local": True}, "last_backup": None,
-                              "review_count": 0})
+                              "review_count": 0, "person_id": None})

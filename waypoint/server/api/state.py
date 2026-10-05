@@ -22,6 +22,7 @@ def api_state(conn, _q, _b) -> State:
         "user": user,
         "last_backup": with_offset(db.get_setting(conn, sk.LAST_BACKUP)),   # the last backup downloaded from Settings
         "review_count": review.count(conn, owner()) + trips.unmatched_count(conn, viewer(conn)),
+        "person_id": viewer(conn).person_id,
     }
 
 

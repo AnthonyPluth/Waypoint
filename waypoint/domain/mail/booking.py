@@ -37,6 +37,7 @@ class Booking:
     details: tuple[tuple[str, str], ...] = ()
     manage_url: str | None = None
     passengers: tuple[Passenger, ...] = ()
+    clock_times: frozenset[str] = frozenset()   # the times of day (HH:MM) the message's own text shows, kept only when a time above is marked UTC
 
 
 @dataclass(frozen=True)
