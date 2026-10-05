@@ -1,31 +1,46 @@
-"""Background jobs: the sweep that ends Gmail connections whose owners can no longer sign in, the flight status checks, and the
-mail scan (every few hours, and on "Scan now")."""
+"""Background jobs: the sweep that ends Gmail connections, notification devices and calendar feeds whose owners can no longer
+sign in, the flight status checks, the reminders, and the mail scan (every few hours, and on "Scan now")."""
 from __future__ import annotations
 
 import threading
 import time
 from datetime import UTC, date, datetime
 
-from .. import monitoring
-from ..domain import flightstatus
+from .. import monitoring, oidc
+from ..domain import flightstatus, reminders
 from ..domain.mail import scan
 from ..providers import gmail
 from ..storage import db
 
+SUBJECT = "mailto:waypoint@localhost"   # the contact a push service gets with each notification (RFC 8292) when there's no WAYPOINT_PUBLIC_URL; no one's address
 SWEEP_EVERY = 3600   # seconds
 FLIGHT_STATUS_EVERY = 300   # the checks are at set points before a flight (20 minutes is the closest), so a round this often is enough
+REMINDERS_EVERY = 300   # a reminder is sent in the round after it falls due, so up to five minutes late
 SCAN_EVERY = 4 * 3600
 SCAN_FIRST = 300     # the first scan waits this long after Waypoint starts
 
 
 def sweep_lapsed() -> None:
-    """End the mailbox connections of people who can no longer sign in, then again every hour (so a connection nothing
-    uses doesn't outlive its owner)."""
+    """End the mailbox connections, notification devices and calendar feeds of people who can no longer sign in, then again
+    every hour (so what nothing uses doesn't outlive its owner)."""
     try:
         with db.session() as conn:
             ended = gmail.end_lapsed(conn)
-        if ended:
-            monitoring.log(f"Ended {ended} Gmail connection(s) whose owner can no longer sign in.")
+        with db.session() as conn:
+            others = reminders.end_lapsed(conn)
+        if ended or others:
+            monitoring.log(f"Ended {ended} Gmail connection(s) and {others} person(s)' reminders and calendar feed whose owner can no longer sign in.")
+    except Exception as e:   # the next round tries again; never the details (they may name a row)
+        monitoring.report(e, values=False)
+
+
+def send_reminders() -> None:
+    """Send the reminders that are due ("Check-in opens", the day-of summary): the machine's local day and hour decide the
+    summary's, a flight's own zone its check-in."""
+    try:
+        local = datetime.now().astimezone()
+        with db.session() as conn:
+            reminders.run_due(conn, datetime.now(UTC), local.date(), local.hour, reminders.sender(conn, oidc.config()["public_url"] or SUBJECT))
     except Exception as e:   # the next round tries again; never the details (they may name a row)
         monitoring.report(e, values=False)
 
@@ -78,6 +93,7 @@ def start(stop: threading.Event) -> list[threading.Thread]:
         monitoring.report(e, values=False)
     threads = [threading.Thread(target=every, args=(SWEEP_EVERY, sweep_lapsed), daemon=True, name="gmail-lapse-sweep"),
                threading.Thread(target=every, args=(FLIGHT_STATUS_EVERY, check_flights), daemon=True, name="flight-status"),
+               threading.Thread(target=every, args=(REMINDERS_EVERY, send_reminders), daemon=True, name="reminders"),
                threading.Thread(target=every, args=(SCAN_EVERY, scan_mailboxes, SCAN_FIRST), daemon=True, name="mail-scan")]
     for t in threads:
         t.start()

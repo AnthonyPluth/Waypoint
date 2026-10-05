@@ -13,6 +13,9 @@ one a correction that used to live as prose and now fails `make check` and CI in
   that skips a test or runs only some (`unittest.skip`, `skipTest(`, `.skip(`, `.only(`, `xit(`) needs a
   `Skips-Test: <name> — <why>` trailer. A test isn't deleted or switched off to get CI green (AGENTS.md); when one
   really goes, the reason is on record for the review.
+- Mail parsers (waypoint/domain/mail/parsers/): each vendor module (not `__init__.py` or a `_` helper) is registered in the
+  package's `PARSERS`, has `booking.eml`, `change.eml` and `cancellation.eml` under tests/fixtures/mail/<vendor>/, and has a
+  test, tests/test_mail_parser_<vendor>.py, that names that directory and each of the three fixtures.
 - Workflows (.github/workflows/, .github/actions/): each workflow runs bash by default (so steps get -eo pipefail);
   every action pinned by SHA has its version in a comment; and `gh api` with `per_page` paginates.
 
@@ -30,6 +33,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MIGRATIONS = ROOT / "waypoint/storage/migrations/versions"
 MIGRATION_TESTS = ROOT / "tests/test_migrations.py"
+PARSERS = ROOT / "waypoint/domain/mail/parsers"
+MAIL_FIXTURES = ROOT / "tests/fixtures/mail"
+TESTS = ROOT / "tests"
 WORKFLOWS = ROOT / ".github/workflows"
 ACTIONS = ROOT / ".github/actions"
 
@@ -239,6 +245,40 @@ def check_tests(base: str, messages: list[str]) -> list[str]:
     return problems
 
 
+# --- Mail parsers -------------------------------------------------------------------------------------------------
+
+PARSER_FIXTURES = ("booking", "change", "cancellation")   # the emails each vendor's fixtures hold, as <name>.eml
+
+
+def parser_vendors(directory: Path = PARSERS) -> list[str]:
+    """The vendor modules among the parsers: every module but `__init__` and the helpers (`_text.py`)."""
+    return sorted(p.stem for p in directory.glob("*.py") if not p.stem.startswith("_"))
+
+
+def check_parsers(vendors: list[str], registry: str, fixtures: Path = MAIL_FIXTURES, tests: Path = TESTS) -> list[str]:
+    """What each vendor parser must have: a place in `registry` (the package's source), synthetic fixtures for a booking, a
+    change and a cancellation, and a test that reads them."""
+    problems = []
+    for vendor in vendors:
+        where = f"waypoint/domain/mail/parsers/{vendor}.py"
+        if not re.search(rf"\b{re.escape(vendor)}\.parse\b", registry):
+            problems.append(f"{where}: not registered in PARSERS in parsers/__init__.py (a parser nothing runs)")
+        for name in PARSER_FIXTURES:
+            if not (fixtures / vendor / f"{name}.eml").is_file():
+                problems.append(f"{where}: no synthetic fixture tests/fixtures/mail/{vendor}/{name}.eml")
+        test = tests / f"test_mail_parser_{vendor}.py"
+        if not test.is_file():
+            problems.append(f"{where}: no test in tests/test_mail_parser_{vendor}.py that uses the fixtures")
+            continue
+        text = test.read_text()
+        if not re.search(rf"""fixtures/mail/{re.escape(vendor)}\b|"fixtures"\s*/\s*"mail"\s*/\s*"{re.escape(vendor)}\"""", text):
+            problems.append(f"{test.name}: doesn't name the fixtures directory tests/fixtures/mail/{vendor}/")
+        for name in PARSER_FIXTURES:
+            if not re.search(rf"""["']{name}["']""", text):
+                problems.append(f"{test.name}: never uses the {name} fixture")
+    return problems
+
+
 # --- Workflows ----------------------------------------------------------------------------------------------------
 
 USES = re.compile(r"^[ \t]*(?:-[ \t]*)?uses:[ \t]*([^\s#]+)(.*)$", re.MULTILINE)
@@ -275,12 +315,27 @@ def check_workflows() -> list[str]:
     return problems
 
 
+def check_manage_links(table: dict, tests_text: str) -> list[str]:
+    """Every provider in the manage-link table is named in a test that builds its URL (tests/test_links.py), over https."""
+    problems = []
+    for provider, (host, _path) in table.items():
+        if not re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", host):
+            problems.append(f"manage link for {provider!r}: {host!r} isn't a bare host")
+        if f'"{provider}"' not in tests_text and f"'{provider}'" not in tests_text:
+            problems.append(f"manage link for {provider!r} has no test in tests/test_links.py")
+    return problems
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--commits", metavar="BASE..HEAD", help="also check these commits' trailers (a pull request's)")
     args = ap.parse_args(argv)
     problems = check_migrations(migrations(), MIGRATION_TESTS.read_text())
+    problems += check_parsers(parser_vendors(), (PARSERS / "__init__.py").read_text())
     problems += check_workflows()
+    sys.path.insert(0, str(ROOT))
+    from waypoint.domain import links
+    problems += check_manage_links(links.MANAGE, (ROOT / "tests/test_links.py").read_text())
     if args.commits:
         found = commits(args.commits)
         for sha, message in found:
@@ -290,9 +345,9 @@ def main(argv: list[str] | None = None) -> int:
     for p in problems:
         print(f"::error::{p}" if "GITHUB_ACTIONS" in os.environ else p, file=sys.stderr)
     if not problems:
-        print("Fleet checks passed: one migration head, migrations tested"
+        print("Fleet checks passed: one migration head, migrations tested, mail parsers registered with fixtures and a test"
               + (", commit trailers, no test removed or skipped without a reason" if args.commits else "")
-              + ", workflow conventions.")
+              + ", workflow conventions, manage links tested.")
     return 1 if problems else 0
 
 

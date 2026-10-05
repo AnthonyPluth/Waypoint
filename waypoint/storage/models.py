@@ -210,3 +210,36 @@ class IgnoredSender(Base):
     id: Mapped[int]
     mailbox_id: Mapped[int]
     domain: Mapped[str]
+
+
+class PushDevice(Base):
+    __table__ = schema.push_devices
+    id: Mapped[int]
+    owner_sub: Mapped[str]
+    endpoint: Mapped[str]            # the push service's address for this browser
+    p256dh: Mapped[str]
+    auth: Mapped[str]
+    created: Mapped[float]
+
+
+class ReminderPrefs(Base):
+    __table__ = schema.reminder_prefs
+    owner_sub: Mapped[str]
+    check_in: Mapped[bool]
+    day_of: Mapped[bool]
+
+
+class ReminderSent(Base):
+    __table__ = schema.reminders_sent
+    id: Mapped[int]
+    owner_sub: Mapped[str]
+    kind: Mapped[str]                # check_in or day_of
+    ref: Mapped[str]                 # the segment's id (check_in) or the day (day_of)
+    sent: Mapped[float]
+
+
+class CalendarFeed(Base):
+    __table__ = schema.calendar_feeds
+    owner_sub: Mapped[str]
+    key_hash: Mapped[str]            # SHA-256 of the key in the feed's address; the key itself is never kept
+    created: Mapped[float]

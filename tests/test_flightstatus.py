@@ -727,12 +727,14 @@ class JobTests(Household):
     def test_the_jobs_start_and_stop(self):
         stop = threading.Event()
         stop.set()
-        with mock.patch.object(jobs, "sweep_lapsed") as sweep, mock.patch.object(jobs, "check_flights") as check:
+        with mock.patch.object(jobs, "sweep_lapsed") as sweep, mock.patch.object(jobs, "check_flights") as check, \
+                mock.patch.object(jobs, "send_reminders") as remind:
             for t in jobs.start(stop):
                 t.join(5)
                 self.assertFalse(t.is_alive())
         sweep.assert_called_once()
         check.assert_called_once()
+        remind.assert_called_once()
 
 
 # ------------------------------------------------------------------------------------------------ the routes

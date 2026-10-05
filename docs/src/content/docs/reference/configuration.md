@@ -9,7 +9,7 @@ Settings that belong to the app live in **Settings** and are stored in the datab
 
 | Variable | Default | What it does |
 |---|---|---|
-| `WAYPOINT_PUBLIC_URL` | | The address you open Waypoint at, e.g. `https://waypoint.example.com`. Required with sign-in. |
+| `WAYPOINT_PUBLIC_URL` | | The address you open Waypoint at, e.g. `https://waypoint.example.com`. Required with sign-in. The calendar feed’s address and Gmail’s return address are made from it. |
 | `OIDC_ISSUER` | | Your identity provider’s issuer URL. Setting it turns sign-in on. |
 | `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | | The client registered with your provider. Leave the secret empty for a public (PKCE-only) client. |
 | `OIDC_ALLOWED_EMAILS` | | Comma-separated emails allowed in. An email counts only if your provider marks it verified (`email_verified`). |

@@ -69,6 +69,7 @@ class Mailbox(TypedDict):
     last_scan: str | None           # when a scan last finished, with its UTC offset
     scan_error: str | None          # what the last scan couldn't do (the last good state is kept); null once one finishes
     scanning: bool                  # a scan is running now
+    scan_notice: str | None         # why the last scan couldn't start (nothing was recorded; it isn't a failed scan), until one does
 
 
 class MailboxList(TypedDict):
@@ -199,6 +200,12 @@ class Traveler(TypedDict):
     name: str                       # the person's name, or the name as printed on the booking
 
 
+class SegmentLinks(TypedDict):
+    app: str | None                 # the provider's manage-trip page (https): its app opens it if installed
+    directions: str | None          # Apple Maps, for a hotel or a rental
+    call: str | None                # tel:
+
+
 class Segment(TypedDict):
     """One flight leg, hotel stay, car rental or train. Its times are local wall-clock times at the place, never
     converted: `start_local` is 2026-03-01T22:15 in `start_zone`, whatever zone the server or the viewer is in."""
@@ -220,6 +227,7 @@ class Segment(TypedDict):
     booked_by: int | None           # a person
     locked_fields: list[str]        # what a person edited, which a later email never overwrites
     travelers: list[Traveler]
+    links: SegmentLinks              # the card's actions, built by the server
 
 
 class Trip(TypedDict):
@@ -376,3 +384,37 @@ class LoyaltyBody(TypedDict):
 
 class Revealed(TypedDict):
     number: str
+
+
+# Reminders and the calendar feed
+
+class ReminderDevice(TypedDict):
+    """A browser or phone that gets this member's notifications."""
+    id: int
+    service: str                    # the push service's host, to tell devices apart
+    created: float                  # seconds since the epoch
+
+
+class Reminders(TypedDict):
+    """The signed-in member's own: which reminders they get, their devices, and whether they have a calendar feed."""
+    public_key: str                 # this server's key, for a browser to subscribe with
+    check_in: bool                  # "Check-in opens", 24 hours before a flight
+    day_of: bool                    # the summary of the day's bookings, from 7:00 on the machine's clock
+    devices: list[ReminderDevice]
+    feed: bool                      # a calendar feed is on (its address was shown once, when it was made)
+
+
+class RemindersBody(TypedDict):
+    check_in: bool
+    day_of: bool
+
+
+class DeviceBody(TypedDict):
+    """A browser's push subscription (`PushSubscription.toJSON()`)."""
+    endpoint: str
+    p256dh: str
+    auth: str
+
+
+class FeedMade(TypedDict):
+    url: str                        # the feed's address, with its key: shown once, and not kept anywhere in Waypoint

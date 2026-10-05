@@ -15,10 +15,11 @@ import TripPage from "./Trip.svelte";
 
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true };
 const sam: Person = { id: 2, display_name: "Sam Doe", first_name: "Sam", legal_name: null, aliases: [], member: true };
-const flight = segment({ id: 1, locked_fields: ["terminal"], manage_url: "https://example.com/manage",
+const flight = segment({ id: 1, locked_fields: ["terminal"], manage_url: "https://example.com/manage", links: { app: "https://example.com/manage", directions: null, call: null },
   travelers: [{ id: 1, person_id: 1, name: "Jane Doe" }, { id: 2, person_id: 2, name: "Sam Doe" }, { id: 3, person_id: null, name: "DOE/MIA MISS" }] });
 const stay = segment({ id: 2, kind: "hotel", provider: "Marriott", origin: "Harbour Hotel", destination: null, start_local: "2026-11-21T15:00", start_zone: "Europe/London",
-  end_local: "2026-11-27T10:00", end_zone: "Europe/London", confirmation: "H88231", details: { address: "1 Quay Street, London" }, status: "changed", travelers: [{ id: 4, person_id: 1, name: "Jane Doe" }] });
+  end_local: "2026-11-27T10:00", end_zone: "Europe/London", confirmation: "H88231", details: { address: "1 Quay Street, London", phone: "+44 20 7946 0000" },
+  links: { app: null, directions: "https://maps.apple.com/?q=1%20Quay%20Street%2C%20London", call: "tel:+442079460000" }, status: "changed", travelers: [{ id: 4, person_id: 1, name: "Jane Doe" }] });
 const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: null, statuses: [{
   segment_id: 1, state: "delayed", origin: "JFK", destination: "LHR", dep_scheduled: "2026-11-20T19:00", dep_estimated: "2026-11-20T19:50",
   dep_actual: null, dep_zone: "America/New_York", dep_terminal: "7", dep_gate: "B24", arr_scheduled: "2026-11-21T07:10", arr_estimated: "2026-11-21T08:05",
@@ -56,6 +57,36 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByTestId("flight-status")).toBeNull();
   });
 
+  it("offers each booking’s actions, and no Wallet off iOS", async () => {
+    render(TripPage);
+    await screen.findByRole("heading", { name: "Trip to London" });
+    const hotel = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
+    expect(hotel.getByRole("link", { name: "Directions" })).toHaveAttribute("href", "https://maps.apple.com/?q=1%20Quay%20Street%2C%20London");
+    expect(hotel.getByRole("link", { name: "Call" })).toHaveAttribute("href", "tel:+442079460000");
+    expect(hotel.queryByRole("link", { name: "Open in app" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Wallet" })).toBeNull();
+  });
+
+  it("shows Wallet, opening shoebox://, on iOS", async () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)");
+    render(TripPage);
+    await screen.findByRole("heading", { name: "Trip to London" });
+    const wallets = screen.getAllByRole("link", { name: "Wallet" });
+    expect(wallets).toHaveLength(2);
+    expect(wallets[0]).toHaveAttribute("href", "shoebox://");
+    vi.restoreAllMocks();
+  });
+
+  it("keeps a cancelled booking’s manage link and drops its other actions", async () => {
+    held = trip([{ ...stay, status: "cancelled", links: { app: "https://example.com/manage", directions: "https://maps.apple.com/?q=x", call: "tel:+442079460000" } }]);
+    render(TripPage);
+    await screen.findByRole("heading", { name: "Trip to London" });
+    const group = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
+    expect(group.getByRole("link", { name: "Open in app" })).toHaveAttribute("href", "https://example.com/manage");
+    expect(group.queryByRole("link", { name: "Directions" })).toBeNull();
+    expect(group.queryByRole("link", { name: "Call" })).toBeNull();
+  });
+
   it("shows each booking with its local times, who is on it and the number each would use", async () => {
     render(TripPage);
     expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
@@ -65,7 +96,7 @@ describe("Trip", () => {
     expect(first.getByText("7:00 PM")).toBeInTheDocument();
     expect(first.getByText("7:10 AM")).toBeInTheDocument();
     expect(first.getByText("Edited by you")).toBeInTheDocument();
-    expect(first.getByRole("link", { name: "Open the booking" })).toHaveAttribute("href", "https://example.com/manage");
+    expect(first.getByRole("link", { name: "Open in app" })).toHaveAttribute("href", "https://example.com/manage");
     // Jane has an AAdvantage number (masked); Sam has none, with a hint; a printed name isn't matched yet.
     expect(first.getByRole("button", { name: "Show and copy American AAdvantage number" })).toHaveTextContent("••••4567");
     expect(first.getByText(/No American AAdvantage number yet/)).toBeInTheDocument();

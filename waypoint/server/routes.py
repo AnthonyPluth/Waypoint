@@ -18,6 +18,8 @@ from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
 from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loyalty_remove, api_loyalty_reveal
 from .api.people import api_people, api_person_add, api_person_edit, api_person_remove
 from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_scan, api_mailboxes
+from .api.reminders import (api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
+                            api_reminders_set)
 from .api.review import api_review, api_review_dismiss, api_review_ignore, api_review_who
 from .api.state import api_state
 
@@ -58,6 +60,12 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/mailboxes/callback", api_mailbox_callback),
     ("DELETE", "/api/mailboxes/{id}", api_mailbox_disconnect),
     ("POST", "/api/mailboxes/{id}/scan", api_mailbox_scan),
+    ("GET", "/api/reminders", api_reminders),
+    ("POST", "/api/reminders", api_reminders_set),
+    ("POST", "/api/reminders/devices", api_device_add),
+    ("DELETE", "/api/reminders/devices/{id}", api_device_remove),
+    ("POST", "/api/feed", api_feed_make),
+    ("DELETE", "/api/feed", api_feed_off),
     ("GET", "/api/review", api_review),
     ("POST", "/api/review/who/{id}", api_review_who),
     ("POST", "/api/review/{id}/ignore", api_review_ignore),

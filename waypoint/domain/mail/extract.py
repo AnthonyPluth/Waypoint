@@ -5,7 +5,10 @@ the server"), so the body is read here, in memory, and what comes out is only th
 A booking is found in the markup airlines, hotels and rental companies add for Gmail's own cards: schema.org JSON-LD and
 microdata (`FlightReservation`, `LodgingReservation`, `RentalCarReservation`, `TrainReservation`). `read` returns the
 bookings, who the message is from and when (its sender's domain and its day: the review queue's labels, never its text). Times come out as the markup wrote them
-(`wall_clock` turns one into the place's wall-clock time); the zone of a place is the scan's to find, since this module touches no database."""
+(`wall_clock` turns one into the place's wall-clock time); the zone of a place is the scan's to find, since this module touches no database.
+
+A sender that has a parser in `parsers/` and whose markup gave no booking is read by it: the parser is given the message's HTML
+and plain-text parts and returns bookings, like the markup does. It sees nothing else of the message."""
 from __future__ import annotations
 
 import base64
@@ -19,12 +22,17 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
-from typing import Any, Literal
+from typing import Any
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-Kind = Literal["flight", "hotel", "car", "train"]
-Status = Literal["confirmed", "cancelled"]
+from ... import monitoring
+from . import parsers
+from .booking import Booking as Booking
+from .booking import Kind, Parsed
+from .booking import Passenger as Passenger
+from .booking import Place as Place
+from .booking import Status
 
 RESERVATIONS: dict[str, Kind] = {"FlightReservation": "flight", "LodgingReservation": "hotel",
                                  "RentalCarReservation": "car", "TrainReservation": "train"}
@@ -33,36 +41,6 @@ MAX_NODES = 200         # reservations considered in one message
 IATA = re.compile(r"[A-Z]{3}")
 BASE64URL = re.compile(r"[A-Za-z0-9_=-]+")
 VOID = {"meta", "link", "img", "source", "area", "br", "hr", "input", "wbr", "col", "embed", "track", "base"}
-
-
-@dataclass(frozen=True)
-class Place:
-    """Where a stay or a rental is, as far as the markup says: what finds its time zone."""
-    city: str | None = None
-    country: str | None = None
-
-
-@dataclass(frozen=True)
-class Passenger:
-    name: str
-    member_number: str | None = None   # a loyalty number printed on the booking (programMembership)
-
-
-@dataclass(frozen=True)
-class Booking:
-    kind: Kind
-    status: Status
-    confirmation: str | None
-    provider: str | None
-    start: str                         # the time as written (ISO 8601, with or without an offset)
-    end: str
-    origin: str | None                 # a flight's airport code; a stay's or a rental's place, a station
-    destination: str | None
-    start_place: Place = Place()
-    end_place: Place = Place()
-    details: tuple[tuple[str, str], ...] = ()
-    manage_url: str | None = None
-    passengers: tuple[Passenger, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -422,13 +400,20 @@ def read(message: Mapping[str, Any]) -> Message:
     except (ValueError, LookupError, TypeError):
         return Message(None, None, broken=True)
     nodes: list[dict[str, Any]] = []
+    htmls: list[str] = []
+    texts: list[str] = []
     for part in parsed.walk():
-        if part.get_content_type() != "text/html":
+        kind = part.get_content_type()
+        if kind not in ("text/html", "text/plain"):
             continue
         try:
             html = str(part.get_content())[:MAX_PART]
         except (ValueError, LookupError, KeyError):
             continue
+        if kind == "text/plain":
+            texts.append(html)
+            continue
+        htmls.append(html)
         scanner = _Markup()
         try:
             scanner.feed(html)
@@ -439,6 +424,15 @@ def read(message: Mapping[str, Any]) -> Message:
             nodes.extend(_jsonld_nodes(ld))
         nodes.extend(scanner.items)
     bookings, unread, seen = _bookings(nodes)
+    parse = parsers.for_sender(sender)
+    if parse is not None and not bookings:   # (a sender with a parser, and no markup that gave a booking: read its text)
+        try:
+            found = parse("\n".join(htmls), "\n".join(texts))
+        except Exception as e:   # a parser's bug: this message goes to the review queue, and later scans carry on
+            monitoring.report(e, values=False)
+            found = Parsed(unread=1)
+        bookings, unread = list(found.bookings), unread + found.unread
+        seen = seen or bool(found.bookings or found.unread)
     return Message(sender, received, tuple(bookings), unread, markup=seen)
 
 

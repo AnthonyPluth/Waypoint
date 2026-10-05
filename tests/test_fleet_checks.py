@@ -109,6 +109,57 @@ class Commits(unittest.TestCase):
         self.assertEqual(fc.check_commit("a" * 40, "fix: x\n\nCo-Authored-By: Pat Doe <pat@example.com>\n"), [])
 
 
+class MailParsers(unittest.TestCase):
+    REGISTRY = "PARSERS = {'acme.com': acme.parse}\n"
+    TEST = 'FIXTURES = Path(__file__).parent / "fixtures" / "mail" / "acme"\nraw("booking"); raw("change"); raw("cancellation")\n'
+
+    def problems(self, vendors=("acme",), registry=REGISTRY, fixtures=("booking", "change", "cancellation"), test=TEST, name="acme"):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "fixtures" / "acme").mkdir(parents=True)
+            for f in fixtures:
+                (root / "fixtures" / "acme" / f"{f}.eml").write_text("From: a\n\nbody")
+            if test is not None:
+                (root / f"test_mail_parser_{name}.py").write_text(test)
+            return fc.check_parsers(list(vendors), registry, root / "fixtures", root)
+
+    def test_the_repository_passes(self):
+        vendors = fc.parser_vendors()
+        self.assertIn("southwest", vendors)
+        self.assertNotIn("_text", vendors)
+        self.assertNotIn("__init__", vendors)
+        self.assertEqual(fc.check_parsers(vendors, (fc.PARSERS / "__init__.py").read_text()), [])
+
+    def test_a_parser_with_fixtures_and_a_test_passes(self):
+        self.assertEqual(self.problems(), [])
+
+    def test_no_parsers_need_nothing(self):
+        self.assertEqual(self.problems(vendors=()), [])
+
+    def test_a_parser_nothing_runs_fails(self):
+        [problem] = self.problems(registry="PARSERS = {'other.com': other.parse}\n")
+        self.assertIn("not registered", problem)
+
+    def test_a_missing_fixture_fails_for_each_one_missing(self):
+        problems = self.problems(fixtures=("booking",))
+        self.assertEqual(len(problems), 2)
+        self.assertTrue(any("change.eml" in p for p in problems) and any("cancellation.eml" in p for p in problems))
+
+    def test_no_test_fails(self):
+        [problem] = self.problems(test=None)
+        self.assertIn("test_mail_parser_acme.py", problem)
+
+    def test_a_test_that_doesnt_name_the_fixtures_or_use_each_of_them_fails(self):
+        problems = self.problems(test='raw("booking")\n')
+        self.assertEqual(len(problems), 3)
+        self.assertIn("fixtures directory", problems[0])
+        self.assertTrue(any("change fixture" in p for p in problems) and any("cancellation fixture" in p for p in problems))
+
+    def test_the_directory_can_be_named_as_a_path(self):
+        text = '"""Reads tests/fixtures/mail/acme."""\nraw("booking"); raw(\'change\'); raw("cancellation")\n'
+        self.assertEqual(self.problems(test=text), [])
+
+
 class Workflows(unittest.TestCase):
     GOOD = ("name: X\non: push\ndefaults:\n  run:\n    shell: bash\njobs:\n  a:\n    steps:\n"
             "      - uses: actions/checkout@" + "a" * 40 + "   # v7.0.1\n"
@@ -204,6 +255,15 @@ class Tests(unittest.TestCase):
             self.skipTest("no origin/main here to compare with")
         found = fc.commits(f"{base}..HEAD")
         self.assertEqual(fc.check_tests(fc._git("merge-base", base, "HEAD").strip(), [m for _, m in found]), [])
+
+
+class ManageLinks(unittest.TestCase):
+    def test_a_provider_needs_a_test_and_a_bare_host(self):
+        table = {"example air": ("www.example.com", "/m?c={code}")}
+        self.assertEqual(fc.check_manage_links(table, 'x("example air")'), [])
+        self.assertIn("has no test", fc.check_manage_links(table, "")[0])
+        self.assertIn("isn't a bare host", fc.check_manage_links({"a": ("evil.com/x", "/")}, '"a"')[0])
+        self.assertEqual(fc.check_manage_links({}, ""), [])
 
 
 if __name__ == "__main__":

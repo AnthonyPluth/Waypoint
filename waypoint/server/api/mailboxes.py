@@ -19,15 +19,21 @@ def owner() -> str:
     return str((getattr(_current, "user", None) or {}).get("sub") or "local")
 
 
+def public_base(needed_by: str) -> str:
+    """The address people open Waypoint at: WAYPOINT_PUBLIC_URL, or this request's own address when none is set (on your
+    own machine, without sign-in). With sign-in on, a client-chosen Host header isn't an address to hand out."""
+    base = oidc.config()["public_url"]
+    if not base:
+        if oidc.enabled():
+            raise ApiError(f"{needed_by} needs WAYPOINT_PUBLIC_URL to be set.")
+        base = f"http://{getattr(_current, 'host', None) or 'localhost'}"
+    return str(base)
+
+
 def redirect_uri() -> str:
     """Where Google sends the browser back: <WAYPOINT_PUBLIC_URL>/api/mailboxes/callback (the address the Google client
     allows), or this request's own address when none is set (on your own machine)."""
-    base = oidc.config()["public_url"]
-    if not base:
-        if oidc.enabled():   # a client-chosen Host header isn't an address to send a sign-in's mailbox back to
-            raise ApiError("Gmail needs WAYPOINT_PUBLIC_URL to be set.")
-        base = f"http://{getattr(_current, 'host', None) or 'localhost'}"   # on your own machine, without sign-in
-    return base + "/api/mailboxes/callback"
+    return public_base("Gmail") + "/api/mailboxes/callback"
 
 
 def _when(t: float | None) -> str | None:
@@ -39,7 +45,8 @@ def api_mailboxes(conn, _q, _b) -> MailboxList:
     gmail.end_lapsed(conn)   # anyone's that lost access: they can't open Settings to disconnect it
     return {"configured": gmail.configured(),
             "mailboxes": [{"id": m["id"], "address": m["address"], "status": m["status"], "last_error": m["last_error"],
-                           "last_scan": _when(m["last_scan"]), "scan_error": m["scan_error"], "scanning": scan.running(m["id"])}
+                           "last_scan": _when(m["last_scan"]), "scan_error": m["scan_error"], "scanning": scan.running(m["id"]),
+                           "scan_notice": scan.notice(m["id"])}
                           for m in gmail.listing(conn, owner())]}
 
 
@@ -55,7 +62,10 @@ def api_mailbox_callback(conn, q, _b) -> Response:
     """Google's return: keep the connection, then back to Settings with how it went (?gmail=connected, denied, ...)."""
     params = {k: v[0] for k, v in q.items() if v}
     try:
-        gmail.finish(conn, owner(), params, redirect_uri())
+        address = gmail.finish(conn, owner(), params, redirect_uri())
+        for m in gmail.listing(conn, owner()):
+            if m["address"] == address:
+                scan.forget(m["id"])   # (connected again: what the last scan said no longer holds)
         outcome = "connected"
     except gmail.GmailError as e:
         outcome = next((code for kind, code in BACK.items() if isinstance(e, kind)), "failed")
@@ -71,6 +81,7 @@ def api_mailbox_disconnect(conn, _q, _b, mailbox_id: str) -> Disconnected:
         raise ApiError("Not found", 404) from None
     except gmail.GmailError as e:
         raise ApiError(str(e), 502) from e
+    scan.forget(n)
     return {"ok": True, "revoked": revoked}
 
 
