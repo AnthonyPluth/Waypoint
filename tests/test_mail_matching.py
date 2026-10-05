@@ -5,6 +5,7 @@ import unittest
 from sqlalchemy import update
 
 from tests.shared import DbCase
+from waypoint import oidc
 from waypoint.domain import airports, loyalty, people
 from waypoint.domain.mail import extract, ingest
 from waypoint.storage import secretbox
@@ -33,6 +34,16 @@ class NameTests(DbCase):
         self.assertIsNone(people.match_name(self.c, "DOE/SAM MR"))
         self.assertIsNone(people.match_name(self.c, ""))
         self.assertIsNone(people.match_name(self.c, "MR"))
+
+    def test_a_passenger_who_matches_a_member_and_a_guest_goes_to_the_member(self):
+        guest = person(self.c, "Jane Doe", "DOE/JANE MS")
+        oidc.remember_user(self.c, "u1", "jane@example.com", "Jane D.", "Jane")
+        member = people.person_for_sub(self.c, "u1")
+        assert member
+        people.edit(self.c, member, {"display_name": "Jane D.", "first_name": "Jane", "legal_name": "Jane Doe", "aliases": []})
+        found = ingest.travelers(self.c, (extract.Passenger("DOE/JANE MS", None),))
+        self.assertEqual(found, [{"person_id": member, "name": None}])
+        self.assertNotEqual(guest, member)
 
     def test_a_name_two_people_share_matches_neither(self):
         person(self.c, "Alex Rivera")

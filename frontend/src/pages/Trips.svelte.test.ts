@@ -12,8 +12,8 @@ import { route } from "$lib/app.svelte";
 import { segment, trip } from "../test/fixtures";
 import Trips from "./Trips.svelte";
 
-const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true };
-const sam: Person = { id: 2, display_name: "Sam Doe", first_name: "Sam", legal_name: null, aliases: [], member: true };
+const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
+const sam: Person = { id: 2, display_name: "Sam Doe", first_name: "Sam", legal_name: null, aliases: [], member: true, links: [] };
 const london = trip([segment({ id: 1, trip_id: 1, travelers: [{ id: 1, person_id: 1, name: "Jane Doe" }, { id: 2, person_id: 2, name: "Sam Doe" }] })], { id: 1, name: "Trip to London" });
 const auckland = trip([segment({ id: 2, trip_id: 2, origin: "JFK", destination: "AKL", start_local: "2027-01-14T21:00", end_local: "2027-01-16T06:30",
   travelers: [{ id: 3, person_id: 2, name: "Sam Doe" }] })], { id: 2, name: "Trip to Auckland" });

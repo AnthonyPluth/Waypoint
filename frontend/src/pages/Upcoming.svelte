@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { errMsg } from "$lib/act";
+  import { act, errMsg } from "$lib/act";
   import { apiCall } from "$lib/contract";
-  import type { Trip } from "$lib/api-types";
+  import type { Person, Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -10,23 +10,41 @@
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import { dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, headline, nextUp, startAt, START_WORD, subline, timesDiffer, tripDays, untimed, viewerZone, when } from "$lib/trips";
+  import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
+  import { toast } from "svelte-sonner";
 
   // The next thing on your trips (a card), then the trip it belongs to, day by day. A failed load leaves nothing drawn that
   // could pass for current, with a Try again.
   let trips = $state<Trip[] | null>(null);
   let loadError = $state("");
   let now = $state(Date.now());
+  // A member who was already a guest sees no trips until they say so: the guests their name matches, to claim ("This is me").
+  let guests = $state<Person[]>([]);
+  let claiming = $state<Person | null>(null);
+  let asking = $state(false);
 
   async function load() {
     loadError = "";
-    try { trips = (await apiCall<"GET /api/trips">("/api/trips")).trips; void loadFlightStatus(); }
-    catch (err) { trips = null; loadError = errMsg(err); }
+    try {
+      trips = (await apiCall<"GET /api/trips">("/api/trips")).trips; void loadFlightStatus();
+      guests = trips.length ? [] : (await apiCall<"GET /api/people/claim-suggestions">("/api/people/claim-suggestions")).guests;
+    } catch (err) { trips = null; guests = []; loadError = errMsg(err); }
   }
   $effect(() => {
     void load();
     const tick = setInterval(() => (now = Date.now()), 30_000);   // the countdown
     return () => clearInterval(tick);
+  });
+
+  const claim = (g: Person) => act(async () => {
+    await apiCall<"POST /api/people/{id}/claim">(`/api/people/${g.id}/claim`, { method: "POST" });
+    toast.success(`Linked ${g.display_name} to you`);
+    await load();
+  });
+  const noneOfThese = () => act(async () => {
+    await apiCall<"POST /api/people/claim-suggestions/dismiss">("/api/people/claim-suggestions/dismiss", { method: "POST" });
+    guests = [];
   });
 
   const today = $derived(dayIn(now, viewerZone()));
@@ -44,6 +62,25 @@
 {:else if trips === null}
   <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading"></div>
 {:else if trips.length === 0}
+  {#if guests.length}
+    <section class="rows mb-6" aria-labelledby="claim-title">
+      <div class="row items-stretch">
+        <div class="flex w-full flex-col gap-3">
+          <h2 id="claim-title" class="font-medium">Are you one of these?</h2>
+          <p class="text-sm text-muted-foreground">Bookings were already made for someone with your name. If it’s you, their trips become yours.</p>
+          <ul class="flex flex-col gap-2" aria-label="Guests that match your name">
+            {#each guests as g (g.id)}
+              <li class="flex flex-wrap items-center justify-between gap-2">
+                <span class="min-w-0 break-words font-medium">{g.display_name}</span>
+                <Button size="sm" aria-label={`This is me: ${g.display_name}`} onclick={() => { claiming = g; asking = true; }}>This is me</Button>
+              </li>
+            {/each}
+          </ul>
+          <div><Button variant="outline" size="sm" onclick={noneOfThese}>None of these</Button></div>
+        </div>
+      </div>
+    </section>
+  {/if}
   <section class="pass" aria-labelledby="empty-title">
     <div class="flex flex-col items-start gap-4 p-6 md:p-8">
       <span class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary"><PlaneTakeoff class="size-6" aria-hidden="true" /></span>
@@ -127,3 +164,7 @@
     </ol>
   {/if}
 {/if}
+
+<ConfirmDialog bind:open={asking} title={`Link ${claiming?.display_name ?? "this guest"} to you?`} confirmLabel="This is me" busyLabel="Linking…"
+  description="Their trips, loyalty and Known Traveler numbers and names become yours, and the guest is removed. This can’t be undone in Waypoint: restoring a backup is the way back."
+  onconfirm={async () => { const g = claiming; return g ? await claim(g) : true; }} />

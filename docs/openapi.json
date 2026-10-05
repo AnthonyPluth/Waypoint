@@ -280,6 +280,99 @@
         }
       }
     },
+    "/api/people/{id}/claim": {
+      "post": {
+        "operationId": "api_person_claim",
+        "x-handler": "waypoint/server/api/people.py:api_person_claim",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Person"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/people/claim-suggestions": {
+      "get": {
+        "operationId": "api_claim_suggestions",
+        "x-handler": "waypoint/server/api/people.py:api_claim_suggestions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimSuggestions"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/people/claim-suggestions/dismiss": {
+      "post": {
+        "operationId": "api_claim_dismiss",
+        "x-handler": "waypoint/server/api/people.py:api_claim_dismiss",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/trips": {
       "get": {
         "operationId": "api_trips",
@@ -1959,6 +2052,22 @@
         ],
         "additionalProperties": false
       },
+      "ClaimSuggestions": {
+        "type": "object",
+        "description": "Guests the signed-in member may be (their name matches, and they have no trips yet), for \"Are you one of these?\".",
+        "properties": {
+          "guests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Person"
+            }
+          }
+        },
+        "required": [
+          "guests"
+        ],
+        "additionalProperties": false
+      },
       "DeviceBody": {
         "type": "object",
         "description": "A browser's push subscription (`PushSubscription.toJSON()`).",
@@ -2483,6 +2592,27 @@
         ],
         "additionalProperties": false
       },
+      "LoyaltyConflict": {
+        "type": "object",
+        "description": "A person with two different numbers for one program (both are kept); People says so.",
+        "properties": {
+          "person_id": {
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "program": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "kind",
+          "program"
+        ],
+        "additionalProperties": false
+      },
       "LoyaltyEntry": {
         "type": "object",
         "description": "One membership. The number comes only masked (its last four characters); `POST /api/loyalty/{id}/reveal` gives it.",
@@ -2546,6 +2676,12 @@
               "$ref": "#/components/schemas/LoyaltyEntry"
             }
           },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LoyaltyConflict"
+            }
+          },
           "programs": {
             "type": "object",
             "additionalProperties": {
@@ -2558,6 +2694,7 @@
         },
         "required": [
           "loyalty",
+          "conflicts",
           "programs"
         ],
         "additionalProperties": false
@@ -2722,6 +2859,12 @@
           },
           "member": {
             "type": "boolean"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonLink"
+            }
           }
         },
         "required": [
@@ -2730,7 +2873,8 @@
           "first_name",
           "legal_name",
           "aliases",
-          "member"
+          "member",
+          "links"
         ],
         "additionalProperties": false
       },
@@ -2762,6 +2906,27 @@
         },
         "required": [
           "display_name"
+        ],
+        "additionalProperties": false
+      },
+      "PersonLink": {
+        "type": "object",
+        "description": "A guest a member claimed: their name, the member who claimed it and the day (YYYY-MM-DD).",
+        "properties": {
+          "guest": {
+            "type": "string"
+          },
+          "by": {
+            "type": "string"
+          },
+          "on": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "guest",
+          "by",
+          "on"
         ],
         "additionalProperties": false
       },

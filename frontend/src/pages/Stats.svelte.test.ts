@@ -11,8 +11,8 @@ import { app, route } from "$lib/app.svelte";
 import { state } from "../test/fixtures";
 import Stats_ from "./Stats.svelte";
 
-const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true };
-const sam: Person = { id: 2, display_name: "Sam Doe", first_name: "Sam", legal_name: null, aliases: [], member: true };
+const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
+const sam: Person = { id: 2, display_name: "Sam Doe", first_name: "Sam", legal_name: null, aliases: [], member: true, links: [] };
 
 const none: Stats = {
   years: [2026, 2025], person: 1, year: null, distance_unit: "mi",
