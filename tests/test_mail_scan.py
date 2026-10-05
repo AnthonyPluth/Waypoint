@@ -373,6 +373,22 @@ class MergeTests(ScanCase):
         segs = self.segments()
         self.assertEqual(sorted((s["start_local"], s["status"]) for s in segs), [("2026-11-20T19:00", "confirmed"), ("2026-12-20T19:00", "confirmed")])
 
+    def moved_by(self, days: int) -> list[str]:
+        """The starts of the segments after a first email and then one for the same booking `days` days later."""
+        self.put("flight_jsonld")
+        self.scan()
+        later = eml("flight_jsonld").replace(b"2026-11-20T19:00:00-05:00", f"2026-11-{20 + days}T19:00:00-05:00".encode()).replace(
+            b"2026-11-21T07:10:00+00:00", f"2026-11-{21 + days}T07:10:00+00:00".encode())
+        self.add_mail("later", later)
+        self.scan(now=NOW + 3600)
+        return sorted(s["start_local"] for s in self.segments())
+
+    def test_a_start_three_days_off_is_the_same_booking(self):
+        self.assertEqual(self.moved_by(3), ["2026-11-23T19:00"])
+
+    def test_a_start_four_days_off_is_another_segment(self):
+        self.assertEqual(self.moved_by(4), ["2026-11-20T19:00", "2026-11-24T19:00"])
+
     def test_another_flight_number_on_the_same_day_is_another_leg(self):
         self.put("flight_jsonld")
         self.scan()
@@ -769,6 +785,11 @@ class MailScanApiTests(GoogleCase):
         status, state = self.call("ana", "GET", "/api/state")
         self.assertEqual((status, state["review_count"]), (200, 2))   # the message to look at, and the name (Jane Doe) to match to someone
         self.assertEqual(self.call("ben", "GET", "/api/state")[1]["review_count"], 0)
+
+    def test_connecting_again_forgets_why_a_scan_couldnt_start(self):
+        scan._notices[self.ana_box] = "Something."
+        self.connect("ana", "ana@gmail.example", "refresh-ana-2")
+        self.assertIsNone(scan.notice(self.ana_box))
 
     def test_disconnecting_forgets_why_a_scan_couldnt_start(self):
         scan._notices[self.ana_box] = "Something."

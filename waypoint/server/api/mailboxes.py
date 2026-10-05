@@ -56,7 +56,10 @@ def api_mailbox_callback(conn, q, _b) -> Response:
     """Google's return: keep the connection, then back to Settings with how it went (?gmail=connected, denied, ...)."""
     params = {k: v[0] for k, v in q.items() if v}
     try:
-        gmail.finish(conn, owner(), params, redirect_uri())
+        address = gmail.finish(conn, owner(), params, redirect_uri())
+        for m in gmail.listing(conn, owner()):
+            if m["address"] == address:
+                scan.forget(m["id"])   # (connected again: what the last scan said no longer holds)
         outcome = "connected"
     except gmail.GmailError as e:
         outcome = next((code for kind, code in BACK.items() if isinstance(e, kind)), "failed")
