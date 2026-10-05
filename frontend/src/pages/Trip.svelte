@@ -9,7 +9,7 @@
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
-  import { isIOS } from "$lib/platform";
+  import { isIOS, isMobile } from "$lib/platform";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
@@ -32,6 +32,7 @@
 
   const id = $derived(route.sub);
   const ios = isIOS();
+  const appWord = isMobile() ? "Open in app" : "Manage booking";   // (a desktop browser has no app to open: it gets the provider’s website)
 
   let latest = 0;   // the newest load: an earlier, slower one finishing later must not put its trip on screen
   async function load() {
@@ -112,7 +113,7 @@
           </dl>
           {#if s.links.app || (live && (s.links.directions || s.links.call || ios))}
             <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
-              {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">Open in app</Button>{/if}
+              {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord}</Button>{/if}
               {#if live && ios}<Button variant="outline" size="sm" href="shoebox://">Wallet</Button>{/if}
               {#if live && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
               {#if live && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
