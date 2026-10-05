@@ -73,6 +73,22 @@ class BackupTests(unittest.TestCase):
     def rows_of(self, c):
         return {t: sorted(map(tuple, p["rows"]), key=repr) for t, p in backup.export(c)["tables"].items()}
 
+    def test_a_restore_ends_every_connected_assistant(self):
+        from waypoint.storage.models import OAuthClient, OAuthGrant, OAuthToken
+        src = self.fill(self.a)
+        data = backup.load(backup.dump(src))
+        self.assertEqual([t for t in data["tables"] if t.startswith("oauth_")], [])   # they don't travel in a file
+        dst = db.connect(self.b)
+        dst.execute(insert(OAuthClient).values(id="wpc_x", redirect_uris="[]", auth_method="none", created=1.0))
+        dst.execute(insert(OAuthGrant).values(id=1, client_id="wpc_x", sub="old", scope="read write", resource="http://h/mcp", created=1.0))
+        dst.execute(insert(OAuthToken).values(token_hash="t", kind="access", grant_id=1, created=1.0, expires=9e12))
+        dst.commit()
+        backup.restore(dst, data)
+        dst.commit()
+        for model in (OAuthClient, OAuthGrant, OAuthToken):
+            self.assertEqual(dst.execute(select(func.count()).select_from(model)).scalar(), 0, model.__name__)
+        src.close(); dst.close()
+
     def test_round_trip_keeps_awkward_values(self):
         src = db.connect(self.a)
         self.awkward(src)
