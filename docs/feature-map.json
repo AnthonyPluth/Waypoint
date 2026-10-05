@@ -89,6 +89,7 @@
         "frontend/src/lib/components/settings/ImportSection.svelte",
         "frontend/src/pages/People.svelte",
         "frontend/src/pages/Review.svelte",
+        "frontend/src/pages/Stats.svelte",
         "frontend/src/pages/Trip.svelte",
         "frontend/src/pages/Trips.svelte"
       ],
@@ -359,6 +360,36 @@
       "path": "/api/stats",
       "handler": "waypoint/server/api/stats.py:api_stats",
       "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_stats.py"
+      ],
+      "docs": [
+        "start/stats"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/distance-unit",
+      "handler": "waypoint/server/api/stats.py:api_distance_unit",
+      "web": [
+        "frontend/src/lib/components/settings/DistanceSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_stats.py"
+      ],
+      "docs": [
+        "start/stats"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/distance-unit",
+      "handler": "waypoint/server/api/stats.py:api_distance_unit_save",
+      "web": [
+        "frontend/src/lib/components/settings/DistanceSection.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_stats.py"

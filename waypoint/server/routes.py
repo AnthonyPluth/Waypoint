@@ -23,7 +23,7 @@ from .api.reminders import (api_device_add, api_device_remove, api_feed_make, ap
                             api_reminders_set)
 from .api.review import api_review, api_review_dismiss, api_review_ignore, api_review_who
 from .api.state import api_state
-from .api.stats import api_stats
+from .api.stats import api_distance_unit, api_distance_unit_save, api_stats
 
 
 # (method, path pattern, handler): each handler takes (conn, query, body, *path params) and returns the JSON reply, or
@@ -53,6 +53,8 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/import/preview", api_import_preview),
     ("POST", "/api/import", api_import),
     ("GET", "/api/stats", api_stats),
+    ("GET", "/api/distance-unit", api_distance_unit),
+    ("POST", "/api/distance-unit", api_distance_unit_save),
     ("GET", "/api/flight-status", api_flight_statuses),
     ("POST", "/api/flight-status/{id}", api_flight_status_refresh),
     ("GET", "/api/loyalty", api_loyalty),

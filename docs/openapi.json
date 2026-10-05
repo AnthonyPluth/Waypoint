@@ -843,6 +843,67 @@
         }
       }
     },
+    "/api/distance-unit": {
+      "get": {
+        "operationId": "api_distance_unit",
+        "x-handler": "waypoint/server/api/stats.py:api_distance_unit",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistanceUnit"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_distance_unit_save",
+        "x-handler": "waypoint/server/api/stats.py:api_distance_unit_save",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DistanceUnitBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistanceUnit"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/flight-status": {
       "get": {
         "operationId": "api_flight_statuses",
@@ -1821,6 +1882,36 @@
         "required": [
           "ok",
           "revoked"
+        ],
+        "additionalProperties": false
+      },
+      "DistanceUnit": {
+        "type": "object",
+        "properties": {
+          "distance_unit": {
+            "enum": [
+              "mi",
+              "km"
+            ]
+          }
+        },
+        "required": [
+          "distance_unit"
+        ],
+        "additionalProperties": false
+      },
+      "DistanceUnitBody": {
+        "type": "object",
+        "properties": {
+          "distance_unit": {
+            "enum": [
+              "mi",
+              "km"
+            ]
+          }
+        },
+        "required": [
+          "distance_unit"
         ],
         "additionalProperties": false
       },
@@ -3199,6 +3290,12 @@
           },
           "review_count": {
             "type": "integer"
+          },
+          "person_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "required": [
@@ -3206,13 +3303,20 @@
           "database",
           "user",
           "last_backup",
-          "review_count"
+          "review_count",
+          "person_id"
         ],
         "additionalProperties": false
       },
       "Stats": {
         "type": "object",
         "properties": {
+          "years": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
           "person": {
             "type": [
               "integer",
@@ -3245,6 +3349,7 @@
           }
         },
         "required": [
+          "years",
           "person",
           "year",
           "distance_unit",
