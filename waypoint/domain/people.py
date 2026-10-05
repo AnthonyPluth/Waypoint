@@ -14,7 +14,7 @@ from typing import Any, TypedDict
 from sqlalchemy import delete, select, update
 
 from ..storage import db
-from ..storage.models import LoyaltyId, Person, Segment, SegmentTraveler, Trip
+from ..storage.models import LoyaltyId, Person, Segment, SegmentRecipient, SegmentTraveler, Trip
 from . import visibility
 
 
@@ -205,8 +205,8 @@ def _new_names(known: list[str], extra: list[str]) -> list[str]:
 
 def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) -> Listed:
     """The member says a guest is them: everything on the guest moves to the member in one transaction (the caller's), and
-    the guest is deleted. Segment travellers, loyalty IDs and who booked trips and segments move over (someone already on
-    the same segment isn't added twice); the guest's legal name and aliases, and the display name as a way to match it, are
+    the guest is deleted. Segment travellers, who got a booking in their mailbox, loyalty IDs and who booked trips and segments move over
+    (someone already on, or a recipient of, the same segment isn't added twice); the guest's legal name and aliases, and the display name as a way to match it, are
     added to the member's names; the member's own display and first names stay unless empty. The merge is kept in the
     member's `links` for People to show. Raises NotAMember (the claimer has no login), NoSuchGuest and NotAGuest."""
     me = conn.orm.get(Person, member_id)
@@ -220,6 +220,9 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
     mine = select(SegmentTraveler.segment_id).where(SegmentTraveler.person_id == member_id)
     conn.execute(delete(SegmentTraveler).where(SegmentTraveler.person_id == guest_id, SegmentTraveler.segment_id.in_(mine)))
     conn.execute(update(SegmentTraveler).where(SegmentTraveler.person_id == guest_id).values(person_id=member_id))
+    has = select(SegmentRecipient.segment_id).where(SegmentRecipient.person_id == member_id)
+    conn.execute(delete(SegmentRecipient).where(SegmentRecipient.person_id == guest_id, SegmentRecipient.segment_id.in_(has)))
+    conn.execute(update(SegmentRecipient).where(SegmentRecipient.person_id == guest_id).values(person_id=member_id))
     conn.execute(update(LoyaltyId).where(LoyaltyId.person_id == guest_id).values(person_id=member_id))
     conn.execute(update(Trip).where(Trip.booked_by == guest_id).values(booked_by=member_id))
     conn.execute(update(Segment).where(Segment.booked_by == guest_id).values(booked_by=member_id))

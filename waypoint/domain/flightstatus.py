@@ -210,7 +210,8 @@ def _flight(seg: Segment) -> Flight | None:
     details = trips.decode_details(seg.details)
     if trips.untimed(details):   # its times are a placeholder: there's no departure to ask about
         return None
-    number = service.normalize(details.get("flight_number"))
+    raw = details.get("flight_number")
+    number = service.normalize(trips.flight_key(raw) or raw)   # (AA04001 and AA 4001 are one flight: one call)
     if not number:
         return None
     return Flight(number, seg.start_local[:10], seg.origin, trips.instant(seg.start_local, seg.start_zone),

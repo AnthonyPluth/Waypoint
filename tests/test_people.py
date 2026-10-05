@@ -5,7 +5,7 @@ from waypoint import oidc
 from waypoint.domain import demo, loyalty, people
 from waypoint.server.api import people as api
 from waypoint.server.common import ApiError, _current
-from waypoint.storage.models import FlightStatus, Person, Segment, SegmentTraveler, Trip, User
+from waypoint.storage.models import FlightStatus, Person, Segment, SegmentRecipient, SegmentTraveler, Trip, User
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
 
@@ -204,6 +204,19 @@ class ClaimTests(DbCase):
         self.c.orm.flush()
         people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
         self.assertEqual([t.person_id for t in self.c.orm.scalars(select(SegmentTraveler)).all()], [self.member])
+
+    def test_a_booking_the_guest_received_stays_visible_to_the_member(self):
+        seg = self.c.orm.scalars(select(Segment)).one()
+        other = Segment(trip_id=self.trip.id, kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="Europe/Lisbon",
+                        end_local="2026-11-03T11:00", end_zone="Europe/Lisbon", source="email")
+        self.c.orm.add(other)
+        self.c.orm.flush()
+        self.c.orm.add_all([SegmentRecipient(segment_id=seg.id, person_id=self.guest), SegmentRecipient(segment_id=seg.id, person_id=self.member),
+                            SegmentRecipient(segment_id=other.id, person_id=self.guest)])
+        self.c.orm.flush()
+        people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        found = sorted((r.segment_id, r.person_id) for r in self.c.orm.scalars(select(SegmentRecipient)).all())
+        self.assertEqual(found, [(seg.id, self.member), (other.id, self.member)])
 
     def test_a_member_cannot_be_claimed_and_a_guest_cannot_claim(self):
         oidc.remember_user(self.c, "u2", "bo@example.com", "Bo Example", "Bo")

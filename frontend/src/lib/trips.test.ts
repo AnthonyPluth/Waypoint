@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { untimed, when, clock, dayIn, featuredTrip, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, subline, tripDays, until } from "./trips";
+import { bookingCards, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, subline, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -154,6 +154,69 @@ describe("loyalty on a booking", () => {
     expect(membershipFor(out, jane, [membership({ program: "Delta SkyMiles" })])).toEqual({ state: "none", program: "American AAdvantage" });
     expect(membershipFor(out, { id: 2, person_id: null, name: "DOE/MIA MISS" }, [mine])).toEqual({ state: "unmatched" });
     expect(membershipFor(segment({ provider: "Example Air" }), jane, [mine])).toBeNull();
+  });
+});
+
+describe("flightKey", () => {
+  it("is one flight however its number is written", () => {
+    for (const n of ["AA 4001", "AA4001", "aa 4001", "AA04001", "AA  4001", "AA-4001"]) expect(flightKey(n)).toBe("AA4001");
+    expect(flightKey("B6 123")).toBe("B6123");
+  });
+  it("is null for what isn't a flight number", () => {
+    expect(flightKey(undefined)).toBeNull();
+    expect(flightKey("")).toBeNull();
+    expect(flightKey("not a flight")).toBeNull();
+  });
+});
+
+describe("bookingCards", () => {
+  // The same flight on two reservations: each keeps its own segment (its code, travellers, edits), the card is one.
+  const mine = segment({ id: 1, confirmation: "AAAAAA", details: { flight_number: "AA 101" } });
+  const theirs = segment({ id: 2, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 5, person_id: 2, name: "Sam Doe" }] });
+
+  it("makes one card of the same flight, date and airports on two bookings, keeping both", () => {
+    const [card, ...rest] = bookingCards([mine, theirs]);
+    expect(rest).toEqual([]);
+    expect(card.segments.map((s) => s.confirmation)).toEqual(["AAAAAA", "BBBBBB"]);
+    expect(card.lead).toBe(mine);
+    expect(card.timesDiffer).toBe(false);
+  });
+  it("keeps other dates, flights and airports apart, and a booking alone is its own card", () => {
+    const nextDay = segment({ id: 3, start_local: "2026-11-21T19:00", end_local: "2026-11-22T07:10", details: { flight_number: "AA 101" } });
+    const otherFlight = segment({ id: 4, details: { flight_number: "AA 102" } });
+    const otherLeg = segment({ id: 5, destination: "MAN", details: { flight_number: "AA 101" } });
+    expect(bookingCards([mine, theirs, nextDay, otherFlight, otherLeg]).map((c) => c.segments.map((s) => s.id))).toEqual([[1, 2], [3], [4], [5]]);
+    expect(bookingCards([mine]).map((c) => c.segments.length)).toEqual([1]);
+  });
+  it("never groups stays or rentals, nor flights with no number", () => {
+    const stays = [segment({ id: 6, kind: "hotel", details: {} }), segment({ id: 7, kind: "hotel", details: {} })];
+    const unnumbered = [segment({ id: 8, details: {} }), segment({ id: 9, details: {} })];
+    expect(bookingCards([...stays, ...unnumbered]).map((c) => c.segments.length)).toEqual([1, 1, 1, 1]);
+  });
+  it("says when the bookings disagree on the times, ignoring a cancelled one", () => {
+    const moved = segment({ id: 2, confirmation: "BBBBBB", start_local: "2026-11-20T21:30", details: { flight_number: "AA 101" } });
+    expect(bookingCards([mine, moved])[0].timesDiffer).toBe(true);
+    const arrives = segment({ id: 2, confirmation: "BBBBBB", end_local: "2026-11-21T08:00", details: { flight_number: "AA 101" } });
+    expect(bookingCards([mine, arrives])[0].timesDiffer).toBe(true);
+    expect(bookingCards([mine, { ...moved, status: "cancelled" }])[0].timesDiffer).toBe(false);
+  });
+  it("leads with a booking that isn't cancelled, and is cancelled only when every booking is", () => {
+    const [one] = bookingCards([{ ...mine, status: "cancelled" }, theirs]);
+    expect(one.lead.id).toBe(2);
+    expect(one.cancelled).toBe(false);
+    expect(bookingCards([{ ...mine, status: "cancelled" }, { ...theirs, status: "cancelled" }])[0].cancelled).toBe(true);
+  });
+});
+
+describe("a flight on two bookings, across the screens", () => {
+  const second = segment({ id: 10, confirmation: "BBBBBB", details: { flight_number: "AA 101" } });
+  const split = trip([out, second, stay, back]);
+  it("is one item on its day", () => {
+    const days = tripDays(split);
+    expect(days[0].items.map((i) => `${i.segment.id}:${i.bookings.length}`)).toEqual(["1:2"]);
+  });
+  it("is one flight to lead with, listing both bookings", () => {
+    expect(nextUp([split], at("2026-11-18T09:00", NY))).toMatchObject({ state: "next", segment: { id: 1 }, bookings: [{ id: 1 }, { id: 10 }] });
   });
 });
 

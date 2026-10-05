@@ -1,13 +1,13 @@
 """A member who claims a guest ("This is me"): the guests they were linked from, and whether they turned the suggestion down.
 
-Revision ID: 0012
-Revises: 0011
+Revision ID: 0013
+Revises: 0012
 """
 import sqlalchemy as sa
 from alembic import op
 
-revision = '0012'
-down_revision = '0011'
+revision = '0013'
+down_revision = '0012'
 branch_labels = None
 depends_on = None
 

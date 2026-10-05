@@ -36,6 +36,13 @@ class DemoTests(DbCase):
     def test_keeps_its_trips_around_today_across_a_year_end(self):
         self.check_dates(date(2026, 12, 30))
 
+    def test_the_family_flights_are_each_on_two_bookings_one_flight(self):
+        demo.seed(self.c, date(2026, 10, 5))
+        found = [s for t in trips.listing(self.c, Viewer(None, household=True)) for s in t["segments"] if s["details"].get("flight_number") in ("AA 101", "AA 102")]
+        self.assertEqual(len(found), 4)
+        self.assertEqual({s["confirmation"] for s in found}, {"KQ7M2X", "MW5T9Z"})
+        self.assertEqual([len(g) for g in trips.flight_groups(found)], [2, 2])
+
     def test_stats_has_something_in_every_section_and_more_than_one_year(self):
         demo.seed(self.c, date(2026, 10, 5))
         got = stats.compute(self.c, Viewer(None, household=True), None, None, datetime(2026, 10, 5, 12, tzinfo=UTC))

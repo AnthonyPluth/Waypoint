@@ -131,6 +131,13 @@ class SegmentTraveler(Base):
     name: Mapped[str | None]         # as printed, until it's matched to a person
 
 
+class SegmentRecipient(Base):
+    __table__ = schema.segment_recipients
+    id: Mapped[int]
+    segment_id: Mapped[int]
+    person_id: Mapped[int]           # got the booking's confirmation in their mailbox (waypoint/domain/mail/ingest.py)
+
+
 class LoyaltyId(Base):
     __table__ = schema.loyalty_ids
     id: Mapped[int]

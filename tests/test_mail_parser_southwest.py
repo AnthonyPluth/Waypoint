@@ -205,7 +205,7 @@ class ScanTests(ScanCase):
         self.assertEqual(after[out["id"]], "changed")
         self.assertEqual(sorted(after.values()), ["cancelled", "changed"])
 
-    def test_an_email_for_a_booking_you_cant_see_changes_nothing_of_it_and_shows_nothing_of_it(self):
+    def test_a_cancellation_in_another_household_mailbox_cancels_the_same_booking_and_shows_it_to_that_owner(self):
         self.put("southwest/booking")
         self.scan()
         before = self.segments(self.jane)
@@ -214,11 +214,12 @@ class ScanTests(ScanCase):
         self.google.mail["msg-cancel"] = raw("cancellation")
         self.assertEqual(self.scan(sam_box).state, "done")
         ours = {s["id"] for s in before}
-        self.assertEqual([s for s in self.segments(self.jane) if s["id"] in ours], before)   # Jane's flights are as they were
         mine = self.segments(self.sam)
+        self.assertEqual({s["id"] for s in mine}, ours)   # the same two flights, not copies: he got their confirmation, so he sees them
         self.assertEqual([s["status"] for s in mine], ["cancelled", "cancelled"])
-        self.assertFalse({s["id"] for s in mine} & ours)   # his own, not hers (she sees them: the email names her)
-        self.assertTrue(all(s["booked_by"] == self.sam.person_id for s in mine))
+        self.assertEqual([s["status"] for s in self.segments(self.jane)], ["cancelled", "cancelled"])
+        self.assertTrue(all(s["booked_by"] == self.jane.person_id for s in mine))
+        self.assertEqual(len(self.segments(self.jane)), 2)   # (and nothing was added for anyone)
 
     def test_mail_the_parser_cant_read_goes_to_the_review_queue(self):
         self.add_mail("odd", mail("Confirmation #: K7QW2N\nFlight 77 Mon, Nov 16, 2026\nDallas (Love Field), TX (DAL) 8:05 AM\n", ctype="text/plain"))
