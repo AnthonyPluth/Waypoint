@@ -7,9 +7,15 @@ import json
 import unittest
 from pathlib import Path
 
-from waypoint.storage import backup, db
+from waypoint.storage import backup, db, secretbox
+from waypoint.storage.models import Mailbox
 from waypoint.storage import settings_keys as sk
-from waypoint.server.api import backups, state
+from unittest import mock
+
+from sqlalchemy import insert
+
+from waypoint.providers import gmail
+from waypoint.server.api import backups, mailboxes, state
 from waypoint.server.common import _current
 from tests.shared import DbCase
 
@@ -90,6 +96,7 @@ class Replies(DbCase):
     def test_every_covered_route_is_checked(self):
         self.test_state()
         self.test_backups()
+        self.test_mailboxes()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
 
     def test_state(self):
@@ -109,6 +116,22 @@ class Replies(DbCase):
         restored = backups.api_restore(None, {}, raw)
         self.assertTrue(restored["ok"])
         self.check("POST /api/restore", restored)
+
+    def test_mailboxes(self):
+        _current.user = {"sub": "u1", "name": "Rosa Example", "email": "rosa@example.com"}
+        env = {"GOOGLE_CLIENT_ID": "client.example", "GOOGLE_CLIENT_SECRET": "secret"}
+        with mock.patch.dict("os.environ", env):
+            self.check("GET /api/mailboxes", mailboxes.api_mailboxes(self.c, {}, {}))   # none yet
+            self.check("POST /api/mailboxes/connect", mailboxes.api_mailbox_connect(self.c, {}, {}))
+        for status in ("connected", "reconnect", "error"):
+            self.c.execute(insert(Mailbox).values(owner_sub="u1", address=f"{status}@gmail.example", token=secretbox.encrypt("t"),
+                                                  status=status, last_error=None if status == "connected" else "Said so.",
+                                                  last_scan=1790000000.0, created=1.0))
+        reply = mailboxes.api_mailboxes(self.c, {}, {})
+        self.assertEqual([m["status"] for m in reply["mailboxes"]], ["connected", "reconnect", "error"])
+        self.check("GET /api/mailboxes", reply)
+        with mock.patch.object(gmail, "_post", return_value={}):
+            self.check("DELETE /api/mailboxes/{id}", mailboxes.api_mailbox_disconnect(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
 
 
 class Mismatches(unittest.TestCase):
@@ -135,8 +158,10 @@ class Generated(unittest.TestCase):
         self.assertEqual(contract.TS_OUT.read_text(), contract.render_ts(doc), "run `make api-contract`")
 
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
-        self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore"})
+        self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
+                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}"})
         self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)
+        self.assertNotIn("GET /api/mailboxes/callback", covered())   # and this one as a redirect
 
     def describe(self, annotation: str) -> str:
         types = {"Thing": {"doc": None, "fields": []}}

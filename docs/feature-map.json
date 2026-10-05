@@ -59,6 +59,7 @@
         "frontend/src/lib/components/settings/GmailSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_gmail.py"
       ],
       "docs": [
@@ -73,6 +74,7 @@
         "frontend/src/lib/components/settings/GmailSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_gmail.py"
       ],
       "docs": [
@@ -99,6 +101,7 @@
         "frontend/src/lib/components/settings/GmailSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_gmail.py"
       ],
       "docs": [

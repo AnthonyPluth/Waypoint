@@ -240,10 +240,11 @@ def _readable(token: str) -> bool:
     return True
 
 
-# What each secret is called where it's entered again (Settings), for saying which ones a restore couldn't read.
 MAILBOXES = "mailboxes"   # not a setting: the Gmail connections' refresh tokens
+MAILBOXES_LABEL = "Gmail connections (connect them again in Settings)"
+
+# What each secret is called where it's entered again (Settings), for saying which ones a restore couldn't read.
 SECRET_LABELS = {
-    MAILBOXES: "Gmail connections (connect them again in Settings)",
     sk.VAPID_PRIVATE_KEY: "notifications' signing key (devices sign up for notifications again)",
 }
 
@@ -251,7 +252,8 @@ SECRET_LABELS = {
 def unreadable_summary(unreadable: list[str]) -> str:
     """unreadable_secrets() for people: each setting by its name in Settings. Only these fixed labels are said, never
     anything read from the rows."""
-    return ", ".join(dict.fromkeys(label for key, label in SECRET_LABELS.items() if key in unreadable))
+    labels = {**SECRET_LABELS, MAILBOXES: MAILBOXES_LABEL}
+    return ", ".join(dict.fromkeys(label for key, label in labels.items() if key in unreadable))
 
 
 # ------------------------------------------------------------------------------------------------ restoring
