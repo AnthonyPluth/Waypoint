@@ -96,8 +96,6 @@
     await settle();
   }, { busy: (on) => (asking_ai = on ? item.id : null) });
 
-  // Ask about every item that has no suggestion yet, one after another (each is its own request, so one failing says why and
-  // stops the rest instead of repeating the same error), then bring the list up to date once.
   let asking_all = $state(false);
   const unasked = $derived(review?.ai ? review.items.filter((i) => !i.suggestion) : []);
   const askAll = (items: ReviewItem[]) => act(async () => {
