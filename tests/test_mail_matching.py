@@ -6,6 +6,7 @@ from sqlalchemy import update
 
 from tests.shared import DbCase
 from waypoint.domain import airports, loyalty, people
+from waypoint.domain.mail import extract, ingest
 from waypoint.storage import secretbox
 from waypoint.storage.models import LoyaltyId
 
@@ -96,6 +97,22 @@ class PlaceZoneTests(DbCase):
         self.assertIsNone(airports.zone_for_place(self.c, "Nowhereville", "US"))
         self.assertIsNone(airports.zone_for_place(self.c, None, None))
         self.assertIsNone(airports.zone_for_place(self.c, "  ", ""))
+
+
+class ExplainTests(DbCase):
+    """Why a booking can't be a segment, from a fixed list of phrases (for the log)."""
+
+    def booking(self, **kw):
+        base = dict(kind="flight", status="confirmed", confirmation="ABC123", provider="Example Air", start="2026-11-20T19:00:00-05:00",
+                    end="2026-11-21T07:10:00+00:00", origin="JFK", destination="LHR")
+        return extract.Booking(**{**base, **kw})
+
+    def test_each_reason(self):
+        self.assertEqual(ingest.explain(self.c, self.booking(origin="QQQ")), "unknown airport")
+        self.assertEqual(ingest.explain(self.c, self.booking(kind="hotel", origin="Harbour Hotel", destination=None)),
+                         "place's time zone unknown")
+        self.assertEqual(ingest.explain(self.c, self.booking(start="tomorrow")), "time isn't a date and time")
+        self.assertEqual(ingest.explain(self.c, self.booking(end="2026-11-20T10:00:00-05:00")), "rejected as a segment")
 
 
 if __name__ == "__main__":
