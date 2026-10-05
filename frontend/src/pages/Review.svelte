@@ -19,6 +19,7 @@
 </script>
 
 <script lang="ts">
+  import { SvelteSet } from "svelte/reactivity";
   import { act, errMsg } from "$lib/act";
   import type { Person, Review, WhoIsThis } from "$lib/api-types";
   import { refreshState } from "$lib/app.svelte";
@@ -90,14 +91,15 @@
     } catch (err) { peeks[item.id] = { state: "error", message: errMsg(err) }; }
   }
 
-  let asking_ai = $state<number | null>(null);
+  // The items whose AI suggestion is being asked for now: any number at once, each with its own "Asking…".
+  const asking_ai = new SvelteSet<number>();
   const askAi = (item: ReviewItem) => act(async () => {
     await apiCall<"POST /api/review/{id}/suggest">(`/api/review/${item.id}/suggest`, { method: "POST" });
     await settle();
-  }, { busy: (on) => (asking_ai = on ? item.id : null) });
+  }, { busy: (on) => (on ? asking_ai.add(item.id) : asking_ai.delete(item.id)) });
 
   let asking_all = $state(false);
-  const unasked = $derived(review?.ai ? review.items.filter((i) => !i.suggestion) : []);
+  const unasked = $derived(review?.ai ? review.items.filter((i) => !i.suggestion && !asking_ai.has(i.id)) : []);
   const askAll = (items: ReviewItem[]) => act(async () => {
     let done = 0;
     try {
@@ -193,7 +195,7 @@
         <h2 id="unread-title" class="eyebrow px-1">Couldn’t read</h2>
         <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see them. Open one in Gmail, or choose Add by hand to read it beside the form (Waypoint fetches it from Gmail when you ask, and keeps none of its text or subject).</p>
         {#if unasked.length > 1}
-          <div class="px-1"><Button variant="outline" size="sm" disabled={asking_all || asking_ai !== null} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : `Ask AI about all ${unasked.length}`}</Button></div>
+          <div class="px-1"><Button variant="outline" size="sm" disabled={asking_all} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : `Ask AI about all ${unasked.length}`}</Button></div>
         {/if}
         <ul class="rows" aria-label="Couldn’t read">
           {#each review.items as item (item.id)}
@@ -206,7 +208,7 @@
               </div>
               <div class="flex basis-full flex-wrap gap-2">
                 <a class={buttonVariants({ variant: "outline", size: "sm" })} href={item.gmail_url} target="_blank" rel="noopener noreferrer" aria-label={`Open “${subject(item)}” in Gmail`}>Open in Gmail</a>
-                {#if review.ai}<Button variant="outline" size="sm" disabled={asking_all || asking_ai === item.id} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai === item.id ? "Asking…" : item.suggestion ? "Ask again" : "Ask AI"}</Button>{/if}
+                {#if review.ai}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestion ? "Ask again" : "Ask AI"}</Button>{/if}
                 {#if item.suggestion}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={`Check the AI’s suggestion for “${subject(item)}”`}>Check suggestion</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
                 {#if item.sender_domain}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Ignore ${item.sender_domain}`}>Ignore this sender</Button>{/if}
