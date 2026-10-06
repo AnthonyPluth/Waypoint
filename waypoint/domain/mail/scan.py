@@ -105,7 +105,7 @@ def _keeper(raw: dict[str, Any]) -> Callable[[], Content]:
 
 def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str, message: extract.Message,
           ignored: list[str], now: float, why: Counter[str] | None = None, again: bool = False,
-          keep: Callable[[], Content] | None = None) -> tuple[int, int]:
+          keep: Callable[[], Content] | None = None, backfill: bool = False) -> tuple[int, int]:
     why = Counter() if why is None else why
     if again:
         conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id))
@@ -115,7 +115,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     made, failed = 0, 0
     touched: list[int] = []
     for booking in message.bookings:
-        filed = ingest.file_booking(conn, viewer, booking, again, touched)
+        filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill)
         if filed is None:
             failed += 1
             why[ingest.explain(conn, booking)] += 1
@@ -251,7 +251,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 continue
             try:
                 with _filing, db.session() as conn:
-                    a, b = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, _keeper(raw))
+                    a, b = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, _keeper(raw), backfill)
             except Exception as e:
                 if db.is_busy(e):
                     raise

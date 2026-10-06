@@ -643,7 +643,7 @@ def _same_leg(seg: Segment, values: Mapping[str, str | None], details: Mapping[s
 
 
 def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, again: bool = False,
-                        touched: list[int] | None = None) -> Literal["added", "updated", "unchanged"]:
+                        touched: list[int] | None = None, fill_only: bool = False) -> Literal["added", "updated", "unchanged"]:
     values = check(conn, fields)
     day = (values["start_local"] or "")[:10]
     found = [s for s in visibility.household_segments(conn, values["kind"] or "") if _same_leg(s, values, fields.get("details") or {})]
@@ -669,7 +669,7 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
     if given.get("manage_url") is None:
         given.pop("manage_url", None)
     stored = decode_details(seg.details)
-    said = {**stored, **(fields.get("details") or {})}
+    said = {**(fields.get("details") or {}), **stored} if fill_only else {**stored, **(fields.get("details") or {})}
     if flight_key(stored.get("flight_number")) is not None and flight_key(stored.get("flight_number")) == flight_key(said.get("flight_number")):
         said["flight_number"] = stored["flight_number"]
     named = given.get("provider")
@@ -678,7 +678,9 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
         if provider_key(seg.provider) == provider_key(named) or (len(code) <= 3 and (flight_key(said.get("flight_number")) or "").startswith(code)):
             given["provider"] = seg.provider
     incoming = unlocked({**given, "details": said}, locked)
-    if "status" not in locked and incoming.get("status") != "cancelled":
+    if fill_only:
+        incoming = cast(SegmentIn, {k: v for k, v in incoming.items() if k == "details" or (k in ("provider", "confirmation", "manage_url") and not getattr(seg, k))})
+    if not fill_only and "status" not in locked and incoming.get("status") != "cancelled":
         moved = any(values[f] != getattr(seg, f) for f in ("start_local", "start_zone", "end_local", "end_zone", "origin", "destination"))
         if moved and not again and "start_local" not in locked and "end_local" not in locked:
             incoming["status"] = "changed"
@@ -699,7 +701,7 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
     if new_ports:
         _set_ports(conn, seg.id, new_ports)
         changed.append("itinerary")
-    if not set(TIME_FIELDS) & set(locked) and bool(fields.get("check_times")) != bool(seg.check_times):
+    if not fill_only and not set(TIME_FIELDS) & set(locked) and bool(fields.get("check_times")) != bool(seg.check_times):
         seg.check_times = bool(fields.get("check_times"))
         changed.append("check_times")
     if "travelers" not in locked:
