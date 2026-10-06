@@ -220,6 +220,26 @@ def _in(day: date, year: int | None) -> bool:
     return year is None or day.year == year
 
 
+CABIN_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("First", ("first", "la premiere")),
+    ("Business", ("business", "polaris", "delta one", "upper class", "club world", "club europe", "club class", "flagship", "mint")),
+    ("Premium Economy", ("premium", "comfort+", "comfort plus", "economy plus", "main cabin extra", "world traveller plus")),
+    ("Economy", ("economy", "coach", "main", "basic", "standard", "saver", "tango", "wanna get away", "anytime", "light", "flex",
+                 "blue", "classic", "value")),
+)
+
+
+def cabin_group(cabin: str) -> str:
+    """The cabin a fare name or a cabin as an email wrote it belongs to: First, Business, Premium Economy or Economy
+    ("Main Basic", "Tango Plus" and "Wanna Get Away" are fares in economy), by the words in it. A name that holds none of the
+    words stays as written, so an unfamiliar one still shows."""
+    low = cabin.casefold()
+    for group, words in CABIN_GROUPS:
+        if any(w in low for w in words):
+            return group
+    return cabin.title() if cabin.islower() or cabin.isupper() else cabin
+
+
 def _flight_number(s: Seg) -> str | None:
     number = s.details.get("flight_number")
     return re.sub(r"\s+", "", number).upper() if number else None
@@ -270,7 +290,7 @@ def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Map
             carriers[(None, s.provider)] += 1
         cabin = (s.details.get("cabin") or "").strip()
         if cabin:
-            cabins[cabin.title() if cabin.islower() or cabin.isupper() else cabin] += 1
+            cabins[cabin_group(cabin)] += 1
         # Each counted traveller's own seat; a booking with none of theirs has its booking seat, once.
         own = [t for t in (re.sub(r"\s+", "", x).upper() for x in s.seats) if t]
         booking = re.sub(r"\s+", "", s.details.get("seat") or "").upper()

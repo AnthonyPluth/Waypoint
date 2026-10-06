@@ -183,6 +183,24 @@ class HotelAndCarTests(StatsCase):
                          {"New York": "2026-06-01", "London": "2026-06-02", "Paris": "2026-06-10"})
 
 
+class CabinGroupTests(StatsCase):
+    def test_fare_names_group_into_the_cabin_they_are_in(self):
+        for name, group in (("Economy", "Economy"), ("Basic Economy", "Economy"), ("Economy Standard", "Economy"), ("Tango Plus", "Economy"),
+                            ("Wanna Get Away", "Economy"), ("Main Basic", "Economy"), ("Main Cabin", "Economy"), ("economy", "Economy"),
+                            ("Premium Economy", "Premium Economy"), ("Comfort+", "Premium Economy"), ("Business", "Business"),
+                            ("Business Class", "Business"), ("Polaris", "Business"), ("First", "First"), ("First Class", "First")):
+            self.assertEqual(stats.cabin_group(name), group, name)
+
+    def test_a_name_with_none_of_the_words_stays_as_written(self):
+        self.assertEqual(stats.cabin_group("Zeta Seat"), "Zeta Seat")
+        self.assertEqual(stats.cabin_group("zeta seat"), "Zeta Seat")
+
+    def test_the_stats_count_the_groups(self):
+        for cabin in ("Economy", "Basic Economy", "Main Basic", "First"):
+            self.mine({**JFK_LHR, "details": {**JFK_LHR["details"], "cabin": cabin}})
+        self.assertEqual(self.stats(self.jane)["flights"]["cabins"], [{"name": "Economy", "count": 3}, {"name": "First", "count": 1}])
+
+
 class SeatStatsTests(StatsCase):
     def flight(self, who, *seats, **extra):
         people = [{"person_id": p, "name": None, "seat": s} for p, s in zip(who, seats, strict=True)]
