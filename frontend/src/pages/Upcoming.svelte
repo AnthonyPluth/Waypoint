@@ -133,7 +133,7 @@
             <dd class="mt-1 flex flex-wrap gap-x-3 text-lg">{#each next.bookings as b (b.id)}{#if b.confirmation}<CopyCode code={b.confirmation} />{/if}{/each}</dd></div>
         {/if}
       </dl>
-      <div class="px-6 pb-6 md:px-8 md:pb-8"><Button href={`#trip/${s.trip_id}`} variant="outline" size="sm">Open {next.trip.name}</Button></div>
+      <div class="px-6 pb-6 md:px-8 md:pb-8"><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm">Open {next.trip.name}</Button></div>
     </section>
   {:else}
     <p class="mb-8 text-muted-foreground">Nothing coming up: every trip you can see is over. <a class="underline" href="#trips">See your trips</a>.</p>
@@ -152,7 +152,8 @@
               <li class="row items-start" class:opacity-60={seg.status === "cancelled"}>
                 <BrandLogo src={seg.logo} size={32} class="mt-0.5" />
                 <div class="min-w-0 flex-1">
-                  <p class="break-words font-medium" class:line-through={seg.status === "cancelled"}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${headline(seg)}` : headline(seg)}</p>
+                  <p class="break-words font-medium" class:line-through={seg.status === "cancelled"}>
+                    <a class="underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${headline(seg)}` : headline(seg)}</a></p>
                   {#if item.role === "start" && subline(seg)}<p class="break-words text-sm text-muted-foreground">{subline(seg)}</p>{/if}
                   {#if item.role === "start" && item.bookings.length > 1}<p class="text-sm text-muted-foreground">{item.bookings.length} bookings{timesDiffer(item.bookings) ? " · times differ between bookings" : ""}</p>{/if}
                 </div>

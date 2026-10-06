@@ -42,7 +42,7 @@ beforeEach(() => {
   vi.mocked(api).mockReset();
   held = trip([flight, stay]);
   loyalty = [membership()];
-  route.page = "trip"; route.sub = "1"; location.hash = "#trip/1";
+  route.page = "trip"; route.sub = "1"; route.query = ""; location.hash = "#trip/1";
   serve();
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); flightStatus.list = null; delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
@@ -364,6 +364,34 @@ describe("Trip", () => {
       expect(within(card).getByText("9:30 PM")).toBeInTheDocument();
       expect(within(card).getByText("7:00 PM")).toBeInTheDocument();
       expect(within(card).getAllByText("Departs")).toHaveLength(2);   // (once in each booking's block)
+    });
+  });
+
+  describe("a link to one booking", () => {
+    it("scrolls to that booking’s card and marks it, and leaves the others alone", async () => {
+      const scroll = vi.fn();
+      Element.prototype.scrollIntoView = scroll;
+      route.query = "segment=2";
+      render(TripPage);
+      const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+      expect(cards.map((c) => c.id)).toEqual(["segment-1", "segment-2"]);
+      await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
+      expect(scroll.mock.contexts[0]).toBe(cards[1]);
+      expect(cards[1]).toHaveClass("ring-2");
+      expect(cards[0]).not.toHaveClass("ring-2");
+    });
+
+    it("does nothing for a booking that isn’t on the trip, or without a link to one", async () => {
+      const scroll = vi.fn();
+      Element.prototype.scrollIntoView = scroll;
+      route.query = "segment=99";
+      const { unmount } = render(TripPage);
+      await screen.findByRole("heading", { name: "Trip to London" });
+      route.query = "";
+      unmount();
+      render(TripPage);
+      await screen.findByRole("heading", { name: "Trip to London" });
+      expect(scroll).not.toHaveBeenCalled();
     });
   });
 
