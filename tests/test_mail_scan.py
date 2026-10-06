@@ -674,6 +674,21 @@ class LaterScanTests(ScanCase):
         self.assertNotEqual(after["start_local"], seg["start_local"])
         self.assertEqual(len(self.segments()), 1)
 
+    def test_a_look_back_fills_in_what_a_booking_lacks_and_keeps_what_it_has(self):
+        self.first()
+        [seg] = self.segments()
+        self.assertEqual((seg["details"]["terminal"], seg["details"]["seat"], seg["provider"]), ("7", "21C", "Example Air"))
+        with db.session() as conn:
+            conn.execute(update(Segment).values(provider=None, manage_url=None, details=json.dumps({"flight_number": seg["details"]["flight_number"], "seat": "1A"})))
+            conn.execute(delete(ScannedMessage))
+        with no_leaks(self, *CANARIES, database=self.path):
+            self.scan(now=NOW + 4 * 3600, backfill=True)
+        [after] = self.segments()
+        self.assertEqual(len(self.segments()), 1)
+        self.assertEqual((after["provider"], after["manage_url"]), ("Example Air", seg["manage_url"]))
+        self.assertEqual((after["details"]["terminal"], after["details"]["seat"]), ("7", "1A"))
+        self.assertEqual((after["start_local"], after["status"]), (seg["start_local"], seg["status"]))
+
     def test_a_look_back_that_fails_keeps_the_last_good_state(self):
         self.first()
         good = self.row()
