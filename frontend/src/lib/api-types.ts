@@ -15,7 +15,7 @@ export interface AiSettings {
 }
 
 export interface AiSuggestion {
-  kind: "flight" | "hotel" | "car" | "train";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise";
   origin: string;
   start_local: string;
   end_local: string;
@@ -707,6 +707,7 @@ export interface Endpoints {
   "POST /api/mailboxes/{id}/scan": { body: never; reply: ScanStarted };
   "POST /api/mailboxes/{id}/share": { body: ShareBody; reply: Ok };
   "POST /api/mailboxes/{id}/reread": { body: never; reply: ScanStarted };
+  "POST /api/mailboxes/{id}/backfill": { body: never; reply: ScanStarted };
   "GET /api/reminders": { body: never; reply: Reminders };
   "POST /api/reminders": { body: RemindersBody; reply: Reminders };
   "POST /api/reminders/devices": { body: DeviceBody; reply: ReminderDevice };

@@ -92,3 +92,10 @@ def api_mailbox_reread(conn, _q, _b, mailbox_id: str) -> ScanStarted:
     if not any(m["id"] == n for m in gmail.listing(conn, owner())):
         raise ApiError("Not found", 404)
     return {"started": jobs.scan_now(n, again=True)}
+
+
+def api_mailbox_backfill(conn, _q, _b, mailbox_id: str) -> ScanStarted:
+    n = row_id(mailbox_id)
+    if not any(m["id"] == n for m in gmail.listing(conn, owner())):
+        raise ApiError("Not found", 404)
+    return {"started": jobs.scan_now(n, backfill=True)}

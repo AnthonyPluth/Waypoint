@@ -75,7 +75,7 @@ class Disconnected(TypedDict):
 
 
 class AiSuggestion(TypedDict):
-    kind: Literal["flight", "hotel", "car", "train"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise"]
     origin: str
     start_local: str
     end_local: str

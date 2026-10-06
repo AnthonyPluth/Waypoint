@@ -152,8 +152,8 @@ class ScanCase(DbCase):
         self.google.matches.append(mid)
         self.google.added.append(mid)
 
-    def scan(self, mailbox_id=None, now=NOW, today=TODAY, again=False) -> scan.Result:
-        return scan.scan(mailbox_id or self.mailbox, now, today, again)
+    def scan(self, mailbox_id=None, now=NOW, today=TODAY, again=False, backfill=False) -> scan.Result:
+        return scan.scan(mailbox_id or self.mailbox, now, today, again, backfill)
 
     def read(self, fn):
         with db.session() as conn:
@@ -177,11 +177,29 @@ class SearchTests(ScanCase):
     def test_the_search_is_for_known_senders_and_booking_words_without_promotions_since_18_months_ago(self):
         self.assertEqual(self.scan().state, "done")
         [q] = self.google.queries
-        self.assertTrue(q.startswith("from:(aa.com OR delta.com"), q)
-        self.assertIn('(confirmation OR itinerary OR reservation OR "e-ticket" OR booking)', q)
+        self.assertTrue(q.startswith("((from:(aa.com OR delta.com"), q)
+        self.assertIn('(confirmation OR itinerary OR reservation OR "e-ticket" OR booking OR cruise OR sailing)', q)
         self.assertIn("-category:promotions", q)
         self.assertTrue(q.endswith("after:2025/03/23"), q)
-        self.assertLess(len(q), 2000)
+        self.assertLess(len(q), 3000)
+
+    def test_the_search_covers_booking_agencies_travel_portals_and_cruise_lines(self):
+        senders = set(query.SENDERS)
+        self.assertLessEqual({"chasetravel.com", "capitalonetravel.com", "perk.com", "amextravel.com", "expedia.com"}, senders)
+        self.assertLessEqual({"carnival.com", "royalcaribbean.com", "ncl.com", "princess.com", "vikingcruises.com", "disneycruise.com"}, senders)
+
+    def test_each_branch_of_the_search_is_grouped_so_gmail_cant_read_the_or_across_them(self):
+        q = query.build(date(2026, 1, 31))
+        words = "(" + query._any(query.WORDS) + ")"
+        subject = "(" + query._any(query.BANK_SUBJECT_WORDS) + ")"
+        senders, banks = " OR ".join(query.SENDERS), " OR ".join(query.BANK_SENDERS)
+        self.assertTrue(q.startswith(f"((from:({senders}) {words}) OR (from:({banks}) subject:{subject} {words})) -category:promotions"), q)
+
+    def test_a_banks_mail_has_to_be_about_travel_to_be_searched(self):
+        q = query.build(date(2026, 1, 31))
+        self.assertIn(") OR (from:(chase.com OR capitalone.com OR americanexpress.com OR aexp.com) subject:(travel OR trip OR flight OR hotel OR cruise OR itinerary OR \"e-ticket\") (", q)
+        self.assertNotIn("chase.com", query.SENDERS)
+        self.assertNotIn("capitalone.com", query.SENDERS)
 
     def test_a_senders_ignored_by_its_owner_are_left_out_of_the_search(self):
         self.read(lambda conn: __import__("waypoint.domain.mail.review", fromlist=["x"]))
@@ -621,6 +639,33 @@ class LaterScanTests(ScanCase):
         self.assertEqual(sorted(self.google.fetched[1:]), ["msg-car_jsonld", "msg-hotel_jsonld"])
         self.assertEqual((self.row()["history_id"], self.row()["last_scan"]), ("310", NOW + 4 * 3600))
         self.assertTrue(self.google.queries[-1].endswith("after:2026-09-19".replace("-", "/")), self.google.queries[-1])
+
+    def test_a_look_back_reads_mail_the_history_didnt_report_without_moving_the_scan_state(self):
+        self.first()
+        before = self.row()
+        self.put("hotel_jsonld")
+        self.google.added = []
+        self.google.history_id = "999"
+        calls = len(self.google.history_calls)
+        self.google.fetched.clear()
+        with no_leaks(self, *CANARIES, database=self.path):
+            result = self.scan(now=NOW + 4 * 3600, backfill=True)
+        self.assertEqual((result.state, result.messages), ("done", 1))
+        self.assertEqual(self.google.fetched, ["msg-hotel_jsonld"])
+        self.assertEqual(len(self.google.history_calls), calls)
+        self.assertTrue(self.google.queries[-1].endswith("after:2025/03/23"), self.google.queries[-1])
+        self.assertEqual(len(self.segments()), 2)
+        self.assertEqual({k: self.row()[k] for k in ("last_scan", "history_id", "scan_error")},
+                         {k: before[k] for k in ("last_scan", "history_id", "scan_error")})
+
+    def test_a_look_back_that_fails_keeps_the_last_good_state(self):
+        self.first()
+        good = self.row()
+        self.put("hotel_jsonld")
+        self.google.fail_on = "msg-hotel_jsonld"
+        with no_leaks(self, *CANARIES, database=self.path), mock.patch("waypoint.providers.gmail.time.sleep"):
+            self.assertEqual(self.scan(now=NOW + 4 * 3600, backfill=True).state, "failed")
+        self.assertEqual((self.row()["last_scan"], self.row()["history_id"]), (good["last_scan"], good["history_id"]))
 
     def test_when_google_no_longer_has_the_history_the_search_by_date_covers_it(self):
         self.first()
@@ -1200,6 +1245,25 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual((status, body["error"]), (404, "Not found"))
         self.assertEqual(self.call("ben", "POST", "/api/mailboxes/abc/reread", {})[0], 404)
         self.assertEqual(self.google.fetched, [])
+
+    def test_a_member_looks_back_through_their_own_mailbox(self):
+        self.put("flight_jsonld", "no_markup")
+        with no_leaks(self, *CANARIES):
+            status, body = self.call("ana", "POST", f"/api/mailboxes/{self.ana_box}/backfill", {})
+            self.assertEqual((status, body), (200, {"started": True}))
+            for _ in range(100):
+                [m] = self.mailboxes()
+                if not m["scanning"] and self.google.queries:
+                    break
+                time.sleep(0.1)
+        self.assertEqual(len(self.google.queries), 1)
+
+    def test_nobody_looks_back_through_another_members_mailbox(self):
+        with no_leaks(self, *CANARIES):
+            status, body = self.call("ben", "POST", f"/api/mailboxes/{self.ana_box}/backfill", {})
+            self.assertEqual((status, body["error"]), (404, "Not found"))
+            self.assertEqual(self.call("ben", "POST", "/api/mailboxes/abc/backfill", {})[0], 404)
+        self.assertEqual(self.google.queries, [])
 
     def test_nobody_scans_or_sees_another_members_mailbox(self):
         status, body = self.call("ben", "POST", f"/api/mailboxes/{self.ana_box}/scan", {})

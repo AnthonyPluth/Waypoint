@@ -303,6 +303,21 @@ describe("Review: the AI’s suggestion", () => {
     expect(body).toMatchObject({ kind: "flight", confirmation: "QW4R7U", origin: "BOS", destination: "DEN", start_local: "2026-12-02T07:15" });
   });
 
+  it("opens a cruise suggestion with its port labels and saves its ports and zones", async () => {
+    const cruise = { kind: "cruise" as const, provider: "Example Cruise Line", confirmation: "QW4R7T", origin: "Miami", destination: "Nassau",
+      start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00", start_zone: "America/New_York", end_zone: "America/Nassau" };
+    held = { items: [item({ suggestion: cruise })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText("Embarkation port")).toHaveValue("Miami");
+    expect(screen.getByLabelText("Disembarkation port")).toHaveValue("Nassau");
+    expect(screen.getByLabelText("Time zone where it ends")).toHaveValue("America/Nassau");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    const [, , body] = calls.find(([p]) => p === "/api/segments")!;
+    expect(body).toMatchObject({ kind: "cruise", origin: "Miami", destination: "Nassau", start_zone: "America/New_York", end_zone: "America/Nassau" });
+  });
+
   it("says why there’s none, and still offers adding by hand", async () => {
     held = { items: [item({ suggestion_error: "The AI didn’t find a booking in this message." })], who: [], ai: false };
     render(ReviewPage);
