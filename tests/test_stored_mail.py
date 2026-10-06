@@ -2,6 +2,7 @@
 review item or by the bookings made from them, deleted when nothing holds them, and carried (still encrypted) in a backup.
 Subjects, texts and keys are invented."""
 import json
+from unittest import mock
 
 from sqlalchemy import insert, select
 
@@ -54,6 +55,21 @@ class KeptMessageTests(DbCase):
             self.assertEqual(stored_mail.get(conn, self.box, "m1"), {"subject": None, "sender_domain": None, "received": None, "text": "",
                                                                       "html": None, "truncated": False})
 
+    def test_subjects_come_without_opening_the_messages_and_are_encrypted_on_their_own(self):
+        with db.session() as conn:
+            stored_mail.put(conn, self.box, "m1", CONTENT, 5.0)
+            stored_mail.put(conn, self.box, "m2", {**CONTENT, "subject": None}, 5.0)
+            raw = conn.execute(select(StoredMessage.subject).where(StoredMessage.message_id == "m1")).scalar()
+            self.assertTrue(secretbox.is_encrypted(raw))
+            self.assertNotIn("CANARY-KEPT", raw)
+            self.assertEqual(stored_mail.subjects(conn, [self.box]), {(self.box, "m1"): CONTENT["subject"], (self.box, "m2"): None})
+            self.assertEqual(stored_mail.subjects(conn, [self.box + 99]), {})
+            self.assertEqual(stored_mail.subjects(conn, []), {})
+            with mock.patch.object(stored_mail, "get", side_effect=AssertionError("opened a message")):
+                stored_mail.subjects(conn, [self.box])
+            conn.execute(StoredMessage.__table__.update().values(subject=secretbox.PREFIX + "bad"))
+            self.assertEqual(stored_mail.subjects(conn, [self.box])[(self.box, "m1")], None)   # (a key that is gone: no subject, not an error)
+
     def test_a_booking_keeps_the_messages_it_was_made_from_newest_first(self):
         with db.session() as conn:
             stored_mail.put(conn, self.box, "old", {**CONTENT, "subject": "First"}, 1.0)
@@ -102,6 +118,7 @@ class KeptMessageTests(DbCase):
             columns = exported["tables"]["stored_messages"]["columns"]
             [row] = exported["tables"]["stored_messages"]["rows"]
             self.assertTrue(secretbox.is_encrypted(row[columns.index("content")]))
+            self.assertTrue(secretbox.is_encrypted(row[columns.index("subject")]))
             self.assertEqual(len(exported["tables"]["segment_messages"]["rows"]), 1)
             self.assertNotIn(b"CANARY-KEPT", backup.dump(conn))
             self.assertNotIn(b"CANARY-KEPT", __import__("gzip").decompress(backup.dump(conn)))   # (nor inside the compressed file)

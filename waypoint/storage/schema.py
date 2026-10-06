@@ -286,6 +286,7 @@ stored_messages = Table(
     Column('mailbox_id', Integer, refers('stored_messages', 'mailbox_id', 'mailboxes.id', 'CASCADE'), nullable=False),
     Column('message_id', Text, nullable=False),
     Column('content', Text, nullable=False, doc='the subject, sender, day, text and cleaned HTML of the message (JSON), encrypted (waypoint/storage/secretbox.py)'),
+    Column('subject', Text, doc='the subject again, encrypted on its own, so a list of items shows it without opening whole messages'),
     Column('created', Float, nullable=False),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_stored_messages_mailbox_message'),
     info={'doc': "a message kept while a review item waits for it or a booking was made from it (waypoint/storage/stored_mail.py), so it can be read without Gmail; encrypted; deleted when neither holds, and with its mailbox"},

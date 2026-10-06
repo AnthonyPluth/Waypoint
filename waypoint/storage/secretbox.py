@@ -35,8 +35,9 @@ MIN_KEY_LENGTH = 32
 
 # settings rows that hold secrets (the rest of the settings table is ordinary preferences)
 SECRET_SETTINGS = settings_keys.SECRETS
-# columns that hold secrets: table -> column (a mailbox's refresh token, a loyalty or Known Traveler number, a kept message)
-SECRET_COLUMNS = {"mailboxes": "token", "loyalty_ids": "number", "stored_messages": "content"}
+# columns that hold secrets: table -> columns (a mailbox's refresh token, a loyalty or Known Traveler number, a kept message and its
+# subject on its own, so a list of subjects doesn't open whole messages)
+SECRET_COLUMNS = {"mailboxes": ("token",), "loyalty_ids": ("number",), "stored_messages": ("content", "subject")}
 
 _lock = threading.Lock()
 _cache: dict[tuple, MultiFernet] = {}
@@ -194,13 +195,13 @@ def encrypt_stored(conn) -> int:
         if new != n["number"]:
             conn.execute(update(LoyaltyId).where(LoyaltyId.id == n["id"]).values(number=new))
             changed += 1
-    for s in conn.execute(select(StoredMessage.id, StoredMessage.content)).fetchall():
+    for s in conn.execute(select(StoredMessage.id, StoredMessage.content, StoredMessage.subject)).fetchall():
         try:
-            new = reencrypt(s["content"])
+            new, new_subject = reencrypt(s["content"]), reencrypt(s["subject"])
         except InvalidToken:
             monitoring.log("Warning: a kept message can't be decrypted with the current key; it can't be read until that key is back.", "warning")
             continue
-        if new != s["content"]:
-            conn.execute(update(StoredMessage).where(StoredMessage.id == s["id"]).values(content=new))
+        if (new, new_subject) != (s["content"], s["subject"]):
+            conn.execute(update(StoredMessage).where(StoredMessage.id == s["id"]).values(content=new, subject=new_subject))
             changed += 1
     return changed

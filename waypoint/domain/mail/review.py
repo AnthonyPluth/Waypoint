@@ -71,11 +71,10 @@ def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .outerjoin(Person, Person.user_sub == Mailbox.owner_sub).where(_seen_by(owner))
                         .order_by(ReviewItem.received.is_(None), ReviewItem.received.desc(), ReviewItem.id.desc())).fetchall()
-    kept = {(r["mailbox_id"], r["message_id"]): stored_mail.get(conn, r["mailbox_id"], r["message_id"]) for r in rows}
-    subjects = {k: (v["subject"] if v is not None else None) for k, v in kept.items()}
+    subjects = stored_mail.subjects(conn, (r["mailbox_id"] for r in rows))   # (not the messages: a list opens none of them)
     return [{"id": r["id"], "address": r["address"], "owner": r["display_name"] or r["address"], "mine": r["owner_sub"] == owner,
-             "sender_domain": r["sender_domain"], "subject": subjects[(r["mailbox_id"], r["message_id"])],
-             "has_email": kept[(r["mailbox_id"], r["message_id"])] is not None,
+             "sender_domain": r["sender_domain"], "subject": subjects.get((r["mailbox_id"], r["message_id"])),
+             "has_email": (r["mailbox_id"], r["message_id"]) in subjects,
              "received": r["received"], "reason": r["reason"],
              "gmail_url": gmail.open_url(r["address"], r["message_id"]) if r["owner_sub"] == owner else None,
              "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None, "suggestion_error": r["suggestion_error"]}

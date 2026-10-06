@@ -74,9 +74,10 @@ def _secret_columns(table: str, cols: list[str]):
     if table == "settings" and "key" in cols and "value" in cols:
         k, v = cols.index("key"), cols.index("value")
         return lambda row: [v] if row[k] in secretbox.SECRET_SETTINGS else []
-    if table in secretbox.SECRET_COLUMNS and secretbox.SECRET_COLUMNS[table] in cols:
-        i = cols.index(secretbox.SECRET_COLUMNS[table])
-        return lambda row: [i]
+    if table in secretbox.SECRET_COLUMNS:
+        found = [cols.index(c) for c in secretbox.SECRET_COLUMNS[table] if c in cols]
+        if found:
+            return lambda row: found
     return None
 
 

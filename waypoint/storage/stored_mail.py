@@ -48,8 +48,10 @@ def _open(value: str) -> Content | None:
 def put(conn: db.Connection, mailbox_id: int, message_id: str, content: Mapping[str, Any], now: float) -> int:
     """Keep a message (again: what was kept is replaced). Returns its row's id."""
     sealed = secretbox.encrypt(json.dumps(dict(content), separators=(",", ":"))) or ""
-    db.upsert(conn, StoredMessage, {"mailbox_id": mailbox_id, "message_id": message_id, "content": sealed, "created": now},
-              key=["mailbox_id", "message_id"], update=["content"])
+    subject = content.get("subject")
+    db.upsert(conn, StoredMessage, {"mailbox_id": mailbox_id, "message_id": message_id, "content": sealed, "created": now,
+                                    "subject": secretbox.encrypt(subject) if isinstance(subject, str) else None},
+              key=["mailbox_id", "message_id"], update=["content", "subject"])
     found = conn.execute(select(StoredMessage.id).where(StoredMessage.mailbox_id == mailbox_id, StoredMessage.message_id == message_id)).scalar()
     return int(found)
 
@@ -59,6 +61,22 @@ def get(conn: db.Connection, mailbox_id: int, message_id: str) -> Content | None
     value = conn.execute(select(StoredMessage.content).where(StoredMessage.mailbox_id == mailbox_id,
                                                               StoredMessage.message_id == message_id)).scalar()
     return _open(value) if value else None
+
+
+def subjects(conn: db.Connection, mailbox_ids: Iterable[int]) -> dict[tuple[int, str], str | None]:
+    """Each kept message of these mailboxes, as (mailbox id, message id): its subject (None when it had none or can't be unlocked),
+    without opening the messages: for a list of items."""
+    ids = sorted(set(mailbox_ids))
+    if not ids:
+        return {}
+    found: dict[tuple[int, str], str | None] = {}
+    for r in conn.execute(select(StoredMessage.mailbox_id, StoredMessage.message_id, StoredMessage.subject)
+                          .where(StoredMessage.mailbox_id.in_(ids))).fetchall():
+        try:
+            found[(int(r["mailbox_id"]), str(r["message_id"]))] = secretbox.decrypt(r["subject"]) if r["subject"] else None
+        except secretbox.SecretError:
+            found[(int(r["mailbox_id"]), str(r["message_id"]))] = None
+    return found
 
 
 def link(conn: db.Connection, segment_id: int, mailbox_id: int, message_id: str) -> bool:

@@ -251,6 +251,7 @@ class StoredMessage(Base):
     mailbox_id: Mapped[int]
     message_id: Mapped[str]
     content: Mapped[str]             # JSON, encrypted (waypoint/storage/stored_mail.py)
+    subject: Mapped[str | None]      # the subject, encrypted on its own
     created: Mapped[float]
 
 

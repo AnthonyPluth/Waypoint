@@ -21,6 +21,7 @@ def upgrade() -> None:
         sa.Column('mailbox_id', sa.Integer(), sa.ForeignKey('mailboxes.id', name='fk_stored_messages_mailbox_id', ondelete='CASCADE', deferrable=True, initially='IMMEDIATE'), nullable=False),
         sa.Column('message_id', sa.Text(), nullable=False),
         sa.Column('content', sa.Text(), nullable=False),
+        sa.Column('subject', sa.Text()),
         sa.Column('created', sa.Float(), nullable=False),
         sa.UniqueConstraint('mailbox_id', 'message_id', name='uq_stored_messages_mailbox_message'),
     )
