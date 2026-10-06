@@ -206,13 +206,15 @@ export type Membership =
   | { state: "unmatched" }                 // the traveller is a printed name, not yet matched to a person
   | null;                                  // nothing to say (the provider's program isn't known)
 
-/** The membership one traveller would use on one booking, from the household's list. */
+/** The membership one traveller would use on one booking, from the household's list. A hotel room needs a number only from
+ *  whoever booked it, so for anyone else on a stay the card says only what they do have, never that they have none. */
 export function membershipFor(segment: Segment, traveler: Traveler, loyalty: LoyaltyEntry[]): Membership {
   const program = programFor(segment);
   if (!program) return null;
-  if (traveler.person_id === null) return { state: "unmatched" };
+  const booker = segment.kind !== "hotel" || (traveler.person_id !== null && traveler.person_id === segment.booked_by);
+  if (traveler.person_id === null) return booker ? { state: "unmatched" } : null;
   const entry = loyalty.find((m) => m.person_id === traveler.person_id && m.program === program);
-  return entry ? { state: "found", entry } : { state: "none", program };
+  return entry ? { state: "found", entry } : booker ? { state: "none", program } : null;
 }
 
 // ------------------------------------------------------------------------------------------ wording
