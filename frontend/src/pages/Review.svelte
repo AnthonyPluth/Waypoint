@@ -131,7 +131,7 @@
     const flight = d.kind === "flight";
     // The times are typed as they read on the booking, with no offset, and kept where they happen.
     const body = { kind: d.kind as "flight" | "hotel" | "car" | "train", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
-      destination: d.destination, ...(flight ? {} : { start_zone: d.startZone, end_zone: d.endZone || d.startZone }) };
+      destination: d.destination, ...(flight ? {} : d.kind === "hotel" ? { start_zone: d.startZone.trim() || null } : { start_zone: d.startZone, end_zone: d.endZone || d.startZone }) };
     let added = false;
     const ok = await act(async () => {
       const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
@@ -254,7 +254,11 @@
                     <Input type="datetime-local" bind:value={d.start} required /></label>
                   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off time" : "Arrives"}</span>
                     <Input type="datetime-local" bind:value={d.end} required /></label>
-                  {#if d.kind !== "flight"}
+                  {#if d.kind === "hotel"}
+                    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>
+                      <Input bind:value={d.startZone} maxlength={64} autocomplete="off" spellcheck={false} placeholder="America/New_York" />
+                      <span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address.</span></label>
+                  {:else if d.kind !== "flight"}
                     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it starts</span>
                       <Input bind:value={d.startZone} required maxlength={64} autocomplete="off" spellcheck={false} placeholder="America/New_York" /></label>
                     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it ends</span>
