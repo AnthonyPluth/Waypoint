@@ -52,7 +52,7 @@ class Prefs(TypedDict):
 
 class DeviceOut(TypedDict):
     id: int
-    service: str       # the push service by a name a person knows ("Chrome or Android (Google)"), else its host, so they can tell their devices apart
+    service: str       # the push service by a name a person knows ("Chrome or Android (Google)"), else "Notifications to" its host, so they can tell their devices apart
     created: float
 
 
@@ -145,12 +145,12 @@ SERVICES = (("fcm.googleapis.com", "Chrome or Android (Google)"), ("push.apple.c
 
 def service_name(endpoint: str) -> str:
     """The name of the push service an endpoint belongs to ("Safari on an Apple device" for web.push.apple.com); one Waypoint
-    doesn't know is shown by its host."""
+    doesn't know is "Notifications to" its host."""
     host = (urllib.parse.urlsplit(endpoint).hostname or "").lower()
     for suffix, name in SERVICES:
         if host == suffix or host.endswith("." + suffix):
             return name
-    return host
+    return f"Notifications to {host}"
 
 
 def devices(conn: db.Connection, owner: str) -> list[DeviceOut]:
