@@ -38,7 +38,7 @@ A flight’s airline comes from the two-character code its flight number starts 
 
 ## The map
 
-The Stats page draws a world map of everywhere you have flown, for the same person and year as the rest of the page: an arc for each route (thicker for more flights), a dot for each airport (bigger for more visits), and the countries that hold one of your airports shaded. Tap or hover a dot or an arc for its name and count; drag, pinch or use the buttons to zoom, and Reset to see the whole world again. Hotel cities without an airport aren’t plotted, and neither is an airport Waypoint doesn’t have coordinates for.
+The Stats page draws a world map of everywhere you have flown, for the same person and year as the rest of the page: an arc for each route (thicker for more flights), a dot for each airport (bigger for more visits), and the countries that hold one of your airports shaded. Tap or hover a dot or an arc for its name and count; The map opens zoomed to just the places you have flown (the whole world when they span it), and follows the person and year you pick; drag, pinch or use the buttons to zoom, **Reset** to go back to that view and **World** to see the whole world. Hotel cities without an airport aren’t plotted, and neither is an airport Waypoint doesn’t have coordinates for.
 
 The map is drawn on your device from country outlines bundled with the app ([Natural Earth](https://www.naturalearthdata.com/), public domain, through the `world-atlas` package). It loads no tiles and calls no map service, so no one outside learns where the household goes. Its code and outlines are downloaded only when you open the Stats page.
 

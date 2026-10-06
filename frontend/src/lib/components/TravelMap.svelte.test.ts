@@ -17,6 +17,15 @@ const flights = {
 
 afterEach(() => vi.restoreAllMocks());
 
+const hawaii = {
+  airports: [
+    { code: "HNL", name: "Daniel K. Inouye International Airport", city: "Honolulu", country: "US", visits: 4, latitude: 21.3187, longitude: -157.9225 },
+    { code: "LIH", name: "Lihue Airport", city: "Lihue", country: "US", visits: 2, latitude: 21.976, longitude: -159.339 },
+  ],
+  routes: [{ a: "HNL", b: "LIH", flights: 2, distance_km: 170, a_latitude: 21.3187, a_longitude: -157.9225, b_latitude: 21.976, b_longitude: -159.339 }],
+} as StatsFlights;
+const scale = (container: HTMLElement) => Number(/scale\(([\d.]+)\)/.exec(container.querySelector("[data-testid=map-layer]")!.getAttribute("transform") ?? "")?.[1]);
+
 describe("TravelMap", () => {
   it("draws the countries, the airports and the routes, and shades the countries visited", async () => {
     const { container } = render(TravelMap, { flights });
@@ -90,5 +99,25 @@ describe("TravelMap", () => {
       const source = readFileSync(new URL(file, import.meta.url), "utf8");
       expect(source, file).not.toMatch(/https?:\/\/|\/\/[a-z0-9.-]+\.[a-z]{2,}\/|new Image|<image|<img/i);
     }
+  });
+
+  it("opens framed on the places flown, with Reset back to that view and World for everything", async () => {
+    const { container } = render(TravelMap, { flights: hawaii });
+    await waitFor(() => expect(scale(container)).toBeGreaterThan(3));
+    const reset = screen.getByRole("button", { name: "Reset" }) as HTMLButtonElement;
+    const world = screen.getByRole("button", { name: "World" }) as HTMLButtonElement;
+    expect(reset.disabled).toBe(true);   // (already there)
+    await userEvent.click(world);
+    expect(scale(container)).toBe(1);
+    expect(world.disabled).toBe(true);
+    await userEvent.click(reset);
+    expect(scale(container)).toBeGreaterThan(3);
+  });
+
+  it("follows the flights when they change (another traveller, another year)", async () => {
+    const { container, rerender } = render(TravelMap, { flights: hawaii });
+    await waitFor(() => expect(scale(container)).toBeGreaterThan(3));
+    await rerender({ flights });
+    await waitFor(() => expect(scale(container)).toBe(1));
   });
 });
