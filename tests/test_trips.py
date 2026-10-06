@@ -394,6 +394,36 @@ class SeatTests(Household):
                          [("Jane Doe", "31a"), ("Sam Doe", "31B"), ("DOE/MIA MISS", "32A"), ("NEW/PERSON MR", None)])
 
 
+class StayZoneTests(Household):
+    def stay(self, **extra):
+        fields = {**HOTEL, "start_zone": None, "end_zone": None, **extra}
+        return self.add(self.jane, fields, None, self.on(self.jane.person_id))
+
+    def test_a_stay_has_one_zone_and_the_end_follows_the_start(self):
+        seg = self.stay(start_zone="America/Chicago", end_zone="Europe/London")
+        self.assertEqual((seg["start_zone"], seg["end_zone"]), ("America/Chicago", "America/Chicago"))   # (a different end zone is not kept)
+
+    def test_a_stay_with_no_zone_takes_the_one_its_address_is_in(self):
+        seg = self.stay(details={"address": "1 Ocean Ave, Honolulu, HI 96815"})
+        self.assertEqual((seg["start_zone"], seg["end_zone"]), ("Pacific/Honolulu", "Pacific/Honolulu"))
+        given = self.stay(details={"address": "1 Ocean Ave, Honolulu, HI 96815"}, start_zone="America/Denver")
+        self.assertEqual(given["start_zone"], "America/Denver")   # (what a person gave wins)
+
+    def test_a_stay_whose_address_settles_nothing_is_refused_and_says_what_to_do(self):
+        for details in ({}, {"address": "Hotel Foo, 1 Road"}):
+            with self.subTest(details=details), self.assertRaisesRegex(trips.Invalid, "time zone of the stay"):
+                self.stay(details=details)
+
+    def test_editing_a_stay_keeps_its_zone_in_both_places(self):
+        seg = self.stay(start_zone="America/Chicago")
+        moved = trips.edit_segment(self.c, self.jane, seg["id"], {"start_zone": "America/Denver"})
+        assert moved
+        self.assertEqual((moved["start_zone"], moved["end_zone"]), ("America/Denver", "America/Denver"))
+        renamed = trips.edit_segment(self.c, self.jane, seg["id"], {"origin": "Other Hotel"})
+        assert renamed
+        self.assertEqual((renamed["start_zone"], renamed["end_zone"]), ("America/Denver", "America/Denver"))
+
+
 class CruiseTests(Household):
     def test_a_cruise_keeps_its_ports_in_order_with_their_own_zones(self):
         seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS})

@@ -305,11 +305,22 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Hotel name"), "Harbour Hotel");
     await u.type(screen.getByLabelText(/^Check-in/), "2026-11-21T15:00");
     await u.type(screen.getByLabelText(/^Check-out/), "2026-11-27T10:00");
-    await u.type(screen.getByLabelText("Time zone"), "Europe/London");
+    await u.type(screen.getByLabelText(/^Time zone/), "Europe/London");
     await u.click(screen.getByLabelText("Sam Doe"));
     await u.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({
-      trip_id: 1, kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London", end_zone: "Europe/London", travelers: [{ person_id: 2 }] }) }));
+      trip_id: 1, kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London", travelers: [{ person_id: 2 }] }) }));
+  });
+
+  it("asks a stay for one time zone, and says it can be worked out from the address", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add a booking/ }));
+    await u.selectOptions(screen.getByLabelText("What is it"), "Hotel");
+    expect(screen.queryByLabelText(/Time zone at the end/)).toBeNull();
+    expect(screen.getByText(/Leave this empty to work it out from the address/)).toBeInTheDocument();
+    await u.selectOptions(screen.getByLabelText("What is it"), "Car rental");
+    expect(screen.getByLabelText(/Time zone at the end/)).toBeInTheDocument();
   });
 
   it("removes a booking after asking", async () => {

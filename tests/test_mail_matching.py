@@ -126,6 +126,25 @@ class ExplainTests(DbCase):
         self.assertEqual(ingest.explain(self.c, self.booking(end="2026-11-20T10:00:00+00:00")), "rejected as a segment")
 
 
+class StayAddressZoneTests(DbCase):
+    """A stay with no city the airports know is placed by its address, from the text alone (place_zones.py)."""
+
+    def stay(self, **kw):
+        base = dict(kind="hotel", status="confirmed", confirmation="H1", provider="Harbour Hotel", start="2026-11-20T15:00:00",
+                    end="2026-11-22T10:00:00", origin="Harbour Hotel", destination=None)
+        return extract.Booking(**{**base, **kw})
+
+    def test_the_address_gives_the_zone_both_ends_share(self):
+        found = ingest.fields(self.c, self.stay(details=(("address", "1 Ocean Ave, Honolulu, HI 96815"),)))
+        assert found is not None
+        self.assertEqual((found["start_zone"], found["end_zone"]), ("Pacific/Honolulu", "Pacific/Honolulu"))
+
+    def test_no_address_and_no_city_is_still_not_filed(self):
+        b = self.stay()
+        self.assertIsNone(ingest.fields(self.c, b))
+        self.assertEqual(ingest.explain(self.c, b), "place's time zone unknown")
+
+
 class TimesTests(DbCase):
     """A booking's times as wall-clock times at its places: as written when the offsets are the places' own or absent, a flight's
     decided by which reading gives a believable flight time, and anything that can't be told apart is not filed (it goes to

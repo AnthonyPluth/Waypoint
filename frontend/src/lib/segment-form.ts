@@ -95,11 +95,14 @@ export function problem(d: Draft): string | null {
   if (!LOCAL.test(d.start_local)) return d.kind === "hotel" ? "Enter the check-in date and time" : "Enter when it starts";
   if (!LOCAL.test(d.end_local)) return d.kind === "hotel" ? "Enter the check-out date and time" : "Enter when it ends";
   // A flight's zones come from its airports unless given; anything else needs one (the end's is the start's if left empty).
-  if (!flight && !d.start_zone.trim()) return "Enter the time zone of the place (for example America/New_York)";
-  for (const zone of [d.start_zone.trim(), d.end_zone.trim()]) {
+  // A stay is in one place, so it has one zone: given, or worked out from its address when it's left empty.
+  const stay = d.kind === "hotel";
+  if (stay && !d.start_zone.trim() && !(d.details.address ?? "").trim()) return "Enter the time zone of the stay (for example America/New_York), or its address to work it out from";
+  if (!flight && !stay && !d.start_zone.trim()) return "Enter the time zone of the place (for example America/New_York)";
+  for (const zone of [d.start_zone.trim(), stay ? "" : d.end_zone.trim()]) {
     if (zone && !knownZone(zone)) return `The time zone “${zone.slice(0, 40)}” isn’t one Waypoint knows (use a name like America/New_York)`;
   }
-  const startZone = d.start_zone.trim(), endZone = d.end_zone.trim() || startZone;
+  const startZone = d.start_zone.trim(), endZone = stay ? startZone : d.end_zone.trim() || startZone;
   // Compared only when both zones are known: a flight's arrival can be earlier on the clock than its departure.
   if (startZone && endZone && instant(d.end_local, endZone) < instant(d.start_local, startZone)) {
     return "This ends before it starts (times are compared at their own places’ zones)";
@@ -139,7 +142,9 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
     kind: d.kind, status: d.status, provider: text(d.provider), confirmation: text(d.confirmation),
     origin: flight ? d.origin.trim().toUpperCase() : text(d.origin), destination: flight ? d.destination.trim().toUpperCase() : text(d.destination),
     start_local: d.start_local, end_local: d.end_local,
-    ...(flight ? { ...(startZone && { start_zone: startZone }), ...(d.end_zone.trim() && { end_zone: d.end_zone.trim() }) } : { start_zone: startZone, end_zone: endZone }),
+    ...(flight ? { ...(startZone && { start_zone: startZone }), ...(d.end_zone.trim() && { end_zone: d.end_zone.trim() }) }
+      : d.kind === "hotel" ? { ...(startZone && { start_zone: startZone }) }   // (a stay's one zone; none typed: the server works it out from the address)
+        : { start_zone: startZone, end_zone: endZone }),
     details, manage_url: text(d.manage_url),
     ...(flight || d.kind !== "cruise" ? {} : { itinerary: d.itinerary.map((p) => ({ name: p.name.trim(), zone: p.zone.trim(), arrive_local: p.arrive || null, depart_local: p.depart || null })) }),
     travelers: [...d.people.map((id) => ({ person_id: id, ...seat(id) })), ...d.printed.map((name) => ({ person_id: null, name, ...seat(name) }))],

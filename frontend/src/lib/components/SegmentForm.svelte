@@ -84,9 +84,12 @@
         <Input type="datetime-local" bind:value={d.end_local} autocomplete="off" />
         <span class="text-muted-foreground">The local time at the place it ends.</span></label>
       <label class={label}><span class="font-medium">{flight ? "Departure time zone (only if the airport isn’t known)" : "Time zone"}</span>
-        <Input bind:value={d.start_zone} list="segment-zones" autocomplete="off" spellcheck={false} placeholder="America/New_York" /></label>
-      <label class={label}><span class="font-medium">{flight ? "Arrival time zone (only if the airport isn’t known)" : "Time zone at the end (if different)"}</span>
-        <Input bind:value={d.end_zone} list="segment-zones" autocomplete="off" spellcheck={false} /></label>
+        <Input bind:value={d.start_zone} list="segment-zones" autocomplete="off" spellcheck={false} placeholder="America/New_York" />
+        {#if d.kind === "hotel"}<span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address.</span>{/if}</label>
+      {#if d.kind !== "hotel"}
+        <label class={label}><span class="font-medium">{flight ? "Arrival time zone (only if the airport isn’t known)" : "Time zone at the end (if different)"}</span>
+          <Input bind:value={d.end_zone} list="segment-zones" autocomplete="off" spellcheck={false} /></label>
+      {/if}
       <datalist id="segment-zones">{#each zones as zone (zone)}<option value={zone}></option>{/each}</datalist>
       {#each DETAILS[d.kind] as [key, name] (key)}
         <label class={label}><span class="font-medium">{name}</span>

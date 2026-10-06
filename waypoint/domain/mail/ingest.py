@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Literal
 
 from ...storage import db
-from .. import airports, loyalty, people, trips
+from .. import airports, loyalty, people, place_zones, trips
 from ..visibility import Viewer
 from . import extract
 
@@ -16,7 +16,8 @@ def _zone(conn: db.Connection, b: extract.Booking, code: str | None, place: extr
     if b.kind == "flight":
         known = airports.lookup(conn, code) if code else None
         return known["zone"] if known else None
-    return airports.zone_for_place(conn, place.city, place.country)
+    return (airports.zone_for_place(conn, place.city, place.country)
+            or (place_zones.zone_for_address(conn, dict(b.details).get("address")) if b.kind == "hotel" else None))
 
 
 def travelers(conn: db.Connection, passengers: tuple[extract.Passenger, ...]) -> list[trips.TravelerIn]:

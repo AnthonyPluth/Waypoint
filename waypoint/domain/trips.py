@@ -23,7 +23,7 @@ from sqlalchemy import delete, select, update
 
 from ..storage import db
 from ..storage.models import Segment, SegmentPort, SegmentTraveler, Trip
-from . import airports, links, logos, people, visibility
+from . import airports, links, logos, people, place_zones, visibility
 from .visibility import Viewer
 
 Kind = Literal["flight", "hotel", "car", "train", "cruise"]
@@ -292,6 +292,17 @@ def _place_zone(conn: db.Connection, kind: str, code: str | None, given: str | N
     return _zone(known["zone"] if known else None, label)
 
 
+def _stay_zone(conn: db.Connection, fields: SegmentIn) -> str:
+    """A stay's zone, which its start and end share: the one given, else the one its address is in (place_zones.py, from the
+    text alone). Raises Invalid when neither is known."""
+    if fields.get("start_zone"):
+        return _zone(fields.get("start_zone"), "stay’s")
+    found = place_zones.zone_for_address(conn, (fields.get("details") or {}).get("address"))
+    if found is None:
+        raise Invalid("Enter the time zone of the stay (Waypoint couldn’t tell it from the address, for example America/New_York)")
+    return _zone(found, "stay’s")
+
+
 def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
     """A segment's columns from all of its fields (not travelers: see `_travelers`), checked: its kind and status are known,
     a flight's places are airport codes, its times are local times with a known zone each (a flight's from its airports
@@ -309,8 +320,11 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
             if not code or not IATA.fullmatch(code):
                 raise Invalid(f"A flight’s {label} is an airport code like JFK")
         origin, destination = (origin or "").upper(), (destination or "").upper()
-    start_zone = _place_zone(conn, kind, origin, fields.get("start_zone"), "start")
-    end_zone = _place_zone(conn, kind, destination, fields.get("end_zone"), "end")
+    if kind == "hotel":   # (a stay is in one place: one zone, given or worked out from its address)
+        start_zone = end_zone = _stay_zone(conn, fields)
+    else:
+        start_zone = _place_zone(conn, kind, origin, fields.get("start_zone"), "start")
+        end_zone = _place_zone(conn, kind, destination, fields.get("end_zone"), "end")
     start, end = _local(fields.get("start_local"), "start"), _local(fields.get("end_local"), "end")
     if instant(end, end_zone) < instant(start, start_zone):
         raise Invalid("This ends before it starts (times are compared at their own places’ zones)")
