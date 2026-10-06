@@ -64,24 +64,49 @@ describe("Stats", () => {
   it("opens on your own numbers for all time, with the totals in the household's unit", async () => {
     serve(() => full);
     render(Stats_);
-    const totals = await screen.findByRole("region", { name: "Totals" });
+    const totals = await screen.findByRole("region", { name: "Flights" });
     expect(statsCalls()).toEqual(["/api/stats?person=1&year=all"]);
     expect(within(totals).getByText("12")).toBeInTheDocument();
     expect(within(totals).getByText("32,311 mi")).toBeInTheDocument();
     expect(within(totals).getByText("3 d 4 h")).toBeInTheDocument();
     expect(within(totals).getByText("1.3× around the Earth")).toBeInTheDocument();
     expect(within(totals).getByText("14% of the way to the Moon")).toBeInTheDocument();
-    expect(within(totals).getByText("9")).toBeInTheDocument();   // nights away
+    expect(within(screen.getByRole("region", { name: "Hotels" })).getByText("9")).toBeInTheDocument();   // nights away
     expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("1");
     expect(screen.getByRole("option", { name: "Jane Doe (you)" })).toBeInTheDocument();
     expect(screen.getByTestId("stats-map-slot")).toBeInTheDocument();
   });
 
+  it("has a section each for flights, hotels, cars and cruises, with its own lists", async () => {
+    serve(() => full);
+    render(Stats_);
+    for (const name of ["Where you’ve been", "Flights", "Hotels", "Cars", "Cruises"]) expect(await screen.findByRole("region", { name })).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Flights" })).getByText("Routes")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Hotels" })).getByText("Hotel chains")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Cars" })).getByText("Rental companies")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Cruises" })).getByText("Cruise lines")).toBeInTheDocument();
+  });
+
+  it("leaves out the section of anything not done, so someone who only stayed has just the hotels", async () => {
+    serve(() => ({ ...full, flights: none.flights, cars: none.cars, cruises: none.cruises }));
+    render(Stats_);
+    await screen.findByRole("region", { name: "Hotels" });
+    for (const name of ["Flights", "Cars", "Cruises"]) expect(screen.queryByRole("region", { name })).toBeNull();
+  });
+
+  it("shows just the Cars section for someone who only rented a car", async () => {
+    serve(() => ({ ...full, flights: none.flights, stays: none.stays, cruises: none.cruises }));
+    render(Stats_);
+    const cars = await screen.findByRole("region", { name: "Cars" });
+    expect(within(cars).getByText("Rental days")).toBeInTheDocument();
+    for (const name of ["Flights", "Hotels", "Cruises"]) expect(screen.queryByRole("region", { name })).toBeNull();
+  });
+
   it("counts cruises, nights aboard, sea days and ports, and lists the lines, only when there are cruises", async () => {
     serve(() => full);
     render(Stats_);
-    const totals = await screen.findByRole("region", { name: "Totals" });
-    for (const [label, value] of [["Cruises", "2"], ["Nights at sea", "10"], ["Sea days", "4"], ["Ports of call", "5"]]) {
+    const totals = await screen.findByRole("region", { name: "Cruises" });
+    for (const [label, value] of [["Cruises taken", "2"], ["Nights at sea", "10"], ["Sea days", "4"], ["Ports of call", "5"]]) {
       const tile = within(totals).getByText(label).closest("div")!;
       expect(within(tile).getByText(value)).toBeInTheDocument();
     }
@@ -92,16 +117,16 @@ describe("Stats", () => {
   it("shows the stay totals, records and the hotel and city lists, and none of them without stays", async () => {
     serve(() => full);
     render(Stats_);
-    const totals = await screen.findByRole("region", { name: "Totals" });
-    for (const [label, value] of [["Stays", "4"], ["Average stay", "3.5 nights"], ["Hotels", "2"]]) {
+    const totals = await screen.findByRole("region", { name: "Hotels" });
+    for (const [label, value] of [["Stays", "4"], ["Average stay", "3.5 nights"], ["Different hotels", "2"]]) {
       expect(within(within(totals).getByText(label).closest("div")!).getByText(value)).toBeInTheDocument();
     }
-    const records = screen.getByRole("heading", { name: "Records" }).closest("section")!;
+    const records = screen.getByRole("heading", { name: "Hotel records" }).closest("div")!;
     expect(within(records).getByText("Longest stay").closest("div")).toHaveTextContent("Harbour Hotel, London4 nights");
     expect(within(records).getByText("Most-visited hotel").closest("div")).toHaveTextContent("Harbour Hotel2 stays · 6 nights");
     expect(within(records).getByText("Most-visited city").closest("div")).toHaveTextContent("London2 stays · 6 nights");
     expect(within(records).getByText("Most nights in a month").closest("div")).toHaveTextContent("June 2026");
-    const hotels = screen.getByRole("heading", { name: "Hotels" }).closest("section")!;
+    const hotels = screen.getByRole("heading", { name: "Hotels stayed at" }).closest("section")!;
     expect(within(hotels).getAllByRole("listitem")[0]).toHaveTextContent("1 Harbour Hotel2 stays 6 nights");
     expect(screen.getByRole("heading", { name: "Cities stayed in" })).toBeInTheDocument();
   });
@@ -109,8 +134,9 @@ describe("Stats", () => {
   it("shows no stay tiles, hotel or city lists for someone without stays", async () => {
     serve(() => ({ ...full, stays: none.stays }));
     render(Stats_);
-    const totals = await screen.findByRole("region", { name: "Totals" });
-    expect(within(totals).queryByText("Average stay")).toBeNull();
+    await screen.findByRole("region", { name: "Flights" });
+    expect(screen.queryByText("Average stay")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Hotels" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Hotels" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Cities stayed in" })).toBeNull();
     expect(screen.queryByText("Longest stay")).toBeNull();
@@ -119,8 +145,9 @@ describe("Stats", () => {
   it("shows no cruise tiles for someone who has not been on one", async () => {
     serve(() => ({ ...full, cruises: none.cruises }));
     render(Stats_);
-    const totals = await screen.findByRole("region", { name: "Totals" });
-    expect(within(totals).queryByText("Sea days")).toBeNull();
+    await screen.findByRole("region", { name: "Flights" });
+    expect(screen.queryByText("Sea days")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Cruises" })).toBeNull();
     expect(screen.queryByText("Cruise lines")).toBeNull();
   });
 
@@ -137,7 +164,7 @@ describe("Stats", () => {
   it("has no year in review for all time", async () => {
     serve(() => full);
     render(Stats_);
-    await screen.findByRole("region", { name: "Totals" });
+    await screen.findByRole("region", { name: "Flights" });
     expect(screen.queryByRole("button", { name: /in review/ })).toBeNull();
   });
 
@@ -175,7 +202,7 @@ describe("Stats", () => {
   it("shows the records and the seats", async () => {
     serve(() => full);
     render(Stats_);
-    const records = (await screen.findByRole("heading", { name: "Records" })).closest("section")!;
+    const records = (await screen.findByRole("heading", { name: "Flight records" })).closest("div")!;
     expect(records).toHaveTextContent("Longest flightJFK – AKL8,823 mi · Mar 1, 2026");
     expect(records).toHaveTextContent("Shortest flightJFK – EWR17 mi · May 2, 2025");
     expect(records).toHaveTextContent("Most-visited airportJFKJFK Airport");
@@ -190,7 +217,7 @@ describe("Stats", () => {
     serve(() => full);
     route.query = "who=2&year=2025";
     render(Stats_);
-    await screen.findByRole("region", { name: "Totals" });
+    await screen.findByRole("region", { name: "Flights" });
     expect(statsCalls()).toEqual(["/api/stats?person=2&year=2025"]);
     expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("2");
     expect(screen.getByRole("combobox", { name: "When" })).toHaveValue("2025");
@@ -206,7 +233,7 @@ describe("Stats", () => {
   it("lists the years that have trips, newest first", async () => {
     serve(() => full);
     render(Stats_);
-    await screen.findByRole("region", { name: "Totals" });
+    await screen.findByRole("region", { name: "Flights" });
     expect(within(screen.getByRole("combobox", { name: "When" })).getAllByRole("option").map((o) => o.textContent)).toEqual(["All time", "2026", "2025"]);
   });
 
@@ -214,13 +241,13 @@ describe("Stats", () => {
     let release: (s: Stats) => void = () => {};
     serve((path) => (path.includes("person=2") ? new Promise<Stats>((r) => { release = r; }) : full));
     render(Stats_);
-    await screen.findByRole("region", { name: "Totals" });
+    await screen.findByRole("region", { name: "Flights" });
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Who" }), "Sam Doe");
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Totals" })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Flights" })).toBeNull());
     expect(screen.getByLabelText("Loading")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("2");   // the pickers stay usable
-    release({ ...full, person: 2, flights: { ...full.flights, count: 3 } });
-    expect(await within(await screen.findByRole("region", { name: "Totals" })).findByText("3")).toBeInTheDocument();
+    release({ ...full, person: 2, flights: { ...full.flights, count: 37 } });
+    expect(await within(await screen.findByRole("region", { name: "Flights" })).findByText("37")).toBeInTheDocument();
   });
 
   it("answers a stale request's reply with nothing: only the latest choice is drawn", async () => {
@@ -231,7 +258,7 @@ describe("Stats", () => {
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Who" }), "Sam Doe");
     await waitFor(() => expect(waiting).toHaveLength(2));
     waiting[1]({ ...full, person: 2, flights: { ...full.flights, count: 21 } });
-    await within(await screen.findByRole("region", { name: "Totals" })).findByText("21");
+    await within(await screen.findByRole("region", { name: "Flights" })).findByText("21");
     waiting[0]({ ...full, flights: { ...full.flights, count: 99 } });
     await new Promise((r) => setTimeout(r, 0));
     expect(screen.queryByText("99")).toBeNull();
@@ -242,21 +269,21 @@ describe("Stats", () => {
     serve(() => (fail ? new Error("Offline") : full));
     render(Stats_);
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn’t load the stats: Offline");
-    expect(screen.queryByRole("region", { name: "Totals" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Flights" })).toBeNull();
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "When" }), "All time");   // still usable
     fail = false;
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByRole("region", { name: "Totals" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Flights" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("drops the old numbers when the next load fails", async () => {
     serve((path) => (path.includes("year=2025") ? new Error("Offline") : full));
     render(Stats_);
-    await screen.findByRole("region", { name: "Totals" });
+    await screen.findByRole("region", { name: "Flights" });
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "When" }), "2025");
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Totals" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Flights" })).toBeNull();
   });
 
   it("says when a person or year has nothing finished, with links to add a trip or import flights", async () => {

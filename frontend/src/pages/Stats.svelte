@@ -62,55 +62,61 @@
   const f = $derived(current?.flights);
   const empty = $derived(!!current && current.flights.count === 0 && current.stays.nights === 0 && current.cars.days === 0 && current.cruises.count === 0);
   const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
-  const tiles = $derived(current && f ? [
-    { label: "Flights", value: count(f.count) },
+  type Tile = { label: string; value: string; note?: string[] };
+  const flightTiles = $derived<Tile[]>(current && f && f.count ? [
+    { label: "Flights taken", value: count(f.count) },
     { label: "Distance", value: distance(f.distance_km, unit), note: comparisons(f) },
     { label: "In the air", value: duration(f.air_seconds) },
     { label: "Airports", value: count(f.airports.length) },
     { label: "Airlines", value: count(f.airlines.length) },
-    { label: "Countries", value: count(current.places.countries.length) },
+  ] : []);
+  const hotelTiles = $derived<Tile[]>(current && (current.stays.nights || current.stays.count) ? [
     { label: "Nights away", value: count(current.stays.nights) },
     ...(current.stays.count ? [
       { label: "Stays", value: count(current.stays.count) },
       { label: "Average stay", value: `${current.stays.average_nights.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${current.stays.average_nights === 1 ? "night" : "nights"}` },
-      { label: "Hotels", value: count(current.stays.hotels.length) },
+      { label: "Different hotels", value: count(current.stays.hotels.length) },
     ] : []),
-    ...(current.cruises.count ? [
-      { label: "Cruises", value: count(current.cruises.count) },
-      { label: "Nights at sea", value: count(current.cruises.nights) },
-      { label: "Sea days", value: count(current.cruises.sea_days) },
-      { label: "Ports of call", value: count(current.cruises.ports) },
-    ] : []),
+  ] : []);
+  const carTiles = $derived<Tile[]>(current && current.cars.days ? [{ label: "Rental days", value: count(current.cars.days) }] : []);
+  const cruiseTiles = $derived<Tile[]>(current && current.cruises.count ? [
+    { label: "Cruises taken", value: count(current.cruises.count) },
+    { label: "Nights at sea", value: count(current.cruises.nights) },
+    { label: "Sea days", value: count(current.cruises.sea_days) },
+    { label: "Ports of call", value: count(current.cruises.ports) },
   ] : []);
 
   const named = (rows: { name: string; count: number }[], unitWord: string): Row[] => rows.map((r) => ({ key: r.name, name: r.name, value: plural(r.count, unitWord) }));
-  const lists = $derived<{ title: string; rows: Row[] }[]>(current && f ? [
+  const flightLists = $derived<{ title: string; rows: Row[] }[]>(f ? [
     { title: "Routes", rows: f.routes.map((r) => ({ key: `${r.a}-${r.b}`, name: `${r.a} – ${r.b}`, sub: r.distance_km === null ? null : distance(r.distance_km, unit), value: plural(r.flights, "flight") })) },
     { title: "Airports", rows: f.airports.map((a) => ({ key: a.code, name: a.code, sub: [a.name === a.code ? null : a.name, a.city].filter(Boolean).join(", ") || null, value: plural(a.visits, "visit") })) },
     { title: "Airlines", rows: f.airlines.map((a) => ({ key: `${a.code}/${a.name}`, name: a.name, value: plural(a.flights, "flight") })) },
+  ] : []);
+  const placeLists = $derived<{ title: string; rows: Row[] }[]>(current ? [
     { title: "Countries", rows: current.places.countries.map((c) => ({ key: c.name, name: countryName(c.name), sub: `First visit ${dateLabel(c.first_visit)}`, value: plural(c.visits, "visit") })) },
-    { title: "Hotels", rows: current.stays.hotels.map((h) => ({ key: h.name, name: h.name, sub: plural(h.stays, "stay"), value: plural(h.nights, "night") })) },
+  ] : []);
+  const hotelLists = $derived<{ title: string; rows: Row[] }[]>(current ? [
+    { title: "Hotels stayed at", rows: current.stays.hotels.map((h) => ({ key: h.name, name: h.name, sub: plural(h.stays, "stay"), value: plural(h.nights, "night") })) },
     { title: "Cities stayed in", rows: current.stays.cities_by_nights.map((c) => ({ key: c.name, name: c.name, sub: plural(c.stays, "stay"), value: plural(c.nights, "night") })) },
     { title: "Hotel chains", rows: named(current.stays.chains, "stay") },
-    { title: "Rental companies", rows: named(current.cars.companies, "rental") },
-    { title: "Cruise lines", rows: named(current.cruises.lines, "cruise") },
   ] : []);
+  const carLists = $derived<{ title: string; rows: Row[] }[]>(current ? [{ title: "Rental companies", rows: named(current.cars.companies, "rental") }] : []);
+  const cruiseLists = $derived<{ title: string; rows: Row[] }[]>(current ? [{ title: "Cruise lines", rows: named(current.cruises.lines, "cruise") }] : []);
 
   const airportName = (code: string) => f?.airports.find((a) => a.code === code);
   const record = (r: NonNullable<Stats["flights"]["longest"]>) => ({ value: `${r.origin} – ${r.destination}`, detail: `${distance(r.distance_km, unit)} · ${dateLabel(r.start_local.slice(0, 10))}` });
   type Record_ = { label: string; value: string; detail: string };
-  const stayRecords = $derived<Record_[]>(current ? ((st) => [
+  const hotelRecords = $derived<Record_[]>(current ? ((st) => [
     st.longest && { label: "Longest stay", value: [st.longest.hotel, st.longest.city].filter(Boolean).join(", ") || "A stay", detail: `${plural(st.longest.nights, "night")} · ${dateLabel(st.longest.start_local.slice(0, 10))}` },
     st.most_visited_hotel && { label: "Most-visited hotel", value: st.most_visited_hotel.name, detail: `${plural(st.most_visited_hotel.stays, "stay")} · ${plural(st.most_visited_hotel.nights, "night")}` },
     st.most_visited_city && { label: "Most-visited city", value: st.most_visited_city.name, detail: `${plural(st.most_visited_city.stays, "stay")} · ${plural(st.most_visited_city.nights, "night")}` },
     st.busiest_month && { label: "Most nights in a month", value: monthLabel(st.busiest_month), detail: "" },
   ].filter((r) => !!r) as Record_[])(current.stays) : []);
-  const records = $derived<Record_[]>(f ? [
+  const flightRecords = $derived<Record_[]>(f ? [
     f.longest && { label: "Longest flight", ...record(f.longest) },
     f.shortest && { label: "Shortest flight", ...record(f.shortest) },
     f.most_visited_airport && { label: "Most-visited airport", value: f.most_visited_airport, detail: airportName(f.most_visited_airport)?.name ?? "" },
     f.busiest_month && { label: "Busiest month", value: monthLabel(f.busiest_month), detail: "" },
-    ...stayRecords,
   ].filter((r) => !!r) as Record_[] : []);
 
   const cabinTotal = $derived(f ? f.cabins.reduce((n, c) => n + c.count, 0) : 0);
@@ -131,6 +137,31 @@
       {/each}
     </ul>
   </div>
+{/snippet}
+
+{#snippet tileGrid(tiles: Tile[])}
+  <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+    {#each tiles as t (t.label)}
+      <div class="rounded-2xl border bg-card p-4 shadow-card {t.note ? 'col-span-2 sm:col-span-1' : ''}">
+        <dt class="eyebrow">{t.label}</dt>
+        <dd class="mt-1 break-words text-3xl font-bold tabular-nums tracking-tight">{t.value}</dd>
+        {#if t.note}{#each t.note as line (line)}<dd class="text-sm text-muted-foreground">{line}</dd>{/each}{/if}
+      </div>
+    {/each}
+  </dl>
+{/snippet}
+
+{#snippet recordList(title: string, items: Record_[])}
+  {#if items.length}
+    <div class="space-y-2">
+      <h3 class="eyebrow px-1">{title}</h3>
+      <dl class="rows">
+        {#each items as r (r.label)}
+            <div class="row"><dt class="text-muted-foreground">{r.label}</dt><dd class="text-right font-medium">{r.value}{#if r.detail}<span class="block text-sm font-normal text-muted-foreground">{r.detail}</span>{/if}</dd></div>
+        {/each}
+      </dl>
+    </div>
+  {/if}
 {/snippet}
 
 <h1 class="mb-6 text-4xl font-bold tracking-tight">Stats</h1>
@@ -171,20 +202,9 @@
     {#if reviewable && sel.year}
       <Button variant="outline" onclick={() => (reviewing = true)}>See your {sel.year} in review</Button>
     {/if}
-    <section aria-label="Totals">
-      <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-        {#each tiles as t (t.label)}
-          <div class="rounded-2xl border bg-card p-4 shadow-card {t.note ? 'col-span-2 sm:col-span-1' : ''}">
-            <dt class="eyebrow">{t.label}</dt>
-            <dd class="mt-1 break-words text-3xl font-bold tabular-nums tracking-tight">{t.value}</dd>
-            {#if t.note}{#each t.note as line (line)}<dd class="text-sm text-muted-foreground">{line}</dd>{/each}{/if}
-          </div>
-        {/each}
-      </dl>
-    </section>
-
-    <section aria-labelledby="map-title" id="stats-map-slot" data-testid="stats-map-slot" class="scroll-mt-20 space-y-3">
-      <h3 id="map-title" class="eyebrow px-1">Where you’ve been</h3>
+    <section aria-labelledby="places-title" id="stats-map-slot" data-testid="stats-map-slot" class="scroll-mt-20 space-y-3">
+      <h2 id="places-title" class="text-2xl font-bold tracking-tight">Where you’ve been</h2>
+      {@render tileGrid([{ label: "Countries", value: count(current.places.countries.length) }])}
       {#if TravelMap}
         <TravelMap flights={f} stays={current?.stays.pins ?? []} />
       {:else if mapError}
@@ -192,29 +212,50 @@
       {:else}
         <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading the map"></div>
       {/if}
+      {#each placeLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
     </section>
 
-    {#each lists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
-
-    {#if records.length}
-      <section aria-labelledby="records-title" class="space-y-2">
-        <h3 id="records-title" class="eyebrow px-1">Records</h3>
-        <dl class="rows">
-          {#each records as r (r.label)}
-            <div class="row"><dt class="text-muted-foreground">{r.label}</dt><dd class="text-right font-medium">{r.value}{#if r.detail}<span class="block text-sm font-normal text-muted-foreground">{r.detail}</span>{/if}</dd></div>
-          {/each}
-        </dl>
+    {#if flightTiles.length}
+      <section aria-labelledby="flights-title" class="space-y-3">
+        <h2 id="flights-title" class="text-2xl font-bold tracking-tight">Flights</h2>
+        {@render tileGrid(flightTiles)}
+        {#each flightLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
+        {@render recordList("Flight records", flightRecords)}
+      {#if cabinTotal || seatTotal}
+        <section aria-labelledby="seats-title" class="space-y-3">
+          <h3 id="seats-title" class="eyebrow px-1">Seats</h3>
+          <div class="rows"><div class="row flex-col items-stretch gap-5 py-4">
+            {#if cabinTotal}{@render bars("Cabin", f.cabins.map((c) => [c.name, c.count]), cabinTotal)}{/if}
+            {#if seatTotal}{@render bars("Where you sit", seatBars, seatTotal)}{/if}
+            {#if f.top_seat}<p class="text-sm"><span class="text-muted-foreground">Top seat</span> <span class="font-medium">{f.top_seat}</span></p>{/if}
+          </div></div>
+        </section>
+      {/if}
       </section>
     {/if}
 
-    {#if cabinTotal || seatTotal}
-      <section aria-labelledby="seats-title" class="space-y-3">
-        <h3 id="seats-title" class="eyebrow px-1">Seats</h3>
-        <div class="rows"><div class="row flex-col items-stretch gap-5 py-4">
-          {#if cabinTotal}{@render bars("Cabin", f.cabins.map((c) => [c.name, c.count]), cabinTotal)}{/if}
-          {#if seatTotal}{@render bars("Where you sit", seatBars, seatTotal)}{/if}
-          {#if f.top_seat}<p class="text-sm"><span class="text-muted-foreground">Top seat</span> <span class="font-medium">{f.top_seat}</span></p>{/if}
-        </div></div>
+    {#if hotelTiles.length}
+      <section aria-labelledby="hotels-title" class="space-y-3">
+        <h2 id="hotels-title" class="text-2xl font-bold tracking-tight">Hotels</h2>
+        {@render tileGrid(hotelTiles)}
+        {#each hotelLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
+        {@render recordList("Hotel records", hotelRecords)}
+      </section>
+    {/if}
+
+    {#if carTiles.length}
+      <section aria-labelledby="cars-title" class="space-y-3">
+        <h2 id="cars-title" class="text-2xl font-bold tracking-tight">Cars</h2>
+        {@render tileGrid(carTiles)}
+        {#each carLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
+      </section>
+    {/if}
+
+    {#if cruiseTiles.length}
+      <section aria-labelledby="cruises-title" class="space-y-3">
+        <h2 id="cruises-title" class="text-2xl font-bold tracking-tight">Cruises</h2>
+        {@render tileGrid(cruiseTiles)}
+        {#each cruiseLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
       </section>
     {/if}
   </div>

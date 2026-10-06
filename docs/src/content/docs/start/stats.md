@@ -9,7 +9,7 @@ Waypoint adds up what you have flown, stayed and driven. The numbers come from `
 
 ## The Stats page
 
-Pick **who** (you by default, any member or guest, or Everyone) and **when** (All time, or a year that has something to count); the choice is kept in the address, so you can link it. The page shows the big numbers, how far that is around the Earth and toward the Moon, the top five of routes, airports, airlines, countries, hotel chains and rental companies (Show all lists the rest), records, and your cabin and seat split. A person or year with nothing finished says so, with links to add a trip or import past flights.
+Pick **who** (you by default, any member or guest, or Everyone) and **when** (All time, or a year that has something to count); the choice is kept in the address, so you can link it. The page is in sections: **Where you’ve been** (the map and the countries), then **Flights**, **Hotels**, **Cars** and **Cruises**, each with its own big numbers and top five lists (Show all lists the rest), and, for flights and hotels, records. Flights also show how far that is around the Earth and toward the Moon, and your cabin and seat split. A section you have nothing finished for isn’t shown. A person or year with nothing finished says so, with links to add a trip or import past flights.
 
 Miles or kilometres is a household setting, under **Settings → Travel → Distances** (`GET` and `POST /api/distance-unit`).
 
