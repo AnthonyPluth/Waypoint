@@ -257,3 +257,32 @@ describe("tripKinds", () => {
     expect(tripKinds(trip([]))).toEqual([]);
   });
 });
+
+describe("the order of a day's items", () => {
+  const hotel = segment({ id: 1, kind: "hotel", origin: "Harbour Hotel", start_local: "2026-11-05T15:00", end_local: "2026-11-08T11:00" });
+  const car = segment({ id: 2, kind: "car", origin: "Miami Airport", provider: "Hertz", start_local: "2026-11-05T14:00", end_local: "2026-11-08T08:00" });
+  const flight = segment({ id: 3, kind: "flight", origin: "MIA", destination: "MSP", start_local: "2026-11-08T09:30", end_local: "2026-11-08T12:45" });
+  const last = (segments: Parameters<typeof trip>[0]) => tripDays(trip(segments)).at(-1)!.items.map((i) => `${i.segment.id}:${i.role}`);
+
+  it("puts the check-out before the car's return and the car's return before the flight, whatever the times say", () => {
+    expect(last([hotel, car, flight])).toEqual(["1:end", "2:end", "3:start"]);   // (11:00, 08:00 and 09:30 as they show)
+  });
+  it("keeps each item's own time, only changing where it sits", () => {
+    const items = tripDays(trip([hotel, car, flight])).at(-1)!.items;
+    expect(items[0].segment.end_local).toBe("2026-11-08T11:00");
+  });
+  it("leaves the order by time when nothing is leaving", () => {
+    const stay = segment({ id: 4, kind: "hotel", start_local: "2026-11-05T15:00", end_local: "2026-11-08T11:00" });
+    const pickup = segment({ id: 5, kind: "car", start_local: "2026-11-08T13:00", end_local: "2026-11-09T09:00" });
+    const dinner = segment({ id: 6, kind: "train", start_local: "2026-11-08T18:00", end_local: "2026-11-08T19:00" });
+    const onThe8th = tripDays(trip([stay, pickup, dinner])).find((d) => d.date === "2026-11-08")!.items.map((i) => `${i.segment.id}:${i.role}`);
+    expect(onThe8th).toEqual(["4:end", "5:start", "6:start"]);
+  });
+  it("is not moved by a cancelled flight", () => {
+    const cancelled = { ...flight, status: "cancelled" as const, start_local: "2026-11-08T07:00" };
+    expect(last([hotel, { ...car, end_local: "2026-11-08T12:00" }, cancelled])).toEqual(["3:start", "1:end", "2:end"]);
+  });
+  it("leaves other days alone", () => {
+    expect(tripDays(trip([hotel, car, flight])).map((d) => d.date)).toEqual(["2026-11-05", "2026-11-08"]);
+  });
+});
