@@ -4,7 +4,6 @@
   import { apiCall } from "$lib/contract";
   import type { Person, Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
-  import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import TripKinds from "$lib/components/TripKinds.svelte";
@@ -71,7 +70,7 @@
             <li>
               <a class="row items-start rounded-2xl border bg-card shadow-card transition-colors hover:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none" href={`#trip/${t.id}`}>
                 <span class="min-w-0 flex-1">
-                  <span class="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-bold tracking-tight"><span class="break-words">{t.name}</span>{#if !t.auto}<Badge variant="outline">Edited</Badge>{/if}<TripKinds trip={t} /></span>
+                  <span class="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-bold tracking-tight"><span class="break-words">{t.name}</span><TripKinds trip={t} /></span>
                   <span class="block text-sm text-muted-foreground">{dates(t)}{t.destination ? ` · ${t.destination}` : ""}</span>
                   {#if names(t)}<span class="block break-words text-sm text-muted-foreground">{names(t)}</span>{/if}
                 </span>
