@@ -176,7 +176,7 @@
         {#each tiles as t (t.label)}
           <div class="rounded-2xl border bg-card p-4 shadow-card {t.note ? 'col-span-2 sm:col-span-1' : ''}">
             <dt class="eyebrow">{t.label}</dt>
-            <dd class="mt-1 text-3xl font-bold tabular-nums tracking-tight">{t.value}</dd>
+            <dd class="mt-1 break-words text-3xl font-bold tabular-nums tracking-tight">{t.value}</dd>
             {#if t.note}{#each t.note as line (line)}<dd class="text-sm text-muted-foreground">{line}</dd>{/each}{/if}
           </div>
         {/each}
