@@ -80,6 +80,26 @@ describe("People", () => {
     expect(screen.queryByRole("button", { name: "This is me: Jane Doe" })).toBeNull();
   });
 
+  it("hides This is me on every guest once your own person has a linked guest", async () => {
+    held = [{ ...jane, links: [{ guest: "Jane D.", by: "Jane Doe", on: "2026-10-05" }] }, mia];
+    render(People);
+    await screen.findByRole("list", { name: "People" });
+    expect(screen.queryByRole("button", { name: /This is me/ })).toBeNull();
+  });
+
+  it("opens a new membership's form under that person, not at the top of the page", async () => {
+    render(People);
+    await screen.findByRole("list", { name: "People" });
+    await userEvent.click(screen.getByRole("button", { name: "Add a membership for Mia Doe" }));
+    const heading = await screen.findByRole("heading", { name: /Add a membership for Mia Doe/ });
+    const row = heading.closest("li");
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText("Mia Doe", { selector: "span" })).toBeInTheDocument();   // (inside her own row)
+    expect(screen.getAllByRole("heading", { name: /Add a membership/ })).toHaveLength(1);
+    const janes = screen.getByText("Jane Doe", { selector: "span" }).closest("li") as HTMLElement;
+    expect(within(janes).queryByRole("heading", { name: /Add a membership/ })).toBeNull();   // (not in anyone else's row)
+  });
+
   it("hides This is me on your own machine, where nobody signs in", async () => {
     app.state = state({ user: { name: null, email: null, local: true } });
     render(People);

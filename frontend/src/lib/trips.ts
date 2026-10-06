@@ -149,6 +149,15 @@ export function nextUp(trips: Trip[], now: number): NextUp | null {
 /** A trip is over once its last day is before today (a trip with no dates yet isn't). */
 export const isPast = (trip: Trip, today: string): boolean => !!trip.end_date && trip.end_date < today;
 
+/** What a trip holds, once each, in a fixed order (flights, stays, rentals, trains, cruises): its cancelled bookings don't count,
+ *  unless every booking is cancelled (then the trip still shows what it was). */
+export const KIND_ORDER: Segment["kind"][] = ["flight", "hotel", "car", "train", "cruise"];
+export function tripKinds(trip: Trip): Segment["kind"][] {
+  const live = trip.segments.filter((s) => s.status !== "cancelled");
+  const held = new Set((live.length ? live : trip.segments).map((s) => s.kind));
+  return KIND_ORDER.filter((k) => held.has(k));
+}
+
 /** Your trips split into those still to come or under way (soonest first) and those over (latest first). */
 export function splitTrips(trips: Trip[], today: string): { upcoming: Trip[]; past: Trip[] } {
   const key = (t: Trip) => t.start_date ?? "9999-12-31";
