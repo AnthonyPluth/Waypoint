@@ -190,15 +190,19 @@ def fetch_due(conn: db.Connection, now: datetime, limit: int = PER_ROUND) -> int
     secret = db.get_setting(conn, sk.LOGODEV_SECRET)
     stamp = now.isoformat(timespec="seconds")
     got = 0
+    search_refused = False   # Brand Search said no to the secret key: brands are asked for by name instead
     for k, name in _due(conn, now, limit):
         try:
             found = None
-            domain = None
-            if secret:   # Brand Search, and only a clear match
-                picked = best_match(name, logodev.search(secret, name))
-                domain = picked["domain"] if picked else None
-                found = logodev.fetch(token, domain=domain) if domain else None
-            else:
+            if secret and not search_refused:   # Brand Search, and only a clear match
+                try:
+                    candidates: list[dict[str, str]] | None = logodev.search(secret, name)
+                except logodev.Refused:   # (the publishable key may be fine, and a plan may not include Brand Search)
+                    candidates, search_refused = None, True
+                if candidates is not None:
+                    picked = best_match(name, candidates)
+                    found = logodev.fetch(token, domain=picked["domain"]) if picked else None
+            if not secret or search_refused:
                 found = logodev.fetch(token, name=name)
         except logodev.LogoError as e:
             db.set_setting(conn, sk.LOGODEV_LAST_ERROR, f"{now:%b %d %H:%M}: {e}")
@@ -209,7 +213,8 @@ def fetch_due(conn: db.Connection, now: datetime, limit: int = PER_ROUND) -> int
             got += 1
         else:   # no such brand (a logo Waypoint has is kept: it may only be Logo.dev's gap)
             conn.execute(update(BrandLogo).where(BrandLogo.key == k).values(checked=stamp))
-    db.set_setting(conn, sk.LOGODEV_LAST_ERROR, None)
+    db.set_setting(conn, sk.LOGODEV_LAST_ERROR, f"{now:%b %d %H:%M}: Logo.dev refused the secret key for Brand Search (or your plan doesn't "
+                   "include it), so brands were looked up by name instead" if search_refused else None)
     return got
 
 

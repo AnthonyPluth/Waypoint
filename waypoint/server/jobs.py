@@ -56,26 +56,26 @@ def check_flights() -> None:
         monitoring.report(e, values=False)
 
 
-def fetch_logos() -> None:
-    """Fetch the logos of the brands in bookings that Waypoint hasn't asked Logo.dev about (when a key is saved)."""
+def fetch_logos() -> bool:
+    """Fetch the logos of the brands in bookings that Waypoint hasn't asked Logo.dev about (when a key is saved). One round runs
+    at a time, scheduled or asked for: False when another is running (this one is skipped)."""
+    if not _fetching.acquire(blocking=False):
+        return False
     try:
         with db.session() as conn:
             logos.fetch_due(conn, datetime.now(UTC))
     except Exception as e:   # the next round tries again; never the details (they may name a row)
         monitoring.report(e, values=False)
+    finally:
+        _fetching.release()
+    return True
 
 
 def fetch_logos_now() -> bool:
     """Start a round of logo fetching in the background (a key was just saved, or "Fetch them now"). False when one is running."""
-    if not _fetching.acquire(blocking=False):
+    if _fetching.locked():
         return False
-
-    def run() -> None:
-        try:
-            fetch_logos()
-        finally:
-            _fetching.release()
-    threading.Thread(target=run, daemon=True, name="logos-now").start()
+    threading.Thread(target=fetch_logos, daemon=True, name="logos-now").start()
     return True
 
 

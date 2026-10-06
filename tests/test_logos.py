@@ -243,6 +243,29 @@ class RoundTests(DbCase):
             self.assertIn("/harbour-hotels.com", [c["path"] for c in self.fake.calls])
             self.assertEqual(logos.logo(conn, "harbour hotels"), (PNG, "image/png"))
 
+    def test_a_refused_secret_key_falls_back_to_asking_by_name_and_says_so(self):
+        self.fake.search_answer = (403, "text/plain", b"no")
+        with self.conn() as conn:
+            db.set_setting(conn, sk.LOGODEV_TOKEN, TOKEN)
+            db.set_setting(conn, sk.LOGODEV_SECRET, SECRET)
+            self.assertGreater(logos.fetch_due(conn, NOW), 0)
+            self.assertEqual(logos.logo(conn, "Harbour Hotels"), (PNG, "image/png"))
+            self.assertEqual(len([c for c in self.fake.calls if c["path"] == "/search"]), 1)   # not asked again for each brand
+            self.assertIn("secret key", logos.status(conn)["last_error"] or "")
+            self.assertNotIn(SECRET, logos.status(conn)["last_error"] or "")
+
+    def test_a_round_is_skipped_while_another_runs(self):
+        with db.session() as conn:
+            db.set_setting(conn, sk.LOGODEV_TOKEN, TOKEN)
+        self.assertTrue(jobs._fetching.acquire(blocking=False))
+        try:
+            self.assertFalse(jobs.fetch_logos())
+            self.assertFalse(jobs.fetch_logos_now())
+        finally:
+            jobs._fetching.release()
+        self.assertEqual(self.fake.calls, [])
+        self.assertTrue(jobs.fetch_logos())
+
     def test_the_job_fetches_with_the_machines_time_and_never_raises(self):
         with db.session() as conn:
             db.set_setting(conn, sk.LOGODEV_TOKEN, TOKEN)
