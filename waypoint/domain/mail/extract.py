@@ -7,7 +7,7 @@ microdata (`FlightReservation`, `LodgingReservation`, `RentalCarReservation`, `T
 bookings, who the message is from and when (its sender's domain and its day: the review queue's labels, never its text). Times come out as the markup wrote them
 (`wall_clock` turns one into the place's wall-clock time); the zone of a place is the scan's to find, since this module touches no database.
 
-A sender that has a parser in `parsers/` and whose markup gave no booking is read by it: the parser is given the message's HTML
+A sender that has a parser in `parsers/` and whose markup gave no booking is read by it (and one whose markup gave fewer flights than its text lists has the text's flights instead): the parser is given the message's HTML
 and plain-text parts and returns bookings, like the markup does. It sees nothing else of the message."""
 from __future__ import annotations
 
@@ -528,16 +528,23 @@ def read(message: Mapping[str, Any]) -> Message:
     bookings, unread, seen, gaps = _bookings(nodes)
     other = bool(nodes) and not seen
     parse = parsers.for_sender(sender)
-    if parse is not None and not bookings:   # (a sender with a parser, and no markup that gave a booking: read its text)
+    if parse is not None:   # (a sender with a parser: it reads the text when the markup gave no booking, and checks the markup's flights when it did)
         try:
             found = parse("\n".join(htmls), "\n".join(texts))
-        except Exception as e:   # a parser's bug: this message goes to the review queue, and later scans carry on
+        except Exception as e:   # a parser's bug: this message goes to the review queue (without markup), and later scans carry on
             monitoring.report(e, values=False)
-            found = Parsed(unread=1)
-        bookings, unread = list(found.bookings), unread + found.unread
-        seen = seen or bool(found.bookings or found.unread)
-        if not found.bookings:
-            gaps.append("sender-specific parser found no booking")
+            found = Parsed(unread=0 if bookings else 1)
+        flights = [x for x in bookings if x.kind == "flight"]
+        if not bookings:
+            bookings, unread = list(found.bookings), unread + found.unread
+            seen = seen or bool(found.bookings or found.unread)
+            if not found.bookings:
+                gaps.append("sender-specific parser found no booking")
+        elif len(text_flights := [x for x in found.bookings if x.kind == "flight"]) > len(flights):
+            # The markup ran several flights into fewer (a round trip as one reservation, out of an airport and back to it, with no
+            # flight number): the text lists each flight, so its flights stand in for the markup's.
+            bookings = [x for x in bookings if x.kind != "flight"] + text_flights
+            unread += found.unread
     if any(utc_marked(t) for b in bookings for t in (b.start, b.end)):
         shown = clock_times(_visible(htmls, texts))   # (kept as times of day alone, and only for a booking that needs them)
         bookings = [replace(b, clock_times=shown) if utc_marked(b.start) or utc_marked(b.end) else b for b in bookings]

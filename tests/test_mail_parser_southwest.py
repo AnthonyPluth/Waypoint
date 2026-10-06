@@ -2,6 +2,7 @@
 cancellation emails, from synthetic emails in tests/fixtures/mail/southwest (invented names, codes and numbers; real
 airports). The parser registry and `extract.read`'s use of it are held here too."""
 import base64
+import json
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -10,7 +11,7 @@ from tests.privacy import no_leaks
 from tests.test_mail_scan import NOW, ScanCase
 from waypoint.domain import trips
 from waypoint.domain.mail import extract, parsers
-from waypoint.domain.mail.booking import Passenger
+from waypoint.domain.mail.booking import Booking, Parsed, Passenger
 from waypoint.domain.mail.parsers import southwest
 
 FIXTURES = Path(__file__).parent / "fixtures" / "mail" / "southwest"
@@ -127,6 +128,55 @@ class ExtractTests(unittest.TestCase):
         with mock.patch.dict(parsers.PARSERS, {"southwest.com": mock.Mock(side_effect=AssertionError("the parser isn't needed"))}):
             [b] = read(mail(f"<html><head>{jsonld}</head><body></body></html>")).bookings
         self.assertEqual(b.confirmation, "ZZ9999")
+
+    def test_markup_that_runs_a_round_trip_into_one_flight_gives_way_to_the_legs_the_text_has(self):
+        # (made up) the markup describes the whole trip as one reservation, out of HNL on the first day and back to HNL on the last
+        jsonld = ('<script type="application/ld+json">{"@type":"FlightReservation","reservationNumber":"K7QW2N",'
+                  '"reservationFor":{"@type":"Flight","airline":{"iataCode":"WN","name":"Southwest Airlines"},'
+                  '"departureAirport":{"iataCode":"HNL"},"departureTime":"2026-01-12T13:15:00",'
+                  '"arrivalAirport":{"iataCode":"HNL"},"arrivalTime":"2026-01-18T12:30:00"}}</script>')
+        body = ("<p>Confirmation #: K7QW2N</p><p>Passenger: JANE DOE</p><div>Flight 1234 Mon, Jan 12, 2026</div>"
+                "<div>Honolulu (HNL), HI (HNL) 1:15 PM</div><div>Lihue, HI (LIH) 2:05 PM</div>"
+                "<div>Flight 2210 Sun, Jan 18, 2026</div><div>Lihue, HI (LIH) 11:30 AM</div><div>Honolulu (HNL), HI (HNL) 12:30 PM</div>")
+        got = read(mail(f"<html><head>{jsonld}</head><body>{body}</body></html>"))
+        self.assertEqual([(b.origin, b.destination, b.start, b.end) for b in got.bookings],
+                         [("HNL", "LIH", "2026-01-12T13:15:00", "2026-01-12T14:05:00"), ("LIH", "HNL", "2026-01-18T11:30:00", "2026-01-18T12:30:00")])
+        self.assertEqual([dict(b.details)["flight_number"] for b in got.bookings], ["WN 1234", "WN 2210"])
+
+    def test_a_parser_that_raises_leaves_the_markups_booking_standing_and_the_message_unflagged(self):
+        jsonld = ('<script type="application/ld+json">{"@type":"FlightReservation","reservationNumber":"ZZ9999",'
+                  '"reservationFor":{"@type":"Flight","flightNumber":"WN 5","airline":{"iataCode":"WN","name":"Southwest Airlines"},'
+                  '"departureAirport":{"iataCode":"DAL"},"departureTime":"2026-11-16T08:05:00",'
+                  '"arrivalAirport":{"iataCode":"HOU"},"arrivalTime":"2026-11-16T09:10:00"}}</script>')
+        with mock.patch.dict(parsers.PARSERS, {"southwest.com": mock.Mock(side_effect=RuntimeError("CANARY-PARSER-CRASH-3K7Z"))}), \
+                mock.patch("waypoint.domain.mail.extract.monitoring.report") as report:
+            got = read(mail(f"<html><head>{jsonld}</head><body></body></html>"))
+        self.assertEqual(([b.confirmation for b in got.bookings], got.unread), (["ZZ9999"], 0))
+        report.assert_called_once()
+        self.assertEqual(report.call_args.kwargs, {"values": False})   # (reported without its values)
+
+    def test_only_the_texts_flights_replace_the_markups_flights_and_its_other_bookings_stay(self):
+        hotel = {"@type": "LodgingReservation", "reservationNumber": "H1", "checkinTime": "2026-01-12T15:00:00", "checkoutTime": "2026-01-18T11:00:00",
+                 "reservationFor": {"@type": "LodgingBusiness", "name": "Harbour Hotel"}}
+        flight = {"@type": "FlightReservation", "reservationNumber": "K7QW2N", "reservationFor": {
+            "@type": "Flight", "airline": {"iataCode": "WN", "name": "Southwest Airlines"}, "departureAirport": {"iataCode": "HNL"},
+            "departureTime": "2026-01-12T13:15:00", "arrivalAirport": {"iataCode": "HNL"}, "arrivalTime": "2026-01-18T12:30:00"}}
+        legs = Parsed((Booking("flight", "confirmed", "K7QW2N", "Southwest Airlines", "2026-01-12T13:15:00", "2026-01-12T14:05:00", "HNL", "LIH"),
+                       Booking("flight", "confirmed", "K7QW2N", "Southwest Airlines", "2026-01-18T11:30:00", "2026-01-18T12:30:00", "LIH", "HNL"),
+                       Booking("hotel", "confirmed", "H1", "Another", "2026-01-12T15:00:00", "2026-01-18T11:00:00", "Not Harbour Hotel", None)))
+        with mock.patch.dict(parsers.PARSERS, {"southwest.com": mock.Mock(return_value=legs)}):
+            got = read(mail(f'<html><head><script type="application/ld+json">{json.dumps([flight, hotel])}</script></head><body></body></html>'))
+        self.assertEqual([(b.kind, b.origin, b.destination) for b in got.bookings],
+                         [("hotel", "Harbour Hotel", None), ("flight", "HNL", "LIH"), ("flight", "LIH", "HNL")])
+
+    def test_markup_that_is_as_complete_as_the_text_is_still_used(self):
+        jsonld = ('<script type="application/ld+json">{"@type":"FlightReservation","reservationNumber":"ZZ9999",'
+                  '"reservationFor":{"@type":"Flight","flightNumber":"WN 5","airline":{"iataCode":"WN","name":"Southwest Airlines"},'
+                  '"departureAirport":{"iataCode":"DAL"},"departureTime":"2026-11-16T08:05:00",'
+                  '"arrivalAirport":{"iataCode":"HOU"},"arrivalTime":"2026-11-16T09:10:00"}}</script>')
+        body = "<p>Confirmation #: K7QW2N</p><div>Flight 77 Mon, Nov 16, 2026</div><div>Dallas (DAL) 8:05 AM</div><div>Houston (HOU) 9:10 AM</div>"
+        [b] = read(mail(f"<html><head>{jsonld}</head><body>{body}</body></html>")).bookings
+        self.assertEqual(b.confirmation, "ZZ9999")   # (one flight in the markup, one in the text: the markup stands)
 
     def test_a_sender_without_a_parser_is_left_alone(self):
         text = "Confirmation #: K7QW2N\nFlight 77 Mon, Nov 16, 2026\nDallas (Love Field), TX (DAL) 8:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM\n"
