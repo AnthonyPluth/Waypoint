@@ -223,7 +223,7 @@ def _in(day: date, year: int | None) -> bool:
 CABIN_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("First", ("first", "la premiere", "la première")),
     ("Business", ("business", "polaris", "delta one", "upper class", "club world", "club europe", "club class", "flagship", "mint")),
-    ("Premium Economy", ("premium", "comfort+", "comfort plus", "economy plus", "main cabin extra", "world traveller plus")),
+    ("Premium Economy", ("premium", "economy comfort", "economy extra", "comfort+", "comfort plus", "economy plus", "main cabin extra", "world traveller plus")),
     ("Economy", ("economy", "coach", "main", "basic", "standard", "saver", "tango", "wanna get away", "anytime", "light", "flex",
                  "blue", "classic", "value")),
 )

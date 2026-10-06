@@ -196,6 +196,8 @@ class CabinGroupTests(StatsCase):
             self.assertEqual(stats.cabin_group(name), name, name)
         self.assertEqual(stats.cabin_group("La Première"), "First")
         self.assertEqual(stats.cabin_group("Comfort+ Extra"), "Premium Economy")
+        self.assertEqual(stats.cabin_group("Economy Comfort"), "Premium Economy")
+        self.assertEqual(stats.cabin_group("Economy Extra"), "Premium Economy")
 
     def test_a_name_with_none_of_the_words_stays_as_written(self):
         self.assertEqual(stats.cabin_group("Zeta Seat"), "Zeta Seat")
