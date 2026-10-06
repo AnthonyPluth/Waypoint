@@ -13,72 +13,80 @@
 /* Geist, bundled with Waypoint (waypoint/static/fonts, SIL Open Font License): a variable font, so one file covers every weight. */
 @font-face { font-family: "Geist"; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 
-/* Waypoint's palette: a departure board by day (warm paper, navy ink, sky blue to act, amber for what changed) and by
-   night (deep navy, the same blue brightened). Text pairs reach 4.5:1 or better on the surfaces they sit on, in both. */
+/* Waypoint's palette, after the look of a flight tracker: near-black surfaces by night with one vivid blue to act, and a cool
+   light theme tuned to match by day; amber stays for what changed (a delay, a gate change). Text pairs reach 4.5:1 or better on
+   the surfaces they sit on, in both. */
 :root {
   color-scheme: light dark;
-  --radius: 1rem;
-  --background: #f6f1e7;          /* paper */
-  --foreground: #14202e;          /* ink */
-  --card: #fffdf8;
-  --card-foreground: #14202e;
-  --popover: #fffdf8;
-  --popover-foreground: #14202e;
-  --primary: #0a6a9c;             /* sky blue */
+  --radius: 1.25rem;
+  --background: #f2f4f8;
+  --foreground: #0e1320;          /* ink */
+  --card: #ffffff;
+  --card-foreground: #0e1320;
+  --popover: #ffffff;
+  --popover-foreground: #0e1320;
+  --primary: #0a63d8;             /* vivid blue */
   --primary-foreground: #ffffff;
-  --secondary: #ece5d5;
-  --secondary-foreground: #14202e;
-  --muted: #ece5d5;
-  --muted-foreground: #5a6676;
-  --accent: #ece5d5;
-  --accent-foreground: #14202e;
-  --destructive: #b3261e;
-  --border: #ddd4c1;
-  --input: #cfc5ae;
-  --ring: #0a6a9c;
+  --secondary: #e8ecf3;
+  --secondary-foreground: #0e1320;
+  --muted: #e8ecf3;
+  --muted-foreground: #586175;
+  --accent: #e8ecf3;
+  --accent-foreground: #0e1320;
+  --destructive: #c7261d;
+  --border: #e0e5ee;
+  --input: #cdd4e0;
+  --ring: #0a63d8;
   /* Amber: something changed or needs a look (a delay, a gate change). `ink` is its readable text, `soft` its wash. */
   --signal: #f2a516;
   --signal-foreground: #3b2500;
   --signal-soft: #fff0d0;
   --signal-ink: #7a4600;
-  --sidebar: #efe8d8;
-  --sidebar-foreground: #14202e;
-  --sidebar-accent: #e2d9c4;
-  --sidebar-accent-foreground: #14202e;
-  --sidebar-border: #ddd4c1;
-  --shadow: 0 1px 2px rgb(20 32 46 / 6%), 0 8px 24px -12px rgb(20 32 46 / 18%);
+  /* Green: on time, confirmed, done. `ink` is its readable text, `soft` its wash. */
+  --ok: #1f9d55;
+  --ok-soft: #dcf5e6;
+  --ok-ink: #0b6132;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0e1320;
+  --sidebar-accent: #eaeef5;
+  --sidebar-accent-foreground: #0e1320;
+  --sidebar-border: #e0e5ee;
+  --shadow: 0 1px 2px rgb(14 19 32 / 5%), 0 12px 32px -16px rgb(14 19 32 / 16%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a1626;        /* night navy */
-    --foreground: #eef3f9;
-    --card: #12233a;
-    --card-foreground: #eef3f9;
-    --popover: #172b46;
-    --popover-foreground: #eef3f9;
-    --primary: #52c4ef;
-    --primary-foreground: #052333;
-    --secondary: #1b3050;
-    --secondary-foreground: #eef3f9;
-    --muted: #1b3050;
-    --muted-foreground: #9fb2c8;
-    --accent: #1b3050;
-    --accent-foreground: #eef3f9;
-    --destructive: #ff8a80;
-    --border: #25405f;
-    --input: #2c4a70;
-    --ring: #52c4ef;
+    --background: #07090e;        /* near black */
+    --foreground: #f3f5f9;
+    --card: #12151d;
+    --card-foreground: #f3f5f9;
+    --popover: #181c26;
+    --popover-foreground: #f3f5f9;
+    --primary: #4f9dff;
+    --primary-foreground: #04101f;
+    --secondary: #1a1e29;
+    --secondary-foreground: #f3f5f9;
+    --muted: #1a1e29;
+    --muted-foreground: #9aa4b8;
+    --accent: #1a1e29;
+    --accent-foreground: #f3f5f9;
+    --destructive: #ff7b72;
+    --border: #232837;
+    --input: #2c3243;
+    --ring: #4f9dff;
     --signal: #f6b73c;
     --signal-foreground: #2b1a00;
-    --signal-soft: #3a2a0c;
+    --signal-soft: #34270c;
     --signal-ink: #ffd58a;
-    --sidebar: #0d1c30;
-    --sidebar-foreground: #eef3f9;
-    --sidebar-accent: #172b46;
-    --sidebar-accent-foreground: #eef3f9;
-    --sidebar-border: #1f3654;
-    --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 10px 28px -14px rgb(0 0 0 / 60%);
+    --ok: #3ddc84;
+    --ok-soft: #0e2b1c;
+    --ok-ink: #7ce8ad;
+    --sidebar: #0a0c12;
+    --sidebar-foreground: #f3f5f9;
+    --sidebar-accent: #171b26;
+    --sidebar-accent-foreground: #f3f5f9;
+    --sidebar-border: #1b1f2b;
+    --shadow: 0 0 0 1px rgb(255 255 255 / 3%), 0 14px 32px -16px rgb(0 0 0 / 70%);
   }
 }
 
@@ -86,11 +94,12 @@
   --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   /* Confirmation codes and flight numbers: a monospace, so every character has its own width and 0/O are told apart. */
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  --radius-sm: calc(var(--radius) - 6px);
-  --radius-md: calc(var(--radius) - 4px);
-  --radius-lg: calc(var(--radius) - 2px);
-  --radius-xl: var(--radius);
-  --radius-2xl: calc(var(--radius) + 6px);
+  --radius-sm: calc(var(--radius) - 10px);
+  --radius-md: calc(var(--radius) - 8px);
+  --radius-lg: calc(var(--radius) - 6px);
+  --radius-xl: calc(var(--radius) - 2px);
+  --radius-2xl: var(--radius);
+  --radius-3xl: calc(var(--radius) + 8px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -113,6 +122,9 @@
   --color-signal-foreground: var(--signal-foreground);
   --color-signal-soft: var(--signal-soft);
   --color-signal-ink: var(--signal-ink);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-ok-ink: var(--ok-ink);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
@@ -123,7 +135,10 @@
 
 @layer base {
   * { @apply border-border outline-ring/50; }
-  body { @apply bg-background text-foreground font-sans antialiased; font-optical-sizing: auto; }
+  body { @apply bg-background text-foreground font-sans antialiased; font-optical-sizing: auto; letter-spacing: -0.006em; }
+  /* Headings: larger and tighter, the way a flight tracker sets its route and times. */
+  h1 { letter-spacing: -0.03em; }
+  h2, h3 { letter-spacing: -0.02em; }
   /* Times, dates and counts line up in columns (a departure board's look). */
   body { font-variant-numeric: tabular-nums; }
   /* No pinch or double-tap zoom: the page is laid out for the phone already. The viewport meta in index.html says the
@@ -134,14 +149,14 @@
 
 @layer components {
   /* A small caps label over a section, spaced out. */
-  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted-foreground); }
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
   /* A confirmation code, flight number or gate: monospace, spaced, upper case. */
   .code { font-family: var(--font-mono); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
   /* A boarding pass: a rounded card whose `.pass-tear` is the perforated line between its two halves, with a notch
      at each end (cut from the page's own background). */
   .pass { position: relative; overflow: hidden; background: var(--card); color: var(--card-foreground); border: 1px solid var(--border);
     border-radius: var(--radius-2xl); box-shadow: var(--shadow-card); }
-  .pass-tear { position: relative; height: 0; border-top: 2px dashed var(--border); }
+  .pass-tear { position: relative; height: 0; border-top: 1.5px dashed var(--border); }
   .pass-tear::before, .pass-tear::after { content: ""; position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 9999px;
     background: var(--background); border: 1px solid var(--border); }
   .pass-tear::before { left: -12px; }

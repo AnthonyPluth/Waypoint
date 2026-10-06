@@ -1,17 +1,17 @@
-/* The few pages Waypoint's server draws itself (signing in, signed out, errors), in the web app's look: warm paper by day,
-   deep navy by night, following the device. The tokens match frontend/src/app.css. */
+/* The few pages Waypoint's server draws itself (signing in, signed out, errors), in the web app's look: a cool light theme by day,
+   near black by night, following the device. The tokens match frontend/src/app.css. */
 @font-face { font-family: "Geist"; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
-:root { color-scheme: light dark; --bg: #f6f1e7; --fg: #14202e; --card: #fffdf8; --muted: #5a6676; --border: #ddd4c1; --primary: #0a6a9c;
-  --primary-fg: #ffffff; --primary-hover: #085a85; --hover: rgba(20, 32, 46, 0.06); --shadow: 0 1px 2px rgba(20, 32, 46, 0.06), 0 8px 24px -12px rgba(20, 32, 46, 0.18); }
+:root { color-scheme: light dark; --bg: #f2f4f8; --fg: #0e1320; --card: #ffffff; --muted: #586175; --border: #e0e5ee; --primary: #0a63d8;
+  --primary-fg: #ffffff; --primary-hover: #0852b3; --hover: rgba(14, 19, 32, 0.06); --shadow: 0 1px 2px rgba(14, 19, 32, 0.05), 0 12px 32px -16px rgba(14, 19, 32, 0.16); }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #0a1626; --fg: #eef3f9; --card: #12233a; --muted: #9fb2c8; --border: #25405f; --primary: #52c4ef; --primary-fg: #052333;
-    --primary-hover: #7bd2f4; --hover: rgba(238, 243, 249, 0.07); --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -14px rgba(0, 0, 0, 0.6); }
+  :root { --bg: #07090e; --fg: #f3f5f9; --card: #12151d; --muted: #9aa4b8; --border: #232837; --primary: #4f9dff; --primary-fg: #04101f;
+    --primary-hover: #7ab6ff; --hover: rgba(243, 245, 249, 0.07); --shadow: 0 0 0 1px rgba(255, 255, 255, 0.03), 0 14px 32px -16px rgba(0, 0, 0, 0.7); }
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 0 16px; background: var(--bg); color: var(--fg); line-height: 1.5; -webkit-font-smoothing: antialiased;
   font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
 h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 22px; padding: 28px 24px; box-shadow: var(--shadow); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 28px 24px; box-shadow: var(--shadow); }
 .help { color: var(--muted); font-size: 14px; max-width: 42ch; }
 .btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 20px; border-radius: 12px; font-size: 15px; font-weight: 500;
   text-decoration: none; }
