@@ -10,7 +10,7 @@
       }
     },
     {
-      "wait_for": "[aria-label='Totals']"
+      "wait_for": "#hotels-title"
     },
     {
       "expect_text": {
@@ -19,19 +19,19 @@
       }
     },
     {
-      "scroll_to": "[aria-label='Totals']"
+      "scroll_to": "#hotels-title"
     },
     {
       "screenshot": "totals"
     },
     {
-      "scroll_to": "#records-title"
+      "scroll_to": "text=Hotel records"
     },
     {
       "screenshot": "records"
     },
     {
-      "scroll_to": "#top-hotels"
+      "scroll_to": "#top-hotels-stayed-at"
     },
     {
       "screenshot": "hotels"
