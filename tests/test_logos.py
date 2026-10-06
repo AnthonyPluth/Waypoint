@@ -343,6 +343,12 @@ class RouteTests(RouteCase):
         self.assertEqual(self.call("ana", "POST", "/api/logodev", {"token": TOKEN})[0], 200)
         self.assertEqual(self.call("ana", "POST", "/api/logodev", {"secret": TOKEN})[0], 400)
 
+    def test_a_request_with_one_bad_key_saves_neither(self):
+        self.assertEqual(self.call("ana", "POST", "/api/logodev", {"token": TOKEN, "secret": TOKEN})[0], 400)
+        self.assertFalse(self.ok("ana", "GET", "/api/logodev")["configured"])
+        got = self.ok("ana", "POST", "/api/logodev", {"token": TOKEN, "secret": SECRET})   # both at once, when both are right
+        self.assertEqual((got["configured"], got["searchable"]), (True, True))
+
     def test_the_secret_key_needs_the_publishable_one_first(self):
         self.assertEqual(self.call("ana", "POST", "/api/logodev", {"secret": SECRET})[0], 400)
 

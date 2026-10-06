@@ -42,20 +42,23 @@ def api_logodev_save(conn, _q, body: LogoDevBody) -> LogoDevStatus:
         db.set_setting(conn, sk.LOGODEV_SECRET, None)
         db.set_setting(conn, sk.LOGODEV_LAST_ERROR, None)
         return logos.status(conn)
+    if token is not None:
+        token = _v.text(token, "Logo.dev publishable key", 200, required=True)
+        if not (token or "").startswith("pk_"):
+            raise ApiError("That isn't a Logo.dev publishable key: it starts with pk_ (the secret sk_ key goes in the other box).")
+    if secret is not None:
+        secret = _v.text(secret, "Logo.dev secret key", 200, required=True)
+        if not (secret or "").startswith("sk_"):
+            raise ApiError("That isn't a Logo.dev secret key: it starts with sk_.")
+        if token is None and not logos.configured(conn):
+            raise ApiError("Save the publishable key first.")
+    # (everything is checked: a request that is refused changes nothing)
     if body.get("clear_secret") is True:
         db.set_setting(conn, sk.LOGODEV_SECRET, None)
     if token is not None:
-        key = _v.text(token, "Logo.dev publishable key", 200, required=True)
-        if not (key or "").startswith("pk_"):
-            raise ApiError("That isn't a Logo.dev publishable key: it starts with pk_ (the secret sk_ key goes in the other box).")
-        db.set_setting(conn, sk.LOGODEV_TOKEN, key)
+        db.set_setting(conn, sk.LOGODEV_TOKEN, token)
     if secret is not None:
-        key = _v.text(secret, "Logo.dev secret key", 200, required=True)
-        if not (key or "").startswith("sk_"):
-            raise ApiError("That isn't a Logo.dev secret key: it starts with sk_.")
-        if not logos.configured(conn):
-            raise ApiError("Save the publishable key first.")
-        db.set_setting(conn, sk.LOGODEV_SECRET, key)
+        db.set_setting(conn, sk.LOGODEV_SECRET, secret)
     if token is not None or secret is not None:
         conn.commit()   # the round below reads it from its own connection
         jobs.fetch_logos_now()
