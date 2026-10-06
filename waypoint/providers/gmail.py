@@ -225,7 +225,13 @@ def _revoke_quietly(token: str) -> None:
 def listing(conn: db.Connection, owner: str) -> list[dict[str, Any]]:
     """`owner`'s own mailboxes, never anyone else's, without their tokens."""
     return db.rows(conn.execute(select(Mailbox.id, Mailbox.address, Mailbox.status, Mailbox.last_error, Mailbox.last_scan,
-                                       Mailbox.scan_error).where(Mailbox.owner_sub == owner).order_by(Mailbox.id)))
+                                       Mailbox.scan_error, Mailbox.share_review).where(Mailbox.owner_sub == owner).order_by(Mailbox.id)))
+
+
+def set_share_review(conn: db.Connection, mailbox_id: int, owner: str, share: bool) -> bool:
+    """Let the household see and clear this mailbox's "Couldn't read" items (or stop). Only its owner can: False when the mailbox
+    isn't `owner`'s, or isn't there."""
+    return conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id, Mailbox.owner_sub == owner).values(share_review=share)).rowcount > 0
 
 
 def _find(conn: db.Connection, mailbox_id: int, owner: str | None = None) -> Any:

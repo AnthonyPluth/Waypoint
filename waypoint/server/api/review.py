@@ -1,5 +1,6 @@
-"""Review: mail Waypoint thought was a booking and couldn't read (visible only to the member whose mailbox it came from,
-with Open in Gmail, Ask AI, Add by hand and Ignore this sender), and the names on bookings that aren't matched
+"""Review: mail Waypoint thought was a booking and couldn't read (visible to the member whose mailbox it came from, with Open
+in Gmail, Ask AI, Add by hand and Ignore this sender, and to the household when that member shares the mailbox, who can
+Add by hand or dismiss it), and the names on bookings that aren't matched
 to a person yet ("Who is this?": any traveller on a trip the member sees). A message's text is shown only by the preview, to its
 mailbox's owner, fetched from Gmail when asked and kept nowhere."""
 from __future__ import annotations
@@ -23,7 +24,9 @@ _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {li
 
 
 def api_review(conn, _q, _b) -> Review:
-    """The signed-in member's review items (their own mailboxes' only) and the names on their trips to match to people."""
+    """The signed-in member's review items (their own mailboxes', and those other members share with the household) and the
+    names on their trips to match to people."""
+    gmail.end_lapsed(conn)   # (a member who lost access takes their mailbox, and what it shares, with them)
     return {"items": [cast(ReviewItem, {**i}) for i in review.listing(conn, owner())],
             "who": [{"id": t.id, "name": t.name or "", "segment_id": s["id"], "trip_id": s["trip_id"], "kind": s["kind"],
                      "provider": s["provider"], "origin": s["origin"], "destination": s["destination"],
@@ -33,14 +36,16 @@ def api_review(conn, _q, _b) -> Review:
 
 
 def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
-    """Take an item off the queue (once it's added by hand, or when it isn't a booking). Someone else's is a 404."""
+    """Take an item off the queue (once it's added by hand, or when it isn't a booking): the member's own, or one its owner
+    shares with the household. Anyone else's is a 404."""
     if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM)):
         raise ApiError(NO_ITEM, 404)
     return {"ok": True}
 
 
 def api_review_ignore(conn, _q, _b, item_id: str) -> Ok:
-    """Stop reviewing the item's sender: later scans skip their mail, and their other items leave the queue."""
+    """Stop reviewing the item's sender: later scans skip their mail, and their other items leave the queue. Only the mailbox's
+    owner can: someone else's, shared or not, is a 404."""
     if review.ignore_sender(conn, owner(), row_id(item_id, NO_ITEM)) is None:
         raise ApiError(NO_ITEM, 404)
     return {"ok": True}

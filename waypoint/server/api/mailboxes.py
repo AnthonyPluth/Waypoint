@@ -3,12 +3,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from ... import oidc
+from ... import oidc, validate
 from ...domain.mail import scan
 from ...providers import gmail
 from .. import jobs
 from ..common import ApiError, Response, _current, row_id
-from ..contract import Disconnected, MailboxList, ScanStarted, Started
+from ..contract import Disconnected, MailboxList, Ok, ScanStarted, ShareBody, Started
 
 # What Settings says about how a return from Google went (?gmail=<code>), as codes so nothing Google said is in an address.
 BACK = {gmail.Declined: "denied", gmail.Refused: "refused", gmail.WrongScope: "scope"}
@@ -46,7 +46,7 @@ def api_mailboxes(conn, _q, _b) -> MailboxList:
     return {"configured": gmail.configured(),
             "mailboxes": [{"id": m["id"], "address": m["address"], "status": m["status"], "last_error": m["last_error"],
                            "last_scan": _when(m["last_scan"]), "scan_error": m["scan_error"], "scanning": scan.running(m["id"]),
-                           "scan_notice": scan.notice(m["id"])}
+                           "scan_notice": scan.notice(m["id"]), "share_review": bool(m["share_review"])}
                           for m in gmail.listing(conn, owner())]}
 
 
@@ -85,6 +85,14 @@ def api_mailbox_disconnect(conn, _q, _b, mailbox_id: str) -> Disconnected:
     return {"ok": True, "revoked": revoked}
 
 
+
+
+def api_mailbox_share(conn, _q, body: ShareBody, mailbox_id: str) -> Ok:
+    """Show the mailbox's "Couldn't read" items to the household, or stop. Only its owner can; someone else's is a 404, as one
+    that isn't there."""
+    if not gmail.set_share_review(conn, row_id(mailbox_id), owner(), validate.on(body.get("share"))):
+        raise ApiError("Not found", 404)
+    return {"ok": True}
 
 
 def api_mailbox_scan(conn, _q, _b, mailbox_id: str) -> ScanStarted:

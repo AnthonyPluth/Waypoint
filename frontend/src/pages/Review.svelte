@@ -32,8 +32,9 @@
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import { toast } from "svelte-sonner";
 
-  // Two lists of what needs a person: mail Waypoint thought was a booking and couldn't read (only the member whose mailbox
-  // it came from sees it; never its text), and the names on bookings that aren't matched to anyone yet. A failed load
+  // Two lists of what needs a person: mail Waypoint thought was a booking and couldn't read (the member whose mailbox it came
+  // from sees it, and the household too when that member shares the mailbox, who can add it by hand or dismiss it; never its
+  // text), and the names on bookings that aren't matched to anyone yet. A failed load
   // leaves nothing drawn that could pass for current, with a Try again.
   let review = $state<Review | null>(null);
   let people = $state<Person[]>([]);
@@ -76,7 +77,7 @@
           destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "" }
       : { item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "" };
     formError = "";
-    void peek(item);   // (the message's text beside the form, so the details are read and typed in one place)
+    if (item.mine) void peek(item);   // (the message's text beside the form, so the details are read and typed in one place: only its owner's Gmail can give it)
   };
   // The message's text, read beside the form: fetched from Gmail when asked, kept only in this page while it's open (never in
   // the browser's storage), and for this member's own items alone.
@@ -99,7 +100,7 @@
   }, { busy: (on) => (on ? asking_ai.add(item.id) : asking_ai.delete(item.id)) });
 
   let asking_all = $state(false);
-  const unasked = $derived(review?.ai ? review.items.filter((i) => !i.suggestion && !asking_ai.has(i.id)) : []);
+  const unasked = $derived(review?.ai ? review.items.filter((i) => i.mine && !i.suggestion && !asking_ai.has(i.id)) : []);
   const askAll = (items: ReviewItem[]) => act(async () => {
     let done = 0;
     try {
@@ -193,7 +194,7 @@
     {#if review.items.length}
       <section aria-labelledby="unread-title" class="space-y-2">
         <h2 id="unread-title" class="eyebrow px-1">Couldn’t read</h2>
-        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see them. Open one in Gmail, or choose Add by hand to read it beside the form (Waypoint fetches it from Gmail when you ask, and keeps none of its text or subject).</p>
+        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Gmail), and then you can add those by hand or dismiss them. Open one in Gmail, or choose Add by hand to read it beside the form (Waypoint fetches it from Gmail when you ask, and keeps none of its text or subject).</p>
         {#if unasked.length > 1}
           <div class="px-1"><Button variant="outline" size="sm" disabled={asking_all} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : `Ask AI about all ${unasked.length}`}</Button></div>
         {/if}
@@ -202,16 +203,16 @@
             <li class="row items-start" data-testid="review-item">
               <div class="min-w-0 basis-full">
                 <p class="break-words font-medium">{subject(item)}</p>
-                <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, `to ${item.address}`].filter(Boolean).join(" · ")}</p>
+                <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, item.mine ? `to ${item.address}` : `in ${item.owner}’s mailbox, shared with the household`].filter(Boolean).join(" · ")}</p>
                 <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestion} <Badge variant="outline">AI suggestion</Badge>{/if}</p>
                 {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
               </div>
               <div class="flex basis-full flex-wrap gap-2">
-                <a class={buttonVariants({ variant: "outline", size: "sm" })} href={item.gmail_url} target="_blank" rel="noopener noreferrer" aria-label={`Open “${subject(item)}” in Gmail`}>Open in Gmail</a>
-                {#if review.ai}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestion ? "Ask again" : "Ask AI"}</Button>{/if}
+                {#if item.gmail_url}<a class={buttonVariants({ variant: "outline", size: "sm" })} href={item.gmail_url} target="_blank" rel="noopener noreferrer" aria-label={`Open “${subject(item)}” in Gmail`}>Open in Gmail</a>{/if}
+                {#if review.ai && item.mine}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestion ? "Ask again" : "Ask AI"}</Button>{/if}
                 {#if item.suggestion}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={`Check the AI’s suggestion for “${subject(item)}”`}>Check suggestion</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
-                {#if item.sender_domain}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Ignore ${item.sender_domain}`}>Ignore this sender</Button>{/if}
+                {#if item.sender_domain && item.mine}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Ignore ${item.sender_domain}`}>Ignore this sender</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={`Dismiss “${subject(item)}”`}>Dismiss</Button>
               </div>
             </li>

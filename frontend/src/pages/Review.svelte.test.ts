@@ -12,7 +12,7 @@ import { toast } from "svelte-sonner";
 import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
 
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
-  id: 1, address: "ana@gmail.example", sender_domain: "example-air.example", received: "2026-10-17",
+  id: 1, address: "ana@gmail.example", owner: "Ana Doe", mine: true, sender_domain: "example-air.example", received: "2026-10-17",
   reason: "no_markup", gmail_url: "https://mail.google.com/mail/?authuser=ana%40gmail.example#all/abc", suggestion: null, suggestion_error: null, ...extra });
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
@@ -68,6 +68,30 @@ describe("Review", () => {
     expect(screen.getByText("to ana@gmail.example")).toBeInTheDocument();
     expect(screen.getByText(REASONS.broken)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /Ignore/ })).toHaveLength(1);   // nothing to ignore for no sender
+  });
+
+  it("shows an item shared by another member with whose mailbox it is, and only Add by hand and Dismiss", async () => {
+    held = { items: [item({ id: 4, mine: false, owner: "Sam Doe", gmail_url: null, address: "sam@gmail.example" })], who: [], ai: true };
+    render(ReviewPage);
+    const row = await screen.findByTestId("review-item");
+    expect(row).toHaveTextContent("in Sam Doe’s mailbox, shared with the household");
+    expect(row).not.toHaveTextContent("sam@gmail.example");
+    expect(within(row).getByRole("button", { name: /Add .Mail from example-air.example.* by hand/ })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: /Dismiss/ })).toBeInTheDocument();
+    for (const name of [/Open .* in Gmail/, /Ask AI about/, /Ignore example-air.example/]) expect(within(row).queryByRole("button", { name }) ?? within(row).queryByRole("link", { name })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ask AI about all/ })).toBeNull();
+  });
+
+  it("adds a shared item by hand without asking Gmail for its message, and dismisses it", async () => {
+    held = { items: [item({ id: 4, mine: false, owner: "Sam Doe", gmail_url: null }), item({ id: 5, mine: true })], who: [], ai: false };
+    render(ReviewPage);
+    const row = (await screen.findAllByTestId("review-item"))[0];
+    await userEvent.click(within(row).getByRole("button", { name: /by hand/ }));
+    expect(await screen.findByLabelText(/Confirmation/)).toBeInTheDocument();
+    expect(calls.some(([path]) => path.endsWith("/preview"))).toBe(false);   // (only its owner's Gmail can give the message)
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(within(row).getByRole("button", { name: /Dismiss/ }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/4", "DELETE", undefined]));
   });
 
   it("dismisses an item", async () => {

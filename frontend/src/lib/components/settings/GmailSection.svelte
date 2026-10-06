@@ -81,6 +81,14 @@
     watching = true;
   }, { busy: (on) => (starting = on ? m.id : null) });
 
+  // Showing a mailbox's unread mail to the household: the box shows what the server kept, and goes back if it refuses.
+  const share = (m: Mailbox, box: HTMLInputElement) => act(async () => {
+    try {
+      await apiCall<"POST /api/mailboxes/{id}/share">(`/api/mailboxes/${m.id}/share`, { method: "POST", body: { share: box.checked }, failed: "Couldn’t change it" });
+      toast.success(box.checked ? "Shared with the household" : "No longer shared");
+    } finally { await load(); box.checked = list?.mailboxes.find((x) => x.id === m.id)?.share_review ?? m.share_review; }
+  });
+
   async function disconnect() {
     const m = leaving;
     if (!m) return false;
@@ -126,6 +134,10 @@
             {#if m.status === "connected"}
               <p class="text-sm text-muted-foreground">Read bookings again re-reads the messages Waypoint already found (it doesn’t search again) and corrects bookings it read wrongly before, such as flight times. Anything you edited stays as you left it.</p>
             {/if}
+            <label class="mt-2 flex items-start gap-2 text-sm">
+              <input type="checkbox" class="mt-0.5 size-4 shrink-0" checked={m.share_review} onchange={(e) => share(m, e.currentTarget)} />
+              <span>Show this mailbox’s unread mail to the household<span class="block text-muted-foreground">Anyone in the household sees who each one is from and its day in Review, and can add it by hand or dismiss it. Never its subject or text, and only you can open it in Gmail. Off until you turn it on.</span></span>
+            </label>
             {#if m.scan_notice && !m.scanning && m.status !== "reconnect"}<p class="text-sm text-muted-foreground" role="status">The scan couldn’t start: {m.scan_notice}</p>{/if}
             {#if m.scan_error}<p class="text-sm text-signal-ink" role="status">The last scan stopped: {m.scan_error} What it had read is kept, and the next scan carries on.</p>{/if}
           </div>
