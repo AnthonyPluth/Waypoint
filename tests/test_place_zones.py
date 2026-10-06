@@ -49,6 +49,21 @@ class AddressZones(DbCase):
             with self.subTest(address=address):
                 self.assertIsNone(self.zone(address))
 
+    def test_a_bare_two_letter_code_is_not_a_us_state_unless_the_address_says_it_is_in_the_us(self):
+        for address in ("10115 Berlin, DE", "Bogotá, CO", "Tel Aviv, IL", "Buenos Aires, AR", "Mumbai, IN", "Lima, PE", "Amsterdam, NL", "Kigali, MA"):
+            with self.subTest(address=address):
+                self.assertNotIn(self.zone(address), ("America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Toronto", "America/Halifax"))
+        self.assertIsNone(self.zone("Berlin, DE"))   # (nothing here says which country: better none than a US zone)
+        self.assertEqual(self.zone("1 Ocean Ave, Honolulu, HI, USA"), "Pacific/Honolulu")   # (the address says it is in the US)
+        self.assertEqual(self.zone("1 Ocean Ave, Honolulu, Hawaii, United States"), "Pacific/Honolulu")
+        self.assertIsNone(self.zone("Somewhere, Georgia"))   # (the country or the state: it doesn't say)
+
+    def test_a_province_needs_a_canadian_postal_code_or_canada(self):
+        self.assertEqual(self.zone("1 King St, Toronto, ON"), "America/Toronto")   # (the airport list knows Toronto)
+        self.assertEqual(self.zone("5 Rue X, Somewhere, QC, Canada"), "America/Toronto")
+        self.assertEqual(self.zone("5 Rue X, Somewhere, QC J2A 1B1"), "America/Toronto")
+        self.assertIsNone(self.zone("5 Straat, Somewhere, NL"))
+
     def test_a_two_letter_word_is_not_a_state_unless_it_stands_where_a_state_does(self):
         self.assertIsNone(self.zone("Unit 4 IN the back, 12 Road"))
         self.assertEqual(self.zone("12 Road, Chicago, IL 60601"), "America/Chicago")

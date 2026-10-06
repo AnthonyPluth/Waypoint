@@ -414,6 +414,14 @@ class StayZoneTests(Household):
             with self.subTest(details=details), self.assertRaisesRegex(trips.Invalid, "time zone of the stay"):
                 self.stay(details=details)
 
+    def test_clearing_a_stays_zone_on_an_edit_works_it_out_again_from_the_address(self):
+        seg = self.stay(start_zone="America/Chicago", details={"address": "1 Ocean Ave, Honolulu, HI 96815"})
+        cleared = trips.edit_segment(self.c, self.jane, seg["id"], {"start_zone": None})
+        assert cleared
+        self.assertEqual((cleared["start_zone"], cleared["end_zone"]), ("Pacific/Honolulu", "Pacific/Honolulu"))
+        with self.assertRaisesRegex(trips.Invalid, "time zone of the stay"):
+            trips.edit_segment(self.c, self.jane, self.stay(start_zone="America/Chicago")["id"], {"start_zone": None})   # (no address to go on)
+
     def test_editing_a_stay_keeps_its_zone_in_both_places(self):
         seg = self.stay(start_zone="America/Chicago")
         moved = trips.edit_segment(self.c, self.jane, seg["id"], {"start_zone": "America/Denver"})

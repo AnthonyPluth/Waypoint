@@ -91,20 +91,19 @@ def _country(tokens: list[str]) -> str | None:
     return None
 
 
-def _us_zone(address: str, tokens: list[str]) -> str | None:
-    """A US address's zone from its state (and ZIP, where the state spans zones): "Honolulu, HI 96815", "Dallas, Texas 75201"."""
-    state: str | None = None
-    zip3: str | None = None
+def _us_zone(address: str, tokens: list[str], country: str | None) -> str | None:
+    """A US address's zone from its state (and ZIP, where the state spans zones): "Honolulu, HI 96815", "Dallas, Texas 75201".
+    A state is taken only from a state and ZIP together, or when the address says it is in the US: a bare "DE", "CO" or "IL"
+    is as likely Germany, Colombia or Israel, and a wrong zone is worse than none."""
     found = re.search(r"\b([A-Z]{2})\s+(\d{5})(?:-\d{4})?\b", address)   # state and ZIP together: the surest reading
-    if found and found.group(1) in US_STATES:
-        state, zip3 = found.group(1), found.group(2)[:3]
-    else:
+    state: str | None = found.group(1) if found and found.group(1) in US_STATES else None
+    zip3: str | None = found.group(2)[:3] if state and found else None
+    if state is None and country == "US":
         for token in tokens:
             bare = ZIP.sub("", token).strip().rstrip(".").strip()
             if bare in US_STATES or bare.upper() in US_NAMES:
                 state = bare if bare in US_STATES else US_NAMES[bare.upper()]
-                z = ZIP.search(token)
-                zip3 = z.group(1)[:3] if z else None
+                break
     if state is None:
         return None
     zone, exceptions = US_STATES[state]
@@ -116,8 +115,11 @@ def _us_zone(address: str, tokens: list[str]) -> str | None:
     return zone
 
 
-def _ca_zone(address: str, tokens: list[str]) -> str | None:
-    """A Canadian address's zone from its province."""
+def _ca_zone(address: str, tokens: list[str], country: str | None) -> str | None:
+    """A Canadian address's zone from its province, taken only when the address has a Canadian postal code or says it is in
+    Canada (a bare "NL" or "PE" is as likely the Netherlands or Peru)."""
+    if country != "CA" and not CA_POSTAL.search(address):
+        return None
     for token in tokens:
         bare = CA_POSTAL.sub("", token).strip().rstrip(".").strip()
         code = bare if bare in CA_PROVINCES else CA_NAMES.get(bare.upper())
@@ -146,11 +148,11 @@ def zone_for_address(conn: db.Connection, address: str | None) -> str | None:
     tokens = _tokens(text)
     country = _country(tokens)
     if country in (None, "US"):
-        zone = _us_zone(text, tokens)
+        zone = _us_zone(text, tokens, country)
         if zone:
             return zone
     if country in (None, "CA"):
-        zone = _ca_zone(text, tokens)
+        zone = _ca_zone(text, tokens, country)
         if zone:
             return zone
     zone = _city_zone(conn, tokens, country)

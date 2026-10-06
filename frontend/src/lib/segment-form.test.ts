@@ -64,7 +64,7 @@ describe("the request the form makes", () => {
   });
   it("lets a stay leave its zone empty when it has an address to work it out from", () => {
     expect(problem(hotel({ start_zone: "", details: { address: "1 Quay Street, London" } }))).toBeNull();
-    expect(body(hotel({ start_zone: "", details: { address: "1 Quay Street, London" } }))).not.toHaveProperty("start_zone");
+    expect(body(hotel({ start_zone: "", details: { address: "1 Quay Street, London" } }))).toMatchObject({ start_zone: null });   // (null on an edit clears the old zone, so it is worked out again)
     expect(problem(hotel({ start_zone: "" }))).toBe("Enter the time zone of the stay (for example America/New_York), or its address to work it out from");
     expect(problem(hotel({ start_zone: "Mars/Olympus" }))).toMatch(/isn’t one Waypoint knows/);
   });

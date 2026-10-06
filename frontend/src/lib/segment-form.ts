@@ -143,7 +143,7 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
     origin: flight ? d.origin.trim().toUpperCase() : text(d.origin), destination: flight ? d.destination.trim().toUpperCase() : text(d.destination),
     start_local: d.start_local, end_local: d.end_local,
     ...(flight ? { ...(startZone && { start_zone: startZone }), ...(d.end_zone.trim() && { end_zone: d.end_zone.trim() }) }
-      : d.kind === "hotel" ? { ...(startZone && { start_zone: startZone }) }   // (a stay's one zone; none typed: the server works it out from the address)
+      : d.kind === "hotel" ? { start_zone: startZone || null }   // (a stay's one zone; none typed: the server works it out from the address, on an edit too)
         : { start_zone: startZone, end_zone: endZone }),
     details, manage_url: text(d.manage_url),
     ...(flight || d.kind !== "cruise" ? {} : { itinerary: d.itinerary.map((p) => ({ name: p.name.trim(), zone: p.zone.trim(), arrive_local: p.arrive || null, depart_local: p.depart || null })) }),
