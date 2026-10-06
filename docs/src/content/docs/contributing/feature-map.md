@@ -27,7 +27,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/people/claim-suggestions/dismiss` | `people.py:api_claim_dismiss` | `pages/Upcoming.svelte` | `test_api_contract.py`, `test_people.py` | [start/people](/waypoint/start/people/) |
 | `GET /api/trips` | `trips.py:api_trips` | `pages/Trips.svelte`, `pages/Upcoming.svelte` | `test_api_contract.py`, `test_flight_import.py`, `test_mcp_routes.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/trips` | `trips.py:api_trip_add` | - | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
-| `GET /api/trips/{id}` | `trips.py:api_trip` | `pages/Trip.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_monitoring.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
+| `GET /api/trips/{id}` | `trips.py:api_trip` | `pages/Trip.svelte` | `test_api_contract.py`, `test_logos.py`, `test_mcp.py`, `test_monitoring.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/trips/{id}` | `trips.py:api_trip_edit` | `pages/Trip.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_monitoring.py`, `test_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `DELETE /api/trips/{id}` | `trips.py:api_trip_remove` | - | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_monitoring.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
 | `POST /api/trips/{id}/merge` | `trips.py:api_trip_merge` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/waypoint/start/trips/) |
@@ -59,7 +59,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `DELETE /api/mailboxes/{id}` | `mailboxes.py:api_mailbox_disconnect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py`, `test_mail_scan.py` | [start/gmail](/waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/scan` | `mailboxes.py:api_mailbox_scan` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/share` | `mailboxes.py:api_mailbox_share` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/waypoint/start/gmail/) |
-| `POST /api/mailboxes/{id}/reread` | `mailboxes.py:api_mailbox_reread` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/waypoint/start/gmail/) |
+| `POST /api/mailboxes/{id}/reread` | `mailboxes.py:api_mailbox_reread` | - | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/waypoint/start/gmail/) |
 | `GET /api/reminders` | `reminders.py:api_reminders` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
 | `POST /api/reminders` | `reminders.py:api_reminders_set` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |
 | `POST /api/reminders/devices` | `reminders.py:api_device_add` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/waypoint/start/reminders/) |

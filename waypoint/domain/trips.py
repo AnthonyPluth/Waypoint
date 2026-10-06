@@ -136,6 +136,7 @@ class SegmentOut(TypedDict):
     travelers: list[TravelerOut]
     itinerary: list[PortIn]
     logo: str | None
+    logo_label: str | None
     links: links.Links
 
 
@@ -440,6 +441,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
          "manage_url": s.manage_url, "source": cast(Literal["manual", "email", "import"], s.source), "booked_by": s.booked_by,
          "locked_fields": decode_locked(s.locked_fields), "check_times": bool(s.check_times), "travelers": by_segment.get(s.id, []),
          "itinerary": ports.get(s.id, []), "logo": f"/api/segments/{s.id}/logo" if brand and logos.key(brand) in with_logo else None,
+         "logo_label": logos.chip(s.kind, s.origin, brand) if brand and logos.key(brand) in with_logo else None,
          "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, details, s.origin)}
         for s, details, brand in zip(segs, decoded, brands, strict=True)]
     return sorted(out, key=lambda s: (instant(s["start_local"], s["start_zone"]), s["id"]))

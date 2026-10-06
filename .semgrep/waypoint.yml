@@ -164,6 +164,18 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/logodev.py"]
 
+  - id: waypoint-wikimedia-hosts
+    message: >-
+      Only waypoint/providers/wikimedia.py talks to Wikidata and Wikimedia Commons, so what a request carries (a hotel brand's
+      name, never a traveller, a date, a confirmation code or the rest of a hotel's name) stays in one place (AGENTS.md, "Email
+      stays on the server"): call it rather than naming its hosts elsewhere.
+    severity: ERROR
+    languages: [python]
+    pattern-regex: (?i)(wikidata|wikimedia)\.org
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/providers/wikimedia.py"]
+
   - id: waypoint-ai-hosts
     message: >-
       Only waypoint/domain/mail/ai.py may send anything to an AI service, and only when the household turned the AI

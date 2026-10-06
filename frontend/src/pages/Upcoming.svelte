@@ -101,7 +101,7 @@
       <div class="flex flex-col gap-3 p-6 md:p-8">
         <p class="eyebrow flex items-center gap-2">{#if next.state === "now"}<span class="size-2 animate-pulse rounded-full bg-primary motion-reduce:animate-none" aria-hidden="true"></span>{/if}{next.state === "now" ? "Under way" : "Next up"}</p>
         <div class="flex items-center gap-3">
-          <BrandLogo src={s.logo} size={48} />
+          <BrandLogo src={s.logo} label={s.logo_label} size={48} />
           <h2 id="next-title" class="min-w-0 break-words text-3xl font-bold tracking-tight md:text-4xl">{headline(s)}</h2>
         </div>
         <p class="w-fit rounded-full bg-primary/12 px-3.5 py-1 text-base font-semibold text-primary" data-countdown>
@@ -150,7 +150,7 @@
             {#each day.items as item (`${item.segment.id}-${item.role}`)}
               {@const seg = item.segment}
               <li class="row items-start" class:opacity-60={seg.status === "cancelled"}>
-                <BrandLogo src={seg.logo} size={32} class="mt-0.5" />
+                <BrandLogo src={seg.logo} label={seg.logo_label} size={32} class="mt-0.5" />
                 <div class="min-w-0 flex-1">
                   <p class="break-words font-medium" class:line-through={seg.status === "cancelled"}>
                     <a class="underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${headline(seg)}` : headline(seg)}</a></p>

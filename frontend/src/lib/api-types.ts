@@ -415,6 +415,7 @@ export interface Segment {
   travelers: Traveler[];
   itinerary: Port[];
   logo: string | null;
+  logo_label: string | null;
   links: SegmentLinks;
 }
 

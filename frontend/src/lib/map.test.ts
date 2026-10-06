@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StatsAirport, StatsFlights, StatsRoute } from "./api-types";
-import { arcs, clampPan, dots, IDENTITY, MAP_HEIGHT, MAP_WIDTH, mapData, pieces, visitedFeatureIds, worldProjection, zoomAt } from "./map";
+import { arcs, clampPan, dots, fitBox, flownBounds, IDENTITY, MAP_HEIGHT, MAP_WIDTH, mapData, pieces, visitedFeatureIds, worldProjection, zoomAt } from "./map";
 
 const airport = (code: string, visits: number, latitude: number | null, longitude: number | null, city: string | null = null): StatsAirport =>
   ({ code, name: code, city, country: "XX", visits, latitude, longitude });
@@ -85,5 +85,40 @@ describe("visited countries", () => {
     const contains = (f: { id: string }, [lon]: [number, number]) => (f.id === "840" ? lon < 0 : f.id === "392" && lon > 100);
     const ids = visitedFeatureIds([airport("JFK", 1, ...JFK), airport("LAX", 1, ...LAX), airport("NRT", 1, ...NRT), airport("XYZ", 1, null, null)], features, contains);
     expect([...ids].sort()).toEqual(["392", "840"]);
+  });
+});
+
+describe("framing what was flown", () => {
+  const at = (code: string, latitude: number | null, longitude: number | null, visits = 1): StatsAirport => ({ code, name: code, city: null, country: null, visits, latitude, longitude });
+  const route = (a: StatsAirport, b: StatsAirport): StatsRoute => ({ a: a.code, b: b.code, flights: 1, distance_km: 1, a_latitude: a.latitude, a_longitude: a.longitude, b_latitude: b.latitude, b_longitude: b.longitude });
+  const only = (airports: StatsAirport[], routes: StatsRoute[] = []) => ({ airports, routes }) as unknown as StatsFlights;
+  const hnl = at("HNL", 21.32, -157.92), lih = at("LIH", 21.98, -159.34), ogg = at("OGG", 20.9, -156.43);
+  const jfk = at("JFK", 40.64, -73.78), nrt = at("NRT", 35.77, 140.39);
+
+  it("zooms in on a region and centres it, never closer than the limit", () => {
+    const hawaii = { airports: [hnl, lih, ogg], routes: [route(hnl, lih), route(hnl, ogg)] } as StatsFlights;
+    const t = fitBox(flownBounds(hawaii, worldProjection()));
+    expect(t.k).toBeGreaterThan(3);
+    expect(t.k).toBeLessThanOrEqual(8);
+    const p = worldProjection()([-157.9, 21.3])!;   // Honolulu lands inside the box, near its middle
+    const [x, y] = [t.x + t.k * p[0], t.y + t.k * p[1]];
+    expect(x).toBeGreaterThan(MAP_WIDTH * 0.25);
+    expect(x).toBeLessThan(MAP_WIDTH * 0.75);
+    expect(y).toBeGreaterThan(MAP_HEIGHT * 0.25);
+    expect(y).toBeLessThan(MAP_HEIGHT * 0.75);
+  });
+
+  it("shows the whole world when the flights span it, or when there are none, and does not zoom to a lone airport's point", () => {
+    expect(fitBox(flownBounds({ airports: [jfk, nrt], routes: [route(jfk, nrt)] } as StatsFlights, worldProjection()))).toEqual(IDENTITY);
+    expect(fitBox(flownBounds(only([]), worldProjection()))).toEqual(IDENTITY);
+    expect(flownBounds(only([at("ZZZ", null, null)]), worldProjection())).toBeNull();
+    const lone = fitBox(flownBounds(only([hnl]), worldProjection()));
+    expect(lone.k).toBeGreaterThan(1);
+    expect(lone.k).toBeLessThan(8);
+  });
+
+  it("keeps the framed map covering its box", () => {
+    const t = fitBox(flownBounds({ airports: [hnl, lih], routes: [route(hnl, lih)] } as StatsFlights, worldProjection()));
+    expect(clampPan(t)).toEqual(t);
   });
 });

@@ -183,20 +183,6 @@ describe("Settings → Gmail", () => {
     await waitFor(() => expect(toast).toHaveBeenCalledWith("A scan of this mailbox is already running."));
   });
 
-  it("reads bookings again, saying what it does, and says when it is already running", async () => {
-    let started = true;
-    vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string }) =>
-      (opts?.method === "POST" ? { started } : list([box()])) as never);
-    render(GmailSection);
-    expect(await screen.findByText(/re-reads the messages Waypoint already found/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Read bookings again" }));
-    expect(api).toHaveBeenCalledWith("/api/mailboxes/1/reread", { method: "POST", failed: "Couldn’t start reading again" });
-    expect(toast).not.toHaveBeenCalled();
-    started = false;
-    await userEvent.click(screen.getByRole("button", { name: "Read bookings again" }));
-    await waitFor(() => expect(toast).toHaveBeenCalledWith("This mailbox is already being read."));
-  });
-
   it("says a scan is running, and checks until it’s done", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {

@@ -1,0 +1,12 @@
+{
+  "name": "stats-map-zoom",
+  "page": "stats",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Stats" } },
+    { "wait_for": "[data-visited]" },
+    { "select": { "selector": "label:has-text('Who') select", "index": 2 } },
+    { "wait_for": "[data-testid='map-layer']" },
+    { "scroll_to": "#stats-map-slot" },
+    { "screenshot": "map-for-one-person" }
+  ]
+}
