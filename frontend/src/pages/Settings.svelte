@@ -26,6 +26,8 @@
   // (?gmail=…) lands on the mail tab, where the answer is shown.
   const TABS = [["account", "Account"], ["mail", "Mail and AI"], ["travel", "Travel"], ["data", "Data"]] as const;
   type Tab = (typeof TABS)[number][0];
+  // Read once at start: the OAuth return lands here with ?gmail=, which GmailSection clears on mount. A later bare
+  // `#settings` falls back to Account, which is fine.
   const landing: Tab | "" = new URLSearchParams(location.search).has("gmail") ? "mail" : "";
   const tab = $derived<Tab>((TABS.find(([id]) => id === route.sub)?.[0]) ?? (landing || "account"));
 
