@@ -71,8 +71,7 @@ def visible_unmatched(conn: db.Connection, viewer: Viewer) -> list[SegmentTravel
 
 
 def household_segments(conn: db.Connection, kind: str) -> list[Segment]:
-    return list(conn.orm.scalars(select(Segment).where(Segment.kind == kind, Segment.confirmation.is_not(None))
-                                 .order_by(Segment.id)).all())
+    return list(conn.orm.scalars(select(Segment).where(Segment.kind == kind).order_by(Segment.id)).all())
 
 
 def note_recipient(conn: db.Connection, viewer: Viewer, segment: Segment) -> bool:

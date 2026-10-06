@@ -632,7 +632,32 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
 EMAIL_MERGE_DAYS = 3
 
 
+PLACE_FILLER = frozenset({"the", "a", "hotel", "hotels", "inn", "resort", "suites", "and"})
+
+
+def _place_words(text: str | None) -> frozenset[str]:
+    return frozenset(w for w in re.sub(r"[^\w\s]", " ", (text or "").casefold()).split() if w not in PLACE_FILLER)
+
+
+def _same_place(mine: str | None, theirs: str | None) -> bool:
+    words = _place_words(mine)
+    return bool(words) and words == _place_words(theirs)
+
+
+def _same_uncoded(seg: Segment, values: Mapping[str, str | None], details: Mapping[str, str]) -> bool:
+    if seg.kind != values["kind"] or not values["confirmation"] or seg.start_local[:10] != (values["start_local"] or "")[:10]:
+        return False
+    if seg.kind == "flight":
+        mine, theirs = flight_key(decode_details(seg.details).get("flight_number")), flight_key(details.get("flight_number"))
+        return (mine is not None and mine == theirs and _text_key(seg.origin) == _text_key(values["origin"])
+                and _text_key(seg.destination) == _text_key(values["destination"]))
+    return (seg.end_local[:10] == (values["end_local"] or "")[:10] and seg.start_zone == values["start_zone"]
+            and _same_place(seg.origin, values["origin"]))
+
+
 def _same_leg(seg: Segment, values: Mapping[str, str | None], details: Mapping[str, str]) -> bool:
+    if not seg.confirmation:
+        return _same_uncoded(seg, values, details)
     mine, theirs = flight_key(decode_details(seg.details).get("flight_number")), flight_key(details.get("flight_number"))
     near = abs((date.fromisoformat(seg.start_local[:10]) - date.fromisoformat((values["start_local"] or "")[:10])).days) <= EMAIL_MERGE_DAYS
     providers = bool(mine and theirs) or not seg.provider or not values["provider"] or provider_key(seg.provider) == provider_key(values["provider"])
@@ -647,8 +672,12 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
     values = check(conn, fields)
     day = (values["start_local"] or "")[:10]
     found = [s for s in visibility.household_segments(conn, values["kind"] or "") if _same_leg(s, values, fields.get("details") or {})]
+    coded = [s for s in found if s.confirmation]
+    uncoded = [s for s in found if not s.confirmation]
+    seen = {s.id for s in visibility.visible_segments(conn, viewer)} if found else set()
+    uncoded = [s for s in uncoded if s.id in seen]
+    found = coded or (uncoded if len(uncoded) == 1 else [])
     if len(found) > 1:
-        seen = {s.id for s in visibility.visible_segments(conn, viewer)}
         found.sort(key=lambda s: (abs((date.fromisoformat(s.start_local[:10]) - date.fromisoformat(day)).days), s.id not in seen, s.id))
     if not found:
         added = add_segment(conn, viewer, fields, source="email")
