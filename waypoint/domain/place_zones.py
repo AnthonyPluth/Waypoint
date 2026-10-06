@@ -157,9 +157,9 @@ def _ca_zone(address: str, tokens: list[str], country: str | None) -> str | None
         bare = CA_POSTAL.sub("", token).strip().rstrip(".").strip()
         code = bare if bare in CA_PROVINCES else CA_NAMES.get(bare.upper())
         if code:
-            if code in CA_SPLIT:   # (part of these provinces is in another zone: only a postal code outside those parts settles it)
-                if not postal or postal.group(0).replace(" ", "").upper().startswith(CA_SPLIT[code]):
-                    return None
+            # (part of the split provinces is in another zone: only a postal code outside those parts settles it)
+            if code in CA_SPLIT and (not postal or postal.group(0).replace(" ", "").upper().startswith(CA_SPLIT[code])):
+                return None
             return CA_PROVINCES.get(code)
     return None
 
