@@ -30,7 +30,7 @@ class AddressZones(DbCase):
         self.assertIsNone(self.zone("1 Farm Rd, Smalltown, KS 66001"))
 
     def test_canadian_provinces_and_countries_with_one_zone(self):
-        for address, zone in (("100 King St W, Toronto, ON M5X 1A9", "America/Toronto"), ("1 Granville St, Vancouver, British Columbia", "America/Vancouver"),
+        for address, zone in (("100 King St W, Toronto, ON M5X 1A9", "America/Toronto"), ("1 Granville St, Vancouver, BC V6C 1A1", "America/Vancouver"),
                               ("10 Rue de Rivoli, Paris, France", "Europe/Paris"), ("221B Baker St, London, UK", "Europe/London"),
                               ("1-1 Marunouchi, Tokyo, Japan", "Asia/Tokyo")):
             with self.subTest(address=address):
@@ -58,10 +58,33 @@ class AddressZones(DbCase):
         self.assertEqual(self.zone("1 Ocean Ave, Honolulu, Hawaii, United States"), "Pacific/Honolulu")
         self.assertIsNone(self.zone("Somewhere, Georgia"))   # (the country or the state: it doesn't say)
 
+    def test_a_state_and_zip_must_agree_when_no_country_is_named(self):
+        for address in ("Berlin, DE 10115", "Casablanca, MA 20000", "Jakarta, ID 10110", "Panama, PA 08001"):
+            with self.subTest(address=address):
+                self.assertFalse((self.zone(address) or "").startswith("America/"), address)   # (never a US zone for them)
+        self.assertIsNone(self.zone("Smalltown, DE 10115"))
+        self.assertEqual(self.zone("12 Main St, Dover, DE 19901"), "America/New_York")
+        self.assertEqual(self.zone("12 Main St, Boise, ID 83702"), "America/Boise")
+
+    def test_places_where_a_split_state_mixes_zones_are_left_to_the_person(self):
+        for address in ("1 Bay Rd, Smalltown, FL 32456", "1 Main St, Smalltown, KY 42701", "9 Oak, Smalltown, KY 42501", "9 Oak, Smalltown, TN 37388", "2 Pine, Smalltown, MI 49855"):
+            with self.subTest(address=address):
+                self.assertIsNone(self.zone(address))   # (a ZIP prefix that mixes zones, and no city the airport list knows)
+        self.assertEqual(self.zone("1 Main St, Elizabethtown, KY 42701"), "America/New_York")   # (a city it knows settles it)
+        self.assertEqual(self.zone("9 Oak, Tullahoma, TN 37388"), "America/Chicago")
+        self.assertEqual(self.zone("9 Oak, Paducah, KY 42001"), "America/Chicago")
+        self.assertEqual(self.zone("9 Oak, Pensacola, FL 32501"), "America/Chicago")
+        self.assertEqual(self.zone("9 Oak, Chattanooga, TN 37402"), "America/New_York")
+
     def test_a_province_needs_a_canadian_postal_code_or_canada(self):
-        self.assertEqual(self.zone("1 King St, Toronto, ON"), "America/Toronto")   # (the airport list knows Toronto)
-        self.assertEqual(self.zone("5 Rue X, Somewhere, QC, Canada"), "America/Toronto")
+        self.assertEqual(self.zone("1 King St, Toronto, ON M5X 1A9"), "America/Toronto")
         self.assertEqual(self.zone("5 Rue X, Somewhere, QC J2A 1B1"), "America/Toronto")
+        self.assertEqual(self.zone("5 Rue X, Somewhere, AB, Canada"), "America/Edmonton")
+        self.assertIsNone(self.zone("5 Rue X, Somewhere, QC, Canada"))   # (QC's Îles-de-la-Madeleine are on Atlantic time: a postal code decides)
+        self.assertIsNone(self.zone("1 Lakeshore Rd, Smalltown, ON P7B 1A1"))   # (northern Ontario spans zones)
+        self.assertIsNone(self.zone("1 Main St, Smalltown, BC V1C 1A1"))   # (the East Kootenay is on Mountain time)
+        self.assertEqual(self.zone("1 Main St, Cranbrook, BC V1C 1A1"), "America/Edmonton")   # (a city the airport list knows)
+        self.assertEqual(self.zone("1 Granville St, Vancouver, BC V6C 1A1"), "America/Vancouver")
         self.assertIsNone(self.zone("5 Straat, Somewhere, NL"))
 
     def test_a_two_letter_word_is_not_a_state_unless_it_stands_where_a_state_does(self):

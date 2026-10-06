@@ -23,16 +23,41 @@ US_STATES: dict[str, tuple[str | None, dict[str, str | None]]] = {
     "MS": (CHI, {}), "MO": (CHI, {}), "MT": (DEN, {}), "NV": (LA, {}), "NH": (NY, {}), "NJ": (NY, {}), "NM": (DEN, {}),
     "NY": (NY, {}), "NC": (NY, {}), "OH": (NY, {}), "OK": (CHI, {}), "PA": (NY, {}), "RI": (NY, {}), "SC": (NY, {}),
     "UT": (DEN, {}), "VT": (NY, {}), "VA": (NY, {}), "WA": (LA, {}), "WV": (NY, {}), "WI": (CHI, {}), "WY": (DEN, {}),
-    "FL": (NY, {"324": CHI, "325": CHI}),                                    # (the panhandle west of the Apalachicola)
+    "FL": (NY, {"324": None, "325": CHI}),                                    # (the panhandle west of the Apalachicola; 324 mixes Panama City with Port St. Joe)
     "TX": (CHI, {"799": DEN, "885": DEN}),                                    # (El Paso)
     "ID": ("America/Boise", {"835": LA, "838": LA}),                          # (the north)
     "OR": (LA, {"979": "America/Boise"}),                                     # (Malheur County)
     "IN": (NY, {"463": CHI, "464": CHI, "476": CHI, "477": CHI}),            # (Gary, Evansville)
-    "KY": (NY, {f"42{n}": CHI for n in range(8)}),                            # (the west)
-    "TN": (CHI, {"373": NY, "374": NY, "376": NY, "377": NY, "378": NY, "379": NY}),   # (the east)
+    "KY": (NY, {"420": CHI, "421": CHI, "422": CHI, "423": CHI, "424": CHI, "425": None, "426": None, "427": None}),   # (the west; 425-427 mix both)
+    "TN": (CHI, {"373": None, "374": NY, "376": NY, "377": NY, "378": NY, "379": NY}),   # (the east; 373 mixes Cleveland with Tullahoma)
     "MI": (None, {str(n): NY for n in range(480, 498)}),                      # (Eastern but for four Upper Peninsula counties, whose ZIPs 498 and 499 are shared)
     "KS": (None, {}), "NE": (None, {}), "ND": (None, {}), "SD": (None, {}),  # (zones split mid-state: a city, or the person)
 }
+# The ZIP prefixes (first three digits) each state's ZIP codes fall in: a state and ZIP with no country named is read only when
+# they agree, since "DE 10115" is Berlin, not Delaware.
+ZIP_RANGES: dict[str, str] = {
+    "AL": "350-352,354-369", "AK": "995-999", "AZ": "850-865", "AR": "716-729", "CA": "900-908,910-928,930-961", "CO": "800-816",
+    "CT": "060-069", "DE": "197-199", "DC": "200,202-205", "FL": "320-342,344,346-347,349", "GA": "300-319,398-399", "HI": "967-968",
+    "ID": "832-838", "IL": "600-629", "IN": "460-479", "IA": "500-516,520-528", "KS": "660-679", "KY": "400-427", "LA": "700-701,703-714",
+    "ME": "039-049", "MD": "206-212,214-219", "MA": "010-027,055", "MI": "480-499", "MN": "550-567", "MS": "386-397",
+    "MO": "630-631,633-641,644-658", "MT": "590-599", "NE": "680-681,683-693", "NV": "889-898", "NH": "030-038", "NJ": "070-089",
+    "NM": "870-871,873-884", "NY": "005,100-149", "NC": "270-289", "ND": "580-588", "OH": "430-458", "OK": "730-731,734-741,743-749",
+    "OR": "970-979", "PA": "150-196", "RI": "028-029", "SC": "290-299", "SD": "570-577", "TN": "370-385", "TX": "733,750-799,885",
+    "UT": "840-847", "VT": "050-054,056-059", "VA": "201,220-246", "WA": "980-986,988-994", "WV": "247-268",
+    "WI": "530-532,534-535,537-539,541-549", "WY": "820-831",
+}
+
+
+def _zip_in_state(state: str, zip3: str) -> bool:
+    """Whether a ZIP code's first three digits are ones this state's ZIP codes start with."""
+    n = int(zip3)
+    for part in ZIP_RANGES.get(state, "").split(","):
+        lo, _, hi = part.partition("-")
+        if part and int(lo) <= n <= int(hi or lo):
+            return True
+    return False
+
+
 US_NAMES = {
     "ALABAMA": "AL", "ALASKA": "AK", "ARIZONA": "AZ", "ARKANSAS": "AR", "CALIFORNIA": "CA", "COLORADO": "CO",
     "CONNECTICUT": "CT", "DELAWARE": "DE", "DISTRICT OF COLUMBIA": "DC", "FLORIDA": "FL", "GEORGIA": "GA", "HAWAII": "HI",
@@ -98,6 +123,8 @@ def _us_zone(address: str, tokens: list[str], country: str | None) -> str | None
     found = re.search(r"\b([A-Z]{2})\s+(\d{5})(?:-\d{4})?\b", address)   # state and ZIP together: the surest reading
     state: str | None = found.group(1) if found and found.group(1) in US_STATES else None
     zip3: str | None = found.group(2)[:3] if state and found else None
+    if state and zip3 and country != "US" and not _zip_in_state(state, zip3):
+        state, zip3 = None, None   # (not that state's ZIP: "Berlin, DE 10115" is not Delaware)
     if state is None and country == "US":
         for token in tokens:
             bare = ZIP.sub("", token).strip().rstrip(".").strip()
@@ -115,15 +142,24 @@ def _us_zone(address: str, tokens: list[str], country: str | None) -> str | None
     return zone
 
 
+# A province and what splits it: the postal-code starts (forward sortation areas) in another zone, and for the provinces whose
+# zones split widely the ones left to the person. Anything without a postal code in such a province is left to the person too.
+CA_SPLIT = {"BC": ("V0", "V1"), "ON": ("P",), "QC": ("G4T",), "NL": ("A0P", "A0R")}
+
+
 def _ca_zone(address: str, tokens: list[str], country: str | None) -> str | None:
     """A Canadian address's zone from its province, taken only when the address has a Canadian postal code or says it is in
     Canada (a bare "NL" or "PE" is as likely the Netherlands or Peru)."""
-    if country != "CA" and not CA_POSTAL.search(address):
+    postal = CA_POSTAL.search(address)
+    if country != "CA" and not postal:
         return None
     for token in tokens:
         bare = CA_POSTAL.sub("", token).strip().rstrip(".").strip()
         code = bare if bare in CA_PROVINCES else CA_NAMES.get(bare.upper())
         if code:
+            if code in CA_SPLIT:   # (part of these provinces is in another zone: only a postal code outside those parts settles it)
+                if not postal or postal.group(0).replace(" ", "").upper().startswith(CA_SPLIT[code]):
+                    return None
             return CA_PROVINCES.get(code)
     return None
 

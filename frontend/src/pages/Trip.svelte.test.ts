@@ -312,6 +312,12 @@ describe("Trip", () => {
       trip_id: 1, kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London", travelers: [{ person_id: 2 }] }) }));
   });
 
+  it("says which time zone a stay's times are in, so one worked out from its address can be checked", async () => {
+    render(TripPage);
+    await screen.findByRole("heading", { name: "Trip to London" });
+    expect(screen.getByTestId("stay-zone")).toHaveTextContent("Europe/London");
+  });
+
   it("asks a stay for one time zone, and says it can be worked out from the address", async () => {
     render(TripPage);
     const u = userEvent.setup();
