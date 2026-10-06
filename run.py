@@ -22,7 +22,7 @@ if __name__ == "__main__":
     p.add_argument("--port", type=int, default=int(os.environ.get("WAYPOINT_PORT", "8765")))
     p.add_argument("--host", default=os.environ.get("WAYPOINT_HOST", "127.0.0.1"),
                    help="address to listen on; 0.0.0.0 for other devices (needs OIDC sign-in, see "
-                        "https://anthonypluth.github.io/waypoint/start/docker/)")
+                        "https://anthonypluth.github.io/Waypoint/start/docker/)")
     p.add_argument("command", nargs="?", choices=["serve", "backup", "restore", "demo", "verify"], default="serve")
     p.add_argument("file", nargs="*", help="backup file (for backup / restore), or the pages to visit (for verify; default all)")
     p.add_argument("--yes", action="store_true", help="restore without asking")

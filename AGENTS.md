@@ -1,6 +1,6 @@
 # Agent guide
 
-Instructions for AI coding agents working in Waypoint, a self-hosted travel app for a household (Python backend in `waypoint/`, Svelte web app in `frontend/`). It shows the trips you're on (flights, hotels, rental cars, confirmation numbers), keeps the household's loyalty and Known Traveler numbers, and reads booking emails privately. Human contributors can use it too; [Development](docs/src/content/docs/contributing/development.md) has the long version, and the published docs are at https://anthonypluth.github.io/waypoint/.
+Instructions for AI coding agents working in Waypoint, a self-hosted travel app for a household (Python backend in `waypoint/`, Svelte web app in `frontend/`). It shows the trips you're on (flights, hotels, rental cars, confirmation numbers), keeps the household's loyalty and Known Traveler numbers, and reads booking emails privately. Human contributors can use it too; [Development](docs/src/content/docs/contributing/development.md) has the long version, and the published docs are at https://anthonypluth.github.io/Waypoint/.
 
 ## Layout
 
@@ -55,7 +55,7 @@ Python goes through Poetry (Python 3.14).
 - Real typography (’ – −) in user-facing strings and comments is intentional; don't "fix" it to ASCII.
 - Schema changes need an Alembic migration in `waypoint/storage/migrations/`, numbered after main's newest, with its own `test_<revision>_…` in `tests/test_migrations.py` (checked).
 - The API contract: a route has its reply and body types in `waypoint/server/contract.py`, on its handler's annotations, and the web app calls it with `apiCall<"METHOD /path">(…)` from `lib/contract.ts`. Change a reply or body there, run `make api-contract` and commit the generated files (see [Development](docs/src/content/docs/contributing/development.md), "The API contract").
-- A change users or contributors would notice updates its page in `docs/src/content/docs/` in the same PR. Link between pages with absolute paths (`/waypoint/start/docker/`); a broken one fails the build.
+- A change users or contributors would notice updates its page in `docs/src/content/docs/` in the same PR. Link between pages with absolute paths (`/Waypoint/start/docker/`); a broken one fails the build.
 - Add or update tests with the change. Don't skip, disable or delete a test to get CI passing; when one really goes, a `Removes-Test:` or `Skips-Test:` trailer says why (checked). A new route is held by `tests/test_every_route.py` without a test of its own for sign-in, the CSRF checks, its contract type and its docs page; it still needs tests of what it does.
 - Never commit secrets. `.env.example` lists configuration; real values stay in `.env`.
 - Read `SECURITY.md` before touching auth, encryption, mailbox access or anything that stores loyalty or Known Traveler numbers.

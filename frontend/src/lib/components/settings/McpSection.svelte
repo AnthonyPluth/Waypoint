@@ -72,7 +72,7 @@
           {#if list.oauth && list.url}
             <p class="text-sm text-muted-foreground">
               Add this address to Claude or another assistant, then approve it here when it asks.
-              <a class="underline underline-offset-2" href="https://anthonypluth.github.io/waypoint/start/mcp/" target="_blank" rel="noopener noreferrer">Learn more</a>
+              <a class="underline underline-offset-2" href="https://anthonypluth.github.io/Waypoint/start/mcp/" target="_blank" rel="noopener noreferrer">Learn more</a>
             </p>
             <div class="flex gap-2">
               <Input readonly value={list.url} aria-label="MCP address" class="font-mono" bind:ref={address} onfocus={(e) => e.currentTarget.select()} />
@@ -82,7 +82,7 @@
             <p class="font-medium">Assistants can’t connect yet</p>
             <p class="text-sm text-muted-foreground">
               {list.reason}
-              <a class="underline underline-offset-2" href="https://anthonypluth.github.io/waypoint/start/mcp/" target="_blank" rel="noopener noreferrer">Learn more</a>
+              <a class="underline underline-offset-2" href="https://anthonypluth.github.io/Waypoint/start/mcp/" target="_blank" rel="noopener noreferrer">Learn more</a>
             </p>
           {/if}
         </div>

@@ -16,7 +16,7 @@ Miles or kilometres is a household setting, under **Settings → Distances** (`G
 ## Who and when
 
 - **Person**: one person’s stats (a member or a guest) count the segments they are a traveller on. `all` is the whole household: each segment counts once, however many of you were on it.
-- **Only trips you can see.** Stats are worked out from the trips you can see (see [Trips](/waypoint/start/trips/)), so your partner’s view of your stats never includes your solo work trips, and a person’s stats include a trip they share with a guest.
+- **Only trips you can see.** Stats are worked out from the trips you can see (see [Trips](/Waypoint/start/trips/)), so your partner’s view of your stats never includes your solo work trips, and a person’s stats include a trip they share with a guest.
 - **Year**: a calendar year in the places themselves (a flight belongs to the year it departs, by the departure airport’s clock), or `all` for a lifetime.
 - **Finished and not cancelled.** A segment counts once its end, at its own place’s clock, has passed. Cancelled segments never count.
 
@@ -34,7 +34,7 @@ Distances are worked out in kilometres. The household’s display unit is a sett
 
 ## Airline names
 
-A flight’s airline comes from the two-character code its flight number starts with, named from [OpenFlights](/waypoint/reference/data-sources/); a code that isn’t in the list shows as the code.
+A flight’s airline comes from the two-character code its flight number starts with, named from [OpenFlights](/Waypoint/reference/data-sources/); a code that isn’t in the list shows as the code.
 
 ## The map
 

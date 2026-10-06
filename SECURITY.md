@@ -15,13 +15,13 @@ Only the latest release gets security fixes. Update with `docker compose pull &&
 
 ## Running Waypoint safely
 
-See [Putting Waypoint on the internet](https://anthonypluth.github.io/waypoint/start/docker/#putting-waypoint-on-the-internet) in the docs: HTTPS in front, sign-in
+See [Putting Waypoint on the internet](https://anthonypluth.github.io/Waypoint/start/docker/#putting-waypoint-on-the-internet) in the docs: HTTPS in front, sign-in
 limited to your household, a `WAYPOINT_SECRET_KEY`, and private backups.
 
 ## What Waypoint will hold
 
 Members can connect their Gmail read-only (the `gmail.readonly` scope only; the refresh token is kept encrypted, and disconnecting revokes it at Google). Waypoint scans those mailboxes for bookings, keeping the promises on the
-[Email scanning](https://anthonypluth.github.io/waypoint/privacy/email-scanning/) page: read-only mailbox access,
+[Email scanning](https://anthonypluth.github.io/Waypoint/privacy/email-scanning/) page: read-only mailbox access,
 messages searched on Google’s side so only likely bookings are downloaded, bodies read in memory by one module and never stored, logged or sent anywhere but Gmail’s own API (a member can preview the text of a message from their own mailbox: it is fetched when they ask, shown to them alone and kept nowhere),
 and nothing sent to a service run by the project. What a scan keeps is the booking’s fields, each message’s Gmail id and, for mail it couldn’t read,
 the sender’s domain and the day. A report about a way around any of those is as serious as one about sign-in.
@@ -29,7 +29,7 @@ the sender’s domain and the day. A report about a way around any of those is a
 The secrets Waypoint saves (such as the refresh token for that mailbox access) are encrypted with
 `WAYPOINT_SECRET_KEY`, and so are the copies in backups. Backups also hold everything else in the database, so keep them private.
 
-An AI assistant (Claude and the like) can connect to Waypoint's `/mcp` endpoint with OAuth, as the member who approved it: it sees what they see, never a loyalty or Known Traveler number (nothing under them is reachable from it), and changes nothing unless the household turned on "Let assistants change trips". Mailboxes, email content, the review queue, AI settings, backup and restore, sign-in, the calendar feed and push devices are never reachable from it, and a connection ends when its approver can no longer sign in. See the [AI assistants](https://anthonypluth.github.io/waypoint/start/mcp/) page.
+An AI assistant (Claude and the like) can connect to Waypoint's `/mcp` endpoint with OAuth, as the member who approved it: it sees what they see, never a loyalty or Known Traveler number (nothing under them is reachable from it), and changes nothing unless the household turned on "Let assistants change trips". Mailboxes, email content, the review queue, AI settings, backup and restore, sign-in, the calendar feed and push devices are never reachable from it, and a connection ends when its approver can no longer sign in. See the [AI assistants](https://anthonypluth.github.io/Waypoint/start/mcp/) page.
 
 ## One household, not one account per person
 

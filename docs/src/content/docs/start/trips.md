@@ -5,13 +5,13 @@ sidebar:
   order: 4
 ---
 
-A **trip** is a journey. It holds **segments**: one flight leg, hotel stay, car rental, train or cruise each. You can add them by hand, and Waypoint adds them from the booking emails in a connected Gmail (see [Scanning](/waypoint/start/gmail/#scanning)).
+A **trip** is a journey. It holds **segments**: one flight leg, hotel stay, car rental, train or cruise each. You can add them by hand, and Waypoint adds them from the booking emails in a connected Gmail (see [Scanning](/Waypoint/start/gmail/#scanning)).
 
 ## The pages
 
 - **Upcoming** leads with a card for what is next: a countdown, the flight number, departure time and terminal (or a hotel’s address and check-in time), and the confirmation code, which you tap to copy. A flight in the air or a rental car out counts as under way and leads until it ends; a hotel stay in progress doesn’t push the day’s flight aside. Below it, the trip that card belongs to (or the next one, when you aren’t travelling) is laid out day by day. Each booking in that list, and the card’s **Open** button, links to that booking’s card on its trip page, which scrolls to it and outlines it. Cancelled segments never lead.
 - **Trips** lists the trips you can see: the ones still to come or under way, and the past ones. Each trip shows small icons for what it holds: a plane for flights, a building for stays, a car, a train or a ship (cancelled bookings don’t count). Pick a traveller to see only their trips; the choice is kept in the address (`#trips?who=…`) so you can bookmark it.
-- A **trip** page shows each segment as a card with its local times, travellers and the loyalty number each traveller would use for that airline or hotel chain, masked. Tap a number to show it and copy it; tap again to hide it. When a traveller has no number for the program a booking is with, the card says so and links to [People](/waypoint/start/people/); a traveller known only by their printed name is marked as not matched to a person yet. On a hotel stay that is said only of the person who booked the room, since the others aren’t asked for a number (a number any of them has is still shown). Waypoint tells the program from the provider’s name (“American Airlines” is American AAdvantage), so write the provider the way the airline or chain does.
+- A **trip** page shows each segment as a card with its local times, travellers and the loyalty number each traveller would use for that airline or hotel chain, masked. Tap a number to show it and copy it; tap again to hide it. When a traveller has no number for the program a booking is with, the card says so and links to [People](/Waypoint/start/people/); a traveller known only by their printed name is marked as not matched to a person yet. On a hotel stay that is said only of the person who booked the room, since the others aren’t asked for a number (a number any of them has is still shown). Waypoint tells the program from the provider’s name (“American Airlines” is American AAdvantage), so write the provider the way the airline or chain does.
 
 Add a booking from Trips (Waypoint puts it in the trip it belongs to, or starts one) or from a trip page (it goes in that trip), edit any segment, or remove it. **Edit** opens the form right under the booking you chose, scrolled into view wherever you are on the page, and the pencil beside a trip’s name renames it. A save that fails keeps everything you typed and says why; a page that can’t reload its trips shows an error with Try again, not the old trips as if they were current.
 
@@ -27,9 +27,9 @@ Without sign-in, on your own machine, everyone is the one local household, which
 
 ## Segments
 
-Each segment has a kind (flight, hotel, car, train or cruise), a status (confirmed, changed or cancelled), a confirmation code, the provider, a start and an end, where it starts and ends, a link to manage the booking, and details: flight number, terminal, seat, cabin, room, car class, address and phone. The **travellers** are people from [People](/waypoint/start/people/), or, until a name on a booking is matched to a person, the name as printed.
+Each segment has a kind (flight, hotel, car, train or cruise), a status (confirmed, changed or cancelled), a confirmation code, the provider, a start and an end, where it starts and ends, a link to manage the booking, and details: flight number, terminal, seat, cabin, room, car class, address and phone. The **travellers** are people from [People](/Waypoint/start/people/), or, until a name on a booking is matched to a person, the name as printed.
 
-A segment is added to a trip you name, or without one: Waypoint puts it in the trip it belongs to (see below) or makes a new trip. Flights from before Waypoint can be [imported from another app’s CSV export](/waypoint/start/import/).
+A segment is added to a trip you name, or without one: Waypoint puts it in the trip it belongs to (see below) or makes a new trip. Flights from before Waypoint can be [imported from another app’s CSV export](/Waypoint/start/import/).
 
 ## Seats
 
@@ -69,10 +69,10 @@ When you change a field of a segment, Waypoint remembers it was you and a later 
 
 ## Live status
 
-With a RapidAPI key set, a flight’s card also shows its live status (delays, gate, terminal) beside the booked times, which it never changes. See [Live flight status](/waypoint/start/flight-status/).
+With a RapidAPI key set, a flight’s card also shows its live status (delays, gate, terminal) beside the booked times, which it never changes. See [Live flight status](/Waypoint/start/flight-status/).
 
-With a Logo.dev key saved in Settings, each booking also shows its airline’s, hotel’s, rental company’s or cruise line’s logo. See [Brand logos](/waypoint/start/logos/).
+With a Logo.dev key saved in Settings, each booking also shows its airline’s, hotel’s, rental company’s or cruise line’s logo. See [Brand logos](/Waypoint/start/logos/).
 
 ## In a backup
 
-Trips, segments and their travellers are part of a [backup](/waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list isn’t: every Waypoint has it already.
+Trips, segments and their travellers are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list isn’t: every Waypoint has it already.

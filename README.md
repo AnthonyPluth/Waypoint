@@ -20,7 +20,7 @@ The image is `ghcr.io/anthonypluth/waypoint`. It uses SQLite in `./data`, or Pos
 
 ## Documentation
 
-https://anthonypluth.github.io/waypoint/ covers [installing with Docker](https://anthonypluth.github.io/waypoint/start/docker/), [configuration](https://anthonypluth.github.io/waypoint/reference/configuration/), [privacy](https://anthonypluth.github.io/waypoint/privacy/email-scanning/) and [contributing](https://anthonypluth.github.io/waypoint/contributing/development/). To report a vulnerability, see [SECURITY.md](SECURITY.md).
+https://anthonypluth.github.io/Waypoint/ covers [installing with Docker](https://anthonypluth.github.io/Waypoint/start/docker/), [configuration](https://anthonypluth.github.io/Waypoint/reference/configuration/), [privacy](https://anthonypluth.github.io/Waypoint/privacy/email-scanning/) and [contributing](https://anthonypluth.github.io/Waypoint/contributing/development/). To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## License
 

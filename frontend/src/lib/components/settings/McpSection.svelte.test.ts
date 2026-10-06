@@ -33,7 +33,7 @@ describe("Settings → AI assistants (MCP)", () => {
     render(McpSection);
     expect(screen.getByText("Loading…")).toBeInTheDocument();
     expect(await screen.findByLabelText("MCP address")).toHaveValue(URL_);
-    expect(screen.getByRole("link", { name: "Learn more" })).toHaveAttribute("href", "https://anthonypluth.github.io/waypoint/start/mcp/");
+    expect(screen.getByRole("link", { name: "Learn more" })).toHaveAttribute("href", "https://anthonypluth.github.io/Waypoint/start/mcp/");
     expect(screen.getByRole("heading", { name: "AI assistants (MCP)" })).toBeInTheDocument();
   });
 

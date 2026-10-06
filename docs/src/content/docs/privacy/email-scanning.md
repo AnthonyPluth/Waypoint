@@ -6,16 +6,16 @@ sidebar:
 ---
 
 :::note[What’s built]
-Members connect a Gmail read-only (see [Google OAuth client for Gmail](/waypoint/start/gmail/)), and Waypoint scans it for bookings in schema.org markup, falling back to a parser for senders without it (Southwest so far), and queuing what it can’t read in [Review](/waypoint/start/review/). The optional AI suggestions below are built.
+Members connect a Gmail read-only (see [Google OAuth client for Gmail](/Waypoint/start/gmail/)), and Waypoint scans it for bookings in schema.org markup, falling back to a parser for senders without it (Southwest so far), and queuing what it can’t read in [Review](/Waypoint/start/review/). The optional AI suggestions below are built.
 :::
 
 Waypoint’s main way of learning about a booking is to read the confirmation email in a Gmail account you connect. The rules it keeps:
 
 - **Read-only.** Waypoint asks Google for read-only access to your mailbox. It can’t send, delete, label or change anything. You can revoke the access at any time in your Google account.
 - **Searched on the server.** Waypoint asks Gmail for messages that look like bookings (by sender and subject), so it never downloads your whole mailbox.
-- **Bodies are read in memory and never stored.** A message’s body is fetched, parsed and thrown away. Waypoint keeps what it found (a flight number, a time, a confirmation code) and a reference to the message (its Gmail id), not the message. For mail it couldn’t read it keeps only the sender’s domain and the day, not its subject. The one place a message’s text is shown is the preview beside the Add by hand form on a [Review](/waypoint/start/review/) item: fetched from Gmail when its owner asks, as plain text or, for an HTML message, as formatted text rebuilt on the server from a short list of safe tags (no scripts, styles or pictures, so nothing is loaded from the sender), shown only to them and kept nowhere. The message text is never logged, reported or sent to any service other than Gmail’s own API, and the project’s checks hold the code to that: only one module looks inside a message, and its tests scan made-up emails while watching the database, the log and every request for any of their text.
-- **Your server only.** The mailbox is read by your own Waypoint, with an OAuth client you create (see [Google OAuth client for Gmail](/waypoint/start/gmail/)). Nothing goes through a service run by the project.
-- **You see only your trips.** A booking is visible to the people on the trip, the person who booked it, and whoever got its confirmation in their own mailbox (the same email in two household members’ mailboxes is one booking, shown to both). Mail Waypoint couldn’t read is the mailbox owner’s alone unless they choose to [share that mailbox’s items with the household](/waypoint/start/review/#sharing-a-mailboxs-items-with-the-household): then the household sees who each one is from and its day, never its subject or text.
+- **Bodies are read in memory and never stored.** A message’s body is fetched, parsed and thrown away. Waypoint keeps what it found (a flight number, a time, a confirmation code) and a reference to the message (its Gmail id), not the message. For mail it couldn’t read it keeps only the sender’s domain and the day, not its subject. The one place a message’s text is shown is the preview beside the Add by hand form on a [Review](/Waypoint/start/review/) item: fetched from Gmail when its owner asks, as plain text or, for an HTML message, as formatted text rebuilt on the server from a short list of safe tags (no scripts, styles or pictures, so nothing is loaded from the sender), shown only to them and kept nowhere. The message text is never logged, reported or sent to any service other than Gmail’s own API, and the project’s checks hold the code to that: only one module looks inside a message, and its tests scan made-up emails while watching the database, the log and every request for any of their text.
+- **Your server only.** The mailbox is read by your own Waypoint, with an OAuth client you create (see [Google OAuth client for Gmail](/Waypoint/start/gmail/)). Nothing goes through a service run by the project.
+- **You see only your trips.** A booking is visible to the people on the trip, the person who booked it, and whoever got its confirmation in their own mailbox (the same email in two household members’ mailboxes is one booking, shown to both). Mail Waypoint couldn’t read is the mailbox owner’s alone unless they choose to [share that mailbox’s items with the household](/Waypoint/start/review/#sharing-a-mailboxs-items-with-the-household): then the household sees who each one is from and its day, never its subject or text.
 
 ## How a booking is read
 
@@ -27,7 +27,7 @@ Waypoint tries the cheapest, most reliable method first and falls through:
 
 ## Optional AI suggestions
 
-Off by default (Settings → AI; see [AI suggestions](/waypoint/start/ai/)). If you turn it on, Waypoint can ask a model to suggest the fields of an email that newly lands in the “Couldn’t read” queue, and you confirm or correct the suggestion there.
+Off by default (Settings → AI; see [AI suggestions](/Waypoint/start/ai/)). If you turn it on, Waypoint can ask a model to suggest the fields of an email that newly lands in the “Couldn’t read” queue, and you confirm or correct the suggestion there.
 
 - **Local:** an [Ollama](https://ollama.com) on your own network. The email text never leaves it.
 - **Hosted:** [OpenRouter](https://openrouter.ai), restricted to providers with zero data retention (every request denies data collection and requires zero retention).
@@ -36,9 +36,9 @@ Only the plain text goes out, with quoted replies, footers and labelled or numbe
 
 ## What this means for the rest of the setup
 
-- The Google OAuth client’s ID and secret are set in `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`); each connected mailbox’s refresh token is stored encrypted with `WAYPOINT_SECRET_KEY`, and backups hold it encrypted too ([Configuration](/waypoint/reference/configuration/)).
+- The Google OAuth client’s ID and secret are set in `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`); each connected mailbox’s refresh token is stored encrypted with `WAYPOINT_SECRET_KEY`, and backups hold it encrypted too ([Configuration](/Waypoint/reference/configuration/)).
 - Each member connects their own Gmail in Settings and sees only their own connections. A connection ends when its owner can no longer sign in (Waypoint checks hourly, and before every use). Anyone you let in can still download a backup, which holds the encrypted tokens. See [SECURITY.md](https://github.com/AnthonyPluth/waypoint/blob/main/SECURITY.md).
 
 ## Live flight status is the one other thing that leaves the server
 
-If you turn on [live flight status](/waypoint/start/flight-status/), Waypoint asks AeroDataBox (through RapidAPI) about a flight by its number and date. That request carries nothing from your email or your trips beyond the flight number and date: no names, confirmation codes or loyalty numbers. It is off until you set a key.
+If you turn on [live flight status](/Waypoint/start/flight-status/), Waypoint asks AeroDataBox (through RapidAPI) about a flight by its number and date. That request carries nothing from your email or your trips beyond the flight number and date: no names, confirmation codes or loyalty numbers. It is off until you set a key.

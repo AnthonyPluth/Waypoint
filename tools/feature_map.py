@@ -167,7 +167,7 @@ def render_page(fm: dict, allowed: set[str]) -> str:
         key = f"{r['method']} {r['path']}"
         tests = ", ".join(f"`{t.removeprefix('tests/')}`" for t in r["tests"]) or ("none (allowed)" if key in allowed else "**none**")
         web = ", ".join(f"`{w.removeprefix('frontend/src/')}`" for w in r["web"]) or "-"
-        docs = ", ".join(f"[{d}](/waypoint/{d}/)" for d in r["docs"]) or "-"
+        docs = ", ".join(f"[{d}](/Waypoint/{d}/)" for d in r["docs"]) or "-"
         lines.append(f"| `{key}` | `{r['handler'].replace('waypoint/server/api/', '')}` | {web} | {tests} | {docs} |")
     return "\n".join(lines) + "\n"
 

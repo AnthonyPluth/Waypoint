@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-Waypoint ships with two reference lists, loaded into the database by its migrations. They are the same for every Waypoint, and aren’t part of a [backup](/waypoint/start/docker/#moving-your-data-from-another-machine).
+Waypoint ships with two reference lists, loaded into the database by its migrations. They are the same for every Waypoint, and aren’t part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine).
 
 ## Airports
 

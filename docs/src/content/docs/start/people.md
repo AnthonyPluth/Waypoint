@@ -21,7 +21,7 @@ Waypoint can add someone as a guest before they ever sign in: a booking’s pass
 
 Linking moves everything on the guest to you in one step: their trips and bookings (including the ones they booked), their loyalty and Known Traveler numbers, and their legal name and aliases, which are added to yours without repeats. You keep your own name and first name (a missing one is filled in from the guest), and the guest is removed. If you both had a number for the same program and they differ, both are kept and People says “Two numbers for …” so you can remove the one that’s wrong. People then shows “Linked from guest … by … on …”.
 
-Linking can’t be undone in Waypoint; restoring a [backup](/waypoint/start/docker/#moving-your-data-from-another-machine) is the way back. Merging two members, or two guests, isn’t supported.
+Linking can’t be undone in Waypoint; restoring a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) is the way back. Merging two members, or two guests, isn’t supported.
 
 ## Names
 
@@ -33,4 +33,4 @@ Each person has:
 
 ## In a backup
 
-People are part of a [backup](/waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, with each member still linked to their sign-in.
+People are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, with each member still linked to their sign-in.
