@@ -149,6 +149,14 @@ class HotelAndCarTests(StatsCase):
         self.assertEqual(s["cities"], [{"name": "London", "count": 2}])
         self.assertEqual(s["countries"], [{"name": "GB", "count": 2}])
 
+    def test_the_chain_is_the_hotels_brand_not_the_site_that_sold_it_and_a_rental_is_its_company(self):
+        self.mine({**HOTEL, "provider": "Capital One Travel", "origin": "The Westin Example City"},
+                  {**HOTEL, "provider": "Hotwire", "origin": "Harbour Hotel", "start_local": "2026-07-02T15:00", "end_local": "2026-07-04T10:00"},
+                  {**CAR, "provider": "Hertz (booked via Hotwire 1234567890)"})
+        got = self.stats(self.jane)
+        self.assertEqual(got["stays"]["chains"], [{"name": "Marriott", "count": 1}])
+        self.assertEqual(got["cars"]["companies"], [{"name": "Hertz", "count": 1}])
+
     def test_a_same_day_stay_has_no_nights_and_an_unfinished_one_does_not_count(self):
         self.mine({**HOTEL, "end_local": "2026-06-02T21:00"}, {**HOTEL, "start_local": "2026-09-22T15:00", "end_local": "2026-09-25T10:00"})
         s = self.stats(self.jane)["stays"]

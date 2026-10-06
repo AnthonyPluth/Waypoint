@@ -25,6 +25,7 @@ from sqlalchemy import func, select
 from ..storage import db
 from ..storage.models import Airline, Airport
 from . import people, trips, visibility
+from .chains import clean, hotel_chain
 from .visibility import Viewer
 
 EARTH_KM = 40075.0        # around the equator
@@ -166,7 +167,7 @@ class StayPin(TypedDict):
 
 class StayStats(TypedDict):
     nights: int                # nights away in hotels, each night once however many stays overlap it
-    chains: list[Named]        # stays by the booking's provider
+    chains: list[Named]        # stays by the hotel's brand (domain/chains.py), else the booking's provider
     cities: list[Named]
     countries: list[Named]
     count: int                 # stays with at least one night (in the year asked about)
@@ -371,8 +372,8 @@ def _stays(stays: Sequence[Seg], year: int | None, city_countries: Mapping[str, 
         nights |= spent_in_year
         if year is not None and not spent_in_year:
             continue
-        if s.provider:
-            chains[s.provider] += 1
+        if (chain := hotel_chain(s.provider, s.origin)):
+            chains[chain] += 1
         if s.destination:
             cities[s.destination] += 1
             if (country := city_countries.get(s.destination.strip().lower())):
@@ -430,8 +431,8 @@ def _cars(cars: Sequence[Seg], year: int | None) -> CarStats:
     for s in cars:
         out = {d for d in _days(s) if _in(d, year)}
         days |= out
-        if out and s.provider:
-            companies[s.provider] += 1
+        if out and (company := clean(s.provider)):
+            companies[company] += 1
     return {"days": len(days), "companies": _ranked(companies)}
 
 
