@@ -245,6 +245,21 @@ class ReviewItem(Base):
     suggestion_error: Mapped[str | None]   # why the AI gave none: fixed text
 
 
+class StoredMessage(Base):
+    __table__ = schema.stored_messages
+    id: Mapped[int]
+    mailbox_id: Mapped[int]
+    message_id: Mapped[str]
+    content: Mapped[str]             # JSON, encrypted (waypoint/storage/stored_mail.py)
+    created: Mapped[float]
+
+
+class SegmentMessage(Base):
+    __table__ = schema.segment_messages
+    segment_id: Mapped[int]
+    stored_message_id: Mapped[int]
+
+
 class IgnoredSender(Base):
     __table__ = schema.ignored_senders
     id: Mapped[int]

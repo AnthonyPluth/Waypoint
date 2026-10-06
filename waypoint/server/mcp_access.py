@@ -14,7 +14,8 @@ scope or switch. An assistant has no need of a number, and none is ever sent to 
 BLOCKED is the boundary: mailboxes and scanning, the "Couldn't read" queue, the AI settings, backup and restore, sign-in,
 the calendar feed, push devices, the flight-status refresh (its budget and key) and these settings are never reachable
 from /mcp, whatever the scope or switch. Nothing from mail is reachable either: no route that returns a message's
-content is allowed (the preview is under /api/review).
+content is allowed (the preview is under /api/review, and the messages a booking was made from are at
+/api/segments/{id}/emails).
 """
 from __future__ import annotations
 
@@ -44,7 +45,7 @@ SWITCHES = {WRITE: sk.MCP_ALLOW_WRITES}
 # these settings. Importing past flights takes a file, which /mcp (JSON only) can't send.
 BLOCKED = (
     "/api/mcp-settings", "/api/mailboxes", "/api/review", "/api/ai", "/api/backup", "/api/restore", "/api/state", "/api/feed",
-    "/api/reminders", "/api/flight-status/{id}", "/api/import", "/api/loyalty", "/api/logodev",
+    "/api/reminders", "/api/flight-status/{id}", "/api/import", "/api/loyalty", "/api/logodev", "/api/segments/{id}/emails",
 )
 
 # GET pages "write" also opens: what its changes need to find what to change. None holds a number or a secret.

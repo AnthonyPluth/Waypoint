@@ -533,6 +533,19 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.loyalty_ids)).scalar(), 5)   # (no row lost)
             command.upgrade(db.alembic_config(c), "head")
 
+    def test_0021_adds_the_tables_that_keep_messages_and_takes_them_away_leaving_everything_else(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            self.assertTrue({"stored_messages", "segment_messages"} <= set(sa.inspect(c).get_table_names()))
+            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected"))
+            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m", sender_domain="x.example", reason="no_markup", created=1.0))
+            command.downgrade(db.alembic_config(c), "0020")
+            self.assertFalse({"stored_messages", "segment_messages"} & set(sa.inspect(c).get_table_names()))
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)   # (the item stays; its message was a copy)
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:

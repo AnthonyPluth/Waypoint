@@ -3,7 +3,7 @@
   import { route } from "$lib/app.svelte";
   import { tick } from "svelte";
   import { apiCall } from "$lib/contract";
-  import type { LoyaltyEntry, Person, Segment, Trip } from "$lib/api-types";
+  import type { LoyaltyEntry, Person, Segment, StoredEmail, Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -15,6 +15,7 @@
   import { isMobile } from "$lib/platform";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
+  import MessageView from "$lib/components/MessageView.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
@@ -38,6 +39,17 @@
   let saving = $state(false);
   let removing = $state<Segment | null>(null);
   let asking = $state(false);
+
+  // The email a booking was made from, read in place: the copy the server kept, fetched when asked and held only while it's open.
+  type Mail = { state: "loading" } | { state: "ready"; emails: StoredEmail[] } | { state: "error"; message: string };
+  let mails = $state<Record<number, Mail | undefined>>({});
+  async function toggleMail(s: Segment) {
+    if (mails[s.id]) { mails[s.id] = undefined; return; }
+    mails[s.id] = { state: "loading" };
+    try {
+      mails[s.id] = { state: "ready", emails: (await apiCall<"GET /api/segments/{id}/emails">(`/api/segments/${s.id}/emails`)).emails };
+    } catch (err) { mails[s.id] = { state: "error", message: errMsg(err) }; }
+  }
 
   const id = $derived(route.sub);
   const appWord = isMobile() ? "Open in app" : "Manage booking";   // (a desktop browser has no app to open: it gets the provider’s website)
@@ -250,6 +262,27 @@
       {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
       {#if s.status !== "cancelled" && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
     </div>
+  {/if}
+  {#if s.has_email}
+    {@const mail = mails[s.id]}
+    <div class="mt-2">
+      <Button variant="outline" size="sm" aria-expanded={!!mail} aria-label={`${mail ? "Hide" : "View"} the email for ${headline(s)}`} onclick={() => toggleMail(s)}>{mail ? "Hide email" : "View email"}</Button>
+    </div>
+    {#if mail}
+      <div class="mt-2 space-y-4" role="region" aria-label={`The email for ${headline(s)}`}>
+        {#if mail.state === "loading"}<p class="text-sm text-muted-foreground" role="status">Opening the email…</p>
+        {:else if mail.state === "error"}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{mail.message}</p>
+        {:else if !mail.emails.length}<p class="text-sm text-muted-foreground">This email isn’t kept any more.</p>
+        {:else}
+          {#each mail.emails as e, i (i)}
+            <div>
+              {#if e.received || e.sender_domain}<p class="mb-1 text-sm text-muted-foreground">{[e.sender_domain, e.received && `sent ${e.received}`].filter(Boolean).join(" · ")}</p>{/if}
+              <MessageView subject={e.subject} text={e.text} html={e.html} truncated={e.truncated} />
+            </div>
+          {/each}
+        {/if}
+      </div>
+    {/if}
   {/if}
 {/snippet}
 

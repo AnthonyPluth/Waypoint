@@ -277,7 +277,25 @@ review_items = Table(
     Column('suggestion', Text),
     Column('suggestion_error', Text),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_review_items_mailbox_message'),
-    info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner alone; neither its subject nor its body is kept; `suggestion` is the booking's fields (JSON) the optional AI read from it, for the person to confirm or edit, and `suggestion_error` why it couldn't (fixed text)"},
+    info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner (and the household, when they share it); the message itself is in stored_messages; `suggestion` is the booking's fields (JSON) the optional AI read from it, for the person to confirm or edit, and `suggestion_error` why it couldn't (fixed text)"},
+)
+
+stored_messages = Table(
+    'stored_messages', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('mailbox_id', Integer, refers('stored_messages', 'mailbox_id', 'mailboxes.id', 'CASCADE'), nullable=False),
+    Column('message_id', Text, nullable=False),
+    Column('content', Text, nullable=False, doc='the subject, sender, day, text and cleaned HTML of the message (JSON), encrypted (waypoint/storage/secretbox.py)'),
+    Column('created', Float, nullable=False),
+    UniqueConstraint('mailbox_id', 'message_id', name='uq_stored_messages_mailbox_message'),
+    info={'doc': "a message kept while a review item waits for it or a booking was made from it (waypoint/storage/stored_mail.py), so it can be read without Gmail; encrypted; deleted when neither holds, and with its mailbox"},
+)
+
+segment_messages = Table(
+    'segment_messages', metadata,
+    Column('segment_id', Integer, refers('segment_messages', 'segment_id', 'segments.id', 'CASCADE'), primary_key=True),
+    Column('stored_message_id', Integer, refers('segment_messages', 'stored_message_id', 'stored_messages.id', 'CASCADE'), primary_key=True),
+    info={'doc': "which stored messages a booking was made from (an email that made or updated it, or the one a person added it from by hand)"},
 )
 
 ignored_senders = Table(

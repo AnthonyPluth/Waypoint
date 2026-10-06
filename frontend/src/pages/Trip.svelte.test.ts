@@ -65,6 +65,39 @@ describe("Trip", () => {
     expect(cards[1].querySelector("img")).toBeNull();
   });
 
+  it("opens the email a booking was made from, in place, and closes it again", async () => {
+    held = trip([segment({ ...flight, has_email: true }), stay]);
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1/emails" ? { emails: [
+      { subject: "Your itinerary: EX 410", sender_domain: "example-air.example", received: "2026-10-17", text: "Gate B12", html: "<p>Gate <b>B12</b></p>", truncated: false }] }
+      : answer(path, opts)) as never);
+    render(TripPage);
+    await screen.findByRole("list", { name: "Bookings" });
+    expect(screen.getAllByRole("button", { name: /the email for/ })).toHaveLength(1);   // (only the booking made from one)
+    await userEvent.click(screen.getByRole("button", { name: /View the email for/ }));
+    const region = await screen.findByRole("region", { name: /The email for/ });
+    expect(await within(region).findByTestId("message-subject")).toHaveTextContent("Your itinerary: EX 410");
+    expect(region).toHaveTextContent("example-air.example · sent 2026-10-17");
+    expect(within(region).getByTestId("preview-html").querySelector("b")).toHaveTextContent("B12");
+    expect(vi.mocked(api)).toHaveBeenCalledWith("/api/segments/1/emails");
+    await userEvent.click(screen.getByRole("button", { name: /Hide the email for/ }));
+    expect(screen.queryByRole("region", { name: /The email for/ })).toBeNull();
+  });
+
+  it("says why an email couldn’t be opened, and when it is no longer kept", async () => {
+    held = trip([segment({ ...flight, has_email: true }), stay]);
+    const answer = vi.mocked(api).getMockImplementation()!;
+    let emails: unknown = new Error("Waypoint is busy.");
+    vi.mocked(api).mockImplementation(async (path, opts) => { if (path === "/api/segments/1/emails") { if (emails instanceof Error) throw emails; return emails as never; } return answer(path, opts) as never; });
+    render(TripPage);
+    await userEvent.click(await screen.findByRole("button", { name: /View the email for/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Waypoint is busy.");
+    await userEvent.click(screen.getByRole("button", { name: /Hide the email for/ }));
+    emails = { emails: [] };
+    await userEvent.click(screen.getByRole("button", { name: /View the email for/ }));
+    expect(await screen.findByText("This email isn’t kept any more.")).toBeInTheDocument();
+  });
+
   it("asks for a look at the times of a booking whose times couldn’t be settled, and only that one", async () => {
     held = trip([{ ...flight, check_times: true }, stay]);
     render(TripPage);

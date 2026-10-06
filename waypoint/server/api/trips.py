@@ -11,7 +11,8 @@ from ... import validate
 from ...domain import airports, people, trips
 from ...domain.visibility import Viewer
 from ..common import ApiError, _current, row_id
-from ..contract import Airport, MergeBody, Ok, Segment, SegmentBody, SegmentEdit, SplitBody, Trip, TripBody, TripList
+from ..contract import (Airport, MergeBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
+                        TripList)
 
 NAME_LIMIT = 100
 NOTES_LIMIT = 4000
@@ -200,6 +201,15 @@ def api_segment(conn, _q, _b, segment_id) -> Segment:
     """One segment, or 404 (also for one whose trip isn't the viewer's)."""
     who = viewer(conn)
     return Segment(**_run(lambda: trips.get_segment(conn, who, row_id(segment_id, NO_SEGMENT)), NO_SEGMENT))
+
+
+def api_segment_emails(conn, _q, _b, segment_id) -> SegmentEmails:
+    """The messages this segment was made from or updated by, as kept (a viewer of the segment may read them), newest first. 404
+    for a segment that isn't the viewer's, as for one that isn't there."""
+    found = trips.emails_of(conn, viewer(conn), row_id(segment_id, NO_SEGMENT))
+    if found is None:
+        raise ApiError(NO_SEGMENT, 404)
+    return {"emails": [StoredEmail(**e) for e in found]}
 
 
 def api_segment_edit(conn, _q, body: SegmentEdit, segment_id) -> Segment:

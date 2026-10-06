@@ -27,7 +27,7 @@ from sqlalchemy import select, update
 
 from .. import monitoring
 from . import settings_keys
-from .models import LoyaltyId, Mailbox, Setting
+from .models import LoyaltyId, Mailbox, Setting, StoredMessage
 
 PREFIX = "enc:v1:"
 KEY_FILE = "secret.key"
@@ -35,8 +35,8 @@ MIN_KEY_LENGTH = 32
 
 # settings rows that hold secrets (the rest of the settings table is ordinary preferences)
 SECRET_SETTINGS = settings_keys.SECRETS
-# columns that hold secrets: table -> column (a mailbox's refresh token, a loyalty or Known Traveler number)
-SECRET_COLUMNS = {"mailboxes": "token", "loyalty_ids": "number"}
+# columns that hold secrets: table -> column (a mailbox's refresh token, a loyalty or Known Traveler number, a kept message)
+SECRET_COLUMNS = {"mailboxes": "token", "loyalty_ids": "number", "stored_messages": "content"}
 
 _lock = threading.Lock()
 _cache: dict[tuple, MultiFernet] = {}
@@ -193,5 +193,14 @@ def encrypt_stored(conn) -> int:
             continue
         if new != n["number"]:
             conn.execute(update(LoyaltyId).where(LoyaltyId.id == n["id"]).values(number=new))
+            changed += 1
+    for s in conn.execute(select(StoredMessage.id, StoredMessage.content)).fetchall():
+        try:
+            new = reencrypt(s["content"])
+        except InvalidToken:
+            monitoring.log("Warning: a kept message can't be decrypted with the current key; it can't be read until that key is back.", "warning")
+            continue
+        if new != s["content"]:
+            conn.execute(update(StoredMessage).where(StoredMessage.id == s["id"]).values(content=new))
             changed += 1
     return changed

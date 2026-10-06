@@ -20,12 +20,12 @@ from tests.shared import TODAY, DbCase
 from tests.test_gmail import CLIENT_ID, CLIENT_SECRET, FakeGoogle, Google, GoogleCase
 from waypoint import oidc
 from waypoint.domain import loyalty, people, trips
-from waypoint.domain.mail import ingest, query, review, scan
+from waypoint.domain.mail import extract, ingest, query, review, scan
 from waypoint.domain.visibility import Viewer
 from waypoint.providers import gmail
 from waypoint.server import jobs
-from waypoint.storage import db, secretbox
-from waypoint.storage.models import Mailbox, ReviewItem, ScannedMessage, Segment, SegmentTraveler
+from waypoint.storage import db, secretbox, stored_mail
+from waypoint.storage.models import IgnoredSender, Mailbox, ReviewItem, ScannedMessage, Segment, SegmentMessage, SegmentTraveler, StoredMessage
 
 FIXTURES = Path(__file__).parent / "fixtures" / "mail"
 NOW = 1_790_000_000.0
@@ -437,18 +437,28 @@ class ReviewTests(ScanCase):
         self.assertEqual({(i["reason"], i["sender_domain"], i["received"]) for i in items},
                          {("no_markup", "example-air.example", "2026-10-17"), ("incomplete", "example-air.example", "2026-10-18")})
         nomarkup = next(i for i in items if i["reason"] == "no_markup")
-        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "received", "reason", "gmail_url", "suggestion", "suggestion_error"}))
+        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "subject", "has_email", "received", "reason", "gmail_url", "suggestion", "suggestion_error"}))
+        self.assertEqual((nomarkup["subject"], nomarkup["has_email"]), ("Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F", True))   # (the subject comes from the kept message)
         self.assertEqual((nomarkup["owner"], nomarkup["mine"]), ("Jane Doe", True))
         self.assertEqual(nomarkup["gmail_url"], "https://mail.google.com/mail/?authuser=jane%40gmail.example#all/msg-no_markup")
         self.assertEqual(self.items("u-sam"), [])
         self.assertEqual(self.scanned(), {"msg-no_markup": "unreadable", "msg-incomplete": "unreadable", "msg-flight_jsonld": "booking"})
 
-    def test_neither_the_subject_nor_the_body_is_kept(self):
+    def test_the_item_holds_neither_the_subject_nor_the_body_but_the_message_is_kept_encrypted(self):
         self.put("no_markup")
-        self.scan()
+        with no_leaks(self, "CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-NOMARKUP-6H9C", database=self.path):   # (not in the clear anywhere)
+            self.scan()
         stored = self.read(lambda conn: dict(conn.execute(select(ReviewItem)).fetchone()))
         self.assertEqual(sorted(stored), ["created", "id", "mailbox_id", "message_id", "reason", "received", "sender_domain", "suggestion", "suggestion_error"])
         self.assertEqual((stored["sender_domain"], stored["received"]), ("example-air.example", "2026-10-17"))
+        sealed = self.read(lambda conn: conn.execute(select(StoredMessage.content)).scalar())
+        self.assertTrue(secretbox.is_encrypted(sealed))
+        kept = self.read(lambda conn: stored_mail.get(conn, self.mailbox, "msg-no_markup"))
+        assert kept
+        self.assertEqual((kept["subject"], kept["sender_domain"], kept["received"]), ("Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F", "example-air.example", "2026-10-17"))
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", kept["text"])
+        assert kept["html"]
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", kept["html"])
 
     def test_a_message_that_cannot_be_decoded_is_queued_as_broken(self):
         self.google.mail["bad"] = b""
@@ -467,11 +477,11 @@ class ReviewTests(ScanCase):
         self.assertEqual(self.segments(), [])
         self.assertEqual(self.items()[0]["reason"], "incomplete")
 
-    def test_an_items_message_is_read_again_for_its_owner_alone_and_kept_nowhere(self):
+    def test_an_items_message_can_be_fetched_again_from_gmail_for_its_owner_alone(self):
         self.put("no_markup")
         self.scan()
         [item] = self.items()
-        with no_leaks(self, "CANARY-BODY-NOMARKUP-6H9C", database=self.path):   # (it comes back to the caller, and goes nowhere else)
+        with no_leaks(self, "CANARY-BODY-NOMARKUP-6H9C", database=self.path):   # (it comes back to the caller, and is kept only encrypted)
             text, html, cut = scan.preview("u-jane", item["id"])
         self.assertIn("CANARY-BODY-NOMARKUP-6H9C", text)
         self.assertNotIn("<", text)   # (text, not markup)
@@ -488,7 +498,7 @@ class ReviewTests(ScanCase):
         self.put("no_markup")
         self.scan()
         [item] = self.items()
-        with mock.patch.object(scan, "PREVIEW_LIMIT", 20):
+        with mock.patch.object(extract, "KEPT_LIMIT", 20):
             text, _html, cut = scan.preview("u-jane", item["id"])
         self.assertEqual((len(text), cut), (20, True))
         del self.google.mail["msg-no_markup"]
@@ -700,8 +710,8 @@ class FailureTests(ScanCase):
     def test_a_message_that_cannot_be_filed_is_queued_rather_than_stopping_every_scan(self):
         self.put("flight_jsonld", "hotel_jsonld")
         real = ingest.file_booking
-        with mock.patch.object(ingest, "file_booking", side_effect=lambda conn, viewer, b, again=False: (
-                (_ for _ in ()).throw(RuntimeError("CANARY-FILE-DETAILS-2Y8W")) if b.kind == "flight" else real(conn, viewer, b, again))):
+        with mock.patch.object(ingest, "file_booking", side_effect=lambda conn, viewer, b, again=False, touched=None: (
+                (_ for _ in ()).throw(RuntimeError("CANARY-FILE-DETAILS-2Y8W")) if b.kind == "flight" else real(conn, viewer, b, again, touched))):
             result = self.scan()
         self.assertEqual((result.state, result.messages, result.bookings, result.review), ("done", 2, 1, 1))
         self.assertEqual(self.scanned(), {"msg-flight_jsonld": "unreadable", "msg-hotel_jsonld": "booking"})
@@ -999,6 +1009,98 @@ class RereadTests(ScanCase):
 TOKEN_AFTER = scan.TOKEN_LIFE + 1
 
 
+class KeptMessageTests(ScanCase):
+    """Which messages a scan keeps, for how long, and what ends their keeping."""
+
+    def kept(self) -> set[str]:
+        return self.read(lambda conn: {m for (m,) in conn.execute(select(StoredMessage.message_id))})
+
+    def item_id(self, reason="no_markup") -> int:
+        return next(i["id"] for i in self.items() if i["reason"] == reason)
+
+    def by_hand(self, **fields) -> int:
+        """A booking added by hand (as Add by hand does), returning its segment id."""
+        seg = self.read(lambda conn: trips.add_segment(conn, self.jane, {"kind": "flight", "origin": "JFK", "destination": "SFO",
+                                                                         "start_local": "2026-12-08T08:00", "end_local": "2026-12-08T11:20", **fields}))
+        assert seg
+        return seg["id"]
+
+    def test_a_scan_keeps_the_messages_of_items_and_bookings_and_no_others(self):
+        self.put("flight_jsonld", "no_markup", "incomplete")
+        sender = "example-air.example"
+        self.scan()
+        self.assertEqual(self.kept(), {"msg-flight_jsonld", "msg-no_markup", "msg-incomplete"})
+        self.read(lambda conn: db.insert_ignore(conn, IgnoredSender, {"mailbox_id": self.mailbox, "domain": sender}, key=["mailbox_id", "domain"]))
+        self.read(lambda conn: conn.execute(StoredMessage.__table__.delete()))
+        self.add_mail("ignored-one", eml("no_markup"))
+        self.assertEqual(self.scan(now=NOW + 60).messages, 1)
+        self.assertEqual(self.kept(), set())   # (a sender they stopped reviewing: nothing kept)
+
+    def test_a_booking_keeps_each_message_that_made_or_updated_it(self):
+        self.put("flight_jsonld")
+        self.scan()
+        [seg] = self.segments()
+        self.assertTrue(seg["has_email"])
+        self.add_mail("msg-again", eml("flight_jsonld"))   # (the same booking again, in another message: nothing changes, and it is linked)
+        self.scan(now=NOW + 60)
+        emails = self.read(lambda conn: trips.emails_of(conn, self.jane, seg["id"]))
+        assert emails is not None
+        self.assertEqual(len(emails), 2)
+        self.assertEqual({e["sender_domain"] for e in emails}, {"example-air.example"})
+        self.assertIsNone(self.read(lambda conn: trips.emails_of(conn, self.sam, seg["id"])))   # (Sam can't see the booking: nor its messages)
+        self.assertIsNone(self.read(lambda conn: trips.emails_of(conn, self.jane, 99999)))
+
+    def test_dismissing_an_item_deletes_its_message_with_it(self):
+        self.put("no_markup", "incomplete")
+        self.scan()
+        item = self.item_id()
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item)))
+        self.assertEqual(self.kept(), {"msg-incomplete"})
+
+    def test_a_booking_added_from_an_item_keeps_the_message_for_as_long_as_the_booking_exists(self):
+        self.put("no_markup")
+        self.scan()
+        item, seg = self.item_id(), self.by_hand()
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item, (self.jane, seg))))
+        self.assertEqual(self.kept(), {"msg-no_markup"})
+        emails = self.read(lambda conn: trips.emails_of(conn, self.jane, seg))
+        assert emails
+        self.assertEqual(emails[0]["subject"], "Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F")
+        self.assertTrue(self.read(lambda conn: trips.delete_segment(conn, self.jane, seg)))
+        self.assertEqual(self.kept(), set())   # (the booking went, and nothing holds the message any more)
+
+    def test_a_booking_the_asker_cannot_see_does_not_keep_the_message(self):
+        self.put("no_markup")
+        self.scan()
+        item = self.item_id()
+        theirs = self.read(lambda conn: trips.add_segment(conn, self.sam, {"kind": "flight", "origin": "JFK", "destination": "SFO",
+                                                                           "start_local": "2026-12-09T08:00", "end_local": "2026-12-09T11:20"}))
+        assert theirs
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item, (self.jane, theirs["id"]))))   # (Jane can't see Sam's)
+        self.assertEqual(self.kept(), set())
+
+    def test_deleting_a_trip_deletes_the_messages_only_its_bookings_held(self):
+        self.put("flight_jsonld")
+        self.scan()
+        [seg] = self.segments()
+        self.assertEqual(self.kept(), {"msg-flight_jsonld"})
+        self.assertTrue(self.read(lambda conn: trips.delete_trip(conn, self.jane, seg["trip_id"])))
+        self.assertEqual(self.kept(), set())
+
+    def test_ignoring_a_sender_deletes_the_messages_of_the_items_that_leave(self):
+        self.put("no_markup", "incomplete")
+        self.scan()
+        self.assertTrue(self.read(lambda conn: review.ignore_sender(conn, "u-jane", self.item_id())) is not None)
+        self.assertEqual(self.kept(), set())
+
+    def test_a_message_that_could_not_be_filed_is_kept_with_its_item(self):
+        self.put("flight_jsonld")
+        with mock.patch.object(ingest, "file_booking", side_effect=RuntimeError("CANARY-FILE-DETAILS-2Y8W")):
+            self.scan()
+        self.assertEqual(self.kept(), {"msg-flight_jsonld"})
+        self.assertEqual(self.items()[0]["has_email"], True)
+
+
 class PrivacyTests(ScanCase):
     def test_email_stays_on_the_server(self):
         # Every fixture is scanned (bookings, one with no markup, one half-read) with its body's text as a canary: none of
@@ -1049,7 +1151,7 @@ class MailScanApiTests(GoogleCase):
         super().setUp()
         reset(self.google)
         with db.session() as conn:
-            for table in (ReviewItem, ScannedMessage, SegmentTraveler, Segment):
+            for table in (SegmentMessage, StoredMessage, ReviewItem, ScannedMessage, SegmentTraveler, Segment):
                 conn.execute(table.__table__.delete())
             conn.execute(__import__("sqlalchemy").delete(__import__("waypoint.storage.models", fromlist=["Trip"]).Trip))
         self.ana_box = self.connect_mailbox("ana", "ana@gmail.example", "refresh-ana")
@@ -1187,7 +1289,7 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(self.call("ben", "DELETE", f"/api/review/{first['id']}")[0], 404)   # (not shared yet)
         self.share()
         fetched = len(self.google.fetched)
-        self.assertEqual(self.call("ben", "GET", f"/api/review/{first['id']}/preview")[0], 404)
+        self.assertEqual(self.call("ben", "GET", f"/api/review/{first['id']}/preview")[0], 200)   # (the kept copy: nothing from Gmail)
         self.assertEqual(self.call("ben", "POST", f"/api/review/{first['id']}/suggest", {})[0], 404)
         self.assertEqual(self.call("ben", "POST", f"/api/review/{first['id']}/ignore", {})[0], 404)
         self.assertEqual(len(self.google.fetched), fetched)   # (nothing was fetched from Ana's Gmail for him)
@@ -1195,7 +1297,7 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual([i["id"] for i in self.call("ana", "GET", "/api/review")[1]["items"]], [second["id"]])
         self.assertEqual(self.call("ben", "DELETE", f"/api/review/{first['id']}")[0], 404)
 
-    def test_what_the_household_sees_of_a_shared_item_holds_nothing_of_the_message(self):
+    def test_the_household_sees_a_shared_items_subject_and_can_read_it_but_never_its_gmail_id(self):
         self.put("no_markup", "incomplete")
         self.scan_now()
         self.share()
@@ -1203,8 +1305,16 @@ class MailScanApiTests(GoogleCase):
             reply = self.call("ben", "GET", "/api/review")[1]
             self.call("ben", "GET", "/api/state")
         self.assertEqual(len(reply["items"]), 2)
-        for canary in ("CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-NOMARKUP-6H9C", "CANARY-BODY-INCOMPLETE-4N7P", "msg-no_markup", "authuser"):
-            self.assertNotIn(canary, json.dumps(reply))
+        self.assertIn("CANARY-SUBJECT-NOMARKUP-8B3F", json.dumps(reply))   # (the subject is in the list, for everyone who sees the item)
+        for canary in ("CANARY-BODY-NOMARKUP-6H9C", "CANARY-BODY-INCOMPLETE-4N7P", "msg-no_markup", "authuser"):
+            self.assertNotIn(canary, json.dumps(reply))   # (the body only in its own request, and never the id or Ana's Gmail address)
+        shown = next(i for i in reply["items"] if i["reason"] == "no_markup")
+        status, body = self.call("ben", "GET", f"/api/review/{shown['id']}/preview")
+        self.assertEqual(status, 200)
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", body["text"])
+        self.assertEqual(body["subject"], "Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F")
+        self.share(on=False)
+        self.assertEqual(self.call("ben", "GET", f"/api/review/{shown['id']}/preview")[0], 404)   # (and it stops with the sharing)
 
     def test_a_member_who_loses_access_takes_what_their_mailbox_shared_with_them(self):
         self.put("no_markup")
@@ -1214,6 +1324,58 @@ class MailScanApiTests(GoogleCase):
         with mock.patch.dict(os.environ, {"OIDC_ALLOWED_EMAILS": "ben@example.com"}), mock.patch.object(gmail, "_post", return_value={}):   # (Ana may no longer sign in)
             self.assertEqual(self.call("ben", "GET", "/api/review")[1]["items"], [])
         self.assertEqual(self.mailboxes("ben"), [])
+
+    def test_the_messages_a_booking_was_made_from_are_read_by_whoever_can_see_the_booking_alone(self):
+        self.put("flight_jsonld")
+        self.scan_now()
+        [trip] = self.call("ana", "GET", "/api/trips")[1]["trips"]
+        [seg] = trip["segments"]
+        self.assertTrue(seg["has_email"])
+        status, body = self.call("ana", "GET", f"/api/segments/{seg['id']}/emails")
+        self.assertEqual(status, 200)
+        [email] = body["emails"]
+        self.assertEqual(set(email), {"subject", "sender_domain", "received", "text", "html", "truncated"})
+        self.assertEqual(email["sender_domain"], "example-air.example")
+        self.assertEqual(self.call("ben", "GET", f"/api/segments/{seg['id']}/emails"), (404, {"error": "No such segment"}))
+        self.assertEqual(self.call("ana", "GET", "/api/segments/99999/emails"), (404, {"error": "No such segment"}))
+        self.assertTrue(all("emails" not in t for t in self.call("ben", "GET", "/api/trips")[1]["trips"]))
+
+    def test_dismissing_with_the_booking_it_became_keeps_the_message_and_with_none_deletes_it(self):
+        self.put("no_markup", "incomplete")
+        self.scan_now()
+        first, second = sorted(self.call("ana", "GET", "/api/review")[1]["items"], key=lambda i: i["reason"], reverse=True)
+        booked = self.call("ana", "POST", "/api/segments", {"kind": "flight", "origin": "JFK", "destination": "SFO",
+                                                            "start_local": "2026-12-08T08:00", "end_local": "2026-12-08T11:20"})[1]
+        self.assertEqual(self.call("ana", "DELETE", f"/api/review/{first['id']}?segment={booked['id']}"), (200, {"ok": True}))
+        [email] = self.call("ana", "GET", f"/api/segments/{booked['id']}/emails")[1]["emails"]
+        self.assertEqual(email["subject"], "Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F")
+        self.assertEqual(self.call("ana", "DELETE", f"/api/review/{second['id']}"), (200, {"ok": True}))   # (no booking: it goes)
+        with db.session() as conn:
+            self.assertEqual(len(conn.execute(__import__("sqlalchemy").select(StoredMessage.id)).fetchall()), 1)
+        self.assertEqual(self.call("ana", "DELETE", f"/api/review/{second['id']}?segment=zz")[0], 400)   # (a segment that isn't a number is a 400)
+
+    def test_a_booking_that_isnt_the_askers_is_never_given_the_message(self):
+        self.put("no_markup")
+        self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        bens = self.call("ben", "POST", "/api/segments", {"kind": "flight", "origin": "JFK", "destination": "SFO",
+                                                          "start_local": "2026-12-09T08:00", "end_local": "2026-12-09T11:20"})[1]
+        self.assertEqual(self.call("ana", "DELETE", f"/api/review/{item['id']}?segment={bens['id']}"), (200, {"ok": True}))
+        self.assertEqual(self.call("ben", "GET", f"/api/segments/{bens['id']}/emails")[1], {"emails": []})   # (Ana's message is not Ben's booking's)
+        with db.session() as conn:
+            self.assertEqual(conn.execute(__import__("sqlalchemy").select(StoredMessage.id)).fetchall(), [])
+        self.assertEqual(self.call("ana", "DELETE", f"/api/review/{item['id']}?segment=abc")[0], 400)
+
+    def test_a_mailbox_that_goes_takes_the_messages_kept_from_it(self):
+        self.put("no_markup", "flight_jsonld")
+        self.scan_now()
+        with db.session() as conn:
+            self.assertEqual(len(conn.execute(__import__("sqlalchemy").select(StoredMessage.id)).fetchall()), 2)
+        with mock.patch.object(gmail, "_post", return_value={}):
+            self.assertEqual(self.call("ana", "DELETE", f"/api/mailboxes/{self.ana_box}")[0], 200)
+        with db.session() as conn:
+            self.assertEqual(conn.execute(__import__("sqlalchemy").select(StoredMessage.id)).fetchall(), [])
+            self.assertEqual(conn.execute(__import__("sqlalchemy").select(SegmentMessage.segment_id)).fetchall(), [])
 
     def test_a_mailbox_that_goes_takes_what_it_shared_with_it(self):
         self.put("no_markup")
@@ -1262,18 +1424,40 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(self.call("ana", "POST", f"/api/review/who/{who['id']}", {"person_id": self.mia})[0], 404)   # done
         self.assertEqual(self.call("ana", "POST", "/api/review/who/zz", {"person_id": self.mia})[0], 404)
 
-    def test_a_message_can_be_previewed_by_its_owner_alone(self):
+    def test_a_kept_message_is_read_without_gmail_and_only_by_those_who_see_the_item(self):
         self.put("no_markup")
         self.scan_now()
         [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        fetched = len(self.google.fetched)
         status, body = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
         self.assertEqual(status, 200)
         self.assertIn("CANARY-BODY-NOMARKUP-6H9C", body["text"])
-        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", body["html"])   # (the markup is the owner's alone too: Ben's request below is a 404)
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", body["html"])
         self.assertFalse(body["truncated"])
-        self.assertEqual(self.call("ben", "GET", f"/api/review/{item['id']}/preview")[0], 404)
+        self.assertEqual(self.call("ben", "GET", f"/api/review/{item['id']}/preview")[0], 404)   # (not shared: not his to see)
         self.assertEqual(self.call("ana", "GET", "/api/review/9999/preview")[0], 404)
+        del self.google.mail["m-no_markup"]   # (gone from Gmail: the kept copy still reads)
+        self.assertEqual(self.call("ana", "GET", f"/api/review/{item['id']}/preview")[0], 200)
+        self.assertEqual(len(self.google.fetched), fetched)
+
+    def test_an_item_from_before_messages_were_kept_is_fetched_for_its_owner_alone_and_kept_from_then_on(self):
+        self.put("no_markup")
+        self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        with db.session() as conn:   # (as an item from before: no kept copy)
+            conn.execute(StoredMessage.__table__.delete())
+        self.assertEqual(self.call("ana", "GET", "/api/review")[1]["items"][0]["has_email"], False)
+        self.share()
+        status, body = self.call("ben", "GET", f"/api/review/{item['id']}/preview")   # (Ben can't have it fetched from Ana's Gmail)
+        self.assertEqual((status, body["error"]), (404, "This message wasn’t kept. Its owner can open it in Gmail."))
+        status, body = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
+        self.assertEqual(status, 200)
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", body["text"])
+        self.assertEqual(body["subject"], "Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F")
+        self.assertEqual(self.call("ben", "GET", f"/api/review/{item['id']}/preview")[0], 200)   # (kept now, so he can read it too)
         del self.google.mail["m-no_markup"]
+        with db.session() as conn:
+            conn.execute(StoredMessage.__table__.delete())
         status, body = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
         self.assertEqual((status, body["error"]), (404, "That message is no longer in Gmail."))
 

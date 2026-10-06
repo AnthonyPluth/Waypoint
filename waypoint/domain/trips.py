@@ -21,7 +21,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import delete, select, update
 
-from ..storage import db
+from ..storage import db, stored_mail
 from ..storage.models import Segment, SegmentPort, SegmentTraveler, Trip
 from . import airports, links, logos, people, place_zones, visibility
 from .visibility import Viewer
@@ -137,6 +137,7 @@ class SegmentOut(TypedDict):
     itinerary: list[PortIn]
     logo: str | None
     logo_label: str | None
+    has_email: bool
     links: links.Links
 
 
@@ -434,6 +435,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
     decoded = [decode_details(s.details) for s in segs]
     brands = logos.brand_names(conn, segs, decoded)
     with_logo = logos.have(conn, brands)
+    with_mail = stored_mail.with_messages(conn, [s.id for s in segs])
     out: list[SegmentOut] = [
         {"id": s.id, "trip_id": s.trip_id, "kind": cast(Kind, s.kind), "status": cast(Status, s.status), "confirmation": s.confirmation,
          "provider": s.provider, "start_local": s.start_local, "start_zone": s.start_zone, "end_local": s.end_local,
@@ -442,6 +444,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
          "locked_fields": decode_locked(s.locked_fields), "check_times": bool(s.check_times), "travelers": by_segment.get(s.id, []),
          "itinerary": ports.get(s.id, []), "logo": f"/api/segments/{s.id}/logo" if brand and logos.key(brand) in with_logo else None,
          "logo_label": logos.chip(s.kind, s.origin, brand) if brand and logos.key(brand) in with_logo else None,
+         "has_email": s.id in with_mail,
          "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, details, s.origin)}
         for s, details, brand in zip(segs, decoded, brands, strict=True)]
     return sorted(out, key=lambda s: (instant(s["start_local"], s["start_zone"]), s["id"]))
@@ -730,8 +733,8 @@ def _same_leg(seg: Segment, values: Mapping[str, str | None], details: Mapping[s
             and _text_key(seg.origin) == _text_key(values["origin"]) and _text_key(seg.destination) == _text_key(values["destination"]))
 
 
-def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
-                        again: bool = False) -> Literal["added", "updated", "unchanged"]:
+def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, again: bool = False,
+                        touched: list[int] | None = None) -> Literal["added", "updated", "unchanged"]:
     """Put a booking read from the viewer's mail among the household's segments: the segment of the same (kind, provider,
     confirmation, leg) takes what the email says, except the fields a person edited (`locked_fields`), whoever booked it. When
     the viewer can't see that segment's trip they are noted as having received its confirmation (`visibility.note_recipient`).
@@ -739,7 +742,7 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
     times moved is marked changed, one the email cancels cancelled; the people on it are added, never removed. `again`: the
     message was read again (Read bookings again), so a time that differs is the reading corrected, not the airline's change. A
     booking whose times couldn't be settled (`check_times`) is flagged, until a person edits or confirms them. Raises Invalid
-    when the booking can't be a segment."""
+    when the booking can't be a segment. `touched` gets the id of the segment the booking became or was merged into."""
     values = check(conn, fields)
     day = (values["start_local"] or "")[:10]
     found = [s for s in visibility.household_segments(conn, values["kind"] or "") if _same_leg(s, values, fields.get("details") or {})]
@@ -750,8 +753,12 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
         added = add_segment(conn, viewer, fields, source="email")
         if added is None:   # (no trip was named, so one is always found or made)
             raise Invalid("The booking couldn’t be added")
+        if touched is not None:
+            touched.append(added["id"])
         return "added"
     seg = found[0]
+    if touched is not None:
+        touched.append(seg.id)
     old: list[TravelerIn] = _stored(conn.orm.scalars(
         select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id).order_by(SegmentTraveler.id)).all())
     locked = decode_locked(seg.locked_fields)
@@ -811,6 +818,13 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
     return "updated" if changed else "unchanged"
 
 
+def emails_of(conn: db.Connection, viewer: Viewer, segment_id: int) -> list[stored_mail.Content] | None:
+    """The messages a segment was made from or updated by, newest first, for a viewer who can see the segment (None: no such
+    segment, for the viewer)."""
+    seg = visibility.visible_segment(conn, viewer, segment_id)
+    return None if seg is None else stored_mail.for_segment(conn, seg.id)
+
+
 def delete_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> bool:
     """Remove a segment. A grouped trip left with none goes too. False: no such segment (for the viewer)."""
     seg = visibility.visible_segment(conn, viewer, segment_id)
@@ -818,6 +832,7 @@ def delete_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> bool
         return False
     trip_id = seg.trip_id
     conn.execute(delete(Segment).where(Segment.id == seg.id))
+    stored_mail.prune(conn)   # (a message only this booking was made from goes with it)
     trip = conn.orm.get(Trip, trip_id)
     if trip:
         left = conn.orm.scalars(select(Segment.id).where(Segment.trip_id == trip_id)).first()
@@ -868,6 +883,7 @@ def delete_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> bool:
     if trip is None:
         return False
     conn.execute(delete(Trip).where(Trip.id == trip.id))
+    stored_mail.prune(conn)   # (messages only its bookings were made from go with them)
     return True
 
 

@@ -118,14 +118,14 @@ def explain(conn: db.Connection, b: extract.Booking) -> str:
     return "rejected as a segment"
 
 
-def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking,
-                 again: bool = False) -> Literal["added", "updated", "unchanged"] | None:
+def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking, again: bool = False,
+                 touched: list[int] | None = None) -> Literal["added", "updated", "unchanged"] | None:
     """Put one booking among `viewer`'s segments (`again`: from a message read again). None: it can't be made into a segment
-    (it goes to the review queue)."""
+    (it goes to the review queue). `touched` gets the id of the segment it became or was merged into."""
     found = fields(conn, b)
     if found is None:
         return None
     try:
-        return trips.merge_email_segment(conn, viewer, found, again)   # (it checks everything before it writes anything)
+        return trips.merge_email_segment(conn, viewer, found, again, touched)   # (it checks everything before it writes anything)
     except trips.Invalid:
         return None

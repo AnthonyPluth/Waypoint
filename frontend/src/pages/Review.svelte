@@ -27,6 +27,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button, buttonVariants } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
+  import MessageView from "$lib/components/MessageView.svelte";
   import { Input } from "$lib/components/ui/input";
   import { apiCall } from "$lib/contract";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
@@ -59,9 +60,9 @@
   const selectClass = "border-input bg-card dark:bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
   // ------------------------------------------------------------------------------------------ Couldn't read
-  // An item is named by who it came from and when: Waypoint keeps neither the subject nor the text of an email.
+  // An item is named by its message's subject, and by who it came from and when for one whose message wasn't kept.
   const sender = (i: ReviewItem) => i.sender_domain || "Unknown sender";
-  const subject = (i: ReviewItem) => `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
+  const subject = (i: ReviewItem) => i.subject || `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
 
   // The form to add one by hand: what the email can tell (who it's from) filled in, the rest typed as on the booking.
   type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string };
@@ -77,19 +78,18 @@
           destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "" }
       : { item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "" };
     formError = "";
-    if (item.mine) void peek(item);   // (the message's text beside the form, so the details are read and typed in one place: only its owner's Gmail can give it)
+    void peek(item);   // (the message beside the form, so the details are read and typed in one place: for everyone who sees the item)
   };
-  // The message's text, read beside the form: fetched from Gmail when asked, kept only in this page while it's open (never in
-  // the browser's storage), and for this member's own items alone.
-  type Peek = { state: "loading" } | { state: "ready"; text: string; html: string | null; truncated: boolean } | { state: "error"; message: string };
+  // The message, read beside the form: the copy the server kept (an item from before is fetched from its owner's Gmail), held only
+  // in this page while it's open, never in the browser's storage.
+  type Peek = { state: "loading" } | { state: "ready"; subject: string | null; text: string; html: string | null; truncated: boolean } | { state: "error"; message: string };
   let peeks = $state<Record<number, Peek>>({});
-  const plainOnly = new SvelteSet<number>();   // (the items whose message is shown as plain text, not as it was formatted)
   async function peek(item: ReviewItem) {
     if (peeks[item.id] && peeks[item.id]?.state !== "error") return;
     peeks[item.id] = { state: "loading" };
     try {
       const r = await apiCall<"GET /api/review/{id}/preview">(`/api/review/${item.id}/preview`);
-      peeks[item.id] = { state: "ready", text: r.text, html: r.html ?? null, truncated: r.truncated };
+      peeks[item.id] = { state: "ready", subject: r.subject ?? null, text: r.text, html: r.html ?? null, truncated: r.truncated };
     } catch (err) { peeks[item.id] = { state: "error", message: errMsg(err) }; }
   }
 
@@ -134,9 +134,10 @@
       destination: d.destination, ...(flight ? {} : { start_zone: d.startZone, end_zone: d.endZone || d.startZone }) };
     let added = false;
     const ok = await act(async () => {
-      await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
+      const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
       added = true;
-      await apiCall<"DELETE /api/review/{id}">(`/api/review/${d.item.id}`, { method: "DELETE" });
+      // (the booking keeps the message it was added from, for as long as it exists)
+      await apiCall<"DELETE /api/review/{id}">(`/api/review/${d.item.id}?segment=${made.id}`, { method: "DELETE" });
     }, { busy: (on) => (saving = on), onError: (m) => (formError = added ? `Added, but couldn’t take it off this list: ${m}` : m) });
     if (!ok) { if (added) { closeForm(); await settle(); } return; }
     closeForm();
@@ -195,7 +196,7 @@
     {#if review.items.length}
       <section aria-labelledby="unread-title" class="space-y-2">
         <h2 id="unread-title" class="eyebrow px-1">Couldn’t read</h2>
-        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Gmail), and then you can add those by hand or dismiss them. Open one in Gmail, or choose Add by hand to read it beside the form (Waypoint fetches it from Gmail when you ask, and keeps none of its text or subject).</p>
+        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Gmail), and then you can add those by hand or dismiss them. Open one in Gmail, or choose Add by hand to read it beside the form. Waypoint keeps each message here, encrypted, so you can read it without Gmail: until the item is dismissed or added, and for as long as a booking you add from it exists.</p>
         {#if unasked.length > 1}
           <div class="px-1"><Button variant="outline" size="sm" disabled={asking_all} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : `Ask AI about all ${unasked.length}`}</Button></div>
         {/if}
@@ -224,15 +225,7 @@
                   {#if p.state === "loading"}<p class="text-sm text-muted-foreground" role="status">Fetching the message from Gmail…</p>
                   {:else if p.state === "error"}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{p.message}</p>
                   {:else}
-                    {#if p.html && !plainOnly.has(item.id)}
-                      <!-- The server rebuilt this from an allowlist (no scripts, styles, images or remote loads; links https and mailto only): see waypoint/domain/mail/safe_html.py. -->
-                      <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                      <div class="max-h-96 overflow-auto rounded-lg bg-muted p-3 text-sm leading-relaxed break-words [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_table]:max-w-full [&_td]:p-1 [&_td]:align-top [&_th]:p-1 [&_th]:text-left [&_ul]:list-disc" data-testid="preview-html">{@html p.html}</div>
-                    {:else}
-                      <pre class="max-h-96 overflow-auto rounded-lg bg-muted p-3 font-sans text-sm leading-relaxed break-words whitespace-pre-wrap">{p.text || "(This message has no text.)"}</pre>
-                    {/if}
-                    {#if p.html}<Button variant="outline" size="sm" onclick={() => (plainOnly.has(item.id) ? plainOnly.delete(item.id) : plainOnly.add(item.id))}>{plainOnly.has(item.id) ? "Show as formatted" : "Show as plain text"}</Button>{/if}
-                    {#if p.truncated}<p class="text-sm text-muted-foreground">Cut short here: open it in Gmail for the rest.</p>{/if}
+                    <MessageView subject={p.subject} text={p.text} html={p.html} truncated={p.truncated} />
                   {/if}
                 </div>
               </li>

@@ -318,9 +318,11 @@ export interface Port {
 
 /**
  * A review item's message as plain text and, when it has an HTML part, as markup rebuilt from an allowlist (no scripts, styles,
- * images or remote loads), fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps none of it.
+ * images or remote loads). Read from the kept copy for anyone who sees the item; an item with none is fetched from Gmail for its
+ * mailbox's owner alone, and kept from then on.
  */
 export interface Preview {
+  subject: string | null;
   text: string;
   html: string | null;
   truncated: boolean;
@@ -368,7 +370,7 @@ export interface Review {
 
 /**
  * One message Waypoint couldn't read, for the member whose mailbox it is and, when its owner shares that mailbox, the
- * household. Never its subject or text: only who it came from and its day (Open in Gmail shows the message, to its owner).
+ * household. Who it came from, its day and its subject; the message itself comes from `GET /api/review/{id}/preview`.
  */
 export interface ReviewItem {
   id: number;
@@ -376,6 +378,8 @@ export interface ReviewItem {
   owner: string;
   mine: boolean;
   sender_domain: string;
+  subject: string | null;
+  has_email: boolean;
   received: string | null;
   reason: "no_markup" | "incomplete" | "broken";
   gmail_url: string | null;
@@ -414,6 +418,7 @@ export interface Segment {
   itinerary: Port[];
   logo: string | null;
   logo_label: string | null;
+  has_email: boolean;
   links: SegmentLinks;
 }
 
@@ -455,6 +460,11 @@ export interface SegmentEdit {
   manage_url?: string | null;
   travelers?: TravelerBody[];
   itinerary?: Port[];
+}
+
+/** The messages a booking was made from (or updated by), newest first, for whoever can see the booking. */
+export interface SegmentEmails {
+  emails: StoredEmail[];
 }
 
 export interface SegmentLinks {
@@ -622,6 +632,16 @@ export interface StatsStays {
   busiest_month: string | null;
 }
 
+/** A message a booking was made from, as kept: text and markup as in `Preview`, cut at 30,000 characters. */
+export interface StoredEmail {
+  subject: string | null;
+  sender_domain: string | null;
+  received: string | null;
+  text: string;
+  html: string | null;
+  truncated: boolean;
+}
+
 export interface Traveler {
   id: number;
   person_id: number | null;
@@ -704,6 +724,7 @@ export interface Endpoints {
   "GET /api/segments/{id}": { body: never; reply: Segment };
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };
   "DELETE /api/segments/{id}": { body: never; reply: Ok };
+  "GET /api/segments/{id}/emails": { body: never; reply: SegmentEmails };
   "GET /api/airports/{id}": { body: never; reply: Airport };
   "POST /api/import/preview": { body: never; reply: ImportPreview };
   "POST /api/import": { body: ImportBody; reply: Imported };

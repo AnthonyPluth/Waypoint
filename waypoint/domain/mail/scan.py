@@ -5,7 +5,9 @@ confirmation words, no promotions), so mail that doesn't match is never download
 later ones take what Gmail's history says was added since the last one's end, among the messages that search finds. Each
 message is fetched, read in memory by extract.py and thrown away: what's kept is the booking's fields (as segments, booked
 by the mailbox's owner), the message's id and what came of it (`scanned_messages`, so nothing is read twice) and, for mail
-that looked like a booking but couldn't be read, a review item (its sender's domain and its day; never its subject or text).
+that looked like a booking but couldn't be read, a review item (its sender's domain and its day). A message that queued an item or made
+a booking is also kept, encrypted, while that holds (its subject, text and cleaned markup: waypoint/storage/stored_mail.py), so it
+can be read without Gmail; it is deleted when the item is added or dismissed and no booking was made from it.
 
 Each message is filed and committed on its own, so a scan that stops halfway keeps what it did, and the scan's end (the
 history id and time it resumes from) moves only when it finishes: the last good state stays, and the mailbox says in a
@@ -20,6 +22,7 @@ from __future__ import annotations
 import threading
 import time
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
@@ -28,8 +31,9 @@ from sqlalchemy import delete, select, update
 
 from ... import dates, monitoring
 from ...providers import gmail
-from ...storage import db
+from ...storage import db, stored_mail
 from ...storage.models import Mailbox, ScannedMessage
+from ...storage.stored_mail import Content
 from .. import loyalty, people
 from ..visibility import Viewer
 from . import ai, extract, ingest, query, review
@@ -124,12 +128,19 @@ def _record(conn: db.Connection, mailbox_id: int, message_id: str, outcome: str,
                                             "scanned": now}, key=["mailbox_id", "message_id"])
 
 
+def _keeper(raw: dict[str, Any]) -> Callable[[], Content]:
+    """What `_file` calls to make what is kept of this message, when it needs to."""
+    return lambda: extract.keep(raw)
+
+
 def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str, message: extract.Message,
-          ignored: list[str], now: float, why: Counter[str] | None = None, again: bool = False) -> tuple[int, int]:
+          ignored: list[str], now: float, why: Counter[str] | None = None, again: bool = False,
+          keep: Callable[[], Content] | None = None) -> tuple[int, int]:
     """File what one message held: its bookings among the owner's segments, a review item for what couldn't be read, and
     the message as seen. Returns (segments added or changed, 1 if queued for review). `why` counts, in words from a fixed
     list, what stopped messages being read (for the log: how many, never which or what they said). `again`: it was read
-    before, so what came of it is cleared first and recorded anew."""
+    before, so what came of it is cleared first and recorded anew. `keep` makes what is kept of the message, called only when
+    it queued an item or made a booking."""
     why = Counter() if why is None else why
     if again:
         conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id))
@@ -137,8 +148,9 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
         _record(conn, mailbox_id, message_id, IGNORED, now)
         return 0, 0
     made, failed = 0, 0
+    touched: list[int] = []
     for booking in message.bookings:
-        filed = ingest.file_booking(conn, viewer, booking, again)
+        filed = ingest.file_booking(conn, viewer, booking, again, touched)
         if filed is None:
             failed += 1
             why[ingest.explain(conn, booking)] += 1
@@ -153,12 +165,15 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
         reason: review.Reason = "broken" if message.broken else "incomplete" if message.markup or message.bookings else "no_markup"
         review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, reason, now)
         queued = 1
+    if keep is not None and (queued or touched):   # (kept while an item waits for it, or for as long as a booking made from it exists)
+        stored_mail.put(conn, mailbox_id, message_id, keep(), now)
+        for segment_id in dict.fromkeys(touched):
+            stored_mail.link(conn, segment_id, mailbox_id, message_id)
     _record(conn, mailbox_id, message_id, BOOKING if usable else UNREADABLE, now)
     return made, queued
 
 
 SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
-PREVIEW_LIMIT = 30_000   # characters of a message shown in the app
 NO_AI = "Turn on AI suggestions in Settings first."
 
 
@@ -178,13 +193,14 @@ def _again(owner: str, item_id: int) -> tuple[int, str, dict[str, Any]]:
 
 
 def preview(owner: str, item_id: int) -> tuple[str, str | None, bool]:
-    """A review item's message for its mailbox's owner to read beside the form: as plain text, and as safe markup when it has an
-    HTML part (None when it hasn't), and whether either was cut at PREVIEW_LIMIT. Fetched when asked, returned to that one request
-    and kept nowhere: not stored, not logged. Raises KeyError, GmailError."""
-    _mailbox, _message, raw = _again(owner, item_id)
-    text = extract.plain_text(raw, PREVIEW_LIMIT + 1)
-    shown = extract.safe_markup(raw, PREVIEW_LIMIT)
-    return text[:PREVIEW_LIMIT], shown[0] if shown else None, len(text) > PREVIEW_LIMIT or bool(shown and shown[1])
+    """A review item's message, fetched from Gmail for its mailbox's owner (an item from before messages were kept, or one whose copy
+    is gone): as plain text, and as safe markup when it has an HTML part (None when it hasn't), and whether either was cut. It is
+    kept from then on, so the household can read it too. Never logged. Raises KeyError, GmailError."""
+    mailbox_id, message_id, raw = _again(owner, item_id)
+    kept = extract.keep(raw)
+    with db.session() as conn:   # (kept from now on, as a scan keeps one: an item from before had none)
+        stored_mail.put(conn, mailbox_id, message_id, kept, time.time())
+    return kept["text"], kept["html"], kept["truncated"]
 
 
 def suggest_now(owner: str, item_id: int, now: float) -> None:
@@ -279,7 +295,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Resu
                 continue
             try:
                 with _filing, db.session() as conn:
-                    a, b = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again)
+                    a, b = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, _keeper(raw))
             except Exception as e:
                 if db.is_busy(e):
                     raise
@@ -288,6 +304,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Resu
                 monitoring.report(e, values=False)
                 with db.session() as conn:
                     review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "incomplete", now)
+                    stored_mail.put(conn, mailbox_id, message_id, extract.keep(raw), now)
                     _record(conn, mailbox_id, message_id, UNREADABLE, now)
                 a, b = 0, 1
             if b:
