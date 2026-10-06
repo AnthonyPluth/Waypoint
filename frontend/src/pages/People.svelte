@@ -63,7 +63,10 @@
   }
 
   // "This is me": a signed-in member claims a guest for themselves (not on your own machine, where nobody signs in).
-  const canClaim = $derived(!!app.state?.user && !app.state.user.local);
+  // "This is me" is for a signed-in member who hasn't yet been linked to a guest of their own: once their own person has a
+  // linked guest, the button stays off every guest.
+  const linked = $derived((people?.find((x) => x.id === app.state?.person_id)?.links.length ?? 0) > 0);
+  const canClaim = $derived(!!app.state?.user && !app.state.user.local && !linked);
   let claiming = $state<Person | null>(null);
   let claimAsking = $state(false);
   const claim = (p: Person) => act(async () => {
@@ -168,10 +171,9 @@
   </form>
 {/if}
 
-{#if idDraft}
-  {@const d = idDraft}
-  <form class="rows mb-6" data-editor onsubmit={saveId} aria-labelledby="id-form-title">
-    <div class="row items-stretch">
+{#snippet idForm(d: IdDraft)}
+  <form class="mt-2 w-full rounded-2xl border bg-background/40 p-4" data-editor onsubmit={saveId} aria-labelledby="id-form-title">
+    <div>
       <div class="flex w-full flex-col gap-4">
         <h2 id="id-form-title" class="font-medium">{d.id === null ? "Add a membership" : "Edit membership"} for {people?.find((p) => p.id === d.person_id)?.display_name ?? "this person"}</h2>
         <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Kind</span>
@@ -199,7 +201,7 @@
       </div>
     </div>
   </form>
-{/if}
+{/snippet}
 
 {#if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">
@@ -259,6 +261,7 @@
           <Button variant="outline" size="sm" aria-label={`Add a membership for ${p.display_name}`} onclick={() => startAddId(p)}><Plus /> ID</Button>
           {#if !p.member && canClaim}<Button variant="outline" size="sm" aria-label={`This is me: ${p.display_name}`} onclick={() => { claiming = p; claimAsking = true; }}>This is me</Button>{/if}
         </div>
+        {#if idDraft && idDraft.person_id === p.id}<div class="basis-full">{@render idForm(idDraft)}</div>{/if}
       </li>
     {/each}
   </ul>
