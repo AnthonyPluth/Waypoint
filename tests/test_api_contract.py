@@ -183,7 +183,7 @@ class Replies(DbCase):
         self.check("GET /api/review", listed)
         self.check("POST /api/review/who/{id}", review_api.api_review_who(self.c, {}, {"person_id": me.person_id}, str(listed["who"][0]["id"])))
         self.check("POST /api/review/{id}/ignore", review_api.api_review_ignore(self.c, {}, {}, str(listed["items"][0]["id"])))
-        with mock.patch.object(scan, "preview", return_value=("Hello.", False)):
+        with mock.patch.object(scan, "preview", return_value=("Hello.", "<p>Hello.</p>", False)):
             self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][1]["id"])))
         with mock.patch.object(scan, "suggest_now"):
             self.check("POST /api/review/{id}/suggest", review_api.api_review_suggest(None, {}, {}, str(listed["items"][1]["id"])))

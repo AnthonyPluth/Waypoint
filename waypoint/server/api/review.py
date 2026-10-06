@@ -87,17 +87,17 @@ GONE = "That message is no longer in Gmail."
 
 @own_session
 def api_review_preview(_conn, _q, _b, item_id: str) -> Preview:
-    """The item's message as plain text, to read beside the form: fetched from Gmail now, for its mailbox's owner alone, and
+    """The item's message as plain text and, when it has HTML, as safe markup, to read beside the form: fetched from Gmail now, for its mailbox's owner alone, and
     not kept or logged. Someone else's item is a 404."""
     try:
-        text, truncated = scan.preview(owner(), row_id(item_id, NO_ITEM))
+        text, html, truncated = scan.preview(owner(), row_id(item_id, NO_ITEM))
     except KeyError:
         raise ApiError(NO_ITEM, 404) from None
     except gmail.MessageGone:
         raise ApiError(GONE, 404) from None
     except gmail.GmailError as e:
         raise ApiError(str(e), 502) from e
-    return {"text": text, "truncated": truncated}
+    return {"text": text, "html": html, "truncated": truncated}
 
 
 @own_session

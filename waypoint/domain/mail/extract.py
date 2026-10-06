@@ -27,7 +27,7 @@ from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ... import monitoring
-from . import parsers
+from . import parsers, safe_html
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger
@@ -591,13 +591,11 @@ def _visible(htmls: list[str], texts: list[str]) -> str:
     return "\n".join([*texts, "".join(scanner.parts)])
 
 
-def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
-    """The message's readable text, for the optional AI fallback alone (waypoint/domain/mail/ai.py, which strips quoted
-    replies, footers and ID numbers before anything is sent): its text/plain part, else its HTML as text. In memory only;
-    "" for a message that can't be decoded."""
+def _bodies(message: Mapping[str, Any]) -> tuple[list[str], list[str]] | None:
+    """The message's text/plain parts and its text/html parts; None for a message that can't be decoded."""
     data = _decode(message.get("raw"))
     if data is None:
-        return ""
+        return None
     try:
         parsed = email.message_from_bytes(data, policy=email.policy.default)
         plain: list[str] = []
@@ -611,7 +609,34 @@ def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
             except (ValueError, LookupError, KeyError):
                 continue
     except (ValueError, LookupError, TypeError):
+        return None
+    return plain, html
+
+
+def safe_markup(message: Mapping[str, Any], limit: int = MAX_PART) -> tuple[str, bool] | None:
+    """The message's HTML part as markup that is safe to show (see safe_html.py) and whether its text was cut at `limit`
+    characters; None when it has no HTML part. In memory only."""
+    bodies = _bodies(message)
+    if bodies is None or not bodies[1]:
+        return None
+    shown: list[str] = []
+    for i, part in enumerate(bodies[1]):   # (one parser for each: an unclosed script or style in one part can't hide the next)
+        markup, cut, size = safe_html.clean_counted(part, limit)
+        shown.append(markup)
+        limit -= size
+        if cut or (limit <= 0 and i + 1 < len(bodies[1])):   # (a budget used exactly, with nothing left out, isn't a cut)
+            return "<hr>".join(shown), True
+    return "<hr>".join(shown), False
+
+
+def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
+    """The message's readable text, for the optional AI fallback alone (waypoint/domain/mail/ai.py, which strips quoted
+    replies, footers and ID numbers before anything is sent): its text/plain part, else its HTML as text. In memory only;
+    "" for a message that can't be decoded."""
+    bodies = _bodies(message)
+    if bodies is None:
         return ""
+    plain, html = bodies
     if plain:
         return "\n".join(plain)[:limit]
     scanner = _Text()

@@ -147,9 +147,10 @@ class Review(TypedDict):
 
 
 class Preview(TypedDict):
-    """A review item's message as plain text, fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps
-    none of it."""
+    """A review item's message as plain text and, when it has an HTML part, as markup rebuilt from an allowlist (no scripts, styles,
+    images or remote loads), fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps none of it."""
     text: str
+    html: str | None                # null: the message has no HTML part
     truncated: bool                 # cut at 30,000 characters
 
 

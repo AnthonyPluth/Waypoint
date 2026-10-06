@@ -38,7 +38,7 @@ function serve(failOn?: string) {
     if (path === "/api/review") return held as never;
     if (path === "/api/state") return {} as never;
     if (path === "/api/segments") return {} as never;
-    if (path.endsWith("/preview")) { if (previewFails) throw new Error(previewFails); return { text: PREVIEW, truncated } as never; }
+    if (path.endsWith("/preview")) { if (previewFails) throw new Error(previewFails); return { text: PREVIEW, html: null, truncated } as never; }
     if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestion: SUGGESTION })) }; return { ok: true } as never; }
     if (opts?.method === "DELETE" || path.endsWith("/ignore")) { const id = Number(path.split("/")[3]); held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true } as never; }
     if (path.startsWith("/api/review/who/")) { const id = Number(path.split("/")[4]); held = { ...held, who: held.who.filter((w) => w.id !== id) }; return { ok: true, matched: 2 } as never; }
@@ -296,6 +296,30 @@ describe("Review: the message beside the form", () => {
     const region = await screen.findByTestId("preview");
     expect(region).toHaveTextContent(hostile);
     expect(region.querySelector("img, script")).toBeNull();
+  });
+
+  it("shows a message's HTML as formatted text, with a switch to its plain text and back", async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview")
+      ? { text: "Gate B12", html: "<p>Gate <b>B12</b></p><table><tr><td>Seat</td><td>12A</td></tr></table>", truncated: false }
+      : path === "/api/people" ? { people: [] } : held) as never);
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
+    const formatted = await screen.findByTestId("preview-html");
+    expect(formatted.querySelector("b")).toHaveTextContent("B12");
+    expect(formatted.querySelector("td")).toHaveTextContent("Seat");
+    await userEvent.click(screen.getByRole("button", { name: "Show as plain text" }));
+    expect(screen.queryByTestId("preview-html")).toBeNull();
+    expect(screen.getByTestId("preview")).toHaveTextContent("Gate B12");
+    await userEvent.click(screen.getByRole("button", { name: "Show as formatted" }));
+    expect(await screen.findByTestId("preview-html")).toBeInTheDocument();
+  });
+
+  it("offers no switch for a message with no HTML part", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
+    await screen.findByTestId("preview");
+    expect(screen.queryByRole("button", { name: /Show as/ })).toBeNull();
+    expect(screen.queryByTestId("preview-html")).toBeNull();
   });
 
   it("says when it was cut short, and when the message has no text", async () => {

@@ -177,13 +177,14 @@ def _again(owner: str, item_id: int) -> tuple[int, str, dict[str, Any]]:
     return found[0], found[1], gmail.fetch(token, found[1])
 
 
-def preview(owner: str, item_id: int) -> tuple[str, bool]:
-    """A review item's message as plain text for its mailbox's owner to read beside the form (and whether it was cut at
-    PREVIEW_LIMIT). Fetched when asked, returned to that one request and kept nowhere: not stored, not logged. Raises KeyError,
-    GmailError."""
+def preview(owner: str, item_id: int) -> tuple[str, str | None, bool]:
+    """A review item's message for its mailbox's owner to read beside the form: as plain text, and as safe markup when it has an
+    HTML part (None when it hasn't), and whether either was cut at PREVIEW_LIMIT. Fetched when asked, returned to that one request
+    and kept nowhere: not stored, not logged. Raises KeyError, GmailError."""
     _mailbox, _message, raw = _again(owner, item_id)
     text = extract.plain_text(raw, PREVIEW_LIMIT + 1)
-    return text[:PREVIEW_LIMIT], len(text) > PREVIEW_LIMIT
+    shown = extract.safe_markup(raw, PREVIEW_LIMIT)
+    return text[:PREVIEW_LIMIT], shown[0] if shown else None, len(text) > PREVIEW_LIMIT or bool(shown and shown[1])
 
 
 def suggest_now(owner: str, item_id: int, now: float) -> None:
