@@ -640,8 +640,8 @@ def _place_words(text: str | None) -> frozenset[str]:
 
 
 def _same_place(mine: str | None, theirs: str | None) -> bool:
-    a, b = _place_words(mine), _place_words(theirs)
-    return bool(a) and bool(b) and (a <= b or b <= a)
+    words = _place_words(mine)
+    return bool(words) and words == _place_words(theirs)
 
 
 def _same_uncoded(seg: Segment, values: Mapping[str, str | None], details: Mapping[str, str]) -> bool:
@@ -673,9 +673,11 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
     day = (values["start_local"] or "")[:10]
     found = [s for s in visibility.household_segments(conn, values["kind"] or "") if _same_leg(s, values, fields.get("details") or {})]
     coded = [s for s in found if s.confirmation]
-    found = coded or (found if len(found) == 1 else [])
+    uncoded = [s for s in found if not s.confirmation]
+    seen = {s.id for s in visibility.visible_segments(conn, viewer)} if found else set()
+    uncoded = [s for s in uncoded if s.id in seen]
+    found = coded or (uncoded if len(uncoded) == 1 else [])
     if len(found) > 1:
-        seen = {s.id for s in visibility.visible_segments(conn, viewer)}
         found.sort(key=lambda s: (abs((date.fromisoformat(s.start_local[:10]) - date.fromisoformat(day)).days), s.id not in seen, s.id))
     if not found:
         added = add_segment(conn, viewer, fields, source="email")

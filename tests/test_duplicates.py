@@ -136,7 +136,7 @@ class BackfillingByHand(Merging):
 
     def test_a_name_written_another_way_still_matches(self):
         self.add(self.jane, BY_HAND)
-        self.assertEqual(self.merge(self.jane, {**EMAILED, "origin": "The Harbour Hotel, London"}), "updated")
+        self.assertEqual(self.merge(self.jane, {**EMAILED, "origin": "THE HARBOUR HOTEL!"}), "updated")
         self.assertEqual(self.count(), 1)
 
     def test_a_later_email_with_the_same_code_then_matches_by_code(self):
@@ -147,14 +147,14 @@ class BackfillingByHand(Merging):
 
     def test_other_dates_or_another_place_are_another_stay(self):
         self.add(self.jane, BY_HAND)
-        for number, swap in enumerate(({"end_local": "2026-06-09T10:00"}, {"start_local": "2026-06-03T15:00"}, {"origin": "Castle Hotel"},
+        for number, swap in enumerate(({"end_local": "2026-06-09T10:00"}, {"start_local": "2026-06-03T15:00"}, {"origin": "Castle Hotel"}, {"origin": "Harbour View Resort"}, {"origin": "Harbour Lights Inn"},
                      {"start_zone": "Europe/Paris", "end_zone": "Europe/Paris"})):
             with self.subTest(swap=swap):
                 self.assertEqual(self.merge(self.jane, {**EMAILED, **swap, "confirmation": f"X{number}"}), "added")
 
     def test_two_stays_added_by_hand_that_both_fit_are_left_alone(self):
         self.add(self.jane, BY_HAND)
-        self.add(self.sam, BY_HAND)
+        self.add(self.jane, BY_HAND)
         self.assertEqual(self.merge(self.jane, EMAILED), "added")
         self.assertEqual(self.count(), 3)
 
@@ -178,3 +178,18 @@ class BackfillingByHand(Merging):
         manual = {k: v for k, v in FLIGHT.items() if k != "confirmation"}
         self.add(self.jane, {**manual, "details": {"flight_number": "AA 4002"}})
         self.assertEqual(self.merge(self.jane), "added")
+
+
+    def test_a_stay_another_member_added_that_you_cant_see_is_not_filled_by_your_email(self):
+        self.add(self.sam, BY_HAND, travelers=self.on(self.sam.person_id))
+        self.assertEqual(self.merge(self.jane, EMAILED, travelers=self.on(self.jane.person_id)), "added")
+        self.assertEqual(self.count(), 2)
+        [seg] = [s for t in trips.listing(self.c, self.sam) for s in t["segments"]]
+        self.assertIsNone(seg["confirmation"])
+        self.assertIsNone(visibility.visible_segment(self.c, self.jane, seg["id"]))
+        self.assertEqual(self.c.orm.scalar(select(func.count()).select_from(SegmentRecipient)), 0)
+
+    def test_a_stay_you_can_see_through_another_member_is_filled(self):
+        self.add(self.sam, BY_HAND, travelers=self.on(self.sam.person_id, self.jane.person_id))
+        self.assertEqual(self.merge(self.jane, EMAILED), "updated")
+        self.assertEqual(self.count(), 1)
