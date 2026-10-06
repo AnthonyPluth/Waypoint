@@ -81,14 +81,15 @@
   };
   // The message's text, read beside the form: fetched from Gmail when asked, kept only in this page while it's open (never in
   // the browser's storage), and for this member's own items alone.
-  type Peek = { state: "loading" } | { state: "ready"; text: string; truncated: boolean } | { state: "error"; message: string };
+  type Peek = { state: "loading" } | { state: "ready"; text: string; html: string | null; truncated: boolean } | { state: "error"; message: string };
   let peeks = $state<Record<number, Peek>>({});
+  const plainOnly = new SvelteSet<number>();   // (the items whose message is shown as plain text, not as it was formatted)
   async function peek(item: ReviewItem) {
     if (peeks[item.id] && peeks[item.id]?.state !== "error") return;
     peeks[item.id] = { state: "loading" };
     try {
       const r = await apiCall<"GET /api/review/{id}/preview">(`/api/review/${item.id}/preview`);
-      peeks[item.id] = { state: "ready", text: r.text, truncated: r.truncated };
+      peeks[item.id] = { state: "ready", text: r.text, html: r.html ?? null, truncated: r.truncated };
     } catch (err) { peeks[item.id] = { state: "error", message: errMsg(err) }; }
   }
 
@@ -223,7 +224,14 @@
                   {#if p.state === "loading"}<p class="text-sm text-muted-foreground" role="status">Fetching the message from Gmail…</p>
                   {:else if p.state === "error"}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{p.message}</p>
                   {:else}
-                    <pre class="max-h-96 overflow-auto rounded-lg bg-muted p-3 font-sans text-sm leading-relaxed break-words whitespace-pre-wrap">{p.text || "(This message has no text.)"}</pre>
+                    {#if p.html && !plainOnly.has(item.id)}
+                      <!-- The server rebuilt this from an allowlist (no scripts, styles, images or remote loads; links https and mailto only): see waypoint/domain/mail/safe_html.py. -->
+                      <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                      <div class="max-h-96 overflow-auto rounded-lg bg-muted p-3 text-sm leading-relaxed break-words [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_table]:max-w-full [&_td]:p-1 [&_td]:align-top [&_th]:p-1 [&_th]:text-left [&_ul]:list-disc" data-testid="preview-html">{@html p.html}</div>
+                    {:else}
+                      <pre class="max-h-96 overflow-auto rounded-lg bg-muted p-3 font-sans text-sm leading-relaxed break-words whitespace-pre-wrap">{p.text || "(This message has no text.)"}</pre>
+                    {/if}
+                    {#if p.html}<Button variant="outline" size="sm" onclick={() => (plainOnly.has(item.id) ? plainOnly.delete(item.id) : plainOnly.add(item.id))}>{plainOnly.has(item.id) ? "Show as formatted" : "Show as plain text"}</Button>{/if}
                     {#if p.truncated}<p class="text-sm text-muted-foreground">Cut short here: open it in Gmail for the rest.</p>{/if}
                   {/if}
                 </div>

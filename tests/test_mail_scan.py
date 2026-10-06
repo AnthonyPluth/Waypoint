@@ -472,9 +472,10 @@ class ReviewTests(ScanCase):
         self.scan()
         [item] = self.items()
         with no_leaks(self, "CANARY-BODY-NOMARKUP-6H9C", database=self.path):   # (it comes back to the caller, and goes nowhere else)
-            text, cut = scan.preview("u-jane", item["id"])
+            text, html, cut = scan.preview("u-jane", item["id"])
         self.assertIn("CANARY-BODY-NOMARKUP-6H9C", text)
         self.assertNotIn("<", text)   # (text, not markup)
+        self.assertTrue(html is None or "CANARY-BODY-NOMARKUP-6H9C" in html)   # (markup only when the message has an HTML part)
         self.assertFalse(cut)
         with self.assertRaises(KeyError):
             scan.preview("u-sam", item["id"])   # not Sam's
@@ -486,7 +487,7 @@ class ReviewTests(ScanCase):
         self.scan()
         [item] = self.items()
         with mock.patch.object(scan, "PREVIEW_LIMIT", 20):
-            text, cut = scan.preview("u-jane", item["id"])
+            text, _html, cut = scan.preview("u-jane", item["id"])
         self.assertEqual((len(text), cut), (20, True))
         del self.google.mail["msg-no_markup"]
         with self.assertRaises(gmail.MessageGone):

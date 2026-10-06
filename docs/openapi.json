@@ -3377,10 +3377,16 @@
       },
       "Preview": {
         "type": "object",
-        "description": "A review item's message as plain text, fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps\nnone of it.",
+        "description": "A review item's message as plain text and, when it has an HTML part, as markup rebuilt from an allowlist (no scripts, styles,\nimages or remote loads), fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps none of it.",
         "properties": {
           "text": {
             "type": "string"
+          },
+          "html": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "truncated": {
             "type": "boolean"
@@ -3388,6 +3394,7 @@
         },
         "required": [
           "text",
+          "html",
           "truncated"
         ],
         "additionalProperties": false
