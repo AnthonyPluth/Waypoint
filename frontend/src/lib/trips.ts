@@ -185,9 +185,27 @@ export function tripDays(trip: Trip): Day[] {
       put(segment.end_local.slice(0, 10), { segment, bookings, role: "end" });
     }
   }
-  return [...days].sort(([a], [b]) => a.localeCompare(b)).map(([date, items]) => ({
-    date, items: items.sort((a, b) => (a.role === "end" ? a.segment.end_local : a.segment.start_local).localeCompare(b.role === "end" ? b.segment.end_local : b.segment.start_local)),
-  }));
+  return [...days].sort(([a], [b]) => a.localeCompare(b)).map(([date, items]) => ({ date, items: inDayOrder(items) }));
+}
+
+/** A day's items in the order they happen, with the sense that you check out before you return the car and return the car before
+ *  you fly: a hotel's check-out is taken as no later than the car's drop-off or a departure that day, and a car's drop-off as no
+ *  later than a departure (a check-out time is often the hotel's standard hour, not when you leave). Each keeps the time it shows. */
+function inDayOrder(items: DayItem[]): DayItem[] {
+  const at = (i: DayItem) => (i.role === "end" ? i.segment.end_local : i.segment.start_local);
+  const live = (i: DayItem) => i.segment.status !== "cancelled";
+  const departures = items.filter((i) => i.role === "start" && (i.segment.kind === "flight" || i.segment.kind === "train") && live(i)).map(at);
+  const returns = items.filter((i) => i.role === "end" && i.segment.kind === "car" && live(i)).map(at);
+  const earliest = (...times: string[]) => times.reduce((a, b) => (b < a ? b : a));
+  const key = (i: DayItem): [string, number] => {
+    if (i.role === "end" && i.segment.kind === "hotel" && live(i)) return [earliest(at(i), ...departures, ...returns), 0];
+    if (i.role === "end" && i.segment.kind === "car" && live(i)) return [earliest(at(i), ...departures), 1];
+    return [at(i), 2];
+  };
+  return [...items].sort((a, b) => {
+    const [ka, ra] = key(a), [kb, rb] = key(b);
+    return ka.localeCompare(kb) || ra - rb || at(a).localeCompare(at(b));
+  });
 }
 
 // ------------------------------------------------------------------------------------------ loyalty
