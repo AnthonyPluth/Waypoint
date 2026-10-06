@@ -1594,6 +1594,46 @@
         }
       }
     },
+    "/api/mailboxes/{id}/backfill": {
+      "post": {
+        "operationId": "api_mailbox_backfill",
+        "x-handler": "waypoint/server/api/mailboxes.py:api_mailbox_backfill",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanStarted"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/reminders": {
       "get": {
         "operationId": "api_reminders",

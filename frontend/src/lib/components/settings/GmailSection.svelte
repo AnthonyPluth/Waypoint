@@ -67,6 +67,14 @@
     watching = true;
   }, { busy: (on) => (starting = on ? m.id : null) });
 
+  const lookBack = (m: Mailbox) => act(async () => {
+    const r = await apiCall<"POST /api/mailboxes/{id}/backfill">(`/api/mailboxes/${m.id}/backfill`, { method: "POST", failed: "Couldn’t start the look-back" });
+    if (!r.started) toast("A scan of this mailbox is already running.");
+    await load();
+    watchUntil = Date.now() + 2 * POLL_MS + 500;
+    watching = true;
+  }, { busy: (on) => (starting = on ? m.id : null) });
+
   const share = (m: Mailbox, box: HTMLInputElement) => act(async () => {
     try {
       await apiCall<"POST /api/mailboxes/{id}/share">(`/api/mailboxes/${m.id}/share`, { method: "POST", body: { share: box.checked }, failed: "Couldn’t change it" });
@@ -125,7 +133,8 @@
           <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <Badge variant={m.status === "connected" ? "outline" : "secondary"}>{label(m)}</Badge>
             {#if m.status === "reconnect"}<Button disabled={connecting} onclick={connect}>Reconnect</Button>
-            {:else}<Button variant="outline" disabled={m.scanning || starting === m.id} onclick={() => scan(m)}>{m.scanning ? "Scanning…" : "Scan now"}</Button>{/if}
+            {:else}<Button variant="outline" disabled={m.scanning || starting === m.id} onclick={() => scan(m)}>{m.scanning ? "Scanning…" : "Scan now"}</Button>
+              <Button variant="outline" disabled={m.scanning || starting === m.id} onclick={() => lookBack(m)} title="Search the last 18 months for bookings Waypoint hasn’t read yet, such as ones from a sender added since your last scan, or for trips you entered by hand">Look back 18 months</Button>{/if}
             <Button variant="outline" onclick={() => { leaving = m; asking = true; }}>Disconnect</Button>
           </div>
         </div>

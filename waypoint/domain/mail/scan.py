@@ -54,13 +54,13 @@ def notice(mailbox_id: int) -> str | None:
         return _notices.get(mailbox_id)
 
 
-def scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Result:
+def scan(mailbox_id: int, now: float, today: date, again: bool = False, backfill: bool = False) -> Result:
     with _lock:
         if mailbox_id in _running:
             return Result("busy")
         _running.add(mailbox_id)
     try:
-        result = _scan(mailbox_id, now, today, again)
+        result = _scan(mailbox_id, now, today, again, backfill)
     finally:
         with _lock:
             _running.discard(mailbox_id)
@@ -198,7 +198,7 @@ def _fail(mailbox_id: int, text: str, partial: tuple[int, int, int]) -> Result:
     return Result("failed", text, *partial)
 
 
-def _scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Result:
+def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfill: bool = False) -> Result:
     with db.session() as conn:
         row = conn.execute(select(Mailbox.owner_sub, Mailbox.address, Mailbox.history_id, Mailbox.last_scan)
                            .where(Mailbox.id == mailbox_id)).fetchone()
@@ -224,9 +224,10 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Resu
                     ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.outcome == BOOKING).order_by(ScannedMessage.message_id)).scalars())
             seen: set[str] = set()
         else:
-            arrived = gmail.history_id(token)
-            found = gmail.search(token, query.build(_since(last_scan, today), ignored))
-            if history and last_scan is not None:
+            arrived = None if backfill else gmail.history_id(token)
+            since = dates.add_months(today, -query.LOOKBACK_MONTHS) if backfill else _since(last_scan, today)
+            found = gmail.search(token, query.build(since, ignored))
+            if history and last_scan is not None and not backfill:
                 try:
                     added = gmail.added_since(token, history)
                     found = [m for m in found if m in added]
@@ -263,7 +264,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Resu
             if b:
                 _suggest(mailbox_id, message_id, raw, now)
             read, made, queued = read + 1, made + a, queued + b
-        if not again:
+        if not again and not backfill:
             with db.session() as conn:
                 conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(
                     last_scan=now, scan_error=None, **({"history_id": arrived} if arrived else {})))
@@ -272,7 +273,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False) -> Resu
     except Exception as e:
         monitoring.report(e, values=False)
         return _fail(mailbox_id, FAILED_GENERALLY, (read, made, queued))
-    monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Scanned a mailbox'}: {read} message(s) read, "
+    monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {read} message(s) read, "
                    f"{made} booking(s) added or changed, {queued} to review.")
     if why:
         monitoring.log("What stopped messages being read: " + "; ".join(f"{n} × {what}" for what, n in sorted(why.items())) + ".")

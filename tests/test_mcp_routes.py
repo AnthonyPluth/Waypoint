@@ -23,7 +23,7 @@ BLOCKED = [
     "DELETE /api/review/{id}", "GET /api/ai", "GET /api/backup", "GET /api/mailboxes", "GET /api/mailboxes/callback",
     "GET /api/mcp-settings", "GET /api/reminders", "GET /api/review", "GET /api/review/{id}/preview", "GET /api/state",
     "POST /api/ai", "POST /api/backup/inspect", "POST /api/feed", "POST /api/flight-status/{id}", "POST /api/import",
-    "POST /api/import/preview", "POST /api/mailboxes/connect", "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/scan", "POST /api/mailboxes/{id}/share",
+    "POST /api/import/preview", "POST /api/mailboxes/connect", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/scan", "POST /api/mailboxes/{id}/share",
     "POST /api/mcp-settings/writes", "POST /api/reminders", "POST /api/reminders/devices",
     "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch", "GET /api/segments/{id}/logo", "GET /api/segments/{id}/emails",
     "POST /api/restore", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/suggest",

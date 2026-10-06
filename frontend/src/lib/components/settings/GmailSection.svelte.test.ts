@@ -182,6 +182,14 @@ describe("Settings → Gmail", () => {
     await waitFor(() => expect(toast).toHaveBeenCalledWith("A scan of this mailbox is already running."));
   });
 
+  it("looks back 18 months, and says when a scan is already running", async () => {
+    serve(list([box()]), (path) => (path === "/api/mailboxes/1/backfill" ? { started: false } : {}));
+    render(GmailSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Look back 18 months" }));
+    expect(api).toHaveBeenCalledWith("/api/mailboxes/1/backfill", { method: "POST", failed: "Couldn’t start the look-back" });
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("A scan of this mailbox is already running."));
+  });
+
   it("says a scan is running, and checks until it’s done", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
