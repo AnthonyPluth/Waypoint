@@ -6,6 +6,7 @@
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
@@ -17,6 +18,7 @@
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
   import { bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, subline, untimed } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
+  import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
   import { toast } from "svelte-sonner";
 
@@ -29,6 +31,9 @@
   let loadError = $state("");
   let form = $state<Draft | null>(null);
   let focus = $state("");   // the form field to put the cursor in (Add address)
+  let renaming = $state<string | null>(null);   // the trip's name while it's being changed (null: not renaming)
+  let renameError = $state("");
+  let saving = $state(false);
   let removing = $state<Segment | null>(null);
   let asking = $state(false);
 
@@ -47,11 +52,29 @@
       void loadFlightStatus();   // (the flights' live status shows beside their times once it arrives)
     } catch (err) { if (mine !== latest) return; trip = null; loadError = errMsg(err); }
   }
-  $effect(() => { void id; form = null; void load(); });
+  $effect(() => { void id; form = null; renaming = null; void load(); });
 
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
   const kindName = (s: Segment) => KINDS.find(([k]) => k === s.kind)?.[1] ?? s.kind;
   const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
+
+  // A form that opens below a card the reader may have scrolled to: bring it into view (reduced motion jumps instead of gliding).
+  function reveal(node: HTMLElement) {
+    const calm = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView?.({ block: "nearest", behavior: calm ? "auto" : "smooth" });
+  }
+
+  const rename = (e: SubmitEvent) => {
+    e.preventDefault();
+    const name = (renaming ?? "").trim();
+    if (!trip || !name) { renameError = "Enter a name for the trip"; return; }
+    return act(async () => {
+      if (!trip) return;
+      trip = await apiCall<"POST /api/trips/{id}">(`/api/trips/${trip.id}`, { method: "POST", body: { name } });
+      renaming = null; renameError = "";
+      toast.success("Saved");
+    }, { busy: (on) => (saving = on), onError: (m) => (renameError = m) });
+  };
 
   async function saved(s: Segment) {
     form = null;
@@ -81,15 +104,29 @@
   {@const t = trip}
   <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
-      <h1 class="break-words text-3xl font-semibold tracking-tight">{t.name}</h1>
+      {#if renaming !== null}
+        <form class="flex flex-col gap-2 sm:flex-row sm:items-center" onsubmit={rename} aria-label="Rename trip">
+          <Input class="sm:w-80" aria-label="Trip name" bind:value={renaming} maxlength={100} autocomplete="off" autofocus />
+          <div class="flex gap-2">
+            <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+            <Button type="button" variant="outline" disabled={saving} onclick={() => { renaming = null; renameError = ""; }}>Cancel</Button>
+          </div>
+        </form>
+        {#if renameError}<p class="mt-2 rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{renameError}</p>{/if}
+      {:else}
+        <div class="flex items-start gap-2">
+          <h1 class="break-words text-3xl font-semibold tracking-tight">{t.name}</h1>
+          <Button variant="ghost" size="icon" class="mt-1 shrink-0" aria-label="Rename trip" onclick={() => { renaming = t.name; renameError = ""; }}><Pencil /></Button>
+        </div>
+      {/if}
       <p class="text-muted-foreground">{dates(t)}{t.destination ? ` · ${t.destination}` : ""}</p>
       {#if t.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
     </div>
     {#if !form}<Button onclick={() => { focus = ""; form = blank(t.id); }}><Plus /> Add a booking</Button>{/if}
   </div>
 
-  {#if form}
-    {#key form.id ?? "new"}<SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} />{/key}
+  {#if form && form.id === null}
+    <SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} />
   {/if}
 
   {#if t.segments.length === 0}
@@ -153,6 +190,10 @@
             </ul>
           </div>
         </li>
+      {/if}
+      <!-- Editing a booking opens its form right under it, where the reader is, not up at the trip's title. -->
+      {#if form && form.id !== null && card.segments.some((b) => b.id === form?.id)}
+        <li use:reveal aria-label="Edit booking"><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></li>
       {/if}
     {/each}
   </ul>

@@ -1,0 +1,16 @@
+{
+  "name": "trip-inline-edit",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/'] >> visible=true" },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "click": "button[aria-label='Rename trip']" },
+    { "wait_for": "input[aria-label='Trip name']" },
+    { "screenshot": "rename" },
+    { "click": "button:has-text('Cancel')" },
+    { "click": "ul[aria-label='Bookings'] button[aria-label^='Edit '] >> nth=-1" },
+    { "wait_for": "li[aria-label='Edit booking']" },
+    { "screenshot": "edit-under-booking" }
+  ]
+}

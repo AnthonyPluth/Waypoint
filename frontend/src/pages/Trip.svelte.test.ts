@@ -45,7 +45,7 @@ beforeEach(() => {
   route.page = "trip"; route.sub = "1"; location.hash = "#trip/1";
   serve();
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); flightStatus.list = null; });
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); flightStatus.list = null; delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
 
 describe("Trip", () => {
   it("shows a flight’s live status on its card and none on a stay", async () => {
@@ -204,6 +204,61 @@ describe("Trip", () => {
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({
       kind: "flight", origin: "JFK", details: { flight_number: "AA 101", terminal: "7" }, travelers: [{ person_id: 1 }, { person_id: 2 }, { person_id: null, name: "DOE/MIA MISS" }] }) }));
     await waitFor(() => expect(screen.queryByRole("form")).toBeNull());
+  });
+
+  it("opens a booking's edit form right under that booking and scrolls to it, not at the top", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;   // (jsdom has none)
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit Harbour Hotel" }));
+    const form = screen.getByRole("listitem", { name: "Edit booking" });
+    expect(form.previousElementSibling).toHaveTextContent("Harbour Hotel");      // under the stay it belongs to, below the flight
+    expect(within(form).getByLabelText("Hotel name")).toBeInTheDocument();
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+    await u.click(within(form).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("listitem", { name: "Edit booking" })).toBeNull();
+  });
+
+  it("still opens Add a booking at the top, above the cards", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add a booking/ }));
+    const bookings = screen.getByRole("list", { name: "Bookings" });
+    expect(screen.getByRole("heading", { name: "Trip to London" }).compareDocumentPosition(bookings.previousElementSibling!)).toBeTruthy();
+    expect(screen.queryByRole("listitem", { name: "Edit booking" })).toBeNull();
+    expect(bookings.previousElementSibling?.tagName).toBe("FORM");
+  });
+
+  it("renames the trip from its title, sending only the name, and shows the new name", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Rename trip" }));
+    expect(screen.getByLabelText("Trip name")).toHaveValue("Trip to London");
+    await u.clear(screen.getByLabelText("Trip name"));
+    await u.type(screen.getByLabelText("Trip name"), "  Lisbon in spring ");
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST" ? { ...held, name: (opts.body as { name: string }).name } : held) as never);
+    await u.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "POST", body: { name: "Lisbon in spring" } }));
+    expect(await screen.findByRole("heading", { name: "Lisbon in spring" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Trip name")).toBeNull();
+  });
+
+  it("won't save an empty trip name, says why when the server refuses, and Cancel keeps the old name", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Rename trip" }));
+    await u.clear(screen.getByLabelText("Trip name"));
+    await u.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Enter a name for the trip");
+    expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
+    await u.type(screen.getByLabelText("Trip name"), "Nope");
+    vi.mocked(api).mockImplementation(async (_p, opts) => { if (opts?.method === "POST") throw new Error("The name is too long"); return held; });
+    await u.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The name is too long");
+    expect(screen.getByLabelText("Trip name")).toHaveValue("Nope");   // what was typed stays
+    await u.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
   });
 
   it("explains a slip in the edit form without sending it, and keeps what was typed", async () => {
