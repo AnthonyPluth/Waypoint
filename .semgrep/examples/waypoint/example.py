@@ -95,6 +95,13 @@ LOGO_SEARCH = "https://api.logo.dev/search?q=Example"
 # ok: waypoint-logodev-hosts
 logos.fetch_due(conn, now)
 
+# ruleid: waypoint-wikimedia-hosts
+BRAND_SEARCH = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=Hyatt"
+# ruleid: waypoint-wikimedia-hosts
+BRAND_FILE = "https://commons.wikimedia.org/wiki/Special:FilePath/Example.png"
+# ok: waypoint-wikimedia-hosts
+logos.fetch_due(conn, now)
+
 # ruleid: waypoint-ai-hosts
 URL = "https://openrouter.ai/api/v1/chat/completions"
 # ruleid: waypoint-ai-hosts

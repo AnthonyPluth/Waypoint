@@ -214,7 +214,7 @@
     {#if cancelled}<Badge variant="destructive">Cancelled</Badge>{:else if s.status !== "confirmed"}<Badge variant="secondary">Changed</Badge>{/if}
     {#if s.locked_fields.length}<Badge variant="outline" title="A later email won’t change what you edited">Edited by you</Badge>{/if}</p>
   <div class="flex items-center gap-3">
-    <BrandLogo src={s.logo} size={40} />
+    <BrandLogo src={s.logo} label={s.logo_label} size={40} />
     <div class="min-w-0">
       <h2 class="break-words text-2xl font-bold tracking-tight" class:line-through={cancelled}>{headline(s)}</h2>
       {#if subline(s)}<p class="break-words text-sm text-muted-foreground">{subline(s)}</p>{/if}
