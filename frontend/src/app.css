@@ -144,8 +144,9 @@
   .code { font-family: var(--font-mono); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
   /* A boarding pass: a rounded card whose `.pass-tear` is the perforated line between its two halves, with a notch
      at each end (cut from the page's own background). */
-  .pass { position: relative; overflow: hidden; background: var(--card); color: var(--card-foreground); border: 1px solid var(--border);
-    border-radius: var(--radius-2xl); box-shadow: var(--shadow-card); }
+  .pass { position: relative; overflow: hidden; color: var(--card-foreground); border: 1px solid var(--border);
+    border-radius: var(--radius-3xl); box-shadow: var(--shadow-card);
+    background: linear-gradient(165deg, color-mix(in oklab, var(--primary) 13%, var(--card)) 0%, var(--card) 62%); }
   .pass-tear { position: relative; height: 0; border-top: 1.5px dashed var(--border); }
   .pass-tear::before, .pass-tear::after { content: ""; position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 9999px;
     background: var(--background); border: 1px solid var(--border); }

@@ -125,7 +125,7 @@
         {#if renameError}<p class="mt-2 rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{renameError}</p>{/if}
       {:else}
         <div class="flex items-start gap-2">
-          <h1 class="break-words text-3xl font-semibold tracking-tight">{t.name}</h1>
+          <h1 class="break-words text-4xl font-bold tracking-tight">{t.name}</h1>
           <Button variant="ghost" size="icon" class="mt-1 shrink-0" aria-label="Rename trip" onclick={() => { renaming = t.name; renameError = ""; }}><Pencil /></Button>
         </div>
       {/if}
@@ -183,7 +183,7 @@
             <ul class="flex flex-col gap-4" aria-label={`Bookings of ${headline(s)}`}>
               {#each card.segments as b (b.id)}
                 {@const name = `${headline(b)} booking${b.confirmation ? ` ${b.confirmation}` : ""}`}
-                <li class="flex flex-col gap-3 rounded-xl border border-border p-4" class:opacity-70={b.status === "cancelled"} data-booking>
+                <li class="flex flex-col gap-3 rounded-2xl border border-border bg-background/40 p-4" class:opacity-70={b.status === "cancelled"} data-booking>
                   <p class="flex flex-wrap items-center gap-2">
                     {#if b.confirmation}<span class="text-lg"><CopyCode code={b.confirmation} /></span>{:else}<span class="text-muted-foreground">No confirmation code</span>{/if}
                     {#if b.status !== "confirmed"}<Badge variant={b.status === "cancelled" ? "destructive" : "secondary"}>{b.status === "cancelled" ? "Cancelled" : "Changed"}</Badge>{/if}
@@ -216,7 +216,7 @@
   <div class="flex items-center gap-3">
     <BrandLogo src={s.logo} size={40} />
     <div class="min-w-0">
-      <h2 class="break-words text-xl font-semibold tracking-tight" class:line-through={cancelled}>{headline(s)}</h2>
+      <h2 class="break-words text-2xl font-bold tracking-tight" class:line-through={cancelled}>{headline(s)}</h2>
       {#if subline(s)}<p class="break-words text-sm text-muted-foreground">{subline(s)}</p>{/if}
     </div>
   </div>

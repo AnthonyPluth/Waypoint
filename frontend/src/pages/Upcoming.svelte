@@ -54,7 +54,7 @@
   const days = $derived(featured ? tripDays(featured) : []);
 </script>
 
-<h1 class="mb-6 text-3xl font-semibold tracking-tight">Upcoming</h1>
+<h1 class="mb-6 text-4xl font-bold tracking-tight">Upcoming</h1>
 
 {#if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">
@@ -99,12 +99,12 @@
     {@const differ = timesDiffer(next.bookings)}
     <section class="pass mb-8" aria-labelledby="next-title">
       <div class="flex flex-col gap-3 p-6 md:p-8">
-        <p class="eyebrow">{next.state === "now" ? "Under way" : "Next up"}</p>
+        <p class="eyebrow flex items-center gap-2">{#if next.state === "now"}<span class="size-2 animate-pulse rounded-full bg-primary motion-reduce:animate-none" aria-hidden="true"></span>{/if}{next.state === "now" ? "Under way" : "Next up"}</p>
         <div class="flex items-center gap-3">
           <BrandLogo src={s.logo} size={48} />
-          <h2 id="next-title" class="min-w-0 break-words text-2xl font-semibold tracking-tight">{headline(s)}</h2>
+          <h2 id="next-title" class="min-w-0 break-words text-3xl font-bold tracking-tight md:text-4xl">{headline(s)}</h2>
         </div>
-        <p class="text-lg font-medium" data-countdown>
+        <p class="w-fit rounded-full bg-primary/12 px-3.5 py-1 text-base font-semibold text-primary" data-countdown>
           {next.state === "now" ? when(END_WORD[s.kind], endAt(s) - now) : when(START_WORD[s.kind], startAt(s) - now)}
         </p>
         {#if subline(s)}<p class="break-words text-muted-foreground">{subline(s)}</p>{/if}
@@ -140,7 +140,7 @@
   {/if}
 
   {#if featured}
-    <h2 class="mb-1 text-xl font-semibold tracking-tight"><a class="underline-offset-2 hover:underline" href={`#trip/${featured.id}`}>{featured.name}</a></h2>
+    <h2 class="mb-1 text-2xl font-bold tracking-tight"><a class="underline-offset-2 hover:underline" href={`#trip/${featured.id}`}>{featured.name}</a></h2>
     {#if featured.start_date && featured.end_date}<p class="mb-4 text-sm text-muted-foreground">{dateLabel(featured.start_date)} – {dateLabel(featured.end_date)}</p>{/if}
     <ol class="flex flex-col gap-6" aria-label={`${featured.name}, day by day`}>
       {#each days as day (day.date)}
