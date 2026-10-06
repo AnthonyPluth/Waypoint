@@ -422,6 +422,14 @@ class StayZoneTests(Household):
         with self.assertRaisesRegex(trips.Invalid, "time zone of the stay"):
             trips.edit_segment(self.c, self.jane, self.stay(start_zone="America/Chicago")["id"], {"start_zone": None})   # (no address to go on)
 
+    def test_a_stay_saved_with_two_zones_before_gets_its_start_zone_for_both_on_its_next_edit(self):
+        seg = self.stay(start_zone="America/Chicago")
+        self.c.orm.get(Segment, seg["id"]).end_zone = "Europe/London"   # (as the form once allowed)
+        self.c.orm.flush()
+        renamed = trips.edit_segment(self.c, self.jane, seg["id"], {"origin": "Other Hotel"})
+        assert renamed
+        self.assertEqual((renamed["start_zone"], renamed["end_zone"]), ("America/Chicago", "America/Chicago"))
+
     def test_editing_a_stay_keeps_its_zone_in_both_places(self):
         seg = self.stay(start_zone="America/Chicago")
         moved = trips.edit_segment(self.c, self.jane, seg["id"], {"start_zone": "America/Denver"})
