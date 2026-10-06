@@ -7,9 +7,6 @@
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
 
-  // Settings → AI: off unless turned on. It reads only the mail Waypoint couldn’t, and what it makes of it is a suggestion
-  // on the Review page that a person confirms or edits. The OpenRouter key is typed here once and never comes back: the
-  // server only says whether one is saved (or comes from the environment).
   type Mode = AiSettings["mode"];
   let saved = $state<AiSettings | null>(null);
   let problem = $state("");

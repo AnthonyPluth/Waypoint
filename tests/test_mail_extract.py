@@ -1,5 +1,3 @@
-"""Reading a message for its bookings (waypoint/domain/mail/extract.py): schema.org JSON-LD and microdata for each kind of
-reservation, from synthetic emails (invented names, codes and numbers; real airports). Nothing here touches a database."""
 import base64
 import unittest
 from pathlib import Path
@@ -10,7 +8,6 @@ FIXTURES = Path(__file__).parent / "fixtures" / "mail"
 
 
 def message(raw: bytes) -> dict:
-    """A message as Gmail's API gives it with format=raw."""
     return {"id": "m1", "raw": base64.urlsafe_b64encode(raw).decode().rstrip("=")}
 
 
@@ -193,7 +190,6 @@ class MarkupTests(unittest.TestCase):
 
 
 class UtcMarkedTimesTests(unittest.TestCase):
-    """An airline that writes local times with a Z: the message's own visible text can settle which reading is meant."""
     CHI, DEN = "America/Chicago", "America/Denver"
 
     def reading(self, name, start=CHI, end=DEN):
@@ -215,7 +211,7 @@ class UtcMarkedTimesTests(unittest.TestCase):
         self.assertIsNone(self.reading("utc_marked_no_times_in_text"))
 
     def test_a_real_offset_has_nothing_to_settle(self):
-        self.assertIsNone(self.reading("offset_marked_times"))   # (the text shows other times entirely: it is not consulted)
+        self.assertIsNone(self.reading("offset_marked_times"))
 
     def test_an_overnight_flight_across_zones_is_read_as_local(self):
         self.assertEqual(self.reading("utc_marked_overnight", "America/Los_Angeles", "America/New_York"), "written")
@@ -225,7 +221,6 @@ class UtcMarkedTimesTests(unittest.TestCase):
         self.assertIsNone(extract.reading(b, self.CHI, self.DEN))
 
     def test_the_readings_must_hold_for_departure_and_arrival_together(self):
-        # 9:00 AM is shown but the arrival's 11:10 AM is not, so the as-written reading isn't confirmed
         self.assertIsNone(extract.reading(self.page("Leaves 9:00 AM"), self.CHI, self.DEN))
 
     def test_the_usual_forms_of_a_time_are_found(self):
@@ -242,7 +237,7 @@ class UtcMarkedTimesTests(unittest.TestCase):
         [b] = fixture("utc_marked_local_in_text").bookings
         self.assertEqual(b.clock_times, frozenset({"09:00", "11:10"}))
         [plain] = fixture("offset_marked_times").bookings
-        self.assertEqual(plain.clock_times, frozenset())   # (read only for a booking with a time marked UTC)
+        self.assertEqual(plain.clock_times, frozenset())
 
     def test_a_time_that_cannot_be_placed_settles_nothing(self):
         [b] = fixture("utc_marked_local_in_text").bookings
@@ -267,14 +262,14 @@ class WallClockTests(unittest.TestCase):
     def test_a_time_with_its_places_offset_keeps_what_is_written(self):
         self.assertEqual(extract.wall_clock("2026-03-01T22:15:00+13:00"), "2026-03-01T22:15:00")
         self.assertEqual(extract.wall_clock("2026-03-01T22:15:00+13:00", "Pacific/Auckland"), "2026-03-01T22:15:00")
-        self.assertEqual(extract.wall_clock("2026-03-01T22:15:00+00:00", "Europe/London"), "2026-03-01T22:15:00")   # (London in March is UTC)
+        self.assertEqual(extract.wall_clock("2026-03-01T22:15:00+00:00", "Europe/London"), "2026-03-01T22:15:00")
         self.assertEqual(extract.wall_clock("2026-03-01T22:15"), "2026-03-01T22:15:00")
         self.assertEqual(extract.wall_clock("2026-03-01 22:15:00"), "2026-03-01T22:15:00")
 
     def test_a_time_in_utc_or_another_offset_than_the_places_is_moved_into_its_own_zone_and_needs_one(self):
         self.assertEqual(extract.wall_clock("2026-03-01T09:15:00Z", "Pacific/Auckland"), "2026-03-01T22:15:00")
         self.assertEqual(extract.wall_clock("2026-03-01T09:15:00+00:00", "Pacific/Auckland"), "2026-03-01T22:15:00")
-        self.assertEqual(extract.wall_clock("2026-07-01T12:00:00+00:00", "Europe/London"), "2026-07-01T13:00:00")   # (BST)
+        self.assertEqual(extract.wall_clock("2026-07-01T12:00:00+00:00", "Europe/London"), "2026-07-01T13:00:00")
         self.assertIsNone(extract.wall_clock("2026-03-01T09:15:00+00:00"))
         self.assertIsNone(extract.wall_clock("2026-03-01T09:15:00Z"))
         self.assertIsNone(extract.wall_clock("2026-03-01T09:15:00Z", "Not/AZone"))

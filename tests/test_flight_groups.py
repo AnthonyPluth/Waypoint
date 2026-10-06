@@ -1,6 +1,3 @@
-"""One flight booked on two reservations is one flight to everything but the bookings themselves (AGENTS.md, "Waypoint's
-promises" are untouched: each booking keeps its own segment): the calendar feed, the reminders and the flight-status calls
-count it once. Names, codes and itineraries are made up; the airports are real."""
 from datetime import UTC, date, datetime
 
 from waypoint.domain import calendar, flightstatus, reminders, trips
@@ -31,7 +28,7 @@ class CalendarGroups(Reminders):
                            segment(id=2, confirmation="BBBBBB", provider="Example Air", details={"flight_number": "NZ0006"}))
         self.assertEqual(sum(line == "BEGIN:VEVENT" for line in lines), 1)
         text = "\n".join(lines).replace("\\n", "\n")
-        self.assertIn("Confirmations: AAAAAA\\, BBBBBB", text)   # (a comma is escaped in iCalendar text)
+        self.assertIn("Confirmations: AAAAAA\\, BBBBBB", text)
         self.assertIn("UID:segment-1@waypoint", lines)
 
     def test_the_event_is_cancelled_only_when_every_booking_is(self):
@@ -55,11 +52,11 @@ class CalendarGroups(Reminders):
 
 class ReminderGroups(Reminders):
     def test_a_flight_on_two_bookings_gets_one_check_in_reminder_and_one_line_in_the_day_summary(self):
-        self.add(self.jane, {**FLIGHT_OUT, "confirmation": "MIA777"}, travelers=self.on(self.jane.person_id))   # (Jane's other booking of it)
+        self.add(self.jane, {**FLIGHT_OUT, "confirmation": "MIA777"}, travelers=self.on(self.jane.person_id))
         self.device()
-        when = datetime(2026, 11, 20, 0, 30, tzinfo=UTC)   # (19:00 in New York is 00:00 UTC the next day: inside the 24 hours)
+        when = datetime(2026, 11, 20, 0, 30, tzinfo=UTC)
         reminders.set_prefs(self.c, "u-jane", {"check_in": True, "day_of": True})
-        self.assertEqual(self.due(when, today=date(2026, 11, 20), hour=8), 2)   # one check-in, one summary
+        self.assertEqual(self.due(when, today=date(2026, 11, 20), hour=8), 2)
         titles = [m["title"] for _d, m in self.sent]
         self.assertEqual(sorted(titles), ["Check-in opens", "Today"])
         [summary] = [m for _d, m in self.sent if m["title"] == "Today"]

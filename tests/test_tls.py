@@ -1,5 +1,3 @@
-"""waypoint/tls.py: every outbound request is to a web address, and checks certificates the same way, with one shared
-context."""
 import io
 import ssl
 import unittest

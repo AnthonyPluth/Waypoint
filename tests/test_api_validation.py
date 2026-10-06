@@ -1,6 +1,3 @@
-"""What the API's handlers do with values they can't use: each is refused with a message saying which (ApiError, a 400
-or a 404), never left to fail as a bug would. Switches sent as text ("false", "0", "no") are off; whole numbers that
-aren't whole, ids that aren't ids and texts that aren't text are refused."""
 import unittest
 
 from waypoint import validate
@@ -62,7 +59,6 @@ class WholeNumberTests(unittest.TestCase):
 
 
 class TextTests(unittest.TestCase):
-    """A field that should be text, sent as something else, is refused rather than taken as empty."""
 
     def test_not_text(self):
         for bad in ({"a": 1}, ["Lisbon"], 10 ** 30, True, 1.5):

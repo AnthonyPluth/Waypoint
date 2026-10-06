@@ -20,13 +20,12 @@ const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
 const mia: Person = { id: 2, display_name: "Mia Doe", first_name: null, legal_name: null, aliases: [], member: false, links: [] };
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: null, legal_name: null, aliases: [], member: true, links: [] };
 
-/** The server, with what's waiting kept in `held`: answers the calls the page makes. */
 const SUGGESTION = { kind: "flight" as const, provider: "Example Air", confirmation: "QW4R7T", origin: "BOS", destination: "DEN",
   start_local: "2026-12-02T07:15", end_local: "2026-12-02T10:05" } as unknown as NonNullable<ReviewItem["suggestion"]>;
 const PREVIEW = "Hello Jane,\nYour flight EX 410 leaves Boston at 7:15 am on 2 January.";
 let previewFails = "";
 let suggestFails = "";
-let suggestGate: Promise<void> | null = null;   // set: every suggest request waits for it
+let suggestGate: Promise<void> | null = null;
 let truncated = false;
 let held: Review;
 let calls: [string, string | undefined, unknown][];
@@ -66,7 +65,7 @@ describe("Review", () => {
     render(ReviewPage);
     const list = await screen.findByRole("list", { name: "Couldn’t read" });
     expect(within(list).getByText("Your itinerary: EX 410")).toBeInTheDocument();
-    expect(within(list).getByRole("button", { name: "Add “Your itinerary: EX 410” by hand" })).toBeInTheDocument();   // (the button is named as it reads)
+    expect(within(list).getByRole("button", { name: "Add “Your itinerary: EX 410” by hand" })).toBeInTheDocument();
     expect(within(list).getByText("Sent 2026-10-17 · to ana@gmail.example")).toBeInTheDocument();
   });
 
@@ -76,7 +75,7 @@ describe("Review", () => {
     expect(await screen.findByText("Mail from an unknown sender")).toBeInTheDocument();
     expect(screen.getByText("to ana@gmail.example")).toBeInTheDocument();
     expect(screen.getByText(REASONS.broken)).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /Ignore/ })).toHaveLength(1);   // nothing to ignore for no sender
+    expect(screen.getAllByRole("button", { name: /Ignore/ })).toHaveLength(1);
   });
 
   it("shows an item shared by another member with whose mailbox it is, and only Add by hand and Dismiss", async () => {
@@ -97,7 +96,7 @@ describe("Review", () => {
     const row = (await screen.findAllByTestId("review-item"))[0];
     await userEvent.click(within(row).getByRole("button", { name: /by hand/ }));
     expect(await screen.findByLabelText(/Confirmation/)).toBeInTheDocument();
-    expect(calls).toContainEqual(["/api/review/4/preview", undefined, undefined]);   // (the kept copy: anyone who sees the item may read it)
+    expect(calls).toContainEqual(["/api/review/4/preview", undefined, undefined]);
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await userEvent.click(within(row).getByRole("button", { name: /Dismiss/ }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/4", "DELETE", undefined]));
@@ -115,7 +114,7 @@ describe("Review", () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: "Ignore example-air.example" }));
     expect(await screen.findByText("Ignore example-air.example?")).toBeInTheDocument();
-    expect(calls.some(([p]) => p.endsWith("/ignore"))).toBe(false);   // not until confirmed
+    expect(calls.some(([p]) => p.endsWith("/ignore"))).toBe(false);
     await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1/ignore", "POST", undefined]));
     expect(toast.success).toHaveBeenCalledWith("Ignoring example-air.example");
@@ -135,7 +134,7 @@ describe("Review", () => {
     await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", {
       kind: "flight", start_local: "2027-01-02T07:15", end_local: "2027-01-02T09:40", provider: "Example Air", confirmation: "ZZ9Y8X",
       origin: "BOS", destination: "DEN" }]));
-    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42", "DELETE", undefined]));   // (the booking keeps the message it came from)
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42", "DELETE", undefined]));
     expect(toast.success).toHaveBeenCalledWith("Added to your trips");
     expect(screen.queryByRole("form")).toBeNull();
   });
@@ -209,7 +208,7 @@ describe("Review", () => {
     await userEvent.type(screen.getByLabelText("Arrives"), "2027-01-02T09:40");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(calls.some(([p]) => p === "/api/segments")).toBe(true));
-    await waitFor(() => expect(calls.filter(([p]) => p === "/api/review").length).toBeGreaterThan(1));   // reloaded either way
+    await waitFor(() => expect(calls.filter(([p]) => p === "/api/review").length).toBeGreaterThan(1));
   });
 
   it("lists names to match, with the booking each is on, and matches one to a person", async () => {
@@ -218,7 +217,7 @@ describe("Review", () => {
     expect(within(list).getByText("DOE/MIA MISS")).toBeInTheDocument();
     expect(within(list).getByText("Flight JFK → SFO on 2026-12-08 (Example Air)")).toBeInTheDocument();
     const button = within(list).getByRole("button", { name: "Match DOE/MIA MISS" });
-    expect(button).toBeDisabled();   // until someone is chosen
+    expect(button).toBeDisabled();
     await userEvent.selectOptions(within(list).getByLabelText("Who is DOE/MIA MISS?"), "Mia Doe");
     await userEvent.click(button);
     await waitFor(() => expect(calls).toContainEqual(["/api/review/who/7", "POST", { person_id: 2 }]));
@@ -231,7 +230,7 @@ describe("Review", () => {
     const list = await screen.findByRole("list", { name: "Who is this?" });
     await userEvent.selectOptions(within(list).getByLabelText("Who is DOE/MIA MISS?"), "A new guest…");
     const button = within(list).getByRole("button", { name: "Match DOE/MIA MISS" });
-    expect(button).toBeDisabled();   // until they have a name
+    expect(button).toBeDisabled();
     await userEvent.type(within(list).getByLabelText("Name for DOE/MIA MISS"), "Mia Rose Doe");
     await userEvent.click(button);
     await waitFor(() => expect(calls).toContainEqual(["/api/review/who/7", "POST", { new_guest: "Mia Rose Doe" }]));
@@ -295,7 +294,7 @@ describe("Review: the AI’s suggestion", () => {
     expect(screen.getByLabelText("Confirmation code")).toHaveValue("QW4R7T");
     expect(screen.getByLabelText("From (airport code)")).toHaveValue("BOS");
     expect(screen.getByLabelText("Departs")).toHaveValue("2026-12-02T07:15");
-    expect(calls.some(([p]) => p === "/api/segments")).toBe(false);   // nothing saved yet
+    expect(calls.some(([p]) => p === "/api/segments")).toBe(false);
     await userEvent.clear(screen.getByLabelText("Confirmation code"));
     await userEvent.type(screen.getByLabelText("Confirmation code"), "QW4R7U");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
@@ -402,7 +401,7 @@ describe("Review: the message beside the form", () => {
 
   it("keeps the message nowhere but the page", async () => {
     const stored: string[] = [];
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation((_k: string, v: string) => { stored.push(v); });   // (both of the browser's stores)
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation((_k: string, v: string) => { stored.push(v); });
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     await screen.findByTestId("preview");
@@ -440,7 +439,7 @@ describe("Review: Ask AI", () => {
     expect(asks[1]).toHaveTextContent("Asking…");
     expect(asks[0]).toBeDisabled();
     expect(asks[2]).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Ask AI about all 2" })).toBeEnabled();   // only those not being asked
+    expect(screen.getByRole("button", { name: "Ask AI about all 2" })).toBeEnabled();
     open();
     await waitFor(() => expect(screen.getAllByRole("button", { name: /Check the AI.s suggestion/ })).toHaveLength(4));
   });

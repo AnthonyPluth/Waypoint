@@ -1,7 +1,3 @@
-"""Made-up data for previews and `make verify`: `run.py demo` fills an empty database with it. Nothing here is anyone's
-real travel (AGENTS.md, "Personal data in the repo"): names, codes and numbers are invented, airports are real.
-
-Each feature that stores something (people, trips) adds its own sample rows here, so `make verify` shows it."""
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
@@ -15,7 +11,6 @@ from . import loyalty, people, trips
 from .mail import review
 from .visibility import Viewer
 
-# A household of two who have signed in (sub, email, name, first name), and two guests who haven't a login.
 MEMBERS = [("demo-jane", "jane.doe@example.com", "Jane Doe", "Jane"),
            ("demo-sam", "sam.doe@example.com", "Sam Doe", "Sam")]
 GUESTS: list[people.Fields] = [
@@ -23,7 +18,6 @@ GUESTS: list[people.Fields] = [
     {"display_name": "Grandma Joan", "first_name": "Joan", "legal_name": "Joan Marie O’Hare", "aliases": ["OHARE/JOAN MRS"]},
 ]
 
-# Made-up memberships: (person's display name, kind, program, number, expiry, notes).
 MEMBERSHIPS = [
     ("Jane Doe", "airline", "American AAdvantage", "DEMO1234567", None, None),
     ("Jane Doe", "airline", "United MileagePlus", "DM987654", None, None),
@@ -37,9 +31,6 @@ MEMBERSHIPS = [
 ]
 
 
-# Four trips (and a fifth, read from an email, below), dated from today (so there is always a past one, one in progress and some to come): the family's two (Jane
-# booked them for Jane, Sam and Mia: one last month, one under way), and one each for Jane and Sam alone, so each member
-# sees three and the other's solo trip isn't among them (AGENTS.md, "You see the trips you're on").
 def _at(today: date, days: int, clock: str) -> str:
     return f"{today + timedelta(days=days):%Y-%m-%d}T{clock}"
 
@@ -72,7 +63,6 @@ def _family_now(today: date) -> list[trips.SegmentIn]:
     ]
 
 
-# Older trips (a year and two years back), so Stats has years to pick, more airlines, hotel chains and a rental car.
 def _family_last_year(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": _at(today, -400, "07:30"), "end_local": _at(today, -400, "10:55"),
@@ -105,7 +95,6 @@ def _port(name: str, zone: str, day: int, arrive: str | None, leave: str | None,
             "depart_local": _at(today, day, leave) if leave else None}
 
 
-# Two sailings: one finished (Stats counts its nights, sea days and ports) and one to come, with its terminal's address.
 def _cruises(today: date) -> list[trips.SegmentIn]:
     new_york, bahamas, cayman = "America/New_York", "America/Nassau", "America/Cayman"
     return [
@@ -122,8 +111,6 @@ def _cruises(today: date) -> list[trips.SegmentIn]:
     ]
 
 
-# Grandma Joan flies with the family on the same flights, on a reservation of her own: the trip shows each flight once, with a block
-# for each booking.
 def _joan(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": _at(today, -2, "19:00"), "end_local": _at(today, -1, "07:10"),
@@ -156,8 +143,6 @@ def _sam_alone(today: date) -> list[trips.SegmentIn]:
     ]
 
 
-# The family's flight home is running late, with a gate: what live flight status shows (where the server has a RAPIDAPI_KEY,
-# which `make verify` gives its demo server).
 def _flight_status(today: date) -> dict[str, str]:
     return {
         "flight_number": "AA102", "date": f"{today + timedelta(days=4):%Y-%m-%d}", "state": "delayed", "origin": "LHR", "destination": "JFK",
@@ -166,28 +151,23 @@ def _flight_status(today: date) -> dict[str, str]:
         "arr_zone": "America/New_York", "arr_terminal": "8",
     }
 
-# A flight Waypoint read from an email, for a traveller whose printed name nobody matches yet ("Who is this?" in Review).
 def _read_from_email(today: date) -> trips.SegmentIn:
     return {"kind": "flight", "origin": "JFK", "destination": "ORD", "start_local": _at(today, 60, "07:00"), "end_local": _at(today, 60, "08:45"),
             "confirmation": "CH3K5P", "provider": "Example Air", "details": {"flight_number": "EX 410"}}
 
 def _message(domain: str, days_ago: int, today: date, subject: str, lines: tuple[str, ...]) -> stored_mail.Content:
-    """A made-up email, as a scan would have kept it (its text and the markup of it)."""
     return {"subject": subject, "sender_domain": domain, "received": (today - timedelta(days=days_ago)).isoformat(), "text": "\n".join(lines),
             "html": "".join(f"<p>{line}</p>" for line in lines), "truncated": False}
 
 
 SUBJECTS = {"example-air.example": "Your itinerary", "example-stays.example": "Your reservation", "example-cruises.example": "Your cruise booking"}
 
-# The household's one connected mailbox, and two messages Waypoint couldn't read (sender's domain, days before today, why).
 DEMO_MAILBOX = "jane.doe@gmail.example"
 UNREAD: list[tuple[str, int, review.Reason]] = [("example-air.example", 21, "no_markup"), ("example-stays.example", 15, "incomplete")]
-# Sam's mailbox, which he shares with the household: what it couldn't read shows in Review for Jane too, marked as his.
 DEMO_SHARED_MAILBOX = "sam.doe@gmail.example"
 SHARED_UNREAD: list[tuple[str, int, review.Reason]] = [("example-cruises.example", 9, "no_markup")]
 
 
-# The seats of the family's flights where each traveller has their own (Jane, Sam, Mia); the other flights keep one on the booking.
 FAMILY_SEATS = {"DL 1412": ("22A", "22B", "22C"), "AA 101": ("31A", "31B", "31C")}
 
 
@@ -199,8 +179,6 @@ def _on(*ids: int | None, seats: tuple[str, ...] = ()) -> list[trips.TravelerIn]
 
 
 def seed(conn: db.Connection, today: date | None = None) -> int:
-    """Fill an empty database with sample data, its trips dated from `today` (this machine's, by default). Returns how many
-    rows it added."""
     today = today or date.today()
     before = _rows(conn)
     for sub, email, name, first in MEMBERS:
@@ -231,7 +209,7 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
         review.add(conn, box.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
         stored_mail.put(conn, box.id, f"demo-{domain}", _message(domain, ago, today, f"{SUBJECTS[domain]}: made-up details",
                                                                  ("Hello Jane,", "These are made-up details for the demo.", "Confirmation: DEMO42")), 0.0)
-    if from_email:   # (the email the demo's flight was read from, so its card has a View email button)
+    if from_email:
         stored_mail.put(conn, box.id, "demo-read-from-email", _message("example-air.example", 60, today, "Your itinerary: flight EX 410",
                                                                        ("Hello,", "Your flight EX 410 leaves New York (JFK) at 7:00 am.", "Confirmation: CH3K5P")), 0.0)
         stored_mail.link(conn, from_email["id"], box.id, "demo-read-from-email")

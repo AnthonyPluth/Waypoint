@@ -33,7 +33,6 @@ class CleanEnvTests(unittest.TestCase):
 
 
 class RunPyFileArgumentTests(unittest.TestCase):
-    """run.py's file argument takes several words now (verify's pages); backup and restore still take one file."""
 
     def run_py(self, tmp, *args):
         return subprocess.run([sys.executable, os.path.join(verify.ROOT, "run.py"), *args], cwd=tmp,

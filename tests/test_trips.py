@@ -1,6 +1,3 @@
-"""Trips and segments: who sees them (AGENTS.md, "You see the trips you're on"), times kept where they happen ("Times are
-where they happen"), grouping, merging and splitting, and the routes that do it. Names, codes and itineraries are made up;
-the airports are real."""
 import secrets
 import urllib.parse
 import time
@@ -34,7 +31,6 @@ def guest(name):
 
 
 class Household(DbCase):
-    """Two members (Jane, Sam) and two guests (Mia, Joan), each with their person row."""
 
     def setUp(self):
         super().setUp()
@@ -81,7 +77,7 @@ class VisibilityTests(Household):
                 self.assertEqual(trips.get_segment(self.c, who, seg["id"]) is not None, sees)
 
     def test_whoever_booked_a_guests_trip_sees_it(self):
-        seg = self.add(self.jane, OUT, travelers=self.on(self.mia))   # Jane isn't on it: she booked it
+        seg = self.add(self.jane, OUT, travelers=self.on(self.mia))
         self.assertIsNotNone(trips.get(self.c, self.jane, seg["trip_id"]))
         self.assertIsNone(trips.get(self.c, self.sam, seg["trip_id"]))
         self.assertEqual([t["name"] for t in trips.listing(self.c, self.jane)[0]["segments"][0]["travelers"]], ["Mia Doe"])
@@ -94,7 +90,7 @@ class VisibilityTests(Household):
                                start_zone="Europe/London", end_local="2026-06-03T09:00", end_zone="Europe/London",
                                source="manual", booked_by=self.sam.person_id))
         self.c.orm.flush()
-        self.assertEqual(len(trips.listing(self.c, self.sam)), 1)   # Sam booked a leg of it, and isn't travelling
+        self.assertEqual(len(trips.listing(self.c, self.sam)), 1)
 
     def test_adding_a_traveller_shares_the_trip(self):
         seg = self.add(self.jane, OUT, travelers=self.on(self.mia))
@@ -102,7 +98,7 @@ class VisibilityTests(Household):
         trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": self.on(self.mia, self.sam.person_id)})
         self.assertIsNotNone(trips.get_segment(self.c, self.sam, seg["id"]))
         self.assertEqual(len(trips.listing(self.c, self.sam)), 1)
-        trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": self.on(self.mia)})   # and taking them off unshares it
+        trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": self.on(self.mia)})
         self.assertEqual(trips.listing(self.c, self.sam), [])
 
     def test_the_local_household_sees_every_trip(self):
@@ -135,7 +131,6 @@ class VisibilityTests(Household):
 
 
 class TimeZoneTests(Household):
-    """A flight's times stay what was typed, with the zone of the airport, through saving, reading and a backup."""
 
     def keeps(self, segments):
         shown = {s["id"]: (s["start_local"], s["start_zone"], s["end_local"], s["end_zone"])
@@ -152,13 +147,13 @@ class TimeZoneTests(Household):
                          ("2026-03-01T22:15", "Pacific/Auckland", "2026-03-01T15:10", "America/Los_Angeles"))
         trip = trips.get(self.c, self.jane, seg["trip_id"])
         assert trip
-        self.assertEqual((trip["start_date"], trip["end_date"]), ("2026-03-01", "2026-03-01"))   # local dates
+        self.assertEqual((trip["start_date"], trip["end_date"]), ("2026-03-01", "2026-03-01"))
 
     def test_clocks_changing_do_not_move_the_times(self):
         london = {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": "2026-03-29T00:45",
-                  "end_local": "2026-03-29T03:30"}   # the night UK clocks go forward
+                  "end_local": "2026-03-29T03:30"}
         stay = {**HOTEL, "start_local": "2026-03-07T15:00", "end_local": "2026-03-08T11:00",
-                "start_zone": "America/New_York", "end_zone": "America/New_York"}   # the night US clocks do
+                "start_zone": "America/New_York", "end_zone": "America/New_York"}
         made = [self.add(self.jane, london), self.add(self.jane, stay)]
         shown, typed = self.keeps(made)
         self.assertEqual(sorted(shown.values()), sorted(typed))
@@ -187,7 +182,6 @@ class TimeZoneTests(Household):
         with self.assertRaisesRegex(trips.Invalid, "ends before it starts"):
             self.add(self.jane, {**OUT, "origin": "JFK", "destination": "BOS", "start_local": "2026-06-01T10:00",
                                  "end_local": "2026-06-01T09:00"})
-        # 09:00 in Los Angeles is later than 10:00 in New York: fine.
         ok = self.add(self.jane, {**OUT, "destination": "LAX", "start_local": "2026-06-01T10:00", "end_local": "2026-06-01T09:00"})
         self.assertEqual((ok["end_local"], ok["end_zone"]), ("2026-06-01T09:00", "America/Los_Angeles"))
 
@@ -206,7 +200,7 @@ class TimeZoneTests(Household):
                             ({"start_zone": "Mars/Olympus"}, "isn’t one"), ({"end_zone": "../etc/passwd"}, "isn’t one")):
             with self.subTest(fields=fields), self.assertRaisesRegex(trips.Invalid, why):
                 self.add(self.jane, {**OUT, **fields})
-        unlisted = self.add(self.jane, {**OUT, "origin": "ZZZ", "start_zone": "Pacific/Fiji"})   # a code the list lacks, given a zone
+        unlisted = self.add(self.jane, {**OUT, "origin": "ZZZ", "start_zone": "Pacific/Fiji"})
         self.assertEqual(unlisted["origin"], "ZZZ")
 
 
@@ -246,7 +240,7 @@ class SegmentTests(Household):
         seg = self.add(self.jane, OUT)
         same = trips.edit_segment(self.c, self.jane, seg["id"], {"status": "confirmed", "confirmation": None})
         assert same
-        self.assertEqual(same["locked_fields"], [])   # nothing changed, nothing locked
+        self.assertEqual(same["locked_fields"], [])
         edited = trips.edit_segment(self.c, self.jane, seg["id"], {"confirmation": "QW3RTY", "details": {"seat": "12A"},
                                                                    "status": "changed", "travelers": self.on(self.sam.person_id)})
         assert edited
@@ -262,7 +256,7 @@ class SegmentTests(Household):
     def test_an_edited_address_is_locked_against_a_later_email_but_an_empty_one_is_filled(self):
         mail = {**HOTEL, "confirmation": "H77001", "details": {"address": "9 Mill Lane\nLondon N1 1AA"}}
         empty = self.add(self.jane, {**HOTEL, "confirmation": "H77001"})
-        self.assertEqual(trips.merge_email_segment(self.c, self.jane, mail), "updated")   # (nothing was there: the email fills it)
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, mail), "updated")
         self.assertEqual(trips.get_segment(self.c, self.jane, empty["id"])["details"], {"address": "9 Mill Lane\nLondon N1 1AA"})
         edited = trips.edit_segment(self.c, self.jane, empty["id"], {"details": {"address": "2 Dock Road"}})
         assert edited
@@ -285,7 +279,7 @@ class SegmentTests(Household):
         given = trips.edit_segment(self.c, self.jane, seg["id"], {"origin": "ZZZ", "start_zone": "Pacific/Fiji", "start_local": "2026-06-01T09:00"})
         assert given
         self.assertEqual(given["start_zone"], "Pacific/Fiji")
-        with self.assertRaisesRegex(trips.Invalid, "ends before"):   # the whole segment is checked again
+        with self.assertRaisesRegex(trips.Invalid, "ends before"):
             trips.edit_segment(self.c, self.jane, seg["id"], {"end_local": "2026-05-01T00:00"})
 
     def test_editing_a_stays_place_keeps_its_zone(self):
@@ -313,11 +307,11 @@ class SegmentTests(Household):
         trips.edit_segment(self.c, self.jane, b["id"], {"status": "cancelled"})
         trip = trips.get(self.c, self.jane, a["trip_id"])
         assert trip
-        self.assertEqual(trip["end_date"], "2026-06-02")   # a cancelled one doesn't stretch it
+        self.assertEqual(trip["end_date"], "2026-06-02")
         trips.edit_segment(self.c, self.jane, a["id"], {"status": "cancelled"})
         trip = trips.get(self.c, self.jane, a["trip_id"])
         assert trip
-        self.assertEqual((trip["start_date"], trip["end_date"]), ("2026-06-01", "2026-06-08"))   # all cancelled: all count
+        self.assertEqual((trip["start_date"], trip["end_date"]), ("2026-06-01", "2026-06-08"))
 
     def test_segments_come_by_start_moment_not_by_clock(self):
         late = self.add(self.jane, BACK)
@@ -353,7 +347,7 @@ class SeatTests(Household):
         again = trips.get_segment(self.c, self.jane, seg["id"])
         assert again
         self.assertEqual([t["seat"] for t in again["travelers"]], ["31a", "31B", "32A"])
-        self.assertEqual([t["seat"] for t in self.add(self.jane, OUT)["travelers"]], [None])   # (a seat is optional)
+        self.assertEqual([t["seat"] for t in self.add(self.jane, OUT)["travelers"]], [None])
         with self.assertRaisesRegex(trips.Invalid, "at most 10"):
             self.add(self.jane, OUT, travelers=[{"person_id": self.jane.person_id, "name": None, "seat": "x" * 11}])
 
@@ -364,7 +358,7 @@ class SeatTests(Household):
             {"person_id": None, "name": "DOE/MIA MISS", "seat": "32A"}]})
         assert moved
         self.assertEqual(([t["seat"] for t in moved["travelers"]], moved["locked_fields"]), (["12C", "31B", "32A"], ["travelers"]))
-        quiet = trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": [   # (an assistant or an older client names who is on it, and no seats)
+        quiet = trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": [
             {"person_id": self.jane.person_id, "name": None}, {"person_id": self.sam.person_id, "name": None}]})
         assert quiet
         self.assertEqual([(t["name"], t["seat"]) for t in quiet["travelers"]], [("Jane Doe", "12C"), ("Sam Doe", "31B")])
@@ -373,13 +367,13 @@ class SeatTests(Household):
         self.assertEqual([t["seat"] for t in cleared["travelers"]], [None])
         same = trips.edit_segment(self.c, self.jane, seg["id"], {"status": "changed"})
         assert same
-        self.assertEqual([t["seat"] for t in same["travelers"]], [None])   # (an edit of something else leaves them alone)
+        self.assertEqual([t["seat"] for t in same["travelers"]], [None])
 
     def test_leaving_a_seat_out_keeps_it_for_a_traveller_matched_from_a_printed_name(self):
         seg = self.add(self.jane, OUT, travelers=[{"person_id": None, "name": "DOE/MIA MISS", "seat": "32A"}])
         mia = self.sam.person_id
         assert mia is not None
-        self.assertEqual(trips.name_traveler(self.c, self.jane, seg["travelers"][0]["id"], mia), 1)   # (the row keeps the printed name, and now has a person)
+        self.assertEqual(trips.name_traveler(self.c, self.jane, seg["travelers"][0]["id"], mia), 1)
         quiet = trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": [{"person_id": mia, "name": None}]})
         assert quiet
         self.assertEqual([t["seat"] for t in quiet["travelers"]], ["32A"])
@@ -401,13 +395,13 @@ class StayZoneTests(Household):
 
     def test_a_stay_has_one_zone_and_the_end_follows_the_start(self):
         seg = self.stay(start_zone="America/Chicago", end_zone="Europe/London")
-        self.assertEqual((seg["start_zone"], seg["end_zone"]), ("America/Chicago", "America/Chicago"))   # (a different end zone is not kept)
+        self.assertEqual((seg["start_zone"], seg["end_zone"]), ("America/Chicago", "America/Chicago"))
 
     def test_a_stay_with_no_zone_takes_the_one_its_address_is_in(self):
         seg = self.stay(details={"address": "1 Ocean Ave, Honolulu, HI 96815"})
         self.assertEqual((seg["start_zone"], seg["end_zone"]), ("Pacific/Honolulu", "Pacific/Honolulu"))
         given = self.stay(details={"address": "1 Ocean Ave, Honolulu, HI 96815"}, start_zone="America/Denver")
-        self.assertEqual(given["start_zone"], "America/Denver")   # (what a person gave wins)
+        self.assertEqual(given["start_zone"], "America/Denver")
 
     def test_a_stay_whose_address_settles_nothing_is_refused_and_says_what_to_do(self):
         for details in ({}, {"address": "Hotel Foo, 1 Road"}):
@@ -420,11 +414,11 @@ class StayZoneTests(Household):
         assert cleared
         self.assertEqual((cleared["start_zone"], cleared["end_zone"]), ("Pacific/Honolulu", "Pacific/Honolulu"))
         with self.assertRaisesRegex(trips.Invalid, "time zone of the stay"):
-            trips.edit_segment(self.c, self.jane, self.stay(start_zone="America/Chicago")["id"], {"start_zone": None})   # (no address to go on)
+            trips.edit_segment(self.c, self.jane, self.stay(start_zone="America/Chicago")["id"], {"start_zone": None})
 
     def test_a_stay_saved_with_two_zones_before_gets_its_start_zone_for_both_on_its_next_edit(self):
         seg = self.stay(start_zone="America/Chicago")
-        self.c.orm.get(Segment, seg["id"]).end_zone = "Europe/London"   # (as the form once allowed)
+        self.c.orm.get(Segment, seg["id"]).end_zone = "Europe/London"
         self.c.orm.flush()
         renamed = trips.edit_segment(self.c, self.jane, seg["id"], {"origin": "Other Hotel"})
         assert renamed
@@ -444,7 +438,7 @@ class CruiseTests(Household):
     def test_a_cruise_keeps_its_ports_in_order_with_their_own_zones(self):
         seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS})
         self.assertEqual(seg["itinerary"], PORTS)
-        self.assertEqual(trips.get_segment(self.c, self.jane, seg["id"])["itinerary"], PORTS)   # (times as typed, never converted)
+        self.assertEqual(trips.get_segment(self.c, self.jane, seg["id"])["itinerary"], PORTS)
         self.assertEqual(self.add(self.jane, {**CRUISE, "confirmation": "NOPORTS"})["itinerary"], [])
 
     def test_a_cruise_with_a_bad_itinerary_is_refused_and_says_why(self):
@@ -463,7 +457,7 @@ class CruiseTests(Household):
     def test_editing_the_ports_locks_them_and_a_later_email_leaves_them_alone_but_fills_an_empty_list(self):
         mail = {**CRUISE, "confirmation": "CR1234", "itinerary": [PORTS[0]]}
         empty = self.add(self.jane, {**CRUISE, "confirmation": "CR1234"})
-        self.assertEqual(trips.merge_email_segment(self.c, self.jane, mail), "updated")   # (nothing was listed: the email fills it)
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, mail), "updated")
         self.assertEqual(trips.get_segment(self.c, self.jane, empty["id"])["itinerary"], [PORTS[0]])
         edited = trips.edit_segment(self.c, self.jane, empty["id"], {"itinerary": PORTS})
         assert edited
@@ -490,12 +484,12 @@ class CruiseTests(Household):
         assert edited
         self.assertEqual((edited["kind"], edited["itinerary"], edited["locked_fields"]), ("hotel", [], ["itinerary", "kind"]))
         self.assertEqual(trips.ports_of(self.c, [seg["id"]]), {})
-        with self.assertRaisesRegex(trips.Invalid, "Only a cruise"):   # (ports sent with the change are still refused)
+        with self.assertRaisesRegex(trips.Invalid, "Only a cruise"):
             trips.edit_segment(self.c, self.jane, seg["id"], {"itinerary": PORTS})
 
     def test_a_bad_list_of_ports_in_an_email_is_left_out_without_spoiling_the_merge(self):
         empty = self.add(self.jane, {**CRUISE, "confirmation": "CR5555"})
-        bad = [{**PORTS[0], "arrive_local": "2030-01-01T08:00", "depart_local": None}]   # after the cruise ends
+        bad = [{**PORTS[0], "arrive_local": "2030-01-01T08:00", "depart_local": None}]
         mail = {**CRUISE, "confirmation": "CR5555", "details": {"ship": "Example Voyager II"}, "itinerary": bad}
         self.assertEqual(trips.merge_email_segment(self.c, self.jane, mail), "updated")
         got = trips.get_segment(self.c, self.jane, empty["id"])
@@ -514,7 +508,7 @@ class TripTests(Household):
                                                      "start_date": "2026-12-04", "end_date": "2026-12-06"})
         self.assertEqual((made["auto"], made["booked_by"], made["start_date"], made["segments"]),
                          (False, self.jane.person_id, "2026-12-04", []))
-        self.assertEqual(len(trips.listing(self.c, self.jane)), 1)   # empty, and still the booker's
+        self.assertEqual(len(trips.listing(self.c, self.jane)), 1)
         self.assertEqual(trips.listing(self.c, self.sam), [])
         for fields, why in (({"name": "x", "start_date": "2026-12-04"}, "both dates"),
                             ({"name": "x", "start_date": "2026-12-06", "end_date": "2026-12-04"}, "before it starts")):
@@ -552,7 +546,7 @@ class TripTests(Household):
     def test_merging_trips_with_different_people_is_refused(self):
         a = self.add(self.jane, OUT, travelers=self.on(self.jane.person_id, self.sam.person_id))
         b = self.add(self.jane, {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"},
-                     travelers=self.on(self.jane.person_id))   # Jane's own: Sam would see it
+                     travelers=self.on(self.jane.person_id))
         with self.assertRaisesRegex(trips.Invalid, "different people"):
             trips.merge(self.c, self.jane, a["trip_id"], b["trip_id"])
         with self.assertRaisesRegex(trips.Invalid, "different people"):
@@ -586,17 +580,17 @@ class TripTests(Household):
         for ids in ([], [9999], [a["id"], b["id"]]):
             with self.subTest(ids=ids), self.assertRaises(trips.Invalid):
                 trips.split(self.c, self.jane, a["trip_id"], ids)
-        with self.assertRaises(trips.Invalid):   # nothing left to split
+        with self.assertRaises(trips.Invalid):
             trips.split(self.c, self.jane, new["id"], [b["id"]])
 
     def test_the_splitter_sees_the_new_trip_because_they_booked_it(self):
-        a = self.add(self.jane, OUT, travelers=self.on(self.sam.person_id))   # Jane booked it for Sam, who's travelling
+        a = self.add(self.jane, OUT, travelers=self.on(self.sam.person_id))
         b = self.add(self.jane, BACK, trip_id=a["trip_id"], travelers=self.on(self.sam.person_id))
         new = trips.split(self.c, self.sam, a["trip_id"], [b["id"]])
         assert new
         self.assertEqual(new["booked_by"], self.sam.person_id)
         self.assertIsNotNone(trips.get(self.c, self.sam, new["id"]))
-        self.assertIsNotNone(trips.get(self.c, self.jane, new["id"]))   # (Jane booked the segment inside it)
+        self.assertIsNotNone(trips.get(self.c, self.jane, new["id"]))
 
 
 class GroupingTests(Household):
@@ -611,7 +605,7 @@ class GroupingTests(Household):
         a, b = self.add(self.jane, OUT), self.add(self.jane, BACK)
         later = self.add(self.jane, {**OUT, "start_local": "2026-06-09T19:00", "end_local": "2026-06-10T07:10"})
         self.assertEqual(a["trip_id"], b["trip_id"])
-        self.assertNotEqual(later["trip_id"], a["trip_id"])   # one day after getting back: not the same trip
+        self.assertNotEqual(later["trip_id"], a["trip_id"])
         far = self.add(self.jane, {**OUT, "start_local": "2026-07-20T19:00", "end_local": "2026-07-21T07:10"})
         self.assertNotIn(far["trip_id"], (a["trip_id"], later["trip_id"]))
 
@@ -629,7 +623,7 @@ class GroupingTests(Household):
 
     def test_someone_elses_booking_never_joins_a_solo_trip(self):
         jane = self.add(self.jane, OUT, travelers=self.on(self.jane.person_id))
-        sam = self.add(self.sam, HOTEL, travelers=self.on(self.sam.person_id))   # the same days and city
+        sam = self.add(self.sam, HOTEL, travelers=self.on(self.sam.person_id))
         self.assertNotEqual(jane["trip_id"], sam["trip_id"])
         self.assertEqual(len(trips.listing(self.c, self.sam)), 1)
         self.assertEqual(len(trips.listing(self.c, self.jane)), 1)
@@ -641,13 +635,13 @@ class GroupingTests(Household):
         hotel = self.add(self.jane, HOTEL, travelers=self.on(self.jane.person_id))
         self.assertEqual(hotel["trip_id"], family["trip_id"])
         newcomer = self.add(self.jane, {**OUT, "start_local": "2026-06-02T08:00", "end_local": "2026-06-02T22:00"},
-                            travelers=self.on(self.jane.person_id, self.joan))   # Joan isn't on it yet: a trip of its own
+                            travelers=self.on(self.jane.person_id, self.joan))
         self.assertNotEqual(newcomer["trip_id"], family["trip_id"])
 
     def test_only_grouped_trips_you_see_take_a_new_segment(self):
         mine = trips.create_trip(self.c, self.jane, {"name": "Made by hand", "start_date": "2026-06-01", "end_date": "2026-06-08"})
         seg = self.add(self.jane, OUT)
-        self.assertNotEqual(seg["trip_id"], mine["id"])   # a trip made by hand is left alone
+        self.assertNotEqual(seg["trip_id"], mine["id"])
         theirs = self.add(self.sam, BACK, travelers=self.on(self.sam.person_id))
         self.assertNotEqual(theirs["trip_id"], seg["trip_id"])
 
@@ -659,11 +653,11 @@ class GroupingTests(Household):
                   trips.Candidate(2, facts("2026-06-10", "2026-06-12", 1), (("JFK", "LHR"),)),
                   trips.Candidate(3, facts("2026-06-13", "2026-06-15", 1), ())]
         pick = lambda start, end, *people: trips.choose_trip(trips_, facts(start, end, *people))
-        self.assertEqual(pick("2026-06-03", "2026-06-04", 1), 1)         # inside one, within its people
-        self.assertIsNone(pick("2026-06-03", "2026-06-04", 3))           # someone who isn't on it
-        self.assertEqual(pick("2026-06-09", "2026-06-09", 1), 2)         # a day from 2, a day after the others' end: 2 is nearest... 1 has returned
-        self.assertEqual(pick("2026-06-12", "2026-06-13", 1), 2)         # two trips touch it: the nearest (an overlap beats a gap), then the earliest
-        self.assertEqual(pick("2026-05-30", "2026-05-30", 1), 1)         # up to two days before
+        self.assertEqual(pick("2026-06-03", "2026-06-04", 1), 1)
+        self.assertIsNone(pick("2026-06-03", "2026-06-04", 3))
+        self.assertEqual(pick("2026-06-09", "2026-06-09", 1), 2)
+        self.assertEqual(pick("2026-06-12", "2026-06-13", 1), 2)
+        self.assertEqual(pick("2026-05-30", "2026-05-30", 1), 1)
         self.assertIsNone(pick("2026-05-20", "2026-05-20", 1))
         self.assertIsNone(pick("2026-06-10", "2026-06-10", 9))
         self.assertIsNone(trips.choose_trip([], facts("2026-06-01", "2026-06-01")))
@@ -684,7 +678,7 @@ class AirportTests(DbCase):
     def test_every_airports_zone_is_a_real_one(self):
         from zoneinfo import ZoneInfo
         for _code, zone in self.c.execute(select(db_airports.code, db_airports.zone)).fetchall():
-            ZoneInfo(zone)   # raises for one that isn't
+            ZoneInfo(zone)
 
 
 db_airports = __import__("waypoint.storage.models", fromlist=["Airport"]).Airport
@@ -696,24 +690,21 @@ class DemoTests(DbCase):
         jane = Viewer(people.person_for_sub(self.c, "demo-jane"))
         sam = Viewer(people.person_for_sub(self.c, "demo-sam"))
         names = {who: [t["name"] for t in trips.listing(self.c, who)] for who in (jane, sam)}
-        self.assertEqual(len(names[jane]), 8)   # the family's four trips (two of them older), two cruises, her own, and the one read from an email for a name nobody matches
+        self.assertEqual(len(names[jane]), 8)
         self.assertEqual(len(names[sam]), 7)
-        self.assertEqual(len(set(names[jane]) & set(names[sam])), 6)   # the family's four trips and the cruises are both's; each has a solo one
+        self.assertEqual(len(set(names[jane]) & set(names[sam])), 6)
         for t in trips.listing(self.c, Viewer(None, household=True)):
             for s in t["segments"]:
                 self.assertTrue(s["start_zone"] and s["end_zone"])
 
 
-# ------------------------------------------------------------------------------------------------ the routes
-
 class RouteCase(ServerCase):
-    """Waypoint with sign-in on and three members with sessions: Ana, Ben and Cy."""
     env = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint",
            "OIDC_ALLOWED_EMAILS": "ana@example.com,ben@example.com,cy@example.com"}
 
     def setUp(self):
         with db.session() as conn:
-            for table in (Trip, AuthSession, User, Person):   # (a trip takes its segments and their travellers)
+            for table in (Trip, AuthSession, User, Person):
                 conn.execute(delete(table))
         self.who = {n: self.sign_in(f"sub-{n}", f"{n}@example.com", n.title()) for n in ("ana", "ben", "cy")}
         with db.session() as conn:
@@ -762,10 +753,9 @@ class VisibilityRouteTests(RouteCase):
                     status, got = self.call(who, method, path, body)
                     self.assertEqual((status, got), (404, {"error": got["error"]}))
                     self.assertIn(got["error"], ("No such trip", "No such segment"))
-        for method, path, body in gone:   # a trip that isn't there answers exactly the same
+        for method, path, body in gone:
             self.assertEqual(self.call("ben", method, path, body)[0], 404)
         self.assertEqual(self.ok("ben", "GET", "/api/trips")["trips"], [])
-        # Nothing the stranger tried changed anything for the person it belongs to.
         got = self.ok("ana", "GET", f"/api/trips/{trip}")
         self.assertEqual((got["name"], [s["status"] for s in got["segments"]]), (got["name"], ["confirmed", "confirmed"]))
         self.assertNotEqual(got["name"], "Stolen")
@@ -863,7 +853,7 @@ class SegmentRouteTests(RouteCase):
         self.assertEqual((edited["status"], edited["details"], edited["provider"], edited["locked_fields"]),
                          ("changed", {"seat": "35A", "terminal": "2"}, None, ["details", "provider", "status"]))
         self.assertEqual(self.ok("ana", "DELETE", f"/api/segments/{seg['id']}"), {"ok": True})
-        self.assertEqual(self.ok("ana", "GET", "/api/trips"), {"trips": []})   # the grouped trip went with its last segment
+        self.assertEqual(self.ok("ana", "GET", "/api/trips"), {"trips": []})
 
     def test_a_segment_goes_to_the_trip_named_or_is_grouped(self):
         out = self.book("ana")
@@ -897,7 +887,7 @@ class SegmentRouteTests(RouteCase):
                 status, got = self.call("ana", "POST", f"/api/segments/{seg['id']}", body)
                 self.assertEqual(status, 400, got)
                 self.assertIn(why, got["error"])
-        self.assertEqual(self.ok("ana", "GET", f"/api/segments/{seg['id']}")["status"], "confirmed")   # (a refused edit changes nothing)
+        self.assertEqual(self.ok("ana", "GET", f"/api/segments/{seg['id']}")["status"], "confirmed")
 
     def test_a_manage_link_must_be_a_web_address_and_may_be_cleared(self):
         seg = self.book("ana", manage_url="http://air.example.com/m")
@@ -914,7 +904,6 @@ class AirportRouteTests(RouteCase):
 
 
 class LocalHouseholdTests(ServerCase):
-    """Without sign-in, on your own machine, everyone is the one local household and sees every trip."""
     unset = ("OIDC_ISSUER",)
 
     def test_the_household_books_and_sees(self):
@@ -940,7 +929,7 @@ class CruiseRouteTests(RouteCase):
                 status, got = self.call("ana", "POST", f"/api/segments/{seg['id']}", {"itinerary": bad})
                 self.assertEqual(status, 400, got)
                 self.assertIn(why, got["error"])
-        self.assertEqual(self.call("ben", "GET", f"/api/segments/{seg['id']}")[0], 404)   # (ben isn't on it)
+        self.assertEqual(self.call("ben", "GET", f"/api/segments/{seg['id']}")[0], 404)
 
 
 class ApiFieldTests(unittest.TestCase):
@@ -958,7 +947,7 @@ class ApiFieldTests(unittest.TestCase):
         self.assertEqual(api.segment_fields({"details": {"address": "x" * 300}})["details"], {"address": "x" * 300})
         with self.assertRaisesRegex(ApiError, "300"):
             api.segment_fields({"details": {"address": "x" * 301}})
-        with self.assertRaisesRegex(ApiError, "200"):   # (the other details keep their limit)
+        with self.assertRaisesRegex(ApiError, "200"):
             api.segment_fields({"details": {"room": "x" * 201}})
 
     def test_what_is_left_out_stays_out(self):

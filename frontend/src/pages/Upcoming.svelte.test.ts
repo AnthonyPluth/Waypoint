@@ -68,7 +68,7 @@ describe("Upcoming", () => {
   });
 
   it("leads with the next segment: countdown, flight, departure time, terminal, and a code to tap and copy", async () => {
-    at("2026-11-20T09:00:00-05:00");   // 10 hours before the 7:00 PM departure
+    at("2026-11-20T09:00:00-05:00");
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
@@ -119,7 +119,7 @@ describe("Upcoming", () => {
   });
 
   it("calls a flight in the air under way, and counts down to landing", async () => {
-    at("2026-11-21T02:00:00-05:00");   // 7:00 AM in London: ten minutes to land
+    at("2026-11-21T02:00:00-05:00");
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
@@ -128,7 +128,7 @@ describe("Upcoming", () => {
   });
 
   it("leads with a hotel's address and check-in time once the flight is behind", async () => {
-    at("2026-11-21T08:00:00Z");   // landed; the hotel is the next thing
+    at("2026-11-21T08:00:00Z");
     serve([trip([outbound, stay])]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "Harbour Hotel" })).closest("section")!;
@@ -154,7 +154,7 @@ describe("Upcoming", () => {
     expect(within(days).getByRole("link", { name: "Harbour Hotel" })).toHaveAttribute("href", "#trip/1?segment=2");
     expect(within(days).getByRole("link", { name: "Check-out: Harbour Hotel" })).toHaveAttribute("href", "#trip/1?segment=2");
     expect(within(days).getByRole("link", { name: "JFK → LHR" })).toHaveAttribute("href", "#trip/1?segment=1");
-    expect(screen.getByRole("link", { name: "Open Trip to London" })).toHaveAttribute("href", "#trip/1?segment=1");   // (the next thing is the flight)
+    expect(screen.getByRole("link", { name: "Open Trip to London" })).toHaveAttribute("href", "#trip/1?segment=1");
   });
 
   it("shows a time at its place and, in brackets, yours when your zone differs", async () => {
@@ -162,7 +162,6 @@ describe("Upcoming", () => {
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
-    // The arrival at 7:10 AM in London reads the same wherever this runs; the bracket is there only if the zone differs.
     expect(within(card).getByText("7:10 AM")).toBeInTheDocument();
   });
 
@@ -195,7 +194,7 @@ describe("Upcoming", () => {
     expect(within(card).getByRole("button", { name: "Copy confirmation code BBBBBB" })).toBeInTheDocument();
     expect(within(card).queryByText("Times differ between bookings")).toBeNull();
     const days = screen.getByRole("list", { name: "Trip to London, day by day" });
-    expect(within(days).getAllByText("JFK → LHR")).toHaveLength(1);   // (one row for the flight, not one per booking)
+    expect(within(days).getAllByText("JFK → LHR")).toHaveLength(1);
     expect(within(days).getByText("2 bookings")).toBeInTheDocument();
   });
 

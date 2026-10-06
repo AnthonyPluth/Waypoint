@@ -1,5 +1,3 @@
-"""POST /mcp over HTTP, the tools and the protocol (waypoint/server/mcp_server.py), and the Settings routes for the assistants
-(switches, connections, Disconnect). Names, codes and numbers are made up."""
 import base64
 import hashlib
 import json
@@ -16,7 +14,6 @@ from waypoint.storage.models import OAuthGrant, OAuthToken
 
 
 class StreamableHttpTests(Assistants):
-    """POST /mcp: the server, served by Waypoint itself."""
 
     def rpc(self, msg, key="", headers=None, method="POST", raw=None):
         h = {"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if key else {}), **(headers or {})}
@@ -38,7 +35,7 @@ class StreamableHttpTests(Assistants):
                 status, headers, _ = self.rpc(ping, k)
                 self.assertEqual(status, 401)
                 self.assertTrue(headers["WWW-Authenticate"].startswith('Bearer realm="Waypoint", resource_metadata="'))
-        status, _, _ = self.rpc(ping, headers={"Authorization": key})              # not a bearer header
+        status, _, _ = self.rpc(ping, headers={"Authorization": key})
         self.assertEqual(status, 401)
         self.assertEqual(self.rpc(ping, key)[0], 200)
 
@@ -48,7 +45,7 @@ class StreamableHttpTests(Assistants):
         for origin in ("https://evil.example", "null", "http://localhost:1"):
             with self.subTest(origin=origin):
                 self.assertEqual(self.rpc(ping, key, {"Origin": origin})[0], 403)
-        self.assertEqual(self.rpc(ping, key, {"Origin": self.base})[0], 200)       # its own address, and no Origin at all, are fine
+        self.assertEqual(self.rpc(ping, key, {"Origin": self.base})[0], 200)
 
     def test_get_is_not_allowed_and_bad_messages_are_answered(self):
         key = self.make_token()
@@ -75,20 +72,20 @@ class StreamableHttpTests(Assistants):
         self.assertIn("wait for the person's explicit yes", write)
         self.assertIn("destructive", write)
         self.assertIn("separately", write)
-        self.assertIn("read-only", json.loads(self.rpc(init, self.make_token(*READ))[2])["result"]["instructions"])   # (no scope)
+        self.assertIn("read-only", json.loads(self.rpc(init, self.make_token(*READ))[2])["result"]["instructions"])
         self.assertEqual(json.loads(self.rpc({**init, "params": {"protocolVersion": "1999"}}, self.make_token())[2])["result"]["protocolVersion"],
                          mcp_server.PROTOCOL_VERSIONS[0])
 
     def test_the_tools_offered_follow_the_scopes_and_switches(self):
         reads = [t["name"] for t in mcp_server.TOOLS]
         names = lambda key: [t["name"] for t in self.tools(key)]
-        self.assertEqual(names(self.make_token(*ALL)), reads)                     # switches off: reads only
+        self.assertEqual(names(self.make_token(*ALL)), reads)
         self.switch(True)
-        self.assertEqual(names(self.make_token(*READ)), reads)                    # (a connection that wasn't allowed it)
+        self.assertEqual(names(self.make_token(*READ)), reads)
         with_write = names(self.make_token(*WRITE))
         self.assertIn("add_segment", with_write)
         self.assertIn("call_endpoint", with_write)
-        self.assertEqual([n for n in with_write if "loyalty" in n], [])           # no tool touches a number, whatever it's allowed
+        self.assertEqual([n for n in with_write if "loyalty" in n], [])
 
     def test_write_tools_carry_mcp_s_annotations(self):
         self.switch(True)
@@ -140,7 +137,7 @@ class StreamableHttpTests(Assistants):
         wide = self.make_token(*WRITE)
         for sent in (2.7, "2.7", "2e0x"):
             with self.subTest(sent=sent):
-                self.assertTrue(self.call(wide, "remove_segment", {"segment_id": sent})["isError"])   # not segment 2
+                self.assertTrue(self.call(wide, "remove_segment", {"segment_id": sent})["isError"])
         _status, _, body = self.rpc({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": 5}}, key)
         self.assertEqual(json.loads(body)["error"]["code"], -32602)
 
@@ -148,7 +145,7 @@ class StreamableHttpTests(Assistants):
         got = json.loads(self.call(self.make_token(), "upcoming", {"days": 30})["content"][0]["text"])
         self.assertEqual((got["today"], got["from"]), ("2026-09-23", "2026-09-23"))
         self.assertEqual([(s["trip"], s["confirmation"], s["start_zone"]) for s in got["segments"]],
-                         [("London", "ZQ4PXD", "America/New_York")])                       # wall-clock times, in the place's zone
+                         [("London", "ZQ4PXD", "America/New_York")])
         far = json.loads(self.call(self.make_token(), "upcoming", {"from": "2027-01-01", "days": 5})["content"][0]["text"])
         self.assertEqual(far["segments"], [])
 
@@ -170,7 +167,6 @@ class StreamableHttpTests(Assistants):
 
 
 class SettingsRoutes(ServerCase):
-    """Settings → AI assistants (MCP), on your own machine (no sign-in), the way Settings calls them."""
     unset = ("OIDC_ISSUER", "WAYPOINT_PUBLIC_URL")
 
     def setUp(self):
@@ -184,7 +180,6 @@ class SettingsRoutes(ServerCase):
             mcp_access.set_allow_writes(conn, False)
 
     def connect(self, *scopes, name=None) -> int:
-        """An assistant `ana@example.com` approved for `scopes`, with its tokens (as if it had traded its code): its grant's id."""
         with db.session() as conn:
             c = mcp_oauth.register(conn, {"client_name": name or "Claude " + self.tag, "redirect_uris": [CALLBACK]})
             challenge = base64.urlsafe_b64encode(hashlib.sha256(VERIFIER.encode()).digest()).rstrip(b"=").decode()
@@ -213,7 +208,7 @@ class SettingsRoutes(ServerCase):
             self.assertTrue(mcp_access.allow_writes(conn))
         self.assertEqual(self.req("POST", "/api/mcp-settings/writes", {"allow": False}), (200, {"allow": False}))
         self.assertEqual(self.req("GET", "/api/mcp-settings")[1]["allow_writes"], False)
-        self.assertEqual(self.req("POST", "/api/mcp-settings/ids", {"allow": True})[0], 404)   # (there is no switch for numbers)
+        self.assertEqual(self.req("POST", "/api/mcp-settings/ids", {"allow": True})[0], 404)
 
     def test_connected_assistants_are_listed_with_who_approved_them_and_disconnect_ends_them_at_once(self):
         grant = self.connect("read", "write", name="Claude " + self.tag)
@@ -223,7 +218,7 @@ class SettingsRoutes(ServerCase):
         self.assertTrue(ours[0]["created"])
         self.assertEqual(self.req("DELETE", f"/api/mcp-settings/connections/{grant}"), (200, {"ok": True}))
         self.assertEqual([c for c in self.req("GET", "/api/mcp-settings")[1]["connections"] if c["client"] == "Claude " + self.tag], [])
-        self.assertEqual(self.req("DELETE", f"/api/mcp-settings/connections/{grant}")[0], 404)   # gone already
+        self.assertEqual(self.req("DELETE", f"/api/mcp-settings/connections/{grant}")[0], 404)
         with db.session() as conn:
             self.assertEqual(conn.execute(select(OAuthToken.token_hash).where(OAuthToken.grant_id == grant)).fetchall(), [])
 

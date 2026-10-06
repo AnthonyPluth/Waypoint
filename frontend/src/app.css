@@ -1,31 +1,23 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* The dark theme follows the device (prefers-color-scheme); the shadcn-svelte primitives' `dark:` classes follow it too. */
 @custom-variant dark (@media (prefers-color-scheme: dark));
-/* A phone, in either orientation: the same query as PHONE_QUERY in lib/phone.svelte.ts. `desktop:` is everything else. */
 @custom-variant phone (@media (max-width: 767px), (max-height: 500px) and (pointer: coarse));
 @custom-variant desktop (@media not ((max-width: 767px) or ((max-height: 500px) and (pointer: coarse))));
-/* A device that can hover (a mouse or trackpad). Row actions shown only on hover use it (`hoverable:opacity-0
-   hoverable:group-hover:opacity-100`), so on a touch screen, which can't hover, they're simply always there. */
 @custom-variant hoverable (@media (hover: hover));
 
-/* Geist, bundled with Waypoint (waypoint/static/fonts, SIL Open Font License): a variable font, so one file covers every weight. */
 @font-face { font-family: "Geist"; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 
-/* Waypoint's palette, after the look of a flight tracker: near-black surfaces by night with one vivid blue to act, and a cool
-   light theme tuned to match by day; amber stays for what changed (a delay, a gate change). Text pairs reach 4.5:1 or better on
-   the surfaces they sit on, in both. */
 :root {
   color-scheme: light dark;
   --radius: 1.25rem;
   --background: #f2f4f8;
-  --foreground: #0e1320;          /* ink */
+  --foreground: #0e1320;
   --card: #ffffff;
   --card-foreground: #0e1320;
   --popover: #ffffff;
   --popover-foreground: #0e1320;
-  --primary: #0a63d8;             /* vivid blue */
+  --primary: #0a63d8;
   --primary-foreground: #ffffff;
   --secondary: #e8ecf3;
   --secondary-foreground: #0e1320;
@@ -37,7 +29,6 @@
   --border: #e0e5ee;
   --input: #cdd4e0;
   --ring: #0a63d8;
-  /* Amber: something changed or needs a look (a delay, a gate change). `ink` is its readable text, `soft` its wash. */
   --signal: #f2a516;
   --signal-foreground: #3b2500;
   --signal-soft: #fff0d0;
@@ -52,7 +43,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #07090e;        /* near black */
+    --background: #07090e;
     --foreground: #f3f5f9;
     --card: #12151d;
     --card-foreground: #f3f5f9;
@@ -85,7 +76,6 @@
 
 @theme inline {
   --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  /* Confirmation codes and flight numbers: a monospace, so every character has its own width and 0/O are told apart. */
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --radius-sm: calc(var(--radius) - 10px);
   --radius-md: calc(var(--radius) - 8px);
@@ -126,24 +116,16 @@
 @layer base {
   * { @apply border-border outline-ring/50; }
   body { @apply bg-background text-foreground font-sans antialiased; font-optical-sizing: auto; letter-spacing: -0.006em; }
-  /* Headings: larger and tighter, the way a flight tracker sets its route and times. */
   h1 { letter-spacing: -0.03em; }
   h2, h3 { letter-spacing: -0.02em; }
-  /* Times, dates and counts line up in columns (a departure board's look). */
   body { font-variant-numeric: tabular-nums; }
-  /* No pinch or double-tap zoom: the page is laid out for the phone already. The viewport meta in index.html says the
-     same; Safari in a tab ignores that and honours this. Scrolling is untouched. Text still follows the phone's text size. */
   html { touch-action: pan-x pan-y; }
   a, button { -webkit-tap-highlight-color: transparent; }
 }
 
 @layer components {
-  /* A small caps label over a section, spaced out. */
   .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
-  /* A confirmation code, flight number or gate: monospace, spaced, upper case. */
   .code { font-family: var(--font-mono); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
-  /* A boarding pass: a rounded card whose `.pass-tear` is the perforated line between its two halves, with a notch
-     at each end (cut from the page's own background). */
   .pass { position: relative; overflow: hidden; color: var(--card-foreground); border: 1px solid var(--border);
     border-radius: var(--radius-3xl); box-shadow: var(--shadow-card);
     background: linear-gradient(165deg, color-mix(in oklab, var(--primary) 13%, var(--card)) 0%, var(--card) 62%); }
@@ -154,7 +136,6 @@
   .pass-tear::after { right: -12px; }
 }
 
-/* A list of rows in a card (Settings): each row a label with its value or action, split by hairlines. */
 @layer components {
   .rows { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-card); }
   .rows > * + * { border-top: 1px solid var(--border); }

@@ -222,14 +222,13 @@ Handlers return dicts that become JSON; the frontend reads them by key.
 
 Almost everything can be written with SQLAlchemy (window functions: `func.row_number().over(...)`; CTEs:
 `.cte()`; `UNION`: `union_all()`; correlated subqueries: `.scalar_subquery()`; `EXISTS`: `.exists()`). If something
-genuinely can't, use `sqlalchemy.text()` with named parameters, and say why on the line above:
+genuinely can't, use `sqlalchemy.text()` with named parameters, list the module in `RAW_SQL` in `tests/test_orm_guard.py` with how many calls it has, and say why in the commit message:
 
 ```python
-# raw SQL: <why this can't be a statement>
 conn.execute(text("... WHERE x = :x"), {"x": x})
 ```
 
-The guard counts `text()` calls without that comment. SQL must still run on both databases. Dynamic table names
+The guard counts every `text()` call that `RAW_SQL` doesn't list. SQL must still run on both databases. Dynamic table names
 (waypoint/storage/backup.py) aren't a reason: use `schema.metadata.tables[name]` and `insert(table)`.
 
 Not statements, on purpose: Alembic migrations (`waypoint/storage/migrations`, with `op.execute`), the driver-level setup in

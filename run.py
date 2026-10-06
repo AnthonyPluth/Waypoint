@@ -1,14 +1,4 @@
 #!/usr/bin/env python3
-"""Start Waypoint:  poetry run python run.py  [--port 8765]  then open http://localhost:8765
-(first time: poetry install --no-root)
-
-Backups:  poetry run python run.py backup [file.json.gz]   save everything to a file
-          poetry run python run.py restore file.json.gz    replace everything with a backup (asks first; --yes to skip;
-                                                           stop Waypoint first)
-Sample:   poetry run python run.py demo                     fill an empty database with made-up data (for previews)
-Verify:   poetry run python run.py verify [page…]           run the app on made-up data in a browser at phone, tablet and
-                                                           desktop widths; screenshots and a report go to artifacts/verify/
-"""
 import argparse
 import os
 import sys
@@ -44,8 +34,6 @@ if __name__ == "__main__":
             with db.session() as conn:
                 print(f"Added sample data ({demo.seed(conn)} rows) to {db.describe()}.")
         elif a.command == "backup":
-            # Without a file name: this folder, or the data folder when Waypoint has one set (in Docker, /data: the code
-            # folder there is read-only).
             name = f"waypoint-backup-{date.today().isoformat()}.json.gz"
             out = a.file or (os.path.join(db.data_dir(), name) if os.environ.get("WAYPOINT_DATA") else name)
             with db.session() as conn:
@@ -65,8 +53,6 @@ if __name__ == "__main__":
                 sys.exit(str(e))
             print(f"Backup from {restored.get('created')} ({restored.get('source')}): "
                   f"{backup.preview(restored)['counts']['total']} rows.")
-            # A running Waypoint's background jobs can't be held off from here: one writing during the restore would mix
-            # its rows in with the backup's.
             print("Stop Waypoint first if it's running: anything it saves during the restore would be mixed in.")
             if not a.yes and input(f"Replace everything in {db.describe()} with it? Type yes: ").strip().lower() != "yes":
                 sys.exit("Nothing changed.")

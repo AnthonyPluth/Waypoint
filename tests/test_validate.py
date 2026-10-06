@@ -1,4 +1,3 @@
-"""waypoint/validate.py, the input checks the churning, planner, net worth and equity modules share."""
 import unittest
 
 from waypoint import validate

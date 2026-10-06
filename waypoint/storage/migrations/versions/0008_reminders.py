@@ -1,9 +1,3 @@
-"""Reminders and the calendar feed: the devices that get notifications, which reminders each member gets, what was already sent,
-and each member's private calendar feed (only the hash of its key).
-
-Revision ID: 0008
-Revises: 0007
-"""
 import sqlalchemy as sa
 from alembic import op
 

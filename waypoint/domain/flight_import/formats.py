@@ -1,8 +1,3 @@
-"""What a flight import's parsers share: the rows they read, the flights they propose, and the small readers for the
-cells every export has (a day, a time of day, an airport code, a flight number). A parser is a pure function from the
-rows of one export to what each row proposes (`Proposed`) or why it can't be read (`Skipped`); it never looks anything up
-(the airports' zones are for `resolve`) and it reads only the columns a flight needs: a notes column, a booking
-reference or anyone's name in the file is never looked at, so it can't be kept."""
 from __future__ import annotations
 
 import re
@@ -10,15 +5,12 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
-Row = Mapping[str, str]   # one data row: the cell under each header, headers as the file spells them, cells stripped
-Numbered = tuple[int, Row]   # a row with its line in the file (the header is line 1)
+Row = Mapping[str, str]
+Numbered = tuple[int, Row]
 
 
 @dataclass(frozen=True)
 class Clock:
-    """A time a file gives for a flight's departure or arrival, as written: the wall-clock `time` (HH:MM), the `day` it
-    says it is on when it says (YYYY-MM-DD), and the UTC offset it carries, in minutes, when it has one (so the time can
-    be put at the airport's own zone; a time with no offset is taken to be the airport's)."""
     time: str
     day: str | None = None
     offset: int | None = None
@@ -26,12 +18,11 @@ class Clock:
 
 @dataclass(frozen=True)
 class Proposed:
-    """A flight a row proposes. `line` is the row's line in the file (the header is line 1)."""
     line: int
-    day: str                          # the departure's local day, YYYY-MM-DD
-    origin: str                       # IATA codes, upper case
+    day: str
+    origin: str
     destination: str
-    flight_number: str | None = None  # no spaces, upper case: EX101
+    flight_number: str | None = None
     airline: str | None = None
     dep: Clock | None = None
     arr: Clock | None = None
@@ -41,7 +32,6 @@ class Proposed:
 
 @dataclass(frozen=True)
 class Skipped:
-    """A row that can't be a flight, and why (a message for the person)."""
     line: int
     reason: str
 
@@ -53,16 +43,14 @@ _CLOCK = re.compile(r"(\d{1,2}):(\d\d)(?::\d\d(?:\.\d+)?)?")
 _OFFSET = re.compile(r"(Z|[+-]\d\d:?\d\d)$")
 _IATA = re.compile(r"[A-Za-z]{3}")
 _PAREN_IATA = re.compile(r"\(([A-Za-z]{3})(?:\s*/\s*[A-Za-z]{4})?\)")
-_FLIGHT = re.compile(r"(?:[A-Z][A-Z0-9]|[0-9][A-Z])\d{1,4}[A-Z]?")   # an airline's code (it has a letter), then the number
+_FLIGHT = re.compile(r"(?:[A-Z][A-Z0-9]|[0-9][A-Z])\d{1,4}[A-Z]?")
 
 
 def shown(cell: str) -> str:
-    """A cell, short enough to quote in a reason."""
     return cell if len(cell) <= 20 else cell[:19] + "…"
 
 
 def day_of(cell: str) -> str | None:
-    """The day in a cell that starts with one (2026-03-01, 2026-03-01 14:30, 2026-03-01T14:30:00Z), else None."""
     m = _DAY.match(cell.strip())
     if not m:
         return None
@@ -73,8 +61,6 @@ def day_of(cell: str) -> str | None:
 
 
 def clock_of(cell: str, day: str | None = None) -> Clock | None:
-    """The time of day in a cell: 14:30, 14:30:00, 2026-03-01 14:30 or 2026-03-01T14:30:00-05:00. None for a cell with
-    none (empty, or only a day), which is how a file says it doesn't know. Its offset is kept, never applied."""
     text = cell.strip()
     when = day
     m = _DAY.match(text)
@@ -92,8 +78,6 @@ def clock_of(cell: str, day: str | None = None) -> Clock | None:
 
 
 def airport_of(cell: str) -> str | None:
-    """An airport's IATA code from a cell that is one (SFO), or names one ("San Francisco Intl (SFO/KSFO)"); None when
-    there's none to find."""
     text = cell.strip()
     if _IATA.fullmatch(text):
         return text.upper()
@@ -102,19 +86,16 @@ def airport_of(cell: str) -> str | None:
 
 
 def flight_number_of(cell: str) -> str | None:
-    """A flight number as it is kept (EX101: no spaces, upper case), or None when the cell isn't one."""
     text = re.sub(r"\s+", "", cell).upper()
     return text if _FLIGHT.fullmatch(text) else None
 
 
 def text_of(cell: str | None, limit: int = 100) -> str | None:
-    """A cell as a short text, or None when it's empty."""
     kept = (cell or "").strip()
     return kept[:limit] or None
 
 
 def cell(row: Row, *names: str) -> str:
-    """The first of these columns the row has, ignoring case and spaces in the header ("" when it has none)."""
     wanted = {re.sub(r"[\s_]+", "", n).casefold() for n in names}
     for header, value in row.items():
         if re.sub(r"[\s_]+", "", header).casefold() in wanted:
@@ -123,7 +104,6 @@ def cell(row: Row, *names: str) -> str:
 
 
 def places(line: int, origin_cell: str, destination_cell: str) -> tuple[str, str] | Skipped:
-    """A row's two airports, or why it hasn't got them."""
     found = []
     for label, text in (("origin", origin_cell), ("destination", destination_cell)):
         code = airport_of(text)

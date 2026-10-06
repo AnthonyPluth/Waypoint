@@ -5,19 +5,6 @@
   import { Dialog } from "bits-ui";
   import type { Snippet } from "svelte";
 
-  // Asks before something that can't be undone, saying what will happen. Built on Bits UI's Dialog (as the Sheet is), so
-  // it's a labelled, modal role="dialog": focus moves in (to the typed word's box, else Cancel), Esc and Cancel close it,
-  // and focus goes back to what opened it.
-  //   open          bindable; set it true to ask
-  //   title         the question ("Remove Chase?"); it labels the dialog
-  //   description   what happens, as text or a snippet (a list, a link)
-  //   confirmLabel  the button that does it ("Remove"); cancelLabel is "Cancel" unless given
-  //   busyLabel     the button while onconfirm runs ("Removing…")
-  //   destructive   the confirm button in red
-  //   typeToConfirm a word ("RESTORE") or name the confirm button waits for, typed exactly
-  //   disabled      holds the confirm button back (while what it would do is still being worked out)
-  //   onconfirm     does it; the dialog stays open and busy until it settles, then closes, unless it returns false (a
-  //                 failure it has already shown). Catch errors inside it: a throw leaves the dialog open.
   let { open = $bindable(false), title, description, confirmLabel = "Confirm", cancelLabel = "Cancel", busyLabel, destructive = false,
     typeToConfirm, disabled = false, onconfirm }: {
     open?: boolean; title: string; description?: string | Snippet; confirmLabel?: string; cancelLabel?: string; busyLabel?: string;

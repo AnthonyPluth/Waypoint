@@ -1,6 +1,3 @@
-"""Settings → AI assistants (MCP): the address to connect to, the assistants connected with OAuth (who approved each, when it was
-last used), and the switch for letting them change trips. The server is waypoint/server/mcp_server.py;
-OAuth is waypoint/server/mcp_oauth.py. Nothing here is reachable from /mcp itself (mcp_access.BLOCKED)."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -25,13 +22,11 @@ def api_mcp_settings(conn, _q, _b) -> McpSettings:
 
 
 def api_mcp_writes(conn, _q, body: McpWritesBody) -> McpWritesBody:
-    """Switch on or off letting assistants allowed "write" make the changes outside mcp_access.BLOCKED."""
     mcp_access.set_allow_writes(conn, validate.on(body.get("allow")))
     return {"allow": mcp_access.allow_writes(conn)}
 
 
 def api_mcp_revoke(conn, _q, _b, grant_id) -> Ok:
-    """Disconnect an assistant: its grant, and every token under it, end at once."""
     if not mcp_oauth.revoke_grant(conn, row_id(grant_id), "revoked_in_settings"):
         raise ApiError("That connection isn't there any more.", 404)
     return {"ok": True}

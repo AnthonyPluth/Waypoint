@@ -1,6 +1,3 @@
-"""The HTTP server: who may reach what (sign-in, the CSRF checks), security headers, request limits, reading a request's
-body, sending the answer, and serve(). The API's routes are answered by routes.dispatch, and the web app's files by
-static.py."""
 from __future__ import annotations
 
 import contextlib
@@ -22,30 +19,25 @@ from .. import monitoring, oidc
 from . import feed, jobs, mcp_http, mcp_oauth, mcp_server, oauth_http, routes, static
 from .common import NOT_READ, ApiError, BadJson, Response, _current, header_value, host_allowed, server_error
 
-# Files anyone may fetch: the sign-in pages' look, and what a phone needs to install Waypoint (it fetches the manifest
-# without cookies). None of them hold any data.
 PUBLIC_FILES = {"/page.css", "/logo.svg", "/logo-180.png", "/fonts/Geist-Variable.woff2", "/manifest.webmanifest", "/sw.js",
                 "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png"}
 
-MAX_JSON_BODY = 1024 * 1024          # API requests are small; anything bigger is refused before it's read
-REQUEST_TIMEOUT = 60                 # seconds a client may stall while sending or receiving (slow-client protection)
-HEADER_DEADLINE = 30                 # seconds to send the request line and headers in all, however it's trickled in
-MIN_BODY_RATE = 16 * 1024            # bytes a second a request body must average, on top of REQUEST_TIMEOUT
+MAX_JSON_BODY = 1024 * 1024
+REQUEST_TIMEOUT = 60
+HEADER_DEADLINE = 30
+MIN_BODY_RATE = 16 * 1024
 MAX_CONCURRENT_REQUESTS = 64
 
-# Why a change was refused (the CSRF checks), shown as the app's error message: what was refused, and the usual fix.
 NOT_SAME_SITE = ("Blocked a request that didn’t come from Waypoint’s own address. If you run Waypoint behind a proxy, check "
                  "WAYPOINT_PUBLIC_URL and WAYPOINT_ALLOWED_HOSTS.")
 NO_APP_HEADER = ("Blocked a change that didn’t come from Waypoint’s app (it was missing the X-Waypoint header). Reload the page "
                  "and try again; if you run Waypoint behind a proxy, make sure it passes that header on.")
 
 def content_security_policy(nonce: str | None = None) -> str:
-    """Only Waypoint's own scripts run (the page's <script> tags carry a per-response nonce; scripts they add are
-    trusted through 'strict-dynamic'). No framing, no plugins, no <base> tricks."""
     scripts = f"'nonce-{nonce}' 'strict-dynamic' 'self'" if nonce else "'self'"
     return ("default-src 'self'; "
             f"script-src {scripts}; "
-            "style-src 'self' 'unsafe-inline'; "     # inline style attributes need this
+            "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; font-src 'self'; "
             "connect-src 'self'; "
             "frame-src 'none'; worker-src 'self'; manifest-src 'self'; "
@@ -56,23 +48,21 @@ AUTH_PATHS = {"/auth/login", "/auth/callback", "/auth/logout", "/auth/signed-out
 
 
 def route_name(path: str) -> str:
-    """A request's name in the log when it fails: its route (/api/trips/{id}), never the ids, names or searches in the
-    address, so nothing of yours is in the line."""
     if path.startswith("/api/"):
-        found = routes.match(None, path)   # the route table's own pattern (by any method)
-        return found.route.pattern if found else "/api/*"   # nothing answers it (a 404)
+        found = routes.match(None, path)
+        return found.route.pattern if found else "/api/*"
     if path in AUTH_PATHS or path in oauth_http.OAUTH_PUBLIC or path in oauth_http.OAUTH_METADATA or path in ("/mcp", "/oauth/authorize"):
         return path
     if path.startswith(("/.well-known/", "/oauth/")):
-        return path[:path.index("/", 1)] + "/*"   # nothing answers it (a 404)
-    return "/"   # the web app's page
+        return path[:path.index("/", 1)] + "/*"
+    return "/"
 
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "Waypoint"
-    sys_version = ""                  # don't advertise the Python version
+    sys_version = ""
     timeout = REQUEST_TIMEOUT
-    _set_cookies: list[str]           # cookies for this request's answer, whatever it is (see _user and end_headers)
+    _set_cookies: list[str]
 
     def setup(self):
         super().setup()
@@ -83,8 +73,6 @@ class Handler(BaseHTTPRequestHandler):
         super().finish()
 
     def _deadline(self, seconds: float | None) -> None:
-        """REQUEST_TIMEOUT is per read, so a client sending a byte every few seconds would never hit it. Server hangs up
-        once this overall deadline passes (None: no deadline, while Waypoint itself is working)."""
         set_deadline = getattr(self.server, "set_deadline", None)
         if set_deadline:
             set_deadline(self.connection, seconds)
@@ -97,15 +85,14 @@ class Handler(BaseHTTPRequestHandler):
             self._deadline(None)
 
     def log_message(self, fmt, *args):
-        pass   # the standard per-request line includes query strings (sign-in codes); log_request writes our own
+        pass
 
     def log_request(self, code="-", size="-"):
-        # One line per request, path only (no query string: /auth/callback carries sign-in codes).
         path = urllib.parse.urlsplit(getattr(self, "path", "") or "").path
         if path == "/healthz":
-            return   # the container health check, every minute
+            return
         if path.startswith(feed.PREFIX):
-            path = feed.PREFIX + "…"   # the calendar feed's key is in its address
+            path = feed.PREFIX + "…"
         started = getattr(self, "_started", None)
         ms = f" {int((time.monotonic() - started) * 1000)}ms" if started else ""
         monitoring.log(f"{self.client_address[0]} {getattr(self, 'command', '-')} {path} {code}{ms}")
@@ -118,7 +105,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
-        if oidc.config()["secure_cookie"]:   # served over https: tell browsers never to use plain http
+        if oidc.config()["secure_cookie"]:
             self.send_header("Strict-Transport-Security", "max-age=31536000")
 
     def _send(self, status: int, body: bytes, ctype: str = "application/json", cache: str = "no-store",
@@ -135,12 +122,10 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def _error(self, e: BaseException) -> None:
-        """An unexpected failure: log the details, show only a reference to them (common.server_error)."""
         err = server_error(e, self.command, route_name(urllib.parse.urlsplit(self.path).path))
         self._json(err.status, {"error": str(err)})
 
     def _body_length(self, limit: int) -> int | None:
-        """The request's Content-Length, or None (after answering) if it's missing a number or too big."""
         try:
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:
@@ -152,14 +137,9 @@ class Handler(BaseHTTPRequestHandler):
         return n
 
     def _json(self, status: int, obj) -> None:
-        # allow_nan=False: an inf (an overflowed sum) would go out as `Infinity`, which isn't JSON; a ValueError here
-        # is a bug, answered as one (_error).
         self._send(status, json.dumps(obj, allow_nan=False).encode())
 
     def _read_json(self, limit: int, empty: Any = BadJson) -> Any:
-        """The request's JSON body, of at most `limit` bytes; `empty` when it has none (a BadJson if it must have one).
-        NOT_READ once it has answered a body that's too large, or a Content-Length that isn't a number. Raises BadJson
-        for anything that isn't JSON, nesting deeper than Python reads included (a RecursionError)."""
         n = self._body_length(limit)
         if n is None:
             return NOT_READ
@@ -169,12 +149,10 @@ class Handler(BaseHTTPRequestHandler):
             return empty
         try:
             return json.loads(self._read_body(n).decode())
-        except (ValueError, RecursionError) as e:   # (JSONDecodeError and UnicodeDecodeError are ValueErrors)
+        except (ValueError, RecursionError) as e:
             raise BadJson(type(e).__name__) from None
 
     def _respond(self, r: Response) -> None:
-        """A route's answer that isn't JSON (common.Response): a download, a logo, a stream."""
-        # Every header value a route chose, checked before anything is sent (common.header_value).
         ctype, cache = header_value(r.content_type), header_value(r.cache)
         etag = header_value(r.etag) if r.etag else None
         csp = header_value(r.csp) if r.csp else None
@@ -195,10 +173,10 @@ class Handler(BaseHTTPRequestHandler):
         if etag:
             self.send_header("ETag", etag)
         if r.stream is not None:
-            self.send_header("X-Accel-Buffering", "no")   # a reverse proxy (nginx) would otherwise hold the events back
+            self.send_header("X-Accel-Buffering", "no")
         self._security_headers()
         if csp:
-            self.send_header("Content-Security-Policy", csp)   # on top of the usual one (a logo opened directly is inert)
+            self.send_header("Content-Security-Policy", csp)
         self.end_headers()
         if r.stream is not None:
             return self._stream(r.stream)
@@ -208,21 +186,19 @@ class Handler(BaseHTTPRequestHandler):
                 r.sent()
 
     def _stream(self, events: Generator[bytes]) -> None:
-        """Server-Sent Events, each piece sent as it comes, until the stream ends or the page is closed."""
         self.close_connection = True
         try:
-            if self.command == "HEAD":   # (the stream is never started)
+            if self.command == "HEAD":
                 return
             for piece in events:
                 self.wfile.write(piece)
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, TimeoutError):
-            pass   # the page was closed
+            pass
         finally:
             events.close()
 
     def _host_ok(self) -> bool:
-        # Refuse requests addressed to hostnames we don't know (DNS-rebinding protection).
         return host_allowed(self.headers.get("Host") or "")
 
     def _cookie(self, name: str) -> str | None:
@@ -234,8 +210,6 @@ class Handler(BaseHTTPRequestHandler):
         return c[name].value if name in c else None
 
     def _user(self, renew: bool = False) -> dict | None:
-        """The signed-in person, or None. Without OIDC configured everyone is 'local'. renew: a session in use is kept
-        going (see oidc.renew_session), and its cookie goes out again with this answer, with the new end."""
         if not oidc.enabled():
             return {"name": None, "email": None, "local": True}
         token = self._cookie("waypoint_session")
@@ -246,15 +220,13 @@ class Handler(BaseHTTPRequestHandler):
         return user
 
     def end_headers(self):
-        # A renewed session (_user), on whatever this request answers. Taken before sending, so a cookie send_header
-        # refuses isn't sent again on the error that follows.
         cookies, self._set_cookies = getattr(self, "_set_cookies", None) or [], []
         for ck in cookies:
             self.send_header("Set-Cookie", ck)
         super().end_headers()
 
     def _redirect(self, location: str, cookies: list[str] | None = None) -> None:
-        if "\r" in location or "\n" in location:   # a redirect somewhere odd goes home instead of failing (see send_header)
+        if "\r" in location or "\n" in location:
             location = "/"
         self.send_response(302)
         self.send_header("Location", location)
@@ -267,7 +239,6 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _page_html(title: str, inner: str, center: bool = True) -> bytes:
-        """One of the few pages the server draws itself: `inner` (already escaped) in a card, in the web app's look."""
         return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)} · Waypoint</title><link rel="icon" href="/logo.svg"><link rel="stylesheet" href="/page.css"></head>
 <body><main style="max-width:520px;margin:12vh auto"><div class="card"{' style="text-align:center"' if center else ''}>
@@ -276,7 +247,6 @@ class Handler(BaseHTTPRequestHandler):
 
     def _page(self, status: int, title: str, message: str, link: tuple[str, str] | None = None,
               other: tuple[str, str] | None = None, cookies: list[str] | None = None) -> None:
-        """A message with up to two buttons: `link` is the main one, `other` a secondary (a different account, say)."""
         buttons = "".join(f'<a class="btn{" primary" if i == 0 else ""}" href="{html.escape(href)}">{html.escape(text)}</a>'
                           for i, (href, text) in enumerate(x for x in (link, other) if x))
         inner = (f'<p class="help" style="margin:0 auto 16px">{html.escape(message)}</p>\n'
@@ -289,7 +259,6 @@ class Handler(BaseHTTPRequestHandler):
         return f"{name}={value}; Path={path}; Max-Age={max_age}; HttpOnly; SameSite=Lax{secure}"
 
     def _auth_routes(self, url) -> bool:
-        """/auth/* pages. Returns True if handled."""
         q = {k: v[0] for k, v in urllib.parse.parse_qs(url.query).items()}
         if url.path == "/auth/login":
             if not oidc.enabled():
@@ -312,16 +281,12 @@ class Handler(BaseHTTPRequestHandler):
             self._redirect(nxt, [self._cookie_header("waypoint_session", token, days * 86400),
                                  self._cookie_header("waypoint_login", "", 0, "/auth")]); return True
         if url.path == "/auth/logout":
-            # Signing out is a POST from the app (see _logout), so another site can't sign you out with a link or image.
             self._page(405, "Sign out from Waypoint", "To sign out, use the Sign out button in Waypoint.", ("/", "Open Waypoint")); return True
         if url.path == "/auth/signed-out":
             self._page(200, "Signed out", "You've signed out of Waypoint.", ("/auth/login", "Sign in again")); return True
         return False
 
     def _not_allowed(self, who: str) -> None:
-        """Signed in at the provider, but not someone Waypoint lets in. Trying again would sign the same account straight
-        back in, so the way out is choosing another account (or signing out at the provider). The fix for the operator
-        goes to the log, not to whoever was refused."""
         monitoring.log(f"[sign-in] refused {who!r}: not in OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS (add them there to let "
                        "them in)", "warning")
         c = oidc.config()
@@ -336,9 +301,6 @@ class Handler(BaseHTTPRequestHandler):
         super().send_response(code, message)
 
     def send_header(self, keyword, value):
-        # Python's server writes a header as given, so a line break in one would end it and start a header (or a body)
-        # of someone else's choosing: response splitting. Every header goes through here and none may carry one. The
-        # answer so far is dropped, so the request fails as any bug does (_handle answers 500), never half-sent.
         if any(c in f"{keyword}{value}" for c in "\r\n"):
             self._headers_buffer = []
             self._responded = False
@@ -346,7 +308,7 @@ class Handler(BaseHTTPRequestHandler):
         super().send_header(keyword, value)
 
     def _dispatch(self, method: str) -> None:
-        self._deadline(None)   # the headers are in
+        self._deadline(None)
         self._started, self._responded = time.monotonic(), False
         self._set_cookies = []
         self._handle(method)
@@ -354,28 +316,24 @@ class Handler(BaseHTTPRequestHandler):
     def _handle(self, method: str) -> None:
         try:
             self._route(method)
-        except Exception as e:   # never show internals; never leave the browser hanging
+        except Exception as e:
             if not self._responded:
                 self._error(e)
             else:
                 monitoring.report()
 
     def _same_site(self, form: bool = False) -> bool:
-        """A state-changing request must come from Waypoint's own pages (defense in depth beside the X-Waypoint header).
-        form: a page's own <form> post, which browsers send with Origin "null" under Referrer-Policy: no-referrer; it
-        counts when the browser also says it's same-origin."""
         site = (self.headers.get("Sec-Fetch-Site") or "").lower()
         if site == "cross-site":
             return False
         origin = self.headers.get("Origin")
         if origin == "null" and form:
             return site == "same-origin"
-        if origin:   # "null" (sandboxed frames, file: pages) is never Waypoint
+        if origin:
             return origin != "null" and host_allowed(urllib.parse.urlsplit(origin).netloc)
         return True
 
     def _logout(self) -> None:
-        """POST /auth/logout from the app: end the session and say where to go next (the provider's sign-out page)."""
         with db.session() as conn:
             target = oidc.logout(conn, self._cookie("waypoint_session")) if oidc.enabled() else "/"
         body = json.dumps({"redirect": target}).encode()
@@ -389,7 +347,6 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _feed(self, method: str, path: str) -> None:
-        """A member's calendar feed (waypoint/server/feed.py): 404 for any key that doesn't open one."""
         if method != "GET":
             return self._send(405, b"", "text/plain")
         found = feed.serve(path)
@@ -399,15 +356,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def _route(self, method: str) -> None:
         url = urllib.parse.urlsplit(self.path)
-        if url.path == "/healthz" and method == "GET":   # container health check: says nothing about your data
+        if url.path == "/healthz" and method == "GET":
             return self._send(200, b"ok", "text/plain")
         if not self._host_ok():
             return self._send(403, b"Waypoint doesn't recognise this address. Add it to WAYPOINT_ALLOWED_HOSTS.", "text/plain")
-        if url.path == "/mcp":   # MCP over HTTP, served here: an OAuth access token instead of a sign-in
+        if url.path == "/mcp":
             return self._mcp_rpc(method)
         if url.path.startswith(("/.well-known/", "/oauth/")) and url.path != "/oauth/authorize":
-            return oauth_http.app_calls(self, method, url)   # OAuth an app calls itself: no sign-in, no same-site checks (see OAUTH_PUBLIC)
-        if method != "GET" and url.path != "/oauth/authorize" and not self._same_site():   # (the consent form checks its own)
+            return oauth_http.app_calls(self, method, url)
+        if method != "GET" and url.path != "/oauth/authorize" and not self._same_site():
             return self._json(403, {"error": NOT_SAME_SITE})
         if url.path.startswith("/auth/") and method == "GET" and self._auth_routes(url):
             return
@@ -415,28 +372,26 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("X-Waypoint") != "1":
                 return self._json(403, {"error": NO_APP_HEADER})
             return self._logout()
-        if url.path.startswith(feed.PREFIX):   # a calendar app can't sign in: its address's key is what lets it in
+        if url.path.startswith(feed.PREFIX):
             return self._feed(method, url.path)
-        # The look of the sign-in pages is public; everything else needs you signed in.
         if url.path not in PUBLIC_FILES:
-            self.user = self._user(renew=url.path.startswith("/api/"))   # API answers are never cached, so a new cookie is safe there
+            self.user = self._user(renew=url.path.startswith("/api/"))
             if not self.user:
                 if url.path.startswith("/api/"):
                     return self._json(401, {"error": "You've been signed out.", "login": "/auth/login"})
                 back = (url.path or "/") + ("?" + url.query if url.query else "")
                 return self._redirect("/auth/login?next=" + urllib.parse.quote(back, safe=""))
-        if url.path == "/oauth/authorize":   # approving an assistant: you, signed in
+        if url.path == "/oauth/authorize":
             return oauth_http.authorize(self, method, url)
         if not url.path.startswith("/api/"):
             if method != "GET":
                 return self._send(405, b"", "text/plain")
             return static.serve(self, url.path)
-        # State-changing calls must carry a custom header, which a foreign web page can't add without CORS approval.
         if method != "GET" and self.headers.get("X-Waypoint") != "1":
             return self._json(403, {"error": NO_APP_HEADER})
         hit = routes.match(method, url.path)
         body: Any = {}
-        if hit is not None and hit.route.upload:   # a file (a backup), as it is
+        if hit is not None and hit.route.upload:
             n = self._body_length(hit.route.upload)
             if n is None:
                 return
@@ -464,13 +419,9 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(200, result)
 
     def _mcp_rpc(self, method: str) -> None:
-        """POST /mcp: MCP's Streamable HTTP transport, answered by waypoint/server/mcp_server.py's handle() in this process, for an
-        OAuth access token issued for this address (mcp_http.authorized), within its scopes, the allowlists and the switches
-        (mcp_http.local_fetch), as the member who approved it. One JSON-RPC message per POST, answered with application/json;
-        notifications get 202. There is no server-to-client stream, so GET is 405."""
         if method != "POST":
             return self._send(405, b"", "text/plain", extra={"Allow": "POST"})
-        if not self._mcp_origin_ok():   # a web page in a browser (DNS rebinding); real clients send no Origin
+        if not self._mcp_origin_ok():
             return self._json(403, {"error": "Origin not allowed."})
         iss = mcp_oauth.issuer(self.headers.get("Host"))
         sent = self.headers.get("Authorization")
@@ -478,7 +429,6 @@ class Handler(BaseHTTPRequestHandler):
             access = mcp_http.authorized(conn, sent, mcp_oauth.resource(iss) if iss else None)
         if access is None:
             self.close_connection = True
-            # RFC 9728: where to find out how to get a token; invalid_token only when one was sent (RFC 6750 §3.1)
             challenge = 'Bearer realm="Waypoint"' + (f', resource_metadata="{mcp_oauth.resource_metadata_url(iss)}"' if iss else "")
             if sent:
                 challenge += ', error="invalid_token"'
@@ -491,7 +441,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}})
         if msg is NOT_READ:
             return
-        if not isinstance(msg, dict):   # a batch or something else: one message per POST
+        if not isinstance(msg, dict):
             return self._json(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Send one JSON-RPC message per request"}})
         reply = mcp_server.handle(msg, mcp_http.fetch_for(access))
         if reply is None:
@@ -499,7 +449,6 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(200, reply)
 
     def _mcp_origin_ok(self) -> bool:
-        """No Origin (an app, not a web page), or this Waypoint's own address. Anything else, and "null", is refused."""
         origin = self.headers.get("Origin")
         if not origin:
             return True
@@ -509,7 +458,7 @@ class Handler(BaseHTTPRequestHandler):
         self._dispatch("GET")
 
     def do_HEAD(self):
-        self._dispatch("GET")   # same answer without the body (_send and _send_file skip it for HEAD)
+        self._dispatch("GET")
 
     def do_POST(self):
         self._dispatch("POST")
@@ -519,7 +468,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class Server(ThreadingHTTPServer):
-    """The standard threaded server, with a cap on requests handled at once so a flood can't exhaust the machine."""
     daemon_threads = True
     request_queue_size = 128
 
@@ -539,7 +487,6 @@ class Server(ThreadingHTTPServer):
                 self._deadlines[sock] = time.monotonic() + seconds
 
     def _hang_up_late(self) -> None:
-        """Close connections past their deadline (see Handler._deadline), so trickling clients can't hold every slot."""
         while not self._closed.wait(0.5):
             now = time.monotonic()
             with self._deadlines_lock:
@@ -548,7 +495,7 @@ class Server(ThreadingHTTPServer):
                     del self._deadlines[sock]
             for sock in late:
                 with contextlib.suppress(OSError):
-                    sock.shutdown(socket.SHUT_RDWR)   # the handler's blocked read returns, and it finishes
+                    sock.shutdown(socket.SHUT_RDWR)
 
     def server_close(self):
         self._closed.set()
@@ -556,7 +503,7 @@ class Server(ThreadingHTTPServer):
 
     def handle_error(self, request, client_address):
         if isinstance(sys.exc_info()[1], OSError):
-            return   # the client went away (or was hung up on): nothing worth a traceback
+            return
         monitoring.report()
 
     def process_request(self, request, client_address):
@@ -592,9 +539,9 @@ def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
         raise SystemExit("Waypoint is set to accept connections from other devices, so it needs sign-in.\n"
                          "Set OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, WAYPOINT_PUBLIC_URL and OIDC_ALLOWED_EMAILS\n"
                          "(or WAYPOINT_ALLOW_NO_AUTH=1 if a proxy in front of Waypoint already handles sign-in).")
-    db.init()   # migrations included
+    db.init()
     httpd = Server((host, port), Handler)
-    jobs.start(httpd._closed)   # (set when the server closes)
+    jobs.start(httpd._closed)
     where = f"http://localhost:{port}" if host in ("127.0.0.1", "localhost") else f"port {port} on all network addresses"
     monitoring.log(f"Waypoint is running at {where}  (data: {db.describe()})"
                    f"{'  · sign-in via ' + oidc.config()['issuer'] if oidc.enabled() else ''}")

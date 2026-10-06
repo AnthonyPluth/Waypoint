@@ -1,28 +1,3 @@
-"""Checks that stand in for instructions agents kept getting wrong (AGENTS.md, "Mistakes that keep coming back"): each
-one a correction that used to live as prose and now fails `make check` and CI instead. Standard library only.
-
-- Migrations (waypoint/storage/migrations/versions/): one Alembic head (two branches that each add the next number both point at
-  the same parent, and together leave two heads); revision ids unique, four digits, and the start of their file's name;
-  and every migration from TESTED_FROM on has its own test in tests/test_migrations.py, a method named
-  `test_<revision>_...`.
-- Commits (`--commits BASE..HEAD`, a pull request's): an agent's commit (one with a `Claude-Session:` trailer, or any
-  `Co-Authored-By:` trailer naming Claude) carries exactly one `Co-Authored-By: Claude <Model> <version>
-  <noreply@anthropic.com>` trailer naming the model that wrote it.
-- Tests (`--commits BASE..HEAD`): a test that was on BASE and is gone (a Python `def test_…`, or a Vitest `it(…)` or
-  `test(…)` title) needs a `Removes-Test: <name> — <why>` trailer on one of the commits, and a line the range adds
-  that skips a test or runs only some (`unittest.skip`, `skipTest(`, `.skip(`, `.only(`, `xit(`) needs a
-  `Skips-Test: <name> — <why>` trailer. A test isn't deleted or switched off to get CI green (AGENTS.md); when one
-  really goes, the reason is on record for the review.
-- Mail parsers (waypoint/domain/mail/parsers/): each vendor module (not `__init__.py` or a `_` helper) is registered in the
-  package's `PARSERS`, has `booking.eml`, `change.eml` and `cancellation.eml` under tests/fixtures/mail/<vendor>/, and has a
-  test, tests/test_mail_parser_<vendor>.py, that names that directory and each of the three fixtures.
-- Workflows (.github/workflows/, .github/actions/): each workflow runs bash by default (so steps get -eo pipefail);
-  every action pinned by SHA has its version in a comment; `gh api` with `per_page` paginates; and every job runs on
-  RUNS_ON (the repository variable picking self-hosted runners; forks' and Dependabot's pull requests always get
-  GitHub's), or on
-  `ubuntu-latest` with a `# hosted: <why>` comment.
-
-Exits 1, listing each problem, when any check fails."""
 from __future__ import annotations
 
 import argparse
@@ -42,7 +17,6 @@ TESTS = ROOT / "tests"
 WORKFLOWS = ROOT / ".github/workflows"
 ACTIONS = ROOT / ".github/actions"
 
-# Migrations from this one on need a test of their own; the ones before it predate the rule. Never lower it.
 TESTED_FROM = "0001"
 
 REVISION = re.compile(r"^\d{4}$")
@@ -53,18 +27,15 @@ GOOD_CO_AUTHOR = re.compile(r"^Claude (" + "|".join(MODEL_FAMILIES) + r") \d+(\.
 CLAUDE = re.compile(r"\bclaude\b|anthropic\.com", re.IGNORECASE)
 
 
-# --- Migrations ---------------------------------------------------------------------------------------------------
-
 def _assigned(tree: ast.Module, name: str) -> object:
     for node in tree.body:
         targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
         if any(getattr(t, "id", None) == name for t in targets) and getattr(node, "value", None) is not None:
             return ast.literal_eval(node.value)  # type: ignore[arg-type]
-    return ...  # not assigned at all
+    return ...
 
 
 def migrations(directory: Path = MIGRATIONS) -> list[dict]:
-    """Each migration file's revision and the revisions it follows (a tuple: a merge follows more than one)."""
     found = []
     for path in sorted(directory.glob("*.py")):
         if path.name.startswith("__"):
@@ -107,14 +78,11 @@ def check_migrations(found: list[dict], tests_text: str) -> list[str]:
     return problems
 
 
-# --- Commits ------------------------------------------------------------------------------------------------------
-
 def check_commit(sha: str, message: str) -> list[str]:
-    """An agent's commit names the model that wrote it, in exactly one Co-Authored-By trailer."""
     co_authors = [c.strip() for c in CO_AUTHOR.findall(message)]
     claude = [c for c in co_authors if CLAUDE.search(c)]
     if not SESSION.search(message) and not claude:
-        return []   # not an agent's commit
+        return []
     subject = message.strip().splitlines()[0] if message.strip() else ""
     where = f"commit {sha[:10]} ({subject[:60]})"
     if not claude:
@@ -134,8 +102,6 @@ def commits(revision_range: str) -> list[tuple[str, str]]:
     return [tuple(rec.strip("\n").split("\0", 1)) for rec in out.split("\x1e") if rec.strip()]  # type: ignore[misc]
 
 
-# --- Tests --------------------------------------------------------------------------------------------------------
-
 PY_TEST = re.compile(r"^\s*(?:async\s+)?def\s+(test_\w+)\s*\(", re.MULTILINE)
 PY_CLASS = re.compile(r"^class\s+(\w+)", re.MULTILINE)
 TS_TEST = re.compile(r"""\b(?:it|test)\(\s*(["'`])((?:(?!\1).)+)\1""")
@@ -150,7 +116,6 @@ def is_test_file(path: str) -> bool:
 
 
 def test_names(path: str, text: str) -> set[str]:
-    """The tests a file defines, as 'file::Class.test_name' (Python) or 'file::title' (Vitest)."""
     if path.endswith(".py"):
         names = set()
         cls = ""
@@ -168,7 +133,6 @@ def _git(*args: str) -> str:
 
 
 def removed_tests(base: str) -> list[str]:
-    """Tests on `base` that the working tree no longer has."""
     gone = []
     for path in _git("ls-tree", "-r", "--name-only", base).splitlines():
         if not is_test_file(path):
@@ -188,8 +152,6 @@ PY_DEF = re.compile(r"^\s*(?:async\s+)?def\s+(\w+)\s*\(")
 
 
 def skipped_name(path: str, lines: list[str], index: int) -> str:
-    """The test a skip on lines[index] (0-based) belongs to: for Python the function it's in, or the one it decorates;
-    for Vitest the title on that line. '' when it can't be told (then the file's name must be given)."""
     if path.endswith(".py"):
         here = lines[index].lstrip()
         steps = range(index + 1, len(lines)) if here.startswith("@") else range(index, -1, -1)
@@ -202,8 +164,6 @@ def skipped_name(path: str, lines: list[str], index: int) -> str:
 
 
 def added_skips(base: str) -> list[tuple[str, str, str]]:
-    """Lines the range adds to test files that skip a test or run only some, as (file, the test it skips, the line). In
-    code only: a string that names a skip, as an example in a test, doesn't count."""
     out = []
     diff = _git("diff", "--unified=0", f"{base}", "--", "tests", "frontend")
     path, line_no = "", 0
@@ -221,8 +181,6 @@ def added_skips(base: str) -> list[tuple[str, str, str]]:
 
 
 def _names(declared: list[str]) -> set[str]:
-    """What each trailer names, before its reason: everything up to " — " (a Vitest title has spaces), or else the
-    first word (a test, `Class.test`, or `file::test`)."""
     out = set()
     for d in (d.strip() for d in declared):
         if d:
@@ -248,19 +206,14 @@ def check_tests(base: str, messages: list[str]) -> list[str]:
     return problems
 
 
-# --- Mail parsers -------------------------------------------------------------------------------------------------
-
-PARSER_FIXTURES = ("booking", "change", "cancellation")   # the emails each vendor's fixtures hold, as <name>.eml
+PARSER_FIXTURES = ("booking", "change", "cancellation")
 
 
 def parser_vendors(directory: Path = PARSERS) -> list[str]:
-    """The vendor modules among the parsers: every module but `__init__` and the helpers (`_text.py`)."""
     return sorted(p.stem for p in directory.glob("*.py") if not p.stem.startswith("_"))
 
 
 def check_parsers(vendors: list[str], registry: str, fixtures: Path = MAIL_FIXTURES, tests: Path = TESTS) -> list[str]:
-    """What each vendor parser must have: a place in `registry` (the package's source), synthetic fixtures for a booking, a
-    change and a cancellation, and a test that reads them."""
     problems = []
     for vendor in vendors:
         where = f"waypoint/domain/mail/parsers/{vendor}.py"
@@ -282,16 +235,11 @@ def check_parsers(vendors: list[str], registry: str, fixtures: Path = MAIL_FIXTU
     return problems
 
 
-# --- Workflows ----------------------------------------------------------------------------------------------------
-
 USES = re.compile(r"^[ \t]*(?:-[ \t]*)?uses:[ \t]*([^\s#]+)(.*)$", re.MULTILINE)
 PINNED = re.compile(r"@[0-9a-f]{40}$")
 BASH_DEFAULT = re.compile(r"^defaults:[ \t]*\n[ \t]+run:[ \t]*\n(?:[ \t]{4,}\S.*\n)*?[ \t]{4,}shell:[ \t]*bash[ \t]*(?:#.*)?$",
                           re.MULTILINE)
 GH_API_LIST = re.compile(r"\bgh api\b[^\n]*per_page=")
-# A job's runner: the repository variable RUNS_ON (a JSON label list such as ["self-hosted", "linux"], unset for GitHub's
-# runners), except for a pull request that isn't from this repository (a fork's, or one whose fork was deleted) and
-# Dependabot's, whose code (or new dependencies' code) never runs on the household's own machines.
 RUNS_ON = ("runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && "
            "(!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && "
            "github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '\"ubuntu-latest\"') }}")
@@ -331,7 +279,6 @@ def check_workflows() -> list[str]:
 
 
 def check_manage_links(table: dict, tests_text: str) -> list[str]:
-    """Every provider in the manage-link table is named in a test that builds its URL (tests/test_links.py), over https."""
     problems = []
     for provider, (host, _path) in table.items():
         if not re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", host):
@@ -342,7 +289,7 @@ def check_manage_links(table: dict, tests_text: str) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap = argparse.ArgumentParser()
     ap.add_argument("--commits", metavar="BASE..HEAD", help="also check these commits' trailers (a pull request's)")
     args = ap.parse_args(argv)
     problems = check_migrations(migrations(), MIGRATION_TESTS.read_text())

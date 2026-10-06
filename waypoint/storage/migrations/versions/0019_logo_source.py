@@ -1,10 +1,3 @@
-"""Where each brand logo came from (`brand_logos.source`): Logo.dev, or Wikidata and Commons for a hotel's own brand. A logo from
-before is Logo.dev's, and every brand is asked about again (`checked` cleared) so a hotel brand that got its parent's logo from
-Logo.dev gets one of its own, or none. A cache, so nothing else changes.
-
-Revision ID: 0019
-Revises: 0018
-"""
 import sqlalchemy as sa
 from alembic import op
 

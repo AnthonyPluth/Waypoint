@@ -144,7 +144,7 @@ describe("TravelMap", () => {
     await waitFor(() => expect(scale(container)).toBeGreaterThan(3));
     const reset = screen.getByRole("button", { name: "Reset" }) as HTMLButtonElement;
     const world = screen.getByRole("button", { name: "World" }) as HTMLButtonElement;
-    expect(reset.disabled).toBe(true);   // (already there)
+    expect(reset.disabled).toBe(true);
     await userEvent.click(world);
     expect(scale(container)).toBe(1);
     expect(world.disabled).toBe(true);

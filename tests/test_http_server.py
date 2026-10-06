@@ -1,4 +1,3 @@
-"""The HTTP server end to end: requests through server.Handler."""
 import unittest
 import urllib.error
 import urllib.request

@@ -1,4 +1,3 @@
-"""The hotel chain and rental company the stats count (waypoint/domain/chains.py). Names are made up or well-known brands."""
 import unittest
 
 from waypoint.domain import chains

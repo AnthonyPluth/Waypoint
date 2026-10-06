@@ -1,5 +1,3 @@
-// The lint rules in eslint.config.js that keep the web app on its paved paths (lib/act.ts, lib/api.ts): each has code it
-// must flag and code it must leave alone. The code is linted with the real config, as the file it says it is, because where a rule applies is part of the rule.
 import { fileURLToPath } from "node:url";
 import { ESLint } from "eslint";
 import { describe, expect, it } from "vitest";
@@ -7,7 +5,6 @@ import { describe, expect, it } from "vitest";
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const eslint = new ESLint({ cwd: root, overrideConfigFile: `${root}frontend/eslint.config.js` });
 
-/** The rules that flag `code`, one entry per finding, when it's linted as `file` (relative to the repository root). */
 async function flagged(code: string, file = "frontend/src/lib/example.ts"): Promise<string[]> {
   const [result] = await eslint.lintText(code, { filePath: `${root}${file}` });
   return result.messages.map((m) => m.ruleId ?? `parse error: ${m.message}`);
@@ -39,15 +36,28 @@ describe("no fetch() outside lib/api.ts", () => {
   });
 });
 
-describe("no .catch(() => {}) without a reason", () => {
+describe("no .catch(() => {})", () => {
   it("flags an empty handler", async () => {
     expect(await flagged("export const p = work().catch(() => {});")).toEqual(["waypoint/no-silent-catch"]);
     expect(await flagged("export const p = work().catch(function () {});")).toEqual(["waypoint/no-silent-catch"]);
+    expect(await flagged("export const p = work().catch(() => { /* why */ });")).toEqual(["waypoint/no-silent-catch", "waypoint/no-comments"]);
   });
-  it("leaves a handler that says why, or does something", async () => {
-    expect(await flagged("export const p = work().catch(() => { /* a failed preload only costs time */ });")).toEqual([]);
-    expect(await flagged("export const p = work().catch(() => {\n  // the next check corrects it\n});")).toEqual([]);
+  it("leaves a handler that does something, and ignoreFailure", async () => {
     expect(await flagged("export const p = work().catch((e) => report(e));")).toEqual([]);
+    expect(await flagged('import { ignoreFailure } from "./act";\nexport const p = work().catch(ignoreFailure);')).toEqual([]);
+  });
+});
+
+describe("no comments", () => {
+  it("flags line, block and template comments", async () => {
+    expect(await flagged("// says what the next line does\nexport const n = 1;")).toEqual(["waypoint/no-comments"]);
+    expect(await flagged("export const n = 1; /* trailing */")).toEqual(["waypoint/no-comments"]);
+    expect(await flagged("<p>hi</p>\n<!-- a note -->\n", "frontend/src/Example.svelte")).toEqual(["waypoint/no-comments"]);
+  });
+  it("leaves the tools' directives and strings that look like comments alone", async () => {
+    expect(await flagged("// @ts-expect-error: the point of the test\nexport const n: string = 1;")).toEqual([]);
+    expect(await flagged('// @vitest-environment jsdom\nexport const u = "https://example.com/a//b";')).toEqual([]);
+    expect(await flagged("// svelte-ignore state_referenced_locally\nexport const n = 1;")).toEqual([]);
   });
 });
 

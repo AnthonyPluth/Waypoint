@@ -1,6 +1,3 @@
-"""A booking read from an email, put among the mailbox owner's trips: its times at their places' zones, its passengers
-matched to people (by loyalty number, then by legal name or alias; a name nobody matches stays "Who is this?"), and its
-segment merged with the one it updates, never overwriting a field a person edited."""
 from __future__ import annotations
 
 from typing import Literal
@@ -12,7 +9,6 @@ from . import extract
 
 
 def _zone(conn: db.Connection, b: extract.Booking, code: str | None, place: extract.Place) -> str | None:
-    """The zone where a booking starts or ends: a flight's airport's, else where the stay, the rental or the station is."""
     if b.kind == "flight":
         known = airports.lookup(conn, code) if code else None
         return known["zone"] if known else None
@@ -21,8 +17,6 @@ def _zone(conn: db.Connection, b: extract.Booking, code: str | None, place: extr
 
 
 def travelers(conn: db.Connection, passengers: tuple[extract.Passenger, ...]) -> list[trips.TravelerIn]:
-    """Who a booking is for: each passenger's person, by the loyalty number printed on the booking and then by name, or the
-    name as printed when nobody matches."""
     found: list[trips.TravelerIn] = []
     for p in passengers:
         pid = loyalty.person_for_number(conn, p.member_number) if p.member_number else None
@@ -33,27 +27,14 @@ def travelers(conn: db.Connection, passengers: tuple[extract.Passenger, ...]) ->
 
 
 class Ambiguous(Exception):
-    """A booking's times carry offsets that aren't its places' own, and nothing says which reading is right."""
+    pass
 
 
 def _plausible(minutes: float, km: float) -> bool:
-    """Whether a flight of this length is believable over this distance: no faster than a jet plus taxiing, no slower than
-    a slow cruise plus a long delay."""
     return km / 950 * 60 + 20 <= minutes <= km / 600 * 60 + 75
 
 
 def _times(conn: db.Connection, b: extract.Booking, start_zone: str, end_zone: str) -> tuple[str, str, bool] | None:
-    """A booking's start and end as wall-clock times at their places, or None when they aren't dates and times. Raises
-    Ambiguous when they can't be told.
-
-    Markup writes a time with an offset. When it is the place's own (or there is none), the clock is what's written. When
-    it isn't, the sender either printed the local clock with a UTC mark ("19:00Z" for 19:00 at the airport) or really gave
-    UTC. A flight is decided when exactly one of the two readings gives a believable flight time for the distance between
-    its airports; before that, the message's own text can settle it (`extract.reading`). A guess made on distance alone for
-    times marked UTC is flagged (the third value) so the segment's card asks for a look. Everything else (a stay, a rental, a
-    train, a short hop where both fit) is Ambiguous and goes to the review queue, rather than being filed with a time that
-    may be hours off. A sender who gives one time with a non-zero offset that is its place's own is giving real instants, so
-    the other time (a "Z" into London in summer) is converted."""
     start, end = extract.written_clock(b.start), extract.written_clock(b.end)
     if start is None or end is None:
         return None
@@ -61,7 +42,7 @@ def _times(conn: db.Connection, b: extract.Booking, start_zone: str, end_zone: s
     if moved == (start, end) or not (extract.has_offset(b.start) or extract.has_offset(b.end)):
         return start, end, False
     if None not in moved and any(extract.real_offset(t) and m == w for t, m, w in ((b.start, moved[0], start), (b.end, moved[1], end))):
-        return moved[0] or "", moved[1] or "", False   # (an offset that is its own place's says the sender gives real instants)
+        return moved[0] or "", moved[1] or "", False
     seen = extract.reading(b, start_zone, end_zone)
     if seen == "written":
         return start, end, False
@@ -84,8 +65,6 @@ def _times(conn: db.Connection, b: extract.Booking, start_zone: str, end_zone: s
 
 
 def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
-    """The segment a booking describes, or None when its times or places can't be settled (no known airport, a place whose
-    zone isn't clear, a time that isn't a date and time)."""
     start_zone, end_zone = _zone(conn, b, b.origin, b.start_place), _zone(conn, b, b.destination, b.end_place)
     if not start_zone or not end_zone:
         return None
@@ -107,7 +86,6 @@ def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
 
 
 def explain(conn: db.Connection, b: extract.Booking) -> str:
-    """Why `file_booking` couldn't make this booking a segment, from a fixed list (nothing from the message)."""
     if not _zone(conn, b, b.origin, b.start_place) or not _zone(conn, b, b.destination, b.end_place):
         return "unknown airport" if b.kind == "flight" else "place's time zone unknown"
     try:
@@ -120,12 +98,10 @@ def explain(conn: db.Connection, b: extract.Booking) -> str:
 
 def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking, again: bool = False,
                  touched: list[int] | None = None) -> Literal["added", "updated", "unchanged"] | None:
-    """Put one booking among `viewer`'s segments (`again`: from a message read again). None: it can't be made into a segment
-    (it goes to the review queue). `touched` gets the id of the segment it became or was merged into."""
     found = fields(conn, b)
     if found is None:
         return None
     try:
-        return trips.merge_email_segment(conn, viewer, found, again, touched)   # (it checks everything before it writes anything)
+        return trips.merge_email_segment(conn, viewer, found, again, touched)
     except trips.Invalid:
         return None

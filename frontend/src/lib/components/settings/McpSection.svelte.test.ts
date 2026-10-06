@@ -18,7 +18,6 @@ const conn = (extra: Partial<McpConnection> = {}): McpConnection =>
   ({ id: 1, client: "Claude", who: "ana@example.com", scope: ["read"], created: "2026-09-01T10:00:00+00:00", last_used: null, ...extra });
 
 type Opts = { method?: string; body?: { allow?: boolean } };
-/** Answers GET /api/mcp-settings with what `current()` says (the switches’ posts update it); anything else with `others`. */
 function serve(current: () => McpSettings, others: (path: string, opts?: Opts) => unknown = () => undefined) {
   vi.mocked(api).mockImplementation((async (path: string, opts?: Opts) => others(path, opts) ?? current()) as never);
 }
@@ -72,7 +71,7 @@ describe("Settings → AI assistants (MCP)", () => {
     expect(await screen.findByText(/Set WAYPOINT_PUBLIC_URL/)).toBeInTheDocument();
     expect(screen.queryByLabelText("MCP address")).toBeNull();
     expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
-    expect(screen.getByRole("checkbox", { name: /Let assistants change trips/ })).toBeInTheDocument();   // the switch stays
+    expect(screen.getByRole("checkbox", { name: /Let assistants change trips/ })).toBeInTheDocument();
   });
 
   it("starts with the switch off and says what it allows", async () => {
@@ -151,7 +150,7 @@ describe("Settings → AI assistants (MCP)", () => {
     render(McpSection);
     await userEvent.click((await screen.findAllByRole("button", { name: "Disconnect" }))[0]);
     expect(await screen.findByText("Disconnect Claude?")).toBeInTheDocument();
-    expect(api).not.toHaveBeenCalledWith("/api/mcp-settings/connections/1", expect.anything());   // not until confirmed
+    expect(api).not.toHaveBeenCalledWith("/api/mcp-settings/connections/1", expect.anything());
     await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/mcp-settings/connections/1", { method: "DELETE", failed: "Couldn’t disconnect" }));
     await waitFor(() => expect(screen.queryByText("Claude")).toBeNull());

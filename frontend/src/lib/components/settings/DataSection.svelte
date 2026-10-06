@@ -1,12 +1,10 @@
 <script lang="ts" module>
   import type { Restored } from "$lib/api-types";
-  // What the last restore said that's worth keeping (where the copy of what it replaced went, secrets it couldn't read):
-  // it stays under Restore until dismissed, through Settings being left and opened again.
   let lastRestore: Restored | null = null;
 </script>
 
 <script lang="ts">
-  import { act, errMsg } from "$lib/act";
+  import { act, errMsg, ignoreFailure } from "$lib/act";
   import { api } from "$lib/api";
   import type { BackupContents } from "$lib/api-types";
   import { app, refreshState } from "$lib/app.svelte";
@@ -16,8 +14,6 @@
   import X from "@lucide/svelte/icons/x";
   import { toast } from "svelte-sonner";
 
-  // Settings → Data: download everything, or replace everything with a backup file. A chosen file is read first
-  // (POST /api/backup/inspect) so you see what it holds before typing RESTORE; the server keeps a copy of what was here.
   let file = $state<File | null>(null);
   let inspected = $state<BackupContents | null>(null);
   let problem = $state("");
@@ -30,7 +26,7 @@
     if (!f) return;
     try {
       const r = await api<BackupContents>("/api/backup/inspect", { method: "POST", body: f, failed: "Couldn’t read that backup" });
-      if (file === f) inspected = r;   // not a file chosen before this one
+      if (file === f) inspected = r;
     } catch (err) { if (file === f) problem = errMsg(err); }
   }
 
@@ -42,7 +38,6 @@
   };
   const dbName = (s: string | null | undefined) => (s === "postgres" ? "Postgres" : s === "sqlite" ? "SQLite" : s || "an unknown database");
   const summary = $derived(inspected ? `Backup from ${when(inspected.created)} (${dbName(inspected.source)}): ${n(total(inspected.counts), "row")}` : "");
-  /** The tables the backup or this Waypoint has anything in, each with both counts. */
   const tables = $derived(inspected
     ? [...new Set([...Object.keys(inspected.counts), ...Object.keys(inspected.current)])].sort()
       .map((t) => ({ name: t.replace(/_/g, " "), backup: inspected!.counts[t] ?? 0, here: inspected!.current[t] ?? 0 }))
@@ -50,16 +45,13 @@
     : []);
   const hasData = $derived(!!inspected && total(inspected.current) > 0);
 
-  // "Last backup: Sep 28": when one was last downloaded from here (the year too when it isn't this one).
   const lastBackup = $derived.by(() => {
     const d = app.state?.last_backup ? new Date(app.state.last_backup) : null;
     if (!d || isNaN(d.getTime())) return null;
     const year = d.getFullYear() !== new Date().getFullYear();
     return { day: d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(year ? { year: "numeric" } : {}) }), full: when(app.state!.last_backup) };
   });
-  // The browser saves the file itself, so there's no telling when it's done: look again once it likely is.
-  // (Only the "last backup" line depends on it, and the next state check corrects it, so a failed look says nothing.)
-  function downloaded() { setTimeout(() => { refreshState().catch(() => { /* stays quiet: see above */ }); }, 3000); }
+  function downloaded() { setTimeout(() => { refreshState().catch(ignoreFailure); }, 3000); }
 
   async function restore() {
     const f = file;

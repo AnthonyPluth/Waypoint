@@ -1,6 +1,3 @@
-"""waypoint/monitoring.py: Waypoint's log. What it writes about an error is only what helps find the bug: credentials,
-query strings, token-like strings and the values a database error quotes are blanked, and a handler's failure is logged
-without what its exception says. Nothing is sent anywhere."""
 import contextlib
 import io
 import time
@@ -13,11 +10,10 @@ from waypoint import monitoring
 from waypoint.server.handler import route_name
 
 SERVICE = "https://user:secretpass@api.travel.example/v2"
-CODE = "QX7P2L"   # a made-up confirmation code: a report must never show it (a traceback quotes source lines, so not inline)
+CODE = "QX7P2L"
 
 
 def logged(fn) -> tuple[str, str]:
-    """(stdout, stderr) of fn()."""
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
         fn()
@@ -26,7 +22,6 @@ def logged(fn) -> tuple[str, str]:
 
 class ScrubTests(unittest.TestCase):
     def test_what_a_service_said_is_kept_safe(self):
-        # A service's message or an API's error is kept and shown: no long numbers (a booking's, a card's) in it.
         self.assertEqual(monitoring.public_text("Northwind Air: booking 123456789 needs a new login (HTTP 401)"),
                          "Northwind Air: booking [number] needs a new login (HTTP 401)")
         self.assertEqual(monitoring.public_text(f"refused at {SERVICE}/accounts?x=1"),
@@ -77,14 +72,12 @@ class ReportTests(unittest.TestCase):
         engine = sa.create_engine("sqlite://")
         with engine.begin() as c:
             c.exec_driver_sql("CREATE TABLE seg (id INTEGER PRIMARY KEY, code TEXT)")
-            # raw SQL: a throwaway table on a plain engine, with a bound value the report must drop
             c.execute(sa.text("INSERT INTO seg VALUES (1, :code)"), {"code": CODE})
         try:
             with engine.begin() as c:
-                # raw SQL: the same row again, so the insert fails quoting its values
                 c.execute(sa.text("INSERT INTO seg VALUES (:id, :code)"), {"id": 1, "code": CODE})
         except sa.exc.IntegrityError as e:
-            self.assertIn(CODE, str(e))   # what SQLAlchemy says, and the report must drop
+            self.assertIn(CODE, str(e))
             caught = e
             err = logged(lambda: monitoring.report(caught, values=False))[1]
         self.assertNotIn(CODE, err)

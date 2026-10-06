@@ -1,10 +1,3 @@
-"""myFlightRadar24's export (My Flights → Export on the website): one row per flight with the columns Date, Flight number,
-From, To, Dep time, Arr time, Duration, Airline, Aircraft, Registration, Seat number, Seat type, Flight class, Flight reason,
-Note and some ids. An airport is written with its name and codes ("San Francisco Intl (SFO/KSFO)"), the times are times of
-day at the airports, and the arrival has no day of its own (`resolve` works it out). The Note column is never looked at.
-
-The columns are from myFlightRadar24's export as published by users; no export from the site was available to check them
-against."""
 from __future__ import annotations
 
 from collections.abc import Sequence

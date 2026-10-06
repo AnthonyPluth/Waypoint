@@ -1,6 +1,3 @@
-"""The Southwest parser (waypoint/domain/mail/parsers/southwest.py) and what a scan does with its bookings, change and
-cancellation emails, from synthetic emails in tests/fixtures/mail/southwest (invented names, codes and numbers; real
-airports). The parser registry and `extract.read`'s use of it are held here too."""
 import base64
 import json
 import unittest
@@ -41,7 +38,7 @@ class ParserTests(unittest.TestCase):
                          ("flight", "confirmed", "K7QW2N", "Southwest Airlines", "DAL", "HOU", OUTBOUND, "2026-11-16T09:10:00"))
         self.assertEqual(dict(out.details), {"flight_number": "WN 1234"})
         self.assertEqual(out.passengers, (Passenger("JANE DOE", "55512340011"),))
-        self.assertEqual((back.origin, back.destination, back.start, back.end), ("HOU", "DAL", RETURN, "2026-11-21T00:55:00"))   # (+1 day)
+        self.assertEqual((back.origin, back.destination, back.start, back.end), ("HOU", "DAL", RETURN, "2026-11-21T00:55:00"))
 
     def test_a_change_is_the_same_booking_with_its_new_times(self):
         out, back = read(raw("change")).bookings
@@ -73,11 +70,11 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(b.passengers, (Passenger("JANE DOE"), Passenger("SAM DOE")))
 
     def test_a_leg_that_doesnt_fit_is_counted_unread_not_guessed_at(self):
-        for leg in ("Flight 77 Mon, Foo 16, 2026\nDallas (Love Field), TX (DAL) 8:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM",   # no such month
-                    "Flight 77 Mon, Feb 31, 2026\nDallas (Love Field), TX (DAL) 8:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM",   # no such day
-                    "Flight 77 Mon, Nov 16, 2026\nDallas (Love Field), TX (DAL) 13:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM",   # no such time
-                    "Flight 77 Mon, Nov 16, 2026\nDallas (Love Field), TX (DAL) 8:05 AM",   # no arrival
-                    "Flight 77 Mon, Nov 16, 2026\nDallas (Love Field), TX 8:05 AM\nHouston (Hobby), TX 9:10 AM"):   # no airports
+        for leg in ("Flight 77 Mon, Foo 16, 2026\nDallas (Love Field), TX (DAL) 8:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM",
+                    "Flight 77 Mon, Feb 31, 2026\nDallas (Love Field), TX (DAL) 8:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM",
+                    "Flight 77 Mon, Nov 16, 2026\nDallas (Love Field), TX (DAL) 13:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM",
+                    "Flight 77 Mon, Nov 16, 2026\nDallas (Love Field), TX (DAL) 8:05 AM",
+                    "Flight 77 Mon, Nov 16, 2026\nDallas (Love Field), TX 8:05 AM\nHouston (Hobby), TX 9:10 AM"):
             with self.subTest(leg=leg):
                 self.assertEqual(southwest.parse("", f"Confirmation #: K7QW2N\n{leg}\n"), parsers.Parsed((), 1))
 
@@ -130,7 +127,6 @@ class ExtractTests(unittest.TestCase):
         self.assertEqual(b.confirmation, "ZZ9999")
 
     def test_markup_that_runs_a_round_trip_into_one_flight_gives_way_to_the_legs_the_text_has(self):
-        # (made up) the markup describes the whole trip as one reservation, out of HNL on the first day and back to HNL on the last
         jsonld = ('<script type="application/ld+json">{"@type":"FlightReservation","reservationNumber":"K7QW2N",'
                   '"reservationFor":{"@type":"Flight","airline":{"iataCode":"WN","name":"Southwest Airlines"},'
                   '"departureAirport":{"iataCode":"HNL"},"departureTime":"2026-01-12T13:15:00",'
@@ -153,7 +149,7 @@ class ExtractTests(unittest.TestCase):
             got = read(mail(f"<html><head>{jsonld}</head><body></body></html>"))
         self.assertEqual(([b.confirmation for b in got.bookings], got.unread), (["ZZ9999"], 0))
         report.assert_called_once()
-        self.assertEqual(report.call_args.kwargs, {"values": False})   # (reported without its values)
+        self.assertEqual(report.call_args.kwargs, {"values": False})
 
     def test_only_the_texts_flights_replace_the_markups_flights_and_its_other_bookings_stay(self):
         hotel = {"@type": "LodgingReservation", "reservationNumber": "H1", "checkinTime": "2026-01-12T15:00:00", "checkoutTime": "2026-01-18T11:00:00",
@@ -176,7 +172,7 @@ class ExtractTests(unittest.TestCase):
                   '"arrivalAirport":{"iataCode":"HOU"},"arrivalTime":"2026-11-16T09:10:00"}}</script>')
         body = "<p>Confirmation #: K7QW2N</p><div>Flight 77 Mon, Nov 16, 2026</div><div>Dallas (DAL) 8:05 AM</div><div>Houston (HOU) 9:10 AM</div>"
         [b] = read(mail(f"<html><head>{jsonld}</head><body>{body}</body></html>")).bookings
-        self.assertEqual(b.confirmation, "ZZ9999")   # (one flight in the markup, one in the text: the markup stands)
+        self.assertEqual(b.confirmation, "ZZ9999")
 
     def test_a_sender_without_a_parser_is_left_alone(self):
         text = "Confirmation #: K7QW2N\nFlight 77 Mon, Nov 16, 2026\nDallas (Love Field), TX (DAL) 8:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM\n"
@@ -210,7 +206,7 @@ class ScanTests(ScanCase):
         self.assertEqual((back["start_local"], back["end_local"], back["confirmation"], back["source"]),
                          ("2026-11-20T23:50", "2026-11-21T00:55", "K7QW2N", "email"))
         self.assertEqual(out["details"], {"flight_number": "WN 1234"})
-        self.assertEqual([t["person_id"] for t in out["travelers"]], [self.jane.person_id])   # (JANE DOE is Jane, by name)
+        self.assertEqual([t["person_id"] for t in out["travelers"]], [self.jane.person_id])
 
     def test_a_change_moves_the_times_and_marks_the_flight_changed_but_not_the_one_that_didnt_move(self):
         self.put("southwest/booking")
@@ -231,7 +227,7 @@ class ScanTests(ScanCase):
         self.scan(now=NOW + 3600)
         after = next(s for s in self.segments() if s["id"] == out["id"])
         self.assertEqual((after["start_local"], after["details"]["seat"], after["end_local"], after["status"]),
-                         ("2026-11-16T07:45", "12A", "2026-11-16T10:35", "confirmed"))   # (the email moved the arrival only)
+                         ("2026-11-16T07:45", "12A", "2026-11-16T10:35", "confirmed"))
 
     def test_a_cancellation_after_a_change_cancels_both_flights_and_keeps_the_changed_times(self):
         self.put("southwest/booking")
@@ -242,7 +238,7 @@ class ScanTests(ScanCase):
         result = self.scan(now=NOW + 7200)
         self.assertEqual((result.bookings, result.review), (2, 0))
         self.assertEqual(self.times(), [("2026-11-16T09:30", "cancelled"), ("2026-11-20T23:50", "cancelled")])
-        self.assertEqual(len(self.segments()), 2)   # (cancelled, not added again)
+        self.assertEqual(len(self.segments()), 2)
 
     def test_a_cancellation_leaves_a_status_a_person_set_alone(self):
         self.put("southwest/booking")
@@ -260,16 +256,16 @@ class ScanTests(ScanCase):
         self.scan()
         before = self.segments(self.jane)
         sam_box = self.connect("u-sam", "sam@gmail.example", "refresh-sam-1")
-        self.google.matches[:] = ["msg-cancel"]   # (Sam is sent only the cancellation)
+        self.google.matches[:] = ["msg-cancel"]
         self.google.mail["msg-cancel"] = raw("cancellation")
         self.assertEqual(self.scan(sam_box).state, "done")
         ours = {s["id"] for s in before}
         mine = self.segments(self.sam)
-        self.assertEqual({s["id"] for s in mine}, ours)   # the same two flights, not copies: he got their confirmation, so he sees them
+        self.assertEqual({s["id"] for s in mine}, ours)
         self.assertEqual([s["status"] for s in mine], ["cancelled", "cancelled"])
         self.assertEqual([s["status"] for s in self.segments(self.jane)], ["cancelled", "cancelled"])
         self.assertTrue(all(s["booked_by"] == self.jane.person_id for s in mine))
-        self.assertEqual(len(self.segments(self.jane)), 2)   # (and nothing was added for anyone)
+        self.assertEqual(len(self.segments(self.jane)), 2)
 
     def test_mail_the_parser_cant_read_goes_to_the_review_queue(self):
         self.add_mail("odd", mail("Confirmation #: K7QW2N\nFlight 77 Mon, Nov 16, 2026\nDallas (Love Field), TX (DAL) 8:05 AM\n", ctype="text/plain"))

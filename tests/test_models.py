@@ -1,4 +1,3 @@
-"""The ORM models (waypoint/storage/models.py) cover every table in waypoint/storage/schema.py and describe it truthfully."""
 import typing
 import unittest
 

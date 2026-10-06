@@ -8,11 +8,6 @@
   import Minus from "@lucide/svelte/icons/minus";
   import Plus from "@lucide/svelte/icons/plus";
 
-  // Everywhere you've flown and stayed, drawn here from the outlines bundled with the app (Natural Earth through world-atlas,
-  // and the Census Bureau's states through us-atlas): no tiles, no map host, nothing sent anywhere. Takes the stats' flights and the
-  // cities stayed in as props. Tap or hover an airport, an arc or a stay for its name and count; an arc or a stay also lists its
-  // trips and when they were. It opens framed on the places you've been; drag, pinch or use the buttons to zoom, Reset to return
-  // to that view and World to see the whole world. The United States is shaded state by state.
   let { flights, stays = [] }: { flights: StatsFlights; stays?: StatsStayPin[] } = $props();
 
   let countries = $state<Country[] | null>(null);
@@ -22,7 +17,7 @@
   async function loadOutlines() {
     loadError = "";
     try { countries = await loadCountries(); } catch (err) { loadError = errMsg(err); return; }
-    try { states = await loadStates(); } catch { states = []; }   // (without the states the United States is shaded as one country)
+    try { states = await loadStates(); } catch { states = []; }
   }
   $effect(() => { void loadOutlines(); });
 
@@ -38,15 +33,12 @@
   const byState = $derived(states.length > 0);
   const sphere = path({ type: "Sphere" }) ?? "";
 
-  // What's picked (tap, focus) or pointed at (hover): its label shows under the map, so a finger isn't covering it.
   type Pick = { label: string; trips: StatsMapTrip[] };
   let picked = $state<Pick | null>(null);
   let hovered = $state<string | null>(null);
   const caption = $derived(hovered ?? picked?.label ?? null);
   const when = (t: StatsMapTrip) => (t.start === t.end ? dateLabel(t.start) : `${dateLabel(t.start)} – ${dateLabel(t.end)}`);
 
-  // Zoom and pan: a transform on the drawing, kept so the world always covers the map's box. It starts framed on the places
-  // flown (the stats' filters change them, and the map follows), and "World" shows all of it.
   const framed = $derived(fitBox(flownBounds(flights, projection, stays)));
   let t = $state<Transform>(IDENTITY);
   $effect(() => { t = framed; picked = null; });
@@ -55,7 +47,6 @@
   let dragged = false;
   let pinch = 0;
 
-  /** A pointer's place in the map's own box (viewBox units), however wide the map is on screen. */
   function inBox(e: { clientX: number; clientY: number }): { x: number; y: number } {
     const r = svg!.getBoundingClientRect();
     return { x: ((e.clientX - r.left) / r.width) * MAP_WIDTH, y: ((e.clientY - r.top) / r.height) * MAP_HEIGHT };
@@ -85,7 +76,7 @@
   }
   function up(e: PointerEvent) { pointers.delete(e.pointerId); pinch = 0; }
   function wheel(e: WheelEvent) {
-    if (!e.ctrlKey && !e.metaKey && t.k === 1) return;   // a plain scroll past the map keeps scrolling the page
+    if (!e.ctrlKey && !e.metaKey && t.k === 1) return;
     e.preventDefault();
     const p = inBox(e);
     t = zoomAt(t, Math.exp(-e.deltaY / 300), p.x, p.y);
@@ -94,7 +85,6 @@
   const reset = () => { t = framed; picked = null; };
   const showWorld = () => { t = IDENTITY; picked = null; };
 
-  // A wheel listener has to be non-passive to stop the page scrolling under a zoom.
   $effect(() => {
     const el = svg;
     if (!el) return;
@@ -129,7 +119,6 @@
           </g>
           <g fill="none" stroke-linecap="round" class="stroke-primary" data-testid="arcs">
             {#each world.arcs as a (a.key)}
-              <!-- A wide, invisible stroke under each arc, so a thin one is easy to hit with a finger. -->
               <g role="button" tabindex="0" aria-label={a.label} onclick={() => pick(a.label, a.trips)} onkeydown={(e) => key(e, a.label, a.trips)}
                 onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = a.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: a.label, trips: a.trips })} class="cursor-pointer outline-none focus-visible:[&>path:last-child]:stroke-signal">
                 <path d={a.d} stroke="transparent" stroke-width="14" vector-effect="non-scaling-stroke" />

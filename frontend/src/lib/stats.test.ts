@@ -21,7 +21,7 @@ describe("formatting", () => {
     expect(duration(45 * 60 + 20)).toBe("45 min");
     expect(duration(0)).toBe("0 min");
     expect(duration(-5)).toBe("0 min");
-    expect(duration(86400 + 29)).toBe("1 d");   // rounds to the minute first
+    expect(duration(86400 + 29)).toBe("1 d");
   });
 
   it("names a month and a country", () => {

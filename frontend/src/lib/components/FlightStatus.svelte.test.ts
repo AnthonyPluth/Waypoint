@@ -13,7 +13,7 @@ import { toast } from "svelte-sonner";
 import { segment } from "../../test/fixtures";
 import FlightStatus, { clock, dayShift } from "./FlightStatus.svelte";
 
-const seg = segment({ id: 7 });   // JFK → LHR, 2026-11-20T19:00 to 2026-11-21T07:10
+const seg = segment({ id: 7 });
 const status = (extra: Partial<Status> = {}): Status => ({
   segment_id: 7, state: "delayed", origin: "JFK", destination: "LHR",
   dep_scheduled: "2026-11-20T19:00", dep_estimated: "2026-11-20T19:50", dep_actual: null, dep_zone: "America/New_York",
@@ -26,7 +26,7 @@ const list = (extra: Partial<FlightStatusList> = {}): FlightStatusList =>
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date("2026-11-20T09:00:00-05:00"));   // ten hours before it leaves
+  vi.setSystemTime(new Date("2026-11-20T09:00:00-05:00"));
   vi.mocked(api).mockReset(); vi.mocked(toast.error).mockReset(); vi.mocked(toast).mockReset(); flightStatus.list = list();
 });
 afterEach(() => { vi.useRealTimers(); flightStatus.list = null; });
@@ -36,7 +36,7 @@ describe("a flight’s live status", () => {
     render(FlightStatus, { segment: seg });
     const card = screen.getByTestId("flight-status");
     expect(card).toHaveTextContent("Delayed 50 min");
-    expect(card).toHaveTextContent("Now 19:50 (booked 19:00)");   // the airport’s own clock: 19:50 stays 19:50 in any zone
+    expect(card).toHaveTextContent("Now 19:50 (booked 19:00)");
     expect(card).toHaveTextContent("Terminal 7 · Gate B24");
     expect(card).toHaveTextContent("Arrives 08:05");
     expect(card).toHaveTextContent("Arrival terminal 5 · gate a10");
@@ -85,7 +85,7 @@ describe("a flight’s live status", () => {
   });
 
   it("asks for nothing, and shows only what it has, once the flight landed hours ago", () => {
-    vi.setSystemTime(new Date("2026-11-21T14:00:00+00:00"));   // 6 h 50 min after the booked landing
+    vi.setSystemTime(new Date("2026-11-21T14:00:00+00:00"));
     flightStatus.list = list({ statuses: [] });
     const { unmount } = render(FlightStatus, { segment: seg });
     expect(screen.queryByTestId("flight-status")).toBeNull();
@@ -103,8 +103,8 @@ describe("a flight’s live status", () => {
       flightStatus.list = list({ paused: { until, reason } });
       const { unmount } = render(FlightStatus, { segment: seg });
       expect(screen.getByRole("status")).toHaveTextContent(text);
-      expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();   // nothing to ask for
-      expect(screen.getByTestId("flight-status")).toHaveTextContent("Delayed 50 min");   // and what it knew stays
+      expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
+      expect(screen.getByTestId("flight-status")).toHaveTextContent("Delayed 50 min");
       unmount();
     }
   });
@@ -117,7 +117,7 @@ describe("a flight’s live status", () => {
     expect(api).toHaveBeenCalledWith("/api/flight-status/7", { method: "POST", failed: "Couldn’t refresh the status" });
     await waitFor(() => expect(screen.getByTestId("flight-status")).toHaveTextContent("Departed"));
     expect(flightStatus.list?.used).toBe(13);
-    expect(flightStatus.list?.statuses.map((x) => x.segment_id).sort()).toEqual([7, 8]);   // the other flight’s kept
+    expect(flightStatus.list?.statuses.map((x) => x.segment_id).sort()).toEqual([7, 8]);
   });
 
   it("says so when the service has no status for the flight", async () => {

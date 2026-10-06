@@ -1,4 +1,3 @@
-"""tools/feature_map.py: how it matches addresses, and that the committed feature map is current."""
 import importlib.util
 import unittest
 from pathlib import Path

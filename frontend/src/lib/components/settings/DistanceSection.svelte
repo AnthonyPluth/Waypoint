@@ -6,7 +6,6 @@
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
 
-  // Settings → Distances: the unit the Stats page shows (the household's, not yours). Miles until it's changed.
   let unit = $state<Stats["distance_unit"] | null>(null);
   let problem = $state("");
   let saving = $state(false);

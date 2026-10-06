@@ -1,6 +1,3 @@
-"""Rules every API route follows, checked for each one in the route table, so a new route is held to them the moment it
-is added (AGENTS.md, "Waypoint's promises" and "Conventions"): it needs sign-in, a change needs the app's header and
-its own site, its reply has a type in the API contract, and its feature has a docs page."""
 import json
 import unittest
 import urllib.parse
@@ -14,7 +11,6 @@ ROOT = Path(__file__).resolve().parent.parent
 OPENAPI = json.loads((ROOT / "docs/openapi.json").read_text())
 FEATURE_MAP = json.loads((ROOT / "docs/feature-map.json").read_text())
 
-# Routes whose reply isn't JSON, so the API contract can't type it. Only downloads belong here; a new one says why.
 NOT_JSON = {
     "GET /api/backup": "a .json.gz file to keep",
     "GET /api/mailboxes/callback": "a redirect back to Settings, where Google sends the browser",
@@ -23,7 +19,6 @@ NOT_JSON = {
 
 
 def address(pattern: str) -> str:
-    """An address the route answers, with each {id} filled in."""
     return pattern.replace("{id}", urllib.parse.quote("a|1", safe=""))
 
 
@@ -32,7 +27,6 @@ def every_route():
 
 
 class SignedOutTests(ServerCase):
-    """With sign-in on, every route answers 401 to someone who isn't signed in, and runs nothing."""
 
     @classmethod
     def setUpClass(cls):
@@ -53,7 +47,6 @@ class SignedOutTests(ServerCase):
 
 
 class ChangeTests(ServerCase):
-    """Every route that changes something refuses a request without the web app's header, or from another site."""
 
     def test_changes_need_the_app_header_and_this_site(self):
         changes = [(m, p) for m, p in every_route() if m != "GET"]

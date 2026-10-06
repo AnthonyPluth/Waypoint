@@ -1,11 +1,3 @@
-"""Checks .semgrep/waypoint.yml against the examples in .semgrep/examples/.
-
-Each `# ruleid: <id>` comment (`// ruleid: <id>` in TypeScript) in an example says the next line must be flagged by that rule, and each `# ok: <id>`
-that the next line must not be. A line no comment mentions must not be flagged at all. The examples sit in a tree that
-mirrors the repository (waypoint/server/api/...), because a rule only looks at the paths it names.
-
-Usage: python3 .semgrep/check_examples.py [semgrep command...]   (default: semgrep)
-"""
 from __future__ import annotations
 
 import json
@@ -22,7 +14,6 @@ MARK = re.compile(r"(?:#|//)\s*(ruleid|ok):\s*(\S+)")
 
 
 def expected() -> tuple[set[tuple[str, int, str]], set[tuple[str, int, str]]]:
-    """The (file, line, rule) triples that must be flagged, and those that must not."""
     flagged: set[tuple[str, int, str]] = set()
     clean: set[tuple[str, int, str]] = set()
     for path in sorted(p for p in EXAMPLES.rglob("*") if p.suffix in (".py", ".ts")):
@@ -35,7 +26,6 @@ def expected() -> tuple[set[tuple[str, int, str]], set[tuple[str, int, str]]]:
 
 
 def found(semgrep: list[str]) -> set[tuple[str, int, str]]:
-    # Scanned from a copy outside the repository, so the rules' paths (/waypoint/...) are read from the examples' own root.
     with tempfile.TemporaryDirectory() as tmp:
         shutil.copytree(EXAMPLES, tmp, dirs_exist_ok=True)
         run = subprocess.run([*semgrep, "scan", "--metrics=off", "--disable-version-check", "--quiet", "--json",

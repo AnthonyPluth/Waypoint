@@ -1,5 +1,3 @@
-"""What sign-in keeps in the database: unfinished sign-ins (auth_pending), sessions (auth_sessions, stored hashed) and
-the people who've signed in (users). The HTTP flow is in test_server.py; these pin the rows."""
 import os
 import time
 import unittest

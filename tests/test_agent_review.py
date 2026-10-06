@@ -1,5 +1,3 @@
-""".github/scripts/agent_review.py: which pull requests the independent review is for, and how the reviewer's answer
-becomes the "Agent review" verdict the merge gate requires."""
 import base64
 import importlib.util
 import json
@@ -96,7 +94,6 @@ echo '{"is_error": false, "structured_output": {"summary": "s", "findings": []}}
 
 @unittest.skipUnless(Path("/bin/bash").exists(), "needs bash")
 class Run(unittest.TestCase):
-    """.github/scripts/agent-review-run.sh, with a stand-in for claude that records how it was started."""
 
     def run_script(self, **secrets):
         tmp = tempfile.TemporaryDirectory()
@@ -124,7 +121,7 @@ class Run(unittest.TestCase):
         self.assertEqual(args[args.index("--permission-mode") + 1], "dontAsk")
         self.assertEqual(args[args.index("--setting-sources") + 1], "")
         self.assertEqual(args[args.index("--model") + 1], "some-model")
-        self.assertNotIn("--bare", args)   # it would ignore the subscription's token
+        self.assertNotIn("--bare", args)
 
     def test_the_subscription_s_token_alone_is_used(self):
         done, args, output = self.run_script(CLAUDE_CODE_OAUTH_TOKEN="oat-token")

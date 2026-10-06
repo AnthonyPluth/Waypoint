@@ -1,18 +1,3 @@
-"""The API's contract with the web app: the request bodies and replies of the routes it covers, as TypedDicts.
-
-A handler names its reply (its return annotation) and, for a route that takes one, its body (the annotation of its third
-parameter) with a type from here; mypy then holds the handler to it, and tools/api_contract.py turns those annotations,
-with the route table (routes.py), into docs/openapi.json and the web app's frontend/src/lib/api-types.ts. `make check`
-and CI fail when either is out of date, and tests/test_api_contract.py checks each covered route's real reply against
-docs/openapi.json, so a field renamed on one side fails the web app's type-check, the drift check or the tests.
-
-A body is what the web app sends. The handler still checks every value it reads (waypoint/validate.py): anyone can send
-anything, so a field typed `float | str` here is one the validators accept as either ("12.50" or 12.5).
-
-Only the types the generator understands are used here: str, int, float, bool, None, Any, `X | Y`, list[X],
-dict[str, X], Literal[...], NotRequired[X], and the TypedDicts in this module (a subclass has its base's fields too).
-Not every route is covered yet; tools/api_contract.py lists the ones that are.
-"""
 from __future__ import annotations
 
 from typing import Literal, NotRequired, TypedDict
@@ -22,13 +7,10 @@ class Ok(TypedDict):
     ok: bool
 
 
-# The app's state
-
 class SignedIn(TypedDict):
-    """Who's signed in. Without sign-in configured (on your own machine), everyone is `local`."""
     name: str | None
     email: str | None
-    sub: NotRequired[str]       # the sign-in provider's id for them (with sign-in on)
+    sub: NotRequired[str]
     local: NotRequired[bool]
 
 
@@ -36,12 +18,10 @@ class State(TypedDict):
     version: str
     database: Literal["sqlite", "postgres"]
     user: SignedIn | None
-    last_backup: str | None         # when a backup was last downloaded from Settings, with its UTC offset
-    review_count: int               # what waits in Review for the signed-in member: mail Waypoint couldn't read, names to match
-    person_id: int | None           # the signed-in member's own person (whose stats the Stats page opens on); none on your own machine
+    last_backup: str | None
+    review_count: int
+    person_id: int | None
 
-
-# Backups
 
 class BackupContents(TypedDict):
     created: str | None
@@ -60,49 +40,44 @@ class Restored(TypedDict):
     unreadable_secrets: list[str]
 
 
-# Gmail connections
-
 class Mailbox(TypedDict):
     id: int
     address: str
-    status: Literal["connected", "reconnect", "error"]   # reconnect: Google no longer honours it; error: it couldn't be reached
+    status: Literal["connected", "reconnect", "error"]
     last_error: str | None
-    last_scan: str | None           # when a scan last finished, with its UTC offset
-    scan_error: str | None          # what the last scan couldn't do (the last good state is kept); null once one finishes
-    scanning: bool                  # a scan is running now
-    scan_notice: str | None         # why the last scan couldn't start (nothing was recorded; it isn't a failed scan), until one does
-    share_review: bool              # its "Couldn't read" items are shown to the household (off until its owner says)
+    last_scan: str | None
+    scan_error: str | None
+    scanning: bool
+    scan_notice: str | None
+    share_review: bool
 
 
 class MailboxList(TypedDict):
-    configured: bool                # GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set
-    mailboxes: list[Mailbox]        # the signed-in member's own
+    configured: bool
+    mailboxes: list[Mailbox]
 
 
 class ShareBody(TypedDict):
-    share: bool                     # show this mailbox's "Couldn't read" items to the household, or stop
+    share: bool
 
 
 class Started(TypedDict):
-    url: str                        # Google's consent screen, to send the browser to
+    url: str
 
 
 class ScanStarted(TypedDict):
-    started: bool                   # false when a scan of this mailbox was already running
+    started: bool
 
 
 class Disconnected(TypedDict):
     ok: bool
-    revoked: bool                   # false when Waypoint couldn't unlock the saved token to revoke it: remove it at Google
+    revoked: bool
 
-
-# Review: mail that looked like a booking and couldn't be read, and names on bookings to match to people
 
 class AiSuggestion(TypedDict):
-    """The booking's fields the AI read, as the Add by hand form has them. A flight has no zones: its airports give them."""
     kind: Literal["flight", "hotel", "car", "train"]
     origin: str
-    start_local: str                # YYYY-MM-DDTHH:MM, as written at the place
+    start_local: str
     end_local: str
     provider: NotRequired[str]
     confirmation: NotRequired[str]
@@ -112,26 +87,23 @@ class AiSuggestion(TypedDict):
 
 
 class ReviewItem(TypedDict):
-    """One message Waypoint couldn't read, for the member whose mailbox it is and, when its owner shares that mailbox, the
-    household. Who it came from, its day and its subject; the message itself comes from `GET /api/review/{id}/preview`."""
     id: int
-    address: str                    # the mailbox it came from
-    owner: str                      # whose mailbox it is
-    mine: bool                      # the signed-in member's own; false: shared with them, and they can only add it by hand or dismiss it
-    sender_domain: str              # empty when the message didn't say
-    subject: str | None             # the message's subject; null when the message wasn't kept (an item from before, or its key was lost)
-    has_email: bool                 # the message is kept: Add by hand shows it beside the form, for everyone who sees the item
-    received: str | None            # a day, YYYY-MM-DD
-    reason: Literal["no_markup", "incomplete", "broken"]   # no booking details in it; some missing; couldn't be opened
-    gmail_url: str | None           # opens the message in Gmail; none for someone else's
-    suggestion: AiSuggestion | None   # what the optional AI read from it (never its text), pre-filled into Add by hand to confirm or edit
-    suggestion_error: str | None    # why the AI gave none, in fixed text
+    address: str
+    owner: str
+    mine: bool
+    sender_domain: str
+    subject: str | None
+    has_email: bool
+    received: str | None
+    reason: Literal["no_markup", "incomplete", "broken"]
+    gmail_url: str | None
+    suggestion: AiSuggestion | None
+    suggestion_error: str | None
 
 
 class WhoIsThis(TypedDict):
-    """A name on a booking that isn't matched to a person, with the segment it's on."""
-    id: int                         # the traveller to match
-    name: str                       # as printed on the booking
+    id: int
+    name: str
     segment_id: int
     trip_id: int
     kind: Literal["flight", "hotel", "car", "train", "cruise"]
@@ -145,81 +117,68 @@ class WhoIsThis(TypedDict):
 class Review(TypedDict):
     items: list[ReviewItem]
     who: list[WhoIsThis]
-    ai: bool                        # the optional AI is on, so Ask AI works
+    ai: bool
 
 
 class Preview(TypedDict):
-    """A review item's message as plain text and, when it has an HTML part, as markup rebuilt from an allowlist (no scripts, styles,
-    images or remote loads). Read from the kept copy for anyone who sees the item; an item with none is fetched from Gmail for its
-    mailbox's owner alone, and kept from then on."""
     subject: str | None
     text: str
-    html: str | None                # null: the message has no HTML part
-    truncated: bool                 # cut at 30,000 characters
+    html: str | None
+    truncated: bool
 
 
 class StoredEmail(TypedDict):
-    """A message a booking was made from, as kept: text and markup as in `Preview`, cut at 30,000 characters."""
     subject: str | None
     sender_domain: str | None
-    received: str | None            # a day, YYYY-MM-DD
+    received: str | None
     text: str
     html: str | None
     truncated: bool
 
 
 class SegmentEmails(TypedDict):
-    """The messages a booking was made from (or updated by), newest first, for whoever can see the booking."""
     emails: list[StoredEmail]
 
 
 class WhoBody(TypedDict):
-    """Who a printed name is: a person in People, or a name to add as a guest. Send one."""
     person_id: NotRequired[int]
     new_guest: NotRequired[str]
 
 
 class Matched(TypedDict):
     ok: bool
-    matched: int                    # how many travellers on bookings became that person (the same printed name is matched everywhere)
+    matched: int
 
-
-# AI (optional, off by default)
 
 class AiSettings(TypedDict):
-    mode: Literal["off", "local", "openrouter"]   # off; Ollama on your own network; OpenRouter with zero data retention
+    mode: Literal["off", "local", "openrouter"]
     ollama_url: str
     ollama_model: str
     openrouter_model: str
-    key: Literal["env", "saved"] | None            # where the OpenRouter key comes from; the key itself never comes back
+    key: Literal["env", "saved"] | None
 
-
-# Brand logos (optional, off until a Logo.dev key is saved)
 
 class LogoDevStatus(TypedDict):
-    configured: bool                # a publishable key is saved (the key itself never comes back)
-    searchable: bool                # a secret key is saved too: Brand Search picks the brand
-    with_logo: int                  # brands that have a logo
-    unknown: int                    # brands that have no logo at the services asked
-    waiting: int                    # brands not asked about yet
-    last_error: str | None          # why the last round failed (fixed text)
+    configured: bool
+    searchable: bool
+    with_logo: int
+    unknown: int
+    waiting: int
+    last_error: str | None
 
 
 class LogoDevFetch(TypedDict):
-    started: bool                   # false when a round of fetching was already running
+    started: bool
 
 
 class LogoDevBody(TypedDict):
-    """Settings → Logos. A field left out stays as it was; `clear` forgets the publishable key (and so the secret one too),
-    `clear_secret` forgets only the secret key."""
-    token: NotRequired[str]         # the publishable key, pk_...
-    secret: NotRequired[str]        # the secret key, sk_...
+    token: NotRequired[str]
+    secret: NotRequired[str]
     clear: NotRequired[bool]
     clear_secret: NotRequired[bool]
 
 
 class AiBody(TypedDict):
-    """Settings → AI. A field left out stays as it was; `openrouter_key: ""` forgets the saved key."""
     mode: Literal["off", "local", "openrouter"]
     ollama_url: NotRequired[str]
     ollama_model: NotRequired[str]
@@ -227,61 +186,51 @@ class AiBody(TypedDict):
     openrouter_key: NotRequired[str]
 
 
-# People
-
 class Person(TypedDict):
-    """Someone who travels: a household member (`member`, linked to their sign-in) or a guest with no login."""
     id: int
     display_name: str
     first_name: str | None
-    legal_name: str | None         # as on an ID
-    aliases: list[str]             # how airlines print the name ("DOE/JANE MS")
+    legal_name: str | None
+    aliases: list[str]
     member: bool
-    links: list[PersonLink]        # the guests this member claimed ("This is me"), oldest first
+    links: list[PersonLink]
 
 
 class PersonLink(TypedDict):
-    """A guest a member claimed: their name, the member who claimed it and the day (YYYY-MM-DD)."""
     guest: str
     by: str
     on: str
 
 
 class People(TypedDict):
-    people: list[Person]            # members first, then guests
+    people: list[Person]
 
 
 class ClaimSuggestions(TypedDict):
-    """Guests the signed-in member may be (their name matches, and they have no trips yet), for "Are you one of these?"."""
     guests: list[Person]
 
 
 class PersonBody(TypedDict):
-    """A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed). Changing
-    replaces all of them, so send every name to keep: one left out is cleared."""
     display_name: str
     first_name: NotRequired[str | None]
     legal_name: NotRequired[str | None]
     aliases: NotRequired[list[str]]
 
 
-# Trips and segments
-
 class Traveler(TypedDict):
     id: int
-    person_id: int | None           # null until the printed name is matched to a person
-    name: str                       # the person's name, or the name as printed on the booking
-    seat: str | None                # their seat on this segment
+    person_id: int | None
+    name: str
+    seat: str | None
 
 
 class SegmentLinks(TypedDict):
-    app: str | None                 # the provider's manage-trip page (https): its app opens it if installed
-    directions: str | None          # Apple Maps, for a hotel or a rental
-    call: str | None                # tel:
+    app: str | None
+    directions: str | None
+    call: str | None
 
 
 class Port(TypedDict):
-    """A cruise's port of call. Its times are local wall-clock times at the port, in its `zone`."""
     name: str
     zone: str
     arrive_local: str | None
@@ -289,76 +238,71 @@ class Port(TypedDict):
 
 
 class Segment(TypedDict):
-    """One flight leg, hotel stay, car rental, train or cruise. Its times are local wall-clock times at the place, never
-    converted: `start_local` is 2026-03-01T22:15 in `start_zone`, whatever zone the server or the viewer is in."""
     id: int
     trip_id: int
     kind: Literal["flight", "hotel", "car", "train", "cruise"]
     status: Literal["confirmed", "changed", "cancelled"]
     confirmation: str | None
     provider: str | None
-    start_local: str                # a hotel's check-in, a car's pick-up, a flight's departure
-    start_zone: str                 # the IANA zone of the place it starts (Pacific/Auckland)
+    start_local: str
+    start_zone: str
     end_local: str
     end_zone: str
-    origin: str | None              # a flight's airport code; a stay's or a rental's place
+    origin: str | None
     destination: str | None
-    details: dict[str, str]         # flight_number, terminal, seat, cabin, room, car_class, address, phone, ship, deck; time_unknown (an imported flight with no times)
+    details: dict[str, str]
     manage_url: str | None
     source: Literal["manual", "email", "import"]
-    booked_by: int | None           # a person
-    locked_fields: list[str]        # what a person edited, which a later email never overwrites
-    check_times: bool               # an email's times couldn't be settled: the card asks for a look, until they're edited or confirmed
+    booked_by: int | None
+    locked_fields: list[str]
+    check_times: bool
     travelers: list[Traveler]
-    itinerary: list[Port]           # a cruise's ports of call in order (empty for anything else)
-    logo: str | None                # where Waypoint serves its brand's logo (the airline, hotel, rental company or cruise line), when it has one
-    logo_label: str | None          # a hotel brand's name ("Hyatt Regency") when the logo is its group's, not the brand's own; else null
-    has_email: bool                 # a message it was made from is kept: `GET /api/segments/{id}/emails`
-    links: SegmentLinks              # the card's actions, built by the server
+    itinerary: list[Port]
+    logo: str | None
+    logo_label: str | None
+    has_email: bool
+    links: SegmentLinks
 
 
 class Trip(TypedDict):
     id: int
     name: str
-    start_date: str | None          # the local dates of its first and last segments
+    start_date: str | None
     end_date: str | None
     destination: str | None
     notes: str | None
-    auto: bool                      # grouped by Waypoint; false once made or changed by hand
+    auto: bool
     booked_by: int | None
-    segments: list[Segment]         # by start time
+    segments: list[Segment]
 
 
 class TripList(TypedDict):
-    trips: list[Trip]               # the signed-in member's own: the ones they're travelling on or booked
+    trips: list[Trip]
 
 
 class TripBody(TypedDict):
-    """A trip made by hand, or what changes on one (a name, where it goes, notes; its dates come from its segments)."""
     name: NotRequired[str]
     destination: NotRequired[str | None]
     notes: NotRequired[str | None]
-    start_date: NotRequired[str | None]     # when creating one with no segments yet, with end_date
+    start_date: NotRequired[str | None]
     end_date: NotRequired[str | None]
 
 
 class MergeBody(TypedDict):
-    merge: int                      # the trip to fold into this one
+    merge: int
 
 
 class SplitBody(TypedDict):
-    segment_ids: list[int]          # the segments to move to a new trip
+    segment_ids: list[int]
 
 
 class TravelerBody(TypedDict):
     person_id: NotRequired[int | None]
-    name: NotRequired[str | None]   # as printed on the booking
-    seat: NotRequired[str | None]   # their seat; left out, it stays as it was
+    name: NotRequired[str | None]
+    seat: NotRequired[str | None]
 
 
 class SegmentBody(TypedDict):
-    """A segment to add; `trip_id` leaves it to Waypoint to group it into a trip. A flight's zones come from its airports
-    unless given."""
     kind: Literal["flight", "hotel", "car", "train", "cruise"]
     start_local: str
     end_local: str
@@ -372,12 +316,11 @@ class SegmentBody(TypedDict):
     destination: NotRequired[str | None]
     details: NotRequired[dict[str, str]]
     manage_url: NotRequired[str | None]
-    travelers: NotRequired[list[TravelerBody]]   # who it's for; the signed-in member when left out
-    itinerary: NotRequired[list[Port]]           # a cruise's ports of call, in order
+    travelers: NotRequired[list[TravelerBody]]
+    itinerary: NotRequired[list[Port]]
 
 
 class SegmentEdit(TypedDict):
-    """What to change on a segment: only the fields sent. The ones that end up different are locked."""
     kind: NotRequired[Literal["flight", "hotel", "car", "train", "cruise"]]
     status: NotRequired[Literal["confirmed", "changed", "cancelled"]]
     confirmation: NotRequired[str | None]
@@ -390,8 +333,8 @@ class SegmentEdit(TypedDict):
     destination: NotRequired[str | None]
     details: NotRequired[dict[str, str]]
     manage_url: NotRequired[str | None]
-    travelers: NotRequired[list[TravelerBody]]   # replaces who it's for
-    itinerary: NotRequired[list[Port]]           # replaces a cruise's ports of call
+    travelers: NotRequired[list[TravelerBody]]
+    itinerary: NotRequired[list[Port]]
 
 
 class Airport(TypedDict):
@@ -399,19 +342,15 @@ class Airport(TypedDict):
     name: str
     city: str
     country: str
-    zone: str                       # IANA
+    zone: str
 
-
-# Importing past flights from another app's CSV export
 
 class ImportRow(TypedDict):
-    """One row of the uploaded file as a flight, for the preview: new, already in Waypoint, or one that can't be read (with
-    why). Times are local wall-clock times at the airports; both are null when the file gave none."""
-    line: int                       # the row's line in the file (the header is line 1)
+    line: int
     status: Literal["new", "exists", "unreadable"]
     reason: str | None
-    day: str | None                 # the local departure day, YYYY-MM-DD
-    origin: str | None              # airport codes
+    day: str | None
+    origin: str | None
     destination: str | None
     flight_number: str | None
     airline: str | None
@@ -422,13 +361,12 @@ class ImportRow(TypedDict):
 
 
 class ImportPreview(TypedDict):
-    format: str                     # which app's export it is, from its header row
-    me: int | None                  # the person the sign-in belongs to (who the flights are for unless chosen otherwise)
+    format: str
+    me: int | None
     rows: list[ImportRow]
 
 
 class ImportFlight(TypedDict):
-    """A flight to save, as the preview showed it: the web app sends back only the rows being saved, never the file."""
     day: str
     origin: str
     destination: str
@@ -441,23 +379,19 @@ class ImportFlight(TypedDict):
 
 
 class ImportBody(TypedDict):
-    flights: list[ImportFlight]     # at most 1,000 at a time
-    person_ids: NotRequired[list[int]]   # who was on these flights; the signed-in member when left out
+    flights: list[ImportFlight]
+    person_ids: NotRequired[list[int]]
 
 
 class Imported(TypedDict):
     added: int
-    existing: int                   # already in Waypoint, so left alone
+    existing: int
 
-
-# Live flight status
 
 class FlightStatus(TypedDict):
-    """A flight's live status, shown beside its booked times (the booking is never changed). Times are `2026-03-01T22:15`
-    wall-clock times at the airports, in their zones (`dep_zone`, `arr_zone`), never converted."""
     segment_id: int
     state: Literal["scheduled", "delayed", "departed", "landed", "cancelled", "diverted"]
-    origin: str | None              # airport codes, as the service names them
+    origin: str | None
     destination: str | None
     dep_scheduled: str | None
     dep_estimated: str | None
@@ -471,40 +405,36 @@ class FlightStatus(TypedDict):
     arr_zone: str
     arr_terminal: str | None
     arr_gate: str | None
-    delay_minutes: int | None       # how much later than booked it leaves (or left)
-    fetched_at: str                 # when the answer came, with its UTC offset
+    delay_minutes: int | None
+    fetched_at: str
 
 
 class FlightStatusPause(TypedDict):
-    until: str                      # with its UTC offset
-    reason: Literal["limit", "rate", "key"]   # the monthly limit (until the 1st), a rate limit, or a key RapidAPI refused (an hour)
+    until: str
+    reason: Literal["limit", "rate", "key"]
 
 
 class FlightStatusList(TypedDict):
-    enabled: bool                   # RAPIDAPI_KEY is set; without it there's nothing to show
-    month: str                      # YYYY-MM, local time: the month `used` counts
-    used: int                       # calls made this month, for the whole household
-    limit: int                      # WAYPOINT_FLIGHT_STATUS_MONTHLY_LIMIT
-    paused: FlightStatusPause | None   # why nothing is fetched now
-    statuses: list[FlightStatus]    # one for each of the viewer's flight segments that has one
+    enabled: bool
+    month: str
+    used: int
+    limit: int
+    paused: FlightStatusPause | None
+    statuses: list[FlightStatus]
 
-
-# Loyalty and Known Traveler numbers
 
 class LoyaltyEntry(TypedDict):
-    """One membership. The number comes only masked (its last four characters); `POST /api/loyalty/{id}/reveal` gives it."""
     id: int
     person_id: int
-    kind: str                       # airline, hotel, car, known_traveler or redress
-    program: str                    # one of `programs` for the kind
+    kind: str
+    program: str
     masked: str
-    readable: bool                  # false when Waypoint's key can't unlock the number (it has to be entered again)
-    expiry: str | None              # YYYY-MM-DD (Known Traveler and redress numbers only)
+    readable: bool
+    expiry: str | None
     notes: str | None
 
 
 class LoyaltyConflict(TypedDict):
-    """A person with two different numbers for one program (both are kept); People says so."""
     person_id: int
     kind: str
     program: str
@@ -513,11 +443,10 @@ class LoyaltyConflict(TypedDict):
 class LoyaltyList(TypedDict):
     loyalty: list[LoyaltyEntry]
     conflicts: list[LoyaltyConflict]
-    programs: dict[str, list[str]]  # the programs to choose from, by kind
+    programs: dict[str, list[str]]
 
 
 class LoyaltyBody(TypedDict):
-    """A membership, to save or to change. `number` is needed to save one; left out when changing, the saved one is kept."""
     person_id: int
     kind: str
     program: str
@@ -530,44 +459,42 @@ class Revealed(TypedDict):
     number: str
 
 
-# Travel stats
-
 class StatsNamed(TypedDict):
     name: str
     count: int
 
 
 class StatsPlace(TypedDict):
-    name: str                       # a country's ISO code or a city's name
-    first_visit: str                # the local date, YYYY-MM-DD
+    name: str
+    first_visit: str
     visits: int
 
 
 class StatsAirport(TypedDict):
     code: str
-    name: str                       # the code, for an airport that isn't in the table
+    name: str
     city: str | None
     country: str | None
-    visits: int                     # the times there: arrivals or departures, whichever are more
-    latitude: float | None          # for the map; none for an airport that isn't in the table
+    visits: int
+    latitude: float | None
     longitude: float | None
 
 
 class StatsAirline(TypedDict):
     code: str | None
-    name: str                       # the code, for an airline that isn't in the table
+    name: str
     flights: int
 
 
 class StatsMapTrip(TypedDict):
     trip_id: int
     name: str
-    start: str                      # the local date, YYYY-MM-DD: a flight's departure, a stay's check-in
-    end: str                        # a flight's arrival, a stay's check-out
+    start: str
+    end: str
 
 
 class StatsRoute(TypedDict):
-    a: str                          # A–B and B–A are one route
+    a: str
     b: str
     flights: int
     distance_km: float | None
@@ -575,7 +502,7 @@ class StatsRoute(TypedDict):
     a_longitude: float | None
     b_latitude: float | None
     b_longitude: float | None
-    trips: list[StatsMapTrip]       # each flight on it, earliest first
+    trips: list[StatsMapTrip]
 
 
 class StatsFlightRecord(TypedDict):
@@ -596,24 +523,24 @@ class StatsSeats(TypedDict):
 class StatsFlights(TypedDict):
     count: int
     distance_km: float
-    air_seconds: int                # booked departure to booked arrival, each at its own zone
-    airports: list[StatsAirport]    # most visited first
+    air_seconds: int
+    airports: list[StatsAirport]
     airlines: list[StatsAirline]
-    countries: list[StatsNamed]     # of the airports, by ISO code
-    routes: list[StatsRoute]        # most flown first
+    countries: list[StatsNamed]
+    routes: list[StatsRoute]
     cabins: list[StatsNamed]
     top_seat: str | None
     seat_positions: StatsSeats
     longest: StatsFlightRecord | None
     shortest: StatsFlightRecord | None
     most_visited_airport: str | None
-    busiest_month: str | None       # YYYY-MM
-    times_around_earth: float       # of 40,075 km
-    moon_fraction: float            # of the way to the Moon, 384,400 km
+    busiest_month: str | None
+    times_around_earth: float
+    moon_fraction: float
 
 
 class StatsStayPlace(TypedDict):
-    name: str                       # a hotel or a city, as first written
+    name: str
     stays: int
     nights: int
 
@@ -622,17 +549,17 @@ class StatsStayRecord(TypedDict):
     hotel: str | None
     city: str | None
     nights: int
-    start_local: str                # check-in, local
+    start_local: str
 
 
 class StatsStayPin(TypedDict):
     city: str
-    country: str | None             # an ISO code
-    latitude: float                 # roughly the city (its airports' middle); never the hotel's address
+    country: str | None
+    latitude: float
     longitude: float
     stays: int
     nights: int
-    trips: list[StatsMapTrip]       # each stay, earliest first
+    trips: list[StatsMapTrip]
 
 
 class StatsStays(TypedDict):
@@ -640,15 +567,15 @@ class StatsStays(TypedDict):
     chains: list[StatsNamed]
     cities: list[StatsNamed]
     countries: list[StatsNamed]
-    count: int                      # stays with at least one night
-    average_nights: float           # nights per stay, to a tenth
-    hotels: list[StatsStayPlace]    # by nights
+    count: int
+    average_nights: float
+    hotels: list[StatsStayPlace]
     cities_by_nights: list[StatsStayPlace]
     longest: StatsStayRecord | None
     most_visited_hotel: StatsStayPlace | None
     most_visited_city: StatsStayPlace | None
-    busiest_month: str | None       # YYYY-MM, the month with the most nights away
-    pins: list[StatsStayPin]        # the cities stayed in that have a place on the map, most nights first
+    busiest_month: str | None
+    pins: list[StatsStayPin]
 
 
 class StatsCars(TypedDict):
@@ -658,9 +585,9 @@ class StatsCars(TypedDict):
 
 class StatsCruises(TypedDict):
     count: int
-    nights: int                     # nights aboard
-    sea_days: int                   # days between embarking and disembarking with no port of call
-    ports: int                      # different ports of call
+    nights: int
+    sea_days: int
+    ports: int
     lines: list[StatsNamed]
 
 
@@ -670,7 +597,7 @@ class StatsPlaces(TypedDict):
 
 
 class DistanceUnit(TypedDict):
-    distance_unit: Literal["mi", "km"]   # how the Stats page shows distances (the household's setting)
+    distance_unit: Literal["mi", "km"]
 
 
 class DistanceUnitBody(TypedDict):
@@ -678,10 +605,10 @@ class DistanceUnitBody(TypedDict):
 
 
 class Stats(TypedDict):
-    years: list[int]                # the years with something finished, newest first, whatever year was asked about
-    person: int | None              # whose; none: the household
-    year: int | None                # none: lifetime
-    distance_unit: Literal["mi", "km"]   # the household's setting; every distance above is kilometres
+    years: list[int]
+    person: int | None
+    year: int | None
+    distance_unit: Literal["mi", "km"]
     flights: StatsFlights
     stays: StatsStays
     cars: StatsCars
@@ -689,22 +616,18 @@ class Stats(TypedDict):
     places: StatsPlaces
 
 
-# Reminders and the calendar feed
-
 class ReminderDevice(TypedDict):
-    """A browser or phone that gets this member's notifications."""
     id: int
-    service: str                    # the push service by name ("Chrome or Android (Google)"), else "Notifications to" its host, to tell devices apart
-    created: float                  # seconds since the epoch
+    service: str
+    created: float
 
 
 class Reminders(TypedDict):
-    """The signed-in member's own: which reminders they get, their devices, and whether they have a calendar feed."""
-    public_key: str                 # this server's key, for a browser to subscribe with
-    check_in: bool                  # "Check-in opens", 24 hours before a flight
-    day_of: bool                    # the summary of the day's bookings, from 7:00 on the machine's clock
+    public_key: str
+    check_in: bool
+    day_of: bool
     devices: list[ReminderDevice]
-    feed: bool                      # a calendar feed is on (its address was shown once, when it was made)
+    feed: bool
 
 
 class RemindersBody(TypedDict):
@@ -713,33 +636,29 @@ class RemindersBody(TypedDict):
 
 
 class DeviceBody(TypedDict):
-    """A browser's push subscription (`PushSubscription.toJSON()`)."""
     endpoint: str
     p256dh: str
     auth: str
 
 
 class FeedMade(TypedDict):
-    url: str                        # the feed's address, with its key: shown once, and not kept anywhere in Waypoint
+    url: str
 
-
-# AI assistants (MCP)
 
 class McpConnection(TypedDict):
-    """An assistant connected with OAuth: one approval, ended by Disconnect or when its approver can no longer sign in."""
     id: int
-    client: str | None              # the app's name, as it registered
-    who: str | None                 # the member who approved it: it sees what they see
-    scope: list[str]                # read, and write when they allowed changes
-    created: str | None             # with its UTC offset
+    client: str | None
+    who: str | None
+    scope: list[str]
+    created: str | None
     last_used: str | None
 
 
 class McpSettings(TypedDict):
-    allow_writes: bool              # "Let assistants change trips"
-    oauth: bool                     # assistants can connect (the address is one OAuth can use)
-    url: str | None                 # what to add to the assistant; none when `oauth` is false
-    reason: str | None              # why not
+    allow_writes: bool
+    oauth: bool
+    url: str | None
+    reason: str | None
     connections: list[McpConnection]
 
 

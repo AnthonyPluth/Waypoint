@@ -1,10 +1,3 @@
-"""An email's HTML part rebuilt as markup that is safe to show: for the preview beside the "Add by hand" form alone.
-
-Nothing the sender wrote is passed through: the markup is read by a parser and written again from an allowlist of tags (text,
-headings, lists, tables, links), every text and attribute value escaped. Scripts, styles, forms, frames and objects go with their
-content; an image becomes its alt text, so showing a message never loads anything from the sender (no tracking pixels).
-A link keeps only an `https:` or `mailto:` address and opens in a new tab without the referrer; no other attribute survives
-but a table cell's span. In memory only, like the text preview."""
 from __future__ import annotations
 
 import re
@@ -16,18 +9,17 @@ from urllib.parse import urlsplit
 
 KEEP = {"p", "div", "span", "br", "hr", "b", "strong", "i", "em", "u", "s", "small", "sub", "sup", "blockquote", "pre", "code",
         "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "dl", "dt", "dd", "table", "thead", "tbody", "tfoot", "tr", "td", "th",
-        "caption", "a", "center", "font"}   # (font and center only as the text they hold: no attribute of theirs is kept)
+        "caption", "a", "center", "font"}
 VOID = {"br", "hr"}
 DROP = {"script", "style", "head", "title", "template", "noscript", "iframe", "object", "embed", "svg", "math", "select",
-        "textarea", "button", "audio", "video", "canvas", "applet", "frameset"}   # (with everything inside them; a form is only unwrapped, its text stays, as mail often wraps its whole body in one)
+        "textarea", "button", "audio", "video", "canvas", "applet", "frameset"}
 SCHEMES = {"https", "mailto"}
 MAX_DEPTH = 40
 SPAN = re.compile(r"[1-9]\d?")
 
 
 def safe_href(value: str | None) -> str | None:
-    """A link's address if it is an https or mailto one, as written; else None."""
-    href = re.sub(r"[\x00-\x20\x7f-\x9f]", "", value or "")   # (browsers ignore these inside a scheme: "java\tscript:")
+    href = re.sub(r"[\x00-\x20\x7f-\x9f]", "", value or "")
     try:
         parts = urlsplit(href)
     except ValueError:
@@ -41,8 +33,8 @@ class _Clean(HTMLParser):
     def __init__(self, limit: int) -> None:
         super().__init__(convert_charrefs=True)
         self.out: list[str] = []
-        self.open: list[tuple[str, bool]] = []   # (tag, whether it was written: a tag past MAX_DEPTH is only counted)
-        self.counts: Counter[str] = Counter()   # (how many of each tag are open: an end tag is matched in one step, however deep)
+        self.open: list[tuple[str, bool]] = []
+        self.counts: Counter[str] = Counter()
         self.skip: list[str] = []
         self.limit = limit
         self.size = 0
@@ -50,7 +42,7 @@ class _Clean(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: Any) -> None:
         if tag == "body" and self.skip and self.skip[0] == "head":
-            self.skip.clear()   # (a head that was never closed ends where the body begins)
+            self.skip.clear()
         if self.skip:
             if tag in DROP and tag not in VOID:
                 self.skip.append(tag)
@@ -73,7 +65,7 @@ class _Clean(HTMLParser):
 
     def handle_startendtag(self, tag: str, attrs: Any) -> None:
         if tag in DROP and not self.skip:
-            return   # (a self-closed script holds nothing)
+            return
         self.handle_starttag(tag, attrs)
         if tag in KEEP and tag not in VOID:
             self.handle_endtag(tag)
@@ -84,7 +76,7 @@ class _Clean(HTMLParser):
                 while self.skip and self.skip.pop() != tag:
                     pass
             return
-        if self.counts[tag]:   # (closes what an unclosed tag left open, and ignores a stray end tag)
+        if self.counts[tag]:
             while self.open:
                 last, shown = self.open.pop()
                 self.counts[last] -= 1
@@ -113,8 +105,6 @@ class _Clean(HTMLParser):
 
 
 def clean_counted(html: str, limit: int) -> tuple[str, bool, int]:
-    """The markup to show for an HTML part, whether its text was cut at `limit` characters, and how many characters of text it
-    holds. Malformed markup is shown as far as it reads."""
     parser = _Clean(limit)
     try:
         parser.feed(html)
@@ -129,6 +119,5 @@ def clean_counted(html: str, limit: int) -> tuple[str, bool, int]:
 
 
 def clean(html: str, limit: int) -> tuple[str, bool]:
-    """The markup to show for an HTML part, and whether its text was cut at `limit` characters."""
     markup, cut, _size = clean_counted(html, limit)
     return markup, cut

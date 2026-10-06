@@ -1,6 +1,3 @@
-"""One booking is one segment however many copies of its email arrive (AGENTS.md, "Email stays on the server" and "You see the
-trips you're on"): the same confirmation in two household members' mailboxes, the same email twice, the airline or flight
-number written another way. Names, codes and itineraries are made up; the airports and airlines are real."""
 from sqlalchemy import func, select
 
 from waypoint.domain import trips, visibility
@@ -34,7 +31,7 @@ class HouseholdWide(Merging):
 
     def test_a_recipient_not_on_the_booking_still_sees_it(self):
         self.merge(self.jane, travelers=self.on(self.jane.person_id, self.mia))
-        self.merge(self.sam, travelers=self.on(self.jane.person_id, self.mia))   # (Sam isn't a passenger)
+        self.merge(self.sam, travelers=self.on(self.jane.person_id, self.mia))
         self.assertEqual(self.count(), 1)
         [seg] = [s for t in trips.listing(self.c, self.sam) for s in t["segments"]]
         self.assertEqual([t["person_id"] for t in seg["travelers"]], [self.jane.person_id, self.mia])

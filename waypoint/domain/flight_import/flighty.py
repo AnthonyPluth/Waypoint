@@ -1,10 +1,3 @@
-"""Flighty's export (Settings → Export in the app): one row per flight, with the columns Date, Airline, Flight, From, To,
-the gate, take-off and landing times (scheduled and actual), Canceled, Seat, Cabin Class and more. Its times are ISO times
-with an offset. Only the flight, its places, its times, the seat and the cabin are read; the booking reference (PNR) and
-Notes columns are never looked at.
-
-The columns here are from Flighty's published export as the project knows it; no export from the app was available to
-check them against, so a column named differently is read as empty (a flight without times), not guessed at."""
 from __future__ import annotations
 
 from collections.abc import Sequence

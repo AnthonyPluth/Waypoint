@@ -1,4 +1,3 @@
-"""db.is_busy: a database error that only means something else was writing (so try again), on SQLite and Postgres."""
 import os
 import sqlite3
 import tempfile
@@ -12,12 +11,10 @@ from waypoint.storage import db
 
 
 def wrapped(orig: BaseException) -> OperationalError:
-    """The driver's error as SQLAlchemy raises it."""
     return OperationalError("UPDATE account SET balance=?", {}, orig)
 
 
 def write_lock(dbapi_conn) -> None:
-    """Take SQLite's write lock on a plain sqlite3 connection, as a sync's write does."""
     dbapi_conn.execute("BEGIN IMMEDIATE")
 
 

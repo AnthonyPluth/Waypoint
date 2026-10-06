@@ -9,8 +9,6 @@
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
 
-  // Settings → Reminders: this member's own notifications ("Check-in opens", the day's summary) and private calendar feed.
-  // The feed's address is shown once, when it's made: Waypoint keeps only a hash of its key, so it can't show it again.
   let list = $state<Reminders | null>(null);
   let problem = $state("");
   let address = $state("");
@@ -32,7 +30,6 @@
     list = await apiCall<"POST /api/reminders">("/api/reminders", { method: "POST", body: { check_in: list.check_in, day_of: list.day_of, ...change }, failed: "Couldn’t save that" });
   }, { busy: (on) => (busy = on) });
 
-  /** The server's key as bytes, for the browser's push service. */
   const keyBytes = (b64u: string) => Uint8Array.from(atob(b64u.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 
   const turnOn = () => act(async () => {

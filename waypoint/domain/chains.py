@@ -1,8 +1,3 @@
-"""The hotel chain and the rental company a booking is with, as the Stats page counts them. An email's provider is often the
-site that sold the stay ("Capital One Travel", "Hotwire"), or the hotel's own name, or a company with the booking site and its
-number in brackets ("Hertz (booked via Hotwire 1234567890)"). The chain is found from the hotel's name first (a Westin is
-Marriott's, a Grand Hyatt is Hyatt's), then from the provider unless that is a booking site; a hotel that belongs to no chain
-Waypoint knows has none. Only these words are read: nothing is looked up."""
 from __future__ import annotations
 
 import re
@@ -52,13 +47,11 @@ def _mentions(text: str, phrases: tuple[str, ...]) -> bool:
 
 
 def clean(name: str | None) -> str | None:
-    """A company's name without the booking site and number an email put in brackets after it."""
     cleaned = VIA.sub(" ", name or "").strip(" ,;-–")
     return " ".join(cleaned.split()) or None
 
 
 def hotel_chain(provider: str | None, hotel: str | None) -> str | None:
-    """The chain a stay is with, or None for a hotel that isn't in one (or when the email says only which site sold it)."""
     provider = clean(provider)
     for text in (_words(hotel), _words(provider)):
         for chain, phrases in CHAINS:

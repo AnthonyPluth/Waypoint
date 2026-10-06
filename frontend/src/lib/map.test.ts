@@ -101,7 +101,7 @@ describe("framing what was flown", () => {
     const t = fitBox(flownBounds(hawaii, worldProjection()));
     expect(t.k).toBeGreaterThan(3);
     expect(t.k).toBeLessThanOrEqual(8);
-    const p = worldProjection()([-157.9, 21.3])!;   // Honolulu lands inside the box, near its middle
+    const p = worldProjection()([-157.9, 21.3])!;
     const [x, y] = [t.x + t.k * p[0], t.y + t.k * p[1]];
     expect(x).toBeGreaterThan(MAP_WIDTH * 0.25);
     expect(x).toBeLessThan(MAP_WIDTH * 0.75);

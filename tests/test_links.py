@@ -6,7 +6,6 @@ from waypoint.domain import links
 
 class ManageLinks(unittest.TestCase):
     def test_every_table_entry_builds_its_url_for_a_sample_booking(self):
-        # Each provider in the table is tested here by name; tools/fleet_checks.py fails a provider with no test.
         for provider, (host, _path) in links.MANAGE.items():
             url = links.manage_link(provider, "ABC123", "Doe")
             self.assertTrue(url and url.startswith(f"https://{host}/"), provider)

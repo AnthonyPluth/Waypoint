@@ -1,8 +1,6 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
 
-  // A top-five list (the first `limit` rows), with Show all to see the rest. Each row has a name, a line under it if there's
-  // something to say, and a count.
   export type Row = { key: string; name: string; sub?: string | null; value: string };
   let { title, rows, limit = 5 }: { title: string; rows: Row[]; limit?: number } = $props();
   let all = $state(false);

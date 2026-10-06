@@ -1,7 +1,3 @@
-"""Remove findings that carry an inline `nosemgrep` from a SARIF file.
-
-Semgrep keeps them in its SARIF output, marked as suppressed, and code scanning still raises an alert for each one.
-"""
 import json
 import sys
 

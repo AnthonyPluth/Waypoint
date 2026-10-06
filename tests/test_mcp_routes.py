@@ -1,7 +1,3 @@
-"""Every route is either reachable by an assistant (and with which scopes) or blocked, listed here, so a route added to
-waypoint/server/routes.py fails these tests until someone has decided which (AGENTS.md: a new route is held to the
-promises the moment it's added). Nothing under mailboxes, the review queue, AI, backup, the feed or push is reachable,
-whatever the scope or switch."""
 import re
 import unittest
 
@@ -10,21 +6,17 @@ from waypoint.server import ROUTES, mcp_access, mcp_http
 READ = ("read",)
 WRITE = ("write",)
 
-# What an assistant may read with "read".
 READS = [
     "GET /api/airports/{id}", "GET /api/distance-unit", "GET /api/flight-status", "GET /api/people",
     "GET /api/segments/{id}", "GET /api/stats", "GET /api/trips", "GET /api/trips/{id}",
 ]
-# What "write" opens to read: it finds who a change is for. No numbers, no mail.
 WRITE_READS = ["GET /api/people/claim-suggestions"]
-# The changes "write" allows (and its switch): everything the web app changes outside BLOCKED.
 CHANGES = [
     "DELETE /api/people/{id}", "DELETE /api/segments/{id}", "DELETE /api/trips/{id}",
     "POST /api/distance-unit", "POST /api/people", "POST /api/people/claim-suggestions/dismiss", "POST /api/people/{id}",
     "POST /api/people/{id}/claim", "POST /api/segments", "POST /api/segments/{id}", "POST /api/trips", "POST /api/trips/{id}",
     "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
 ]
-# Never reachable, whatever the scope or switch (loyalty and Known Traveler numbers: not even the masked listing).
 BLOCKED = [
     "DELETE /api/loyalty/{id}", "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "POST /api/loyalty/{id}/reveal",
     "DELETE /api/feed", "DELETE /api/mailboxes/{id}", "DELETE /api/mcp-settings/connections/{id}", "DELETE /api/reminders/devices/{id}",
@@ -36,8 +28,6 @@ BLOCKED = [
     "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch", "GET /api/segments/{id}/logo", "GET /api/segments/{id}/emails",
     "POST /api/restore", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/suggest",
 ]
-# Where a route in one of these areas must never be reachable: the promises' sources (mail, the AI, backups, sign-in and
-# sessions, the feed's key, push devices, the flight-status budget and key, these settings).
 NEVER = re.compile(r"^/api/(mailboxes|review|ai|backup|restore|state|feed|reminders|mcp-settings|import|loyalty|logodev)(/|$)|^/api/flight-status/|^/api/segments/\{id\}/emails$")
 
 
@@ -91,7 +81,7 @@ class RouteTests(unittest.TestCase):
 
     def test_oauth_and_mcp_are_not_api_routes(self):
         for _m, p, *_ in ROUTES:
-            self.assertFalse(p.startswith(("/mcp", "/oauth", "/.well-known")), p)   # (the handler answers those, not the table)
+            self.assertFalse(p.startswith(("/mcp", "/oauth", "/.well-known")), p)
 
 
 if __name__ == "__main__":

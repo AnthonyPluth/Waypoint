@@ -1,11 +1,3 @@
-"""Importing past flights from another app's CSV export (Settings → Import past flights): Flighty, myFlightRadar24,
-OpenFlights or App in the Air.
-
-`read` turns an uploaded file into what each row proposes, detecting the format from its header row; the parsers (one
-module each) are pure functions from rows to proposed flights. `preview` marks each as new, already in Waypoint, or one
-that can't be read, and `save` adds the ones the person confirms as segments (source "import"), grouped into trips as any
-segment is. The file is read in memory and dropped: nothing here keeps it, logs a row or looks at a notes column, and
-the confirm step sends back only the flights to save."""
 from __future__ import annotations
 
 import csv
@@ -32,8 +24,6 @@ __all__ = [
 ]
 
 MAX_ROWS = 10_000
-# Each format's name, the headers that identify it (normalised: case, spaces and underscores dropped) and its parser,
-# in the order they're tried.
 FORMATS: dict[str, tuple[frozenset[str], Parser]] = {
     "Flighty": (frozenset(flighty.SIGNATURE), flighty.parse),
     "myFlightRadar24": (frozenset(myflightradar24.SIGNATURE), myflightradar24.parse),
@@ -44,7 +34,7 @@ SUPPORTED = "Flighty, myFlightRadar24, OpenFlights and App in the Air"
 
 
 class Unreadable(ValueError):
-    """The file can't be imported at all; the message says why (the API's 400)."""
+    pass
 
 
 @dataclass(frozen=True)
@@ -58,8 +48,6 @@ def _normal(header: str) -> str:
 
 
 def read(data: bytes) -> Parsed:
-    """The flights a CSV export proposes, one entry per row. Raises Unreadable for a file that isn't text or CSV, is empty,
-    has no flights, has more than MAX_ROWS rows, or has headers that are none of the supported formats'."""
     if not data.strip():
         raise Unreadable("That file is empty.")
     try:

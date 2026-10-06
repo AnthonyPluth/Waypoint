@@ -1,6 +1,3 @@
-"""OAuth for the MCP endpoint, as functions over a database connection (waypoint/server/mcp_oauth.py): the HTTP side is
-in tests/test_mcp_oauth_http.py. The grant types, PKCE, rotation and replay revocation, revocation, expiry of apps nobody
-approved, and a grant ending when its approver can no longer sign in (oidc.access_lapsed) are held here."""
 import base64
 import hashlib
 import json
@@ -36,8 +33,6 @@ def clear(conn):
 
 
 class Db(unittest.TestCase):
-    """A database of its own (on Postgres, its own schema), so these tests may clear the OAuth tables and count their rows
-    while other test modules run alongside."""
     @classmethod
     def setUpClass(cls):
         cls.path = add_database(cls, database_path(cls, "oauth.db"))
@@ -74,7 +69,6 @@ class Db(unittest.TestCase):
 
 
 class IssuerTests(unittest.TestCase):
-    """The address OAuth is served at (WAYPOINT_PUBLIC_URL, or a home address) and the two metadata documents."""
     def issuer(self, host, public=None):
         env = {"WAYPOINT_PUBLIC_URL": public} if public is not None else {}
         with mock.patch.dict(os.environ, env):
@@ -113,7 +107,6 @@ class IssuerTests(unittest.TestCase):
 
 
 class ValueTests(unittest.TestCase):
-    """The checks on what an app sends: redirect URIs, scopes, resource, PKCE and what the consent page says each opt-in allows."""
     def test_redirect_uris(self):
         for ok in ("https://claude.ai/api/mcp/auth_callback", "https://x.example:8443/cb?a=1", "http://127.0.0.1:33418/callback",
                    "http://localhost/cb", "http://[::1]:5000/cb"):
@@ -140,7 +133,7 @@ class ValueTests(unittest.TestCase):
                 self.assertFalse(mcp_oauth.redirect_matches(reg, bad))
 
     def test_what_the_consent_page_says_each_opt_in_allows(self):
-        self.assertEqual(set(mcp_oauth.CONSENT), {"write"})   # nothing opens full ID numbers to an assistant
+        self.assertEqual(set(mcp_oauth.CONSENT), {"write"})
         label, note, off = mcp_oauth.CONSENT["write"]
         self.assertEqual(label, "Change trips")
         for words in ("Add, change and remove trips, bookings, travellers, people and guests, and the distance unit",
@@ -178,7 +171,6 @@ class ValueTests(unittest.TestCase):
 
 
 class RegistrationTests(Db):
-    """Dynamic client registration: what's saved, what's refused, and the cap on apps nobody has approved."""
     def test_a_public_client(self):
         out = self.client()
         self.assertTrue(out["client_id"].startswith("wpc_"))
@@ -246,7 +238,6 @@ class RegistrationTests(Db):
 
 
 class ClientAuthTests(Db):
-    """How an app proves who it is on /oauth/token and /oauth/revoke, the way it registered."""
     def auth(self, form, header=None):
         return mcp_oauth.authenticate_client(self.conn, form, header)
 
@@ -284,7 +275,6 @@ class ClientAuthTests(Db):
 
 
 class AuthorizeTests(Db):
-    """The authorization request, and the consent form's token (kept once, for ten minutes)."""
     def test_a_good_request(self):
         c = self.client()
         req = self.request(c, scope="write", resource=RES + "/")
@@ -321,7 +311,6 @@ class AuthorizeTests(Db):
 
 
 class TokenTests(Db):
-    """Codes, tokens, refresh rotation and its replay revocation, expiry, use being noted and revocation."""
     def exchange(self, client_id, the_code, **over):
         form = {"grant_type": "authorization_code", "code": the_code, "redirect_uri": "https://claude.ai/api/mcp/auth_callback",
                 "code_verifier": VERIFIER, **over}
@@ -407,7 +396,7 @@ class TokenTests(Db):
                                 (c["client_id"], {"refresh_token": out["access_token"]})):
             with self.subTest(over=over), self.assertRaises(OAuthError):
                 self.refresh(client_id, out["refresh_token"], **over)
-        with self.assertRaises(OAuthError) as e:                                  # ids:read is no scope at all
+        with self.assertRaises(OAuthError) as e:
             self.refresh(c["client_id"], out["refresh_token"], scope="read ids:read")
         self.assertEqual(e.exception.error, "invalid_scope")
         again = self.refresh(c["client_id"], out["refresh_token"], scope="read")
@@ -468,7 +457,6 @@ OIDC_RULES = ("OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_ALLOWED_EMAILS", "OIDC_ALLO
 
 
 def sign_in(**env):
-    """Waypoint's sign-in rules as these environment variables say (the rest unset)."""
     patch = mock.patch.dict(os.environ, env)
     patch.start()
     for k in OIDC_RULES:
@@ -478,7 +466,6 @@ def sign_in(**env):
 
 
 class ApproverTests(Db):
-    """An approval lasts only as long as its approver may sign in (mcp_oauth.cut_off_reason, by oidc.still_allowed)."""
 
     def setUp(self):
         super().setUp()
@@ -586,7 +573,6 @@ class ApproverTests(Db):
 
 
 class HousekeepingTests(Db):
-    """What housekeeping keeps and what it deletes (apps nobody approved after a day, spent tokens, old codes)."""
     def test_what_is_kept_and_what_goes(self):
         now = 10_000_000.0
         day = 86400

@@ -12,7 +12,6 @@ import { toast } from "svelte-sonner";
 import RemindersSection from "./RemindersSection.svelte";
 
 const view = (extra: Partial<Reminders> = {}): Reminders => ({ public_key: "BAUQ", check_in: true, day_of: true, devices: [], feed: false, ...extra });
-/** Answers GET /api/reminders with what `current()` says; other calls with what `others` says. */
 const serve = (current: () => Reminders, others: (path: string, opts?: { method?: string; body?: unknown }) => unknown = () => ({})) =>
   vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string; body?: unknown }) =>
     (path === "/api/reminders" && !opts?.method ? current() : others(path, opts)) as never);
@@ -50,7 +49,7 @@ describe("Settings → Reminders", () => {
     serve(() => view({ devices }), (path, opts) => { if (opts?.method === "DELETE") devices = devices.filter((d) => d.id !== 7); return { ok: true }; });
     render(RemindersSection);
     expect(await screen.findByText("Notifications to push.example.com")).toBeInTheDocument();
-    expect(screen.getByText("Chrome or Android (Google)")).toBeInTheDocument();   // (a known service by its name, not its host)
+    expect(screen.getByText("Chrome or Android (Google)")).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole("button", { name: "Turn off" })[0]!);
     expect(api).toHaveBeenCalledWith("/api/reminders/devices/7", expect.objectContaining({ method: "DELETE" }));
     await waitFor(() => expect(screen.getAllByTestId("device")).toHaveLength(1));
@@ -135,7 +134,6 @@ describe("Settings → Reminders", () => {
   });
 });
 
-/** The confirm button of the open dialog (there's a "Turn off" on the page too). */
 function within_dialog() {
   return screen.getAllByRole("button", { name: "Turn off" }).at(-1) as HTMLElement;
 }

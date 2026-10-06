@@ -3,8 +3,6 @@
   import type { NavItem } from "$lib/nav";
   import { cn } from "$lib/utils";
 
-  // One page's link, in the tab bar (`tab`: icon over label) or the sidebar (icon beside it). A page with something waiting
-  // shows how much, as a number on the link (and in its name, for a screen reader).
   let { item, current, tab = false }: { item: NavItem; current: boolean; tab?: boolean } = $props();
   const waiting = $derived(item.badge && app.state ? item.badge(app.state) : 0);
 </script>

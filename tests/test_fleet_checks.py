@@ -1,5 +1,3 @@
-"""tools/fleet_checks.py: the checks that replaced instructions (one migration head, migrations tested, agents' commit
-trailers, workflow conventions), each passing on the repository as it is and failing on the mistake it is for."""
 import importlib.util
 import tempfile
 import unittest
@@ -20,7 +18,6 @@ class Migrations(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.dir = Path(tmp.name)
-        # A repository that started the rule at 0036 (Waypoint's own starts at 0001), so the one before needs no test.
         patch = mock.patch.object(fc, "TESTED_FROM", "0036")
         patch.start()
         self.addCleanup(patch.stop)
@@ -41,7 +38,6 @@ class Migrations(unittest.TestCase):
         self.assertEqual(self.problems(), [])
 
     def test_two_branches_each_adding_the_next_number_leave_two_heads(self):
-        # What nearly merged: two pull requests both added a migration after the same parent.
         self.write("0037_c.py", "0037", "0036")
         self.write("0038_d.py", "0038", "0036")
         problems = self.problems()
@@ -190,9 +186,7 @@ class Workflows(unittest.TestCase):
             self.assertIn("should be fleet_checks.RUNS_ON", fc.check_workflow("x.yml", self.GOOD.replace(fc.RUNS_ON, bare))[0])
 
 
-
 class Tests(unittest.TestCase):
-    """A test that's removed or skipped needs a trailer saying why."""
 
     def test_names_python_and_vitest(self):
         py = "class A(unittest.TestCase):\n    def test_one(self):\n        pass\n\n\ndef test_free():\n    pass\n"

@@ -13,7 +13,6 @@ import GmailSection from "./GmailSection.svelte";
 
 const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, scan_notice: null, share_review: false, ...extra });
 const list = (mailboxes: Mailbox[] = [], configured = true): MailboxList => ({ configured, mailboxes });
-/** Answers GET /api/mailboxes with `reply`; other calls with what `others` says. */
 const serve = (reply: MailboxList, others: (path: string) => unknown = () => ({})) =>
   vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/mailboxes" ? reply : others(path)) as never);
 
@@ -58,7 +57,7 @@ describe("Settings → Gmail", () => {
     }) as never);
     render(GmailSection);
     const sharing = await screen.findByRole("checkbox", { name: /Show this mailbox’s unread mail to the household/ });
-    expect(sharing).not.toBeChecked();   // (off until they say)
+    expect(sharing).not.toBeChecked();
     await userEvent.click(sharing);
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/mailboxes/1/share", expect.objectContaining({ method: "POST", body: { share: true } })));
     await waitFor(() => expect(screen.getByRole("checkbox", { name: /Show this mailbox/ })).toBeChecked());
@@ -108,7 +107,7 @@ describe("Settings → Gmail", () => {
     render(GmailSection);
     await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
     expect(await screen.findByText("Disconnect ana@gmail.example?")).toBeInTheDocument();
-    expect(api).not.toHaveBeenCalledWith("/api/mailboxes/1", expect.anything());   // not until confirmed
+    expect(api).not.toHaveBeenCalledWith("/api/mailboxes/1", expect.anything());
     await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/mailboxes/1", { method: "DELETE", failed: "Couldn’t disconnect" }));
     await waitFor(() => expect(screen.queryByText("ana@gmail.example")).toBeNull());
@@ -151,7 +150,7 @@ describe("Settings → Gmail", () => {
     serve(list());
     render(GmailSection);
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(words));
-    expect(location.search).toBe("");   // a reload doesn’t say it again
+    expect(location.search).toBe("");
     expect(location.hash).toBe("#settings");
   });
 
@@ -197,7 +196,7 @@ describe("Settings → Gmail", () => {
       expect(screen.queryByText("Scanning for bookings…")).toBeNull();
       const calls = vi.mocked(api).mock.calls.length;
       await vi.advanceTimersByTimeAsync(10_000);
-      expect(vi.mocked(api).mock.calls.length).toBe(calls);   // and stops asking
+      expect(vi.mocked(api).mock.calls.length).toBe(calls);
     } finally { vi.useRealTimers(); }
   });
 
@@ -225,7 +224,7 @@ describe("Settings → Gmail", () => {
       notice = "Google refused to refresh the connection just now.";
       await vi.advanceTimersByTimeAsync(3100);
       expect(await screen.findByText(/The scan couldn’t start: Google refused/)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(10_000);   // and stops looking
+      await vi.advanceTimersByTimeAsync(10_000);
       const calls = vi.mocked(api).mock.calls.length;
       await vi.advanceTimersByTimeAsync(10_000);
       expect(vi.mocked(api).mock.calls.length).toBe(calls);

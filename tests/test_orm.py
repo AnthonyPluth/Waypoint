@@ -1,6 +1,3 @@
-"""The ORM session layer (waypoint/storage/db.py): statements run with Connection.execute() and the ORM Session share the
-Connection's transaction, results read as rows did, and the portable helpers (upsert, insert_ignore) give the rows they
-should."""
 import unittest
 
 from sqlalchemy import func, insert, select, update

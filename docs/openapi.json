@@ -2150,7 +2150,6 @@
     "schemas": {
       "AiBody": {
         "type": "object",
-        "description": "Settings → AI. A field left out stays as it was; `openrouter_key: \"\"` forgets the saved key.",
         "properties": {
           "mode": {
             "enum": [
@@ -2215,7 +2214,6 @@
       },
       "AiSuggestion": {
         "type": "object",
-        "description": "The booking's fields the AI read, as the Add by hand form has them. A flight has no zones: its airports give them.",
         "properties": {
           "kind": {
             "enum": [
@@ -2331,7 +2329,6 @@
       },
       "ClaimSuggestions": {
         "type": "object",
-        "description": "Guests the signed-in member may be (their name matches, and they have no trips yet), for \"Are you one of these?\".",
         "properties": {
           "guests": {
             "type": "array",
@@ -2347,7 +2344,6 @@
       },
       "DeviceBody": {
         "type": "object",
-        "description": "A browser's push subscription (`PushSubscription.toJSON()`).",
         "properties": {
           "endpoint": {
             "type": "string"
@@ -2426,7 +2422,6 @@
       },
       "FlightStatus": {
         "type": "object",
-        "description": "A flight's live status, shown beside its booked times (the booking is never changed). Times are `2026-03-01T22:15`\nwall-clock times at the airports, in their zones (`dep_zone`, `arr_zone`), never converted.",
         "properties": {
           "segment_id": {
             "type": "integer"
@@ -2636,7 +2631,6 @@
       },
       "ImportFlight": {
         "type": "object",
-        "description": "A flight to save, as the preview showed it: the web app sends back only the rows being saved, never the file.",
         "properties": {
           "day": {
             "type": "string"
@@ -2719,7 +2713,6 @@
       },
       "ImportRow": {
         "type": "object",
-        "description": "One row of the uploaded file as a flight, for the preview: new, already in Waypoint, or one that can't be read (with\nwhy). Times are local wall-clock times at the airports; both are null when the file gave none.",
         "properties": {
           "line": {
             "type": "integer"
@@ -2826,7 +2819,6 @@
       },
       "LogoDevBody": {
         "type": "object",
-        "description": "Settings → Logos. A field left out stays as it was; `clear` forgets the publishable key (and so the secret one too),\n`clear_secret` forgets only the secret key.",
         "properties": {
           "token": {
             "type": "string"
@@ -2893,7 +2885,6 @@
       },
       "LoyaltyBody": {
         "type": "object",
-        "description": "A membership, to save or to change. `number` is needed to save one; left out when changing, the saved one is kept.",
         "properties": {
           "person_id": {
             "type": "integer"
@@ -2932,7 +2923,6 @@
       },
       "LoyaltyConflict": {
         "type": "object",
-        "description": "A person with two different numbers for one program (both are kept); People says so.",
         "properties": {
           "person_id": {
             "type": "integer"
@@ -2953,7 +2943,6 @@
       },
       "LoyaltyEntry": {
         "type": "object",
-        "description": "One membership. The number comes only masked (its last four characters); `POST /api/loyalty/{id}/reveal` gives it.",
         "properties": {
           "id": {
             "type": "integer"
@@ -3127,7 +3116,6 @@
       },
       "McpConnection": {
         "type": "object",
-        "description": "An assistant connected with OAuth: one approval, ended by Disconnect or when its approver can no longer sign in.",
         "properties": {
           "id": {
             "type": "integer"
@@ -3263,7 +3251,6 @@
       },
       "Person": {
         "type": "object",
-        "description": "Someone who travels: a household member (`member`, linked to their sign-in) or a guest with no login.",
         "properties": {
           "id": {
             "type": "integer"
@@ -3312,7 +3299,6 @@
       },
       "PersonBody": {
         "type": "object",
-        "description": "A person's names, to add a guest or to change anyone's (a member's link to their login can't be changed). Changing\nreplaces all of them, so send every name to keep: one left out is cleared.",
         "properties": {
           "display_name": {
             "type": "string"
@@ -3343,7 +3329,6 @@
       },
       "PersonLink": {
         "type": "object",
-        "description": "A guest a member claimed: their name, the member who claimed it and the day (YYYY-MM-DD).",
         "properties": {
           "guest": {
             "type": "string"
@@ -3364,7 +3349,6 @@
       },
       "Port": {
         "type": "object",
-        "description": "A cruise's port of call. Its times are local wall-clock times at the port, in its `zone`.",
         "properties": {
           "name": {
             "type": "string"
@@ -3395,7 +3379,6 @@
       },
       "Preview": {
         "type": "object",
-        "description": "A review item's message as plain text and, when it has an HTML part, as markup rebuilt from an allowlist (no scripts, styles,\nimages or remote loads). Read from the kept copy for anyone who sees the item; an item with none is fetched from Gmail for its\nmailbox's owner alone, and kept from then on.",
         "properties": {
           "subject": {
             "type": [
@@ -3426,7 +3409,6 @@
       },
       "ReminderDevice": {
         "type": "object",
-        "description": "A browser or phone that gets this member's notifications.",
         "properties": {
           "id": {
             "type": "integer"
@@ -3447,7 +3429,6 @@
       },
       "Reminders": {
         "type": "object",
-        "description": "The signed-in member's own: which reminders they get, their devices, and whether they have a calendar feed.",
         "properties": {
           "public_key": {
             "type": "string"
@@ -3580,7 +3561,6 @@
       },
       "ReviewItem": {
         "type": "object",
-        "description": "One message Waypoint couldn't read, for the member whose mailbox it is and, when its owner shares that mailbox, the\nhousehold. Who it came from, its day and its subject; the message itself comes from `GET /api/review/{id}/preview`.",
         "properties": {
           "id": {
             "type": "integer"
@@ -3672,7 +3652,6 @@
       },
       "Segment": {
         "type": "object",
-        "description": "One flight leg, hotel stay, car rental, train or cruise. Its times are local wall-clock times at the place, never\nconverted: `start_local` is 2026-03-01T22:15 in `start_zone`, whatever zone the server or the viewer is in.",
         "properties": {
           "id": {
             "type": "integer"
@@ -3827,7 +3806,6 @@
       },
       "SegmentBody": {
         "type": "object",
-        "description": "A segment to add; `trip_id` leaves it to Waypoint to group it into a trip. A flight's zones come from its airports\nunless given.",
         "properties": {
           "kind": {
             "enum": [
@@ -3927,7 +3905,6 @@
       },
       "SegmentEdit": {
         "type": "object",
-        "description": "What to change on a segment: only the fields sent. The ones that end up different are locked.",
         "properties": {
           "kind": {
             "enum": [
@@ -4017,7 +3994,6 @@
       },
       "SegmentEmails": {
         "type": "object",
-        "description": "The messages a booking was made from (or updated by), newest first, for whoever can see the booking.",
         "properties": {
           "emails": {
             "type": "array",
@@ -4074,7 +4050,6 @@
       },
       "SignedIn": {
         "type": "object",
-        "description": "Who's signed in. Without sign-in configured (on your own machine), everyone is `local`.",
         "properties": {
           "name": {
             "type": [
@@ -4858,7 +4833,6 @@
       },
       "StoredEmail": {
         "type": "object",
-        "description": "A message a booking was made from, as kept: text and markup as in `Preview`, cut at 30,000 characters.",
         "properties": {
           "subject": {
             "type": [
@@ -5020,7 +4994,6 @@
       },
       "TripBody": {
         "type": "object",
-        "description": "A trip made by hand, or what changes on one (a name, where it goes, notes; its dates come from its segments).",
         "properties": {
           "name": {
             "type": "string"
@@ -5070,7 +5043,6 @@
       },
       "WhoBody": {
         "type": "object",
-        "description": "Who a printed name is: a person in People, or a name to add as a guest. Send one.",
         "properties": {
           "person_id": {
             "type": "integer"
@@ -5084,7 +5056,6 @@
       },
       "WhoIsThis": {
         "type": "object",
-        "description": "A name on a booking that isn't matched to a person, with the segment it's on.",
         "properties": {
           "id": {
             "type": "integer"

@@ -3,7 +3,6 @@
   import NavLink from "$lib/components/NavLink.svelte";
   import { NAV, navFor } from "$lib/nav";
 
-  // On a phone or tablet (below 1024px) the pages are tabs along the bottom, where a thumb reaches; the sidebar takes over above.
   const current = $derived(navFor(route.page));
 </script>
 

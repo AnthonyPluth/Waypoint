@@ -1,6 +1,3 @@
-"""Brand logos (waypoint/providers/logodev.py, waypoint/providers/wikimedia.py, waypoint/domain/logos.py, waypoint/server/api/logos.py):
-what a Logo.dev or Wikimedia request carries, what is kept from the answer, which brand a booking has, how a round of fetching ends,
-and who can see a logo. Neither service is ever called: fake ones stand in for them. Names, codes and keys are invented."""
 import json
 import threading
 import unittest
@@ -29,7 +26,6 @@ NOW = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
 
 
 class FakeLogoDev(HTTPServer):
-    """Logo.dev's image and search endpoints: answers `status, content type, body` per kind of request, and keeps what it was asked."""
 
     def __init__(self):
         class Handler(BaseHTTPRequestHandler):
@@ -54,7 +50,6 @@ class FakeLogoDev(HTTPServer):
 
 
 def serve_fake(case) -> FakeLogoDev:
-    """A fake Logo.dev, which the provider is pointed at until the test is cleaned up."""
     fake = FakeLogoDev()
     threading.Thread(target=fake.serve_forever, daemon=True).start()
     case.addCleanup(fake.server_close)
@@ -67,8 +62,6 @@ def serve_fake(case) -> FakeLogoDev:
 
 
 class FakeWikimedia(HTTPServer):
-    """Wikidata's search and entity API and Commons' file service: knows `brands` (label -> its logo file) and `files` (file ->
-    status, content type, body), and keeps what it was asked. `busy` answers every request with 429."""
 
     def __init__(self):
         outer = self
@@ -93,7 +86,7 @@ class FakeWikimedia(HTTPServer):
                 if outer.busy:
                     return self.reply(429, "text/plain", b"slow down")
                 if url.path == "/w/api.php" and query["action"] == ["wbsearchentities"]:
-                    hits = [{"id": f"Q{i}", "label": label, "description": outer.described.get(label, "hotel brand")}   # (all it knows: search is fuzzy)
+                    hits = [{"id": f"Q{i}", "label": label, "description": outer.described.get(label, "hotel brand")}
                             for i, label in enumerate(outer.brands, 1)]
                     return self.reply(200, "application/json", json.dumps({"search": hits}).encode())
                 if url.path == "/w/api.php" and query["action"] == ["wbgetentities"]:
@@ -116,7 +109,6 @@ class FakeWikimedia(HTTPServer):
         self.busy = False
 
     def know(self, label: str, file: str | None = None, image: bytes = PNG, description: str | None = None):
-        """Wikidata has an item called `label`, with its logo in `file` on Commons (None: no logo)."""
         file = file if file is not None else label + " logo.svg"
         self.brands[label] = file
         self.files[file] = (200, "image/png", image)
@@ -125,7 +117,6 @@ class FakeWikimedia(HTTPServer):
 
 
 def serve_wikimedia(case) -> FakeWikimedia:
-    """A fake Wikidata and Commons, which the provider is pointed at until the test is cleaned up."""
     fake = FakeWikimedia()
     threading.Thread(target=fake.serve_forever, daemon=True).start()
     case.addCleanup(fake.server_close)
@@ -148,7 +139,7 @@ class WikimediaProviderTests(unittest.TestCase):
         self.assertEqual(search["query"]["search"], ["Hyatt Place"])
         self.assertEqual(entity["query"]["ids"], ["Q1"])
         self.assertEqual((image["path"], image["query"]), ("/files/Hyatt%20Place%20logo.svg", {"width": ["256"]}))
-        self.assertIn("Waypoint", image["headers"]["User-Agent"])   # (Wikimedia asks who is calling)
+        self.assertIn("Waypoint", image["headers"]["User-Agent"])
         self.assertNotIn("@", image["headers"]["User-Agent"])
 
     def test_the_same_brand_give_or_take_hotels_by_marriott_accents_and_punctuation(self):
@@ -163,7 +154,7 @@ class WikimediaProviderTests(unittest.TestCase):
     def test_another_brand_is_never_taken_for_this_one(self):
         self.fake.know("Holiday Inn Express")
         self.assertIsNone(wikimedia.find_logo("Holiday Inn"))
-        self.assertEqual([c["query"]["action"] for c in self.fake.calls], [["wbsearchentities"]])   # (no item to look at, no image asked for)
+        self.assertEqual([c["query"]["action"] for c in self.fake.calls], [["wbsearchentities"]])
 
     def test_a_building_or_one_hotel_is_not_a_brand(self):
         for description in ("skyscraper in Chicago", "hotel in Dubai", "building in Quebec"):
@@ -200,7 +191,7 @@ class WikimediaProviderTests(unittest.TestCase):
                             ("image/png", b"x" * (wikimedia.MAX_LOGO + 1))):
             self.fake.files["m.png"] = (200, ctype, body)
             self.assertIsNone(wikimedia.find_logo("Moxy"), ctype)
-        for code in (400, 403, 415):   # (a file Commons won't draw)
+        for code in (400, 403, 415):
             self.fake.files["m.png"] = (code, "text/plain", b"no")
             self.assertIsNone(wikimedia.find_logo("Moxy"), code)
         for ctype in ("image/jpeg", "image/webp", "image/gif"):
@@ -214,7 +205,7 @@ class WikimediaProviderTests(unittest.TestCase):
             wikimedia.find_logo("Aloft")
         self.assertIn("busy", str(caught.exception))
         self.fake.busy = False
-        for code in (429, 500, 503):   # (the service's trouble, not that file's)
+        for code in (429, 500, 503):
             self.fake.files["Aloft Hotels logo.svg"] = (code, "text/plain", b"oops")
             with self.assertRaises(wikimedia.Unavailable, msg=code):
                 wikimedia.find_logo("Aloft")
@@ -231,11 +222,11 @@ class WikimediaProviderTests(unittest.TestCase):
             with self.assertRaises(wikimedia.Unavailable):
                 wikimedia.find_logo("Sofitel")
         with mock.patch.object(wikimedia, "_open", return_value=(b'{"error": {"code": "badvalue"}}', "application/json")):
-            self.assertIsNone(wikimedia.find_logo("Sofitel"))   # (that question has no answer; the service is fine)
+            self.assertIsNone(wikimedia.find_logo("Sofitel"))
 
     def test_a_redirect_leaves_wikimedia_only_for_its_own_image_hosts(self):
         with self.assertRaises(wikimedia.Unavailable):
-            wikimedia._download("redirect")   # (the fake sends it to another host)
+            wikimedia._download("redirect")
         self.assertEqual([c["path"] for c in self.fake.calls], ["/files/redirect"])
 
 
@@ -312,7 +303,7 @@ class ProviderTests(unittest.TestCase):
 
 
 class BrandTests(unittest.TestCase):
-    AIRLINES = {"EX": "Example Air"}   # (a flight number whose code the table knows)
+    AIRLINES = {"EX": "Example Air"}
 
     def test_a_brand_is_the_provider_else_a_flights_airline(self):
         got = logos.brands_of([("hotel", "Harbour  Hotels", None), ("flight", None, "EX 101"), ("flight", "Other Air", "EX 101"),
@@ -334,19 +325,19 @@ class BrandTests(unittest.TestCase):
             with self.subTest(hotel=hotel):
                 self.assertIsNone(logos.sub_brand(hotel))
                 self.assertEqual(logos.brands_of([("hotel", "Hyatt", None, hotel)], {}), ["Hyatt"])
-        self.assertEqual(logos.brands_of([("car", "Hertz", None, "Hyatt Place Chicago")], {}), ["Hertz"])   # (only a hotel's name says its brand)
+        self.assertEqual(logos.brands_of([("car", "Hertz", None, "Hyatt Place Chicago")], {}), ["Hertz"])
 
     def test_a_hotel_of_a_known_brand_falls_back_to_its_group_not_to_the_booking_site(self):
         self.assertEqual(logos._candidates("hotel", "Booking.com", None, "Hyatt Regency Chicago", {}), ["Hyatt Regency", "Hyatt"])
         self.assertEqual(logos._candidates("hotel", None, None, "Courtyard Denver", {}), ["Courtyard by Marriott", "Marriott"])
-        self.assertEqual(logos._candidates("hotel", "Booking.com", None, "Harbour Hotel", {}), ["Booking.com"])   # (no brand of a group: its provider)
+        self.assertEqual(logos._candidates("hotel", "Booking.com", None, "Harbour Hotel", {}), ["Booking.com"])
         self.assertEqual(logos._candidates("car", "Hertz", None, "Hyatt Regency Chicago", {}), ["Hertz"])
 
     def test_every_brand_has_a_group_and_each_start_is_listed_once(self):
         starts = [start for start, _ in logos.SUB_BRANDS]
         self.assertEqual(len(starts), len(set(starts)))
         for start, brand in logos.SUB_BRANDS:
-            self.assertEqual(start, logos._plain(start), start)   # (written as a hotel's name is read)
+            self.assertEqual(start, logos._plain(start), start)
             self.assertIn(logos.key(brand), logos.GROUP_OF, brand)
         self.assertEqual(logos.GROUP_OF[logos.key("Hyatt Regency")], "Hyatt")
         self.assertGreater(len(logos.SUB_BRANDS), 140)
@@ -358,8 +349,8 @@ class BrandTests(unittest.TestCase):
 
     def test_a_hotel_shows_a_chip_only_when_the_logo_is_its_groups(self):
         self.assertEqual(logos.chip("hotel", "Hyatt Regency Chicago", "Hyatt"), "Hyatt Regency")
-        self.assertIsNone(logos.chip("hotel", "Hyatt Regency Chicago", "Hyatt Regency"))   # (its own)
-        self.assertIsNone(logos.chip("hotel", "Harbour Hotel", "Harbour Hotels"))          # (no brand of a group)
+        self.assertIsNone(logos.chip("hotel", "Hyatt Regency Chicago", "Hyatt Regency"))
+        self.assertIsNone(logos.chip("hotel", "Harbour Hotel", "Harbour Hotels"))
         self.assertIsNone(logos.chip("car", "Hyatt Regency Chicago", "Hertz"))
         self.assertIsNone(logos.chip("hotel", "Hyatt Regency Chicago", None))
 
@@ -373,14 +364,13 @@ class BrandTests(unittest.TestCase):
     def test_brand_search_picks_only_a_clear_match(self):
         found = [{"name": "Harbour Hotels", "domain": "harbour-hotels.com"}, {"name": "Harbor Freight", "domain": "harborfreight.com"}]
         self.assertEqual(logos.best_match("Harbour Hotels Inc", found), found[0])
-        self.assertEqual(logos.best_match("Harbour Hotels Lisbon Marina", found), found[0])   # a brand the name starts with
-        self.assertIsNone(logos.best_match("Quayside Inn", found))                              # better none than someone else's
+        self.assertEqual(logos.best_match("Harbour Hotels Lisbon Marina", found), found[0])
+        self.assertIsNone(logos.best_match("Quayside Inn", found))
         self.assertIsNone(logos.best_match("ab", found))
         self.assertIsNone(logos.best_match("Harbour", []))
 
 
 class RoundTests(DbCase):
-    """A round of fetching: new brands noted, asked about, kept; and how it ends when Logo.dev can't be asked."""
 
     def setUp(self):
         super().setUp()
@@ -437,7 +427,7 @@ class RoundTests(DbCase):
             status = logos.status(conn)
             self.assertIn("refused the key", status["last_error"] or "")
             self.assertNotIn(TOKEN, status["last_error"] or "")
-            self.assertEqual(status["unknown"], 0)   # not taken for "no such brand"
+            self.assertEqual(status["unknown"], 0)
             self.assertGreater(status["waiting"], 0)
             self.fake.image_answer = (200, "image/png", PNG)
             logos.fetch_due(conn, NOW + timedelta(minutes=15))
@@ -468,7 +458,7 @@ class RoundTests(DbCase):
             db.set_setting(conn, sk.LOGODEV_SECRET, SECRET)
             self.assertGreater(logos.fetch_due(conn, NOW), 0)
             self.assertEqual(logos.logo(conn, "Harbour Hotels"), (PNG, "image/png"))
-            self.assertEqual(len([c for c in self.fake.calls if c["path"] == "/search"]), 1)   # not asked again for each brand
+            self.assertEqual(len([c for c in self.fake.calls if c["path"] == "/search"]), 1)
             self.assertIn("secret key", logos.status(conn)["last_error"] or "")
             self.assertNotIn(SECRET, logos.status(conn)["last_error"] or "")
 
@@ -496,7 +486,6 @@ class RoundTests(DbCase):
 
 
 class HotelBrandRoundTests(DbCase):
-    """A hotel's own brand is asked of Wikimedia and its group of Logo.dev; and what happens when one of them can't answer."""
 
     def setUp(self):
         super().setUp()
@@ -521,10 +510,10 @@ class HotelBrandRoundTests(DbCase):
         with db.session() as conn:
             logos.fetch_due(conn, NOW)
             self.assertEqual(self.kept(conn), {"hyatt place": (PNG2, "wikimedia"), "hyatt": (PNG, "logodev")})
-        self.assertEqual(self.logodev_names(), ["Hyatt"])   # (Logo.dev is never asked about the hotel's brand)
+        self.assertEqual(self.logodev_names(), ["Hyatt"])
         self.assertEqual({c["query"]["search"][0] for c in self.wiki.calls if "search" in c["query"]}, {"Hyatt Place"})
         for calls in (self.logodev.calls, self.wiki.calls):
-            self.assertFalse(any("Quay" in str(c) for c in calls))   # (a place never goes to either)
+            self.assertFalse(any("Quay" in str(c) for c in calls))
 
     def test_a_brand_wikimedia_has_none_for_is_remembered_and_the_group_is_still_fetched(self):
         with db.session() as conn:
@@ -538,17 +527,17 @@ class HotelBrandRoundTests(DbCase):
         self.wiki.know("Hyatt Place", image=PNG2)
         self.wiki.busy = True
         with db.session() as conn:
-            self.assertEqual(logos.fetch_due(conn, NOW), 1)   # (the group still comes from Logo.dev)
+            self.assertEqual(logos.fetch_due(conn, NOW), 1)
             self.assertEqual(self.kept(conn)["hyatt"], (PNG, "logodev"))
             self.assertIn("Wikimedia couldn't be reached", logos.status(conn)["last_error"] or "")
             asked = len(self.wiki.calls)
-            for later in (15, 30):   # (the brands are still waiting out their hour: not asked, and the warning is not cleared)
+            for later in (15, 30):
                 logos.fetch_due(conn, NOW + timedelta(minutes=later))
                 self.assertEqual(len(self.wiki.calls), asked)
                 self.assertIn("Wikimedia couldn't be reached", logos.status(conn)["last_error"] or "", later)
             conn.execute(insert(Segment).values(trip_id=1, kind="car", status="confirmed", provider="Hertz", start_local="2026-10-02T09:00",
                                                 start_zone="Europe/London", end_local="2026-10-03T09:00", end_zone="Europe/London", source="manual"))
-            self.assertEqual(logos.fetch_due(conn, NOW + timedelta(minutes=40)), 1)   # a Logo.dev round meanwhile doesn't clear it either
+            self.assertEqual(logos.fetch_due(conn, NOW + timedelta(minutes=40)), 1)
             self.assertIn("Wikimedia couldn't be reached", logos.status(conn)["last_error"] or "")
             self.wiki.busy = False
             self.assertEqual(logos.fetch_due(conn, NOW + logos.RETRY_AFTER + timedelta(minutes=1)), 1)
@@ -565,7 +554,7 @@ class HotelBrandRoundTests(DbCase):
         with db.session() as conn:
             logos.fetch_due(conn, NOW)
             got = self.kept(conn)
-            self.assertEqual([got["hyatt house"][0], got["hyatt place"][0]].count(PNG2), 1)   # (one has it, not both)
+            self.assertEqual([got["hyatt house"][0], got["hyatt place"][0]].count(PNG2), 1)
 
     def test_a_group_logo_from_before_is_dropped_for_a_brand_that_has_none_of_its_own_but_kept_when_it_does(self):
         with db.session() as conn:
@@ -573,8 +562,8 @@ class HotelBrandRoundTests(DbCase):
                 conn.execute(insert(BrandLogo).values(key=logos.key(brand), name=brand, logo=PNG2, logo_type="image/png", source="logodev"))
             logos.fetch_due(conn, NOW)
             got = self.kept(conn)
-            self.assertEqual(got["hyatt place"], (None, None))   # (Logo.dev's was the group's)
-            self.assertEqual(got["hyatt"], (PNG, "logodev"))     # (the group's own is asked again)
+            self.assertEqual(got["hyatt place"], (None, None))
+            self.assertEqual(got["hyatt"], (PNG, "logodev"))
         self.wiki.know("Hyatt Place", image=b"\x89PNG\r\n\x1a\nits own")
         with db.session() as conn:
             logos.fetch_due(conn, NOW + timedelta(days=logos.REFRESH_DAYS + 1))
@@ -586,12 +575,12 @@ class HotelBrandRoundTests(DbCase):
                                                 start_local="2026-11-01T15:00", start_zone="Europe/London", end_local="2026-11-03T10:00",
                                                 end_zone="Europe/London", source="manual"))
         self.wiki.know("Hyatt House", "house.svg")
-        self.wiki.files["house.svg"] = (200, "image/svg+xml", b"<svg onload=alert(1)/>")   # ("hyatt house" sorts before "hyatt place")
+        self.wiki.files["house.svg"] = (200, "image/svg+xml", b"<svg onload=alert(1)/>")
         self.wiki.know("Hyatt Place", image=PNG2)
         with db.session() as conn:
             logos.fetch_due(conn, NOW)
             self.assertEqual(self.kept(conn), {"hyatt house": (None, None), "hyatt place": (PNG2, "wikimedia"), "hyatt": (PNG, "logodev")})
-            self.assertIsNone(logos.status(conn)["last_error"])   # (Wikimedia was never down)
+            self.assertIsNone(logos.status(conn)["last_error"])
             self.assertEqual(logos.status(conn)["waiting"], 0)
 
     def test_a_hotel_brand_a_booking_names_as_its_provider_falls_back_to_logo_dev(self):
@@ -612,7 +601,6 @@ class HotelBrandRoundTests(DbCase):
 
 
 class RouteTests(RouteCase):
-    """Who sees a logo, and Settings → Logos."""
 
     def setUp(self):
         super().setUp()
@@ -647,16 +635,16 @@ class RouteTests(RouteCase):
     def test_a_hotel_shows_its_own_brands_logo_else_its_providers(self):
         self.keep("Hyatt")
         hyatt = self.book("ana", HOTEL, provider="Hyatt", origin="Hyatt Place Harbour", travelers=[{"person_id": self.person["ana"]}])
-        self.assertEqual(hyatt["logo"], f"/api/segments/{hyatt['id']}/logo")   # (no logo of Hyatt Place's own: Hyatt's)
+        self.assertEqual(hyatt["logo"], f"/api/segments/{hyatt['id']}/logo")
         self.assertEqual(fetch(self.base, "GET", hyatt["logo"], headers={"X-Waypoint": "1", **self.who["ana"]})[2], PNG)
         with db.session() as conn:
             conn.execute(BrandLogo.__table__.insert().values(key="hyatt place", name="Hyatt Place", logo=PNG2, logo_type="image/png", checked=NOW.isoformat()))
         regency = self.book("ana", {**HOTEL, "start_local": "2026-12-01T15:00", "end_local": "2026-12-03T10:00"}, provider="Hyatt",
                             origin="Hyatt Regency Harbour", travelers=[{"person_id": self.person["ana"]}])
         image = lambda seg: fetch(self.base, "GET", f"/api/segments/{seg['id']}/logo", headers={"X-Waypoint": "1", **self.who["ana"]})[2]
-        self.assertEqual((image(hyatt), image(regency)), (PNG2, PNG))   # Hyatt Place has its own now; Hyatt Regency falls back to Hyatt's
+        self.assertEqual((image(hyatt), image(regency)), (PNG2, PNG))
         label = lambda seg: next(x for x in self.ok("ana", "GET", f"/api/trips/{seg['trip_id']}")["segments"] if x["id"] == seg["id"])["logo_label"]
-        self.assertEqual((label(hyatt), label(regency)), (None, "Hyatt Regency"))   # (a chip when the logo is the group's)
+        self.assertEqual((label(hyatt), label(regency)), (None, "Hyatt Regency"))
 
     def test_no_logo_link_without_a_logo(self):
         seg = self.book("ana", OUT, travelers=[{"person_id": self.person["ana"]}])
@@ -680,7 +668,7 @@ class RouteTests(RouteCase):
         for reply in (got, self.ok("ben", "GET", "/api/logodev")):
             self.assertNotIn(TOKEN, json.dumps(reply))
             self.assertNotIn(SECRET, json.dumps(reply))
-        with db.session() as conn:   # saved encrypted
+        with db.session() as conn:
             raw = conn.execute(select(Setting.value).where(Setting.key == sk.LOGODEV_TOKEN)).scalar()
             self.assertNotIn(TOKEN, raw)
             self.assertEqual(db.get_setting(conn, sk.LOGODEV_TOKEN), TOKEN)
@@ -694,7 +682,7 @@ class RouteTests(RouteCase):
     def test_a_request_with_one_bad_key_saves_neither(self):
         self.assertEqual(self.call("ana", "POST", "/api/logodev", {"token": TOKEN, "secret": TOKEN})[0], 400)
         self.assertFalse(self.ok("ana", "GET", "/api/logodev")["configured"])
-        got = self.ok("ana", "POST", "/api/logodev", {"token": TOKEN, "secret": SECRET})   # both at once, when both are right
+        got = self.ok("ana", "POST", "/api/logodev", {"token": TOKEN, "secret": SECRET})
         self.assertEqual((got["configured"], got["searchable"]), (True, True))
 
     def test_the_secret_key_needs_the_publishable_one_first(self):
@@ -721,7 +709,6 @@ class RouteTests(RouteCase):
 
 
 class PrivacyTests(DbCase):
-    """Logo.dev is told a brand's name and the key, nothing about who travelled, when, or the booking."""
 
     def test_a_request_carries_neither_a_traveller_nor_a_confirmation_code(self):
         db.init(self.path)

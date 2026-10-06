@@ -1,9 +1,3 @@
-"""A cruise's ports of call (`segment_ports`): in order, each with its name, IANA zone and the local times the ship arrives and
-leaves. Nothing else changes: a cruise is a segment of kind `cruise`, and `segments.kind` is free text.
-
-Revision ID: 0015
-Revises: 0014
-"""
 import sqlalchemy as sa
 from alembic import op
 

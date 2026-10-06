@@ -45,7 +45,8 @@ Earlier clean-ups left one way to do most things, and `make lint` (so `make chec
 | `datetime.utcnow()` | the local time, or `datetime.now(timezone.utc)` for another system |
 | `(e as Error).message` in the web app | `errMsg(e)` from `lib/act.ts` |
 | `fetch(` outside `lib/api.ts` | `api()` |
-| `.catch(() => {})` with nothing in the braces | a comment saying why the failure doesn't matter |
+| `.catch(() => {})` with nothing in the braces | `ignoreFailure` from `lib/act.ts` |
+| a comment (`#`, `//`, `/* */`, `<!-- -->`), apart from a tool's directive such as `# noqa` or `// eslint-disable-next-line` | a name that says it; the why goes in the commit message or the docs (`tools/no_comments.py`, ESLint's `waypoint/no-comments`) |
 
 The Python rules are in `.semgrep/waypoint.yml`, with a failing and a passing example each in `.semgrep/examples/` (`make semgrep` runs the examples, then the code; CI's Semgrep job does too). It runs through `pipx`, at the version `.github/workflows/security.yml` pins. The web app's rules are in `frontend/eslint.config.js`, with their examples in `frontend/src/lint-rules.test.ts`.
 

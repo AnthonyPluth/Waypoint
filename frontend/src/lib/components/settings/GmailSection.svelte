@@ -1,6 +1,4 @@
 <script lang="ts" module>
-  // What Google's return says (?gmail=<code>, set by the server's callback), as words. Only these fixed codes come back,
-  // never anything Google said.
   const OUTCOMES: Record<string, { ok: boolean; text: string }> = {
     connected: { ok: true, text: "Gmail connected." },
     denied: { ok: false, text: "Google didn’t connect it: access wasn’t allowed." },
@@ -21,8 +19,6 @@
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
 
-  // Settings → Gmail: this member's own connected Gmail accounts (each member sees only theirs). Connecting sends the
-  // browser to Google for read-only access and comes back here; Disconnect revokes the access at Google first.
   let list = $state<MailboxList | null>(null);
   let problem = $state("");
   let notice = $state<{ ok: boolean; text: string } | null>(null);
@@ -36,7 +32,6 @@
     catch (err) { problem = errMsg(err); }
   }
 
-  // A scan runs on the server for a while: check on it until it's done.
   const POLL_MS = 3000;
   let watching = $state(false);
   let watchUntil = 0;
@@ -44,7 +39,7 @@
     const busy = !!list?.mailboxes?.some((m) => m.scanning);
     if (!busy && !watching) return;
     const timer = setInterval(() => {
-      if (watching && Date.now() > watchUntil) watching = false;   // (just a few looks after a click)
+      if (watching && Date.now() > watchUntil) watching = false;
       void load();
     }, POLL_MS);
     return () => clearInterval(timer);
@@ -54,12 +49,11 @@
     const code = new URLSearchParams(location.search).get("gmail");
     if (code && OUTCOMES[code]) {
       notice = OUTCOMES[code];
-      history.replaceState(null, "", location.pathname + location.hash);   // so reloading doesn't say it again
+      history.replaceState(null, "", location.pathname + location.hash);
     }
     load();
   });
 
-  // Google's consent screen is another site: the server makes the address (with this connection's state), the browser goes.
   const connect = () => act(async () => {
     const r = await apiCall<"POST /api/mailboxes/connect">("/api/mailboxes/connect", { method: "POST" });
     location.href = r.url;
@@ -70,10 +64,9 @@
     if (!r.started) toast("A scan of this mailbox is already running.");
     await load();
     watchUntil = Date.now() + 2 * POLL_MS + 500;
-    watching = true;   // a scan that can't start ends at once: look again for a moment to say why
+    watching = true;
   }, { busy: (on) => (starting = on ? m.id : null) });
 
-  // Showing a mailbox's unread mail to the household: the box shows what the server kept, and goes back if it refuses.
   const share = (m: Mailbox, box: HTMLInputElement) => act(async () => {
     try {
       await apiCall<"POST /api/mailboxes/{id}/share">(`/api/mailboxes/${m.id}/share`, { method: "POST", body: { share: box.checked }, failed: "Couldn’t change it" });
@@ -92,7 +85,6 @@
     });
   }
 
-  /** When a scan finished, in the viewer's own time zone (it's a moment in time, unlike a booking's times). */
   const scanned = (m: Mailbox) => (m.last_scan ? new Date(m.last_scan).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : null);
 
   const label = (m: Mailbox) => (m.status === "connected" ? "Connected" : m.status === "reconnect" ? "Reconnect" : "Couldn’t reach Google");

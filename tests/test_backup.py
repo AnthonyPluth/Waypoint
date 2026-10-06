@@ -44,12 +44,12 @@ class BackupTests(unittest.TestCase):
         raw = backup.dump(src)
         data = backup.load(raw)
         self.assertEqual(data["format"], "waypoint-backup")
-        self.assertNotIn("auth_sessions", data["tables"])          # sessions don't travel
+        self.assertNotIn("auth_sessions", data["tables"])
         self.assertNotIn("auth_pending", data["tables"])
         stored = dict(data["tables"]["settings"]["rows"])
-        self.assertTrue(stored[sk.VAPID_PRIVATE_KEY].startswith("enc:v1:"))   # a secret stays encrypted in the file
+        self.assertTrue(stored[sk.VAPID_PRIVATE_KEY].startswith("enc:v1:"))
         dst = db.connect(self.b)
-        dst.execute(insert(User).values(sub="old", email="old@example.com"))   # replaced, not merged
+        dst.execute(insert(User).values(sub="old", email="old@example.com"))
         counts = backup.restore(dst, data)
         dst.commit()
         self.assertEqual(counts["users"], 5)
@@ -59,7 +59,6 @@ class BackupTests(unittest.TestCase):
         src.close(); dst.close()
 
     def awkward(self, c):
-        """Rows with values a restore must put back exactly as they were."""
         c.execute(insert(User).values(sub="a:1|’", email="o'brien+tag@example.com", name="Ünïcödé 🐶 %s :name \\ back\nslash",
                                       first_name="", last_seen=-0.0))
         c.execute(insert(User).values(sub="z", email=None, name="Line one\nline two\ttab " + "x" * 5000, last_seen=1e-9))
@@ -77,7 +76,7 @@ class BackupTests(unittest.TestCase):
         from waypoint.storage.models import OAuthClient, OAuthGrant, OAuthToken
         src = self.fill(self.a)
         data = backup.load(backup.dump(src))
-        self.assertEqual([t for t in data["tables"] if t.startswith("oauth_")], [])   # they don't travel in a file
+        self.assertEqual([t for t in data["tables"] if t.startswith("oauth_")], [])
         dst = db.connect(self.b)
         dst.execute(insert(OAuthClient).values(id="wpc_x", redirect_uris="[]", auth_method="none", created=1.0))
         dst.execute(insert(OAuthGrant).values(id=1, client_id="wpc_x", sub="old", scope="read write", resource="http://h/mcp", created=1.0))
@@ -94,13 +93,12 @@ class BackupTests(unittest.TestCase):
         self.awkward(src)
         src.commit()
         data = backup.load(backup.dump(src))
-        self.assertEqual(data["revision"], backup.head())   # made at this version's revision: restored as it is
+        self.assertEqual(data["revision"], backup.head())
         dst = db.connect(self.b)
         backup.restore(dst, data)
         dst.commit()
         exported = self.rows_of(dst)
         want = self.rows_of(src)
-        # The secret is encrypted again on the way out (a new token each time): compare what it decrypts to.
         for rows in (exported, want):
             rows["settings"] = [(k, secretbox_plain(v) if k == sk.VAPID_PRIVATE_KEY else v) for k, v in rows["settings"]]
         self.assertEqual(exported, want)
@@ -183,17 +181,15 @@ class BackupTests(unittest.TestCase):
             c.close()
 
     def test_a_backup_through_the_migrations_from_the_first_revision(self):
-        # A backup made at an older revision is brought up to date in a scratch database first. With one migration so
-        # far that's 0001 to itself; this keeps the path working for the migrations to come.
         src = self.fill(self.a)
         data = backup.load(backup.dump(src))
         data["revision"] = "0001"
         dst = db.connect(self.b)
-        with mock.patch.object(backup, "head", return_value="not-this-one"):   # take the scratch-database path
+        with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)
         dst.commit()
         self.assertEqual(self.rows_of(dst)["users"], self.rows_of(src)["users"])
-        if db.using_postgres():   # the database it was brought up to date in is gone, never committed
+        if db.using_postgres():
             self.assertEqual(dst.sa.exec_driver_sql("SELECT count(*) FROM pg_namespace WHERE nspname LIKE 'waypoint_restore_%%'").scalar(), 0)
         src.close(); dst.close()
 
@@ -209,7 +205,7 @@ class BackupTests(unittest.TestCase):
         dst.execute(insert(User).values(sub="kept"))
         with self.assertRaisesRegex(ValueError, "newer version of Waypoint"):
             backup.restore(dst, {**data, "revision": "0999"})
-        self.assertEqual([r[0] for r in dst.execute(select(User.sub))], ["kept"])   # nothing touched
+        self.assertEqual([r[0] for r in dst.execute(select(User.sub))], ["kept"])
         for bad in (5, ["0001"], None):
             with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "isn't a Waypoint backup"):
                 backup.load(json.dumps({**data, "revision": bad}).encode())
@@ -242,7 +238,7 @@ class BackupTests(unittest.TestCase):
 
     def test_a_column_only_the_database_has_travels(self):
         src = self.fill(self.a)
-        src.sa.exec_driver_sql("ALTER TABLE users ADD COLUMN legacy_note TEXT")   # not in the schema: SQL on the raw connection
+        src.sa.exec_driver_sql("ALTER TABLE users ADD COLUMN legacy_note TEXT")
         src.sa.exec_driver_sql("UPDATE users SET legacy_note='kept' WHERE sub='s0'")
         data = backup.load(backup.dump(src))
         self.assertIn("legacy_note", data["tables"]["users"]["columns"])
@@ -259,11 +255,11 @@ class BackupTests(unittest.TestCase):
             with lock, self.assertRaises(backup.Busy):
                 backup.restore_all(data, locks=(threading.Lock(), lock), directory=self.dir)
             with db.session() as c:
-                self.assertEqual(c.execute(select(func.count()).select_from(User)).scalar(), 0)   # nothing restored
+                self.assertEqual(c.execute(select(func.count()).select_from(User)).scalar(), 0)
             done = backup.restore_all(data, locks=(lock,), directory=self.dir)
             self.assertFalse(lock.locked())
             self.assertEqual((done["counts"]["users"], done["safety_copy"], done["unreadable_secrets"]),
-                             (5, None, []))   # nothing was here to keep a copy of
+                             (5, None, []))
 
     def test_every_secret_has_a_label(self):
         self.assertEqual(set(backup.SECRET_LABELS), set(sk.SECRETS))
@@ -273,13 +269,13 @@ class BackupTests(unittest.TestCase):
     def test_preview_says_what_a_backup_holds(self):
         src = self.fill(self.a)
         data = backup.load(backup.dump(src))
-        data["tables"]["table_from_the_future"] = {"columns": ["x"], "rows": [[1], [2]]}   # not counted: it isn't restored
+        data["tables"]["table_from_the_future"] = {"columns": ["x"], "rows": [[1], [2]]}
         p = backup.preview(data)
         self.assertEqual((p["source"], p["version"]), ("postgres" if db.using_postgres() else "sqlite", backup.VERSION))
         self.assertEqual((p["revision"], p["created"]), (backup.head(), data["created"]))
         self.assertEqual({k: p["counts"][k] for k in backup.SUMMARY}, {"users": 5})
         self.assertEqual(p["counts"]["total"], sum(len(t["rows"]) for n, t in data["tables"].items() if n != "table_from_the_future"))
-        self.assertEqual(backup.counts(src), p["counts"])                    # the live database, counted the same way
+        self.assertEqual(backup.counts(src), p["counts"])
         self.assertEqual(backup.counts(db.connect(self.b))["users"], 0)
         src.close()
 
@@ -287,18 +283,18 @@ class BackupTests(unittest.TestCase):
         out = os.path.join(self.dir, "copies")
         os.mkdir(out)
         empty = db.connect(self.b)
-        self.assertIsNone(backup.safety_copy(empty, out))                    # nothing to keep
+        self.assertIsNone(backup.safety_copy(empty, out))
         self.assertEqual(os.listdir(out), [])
         src = self.fill(self.a)
         path = backup.safety_copy(src, out)
         assert path is not None
         self.assertEqual(os.path.dirname(path), out)
         self.assertRegex(os.path.basename(path), r"^waypoint-before-restore-\d{4}-\d\d-\d\d-\d{6}\.json\.gz$")
-        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)         # it holds your data: private
+        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
         with open(path, "rb") as f:
             kept = backup.load(f.read())
         self.assertEqual(len(kept["tables"]["users"]["rows"]), 5)
-        backup.restore(empty, kept)                                          # and it restores like any backup
+        backup.restore(empty, kept)
         self.assertEqual(empty.execute(select(func.count()).select_from(User)).fetchone()[0], 5)
         src.close(); empty.close()
 
@@ -309,12 +305,10 @@ def secretbox_plain(value):
 
 
 class BackupServerTests(unittest.TestCase):
-    """POST /api/backup/inspect, and the copy POST /api/restore keeps of what it replaces. A restore replaces the whole
-    database, so the test has one of its own."""
     HEADERS = {"X-Waypoint": "1", "Content-Type": "application/octet-stream"}
 
     def setUp(self):
-        self.data = os.path.dirname(own_database(self))   # WAYPOINT_DATA, where the safety copy goes
+        self.data = os.path.dirname(own_database(self))
         self.base = serve(self, server.Server)
 
     def post(self, path, body):
@@ -326,23 +320,23 @@ class BackupServerTests(unittest.TestCase):
         return status, raw
 
     def test_downloading_a_backup_records_when(self):
-        self.assertIsNone(json.loads(self.get("/api/state")[1])["last_backup"])   # never downloaded
+        self.assertIsNone(json.loads(self.get("/api/state")[1])["last_backup"])
         self.assertEqual(self.get("/api/backup", "HEAD")[0], 200)
-        self.assertIsNone(json.loads(self.get("/api/state")[1])["last_backup"])   # a HEAD isn't a download
+        self.assertIsNone(json.loads(self.get("/api/state")[1])["last_backup"])
         before = datetime.now().replace(microsecond=0)
         code, raw = self.get("/api/backup")
         self.assertEqual(code, 200)
         self.assertIn("tables", backup.load(raw))
         stamp = None
-        for _ in range(50):   # recorded once the file has been sent, so just after the client has it
+        for _ in range(50):
             with db.session() as c:
                 stamp = db.get_setting(c, sk.LAST_BACKUP)
             if stamp:
                 break
             time.sleep(0.05)
-        self.assertLessEqual(before, datetime.fromisoformat(stamp))           # the machine's local time, no offset stored
+        self.assertLessEqual(before, datetime.fromisoformat(stamp))
         got = json.loads(self.get("/api/state")[1])["last_backup"]
-        self.assertTrue(got.startswith(stamp))                                 # sent with its UTC offset
+        self.assertTrue(got.startswith(stamp))
         self.assertEqual(datetime.fromisoformat(got).replace(tzinfo=None), datetime.fromisoformat(stamp))
 
     def test_inspect_then_restore_keeps_a_copy(self):
@@ -352,12 +346,12 @@ class BackupServerTests(unittest.TestCase):
             raw, here = backup.dump(c), backup.counts(c)
         code, got = self.post("/api/backup/inspect", raw)
         self.assertEqual(code, 200)
-        self.assertEqual(got["counts"], here)                                # this backup is of what's here
+        self.assertEqual(got["counts"], here)
         self.assertEqual(got["current"], here)
         self.assertIn(got["database"], ("sqlite", "postgres"))
         self.assertEqual(self.post("/api/backup/inspect", b"hello"), (400, {"error": "That file isn't a Waypoint backup."}))
         self.assertEqual(self.post("/api/backup/inspect", b""), (400, {"error": "Choose a backup file (up to 200 MB)."}))
-        self.assertFalse([f for f in os.listdir(self.data) if f.startswith("waypoint-before-restore-")])   # inspecting changes nothing
+        self.assertFalse([f for f in os.listdir(self.data) if f.startswith("waypoint-before-restore-")])
 
         with db.session() as c:
             c.execute(update(User).where(User.sub == "test:bk").values(email="changed@example.com"))
@@ -394,10 +388,9 @@ class BackupServerTests(unittest.TestCase):
 
 
 class RestoreCommandTests(unittest.TestCase):
-    """python run.py restore: the same restore as the web's (a copy first, what can't be read)."""
 
     def run_py(self, data_dir, *args, stdin=None):
-        env = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}   # a SQLite database of its own
+        env = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}
         env.update(WAYPOINT_DATA=data_dir, WAYPOINT_SECRET_KEY="k" * 40)
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         return subprocess.run([sys.executable, os.path.join(root, "run.py"), *args], env=env, input=stdin, capture_output=True,
@@ -426,15 +419,14 @@ class RestoreCommandTests(unittest.TestCase):
             r = self.run_py(dst, "restore", full, "--yes")
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertIn("Restored", r.stdout)
-            self.assertNotIn("A copy of what was here", r.stdout)        # an empty database: nothing to keep
+            self.assertNotIn("A copy of what was here", r.stdout)
 
-            r = self.run_py(dst, "restore", full, "--yes")                # again, over what's there now
+            r = self.run_py(dst, "restore", full, "--yes")
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertIn("A copy of what was here before is at " + dst, r.stdout)
             self.assertTrue([f for f in os.listdir(dst) if f.startswith("waypoint-before-restore-")])
             self.assertNotIn("can't be read", r.stdout)
 
-            # A secret this key can't read (made under another): named as Settings has it, never its value.
             data["tables"]["settings"]["rows"].append([sk.VAPID_PRIVATE_KEY, "enc:v1:not-this-key-sekrit"])
             locked = os.path.join(tmp, "locked.json.gz")
             with open(locked, "wb") as f:

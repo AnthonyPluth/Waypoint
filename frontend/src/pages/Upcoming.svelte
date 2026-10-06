@@ -15,12 +15,9 @@
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
   import { toast } from "svelte-sonner";
 
-  // The next thing on your trips (a card), then the trip it belongs to, day by day. A failed load leaves nothing drawn that
-  // could pass for current, with a Try again.
   let trips = $state<Trip[] | null>(null);
   let loadError = $state("");
   let now = $state(Date.now());
-  // A member who was already a guest sees no trips until they say so: the guests their name matches, to claim ("This is me").
   let guests = $state<Person[]>([]);
   let claiming = $state<Person | null>(null);
   let asking = $state(false);
@@ -34,7 +31,7 @@
   }
   $effect(() => {
     void load();
-    const tick = setInterval(() => (now = Date.now()), 30_000);   // the countdown
+    const tick = setInterval(() => (now = Date.now()), 30_000);
     return () => clearInterval(tick);
   });
 

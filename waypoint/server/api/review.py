@@ -1,9 +1,3 @@
-"""Review: mail Waypoint thought was a booking and couldn't read (visible to the member whose mailbox it came from, with Open
-in Gmail, Ask AI, Add by hand and Ignore this sender, and to the household when that member shares the mailbox, who can
-Add by hand or dismiss it), and the names on bookings that aren't matched
-to a person yet ("Who is this?": any traveller on a trip the member sees). A message is kept, encrypted, while its item waits
-(waypoint/storage/stored_mail.py): the preview reads it for anyone who sees the item, and an item from before messages were kept
-is fetched from Gmail for its mailbox's owner alone, and kept from then on."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -26,9 +20,7 @@ _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {li
 
 
 def api_review(conn, _q, _b) -> Review:
-    """The signed-in member's review items (their own mailboxes', and those other members share with the household) and the
-    names on their trips to match to people."""
-    gmail.end_lapsed(conn)   # (a member who lost access takes their mailbox, and what it shares, with them)
+    gmail.end_lapsed(conn)
     return {"items": [cast(ReviewItem, {**i}) for i in review.listing(conn, owner())],
             "who": [{"id": t.id, "name": t.name or "", "segment_id": s["id"], "trip_id": s["trip_id"], "kind": s["kind"],
                      "provider": s["provider"], "origin": s["origin"], "destination": s["destination"],
@@ -38,10 +30,7 @@ def api_review(conn, _q, _b) -> Review:
 
 
 def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
-    """Take an item off the queue (once it's added by hand, or when it isn't a booking): the member's own, or one its owner
-    shares with the household. Anyone else's is a 404. `?segment=` names the booking it was added as, which then keeps the
-    message (the one the viewer sees: any other is ignored); otherwise the message is deleted with the item."""
-    added = (_q.get("segment") or [""])[0]   # (a query's values are lists)
+    added = (_q.get("segment") or [""])[0]
     booking = (viewer(conn), row_id(added, "No such segment", 400)) if added else None
     if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), booking):
         raise ApiError(NO_ITEM, 404)
@@ -49,8 +38,6 @@ def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
 
 
 def api_review_ignore(conn, _q, _b, item_id: str) -> Ok:
-    """Stop reviewing the item's sender: later scans skip their mail, and their other items leave the queue. Only the mailbox's
-    owner can: someone else's, shared or not, is a 404."""
     if review.ignore_sender(conn, owner(), row_id(item_id, NO_ITEM)) is None:
         raise ApiError(NO_ITEM, 404)
     return {"ok": True}
@@ -69,8 +56,6 @@ def _who(body: Mapping[str, Any]) -> tuple[int | None, str | None]:
 
 
 def api_review_who(conn, _q, body: WhoBody, traveler_id: str) -> Matched:
-    """Say who a printed name is: a person in People, or a new guest. Every traveller with that printed name on the member's
-    trips becomes them, and the name is kept as an alias so later bookings match."""
     person, guest = _who(body)
     who = viewer(conn)
     row = row_id(traveler_id, "No such traveller")
@@ -95,9 +80,6 @@ NOT_KEPT = "This message wasn’t kept. Its owner can open it in Gmail."
 
 @own_session
 def api_review_preview(_conn, _q, _b, item_id: str) -> Preview:
-    """The item's message as plain text and, when it has HTML, as safe markup, to read beside the form: the kept copy, for anyone
-    who sees the item. An item with none (from before messages were kept) is fetched from Gmail for its mailbox's owner, and kept
-    from then on; for anyone else it is a 404, as is an item they can't see."""
     item = row_id(item_id, NO_ITEM)
     with db.session() as conn:
         visible, kept = review.stored_email(conn, owner(), item)
@@ -121,7 +103,6 @@ def api_review_preview(_conn, _q, _b, item_id: str) -> Preview:
 
 @own_session
 def api_review_suggest(_conn, _q, _b, item_id: str) -> Ok:
-    """Ask the optional AI about this item now (the answer, or why there is none, shows on the item). 400 when the AI is off."""
     try:
         scan.suggest_now(owner(), row_id(item_id, NO_ITEM), time.time())
     except KeyError:

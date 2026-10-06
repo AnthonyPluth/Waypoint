@@ -7,7 +7,6 @@
   import Ship from "@lucide/svelte/icons/ship";
   import TrainFront from "@lucide/svelte/icons/train-front";
 
-  // Small icons for what a trip holds: a plane for flights, a building for stays, a car, a train, a ship.
   let { trip }: { trip: Trip } = $props();
   const kinds = $derived(tripKinds(trip));
   const ICONS = { flight: Plane, hotel: Building, car: Car, train: TrainFront, cruise: Ship } as const;

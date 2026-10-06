@@ -25,22 +25,18 @@
   import Plus from "@lucide/svelte/icons/plus";
   import { toast } from "svelte-sonner";
 
-  // One trip: each booking as a card (a flight on two bookings is one card, with a block for each booking), with its local times,
-  // travellers and the number each would use. A failed load leaves
-  // nothing drawn that could pass for current, with a Try again.
   let trip = $state<Trip | null>(null);
   let people = $state<Person[]>([]);
   let loyalty = $state<LoyaltyEntry[]>([]);
   let loadError = $state("");
   let form = $state<Draft | null>(null);
-  let focus = $state("");   // the form field to put the cursor in (Add address)
-  let renaming = $state<string | null>(null);   // the trip's name while it's being changed (null: not renaming)
+  let focus = $state("");
+  let renaming = $state<string | null>(null);
   let renameError = $state("");
   let saving = $state(false);
   let removing = $state<Segment | null>(null);
   let asking = $state(false);
 
-  // The email a booking was made from, read in place: the copy the server kept, fetched when asked and held only while it's open.
   type Mail = { state: "loading" } | { state: "ready"; emails: StoredEmail[] } | { state: "error"; message: string };
   let mails = $state<Record<number, Mail | undefined>>({});
   async function toggleMail(s: Segment) {
@@ -52,9 +48,9 @@
   }
 
   const id = $derived(route.sub);
-  const appWord = isMobile() ? "Open in app" : "Manage booking";   // (a desktop browser has no app to open: it gets the provider’s website)
+  const appWord = isMobile() ? "Open in app" : "Manage booking";
 
-  let latest = 0;   // the newest load: an earlier, slower one finishing later must not put its trip on screen
+  let latest = 0;
   async function load() {
     const mine = ++latest;
     loadError = "";
@@ -63,12 +59,11 @@
       const [t, p, l] = await Promise.all([apiCall<"GET /api/trips/{id}">(`/api/trips/${id}`), apiCall<"GET /api/people">("/api/people"), apiCall<"GET /api/loyalty">("/api/loyalty")]);
       if (mine !== latest) return;
       trip = t; people = p.people; loyalty = l.loyalty;
-      void loadFlightStatus();   // (the flights' live status shows beside their times once it arrives)
+      void loadFlightStatus();
     } catch (err) { if (mine !== latest) return; trip = null; loadError = errMsg(err); }
   }
   $effect(() => { void id; form = null; renaming = null; void load(); });
 
-  // A link to one booking (#trip/<id>?segment=<its card's first segment>): once the trip is on screen, scroll to that card and mark it.
   const wanted = $derived(new URLSearchParams(route.query).get("segment"));
   $effect(() => {
     if (!trip || !wanted) return;
@@ -80,7 +75,6 @@
   const kindName = (s: Segment) => KINDS.find(([k]) => k === s.kind)?.[1] ?? s.kind;
   const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
 
-  // A form that opens below a card the reader may have scrolled to: bring it into view (reduced motion jumps instead of gliding).
   function reveal(node: HTMLElement) {
     const calm = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     node.scrollIntoView?.({ block: "nearest", behavior: calm ? "auto" : "smooth" });
@@ -108,7 +102,6 @@
   const remove = (s: Segment) => act(async () => {
     await apiCall<"DELETE /api/segments/{id}">(`/api/segments/${s.id}`, { method: "DELETE" });
     toast.success("Removed");
-    // A grouped trip left with no bookings goes too.
     if (trip && trip.segments.length === 1 && trip.auto) { location.hash = "#trips"; return; }
     await load();
   });
@@ -178,7 +171,6 @@
           </div>
         </li>
       {:else}
-        <!-- One flight on several bookings: the flight once, then a block for each booking. -->
         <li class="pass scroll-mt-20" id={`segment-${s.id}`} class:ring-2={wanted === String(s.id)} class:ring-ring={wanted === String(s.id)} class:opacity-70={card.cancelled} aria-label={`${headline(s)}, on ${card.segments.length} bookings`}>
           <div class="flex flex-col gap-2 p-5 md:p-6">
             {@render heading(s, card.cancelled)}
@@ -212,7 +204,6 @@
           </div>
         </li>
       {/if}
-      <!-- Editing a booking opens its form right under it, where the reader is, not up at the trip's title. -->
       {#if form && form.id !== null && card.segments.some((b) => b.id === form?.id)}
         <li use:reveal aria-label="Edit booking"><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></li>
       {/if}
@@ -238,7 +229,6 @@
   <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
     <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</dd></div>
   {#if s.kind === "hotel" && !untimed(s)}
-    <!-- A stay's zone may have been worked out from its address: say which, so a wrong one is caught. -->
     <div><dt class="eyebrow">Time zone</dt><dd class="mt-1 text-sm text-muted-foreground" data-testid="stay-zone">{s.start_zone.replaceAll("_", " ")}</dd></div>
   {/if}
 {/snippet}

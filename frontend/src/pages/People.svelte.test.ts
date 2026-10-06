@@ -19,7 +19,6 @@ const PROGRAMS = { airline: ["American AAdvantage", "Other"], hotel: ["Marriott 
 const aa: LoyaltyEntry = { id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, expiry: null, notes: null };
 const tsa: LoyaltyEntry = { id: 12, person_id: 1, kind: "known_traveler", program: "TSA PreCheck", masked: "••••2345", readable: true, expiry: "2029-03-31", notes: null };
 
-/** The server, with its people kept in `held` and their memberships in `ids`: answers the calls the page makes. */
 let held: Person[];
 let ids: LoyaltyEntry[];
 let conflicts: LoyaltyList["conflicts"];
@@ -37,7 +36,7 @@ function serve() {
       return next;
     }
     const id = Number(path.split("/")[3]);
-    if (path.endsWith("/claim")) {   // the signed-in member (Jane) takes the guest
+    if (path.endsWith("/claim")) {
       const guest = held.find((p) => p.id === id)!;
       held = held.filter((p) => p.id !== id).map((p) => (p.id === 1 ? { ...p, links: [{ guest: guest.display_name, by: p.display_name, on: "2026-10-05" }] } : p));
       return held[0];
@@ -94,10 +93,10 @@ describe("People", () => {
     const heading = await screen.findByRole("heading", { name: /Add a membership for Mia Doe/ });
     const row = heading.closest("li");
     expect(row).not.toBeNull();
-    expect(within(row as HTMLElement).getByText("Mia Doe", { selector: "span" })).toBeInTheDocument();   // (inside her own row)
+    expect(within(row as HTMLElement).getByText("Mia Doe", { selector: "span" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: /Add a membership/ })).toHaveLength(1);
     const janes = screen.getByText("Jane Doe", { selector: "span" }).closest("li") as HTMLElement;
-    expect(within(janes).queryByRole("heading", { name: /Add a membership/ })).toBeNull();   // (not in anyone else's row)
+    expect(within(janes).queryByRole("heading", { name: /Add a membership/ })).toBeNull();
   });
 
   it("hides This is me on your own machine, where nobody signs in", async () => {
@@ -207,7 +206,7 @@ describe("People", () => {
     const kt = screen.getByRole("region", { name: "Jane Doe’s Known Traveler memberships" });
     expect(within(kt).getByText("Expires 2029-03-31")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: /Mia Doe/ })).toBeNull();
-    expect(screen.queryByText(/DEMO1234567/)).toBeNull();   // no number came with the page
+    expect(screen.queryByText(/DEMO1234567/)).toBeNull();
   });
 
   it("reveals one number on tap, copies it, and hides it on a second tap", async () => {
@@ -218,7 +217,7 @@ describe("People", () => {
     expect(api).toHaveBeenCalledWith("/api/loyalty/11/reveal", { method: "POST" });
     expect(await screen.findByText("DEMO1234567")).toBeInTheDocument();
     expect(writeText).toHaveBeenCalledWith("DEMO1234567");
-    expect(screen.getByText("••••2345")).toBeInTheDocument();   // the other stays masked
+    expect(screen.getByText("••••2345")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Hide American AAdvantage number" }));
     expect(screen.queryByText("DEMO1234567")).toBeNull();
     vi.unstubAllGlobals();
@@ -255,17 +254,17 @@ describe("People", () => {
     render(People);
     await userEvent.click(await screen.findByRole("button", { name: "Add a membership for Jane Doe" }));
     const program = screen.getByLabelText(/^Program/);
-    expect(within(program).queryByRole("option", { name: "American AAdvantage" })).toBeNull();   // (Jane has it)
+    expect(within(program).queryByRole("option", { name: "American AAdvantage" })).toBeNull();
     expect(within(program).getByRole("option", { name: "Other" })).toBeInTheDocument();
-    expect(program).toHaveValue("Other");                                                         // (the first one left)
+    expect(program).toHaveValue("Other");
     await userEvent.selectOptions(screen.getByLabelText("Kind"), "hotel");
-    expect(within(screen.getByLabelText(/^Program/)).getByRole("option", { name: "Marriott Bonvoy" })).toBeInTheDocument();   // (not hers)
+    expect(within(screen.getByLabelText(/^Program/)).getByRole("option", { name: "Marriott Bonvoy" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await userEvent.click(screen.getByRole("button", { name: "Edit Jane Doe’s American AAdvantage" }));
     expect(screen.getByLabelText(/^Program/)).toHaveValue("American AAdvantage");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await userEvent.click(screen.getByRole("button", { name: "Add a membership for Mia Doe" }));
-    expect(within(screen.getByLabelText(/^Program/)).getByRole("option", { name: "American AAdvantage" })).toBeInTheDocument();   // (Mia doesn't)
+    expect(within(screen.getByLabelText(/^Program/)).getByRole("option", { name: "American AAdvantage" })).toBeInTheDocument();
   });
 
   it("has no Tier, and offers an expiry only for Known Traveler and redress numbers", async () => {

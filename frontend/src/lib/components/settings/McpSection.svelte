@@ -9,9 +9,6 @@
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
 
-  // Settings → AI assistants (MCP): the address an assistant is given, the household switch that decides whether an
-  // assistant may be allowed to change trips (each assistant is approved on Waypoint’s own page, where the person ticks what it gets),
-  // and the assistants connected, each with Disconnect.
   let list = $state<McpSettings | null>(null);
   let problem = $state("");
   let leaving = $state<McpConnection | null>(null);
@@ -25,20 +22,19 @@
   }
   onMount(load);
 
-  // The switch shows what the server kept. If the server refuses, the box goes back to where it was and the toast says why.
   async function choose(e: Event) {
     const box = e.currentTarget as HTMLInputElement, allow = box.checked;
     await act(async () => {
       const r = await apiCall<"POST /api/mcp-settings/writes">("/api/mcp-settings/writes", { method: "POST", body: { allow }, failed: "Couldn’t save that" });
       if (list) list = { ...list, allow_writes: r.allow };
     }, { busy: (on) => (saving = on) });
-    if (list) box.checked = list.allow_writes;   // as the server has it (after a refusal, as it was)
+    if (list) box.checked = list.allow_writes;
   }
 
   async function copy() {
     if (!list?.url) return;
     try { await navigator.clipboard.writeText(list.url); toast.success("Copied"); }
-    catch { address?.select(); toast("Couldn’t copy it: it’s selected, so copy it yourself."); }   // no clipboard (a plain http page, a refused permission)
+    catch { address?.select(); toast("Couldn’t copy it: it’s selected, so copy it yourself."); }
   }
 
   async function disconnect() {
@@ -52,10 +48,8 @@
   }
 
   const SCOPES: Record<string, string> = { read: "Read", write: "Change trips" };
-  /** What an approval allows, as words: read always, then whatever else it was given. */
   const access = (scope: string[]) => Object.keys(SCOPES).filter((s) => s === "read" || scope.includes(s)).map((s) => SCOPES[s]);
 
-  /** A moment in time, in the viewer's own time zone. */
   const at = (t: string) => new Date(t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 </script>
 

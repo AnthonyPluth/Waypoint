@@ -43,7 +43,6 @@ const full: Stats = {
   places: { countries: [{ name: "US", first_visit: "2025-05-02", visits: 3 }, { name: "GB", first_visit: "2026-06-01", visits: 1 }], cities: [] },
 };
 
-/** Serves the people and, for each stats request, what `stats` makes of its address. */
 function serve(stats: (path: string) => Stats | Error | Promise<Stats>) {
   vi.mocked(api).mockImplementation((async (path: string) => {
     if (path === "/api/people") return { people: [jane, sam] };
@@ -71,7 +70,7 @@ describe("Stats", () => {
     expect(within(totals).getByText("3 d 4 h")).toBeInTheDocument();
     expect(within(totals).getByText("1.3× around the Earth")).toBeInTheDocument();
     expect(within(totals).getByText("14% of the way to the Moon")).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "Hotels" })).getByText("9")).toBeInTheDocument();   // nights away
+    expect(within(screen.getByRole("region", { name: "Hotels" })).getByText("9")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("1");
     expect(screen.getByRole("option", { name: "Jane Doe (you)" })).toBeInTheDocument();
     expect(screen.getByTestId("stats-map-slot")).toBeInTheDocument();
@@ -153,7 +152,7 @@ describe("Stats", () => {
 
   it("offers the year in review for a past year, and not for all time", async () => {
     serve(() => full);
-    route.query = "year=2024"; location.hash = "#stats?year=2024";   // (the address too: a hashchange re-reads the query from it)
+    route.query = "year=2024"; location.hash = "#stats?year=2024";
     render(Stats_);
     await userEvent.click(await screen.findByRole("button", { name: "See your 2024 in review" }));
     expect(await screen.findByTestId("year-in-review")).toBeInTheDocument();
@@ -228,7 +227,7 @@ describe("Stats", () => {
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Who" }), "Jane Doe (you)");
     await waitFor(() => expect(route.query).toBe(""));
     expect(statsCalls().at(-1)).toBe("/api/stats?person=1&year=all");
-  }, 15_000);   // three picker changes, each re-rendering the page: near Vitest's 5 s default under coverage on CI
+  }, 15_000);
 
   it("lists the years that have trips, newest first", async () => {
     serve(() => full);
@@ -245,7 +244,7 @@ describe("Stats", () => {
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Who" }), "Sam Doe");
     await waitFor(() => expect(screen.queryByRole("region", { name: "Flights" })).toBeNull());
     expect(screen.getByLabelText("Loading")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("2");   // the pickers stay usable
+    expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("2");
     release({ ...full, person: 2, flights: { ...full.flights, count: 37 } });
     expect(await within(await screen.findByRole("region", { name: "Flights" })).findByText("37")).toBeInTheDocument();
   });
@@ -270,7 +269,7 @@ describe("Stats", () => {
     render(Stats_);
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn’t load the stats: Offline");
     expect(screen.queryByRole("region", { name: "Flights" })).toBeNull();
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "When" }), "All time");   // still usable
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "When" }), "All time");
     fail = false;
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("region", { name: "Flights" })).toBeInTheDocument();
@@ -294,7 +293,7 @@ describe("Stats", () => {
     expect(empty).toHaveTextContent("Nothing finished for Jane Doe in 2024.");
     expect(within(empty).getByRole("link", { name: "Add a trip" })).toHaveAttribute("href", "#trips");
     expect(within(empty).getByRole("link", { name: "Import past flights" })).toHaveAttribute("href", "#settings/travel");
-    expect(screen.getByRole("option", { name: "2024" })).toBeInTheDocument();   // the chosen year stays in the picker
+    expect(screen.getByRole("option", { name: "2024" })).toBeInTheDocument();
   });
 
   it("opens on everyone on your own machine, and falls back to Everyone when the names don't load", async () => {

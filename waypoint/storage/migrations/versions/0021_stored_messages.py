@@ -1,10 +1,3 @@
-"""Messages kept while they are needed (`stored_messages`, `segment_messages`): the message of a review item, until it is added or
-dismissed, and the messages a booking was made from, for as long as the booking exists, so they can be read without Gmail.
-Encrypted. Nothing is filled in: messages scanned before are not kept.
-
-Revision ID: 0021
-Revises: 0020
-"""
 import sqlalchemy as sa
 from alembic import op
 

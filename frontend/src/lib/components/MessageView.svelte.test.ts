@@ -11,7 +11,7 @@ describe("MessageView", () => {
     expect(screen.getByTestId("message-subject")).toHaveTextContent("Your itinerary");
     expect(screen.getByText("Gate B12")).toBeInTheDocument();
     expect(screen.getByText("Cut short here.")).toBeInTheDocument();
-    expect(screen.queryByRole("button")).toBeNull();   // (no HTML part: nothing to switch)
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("shows markup formatted, with a switch to its plain text and back", async () => {

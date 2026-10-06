@@ -1,5 +1,3 @@
-"""The API's routes: which handler answers each method and path (ROUTES), finding a request's (match) and answering it
-(dispatch)."""
 from __future__ import annotations
 
 import urllib.parse
@@ -30,8 +28,6 @@ from .api.state import api_state
 from .api.stats import api_distance_unit, api_distance_unit_save, api_stats
 
 
-# (method, path pattern, handler): each handler takes (conn, query, body, *path params) and returns the JSON reply, or
-# a common.Response for anything else (a download, a logo, a stream). A HEAD is answered as its GET, without the body.
 ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/ai", api_ai),
     ("POST", "/api/ai", api_ai_save),
@@ -105,14 +101,13 @@ class Route:
     method: str
     pattern: str
     fn: Callable[..., Any]
-    parts: tuple[str | None, ...]   # the pattern's segments, None for an {id}
-    upload: int | None = None       # the body is a file of up to this many bytes, as it is (common.upload); else JSON
-    own_session: bool = False       # the handler opens its own database sessions (common.own_session)
+    parts: tuple[str | None, ...]
+    upload: int | None = None
+    own_session: bool = False
 
 
 @dataclass(frozen=True)
 class Match:
-    """A request's route, and the values of the {id}s in its address (unquoted)."""
     route: Route
     params: list[str]
 
@@ -122,8 +117,6 @@ def _segments(path: str) -> list[str]:
 
 
 class Table:
-    """ROUTES, split up once: each method's routes by how many segments their address has, in ROUTES' order (the
-    first that matches answers, so /api/trips/new goes before /api/trips/{id})."""
 
     def __init__(self, routes):
         self.routes = [Route(m, pattern, fn, tuple(None if s == "{id}" else s for s in _segments(pattern)),
@@ -131,11 +124,10 @@ class Table:
                        for m, pattern, fn in routes]
         self._by_shape: dict[tuple[str | None, int], list[Route]] = {}
         for r in self.routes:
-            for method in (r.method, None):   # (None: any method, for naming a request)
+            for method in (r.method, None):
                 self._by_shape.setdefault((method, len(r.parts)), []).append(r)
 
     def match(self, method: str | None, path: str) -> Match | None:
-        """The route that answers `method path` (any method, for None), or None."""
         parts = _segments(path)
         for r in self._by_shape.get((method, len(parts)), ()):
             params = []
@@ -156,12 +148,6 @@ BUSY = "Waypoint is busy saving something else. Try again in a few seconds."
 
 
 def dispatch(found: Match, query: dict, body) -> Any:
-    """Answer a request that matched a route: its handler's reply (what to send as JSON, or a common.Response), run with
-    a database connection that's committed if it succeeds and rolled back if not (or none, for a route with its own
-    sessions). `body` is the request's JSON object, or for an upload its bytes. Every way it can fail comes out as
-    ApiError: the handler's own, saying what was wrong (a 4xx); 503 when the database was busy with something else; and
-    anything else, which is a bug, 500 with only a reference, logged and reported without what the error said
-    (common.server_error)."""
     r = found.route
     try:
         if r.own_session:

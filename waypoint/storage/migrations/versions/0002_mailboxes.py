@@ -1,8 +1,3 @@
-"""Gmail connections: a member's mailbox (its refresh token encrypted) and the connections in progress at Google.
-
-Revision ID: 0002
-Revises: 0001
-"""
 import sqlalchemy as sa
 from alembic import op
 

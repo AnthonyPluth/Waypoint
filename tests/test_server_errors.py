@@ -1,6 +1,3 @@
-"""What a request is told when its handler fails, through routes.dispatch: a value it can't use is a 400 saying which;
-the database busy with something else is a 503; anything else is a bug, a 500 with only a reference, logged
-without what the error said."""
 import contextlib
 import io
 import json
@@ -73,9 +70,9 @@ class ErrorTests(ServerCase):
             routes.dispatch(found, {}, {})
         self.assertEqual(cm.exception.status, 500)
         ref = str(cm.exception).split("reference ", 1)[1].split(";", 1)[0]
-        self.assertIn(f"[error {ref}] GET /api/state", out.getvalue())   # the route, never the address
+        self.assertIn(f"[error {ref}] GET /api/state", out.getvalue())
         self.assertIn("builtins.ValueError: [Filtered]", err.getvalue())
-        self.assertIn("in api_state", err.getvalue())                     # where it was raised
+        self.assertIn("in api_state", err.getvalue())
         for private in ("Acme", "12.34"):
             self.assertNotIn(private, out.getvalue() + err.getvalue())
 

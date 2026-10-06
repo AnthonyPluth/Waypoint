@@ -7,12 +7,9 @@
   import { apiCall } from "$lib/contract";
   import { toast } from "svelte-sonner";
 
-  // Settings → Import past flights: choose a CSV exported from another app, see what each row would add, pick who was on the
-  // flights, then add the new ones. The file goes up once, for the preview, and isn't kept: saving sends back only the flights
-  // being added, a thousand at a time (the most one request takes).
   const MAX_BYTES = 5 * 1024 * 1024;
   const BATCH = 1000;
-  const SHOWN = 200;   // rows listed at once: a long file shows its first rows and the counts of them all
+  const SHOWN = 200;
 
   let preview = $state<ImportPreview | null>(null);
   let people = $state<Person[]>([]);
@@ -21,7 +18,7 @@
   let saving = $state(false);
   let problem = $state("");
   let input = $state<HTMLInputElement | null>(null);
-  let chosen = 0;   // which choosing this answer belongs to, so a slow one can't replace a newer one
+  let chosen = 0;
 
   const count = (status: ImportRow["status"]) => preview?.rows.filter((r) => r.status === status).length ?? 0;
   const fresh = $derived(count("new"));
@@ -52,7 +49,6 @@
   }
 
   async function add() {
-    // In date order, so the trips they're grouped into don't depend on the file's order or on where the batches split.
     const rows = (preview?.rows.filter((r) => r.status === "new") ?? [])
       .sort((a, b) => (a.day! + (a.start_local ?? "")).localeCompare(b.day! + (b.start_local ?? "")) || a.line - b.line);
     let added = 0, existing = 0;

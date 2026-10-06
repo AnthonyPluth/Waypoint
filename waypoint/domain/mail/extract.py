@@ -1,14 +1,3 @@
-"""Reading one message for the bookings in it: the only module that looks inside a message (Gmail's `raw`, its decoded
-parts and their HTML). Semgrep's `waypoint-message-body` keeps those out of every other module (AGENTS.md, "Email stays on
-the server"), so the body is read here, in memory, and what comes out is only the fields of a booking.
-
-A booking is found in the markup airlines, hotels and rental companies add for Gmail's own cards: schema.org JSON-LD and
-microdata (`FlightReservation`, `LodgingReservation`, `RentalCarReservation`, `TrainReservation`). `read` returns the
-bookings, who the message is from and when (its sender's domain and its day: the review queue's labels, never its text). Times come out as the markup wrote them
-(`wall_clock` turns one into the place's wall-clock time); the zone of a place is the scan's to find, since this module touches no database.
-
-A sender that has a parser in `parsers/` and whose markup gave no booking is read by it (and one whose markup gave fewer flights than its text lists has the text's flights instead): the parser is given the message's HTML
-and plain-text parts and returns bookings, like the markup does. It sees nothing else of the message."""
 from __future__ import annotations
 
 import base64
@@ -37,8 +26,8 @@ from .booking import Status
 
 RESERVATIONS: dict[str, Kind] = {"FlightReservation": "flight", "LodgingReservation": "hotel",
                                  "RentalCarReservation": "car", "TrainReservation": "train"}
-MAX_PART = 2_000_000    # characters of one HTML part read (a booking's markup is far smaller)
-MAX_NODES = 200         # reservations considered in one message
+MAX_PART = 2_000_000
+MAX_NODES = 200
 IATA = re.compile(r"[A-Z]{3}")
 CLOCK = re.compile(r"(?<![\d:.])(\d{1,2}):(\d{2})(?::\d{2})?(?!\d)(?:\s*([AaPp])\.?[Mm]\.?)?")
 BASE64URL = re.compile(r"[A-Za-z0-9_=-]+")
@@ -47,19 +36,15 @@ VOID = {"meta", "link", "img", "source", "area", "br", "hr", "input", "wbr", "co
 
 @dataclass(frozen=True)
 class Message:
-    """What a scan keeps in mind about one message, none of its text. `unread`: reservations in it that were found but
-    couldn't be made into a booking (a missing time or place)."""
     sender_domain: str | None
-    received: str | None               # the day on its Date header, as written
+    received: str | None
     bookings: tuple[Booking, ...] = ()
     unread: int = 0
-    broken: bool = False               # the message itself couldn't be decoded
-    markup: bool = False               # any reservation markup at all was found
-    gaps: tuple[str, ...] = ()         # what the unread reservations lacked, in a fixed vocabulary (for counting, never for showing text)
-    other_markup: bool = False         # structured data was there, but none of it a reservation
+    broken: bool = False
+    markup: bool = False
+    gaps: tuple[str, ...] = ()
+    other_markup: bool = False
 
-
-# ------------------------------------------------------------------------------------------------ markup
 
 class _Frame:
     __slots__ = ("attrs", "item", "props", "tag", "text")
@@ -84,14 +69,13 @@ def _put(item: dict[str, Any], name: str, value: Any) -> None:
 
 
 class _Markup(HTMLParser):
-    """The JSON-LD scripts and the microdata items of one HTML document."""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.jsonld: list[str] = []
         self.items: list[dict[str, Any]] = []
         self._ld: list[str] | None = None
-        self._script = False   # inside a script that isn't JSON-LD
+        self._script = False
         self._stack: list[_Frame] = []
 
     def _scope(self) -> dict[str, Any] | None:
@@ -128,7 +112,6 @@ class _Markup(HTMLParser):
             self.handle_endtag(tag)
 
     def _attach(self, frame: _Frame, text: str) -> None:
-        """A finished element: its item is a property of the item around it (or a top-level item), or its value is."""
         parent = self._scope()
         if frame.item is not None:
             if frame.props and parent is not None:
@@ -157,15 +140,15 @@ class _Markup(HTMLParser):
         while len(self._stack) > i:
             frame = self._stack.pop()
             self._attach(frame, "".join(frame.text))
-            if self._stack:   # (its text belongs to the element around it too)
+            if self._stack:
                 self._stack[-1].text.extend(frame.text)
 
     def handle_data(self, data: str) -> None:
         if self._ld is not None:
             self._ld.append(data)
             return
-        if self._stack and not self._script and self._scope() is not None:   # (text matters only inside an item)
-            self._stack[-1].text.append(data)   # the innermost element's own; the one around it takes it when this ends
+        if self._stack and not self._script and self._scope() is not None:
+            self._stack[-1].text.append(data)
 
 
 def _jsonld_nodes(raw: str) -> Iterator[dict[str, Any]]:
@@ -190,14 +173,11 @@ def _types(node: Mapping[str, Any]) -> list[str]:
     return [_type_name(x) for x in (t if isinstance(t, list) else [t]) if isinstance(x, str)]
 
 
-# ------------------------------------------------------------------------------------------------ values
-
 def _one(v: Any) -> Any:
     return v[0] if isinstance(v, list) and v else v
 
 
 def _text(v: Any) -> str | None:
-    """A value as text: a string, a number, or a node's name."""
     v = _one(v)
     if isinstance(v, dict):
         v = v.get("name") or v.get("@value")
@@ -249,7 +229,6 @@ def _passengers(res: Mapping[str, Any]) -> tuple[Passenger, ...]:
         if name:
             who.append(name)
     number = next((m for m in members if m), None)
-    # A membership number on a booking for one traveller is theirs; with several, whose it is isn't said.
     return tuple(Passenger(name, number if len(who) == 1 else None) for name in who)
 
 
@@ -323,7 +302,6 @@ _BUILD = {"flight": _flight, "hotel": _hotel, "car": _car, "train": _train}
 
 
 def _gaps(kind: str, res: Mapping[str, Any]) -> list[str]:
-    """What a reservation that couldn't be made into a booking lacks, named from a fixed list (no text from the message)."""
     trip = _node(res.get("reservationFor"))
     lacks: list[str] = []
     if kind == "flight":
@@ -347,8 +325,6 @@ def _gaps(kind: str, res: Mapping[str, Any]) -> list[str]:
 
 
 def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool, list[str]]:
-    """The bookings in these markup nodes (each once), how many reservations couldn't be made into one, whether any
-    reservation markup was there at all, and what the unread ones lacked (`_gaps`)."""
     found: list[Booking] = []
     unread, seen = 0, False
     gaps: list[str] = []
@@ -360,19 +336,15 @@ def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool, li
                 if made is None:
                     unread += 1
                     gaps += _gaps(RESERVATIONS[t], node)
-                elif made not in found:   # (the same booking in JSON-LD and microdata is one)
+                elif made not in found:
                     found.append(made)
-            elif t.endswith("Reservation"):   # another kind (a table, a show): seen, not ours to read
+            elif t.endswith("Reservation"):
                 seen, unread = True, unread + 1
                 gaps.append("another kind of reservation")
     return found, unread, seen, gaps
 
 
-# ------------------------------------------------------------------------------------------------ times
-
 def written_clock(text: str) -> str | None:
-    """The date and time exactly as written, whatever offset follows it (the clock a sender printed), or None when it isn't a
-    date and time."""
     text = text.strip()
     if "T" not in text.upper() and " " not in text:
         return None
@@ -383,8 +355,6 @@ def written_clock(text: str) -> str | None:
 
 
 def real_offset(text: str) -> bool:
-    """Whether the time carries an offset other than UTC (a sender who writes one is giving real instants: "Z" is also what a
-    sender who only prints the local clock writes)."""
     try:
         t = datetime.fromisoformat(text.strip())
     except ValueError:
@@ -400,14 +370,9 @@ def has_offset(text: str) -> bool:
 
 
 def wall_clock(text: str, zone: str | None = None) -> str | None:
-    """The wall-clock time a booking's time says, as 2026-03-01T22:15:00 with no offset, at its place. A time with an offset is
-    an instant, so it is put into the place's own zone (it needs one): when the offset is the place's own that is what is
-    written, and a time in UTC ('Z' or +00:00) for a place that isn't, moves to the place's clock. Without a zone, an offset
-    that isn't UTC is the place's own, so what is written is kept. None when it isn't a date and time, or needs a zone it
-    hasn't."""
     text = text.strip()
     if "T" not in text.upper() and " " not in text:
-        return None   # a date alone isn't a time
+        return None
     try:
         t = datetime.fromisoformat(text)
     except ValueError:
@@ -419,7 +384,7 @@ def wall_clock(text: str, zone: str | None = None) -> str | None:
             except (ZoneInfoNotFoundError, ValueError, OSError):
                 return None
         elif t.utcoffset() == timedelta(0):
-            return None   # UTC says nothing of the place's clock
+            return None
     return t.replace(tzinfo=None).isoformat(timespec="seconds")
 
 
@@ -432,12 +397,10 @@ def utc_marked(text: str) -> bool:
 
 
 def _as_written(text: str) -> str:
-    """A time marked UTC with its mark dropped: the clock reading it carries, 2026-03-01T09:15:00."""
     return datetime.fromisoformat(text.strip()).replace(tzinfo=None).isoformat(timespec="seconds")
 
 
 def clock_times(text: str) -> frozenset[str]:
-    """The times of day a text shows, as HH:MM on the 24-hour clock: 9:00 AM, 9:00am, 09:00 and 9:00 are all 09:00."""
     found: set[str] = set()
     for m in CLOCK.finditer(text):
         hour, minute, half = int(m.group(1)), int(m.group(2)), (m.group(3) or "").lower()
@@ -451,22 +414,16 @@ def clock_times(text: str) -> frozenset[str]:
 
 
 def reading(b: Booking, start_zone: str, end_zone: str) -> Literal["written", "moved"] | None:
-    """Which reading of a booking's times the message itself settles, when they are marked UTC for places that aren't: the
-    clock as written ("written"), or moved to the places' zones ("moved"), or neither (None: the text doesn't say, or shows
-    both). Both readings are looked for among the times of day the message shows (`b.clock_times`); only one appearing
-    settles it, for the start and the end together, so a duration never comes out negative or absurd."""
     moved = (wall_clock(b.start, start_zone), wall_clock(b.end, end_zone))
     marked = [(t, m) for t, m in zip((b.start, b.end), moved, strict=True) if utc_marked(t)]
     written = [_as_written(t)[11:16] for t, _ in marked]
     converted = [m[11:16] for _, m in marked if m]
     if not marked or len(converted) < len(marked) or written == converted:
-        return None   # (nothing marked UTC, a time that can't be placed, or a place whose clock is UTC's: nothing to settle)
+        return None
     local = all(w in b.clock_times for w in written)
     utc = all(c in b.clock_times for c in converted)
     return "written" if local and not utc else "moved" if utc and not local else None
 
-
-# ------------------------------------------------------------------------------------------------ the message
 
 def _decode(raw: Any) -> bytes | None:
     if not isinstance(raw, str) or not raw or not BASE64URL.fullmatch(raw):
@@ -488,12 +445,10 @@ def _day(header: Any) -> str | None:
         sent = email.utils.parsedate_to_datetime(str(header))
     except (TypeError, ValueError, IndexError):
         return None
-    return sent.date().isoformat()   # the day the sender's own clock says
+    return sent.date().isoformat()
 
 
 def read(message: Mapping[str, Any]) -> Message:
-    """The bookings in a message as Gmail returns it with `format=raw`, and who and what it's about. Nothing here raises
-    for what a message holds: one that can't be decoded comes back `broken`."""
     data = _decode(message.get("raw"))
     if data is None:
         return Message(None, None, broken=True)
@@ -529,10 +484,10 @@ def read(message: Mapping[str, Any]) -> Message:
     bookings, unread, seen, gaps = _bookings(nodes)
     other = bool(nodes) and not seen
     parse = parsers.for_sender(sender)
-    if parse is not None:   # (a sender with a parser: it reads the text when the markup gave no booking, and checks the markup's flights when it did)
+    if parse is not None:
         try:
             found = parse("\n".join(htmls), "\n".join(texts))
-        except Exception as e:   # a parser's bug: this message goes to the review queue (without markup), and later scans carry on
+        except Exception as e:
             monitoring.report(e, values=False)
             found = Parsed(unread=0 if bookings else 1)
         flights = [x for x in bookings if x.kind == "flight"]
@@ -542,20 +497,15 @@ def read(message: Mapping[str, Any]) -> Message:
             if not found.bookings:
                 gaps.append("sender-specific parser found no booking")
         elif len(text_flights := [x for x in found.bookings if x.kind == "flight"]) > len(flights):
-            # The markup ran several flights into fewer (a round trip as one reservation, out of an airport and back to it, with no
-            # flight number): the text lists each flight, so its flights stand in for the markup's.
             bookings = [x for x in bookings if x.kind != "flight"] + text_flights
             unread += found.unread
     if any(utc_marked(t) for b in bookings for t in (b.start, b.end)):
-        shown = clock_times(_visible(htmls, texts))   # (kept as times of day alone, and only for a booking that needs them)
+        shown = clock_times(_visible(htmls, texts))
         bookings = [replace(b, clock_times=shown) if utc_marked(b.start) or utc_marked(b.end) else b for b in bookings]
     return Message(sender, received, tuple(bookings), unread, markup=seen, gaps=tuple(gaps), other_markup=other)
 
 
-# ------------------------------------------------------------------------------------------------ plain text (the optional AI)
-
 class _Text(HTMLParser):
-    """An HTML part as lines of text, without its scripts and styles."""
     BREAKS = {"br", "p", "div", "tr", "li", "table", "h1", "h2", "h3", "h4"}
 
     def __init__(self) -> None:
@@ -581,7 +531,6 @@ class _Text(HTMLParser):
 
 
 def _visible(htmls: list[str], texts: list[str]) -> str:
-    """What a reader of the message sees: its text parts and its HTML parts without tags, scripts and styles."""
     scanner = _Text()
     for h in htmls:
         try:
@@ -593,7 +542,6 @@ def _visible(htmls: list[str], texts: list[str]) -> str:
 
 
 def _bodies(message: Mapping[str, Any]) -> tuple[list[str], list[str]] | None:
-    """The message's text/plain parts and its text/html parts; None for a message that can't be decoded."""
     data = _decode(message.get("raw"))
     if data is None:
         return None
@@ -615,25 +563,20 @@ def _bodies(message: Mapping[str, Any]) -> tuple[list[str], list[str]] | None:
 
 
 def safe_markup(message: Mapping[str, Any], limit: int = MAX_PART) -> tuple[str, bool] | None:
-    """The message's HTML part as markup that is safe to show (see safe_html.py) and whether its text was cut at `limit`
-    characters; None when it has no HTML part. In memory only."""
     bodies = _bodies(message)
     if bodies is None or not bodies[1]:
         return None
     shown: list[str] = []
-    for i, part in enumerate(bodies[1]):   # (one parser for each: an unclosed script or style in one part can't hide the next)
+    for i, part in enumerate(bodies[1]):
         markup, cut, size = safe_html.clean_counted(part, limit)
         shown.append(markup)
         limit -= size
-        if cut or (limit <= 0 and i + 1 < len(bodies[1])):   # (a budget used exactly, with nothing left out, isn't a cut)
+        if cut or (limit <= 0 and i + 1 < len(bodies[1])):
             return "<hr>".join(shown), True
     return "<hr>".join(shown), False
 
 
 def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
-    """The message's readable text, for the optional AI fallback alone (waypoint/domain/mail/ai.py, which strips quoted
-    replies, footers and ID numbers before anything is sent): its text/plain part, else its HTML as text. In memory only;
-    "" for a message that can't be decoded."""
     bodies = _bodies(message)
     if bodies is None:
         return ""
@@ -651,12 +594,10 @@ def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
 
 
 SUBJECT_LIMIT = 300
-KEPT_LIMIT = 30_000   # characters of a message kept, as text and as markup (the most the app shows)
+KEPT_LIMIT = 30_000
 
 
 def keep(message: Mapping[str, Any]) -> Content:
-    """What is kept of a message while it is needed (waypoint/storage/stored_mail.py): its subject, the sender's domain and day,
-    its text and its cleaned markup, each cut at KEPT_LIMIT. Never raises: a message that can't be decoded keeps nothing."""
     data = _decode(message.get("raw"))
     subject: str | None = None
     sender: str | None = None

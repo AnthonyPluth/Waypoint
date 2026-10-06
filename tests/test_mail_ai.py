@@ -1,8 +1,3 @@
-"""The optional AI fallback for the "Couldn't read" queue (waypoint/domain/mail/ai.py, waypoint/server/api/ai.py): off unless
-turned on; what's redacted before anything is sent; the request (OpenRouter's zero-data-retention settings, Ollama's local
-address); a reply that is anything but the fields of a booking becoming no suggestion and a note the person sees; turning it
-off stopping the sending at once, mid-scan too; and AGENTS.md's promise that email stays on the server (no_leaks). No AI service
-is ever called: a fake one stands in for it, and every name, code and number here is made up."""
 import json
 import os
 import threading
@@ -22,8 +17,8 @@ from waypoint.storage import db
 from waypoint.storage import settings_keys as sk
 from waypoint.storage.models import ReviewItem, Setting
 
-BODY = "CANARY-BODY-AI-5J2K"          # in the email's text, which is meant to go to the AI
-IDS = ("TT87654321", "4111 1111 1111 1111", "2207781905", "FXLOY-4400123")   # KTN, card, a loyalty number, Jane's saved one
+BODY = "CANARY-BODY-AI-5J2K"
+IDS = ("TT87654321", "4111 1111 1111 1111", "2207781905", "FXLOY-4400123")
 QUOTED, FOOTER = "CANARY-QUOTED-REPLY-8D1L", "CANARY-FOOTER-SIGNATURE-4M9W"
 KEY = "sk-or-test-key-7f3a91c2b8"
 REPLY_CANARY = "CANARY-REPLY-HOSTILE-6X2P"
@@ -32,8 +27,6 @@ GOOD = {"kind": "flight", "provider": "Example Air", "confirmation": "QW4R7T", "
 
 
 class FakeAi(HTTPServer):
-    """Answers an Ollama chat (`/api/chat`) and an OpenRouter completion (`/chat/completions`) with `content` as the model's
-    text, and keeps each request: its path, headers and JSON body. `on_request` runs before it answers."""
 
     def __init__(self):
         class Handler(BaseHTTPRequestHandler):
@@ -137,7 +130,7 @@ class ParseTests(unittest.TestCase):
 
     def test_a_booking_in_the_schema_is_a_suggestion(self):
         self.assertEqual(self.parse(GOOD), GOOD)
-        self.assertEqual(self.parse("```json\n" + json.dumps(GOOD) + "\n```"), GOOD)   # (a fenced reply is still that JSON)
+        self.assertEqual(self.parse("```json\n" + json.dumps(GOOD) + "\n```"), GOOD)
 
     def test_a_flights_zones_are_dropped_and_a_hotels_kept(self):
         self.assertEqual(self.parse({**GOOD, "start_zone": "America/New_York"}), GOOD)
@@ -151,7 +144,7 @@ class ParseTests(unittest.TestCase):
 
     def test_a_code_that_isnt_in_the_message_is_another_trips(self):
         self.refused({**GOOD, "confirmation": "ZZ9Y8X"})
-        self.assertEqual(self.parse({**GOOD, "confirmation": "qw4-r7t"})["confirmation"], "qw4-r7t")   # (spacing and case don't matter)
+        self.assertEqual(self.parse({**GOOD, "confirmation": "qw4-r7t"})["confirmation"], "qw4-r7t")
 
     def test_replies_that_arent_a_booking_are_refused(self):
         for reply in ("not json", "[]", '"text"', "null", json.dumps({**GOOD, "kind": "boat"}),
@@ -190,7 +183,7 @@ class ConfigTests(unittest.TestCase):
     def test_it_is_off_until_turned_on_and_needs_what_it_sends_with(self):
         self.assertEqual((ai.mode(self.c), ai.config(self.c)), ("off", None))
         db.set_setting(self.c, sk.AI_MODE, "local")
-        self.assertIsNone(ai.config(self.c))   # no address or model yet
+        self.assertIsNone(ai.config(self.c))
         db.set_setting(self.c, sk.AI_OLLAMA_URL, "http://ollama.example:1234")
         db.set_setting(self.c, sk.AI_OLLAMA_MODEL, "llama3")
         self.assertEqual(ai.config(self.c), ai.Config("local", "llama3", url="http://ollama.example:1234"))
@@ -209,7 +202,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(ai.saved_key(self.c), ("env-key-0123456789", "env"))
         cfg = ai.config(self.c)
         self.assertEqual(cfg.key if cfg else None, "env-key-0123456789")
-        self.assertNotIn("env-key", repr(cfg))   # (a key is never in a repr, so never in a log line or an error)
+        self.assertNotIn("env-key", repr(cfg))
 
     def test_the_key_is_one_of_the_secrets_and_the_environments_is_scrubbed_from_logs(self):
         self.assertIn(sk.AI_OPENROUTER_KEY, sk.SECRETS)
@@ -225,7 +218,6 @@ class ConfigTests(unittest.TestCase):
 
 
 class SuggestTests(unittest.TestCase):
-    """ai.suggest against a fake service: the request, the answer, and what goes wrong."""
 
     @classmethod
     def setUpClass(cls):
@@ -274,7 +266,7 @@ class SuggestTests(unittest.TestCase):
         self.fake.status = 404
         with self.assertRaises(ai.AiError) as caught:
             ai.suggest(self.router, "Confirmation code: QW4R7T")
-        self.assertEqual(str(caught.exception), ai.NO_PRIVATE_PROVIDER)   # (no provider keeps nothing: nothing was sent to one that does)
+        self.assertEqual(str(caught.exception), ai.NO_PRIVATE_PROVIDER)
 
     def test_a_service_that_cant_be_reached_is_a_fixed_message(self):
         gone = ai.Config("local", "llama3", url="http://127.0.0.1:1")
@@ -300,7 +292,7 @@ class SuggestTests(unittest.TestCase):
         self.fake.requests.clear()
         with self.assertRaises(ai.AiError):
             ai.suggest(self.local, "")
-        self.assertEqual(self.fake.requests, [])   # (nothing to read: nothing sent)
+        self.assertEqual(self.fake.requests, [])
 
 
 class PlainTextTests(unittest.TestCase):
@@ -354,7 +346,7 @@ class ScanTests(ScanAiCase):
         self.assertEqual(self.scan().review, 1)
         [item] = self.items()
         self.assertEqual((item["suggestion"], item["suggestion_error"]), (GOOD, None))
-        self.assertEqual(self.segments(), [])   # (nothing is saved as a booking without the person)
+        self.assertEqual(self.segments(), [])
         self.assertEqual(len(self.fake.requests), 1)
 
     def test_only_the_review_queue_is_sent_never_a_booking_that_was_read(self):
@@ -366,7 +358,6 @@ class ScanTests(ScanAiCase):
     def test_the_request_carries_the_body_but_none_of_the_ids_and_nothing_else_leaks(self):
         self.turn_on()
         self.put("no_markup_ids")
-        # The ids never go anywhere (outer); the body may go to the AI and nowhere else (inner, sent_ok).
         with no_leaks(self, *IDS, QUOTED, FOOTER, database=self.path):
             with no_leaks(self, BODY, database=self.path, sent_ok=True):
                 self.scan()
@@ -425,7 +416,7 @@ class ScanTests(ScanAiCase):
         self.put("no_markup_ids")
         self.add_mail("msg-second", eml("no_markup_ids"))
         self.add_mail("msg-third", eml("no_markup_ids"))
-        self.fake.on_request = lambda n: self.turn_off() if n == 1 else None   # the household turns it off during the first
+        self.fake.on_request = lambda n: self.turn_off() if n == 1 else None
         self.assertEqual(self.scan().review, 3)
         self.assertEqual(len(self.fake.requests), 1)
         notes = sorted((i["suggestion"] is not None) for i in self.items())
@@ -461,8 +452,8 @@ class AiApiTests(RouteCase):
         self.assertEqual((status, body["error"]), (400, "Enter the Ollama address and the model to use"))
         got = self.ok("ana", "POST", "/api/ai", {"mode": "local", "ollama_url": "http://ollama.example:11434/", "ollama_model": "llama3"})
         self.assertEqual((got["mode"], got["ollama_url"], got["ollama_model"]), ("local", "http://ollama.example:11434", "llama3"))
-        self.assertEqual(self.ok("ben", "GET", "/api/ai"), got)   # (the household's setting, every member sees it)
-        self.assertEqual(self.ok("ana", "POST", "/api/ai", {"mode": "off"})["ollama_model"], "llama3")   # off keeps what was entered
+        self.assertEqual(self.ok("ben", "GET", "/api/ai"), got)
+        self.assertEqual(self.ok("ana", "POST", "/api/ai", {"mode": "off"})["ollama_model"], "llama3")
 
     def test_choosing_openrouter_needs_a_model_and_a_key_which_never_comes_back(self):
         status, body = self.call("ana", "POST", "/api/ai", {"mode": "openrouter"})
@@ -476,8 +467,8 @@ class AiApiTests(RouteCase):
         with db.session() as conn:
             stored = conn.execute(select(Setting.value).where(Setting.key == sk.AI_OPENROUTER_KEY)).scalar()
         self.assertTrue(stored.startswith("enc:v1:"))
-        self.assertEqual(self.ok("ana", "POST", "/api/ai", {"mode": "openrouter"})["key"], "saved")   # (left out: kept)
-        self.assertEqual(self.call("ana", "POST", "/api/ai", {"mode": "openrouter", "openrouter_key": ""})[0], 400)   # (forgotten: none left)
+        self.assertEqual(self.ok("ana", "POST", "/api/ai", {"mode": "openrouter"})["key"], "saved")
+        self.assertEqual(self.call("ana", "POST", "/api/ai", {"mode": "openrouter", "openrouter_key": ""})[0], 400)
         os.environ[ai.KEY_ENV] = "env-key-0123456789"
         self.assertEqual(self.ok("ana", "GET", "/api/ai")["key"], "env")
 

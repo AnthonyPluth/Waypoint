@@ -8,11 +8,9 @@
   import { cardSvg, firstName, mapSvg, outlinesFor, reviewFacts, shareOrDownload, svgToPng } from "$lib/review";
   import { count } from "$lib/stats";
 
-  // A person's year as a few full-screen cards, then a summary card to share. The picture is made here, on the device, and goes
-  // to the share sheet (or is downloaded): nothing is uploaded. The first name is on it only when "Show the first name" is ticked.
   let { stats, person, name = null, onclose }: { stats: Stats; person: number | "all"; name?: string | null; onclose: () => void } = $props();
 
-  let allTime = $state<Stats | null>(null);   // to tell which countries were new; without it no country is called new
+  let allTime = $state<Stats | null>(null);
   let countries = $state<Country[] | null>(null);
   let step = $state(0);
   let showName = $state(false);
@@ -22,8 +20,8 @@
   let problem = $state("");
 
   $effect(() => {
-    apiCall<"GET /api/stats">(`/api/stats?person=${person}&year=all`).then((s) => { allTime = s; }).catch(() => { allTime = null; });   // (the new-countries card is left out)
-    loadCountries().then((c) => { countries = c; }).catch(() => { countries = []; outlinesFailed = true; });   // (the map is drawn without outlines, and says so)
+    apiCall<"GET /api/stats">(`/api/stats?person=${person}&year=all`).then((s) => { allTime = s; }).catch(() => { allTime = null; });
+    loadCountries().then((c) => { countries = c; }).catch(() => { countries = []; outlinesFailed = true; });
   });
 
   const facts = $derived(reviewFacts(stats, allTime));

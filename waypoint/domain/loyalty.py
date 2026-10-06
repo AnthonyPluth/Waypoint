@@ -1,8 +1,3 @@
-"""Loyalty and Known Traveler numbers: one membership per row, for a person (member or guest). Every signed-in member sees
-and edits everyone's, so anyone can book for anyone (AGENTS.md, "IDs are for the household"). A number is encrypted at
-rest (waypoint/storage/secretbox.py) and this is the only module in the domain that decrypts one. Listings carry only the
-number's last four characters; the number itself comes from `reveal`, one membership at a time, so a page load never
-holds every number. Numbers never go in a log, a report, a notification or an AI prompt."""
 from __future__ import annotations
 
 from typing import TypedDict
@@ -14,8 +9,7 @@ from ..storage.models import LoyaltyId, Person
 
 KINDS = ("airline", "hotel", "car", "known_traveler", "redress")
 OTHER = "Other"
-EXPIRES = ("known_traveler", "redress")   # the kinds whose numbers expire (an airline, hotel or car program's doesn't)
-# The programs to choose from, for each kind (a fixed list: "Other" for any that isn't there).
+EXPIRES = ("known_traveler", "redress")
 PROGRAMS: dict[str, tuple[str, ...]] = {
     "airline": ("Alaska Mileage Plan", "American AAdvantage", "Delta SkyMiles", "JetBlue TrueBlue", "Southwest Rapid Rewards",
                 "United MileagePlus", OTHER),
@@ -28,7 +22,6 @@ MASK = "••••"
 
 
 class Fields(TypedDict):
-    """What a membership's form edits, already checked (waypoint/server/api/loyalty.py). `number` None: keep the one saved."""
     person_id: int
     kind: str
     program: str
@@ -42,29 +35,28 @@ class Listed(TypedDict):
     person_id: int
     kind: str
     program: str
-    masked: str            # MASK and the number's last four characters (all of it masked when it's that short)
-    readable: bool         # false: Waypoint's key can't unlock it (a restore under another key); it has to be entered again
+    masked: str
+    readable: bool
     expiry: str | None
     notes: str | None
 
 
 class Conflict(TypedDict):
-    """A person with two different numbers for one program (a claimed guest's and their own): both are kept, People flags it."""
     person_id: int
     kind: str
     program: str
 
 
 class NoSuchPerson(Exception):
-    """A membership names someone who isn't in People."""
+    pass
 
 
 class Duplicate(Exception):
-    """The person already has a membership in that program (a second one in "Other" is fine: it can be any program)."""
+    pass
 
 
 class Unreadable(Exception):
-    """The saved number can't be unlocked with Waypoint's current key."""
+    pass
 
 
 def mask(number: str) -> str:
@@ -81,20 +73,18 @@ def listed(row: LoyaltyId) -> Listed:
 
 
 def everyone(conn: db.Connection) -> list[Listed]:
-    """Every membership, in a person's order of kinds (airline, hotel, car, Known Traveler, redress) and then by program."""
     rows = conn.orm.scalars(select(LoyaltyId)).all()
     order = {k: i for i, k in enumerate(KINDS)}
     return [listed(r) for r in sorted(rows, key=lambda r: (r.person_id, order.get(r.kind, len(order)), r.program.casefold(), r.id))]
 
 
 def conflicts(conn: db.Connection) -> list[Conflict]:
-    """The people with more than one different number for the same program. Only who and which program come out."""
     seen: dict[tuple[int, str, str], set[str]] = {}
     for row in conn.orm.scalars(select(LoyaltyId)).all():
         try:
             number = _plain(secretbox.decrypt(row.number) or "")
         except secretbox.SecretError:
-            continue   # (a number this key can't unlock can't be compared)
+            continue
         seen.setdefault((row.person_id, row.kind, row.program), set()).add(number)
     return [{"person_id": p, "kind": k, "program": g} for (p, k, g), numbers in sorted(seen.items()) if len(numbers) > 1]
 
@@ -104,7 +94,6 @@ def _person_exists(conn: db.Connection, person_id: int) -> bool:
 
 
 def _holds(conn: db.Connection, fields: Fields, *, besides: int | None = None) -> bool:
-    """Whether the person has a membership (other than `besides`) in this program."""
     if fields["program"] == OTHER:
         return False
     found = select(LoyaltyId.id).where(LoyaltyId.person_id == fields["person_id"], LoyaltyId.kind == fields["kind"],
@@ -115,7 +104,6 @@ def _holds(conn: db.Connection, fields: Fields, *, besides: int | None = None) -
 
 
 def add(conn: db.Connection, fields: Fields) -> Listed:
-    """Save a membership. Raises NoSuchPerson, Duplicate (they have one in that program), and ValueError when there is no number."""
     if not _person_exists(conn, fields["person_id"]):
         raise NoSuchPerson()
     if _holds(conn, fields):
@@ -131,9 +119,6 @@ def add(conn: db.Connection, fields: Fields) -> Listed:
 
 
 def edit(conn: db.Connection, loyalty_id: int, fields: Fields) -> Listed | None:
-    """Change a membership (the number only when one is given). None: there's no such membership. Raises NoSuchPerson, and
-    Duplicate when it would move to a program the person already has (one left in the program it was in, as a person who was
-    given two by claiming a guest has, can still be edited)."""
     if not _person_exists(conn, fields["person_id"]):
         raise NoSuchPerson()
     current = conn.orm.get(LoyaltyId, loyalty_id)
@@ -156,7 +141,6 @@ def remove(conn: db.Connection, loyalty_id: int) -> bool:
 
 
 def reveal(conn: db.Connection, loyalty_id: int) -> str | None:
-    """One membership's number, in the clear. None: there's no such membership. Raises Unreadable."""
     row = conn.orm.get(LoyaltyId, loyalty_id)
     if row is None:
         return None
@@ -171,9 +155,6 @@ def _plain(number: str) -> str:
 
 
 def person_for_number(conn: db.Connection, number: str) -> int | None:
-    """The person who has this loyalty or Known Traveler number (as printed on a booking), so a booking is matched to them
-    by it. None when no one does, or when the number is on more than one person. The numbers stay in here: only who
-    they belong to comes out."""
     wanted = _plain(number)
     if not wanted:
         return None
@@ -182,15 +163,13 @@ def person_for_number(conn: db.Connection, number: str) -> int | None:
         try:
             saved = secretbox.decrypt(row.number) or ""
         except secretbox.SecretError:
-            continue   # (a number this key can't unlock can't match)
+            continue
         if _plain(saved) == wanted:
             found.add(row.person_id)
     return found.pop() if len(found) == 1 else None
 
 
 def known_numbers(conn: db.Connection) -> list[str]:
-    """Every number saved, as typed, so the optional AI fallback can strip exactly these from what it sends (they never go
-    to it: AGENTS.md, "IDs are for the household"). Stays in memory; nothing here is shown, kept or logged."""
     found: list[str] = []
     for row in conn.orm.scalars(select(LoyaltyId)).all():
         try:

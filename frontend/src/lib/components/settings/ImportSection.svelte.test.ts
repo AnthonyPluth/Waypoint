@@ -22,7 +22,6 @@ const people = { people: [
 ] };
 const csv = (size = 10) => new File(["x".repeat(size)], "flights.csv", { type: "text/csv" });
 
-/** Answers the preview with `reply`, People, and a save with `saved`. */
 function serve(reply: ImportPreview | Error, saved: (body: { flights: unknown[]; person_ids: number[] }) => unknown = () => ({ added: 1, existing: 0 })) {
   vi.mocked(api).mockImplementation((async (path: string, opts?: { body?: unknown }) => {
     if (path === "/api/import/preview") { if (reply instanceof Error) throw reply; return reply; }
@@ -47,7 +46,7 @@ describe("Settings → Import past flights", () => {
     expect(within(box).getByText(/doesn’t know the airport ZZZ/)).toBeInTheDocument();
     expect(within(box).getByText(/no times/)).toBeInTheDocument();
     expect(within(box).getAllByText("New")).toHaveLength(2);
-    expect(vi.mocked(api).mock.calls.map((c) => c[0])).not.toContain("/api/import");   // a preview saves nothing
+    expect(vi.mocked(api).mock.calls.map((c) => c[0])).not.toContain("/api/import");
     expect(vi.mocked(api).mock.calls[0][1]).toMatchObject({ method: "POST", body: expect.any(File) });
   });
 
