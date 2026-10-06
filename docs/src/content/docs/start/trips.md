@@ -13,7 +13,7 @@ A **trip** is a journey. It holds **segments**: one flight leg, hotel stay, car 
 - **Trips** lists the trips you can see: the ones still to come or under way, and the past ones. Pick a traveller to see only their trips; the choice is kept in the address (`#trips?who=…`) so you can bookmark it.
 - A **trip** page shows each segment as a card with its local times, travellers and the loyalty number each traveller would use for that airline or hotel chain, masked. Tap a number to show it and copy it; tap again to hide it. When a traveller has no number for the program a booking is with, the card says so and links to [People](/waypoint/start/people/); a traveller known only by their printed name is marked as not matched to a person yet. Waypoint tells the program from the provider’s name (“American Airlines” is American AAdvantage), so write the provider the way the airline or chain does.
 
-Add a booking from Trips (Waypoint puts it in the trip it belongs to, or starts one) or from a trip page (it goes in that trip), edit any segment, or remove it. A save that fails keeps everything you typed and says why; a page that can’t reload its trips shows an error with Try again, not the old trips as if they were current.
+Add a booking from Trips (Waypoint puts it in the trip it belongs to, or starts one) or from a trip page (it goes in that trip), edit any segment, or remove it. **Edit** opens the form right under the booking you chose, scrolled into view wherever you are on the page, and the pencil beside a trip’s name renames it. A save that fails keeps everything you typed and says why; a page that can’t reload its trips shows an error with Try again, not the old trips as if they were current.
 
 ## Times beside yours
 

@@ -255,7 +255,9 @@
       "method": "POST",
       "path": "/api/trips/{id}",
       "handler": "waypoint/server/api/trips.py:api_trip_edit",
-      "web": [],
+      "web": [
+        "frontend/src/pages/Trip.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp.py",
