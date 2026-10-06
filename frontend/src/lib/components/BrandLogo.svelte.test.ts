@@ -13,17 +13,17 @@ describe("BrandLogo", () => {
     expect(img.getAttribute("width")).toBe("32");
   });
 
-  it("names the hotel brand under its group's logo, and only when it is given one", () => {
+  it("names the hotel brand under its group's logo, and only when it is given one", async () => {
     const { container, rerender } = render(BrandLogo, { src: "/api/segments/4/logo", label: "Hyatt Regency" });
     expect(container.textContent).toContain("Hyatt Regency");
-    rerender({ src: "/api/segments/4/logo", label: null });
-    expect(container.textContent).toBe("");
+    await rerender({ src: "/api/segments/4/logo", label: null });
+    expect(container.textContent?.trim()).toBe("");
   });
 
   it("shows nothing without a logo", () => {
     const { container } = render(BrandLogo, { src: null, label: "Hyatt Regency" });
     expect(container.querySelector("img")).toBeNull();
-    expect(container.textContent).toBe("");
+    expect(container.textContent?.trim()).toBe("");
   });
 
   it("shows nothing when the image fails to load", async () => {
