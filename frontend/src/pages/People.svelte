@@ -213,7 +213,7 @@
   <ul class="rows" aria-label="People">
     {#each people as p (p.id)}
       <li class="row items-start">
-        <div class="min-w-0 basis-full sm:basis-0 sm:flex-1">
+        <div class="min-w-0 basis-full">
           <div class="flex items-start justify-between gap-2">
             <p class="flex flex-wrap items-center gap-2 font-medium"><span class="break-words">{p.display_name}</span>
               <Badge variant={p.member ? "default" : "outline"}>{p.member ? "Member" : "Guest"}</Badge></p>
