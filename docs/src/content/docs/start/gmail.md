@@ -60,7 +60,7 @@ Each mailbox in Settings shows when its last scan finished. If a scan couldn’t
 
 Some airlines write a flight’s times as UTC (`…T09:00:00Z`) when they mean the airport’s own clock. Waypoint settles which from the message itself, in memory: it looks for both readings of the times (as written, and moved to the airport’s zone) among the times of day the email shows (`9:00 AM`, `9:00am`, `09:00`, `9:00`). If only the as-written times appear, they are the local times; if only the moved ones appear, the markup really was UTC; the same reading applies to the departure and the arrival together. If both or neither appear, Waypoint keeps the move and the booking’s card says **Check the times** until you edit or confirm them (saving the times, even unchanged, confirms them). A time with a real offset (`-06:00`) is never second-guessed. Only the times of day are kept from the text, and only while the message is read.
 
-What Waypoint can’t do yet: read mail with no booking markup from a sender that has no parser yet (they come one vendor at a time; the rest goes to Review), and any sender outside its list.
+What Waypoint can’t do yet: read mail with no booking markup from a sender that has no parser yet (they come one vendor at a time; the rest goes to Review), and any sender outside its list. Cruise lines don’t put booking markup in their emails, so their mail is found by the search but goes to Review: with [AI suggestions](/Waypoint/start/ai/) on, it comes with a suggested cruise (ports, dates and time zones) to check and add; without them, you add the cruise by hand.
 
 ## What Waypoint keeps
 
