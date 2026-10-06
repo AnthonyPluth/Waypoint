@@ -1,7 +1,9 @@
 """Logos for the airlines, hotels, rental companies and cruise lines in bookings, from Logo.dev (waypoint/providers/logodev.py).
 
 A booking's `provider` names its brand ("American Airlines", "Marriott"); a flight with none is named by its flight number's
-airline code. Once the household saves a Logo.dev key (Settings), a background round (jobs.fetch_logos) asks Logo.dev for each
+airline code. A hotel whose name starts with one of a hotel group's own brands ("Hyatt Regency Chicago", "Courtyard Denver") is
+asked about by that brand ("Hyatt Regency", "Courtyard by Marriott") first, so each has its own logo, and by its provider's when
+Logo.dev has none for it. Only the brand, never the rest of the hotel's name (a place), is sent. Once the household saves a Logo.dev key (Settings), a background round (jobs.fetch_logos) asks Logo.dev for each
 brand it hasn't asked about, keeps the answer in `brand_logos` and Waypoint serves it itself, so the app never asks
 anyone else for an image and the page's content policy stays "images from Waypoint only". A brand Logo.dev has none for is
 remembered as such and asked again after a month, as is one it has, in case the brand's logo changed. Logo.dev only ever
@@ -60,15 +62,60 @@ def _name(provider: str | None) -> str | None:
     return text if 2 <= len(text) <= 100 and len(re.findall(r"[A-Za-z]", text)) >= 2 else None
 
 
-def brands_of(segments: Iterable[tuple[str, str | None, str | None]], airlines: Mapping[str, str]) -> list[str | None]:
-    """The brand of each (kind, provider, flight number): its provider, else for a flight its airline's name."""
+# The brands a hotel group runs under their own names: what a hotel's name starts with (lower case, letters and digits), and the
+# brand asked about for it. Not every brand has a logo of its own at Logo.dev; the booking's provider is the fallback.
+SUB_BRANDS: tuple[tuple[str, str], ...] = (
+    ("hyatt regency", "Hyatt Regency"), ("hyatt place", "Hyatt Place"), ("hyatt house", "Hyatt House"), ("grand hyatt", "Grand Hyatt"),
+    ("park hyatt", "Park Hyatt"), ("hyatt centric", "Hyatt Centric"), ("andaz", "Andaz"), ("hyatt ziva", "Hyatt Ziva"),
+    ("courtyard", "Courtyard by Marriott"), ("residence inn", "Residence Inn by Marriott"), ("fairfield inn", "Fairfield by Marriott"),
+    ("fairfield by marriott", "Fairfield by Marriott"), ("springhill suites", "SpringHill Suites by Marriott"),
+    ("towneplace suites", "TownePlace Suites by Marriott"), ("sheraton", "Sheraton"), ("westin", "Westin"), ("renaissance", "Renaissance Hotels"),
+    ("autograph collection", "Autograph Collection"), ("aloft", "Aloft Hotels"), ("moxy", "Moxy Hotels"), ("four points", "Four Points by Sheraton"),
+    ("le meridien", "Le Méridien"), ("ritz carlton", "The Ritz-Carlton"), ("st regis", "The St. Regis"), ("jw marriott", "JW Marriott"),
+    ("gaylord", "Gaylord Hotels"), ("w hotel", "W Hotels"), ("ac hotel", "AC Hotels by Marriott"), ("element by westin", "Element Hotels"),
+    ("hampton inn", "Hampton by Hilton"), ("hampton by hilton", "Hampton by Hilton"), ("hilton garden inn", "Hilton Garden Inn"),
+    ("doubletree", "DoubleTree by Hilton"), ("embassy suites", "Embassy Suites by Hilton"), ("homewood suites", "Homewood Suites by Hilton"),
+    ("home2 suites", "Home2 Suites by Hilton"), ("tru by hilton", "Tru by Hilton"), ("conrad", "Conrad Hotels"),
+    ("waldorf astoria", "Waldorf Astoria Hotels"), ("curio collection", "Curio Collection by Hilton"), ("canopy by hilton", "Canopy by Hilton"),
+    ("holiday inn express", "Holiday Inn Express"), ("holiday inn", "Holiday Inn"), ("crowne plaza", "Crowne Plaza"),
+    ("intercontinental", "InterContinental Hotels"), ("staybridge suites", "Staybridge Suites"), ("candlewood suites", "Candlewood Suites"),
+    ("hotel indigo", "Hotel Indigo"), ("kimpton", "Kimpton Hotels"), ("even hotel", "EVEN Hotels"), ("avid hotel", "avid hotels"),
+    ("best western plus", "Best Western Plus"), ("best western premier", "Best Western Premier"), ("comfort inn", "Comfort Inn"),
+    ("comfort suites", "Comfort Suites"), ("quality inn", "Quality Inn"), ("sleep inn", "Sleep Inn"), ("la quinta", "La Quinta by Wyndham"),
+    ("wyndham garden", "Wyndham Garden"), ("radisson blu", "Radisson Blu"), ("radisson red", "Radisson RED"), ("fairmont", "Fairmont Hotels"),
+    ("sofitel", "Sofitel"), ("novotel", "Novotel"), ("pullman", "Pullman Hotels"), ("mercure", "Mercure Hotels"),
+)
+_SUB_BRANDS = sorted(SUB_BRANDS, key=lambda b: -len(b[0]))   # (the longest first: "holiday inn express" before "holiday inn")
+
+
+def sub_brand(hotel: str | None) -> str | None:
+    """The hotel group brand a hotel's name starts with ("Hyatt Place Chicago River North" -> "Hyatt Place"), or None."""
+    words = " ".join(re.sub(r"[^a-z0-9]+", " ", (hotel or "").lower()).split())
+    for start, brand in _SUB_BRANDS:
+        if words == start or words.startswith(start + " "):
+            return brand
+    return None
+
+
+def _candidates(kind: str, provider: str | None, number: str | None, hotel: str | None, airlines: Mapping[str, str]) -> list[str]:
+    """The brands a segment may show a logo of, best first: a hotel's own brand, then its provider's (a flight with none: its
+    airline's)."""
+    brand = _name(provider)
+    if brand is None and kind == "flight":
+        found = FLIGHT_NUMBER.fullmatch(number or "")
+        brand = airlines.get(found.group(1).upper()) if found else None
+    own = sub_brand(hotel) if kind == "hotel" else None
+    return [b for b in (own, brand) if b and (b is own or not own or key(b) != key(own))]
+
+
+def brands_of(segments: Iterable[tuple[str, str | None, str | None] | tuple[str, str | None, str | None, str | None]],
+              airlines: Mapping[str, str]) -> list[str | None]:
+    """The brand of each (kind, provider, flight number, and for a hotel its name): a hotel's own brand, else its provider, else
+    for a flight its airline's name."""
     out: list[str | None] = []
-    for kind, provider, number in segments:
-        brand = _name(provider)
-        if brand is None and kind == "flight":
-            found = FLIGHT_NUMBER.fullmatch(number or "")
-            brand = airlines.get(found.group(1).upper()) if found else None
-        out.append(brand)
+    for s in segments:
+        found = _candidates(s[0], s[1], s[2], s[3] if len(s) > 3 else None, airlines)
+        out.append(found[0] if found else None)
     return out
 
 
@@ -80,9 +127,13 @@ def _airlines(conn: db.Connection, numbers: Iterable[str | None]) -> dict[str, s
 
 
 def brand_names(conn: db.Connection, segments: Sequence[Segment], details: Sequence[Mapping[str, str]]) -> list[str | None]:
-    """The brand of each segment (details: its decoded details, in the same order), or None."""
+    """The brand each segment shows (details: its decoded details, in the same order), or None: the first of its brands that
+    Waypoint has a logo for (a hotel's own brand, then its provider's), else the first."""
     numbers = [d.get("flight_number") for d in details]
-    return brands_of(((s.kind, s.provider, n) for s, n in zip(segments, numbers, strict=True)), _airlines(conn, numbers))
+    airlines = _airlines(conn, numbers)
+    each = [_candidates(s.kind, s.provider, n, s.origin, airlines) for s, n in zip(segments, numbers, strict=True)]
+    kept = have(conn, [b for found in each for b in found])
+    return [next((b for b in found if key(b) in kept), found[0] if found else None) for found in each]
 
 
 def have(conn: db.Connection, brands: Iterable[str | None]) -> set[str]:
@@ -156,12 +207,12 @@ def _flight_number(details: str | None) -> str | None:
 
 def note(conn: db.Connection) -> int:
     """Note the brands of every segment that Waypoint hasn't asked about (a row with no answer yet). Returns how many are new."""
-    rows = conn.execute(select(Segment.kind, Segment.provider, Segment.details)).fetchall()
+    rows = conn.execute(select(Segment.kind, Segment.provider, Segment.details, Segment.origin)).fetchall()
     numbers = [_flight_number(r[2]) for r in rows]
     airlines = _airlines(conn, numbers)
     found: dict[str, str] = {}
-    for brand in brands_of(((r[0], r[1], n) for r, n in zip(rows, numbers, strict=True)), airlines):
-        if brand:
+    for r, n in zip(rows, numbers, strict=True):
+        for brand in _candidates(r[0], r[1], n, r[3], airlines):
             found.setdefault(key(brand), brand)
     if not found:
         return 0
