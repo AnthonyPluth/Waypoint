@@ -88,6 +88,13 @@ OTHER = "https://example-api.rapidapi.com/status"
 # ok: waypoint-flightstatus-hosts
 flightstatus.fetch("EX101", "2026-11-20")
 
+# ruleid: waypoint-logodev-hosts
+LOGO_URL = "https://img.logo.dev/name/Example%20Hotels?token=pk_example"
+# ruleid: waypoint-logodev-hosts
+LOGO_SEARCH = "https://api.logo.dev/search?q=Example"
+# ok: waypoint-logodev-hosts
+logos.fetch_due(conn, now)
+
 # ruleid: waypoint-ai-hosts
 URL = "https://openrouter.ai/api/v1/chat/completions"
 # ruleid: waypoint-ai-hosts

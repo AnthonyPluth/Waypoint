@@ -28,8 +28,14 @@ AI_OPENROUTER_KEY = "ai_openrouter_key"
 # AI assistants (waypoint/server/mcp_access.py): the household's switch, off until turned on ("1" is on)
 MCP_ALLOW_WRITES = "mcp_allow_writes"   # "Let assistants change trips"
 
+# Brand logos (waypoint/domain/logos.py): Logo.dev's publishable key (pk_..., to fetch a logo) and optional secret key (sk_...,
+# Brand Search, for better matches on hotel names), and why the last lookup failed (fixed text, never a name)
+LOGODEV_TOKEN = "logodev_token"
+LOGODEV_SECRET = "logodev_secret"
+LOGODEV_LAST_ERROR = "logodev_last_error"
+
 VAPID_PRIVATE_KEY = "vapid_private_key"   # web push signing key, made on first use
 
 # Rows that hold secrets: stored encrypted (waypoint/storage/secretbox.py), and encrypted in backups too
 # (waypoint/storage/backup.py).
-SECRETS = frozenset({VAPID_PRIVATE_KEY, AI_OPENROUTER_KEY})
+SECRETS = frozenset({VAPID_PRIVATE_KEY, AI_OPENROUTER_KEY, LOGODEV_TOKEN, LOGODEV_SECRET})

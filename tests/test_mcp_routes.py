@@ -33,11 +33,12 @@ BLOCKED = [
     "POST /api/ai", "POST /api/backup/inspect", "POST /api/feed", "POST /api/flight-status/{id}", "POST /api/import",
     "POST /api/import/preview", "POST /api/mailboxes/connect", "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/scan",
     "POST /api/mcp-settings/writes", "POST /api/reminders", "POST /api/reminders/devices",
+    "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch", "GET /api/segments/{id}/logo",
     "POST /api/restore", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/suggest",
 ]
 # Where a route in one of these areas must never be reachable: the promises' sources (mail, the AI, backups, sign-in and
 # sessions, the feed's key, push devices, the flight-status budget and key, these settings).
-NEVER = re.compile(r"^/api/(mailboxes|review|ai|backup|restore|state|feed|reminders|mcp-settings|import|loyalty)(/|$)|^/api/flight-status/")
+NEVER = re.compile(r"^/api/(mailboxes|review|ai|backup|restore|state|feed|reminders|mcp-settings|import|loyalty|logodev)(/|$)|^/api/flight-status/")
 
 
 class RouteTests(unittest.TestCase):

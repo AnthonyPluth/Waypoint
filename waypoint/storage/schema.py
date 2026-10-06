@@ -1,5 +1,5 @@
 """Waypoint's database schema, for SQLite and Postgres alike. Alembic migrations (waypoint/storage/migrations) create and change it."""
-from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, MetaData, Table, Text, UniqueConstraint, false, text
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, LargeBinary, MetaData, Table, Text, UniqueConstraint, false, text
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 
@@ -98,6 +98,16 @@ airlines = Table(
     Column('name', Text, nullable=False),
     Column('country', Text),
     info={'doc': 'airlines by IATA code (seeded from waypoint/storage/airlines.tsv.gz, from OpenFlights under the ODbL; reference data, not part of a backup)'},
+)
+
+brand_logos = Table(
+    'brand_logos', metadata,
+    Column('key', Text, primary_key=True, doc='the brand as a booking names it, lowercased with single spaces (waypoint/domain/logos.py key())'),
+    Column('name', Text, nullable=False, doc='the brand as first seen, for Logo.dev to look up'),
+    Column('logo', LargeBinary, doc='the logo itself (downloaded once from Logo.dev, served by Waypoint); NULL when Logo.dev has none'),
+    Column('logo_type', Text, doc='image/png, ...'),
+    Column('checked', Text, doc='when Waypoint last asked Logo.dev (ISO, UTC); NULL: not yet'),
+    info={'doc': "logos of the airlines, hotels, rental companies and cruise lines in bookings (fetched from Logo.dev when a key is saved; a cache, not part of a backup)"},
 )
 
 trips = Table(

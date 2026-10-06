@@ -439,6 +439,16 @@ class MigrationTests(unittest.TestCase):
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
 
+    def test_0016_adds_the_brand_logos_table_and_takes_it_away(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            self.assertIn("brand_logos", sa.inspect(c).get_table_names())
+            command.downgrade(db.alembic_config(c), "0015")
+            self.assertNotIn("brand_logos", sa.inspect(c).get_table_names())
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+
     def test_a_cruises_ports_go_with_the_cruise(self):
         db.init(self.path)
         with db.session(self.path) as conn:

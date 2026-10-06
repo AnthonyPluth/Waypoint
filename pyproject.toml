@@ -111,6 +111,12 @@ type = "independence"
 modules = ["waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
 
 [[tool.importlinter.contracts]]
+id = "logodev-alone"
+name = "The Logo.dev provider imports no other provider, and none imports it"
+type = "independence"
+modules = ["waypoint.providers.logodev", "waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
+
+[[tool.importlinter.contracts]]
 id = "storage-at-the-bottom"
 name = "Storage imports nothing from the domain, the providers or the server"
 type = "forbidden"

@@ -7,6 +7,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
+  import BrandLogo from "$lib/components/BrandLogo.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import { isMobile } from "$lib/platform";
@@ -162,8 +163,13 @@
   <p class="flex flex-wrap items-center gap-2"><span class="eyebrow">{kindName(s)}</span>
     {#if cancelled}<Badge variant="destructive">Cancelled</Badge>{:else if s.status !== "confirmed"}<Badge variant="secondary">Changed</Badge>{/if}
     {#if s.locked_fields.length}<Badge variant="outline" title="A later email won’t change what you edited">Edited by you</Badge>{/if}</p>
-  <h2 class="break-words text-xl font-semibold tracking-tight" class:line-through={cancelled}>{headline(s)}</h2>
-  {#if subline(s)}<p class="break-words text-sm text-muted-foreground">{subline(s)}</p>{/if}
+  <div class="flex items-center gap-3">
+    <BrandLogo src={s.logo} size={40} />
+    <div class="min-w-0">
+      <h2 class="break-words text-xl font-semibold tracking-tight" class:line-through={cancelled}>{headline(s)}</h2>
+      {#if subline(s)}<p class="break-words text-sm text-muted-foreground">{subline(s)}</p>{/if}
+    </div>
+  </div>
 {/snippet}
 
 {#snippet times(s: Segment)}

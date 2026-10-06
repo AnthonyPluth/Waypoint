@@ -6,7 +6,7 @@ from sqlalchemy.orm import configure_mappers
 
 from waypoint.storage import models, schema
 
-PY = {"TEXT": str, "FLOAT": float, "INTEGER": int, "BOOLEAN": bool}
+PY = {"TEXT": str, "FLOAT": float, "INTEGER": int, "BOOLEAN": bool, "BLOB": bytes}
 
 
 class ModelTests(unittest.TestCase):

@@ -57,6 +57,14 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByTestId("flight-status")).toBeNull();
   });
 
+  it("shows each booking’s brand logo on its card, and none where the server has none", async () => {
+    held = trip([{ ...flight, logo: "/api/segments/1/logo" }, stay]);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+    expect(cards[0].querySelector("img")?.getAttribute("src")).toBe("/api/segments/1/logo");
+    expect(cards[1].querySelector("img")).toBeNull();
+  });
+
   it("asks for a look at the times of a booking whose times couldn’t be settled, and only that one", async () => {
     held = trip([{ ...flight, check_times: true }, stay]);
     render(TripPage);

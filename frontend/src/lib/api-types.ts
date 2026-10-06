@@ -164,6 +164,30 @@ export interface Imported {
   existing: number;
 }
 
+/**
+ * Settings → Logos. A field left out stays as it was; `clear` forgets the publishable key (and so the secret one too),
+ * `clear_secret` forgets only the secret key.
+ */
+export interface LogoDevBody {
+  token?: string;
+  secret?: string;
+  clear?: boolean;
+  clear_secret?: boolean;
+}
+
+export interface LogoDevFetch {
+  started: boolean;
+}
+
+export interface LogoDevStatus {
+  configured: boolean;
+  searchable: boolean;
+  with_logo: number;
+  unknown: number;
+  waiting: number;
+  last_error: string | null;
+}
+
 /** A membership, to save or to change. `number` is needed to save one; left out when changing, the saved one is kept. */
 export interface LoyaltyBody {
   person_id: number;
@@ -386,6 +410,7 @@ export interface Segment {
   check_times: boolean;
   travelers: Traveler[];
   itinerary: Port[];
+  logo: string | null;
   links: SegmentLinks;
 }
 
@@ -657,6 +682,9 @@ export interface Endpoints {
   "POST /api/distance-unit": { body: DistanceUnitBody; reply: DistanceUnit };
   "GET /api/flight-status": { body: never; reply: FlightStatusList };
   "POST /api/flight-status/{id}": { body: never; reply: FlightStatusList };
+  "GET /api/logodev": { body: never; reply: LogoDevStatus };
+  "POST /api/logodev": { body: LogoDevBody; reply: LogoDevStatus };
+  "POST /api/logodev/fetch": { body: never; reply: LogoDevFetch };
   "GET /api/loyalty": { body: never; reply: LoyaltyList };
   "POST /api/loyalty": { body: LoyaltyBody; reply: LoyaltyEntry };
   "POST /api/loyalty/{id}": { body: LoyaltyBody; reply: LoyaltyEntry };

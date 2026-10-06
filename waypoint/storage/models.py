@@ -89,6 +89,15 @@ class Airline(Base):
     country: Mapped[str | None]
 
 
+class BrandLogo(Base):
+    __table__ = schema.brand_logos
+    key: Mapped[str]
+    name: Mapped[str]
+    logo: Mapped[bytes | None]
+    logo_type: Mapped[str | None]
+    checked: Mapped[str | None]
+
+
 class Trip(Base):
     __table__ = schema.trips
     id: Mapped[int]

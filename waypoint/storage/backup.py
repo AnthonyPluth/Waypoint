@@ -48,7 +48,7 @@ VERSION = 1
 # a restore (what was already sent isn't sent twice, but a restored database may be on another day's flights). Nor do the
 # AI assistants connected with OAuth, their approvals and tokens: a restore ends every connection (restore deletes them), so
 # they connect again; an approval made before it never acts on the restored household's data.
-SKIP = {"auth_sessions", "auth_pending", "mailbox_pending", "airports", "airlines", "flight_status", "push_devices", "calendar_feeds",
+SKIP = {"auth_sessions", "auth_pending", "mailbox_pending", "airports", "airlines", "flight_status", "brand_logos", "push_devices", "calendar_feeds",
         "reminders_sent", "oauth_clients", "oauth_grants", "oauth_codes", "oauth_tokens", "oauth_consents"}
 ASSISTANT_TABLES = ("oauth_tokens", "oauth_codes", "oauth_consents", "oauth_grants", "oauth_clients")
 NEWER = "That backup is from a newer version of Waypoint. Update Waypoint first."
@@ -258,6 +258,8 @@ LOYALTY_LABEL = "loyalty numbers (enter them again on People)"
 SECRET_LABELS = {
     sk.VAPID_PRIVATE_KEY: "notifications' signing key (devices sign up for notifications again)",
     sk.AI_OPENROUTER_KEY: "OpenRouter key (enter it again in Settings → AI)",
+    sk.LOGODEV_TOKEN: "Logo.dev publishable key (enter it again in Settings → Brand logos)",
+    sk.LOGODEV_SECRET: "Logo.dev secret key (enter it again in Settings → Brand logos)",
 }
 
 

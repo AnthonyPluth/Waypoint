@@ -23,7 +23,7 @@ from sqlalchemy import delete, select, update
 
 from ..storage import db
 from ..storage.models import Segment, SegmentPort, SegmentTraveler, Trip
-from . import airports, links, people, visibility
+from . import airports, links, logos, people, visibility
 from .visibility import Viewer
 
 Kind = Literal["flight", "hotel", "car", "train", "cruise"]
@@ -132,6 +132,7 @@ class SegmentOut(TypedDict):
     check_times: bool
     travelers: list[TravelerOut]
     itinerary: list[PortIn]
+    logo: str | None
     links: links.Links
 
 
@@ -396,15 +397,18 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
         who = by_segment.get(s.id, [])
         return who[0]["name"].split()[-1] if who and who[0]["name"] else None
 
+    decoded = [decode_details(s.details) for s in segs]
+    brands = logos.brand_names(conn, segs, decoded)
+    with_logo = logos.have(conn, brands)
     out: list[SegmentOut] = [
         {"id": s.id, "trip_id": s.trip_id, "kind": cast(Kind, s.kind), "status": cast(Status, s.status), "confirmation": s.confirmation,
          "provider": s.provider, "start_local": s.start_local, "start_zone": s.start_zone, "end_local": s.end_local,
-         "end_zone": s.end_zone, "origin": s.origin, "destination": s.destination, "details": decode_details(s.details),
+         "end_zone": s.end_zone, "origin": s.origin, "destination": s.destination, "details": details,
          "manage_url": s.manage_url, "source": cast(Literal["manual", "email", "import"], s.source), "booked_by": s.booked_by,
          "locked_fields": decode_locked(s.locked_fields), "check_times": bool(s.check_times), "travelers": by_segment.get(s.id, []),
-         "itinerary": ports.get(s.id, []),
-         "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, decode_details(s.details), s.origin)}
-        for s in segs]
+         "itinerary": ports.get(s.id, []), "logo": f"/api/segments/{s.id}/logo" if brand and logos.key(brand) in with_logo else None,
+         "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, details, s.origin)}
+        for s, details, brand in zip(segs, decoded, brands, strict=True)]
     return sorted(out, key=lambda s: (instant(s["start_local"], s["start_zone"]), s["id"]))
 
 

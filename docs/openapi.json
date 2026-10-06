@@ -1058,6 +1058,99 @@
         }
       }
     },
+    "/api/logodev": {
+      "get": {
+        "operationId": "api_logodev",
+        "x-handler": "waypoint/server/api/logos.py:api_logodev",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoDevStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_logodev_save",
+        "x-handler": "waypoint/server/api/logos.py:api_logodev_save",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoDevBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoDevStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/logodev/fetch": {
+      "post": {
+        "operationId": "api_logodev_fetch",
+        "x-handler": "waypoint/server/api/logos.py:api_logodev_fetch",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoDevFetch"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/loyalty": {
       "get": {
         "operationId": "api_loyalty",
@@ -2650,6 +2743,73 @@
         ],
         "additionalProperties": false
       },
+      "LogoDevBody": {
+        "type": "object",
+        "description": "Settings → Logos. A field left out stays as it was; `clear` forgets the publishable key (and so the secret one too),\n`clear_secret` forgets only the secret key.",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "string"
+          },
+          "clear": {
+            "type": "boolean"
+          },
+          "clear_secret": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "LogoDevFetch": {
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "started"
+        ],
+        "additionalProperties": false
+      },
+      "LogoDevStatus": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "searchable": {
+            "type": "boolean"
+          },
+          "with_logo": {
+            "type": "integer"
+          },
+          "unknown": {
+            "type": "integer"
+          },
+          "waiting": {
+            "type": "integer"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "configured",
+          "searchable",
+          "with_logo",
+          "unknown",
+          "waiting",
+          "last_error"
+        ],
+        "additionalProperties": false
+      },
       "LoyaltyBody": {
         "type": "object",
         "description": "A membership, to save or to change. `number` is needed to save one; left out when changing, the saved one is kept.",
@@ -3510,6 +3670,12 @@
               "$ref": "#/components/schemas/Port"
             }
           },
+          "logo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "links": {
             "$ref": "#/components/schemas/SegmentLinks"
           }
@@ -3535,6 +3701,7 @@
           "check_times",
           "travelers",
           "itinerary",
+          "logo",
           "links"
         ],
         "additionalProperties": false
