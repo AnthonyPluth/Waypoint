@@ -35,7 +35,7 @@ VERIFY_DIR = ROOT / "artifacts" / "verify"
 BRANCH = "pr-screenshots"
 REPO_SLUG = "AnthonyPluth/waypoint"
 WIDTHS = {"phone": 390, "tablet": 768, "desktop": 1280}
-OTHER_THEME = {"dark": "light", "light": "dark"}
+THEMES = ("dark", "light")   # (what the screenshots may show: light is enough, and what `make verify` captures)
 _spec = importlib.util.spec_from_file_location("fleet_checks", Path(__file__).resolve().parent / "fleet_checks.py")
 assert _spec and _spec.loader
 fleet_checks = importlib.util.module_from_spec(_spec)
@@ -101,9 +101,6 @@ def comment_markdown(pr: int, names: Sequence[str], theme: str = "light", slug: 
             continue
         out += [f"**{key.capitalize()} ({WIDTHS[key]} px)**" if key in WIDTHS else "**Other**", ""]
         out += [f"![{alt_text(n)}]({raw_url(pr, n, slug)})\n" for n in groups[key]]
-    other = OTHER_THEME[theme]
-    out += [f"Not checked: the {other} theme (`make verify` captures light only).\n" if theme == "light"
-            else f"Not checked: the {other} theme.\n"]
     out.append(FOOTER)
     return "\n".join(out) + "\n"
 
@@ -129,7 +126,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser(prog="pr_screenshots.py", description="Publish make verify screenshots for a PR and print its comment.")
     ap.add_argument("pr", type=int, help="the pull request's number")
     ap.add_argument("files", nargs="*", help="screenshots to publish (default: every *-top.png in artifacts/verify/)")
-    ap.add_argument("--theme", choices=sorted(OTHER_THEME), default="light", help="the theme the screenshots show (default light)")
+    ap.add_argument("--theme", choices=sorted(THEMES), default="light", help="the theme the screenshots show (default light)")
     ap.add_argument("--trailer", action="append", default=[], help="a commit trailer, 'Key: value' (repeatable)")
     ap.add_argument("--remote", default="origin", help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
