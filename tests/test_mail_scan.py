@@ -648,7 +648,8 @@ class LaterScanTests(ScanCase):
         self.google.history_id = "999"
         calls = len(self.google.history_calls)
         self.google.fetched.clear()
-        result = self.scan(now=NOW + 4 * 3600, backfill=True)
+        with no_leaks(self, *CANARIES, database=self.path):
+            result = self.scan(now=NOW + 4 * 3600, backfill=True)
         self.assertEqual((result.state, result.messages), ("done", 1))
         self.assertEqual(self.google.fetched, ["msg-hotel_jsonld"])
         self.assertEqual(len(self.google.history_calls), calls)
@@ -662,7 +663,7 @@ class LaterScanTests(ScanCase):
         good = self.row()
         self.put("hotel_jsonld")
         self.google.fail_on = "msg-hotel_jsonld"
-        with mock.patch("waypoint.providers.gmail.time.sleep"):
+        with no_leaks(self, *CANARIES, database=self.path), mock.patch("waypoint.providers.gmail.time.sleep"):
             self.assertEqual(self.scan(now=NOW + 4 * 3600, backfill=True).state, "failed")
         self.assertEqual((self.row()["last_scan"], self.row()["history_id"]), (good["last_scan"], good["history_id"]))
 
@@ -1246,19 +1247,22 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(self.google.fetched, [])
 
     def test_a_member_looks_back_through_their_own_mailbox(self):
-        status, body = self.call("ana", "POST", f"/api/mailboxes/{self.ana_box}/backfill", {})
-        self.assertEqual((status, body), (200, {"started": True}))
-        for _ in range(100):
-            [m] = self.mailboxes()
-            if not m["scanning"] and self.google.queries:
-                break
-            time.sleep(0.1)
+        self.put("flight_jsonld", "no_markup")
+        with no_leaks(self, *CANARIES):
+            status, body = self.call("ana", "POST", f"/api/mailboxes/{self.ana_box}/backfill", {})
+            self.assertEqual((status, body), (200, {"started": True}))
+            for _ in range(100):
+                [m] = self.mailboxes()
+                if not m["scanning"] and self.google.queries:
+                    break
+                time.sleep(0.1)
         self.assertEqual(len(self.google.queries), 1)
 
     def test_nobody_looks_back_through_another_members_mailbox(self):
-        status, body = self.call("ben", "POST", f"/api/mailboxes/{self.ana_box}/backfill", {})
-        self.assertEqual((status, body["error"]), (404, "Not found"))
-        self.assertEqual(self.call("ben", "POST", "/api/mailboxes/abc/backfill", {})[0], 404)
+        with no_leaks(self, *CANARIES):
+            status, body = self.call("ben", "POST", f"/api/mailboxes/{self.ana_box}/backfill", {})
+            self.assertEqual((status, body["error"]), (404, "Not found"))
+            self.assertEqual(self.call("ben", "POST", "/api/mailboxes/abc/backfill", {})[0], 404)
         self.assertEqual(self.google.queries, [])
 
     def test_nobody_scans_or_sees_another_members_mailbox(self):

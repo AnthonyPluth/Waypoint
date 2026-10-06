@@ -190,6 +190,18 @@ describe("Settings → Gmail", () => {
     await waitFor(() => expect(toast).toHaveBeenCalledWith("A scan of this mailbox is already running."));
   });
 
+  it("says what stopped a look-back that started, and that nothing was lost", async () => {
+    let stopped = false;
+    vi.mocked(api).mockImplementation(async (_path: string, opts?: { method?: string }) =>
+      (opts?.method === "POST" ? { started: true } : list([box({ scan_error: stopped ? "Couldn’t reach Google while reading the mailbox." : null })])) as never);
+    render(GmailSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Look back 18 months" }));
+    expect(toast).not.toHaveBeenCalled();
+    stopped = true;
+    await userEvent.click(screen.getByRole("button", { name: "Scan now" }));
+    expect(await screen.findByText(/The last scan stopped: Couldn’t reach Google while reading the mailbox\. What it had read is kept/)).toBeInTheDocument();
+  });
+
   it("says a scan is running, and checks until it’s done", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
