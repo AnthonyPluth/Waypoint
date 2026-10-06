@@ -502,11 +502,11 @@ def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Ai
             if a:
                 seen(countries, a.country, local[:10])
                 seen(cities, a.city, local[:10])
-        for kind, name in (("country", lambda a: a.country), ("city", lambda a: a.city)):
-            if there and (not here or name(here) != name(there)):
-                came[kind][name(there)] += 1
-            if here and (not there or name(here) != name(there)):
-                went[kind][name(here)] += 1
+        for kind in ("country", "city"):
+            if there and (not here or getattr(here, kind) != getattr(there, kind)):
+                came[kind][getattr(there, kind)] += 1
+            if here and (not there or getattr(here, kind) != getattr(there, kind)):
+                went[kind][getattr(here, kind)] += 1
     for s in stays:
         if s.destination:
             seen(cities, s.destination.strip(), s.start_local[:10])
