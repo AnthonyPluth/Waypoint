@@ -540,10 +540,10 @@ def read(message: Mapping[str, Any]) -> Message:
             seen = seen or bool(found.bookings or found.unread)
             if not found.bookings:
                 gaps.append("sender-specific parser found no booking")
-        elif len([x for x in found.bookings if x.kind == "flight"]) > len(flights):
+        elif len(text_flights := [x for x in found.bookings if x.kind == "flight"]) > len(flights):
             # The markup ran several flights into fewer (a round trip as one reservation, out of an airport and back to it, with no
             # flight number): the text lists each flight, so its flights stand in for the markup's.
-            bookings = [x for x in bookings if x.kind != "flight"] + list(found.bookings)
+            bookings = [x for x in bookings if x.kind != "flight"] + text_flights
             unread += found.unread
     if any(utc_marked(t) for b in bookings for t in (b.start, b.end)):
         shown = clock_times(_visible(htmls, texts))   # (kept as times of day alone, and only for a booking that needs them)
