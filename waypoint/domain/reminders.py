@@ -52,7 +52,7 @@ class Prefs(TypedDict):
 
 class DeviceOut(TypedDict):
     id: int
-    service: str       # the push service's host (fcm.googleapis.com, …), so a person can tell their devices apart
+    service: str       # the push service by a name a person knows ("Chrome or Android (Google)"), else its host, so they can tell their devices apart
     created: float
 
 
@@ -138,9 +138,24 @@ def check_subscription(endpoint: str, p256dh: str, auth: str) -> None:
         raise Invalid("That subscription’s keys aren’t valid.")
 
 
+# The push services browsers use, by the end of their host: what a person would call the browser or device behind each.
+SERVICES = (("fcm.googleapis.com", "Chrome or Android (Google)"), ("push.apple.com", "Safari on an Apple device"),
+            ("push.services.mozilla.com", "Firefox"), ("notify.windows.com", "Microsoft Edge on Windows"))
+
+
+def service_name(endpoint: str) -> str:
+    """The name of the push service an endpoint belongs to ("Safari on an Apple device" for web.push.apple.com); one Waypoint
+    doesn't know is shown by its host."""
+    host = (urllib.parse.urlsplit(endpoint).hostname or "").lower()
+    for suffix, name in SERVICES:
+        if host == suffix or host.endswith("." + suffix):
+            return name
+    return host
+
+
 def devices(conn: db.Connection, owner: str) -> list[DeviceOut]:
     rows = conn.orm.scalars(select(PushDevice).where(PushDevice.owner_sub == owner).order_by(PushDevice.id)).all()
-    return [{"id": d.id, "service": urllib.parse.urlsplit(d.endpoint).hostname or "", "created": d.created} for d in rows]
+    return [{"id": d.id, "service": service_name(d.endpoint), "created": d.created} for d in rows]
 
 
 def add_device(conn: db.Connection, owner: str, endpoint: str, p256dh: str, auth: str, now: float) -> DeviceOut:
@@ -154,7 +169,7 @@ def add_device(conn: db.Connection, owner: str, endpoint: str, p256dh: str, auth
               key=["endpoint"])
     found = conn.orm.scalars(select(PushDevice).where(PushDevice.endpoint == endpoint)).one()
     conn.orm.refresh(found)
-    return {"id": found.id, "service": urllib.parse.urlsplit(found.endpoint).hostname or "", "created": found.created}
+    return {"id": found.id, "service": service_name(found.endpoint), "created": found.created}
 
 
 def remove_device(conn: db.Connection, owner: str, device_id: int) -> bool:

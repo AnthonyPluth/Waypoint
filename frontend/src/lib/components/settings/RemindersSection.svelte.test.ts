@@ -49,7 +49,7 @@ describe("Settings → Reminders", () => {
     let devices = [{ id: 7, service: "push.example.com", created: 1790000000 }];
     serve(() => view({ devices }), (path, opts) => { if (opts?.method === "DELETE") devices = []; return { ok: true }; });
     render(RemindersSection);
-    expect(await screen.findByText("Notifications to push.example.com")).toBeInTheDocument();
+    expect(await screen.findByText("push.example.com")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Turn off" }));
     expect(api).toHaveBeenCalledWith("/api/reminders/devices/7", expect.objectContaining({ method: "DELETE" }));
     await waitFor(() => expect(screen.queryByTestId("device")).toBeNull());
