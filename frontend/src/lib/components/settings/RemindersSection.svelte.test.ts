@@ -46,13 +46,14 @@ describe("Settings → Reminders", () => {
   });
 
   it("lists the member’s devices and turns one off", async () => {
-    let devices = [{ id: 7, service: "push.example.com", created: 1790000000 }];
-    serve(() => view({ devices }), (path, opts) => { if (opts?.method === "DELETE") devices = []; return { ok: true }; });
+    let devices = [{ id: 7, service: "Notifications to push.example.com", created: 1790000000 }, { id: 8, service: "Chrome or Android (Google)", created: 1790000100 }];
+    serve(() => view({ devices }), (path, opts) => { if (opts?.method === "DELETE") devices = devices.filter((d) => d.id !== 7); return { ok: true }; });
     render(RemindersSection);
     expect(await screen.findByText("Notifications to push.example.com")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Turn off" }));
+    expect(screen.getByText("Chrome or Android (Google)")).toBeInTheDocument();   // (a known service by its name, not its host)
+    await userEvent.click(screen.getAllByRole("button", { name: "Turn off" })[0]!);
     expect(api).toHaveBeenCalledWith("/api/reminders/devices/7", expect.objectContaining({ method: "DELETE" }));
-    await waitFor(() => expect(screen.queryByTestId("device")).toBeNull());
+    await waitFor(() => expect(screen.getAllByTestId("device")).toHaveLength(1));
   });
 
   it("says a browser that can’t show notifications can’t, and offers no way to turn them on", async () => {
@@ -68,7 +69,7 @@ describe("Settings → Reminders", () => {
     vi.stubGlobal("PushManager", class {});
     vi.stubGlobal("Notification", { requestPermission: vi.fn(async () => "granted") });
     Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { ready: Promise.resolve({ pushManager }) } });
-    serve(() => view(), () => ({ id: 1, service: "push.example.com", created: 1 }));
+    serve(() => view(), () => ({ id: 1, service: "Notifications to push.example.com", created: 1 }));
     render(RemindersSection);
     await userEvent.click(await screen.findByRole("button", { name: "Turn on" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/reminders/devices", expect.objectContaining({

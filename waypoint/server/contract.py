@@ -675,7 +675,7 @@ class Stats(TypedDict):
 class ReminderDevice(TypedDict):
     """A browser or phone that gets this member's notifications."""
     id: int
-    service: str                    # the push service's host, to tell devices apart
+    service: str                    # the push service by name ("Chrome or Android (Google)"), else "Notifications to" its host, to tell devices apart
     created: float                  # seconds since the epoch
 
 

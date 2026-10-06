@@ -98,7 +98,7 @@
 
       {#each devices as d (d.id)}
         <div class="row" data-testid="device">
-          <div class="min-w-0"><p class="truncate font-medium">Notifications to {d.service}</p><p class="text-sm text-muted-foreground">Turned on {when(d.created)}.</p></div>
+          <div class="min-w-0"><p class="truncate font-medium">{d.service}</p><p class="text-sm text-muted-foreground">Turned on {when(d.created)}.</p></div>
           <Button variant="outline" disabled={busy} onclick={() => removeDevice(d.id)}>Turn off</Button>
         </div>
       {/each}

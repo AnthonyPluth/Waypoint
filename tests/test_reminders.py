@@ -427,9 +427,20 @@ class DeviceTests(Reminders):
                 reminders.add_device(self.c, "u-jane", *args, 1.0)
         self.assertEqual(reminders.devices(self.c, "u-jane"), [])
 
+    def test_a_push_service_is_named_the_way_a_person_knows_it_and_an_unknown_one_by_its_host(self):
+        for endpoint, name in (("https://fcm.googleapis.com/fcm/send/abc", "Chrome or Android (Google)"),
+                               ("https://web.push.apple.com/QGx", "Safari on an Apple device"),
+                               ("https://updates.push.services.mozilla.com/wpush/v2/x", "Firefox"),
+                               ("https://db5p.notify.windows.com/?token=x", "Microsoft Edge on Windows"),
+                               ("https://FCM.GoogleAPIs.com/x", "Chrome or Android (Google)"),
+                               ("https://push.example.com/x", "Notifications to push.example.com"),
+                               ("https://evilfcm.googleapis.com.example.net/x", "Notifications to evilfcm.googleapis.com.example.net"),
+                               ("https://notfcm.googleapis.com/x", "Notifications to notfcm.googleapis.com")):
+            self.assertEqual(reminders.service_name(endpoint), name, endpoint)
+
     def test_a_device_is_listed_by_its_service_and_belongs_to_one_member(self):
         made = self.device("u-jane")
-        self.assertEqual(reminders.devices(self.c, "u-jane"), [{"id": made["id"], "service": "push.example.com", "created": made["created"]}])
+        self.assertEqual(reminders.devices(self.c, "u-jane"), [{"id": made["id"], "service": "Notifications to push.example.com", "created": made["created"]}])
         self.assertEqual(reminders.devices(self.c, "u-sam"), [])
         self.assertFalse(reminders.remove_device(self.c, "u-sam", made["id"]))   # not Sam's to remove
         self.assertTrue(reminders.remove_device(self.c, "u-jane", made["id"]))
@@ -499,7 +510,7 @@ class ApiTests(RouteCase):
         endpoint, p256dh, auth = subscription()
         body = {"endpoint": endpoint, "p256dh": p256dh, "auth": auth}
         status, added = self.call("ana", "POST", "/api/reminders/devices", body)
-        self.assertEqual((status, added["service"]), (200, "push.example.com"))
+        self.assertEqual((status, added["service"]), (200, "Notifications to push.example.com"))
         self.assertEqual(len(self.call("ana", "GET", "/api/reminders")[1]["devices"]), 1)
         self.assertEqual(self.call("ben", "GET", "/api/reminders")[1]["devices"], [])
         self.assertEqual(self.call("ben", "DELETE", f"/api/reminders/devices/{added['id']}")[0], 404)   # as one that isn't there
