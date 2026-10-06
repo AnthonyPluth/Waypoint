@@ -194,13 +194,15 @@ class WikimediaProviderTests(unittest.TestCase):
         self.fake.files.clear()
         self.assertIsNone(wikimedia.find_logo("Kimpton"))
 
-    def test_only_a_small_png_jpeg_webp_or_gif_is_kept(self):
+    def test_only_a_small_png_jpeg_webp_or_gif_is_kept_and_any_other_file_is_no_logo_not_an_outage(self):
         self.fake.know("Moxy Hotels", "m.png")
         for ctype, body in (("image/svg+xml", b"<svg onload=alert(1)/>"), ("text/html", b"<p>"), ("image/png", b""),
                             ("image/png", b"x" * (wikimedia.MAX_LOGO + 1))):
             self.fake.files["m.png"] = (200, ctype, body)
-            with self.assertRaises(wikimedia.Unavailable, msg=ctype):
-                wikimedia.find_logo("Moxy")
+            self.assertIsNone(wikimedia.find_logo("Moxy"), ctype)
+        for code in (400, 403, 415):   # (a file Commons won't draw)
+            self.fake.files["m.png"] = (code, "text/plain", b"no")
+            self.assertIsNone(wikimedia.find_logo("Moxy"), code)
         for ctype in ("image/jpeg", "image/webp", "image/gif"):
             self.fake.files["m.png"] = (200, ctype + "; charset=binary", PNG)
             self.assertEqual(wikimedia.find_logo("Moxy"), (PNG, ctype))
@@ -212,9 +214,10 @@ class WikimediaProviderTests(unittest.TestCase):
             wikimedia.find_logo("Aloft")
         self.assertIn("busy", str(caught.exception))
         self.fake.busy = False
-        self.fake.files["Aloft Hotels logo.svg"] = (500, "text/plain", b"oops")
-        with self.assertRaises(wikimedia.Unavailable):
-            wikimedia.find_logo("Aloft")
+        for code in (429, 500, 503):   # (the service's trouble, not that file's)
+            self.fake.files["Aloft Hotels logo.svg"] = (code, "text/plain", b"oops")
+            with self.assertRaises(wikimedia.Unavailable, msg=code):
+                wikimedia.find_logo("Aloft")
         self.fake.shutdown()
         self.fake.server_close()
         with self.assertRaises(wikimedia.Unavailable):
@@ -224,9 +227,11 @@ class WikimediaProviderTests(unittest.TestCase):
         with mock.patch.object(wikimedia, "_open", return_value=(b"<html>", "text/html")):
             with self.assertRaises(wikimedia.Unavailable):
                 wikimedia.find_logo("Sofitel")
-        with mock.patch.object(wikimedia, "_open", return_value=(b'{"error": {"code": "badvalue"}}', "application/json")):
+        with mock.patch.object(wikimedia, "_open", return_value=(b'{"error": {"code": "ratelimited"}}', "application/json")):
             with self.assertRaises(wikimedia.Unavailable):
                 wikimedia.find_logo("Sofitel")
+        with mock.patch.object(wikimedia, "_open", return_value=(b'{"error": {"code": "badvalue"}}', "application/json")):
+            self.assertIsNone(wikimedia.find_logo("Sofitel"))   # (that question has no answer; the service is fine)
 
     def test_a_redirect_leaves_wikimedia_only_for_its_own_image_hosts(self):
         with self.assertRaises(wikimedia.Unavailable):
@@ -319,12 +324,12 @@ class BrandTests(unittest.TestCase):
                              ("hyatt  regency chicago", "Hyatt Regency"), ("Courtyard Denver Downtown", "Courtyard by Marriott"),
                              ("Holiday Inn Express & Suites Reno", "Holiday Inn Express"), ("Holiday Inn Reno", "Holiday Inn"),
                              ("Hampton Inn Boston", "Hampton by Hilton"), ("The Westin Chicago River North", "Westin"),
-                             ("Le Méridien Paris Etoile", "Le Méridien"), ("W Chicago City Center", "W Hotels"),
+                             ("Le Méridien Paris Etoile", "Le Méridien"), ("W Hotel Barcelona", "W Hotels"),
                              ("The Ritz-Carlton, Amelia Island", "The Ritz-Carlton"), ("Radisson Blu Edwardian", "Radisson Blu")):
             with self.subTest(hotel=hotel):
                 self.assertEqual(logos.sub_brand(hotel), brand)
                 self.assertEqual(logos.brands_of([("hotel", "Hyatt", None, hotel)], {}), [brand])
-        for hotel in ("Harbour Hotel", "Hyatt", "Hyattsville Inn", "Placeholder Hyatt Place", "", None):
+        for hotel in ("Harbour Hotel", "Hyatt", "Hyattsville Inn", "Placeholder Hyatt Place", "W Motel", "Glo Inn", "Vib Lodge", "", None):
             with self.subTest(hotel=hotel):
                 self.assertIsNone(logos.sub_brand(hotel))
                 self.assertEqual(logos.brands_of([("hotel", "Hyatt", None, hotel)], {}), ["Hyatt"])
@@ -567,6 +572,20 @@ class HotelBrandRoundTests(DbCase):
         with db.session() as conn:
             logos.fetch_due(conn, NOW + timedelta(days=logos.REFRESH_DAYS + 1))
             self.assertEqual(self.kept(conn)["hyatt place"], (b"\x89PNG\r\n\x1a\nits own", "wikimedia"))
+
+    def test_one_brands_bad_file_is_no_logo_for_it_and_the_next_brand_still_gets_its_own(self):
+        with db.session() as conn:
+            conn.execute(insert(Segment).values(trip_id=1, kind="hotel", status="confirmed", provider="Hyatt", origin="Hyatt House Dock Road",
+                                                start_local="2026-11-01T15:00", start_zone="Europe/London", end_local="2026-11-03T10:00",
+                                                end_zone="Europe/London", source="manual"))
+        self.wiki.know("Hyatt House", "house.svg")
+        self.wiki.files["house.svg"] = (200, "image/svg+xml", b"<svg onload=alert(1)/>")   # ("hyatt house" sorts before "hyatt place")
+        self.wiki.know("Hyatt Place", image=PNG2)
+        with db.session() as conn:
+            logos.fetch_due(conn, NOW)
+            self.assertEqual(self.kept(conn), {"hyatt house": (None, None), "hyatt place": (PNG2, "wikimedia"), "hyatt": (PNG, "logodev")})
+            self.assertIsNone(logos.status(conn)["last_error"])   # (Wikimedia was never down)
+            self.assertEqual(logos.status(conn)["waiting"], 0)
 
     def test_a_hotel_brand_a_booking_names_as_its_provider_falls_back_to_logo_dev(self):
         with db.session() as conn:

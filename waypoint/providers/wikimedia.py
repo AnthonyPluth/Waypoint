@@ -30,6 +30,7 @@ TYPES = frozenset({"image/png", "image/jpeg", "image/webp", "image/gif"})
 IMAGE_HOSTS = frozenset({"commons.wikimedia.org", "upload.wikimedia.org"})
 USER_AGENT = "Waypoint (https://github.com/AnthonyPluth/Waypoint; self-hosted travel app)"   # (Wikimedia asks for one that says who)
 CANDIDATES = 10   # items looked at for a name
+SERVICE_ERRORS = frozenset({"ratelimited", "maxlag", "readonly", "internal_api_error_DBConnectionError"})   # (an API error that is the service's)
 NOT_A_BRAND = ("building", "skyscraper", "airport", "hotel in ", "hotel located", "resort in ", "stadium", "station")
 
 
@@ -45,8 +46,8 @@ HOSTS = Hosts()
 
 
 class Unavailable(Exception):
-    """Wikidata or Commons couldn't be reached, was too busy, or answered with something that isn't what was asked for. The
-    message is fixed text, safe to show and log."""
+    """Wikidata or Commons couldn't be reached or was too busy: the service, not one brand's logo, is the trouble, so a round
+    stops asking. The message is fixed text, safe to show and log. (A brand whose file is no good is just None: no logo.)"""
 
 
 class _Redirects(urllib.request.HTTPRedirectHandler):
@@ -59,14 +60,15 @@ class _Redirects(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def _open(url: str, limit: int, accept: str) -> tuple[bytes, str]:
+def _open(url: str, limit: int, accept: str, file: bool = False) -> tuple[bytes, str]:
+    """A file Commons won't give (any 4xx but "too many requests") is raised as FileNotFoundError, as that file's problem."""
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept})
     try:
         with tls.urlopen(req, timeout=TIMEOUT, allow_http=HOSTS.allow_http, handlers=(_Redirects(),)) as resp:
             return resp.read(limit + 1), (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
     except urllib.error.HTTPError as e:
         e.close()
-        if e.code == 404:
+        if e.code == 404 or (file and 400 <= e.code < 500 and e.code != 429):
             raise FileNotFoundError from None
         raise Unavailable("Wikimedia is busy or refused the request" if e.code == 429 else f"Wikimedia answered HTTP {e.code}") from None
     except (urllib.error.URLError, OSError, ValueError):
@@ -82,8 +84,12 @@ def _api(**params: str) -> dict[str, Any]:
         found = None
     except ValueError:
         found = None
-    if not isinstance(found, dict) or "error" in found:
+    if not isinstance(found, dict):
         raise Unavailable("Wikidata answered with something that isn't what was asked for")
+    if "error" in found:   # busy or read-only: the service; any other error is this one question's, which has no answer
+        if str((found["error"] or {}).get("code") if isinstance(found["error"], dict) else "") in SERVICE_ERRORS:
+            raise Unavailable("Wikidata is busy or read-only")
+        return {}
     return found
 
 
@@ -130,7 +136,8 @@ def _label(entity: dict[str, Any]) -> str:
 
 def find_logo(name: str) -> tuple[bytes, str] | None:
     """The logo of a hotel brand by its name, as (image, content type); None when Wikidata has no item for exactly that brand
-    with a logo on Commons. Raises Unavailable when it couldn't be asked, so a failure is never taken for "no such brand"."""
+    with a logo on Commons that is a small image. Raises Unavailable when the service couldn't be asked, so that is never taken
+    for "no such brand"."""
     words = " ".join((name or "").split())
     if len(norm(words)) < 2:
         return None
@@ -153,9 +160,9 @@ def find_logo(name: str) -> tuple[bytes, str] | None:
 def _download(file: str) -> tuple[bytes, str] | None:
     url = f"{HOSTS.files}/{urllib.parse.quote(file, safe='')}?{urllib.parse.urlencode({'width': WIDTH})}"
     try:
-        data, ctype = _open(url, MAX_LOGO, "image/png,image/*")
+        data, ctype = _open(url, MAX_LOGO, "image/png,image/*", file=True)
     except FileNotFoundError:
         return None
-    if ctype not in TYPES or not data or len(data) > MAX_LOGO:
-        raise Unavailable("Wikimedia answered with something that isn't an image")
+    if ctype not in TYPES or not data or len(data) > MAX_LOGO:   # (that brand's file, not the service: no logo)
+        return None
     return data, ctype

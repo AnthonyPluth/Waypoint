@@ -82,7 +82,7 @@ _GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
         ("towneplace suites", "TownePlace Suites by Marriott"), ("sheraton", "Sheraton"), ("westin", "Westin"), ("renaissance", "Renaissance Hotels"),
         ("autograph collection", "Autograph Collection"), ("aloft", "Aloft Hotels"), ("moxy", "Moxy Hotels"), ("four points", "Four Points by Sheraton"),
         ("le meridien", "Le Méridien"), ("ritz carlton", "The Ritz-Carlton"), ("st regis", "The St. Regis"), ("jw marriott", "JW Marriott"),
-        ("gaylord", "Gaylord Hotels"), ("w", "W Hotels"), ("w hotel", "W Hotels"), ("ac hotel", "AC Hotels by Marriott"),
+        ("gaylord", "Gaylord Hotels"), ("w hotel", "W Hotels"), ("ac hotel", "AC Hotels by Marriott"),
         ("element by westin", "Element Hotels"), ("element", "Element Hotels"), ("tribute portfolio", "Tribute Portfolio"),
         ("luxury collection", "The Luxury Collection"), ("delta hotels", "Delta Hotels by Marriott"), ("protea hotel", "Protea Hotels by Marriott"),
         ("design hotels", "Design Hotels"), ("city express", "City Express by Marriott"), ("bvlgari hotel", "Bvlgari Hotels & Resorts"),
@@ -114,7 +114,7 @@ _GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
         ("suburban extended stay", "Suburban Extended Stay"), ("woodspring suites", "WoodSpring Suites"), ("everhome suites", "Everhome Suites"))),
     ("Best Western", (
         ("best western plus", "Best Western Plus"), ("best western premier", "Best Western Premier"), ("surestay", "SureStay Hotels"),
-        ("vib", "Vib Hotels"), ("glo", "GLō Hotels"), ("aiden", "Aiden by Best Western"), ("executive residency", "Executive Residency by Best Western"))),
+        ("aiden by best western", "Aiden by Best Western"), ("executive residency", "Executive Residency by Best Western"))),
     ("Radisson Hotel Group", (
         ("radisson blu", "Radisson Blu"), ("radisson red", "Radisson RED"), ("radisson collection", "Radisson Collection"),
         ("radisson individuals", "Radisson Individuals"), ("park plaza", "Park Plaza"), ("park inn", "Park Inn by Radisson"),
