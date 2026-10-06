@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Stats } from "./api-types";
-import { cardSvg, firstName, mapSvg, reviewFacts, reviewOffered } from "./review";
+import { cardSvg, firstName, mapSvg, outlinesFor, reviewFacts, reviewOffered } from "./review";
+import type { Country } from "./map";
 
 // Canary values sit where the stats carry personal or detailed data; none may reach the card.
 const CANARIES = ["Zelda Quimby", "Quimby", "ZQ7X9K", "Hotel Canarios", "Canario Suites", "ZX 9931", "2026-03-14", "14 Mar", "March 14", "Canary City", "Canary Airways", "FF-123456"];
@@ -92,5 +93,20 @@ describe("reviewOffered", () => {
     expect(reviewOffered(2025, new Date(2026, 0, 2))).toBe(true);
     expect(reviewOffered(2027, new Date(2026, 11, 20))).toBe(false);
     expect(reviewOffered(null, new Date(2026, 11, 20))).toBe(false);
+  });
+});
+
+describe("the card's country shading", () => {
+  const square = (id: string, west: number, south: number, east: number, north: number): Country => ({
+    type: "Feature", id, properties: {}, geometry: { type: "Polygon", coordinates: [[[west, south], [west, north], [east, north], [east, south], [west, south]]] },
+  });
+  const countries = [square("826", -8, 49, 2, 61), square("250", -5, 42, 8, 51), square("392", 129, 31, 146, 46)];
+
+  it("shades the countries of the airports flown and of the cities stayed in", () => {
+    const base = stats();
+    const withStay = { ...base, flights: { ...base.flights, airports: [base.flights.airports[0]] },
+      stays: { ...base.stays, pins: [{ city: "Paris", country: "FR", latitude: 48.85, longitude: 2.35, stays: 1, nights: 3, trips: [] }] } };
+    expect(outlinesFor(countries, withStay).map((c) => c.visited)).toEqual([false, true, false]);
+    expect(outlinesFor(countries, { ...withStay, stays: { ...withStay.stays, pins: [] } }).map((c) => c.visited)).toEqual([false, false, false]);
   });
 });

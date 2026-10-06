@@ -346,10 +346,10 @@ def _stay_pins(stays: Sequence[Seg], year: int | None, city_countries: Mapping[s
     found: dict[str, StayPin] = {}
     for s in stays:
         spent = {d for d in _nights(s) if _in(d, year)}
-        key = " ".join((s.destination or "").split()).casefold()
+        key = (s.destination or "").strip().lower()
         if not spent or key not in city_points:
             continue
-        pin = found.setdefault(key, {"city": " ".join((s.destination or "").split()), "country": city_countries.get(key),
+        pin = found.setdefault(key, {"city": (s.destination or "").strip(), "country": city_countries.get(key),
                                      "latitude": city_points[key][0], "longitude": city_points[key][1], "stays": 0, "nights": 0, "trips": []})
         pin["stays"] += 1
         pin["nights"] += len(spent)
