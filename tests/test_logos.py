@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import mock
 
-from sqlalchemy import select
+from sqlalchemy import insert, select
 
 from tests.privacy import no_leaks
 from tests.shared import DbCase, fetch
@@ -22,6 +22,7 @@ from waypoint.storage import settings_keys as sk
 from waypoint.storage.models import BrandLogo, Segment, Setting, Trip
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"made-up image bytes"
+PNG2 = b"\x89PNG\r\n\x1a\n" + b"another made-up image"
 TOKEN = "pk_test-publishable-4d7e1a90"
 SECRET = "sk_test-secret-9b2c5f31"
 NOW = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
@@ -145,6 +146,20 @@ class BrandTests(unittest.TestCase):
                                ("flight", None, "ZZ9"), ("car", None, None), ("cruise", "Sea Line", None)], self.AIRLINES)
         self.assertEqual(got, ["Harbour Hotels", "Example Air", "Other Air", None, None, "Sea Line"])
 
+    def test_a_hotel_is_asked_about_by_its_own_brand_first_without_the_rest_of_its_name(self):
+        for hotel, brand in (("Hyatt Place Chicago River North", "Hyatt Place"), ("Hyatt Regency O'Hare", "Hyatt Regency"),
+                             ("hyatt  regency chicago", "Hyatt Regency"), ("Courtyard Denver Downtown", "Courtyard by Marriott"),
+                             ("Holiday Inn Express & Suites Reno", "Holiday Inn Express"), ("Holiday Inn Reno", "Holiday Inn"),
+                             ("Hampton Inn Boston", "Hampton by Hilton")):
+            with self.subTest(hotel=hotel):
+                self.assertEqual(logos.sub_brand(hotel), brand)
+                self.assertEqual(logos.brands_of([("hotel", "Hyatt", None, hotel)], {}), [brand])
+        for hotel in ("Harbour Hotel", "Hyatt", "Hyattsville Inn", "Placeholder Hyatt Place", "", None):
+            with self.subTest(hotel=hotel):
+                self.assertIsNone(logos.sub_brand(hotel))
+                self.assertEqual(logos.brands_of([("hotel", "Hyatt", None, hotel)], {}), ["Hyatt"])
+        self.assertEqual(logos.brands_of([("car", "Hertz", None, "Hyatt Place Chicago")], {}), ["Hertz"])   # (only a hotel's name says its brand)
+
     def test_a_provider_that_is_not_a_name_is_not_asked_about(self):
         for odd in ("", " ", "A", "12", "x" * 101):
             self.assertEqual(logos.brands_of([("hotel", odd, None)], {}), [None], odd)
@@ -195,6 +210,20 @@ class RoundTests(DbCase):
             self.assertEqual(len([c for c in self.fake.calls if c["path"].endswith("Harbour%20Hotels")]), 1)
             self.assertEqual(logos.status(conn)["waiting"], 0)
             self.assertIsNone(logos.status(conn)["last_error"])
+
+    def test_a_hotels_own_brand_and_its_provider_are_both_asked_about_and_never_the_hotels_name(self):
+        with self.conn() as conn:
+            conn.execute(Segment.__table__.delete())
+            conn.execute(Trip.__table__.delete())
+            conn.execute(insert(Trip).values(id=1, name="T", auto=True))
+            conn.execute(insert(Segment).values(trip_id=1, kind="hotel", status="confirmed", provider="Hyatt", origin="Hyatt Place Quay Street",
+                                                start_local="2026-10-01T15:00", start_zone="Europe/London", end_local="2026-10-03T10:00",
+                                                end_zone="Europe/London", source="manual"))
+            db.set_setting(conn, sk.LOGODEV_TOKEN, TOKEN)
+            logos.fetch_due(conn, NOW)
+            self.assertEqual(sorted(k for (k,) in conn.execute(select(BrandLogo.key))), ["hyatt", "hyatt place"])
+        self.assertEqual(sorted(c["path"].split("/")[-1].split("?")[0] for c in self.fake.calls if "/name/" in c["path"]), ["Hyatt", "Hyatt%20Place"])
+        self.assertFalse(any("Quay" in c["path"] or "Quay" in str(c) for c in self.fake.calls))   # (a place never goes to Logo.dev)
 
     def test_a_brand_logo_dev_has_none_for_is_remembered_and_asked_again_after_a_month(self):
         self.fake.image_answer = (404, "text/plain", b"")
@@ -309,6 +338,18 @@ class RouteTests(RouteCase):
         status, headers, body = fetch(self.base, "GET", seg["logo"], headers={"X-Waypoint": "1", **self.who["ana"]})
         self.assertEqual((status, headers["Content-Type"], body), (200, "image/png", PNG))
         self.assertIn("private", headers["Cache-Control"])
+
+    def test_a_hotel_shows_its_own_brands_logo_else_its_providers(self):
+        self.keep("Hyatt")
+        hyatt = self.book("ana", HOTEL, provider="Hyatt", origin="Hyatt Place Harbour", travelers=[{"person_id": self.person["ana"]}])
+        self.assertEqual(hyatt["logo"], f"/api/segments/{hyatt['id']}/logo")   # (no logo of Hyatt Place's own: Hyatt's)
+        self.assertEqual(fetch(self.base, "GET", hyatt["logo"], headers={"X-Waypoint": "1", **self.who["ana"]})[2], PNG)
+        with db.session() as conn:
+            conn.execute(BrandLogo.__table__.insert().values(key="hyatt place", name="Hyatt Place", logo=PNG2, logo_type="image/png", checked=NOW.isoformat()))
+        regency = self.book("ana", {**HOTEL, "start_local": "2026-12-01T15:00", "end_local": "2026-12-03T10:00"}, provider="Hyatt",
+                            origin="Hyatt Regency Harbour", travelers=[{"person_id": self.person["ana"]}])
+        image = lambda seg: fetch(self.base, "GET", f"/api/segments/{seg['id']}/logo", headers={"X-Waypoint": "1", **self.who["ana"]})[2]
+        self.assertEqual((image(hyatt), image(regency)), (PNG2, PNG))   # Hyatt Place has its own now; Hyatt Regency falls back to Hyatt's
 
     def test_no_logo_link_without_a_logo(self):
         seg = self.book("ana", OUT, travelers=[{"person_id": self.person["ana"]}])
