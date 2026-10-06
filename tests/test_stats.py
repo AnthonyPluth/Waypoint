@@ -63,8 +63,7 @@ class FlightTests(StatsCase):
         self.assertAlmostEqual(f["longest"]["distance_km"], 10500, delta=100)
         self.assertEqual((f["shortest"]["origin"], f["shortest"]["flight_number"]), ("JFK", "BA112"))
         self.assertAlmostEqual(f["distance_km"], 2 * f["routes"][0]["distance_km"] + f["longest"]["distance_km"], delta=0.5)
-        self.assertEqual({a["code"]: a["visits"] for a in f["airports"]}, {"JFK": 2, "LHR": 2, "AKL": 1, "LAX": 1})
-        self.assertEqual(f["most_visited_airport"], "JFK")
+        self.assertEqual({a["code"]: a["visits"] for a in f["airports"]}, {"JFK": 1, "LHR": 1, "AKL": 1, "LAX": 1})
         self.assertEqual(f["airports"][0]["latitude"] is not None, True)
         self.assertEqual({c["name"]: c["count"] for c in f["countries"]}, {"US": 3, "GB": 2, "NZ": 1})
         self.assertAlmostEqual(f["times_around_earth"], f["distance_km"] / 40075, places=3)
@@ -215,6 +214,41 @@ class CabinGroupTests(StatsCase):
         for cabin in ("Economy", "Basic Economy", "Main Basic", "First"):
             self.mine({**JFK_LHR, "details": {**JFK_LHR["details"], "cabin": cabin}})
         self.assertEqual(self.stats(self.jane)["flights"]["cabins"], [{"name": "Economy", "count": 3}, {"name": "First", "count": 1}])
+
+
+class VisitCountTests(StatsCase):
+    ROUND_TRIP = (JFK_LHR, LHR_JFK)
+
+    def test_a_round_trip_is_one_visit_to_each_end_not_two(self):
+        self.mine(*self.ROUND_TRIP)
+        f = self.stats(self.jane)
+        self.assertEqual({a["code"]: a["visits"] for a in f["flights"]["airports"]}, {"JFK": 1, "LHR": 1})
+        self.assertEqual({p["name"]: p["visits"] for p in f["places"]["countries"]}, {"US": 1, "GB": 1})
+        self.assertEqual({p["name"]: p["visits"] for p in f["places"]["cities"]}, {"London": 1, "New York": 1})
+
+    def test_a_connection_is_one_visit_and_a_second_trip_is_a_second(self):
+        self.mine({**JFK_LHR, "destination": "LHR"}, {**LHR_JFK, "origin": "LHR", "destination": "CDG", "start_local": "2026-06-03T09:00", "end_local": "2026-06-03T11:30"},
+                  {"kind": "flight", "origin": "CDG", "destination": "JFK", "start_local": "2026-06-08T11:00", "end_local": "2026-06-08T14:05",
+                   "details": {"flight_number": "AF 22"}},
+                  {**JFK_LHR, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"})
+        f = self.stats(self.jane)
+        visits = {a["code"]: a["visits"] for a in f["flights"]["airports"]}
+        self.assertEqual((visits["LHR"], visits["CDG"], visits["JFK"]), (2, 1, 2))
+        self.assertEqual({p["name"]: p["visits"] for p in f["places"]["countries"]}, {"US": 2, "GB": 2, "FR": 1})
+        self.assertEqual(f["flights"]["most_visited_airport"], "JFK")
+
+    def test_domestic_hops_inside_a_country_are_not_visits_to_it(self):
+        self.mine({"kind": "flight", "origin": "JFK", "destination": "ORD", "start_local": "2026-06-01T09:00", "end_local": "2026-06-01T10:30",
+                   "details": {"flight_number": "AA 1"}},
+                  {"kind": "flight", "origin": "ORD", "destination": "LAX", "start_local": "2026-06-02T09:00", "end_local": "2026-06-02T11:30",
+                   "details": {"flight_number": "AA 2"}})
+        self.assertEqual({p["name"]: p["visits"] for p in self.stats(self.jane)["places"]["countries"]}, {"US": 1})
+
+    def test_hotels_in_a_row_in_one_city_are_one_visit(self):
+        self.mine(HOTEL, {**HOTEL, "origin": "Quay Inn", "start_local": "2026-06-08T15:00", "end_local": "2026-06-10T10:00"},
+                  {**HOTEL, "origin": "Later Inn", "start_local": "2026-08-01T15:00", "end_local": "2026-08-03T10:00"})
+        cities = {p["name"]: p["visits"] for p in self.stats(self.jane)["places"]["cities"]}
+        self.assertEqual(cities, {"London": 2})
 
 
 class MapDetailTests(StatsCase):

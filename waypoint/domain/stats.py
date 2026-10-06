@@ -83,7 +83,7 @@ class AirportVisit(TypedDict):
     name: str                  # the airport's name; the code when it isn't in the table
     city: str | None
     country: str | None
-    visits: int                # each departure from it and arrival at it
+    visits: int                # the times there: its arrivals or its departures, whichever are more (a round trip is one visit to each end)
     latitude: float | None
     longitude: float | None
 
@@ -281,7 +281,8 @@ def _record(origin: str, destination: str, km: float, s: Seg) -> FlightRecord:
 
 def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Mapping[str, str], trip_names: Mapping[int, str]) -> FlightStats:
     total_km, air = 0.0, 0.0
-    visits: Counter[str] = Counter()
+    arrivals: Counter[str] = Counter()
+    departures: Counter[str] = Counter()
     carriers: Counter[tuple[str | None, str]] = Counter()
     routes: Counter[tuple[str, str]] = Counter()
     route_trips: dict[tuple[str, str], list[MapTrip]] = {}
@@ -296,7 +297,8 @@ def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Map
         origin, destination = (s.origin or "").upper(), (s.destination or "").upper()
         air += (trips.instant(s.end_local, s.end_zone) - trips.instant(s.start_local, s.start_zone)).total_seconds()
         months[s.start_local[:7]] += 1
-        visits.update((origin, destination))
+        departures[origin] += 1
+        arrivals[destination] += 1
         route = (min(origin, destination), max(origin, destination))
         routes[route] += 1
         if (ref := _map_trip(s, trip_names)):
@@ -327,6 +329,7 @@ def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Map
                 seats[seat] += 1
             positions[seat_position(seat)] += 1
     airports_out: list[AirportVisit] = []
+    visits = {code: max(arrivals[code], departures[code]) for code in arrivals.keys() | departures.keys()}
     for code, n in sorted(visits.items(), key=lambda kv: (-kv[1], kv[0])):
         a = known.get(code)
         airports_out.append({"code": code, "name": a.name if a else code, "city": a.city if a else None,
@@ -487,25 +490,44 @@ def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Ai
             city_countries: Mapping[str, str]) -> PlaceStats:
     countries: dict[str, list[str]] = {}
     cities: dict[str, list[str]] = {}
+    came: dict[str, Counter[str]] = {"country": Counter(), "city": Counter()}
+    went: dict[str, Counter[str]] = {"country": Counter(), "city": Counter()}
+    stayed: dict[str, list[tuple[date, date]]] = {}
 
     def seen(into: dict[str, list[str]], name: str, day: str) -> None:
         into.setdefault(name, []).append(day)
     for s in flights:
-        for code, local in ((s.origin, s.start_local), (s.destination, s.end_local)):
-            a = known.get((code or "").upper())
+        there, here = known.get((s.destination or "").upper()), known.get((s.origin or "").upper())
+        for a, local in ((here, s.start_local), (there, s.end_local)):
             if a:
                 seen(countries, a.country, local[:10])
                 seen(cities, a.city, local[:10])
+        for kind, name in (("country", lambda a: a.country), ("city", lambda a: a.city)):
+            if there and (not here or name(here) != name(there)):
+                came[kind][name(there)] += 1
+            if here and (not there or name(here) != name(there)):
+                went[kind][name(here)] += 1
     for s in stays:
         if s.destination:
             seen(cities, s.destination.strip(), s.start_local[:10])
+            stayed.setdefault(s.destination.strip(), []).append((date.fromisoformat(s.start_local[:10]), date.fromisoformat(s.end_local[:10])))
             if (country := city_countries.get(s.destination.strip().lower())):
                 seen(countries, country, s.start_local[:10])
 
-    def listed(found: dict[str, list[str]]) -> list[Place]:
-        return sorted(({"name": n, "first_visit": min(days), "visits": len(set(days))} for n, days in found.items()),
-                      key=lambda p: (p["first_visit"], p["name"]))
-    return {"countries": listed(countries), "cities": listed(cities)}
+    def stay_visits(name: str) -> int:
+        spans = sorted(stayed.get(name, []))
+        groups, reach = 0, None
+        for start, end in spans:
+            if reach is None or start > reach + timedelta(days=1):
+                groups += 1
+            reach = end if reach is None else max(reach, end)
+        return groups
+
+    def listed(found: dict[str, list[str]], kind: str) -> list[Place]:
+        return sorted(({"name": n, "first_visit": min(days),
+                        "visits": max(came[kind][n], went[kind][n], stay_visits(n) if kind == "city" else 0, 1)}
+                       for n, days in found.items()), key=lambda p: (p["first_visit"], p["name"]))
+    return {"countries": listed(countries, "country"), "cities": listed(cities, "city")}
 
 
 def _years(live: Sequence[Seg]) -> list[int]:
