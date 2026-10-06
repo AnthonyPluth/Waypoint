@@ -60,6 +60,10 @@ class NoSuchPerson(Exception):
     """A membership names someone who isn't in People."""
 
 
+class Duplicate(Exception):
+    """The person already has a membership in that program (a second one in "Other" is fine: it can be any program)."""
+
+
 class Unreadable(Exception):
     """The saved number can't be unlocked with Waypoint's current key."""
 
@@ -100,10 +104,23 @@ def _person_exists(conn: db.Connection, person_id: int) -> bool:
     return conn.orm.scalar(select(Person.id).where(Person.id == person_id)) is not None
 
 
+def _holds(conn: db.Connection, fields: Fields, *, besides: int | None = None) -> bool:
+    """Whether the person has a membership (other than `besides`) in this program."""
+    if fields["program"] == OTHER:
+        return False
+    found = select(LoyaltyId.id).where(LoyaltyId.person_id == fields["person_id"], LoyaltyId.kind == fields["kind"],
+                                        LoyaltyId.program == fields["program"])
+    if besides is not None:
+        found = found.where(LoyaltyId.id != besides)
+    return conn.orm.scalar(found.limit(1)) is not None
+
+
 def add(conn: db.Connection, fields: Fields) -> Listed:
-    """Save a membership. Raises NoSuchPerson, and ValueError when there is no number."""
+    """Save a membership. Raises NoSuchPerson, Duplicate (they have one in that program), and ValueError when there is no number."""
     if not _person_exists(conn, fields["person_id"]):
         raise NoSuchPerson()
+    if _holds(conn, fields):
+        raise Duplicate()
     if not fields["number"]:
         raise ValueError("a new membership needs a number")
     row = LoyaltyId(person_id=fields["person_id"], kind=fields["kind"], program=fields["program"],
@@ -115,9 +132,15 @@ def add(conn: db.Connection, fields: Fields) -> Listed:
 
 
 def edit(conn: db.Connection, loyalty_id: int, fields: Fields) -> Listed | None:
-    """Change a membership (the number only when one is given). None: there's no such membership. Raises NoSuchPerson."""
+    """Change a membership (the number only when one is given). None: there's no such membership. Raises NoSuchPerson, and
+    Duplicate when it would move to a program the person already has (one left in the program it was in, as a person who was
+    given two by claiming a guest has, can still be edited)."""
     if not _person_exists(conn, fields["person_id"]):
         raise NoSuchPerson()
+    current = conn.orm.get(LoyaltyId, loyalty_id)
+    moved = current is not None and (current.person_id, current.kind, current.program) != (fields["person_id"], fields["kind"], fields["program"])
+    if moved and _holds(conn, fields, besides=loyalty_id):
+        raise Duplicate()
     values = {"person_id": fields["person_id"], "kind": fields["kind"], "program": fields["program"],
               "tier": fields["tier"], "expiry": fields["expiry"], "notes": fields["notes"]}
     if fields["number"]:

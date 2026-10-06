@@ -88,12 +88,19 @@
   let idRemoving = $state<LoyaltyEntry | null>(null);
   let idAsking = $state(false);
 
-  const startAddId = (p: Person) => { idDraft = { id: null, person_id: p.id, kind: "airline", program: programs.airline?.[0] ?? "", number: "", tier: "", expiry: "", notes: "", masked: "" }; idError = ""; };
+  // The programs a person can still pick for a kind: one they already have isn't offered again ("Other" can repeat, and a
+  // membership being edited keeps its own program).
+  const choices = (personId: number, kind: string, editing: number | null = null): string[] => {
+    const kept = editing === null ? null : memberships.find((m) => m.id === editing)?.program;
+    const held = new Set(memberships.filter((m) => m.person_id === personId && m.kind === kind && m.id !== editing).map((m) => m.program));
+    return (programs[kind] ?? []).filter((name) => name === "Other" || name === kept || !held.has(name));
+  };
+  const startAddId = (p: Person) => { idDraft = { id: null, person_id: p.id, kind: "airline", program: choices(p.id, "airline")[0] ?? "", number: "", tier: "", expiry: "", notes: "", masked: "" }; idError = ""; };
   const startEditId = (m: LoyaltyEntry) => {
     idDraft = { id: m.id, person_id: m.person_id, kind: m.kind, program: m.program, number: "", tier: m.tier ?? "", expiry: m.expiry ?? "", notes: m.notes ?? "", masked: m.masked };
     idError = "";
   };
-  const pickKind = (d: IdDraft) => { if (!(programs[d.kind] ?? []).includes(d.program)) d.program = programs[d.kind]?.[0] ?? ""; };
+  const pickKind = (d: IdDraft) => { const open = choices(d.person_id, d.kind, d.id); if (!open.includes(d.program)) d.program = open[0] ?? ""; };
 
   async function saveId(e: SubmitEvent) {
     e.preventDefault();
@@ -180,7 +187,7 @@
           </select></label>
         <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Program</span>
           <select bind:value={d.program} class={selectClass}>
-            {#each programs[d.kind] ?? [] as name (name)}<option value={name}>{name}</option>{/each}
+            {#each choices(d.person_id, d.kind, d.id) as name (name)}<option value={name}>{name}</option>{/each}
           </select>
           {#if d.program === "Other"}<span class="text-muted-foreground">Say which program in the notes.</span>{/if}</label>
         <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Number</span>

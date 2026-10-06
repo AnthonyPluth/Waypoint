@@ -17,6 +17,8 @@ A membership has a **kind**, a **program**, a **number**, and optionally a tier,
 
 Each kind has a fixed list of programs. Choose **Other** for one that isn’t listed, and say which in the notes.
 
+A person has one membership in each program: once one is saved, that program is no longer offered for them under **+ ID**, and Waypoint refuses a second one (edit the first instead). **Other** can be used more than once, since it can stand for any program. A person who ended up with two numbers for one program by claiming a guest keeps both, flagged on the People page, and can still edit either.
+
 ## How the numbers are protected
 
 - A number is **encrypted** in the database, with the same key as Waypoint’s other secrets (`WAYPOINT_SECRET_KEY`).

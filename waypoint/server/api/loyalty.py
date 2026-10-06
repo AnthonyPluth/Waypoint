@@ -15,6 +15,7 @@ TEXT_LIMIT = 100
 NOTES_LIMIT = 500
 _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {limit} characters)")
 NO_SUCH = "No such membership"
+DUPLICATE = "They already have a membership in that program. Edit that one instead."
 
 
 def fields(body: Mapping[str, Any], *, need_number: bool) -> loyalty.Fields:
@@ -50,6 +51,8 @@ def api_loyalty_add(conn, _q, body: LoyaltyBody) -> LoyaltyEntry:
         return LoyaltyEntry(**loyalty.add(conn, fields(body, need_number=True)))
     except loyalty.NoSuchPerson:
         raise ApiError("No such person", 404) from None
+    except loyalty.Duplicate:
+        raise ApiError(DUPLICATE) from None
 
 
 def api_loyalty_edit(conn, _q, body: LoyaltyBody, loyalty_id) -> LoyaltyEntry:
@@ -58,6 +61,8 @@ def api_loyalty_edit(conn, _q, body: LoyaltyBody, loyalty_id) -> LoyaltyEntry:
         found = loyalty.edit(conn, row_id(loyalty_id, NO_SUCH), fields(body, need_number=False))
     except loyalty.NoSuchPerson:
         raise ApiError("No such person", 404) from None
+    except loyalty.Duplicate:
+        raise ApiError(DUPLICATE) from None
     if found is None:
         raise ApiError(NO_SUCH, 404)
     return LoyaltyEntry(**found)

@@ -232,6 +232,23 @@ describe("People", () => {
     expect(screen.queryByRole("form")).toBeNull();
   });
 
+  it("doesn't offer a program the person already has, keeps Other, and keeps a membership's own program when editing it", async () => {
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "Add a membership for Jane Doe" }));
+    const program = screen.getByLabelText(/^Program/);
+    expect(within(program).queryByRole("option", { name: "American AAdvantage" })).toBeNull();   // (Jane has it)
+    expect(within(program).getByRole("option", { name: "Other" })).toBeInTheDocument();
+    expect(program).toHaveValue("Other");                                                         // (the first one left)
+    await userEvent.selectOptions(screen.getByLabelText("Kind"), "hotel");
+    expect(within(screen.getByLabelText(/^Program/)).getByRole("option", { name: "Marriott Bonvoy" })).toBeInTheDocument();   // (not hers)
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit Jane Doe’s American AAdvantage" }));
+    expect(screen.getByLabelText(/^Program/)).toHaveValue("American AAdvantage");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add a membership for Mia Doe" }));
+    expect(within(screen.getByLabelText(/^Program/)).getByRole("option", { name: "American AAdvantage" })).toBeInTheDocument();   // (Mia doesn't)
+  });
+
   it("changes a membership without asking for the number again", async () => {
     render(People);
     await userEvent.click(await screen.findByRole("button", { name: "Edit Jane Doe’s American AAdvantage" }));

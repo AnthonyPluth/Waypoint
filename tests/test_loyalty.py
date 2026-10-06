@@ -77,6 +77,29 @@ class StorageTests(DbCase):
         with self.assertRaises(loyalty.NoSuchPerson):
             loyalty.edit(self.c, added["id"], membership(999))
 
+    def test_a_person_cannot_hold_two_memberships_in_one_program_but_can_in_other(self):
+        who, other = guest(self.c), guest(self.c, "Bo")
+        first = loyalty.add(self.c, membership(who))
+        with self.assertRaises(loyalty.Duplicate):
+            loyalty.add(self.c, membership(who, number="DEMO7654321"))
+        loyalty.add(self.c, membership(other))                                          # (another person: fine)
+        loyalty.add(self.c, membership(who, kind="hotel", program="Hilton Honors"))      # (another program: fine)
+        for _ in range(2):
+            loyalty.add(self.c, membership(who, program=loyalty.OTHER))                  # (Other can be any program)
+        second = loyalty.add(self.c, membership(who, program="Delta SkyMiles"))
+        with self.assertRaises(loyalty.Duplicate):                                      # (moving one onto a program they have)
+            loyalty.edit(self.c, second["id"], membership(who, program="American AAdvantage"))
+        loyalty.edit(self.c, first["id"], membership(who, tier="Platinum"))              # (editing it in place is fine)
+        self.assertEqual(len([m for m in loyalty.everyone(self.c) if m["person_id"] == who and m["program"] == "American AAdvantage"]), 1)
+
+    def test_a_person_who_already_has_two_from_a_claim_can_still_edit_either(self):
+        who = guest(self.c)
+        first = loyalty.add(self.c, membership(who))
+        self.c.orm.add(LoyaltyId(person_id=who, kind="airline", program="American AAdvantage", number=secretbox.encrypt("DEMO7654321") or ""))
+        self.c.orm.flush()
+        self.assertEqual(len(loyalty.conflicts(self.c)), 1)
+        self.assertEqual(loyalty.edit(self.c, first["id"], membership(who, tier="Platinum"))["tier"], "Platinum")   # (not moved: allowed)
+
     def test_removing_a_guest_takes_their_memberships(self):
         who, other = guest(self.c), guest(self.c, "Bo")
         loyalty.add(self.c, membership(who))
@@ -147,6 +170,19 @@ class RouteTests(ServerCase):
         self.assertEqual((status, edited["program"], edited["masked"]), (200, "Hilton Honors", "••••1234"))
         self.assertEqual(self.req("DELETE", f"/api/loyalty/{added['id']}"), (200, {"ok": True}))
         self.assertNotIn(added["id"], [m["id"] for m in self.req("GET", "/api/loyalty")[1]["loyalty"]])
+
+    def test_a_second_membership_in_a_program_is_a_400_for_a_save_and_a_move_but_not_an_edit_in_place(self):
+        status, first = self.save()
+        self.assertEqual(status, 200)
+        status, refused = self.save(number="DEMO7654321")
+        self.assertEqual(status, 400)
+        self.assertIn("already have a membership", refused["error"])
+        self.assertNotIn("DEMO7654321", str(refused))
+        status, other = self.save(program="Hilton Honors")
+        self.assertEqual(status, 200)
+        move = {"person_id": self.guest["id"], "kind": "hotel", "program": "Marriott Bonvoy"}
+        self.assertEqual(self.req("POST", f"/api/loyalty/{other['id']}", move)[0], 400)
+        self.assertEqual(self.req("POST", f"/api/loyalty/{first['id']}", {**move, "tier": "Gold"})[0], 200)
 
     def test_an_id_that_is_not_there_is_a_404(self):
         for who in ("999", "abc"):
