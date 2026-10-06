@@ -3,6 +3,7 @@ wrote is passed through. Invented content."""
 import unittest
 from unittest import mock
 
+from tests.privacy import no_leaks
 from tests.test_mail_extract import eml, message
 from waypoint.domain.mail import extract, safe_html
 
@@ -112,6 +113,11 @@ class Limits(unittest.TestCase):
 
 
 class FromAMessage(unittest.TestCase):
+    def test_a_message_is_read_in_memory_alone(self):
+        html = '<html><body><p>CANARY-BODY-PREVIEW-8M3Q</p></body></html>'
+        with no_leaks(self, "CANARY-BODY-PREVIEW-8M3Q"):   # (it comes back to the caller, and goes nowhere else)
+            self.assertEqual(extract.safe_markup(message(eml(html))), ("<p>CANARY-BODY-PREVIEW-8M3Q</p>", False))
+
     def test_a_messages_html_part_is_cleaned_and_a_text_only_message_has_none(self):
         html = '<html><head><style>p{}</style></head><body><p onclick="x()">Gate <b>B12</b></p><script>evil()</script></body></html>'
         self.assertEqual(extract.safe_markup(message(eml(html))), ("<p>Gate <b>B12</b></p>", False))
