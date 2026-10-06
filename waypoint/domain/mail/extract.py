@@ -620,11 +620,11 @@ def safe_markup(message: Mapping[str, Any], limit: int = MAX_PART) -> tuple[str,
     if bodies is None or not bodies[1]:
         return None
     shown: list[str] = []
-    for part in bodies[1]:   # (one parser for each: an unclosed script or style in one part can't hide the next)
+    for i, part in enumerate(bodies[1]):   # (one parser for each: an unclosed script or style in one part can't hide the next)
         markup, cut, size = safe_html.clean_counted(part, limit)
         shown.append(markup)
         limit -= size
-        if cut or limit <= 0:
+        if cut or (limit <= 0 and i + 1 < len(bodies[1])):   # (a budget used exactly, with nothing left out, isn't a cut)
             return "<hr>".join(shown), True
     return "<hr>".join(shown), False
 

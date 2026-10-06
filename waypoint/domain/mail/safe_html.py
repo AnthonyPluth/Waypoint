@@ -8,6 +8,7 @@ but a table cell's span. In memory only, like the text preview."""
 from __future__ import annotations
 
 import re
+from collections import Counter
 from html import escape
 from html.parser import HTMLParser
 from typing import Any
@@ -41,6 +42,7 @@ class _Clean(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.out: list[str] = []
         self.open: list[tuple[str, bool]] = []   # (tag, whether it was written: a tag past MAX_DEPTH is only counted)
+        self.counts: Counter[str] = Counter()   # (how many of each tag are open: an end tag is matched in one step, however deep)
         self.skip: list[str] = []
         self.limit = limit
         self.size = 0
@@ -67,6 +69,7 @@ class _Clean(HTMLParser):
                 if shown:
                     self.out.append(f"<{tag}{self._attributes(tag, dict(attrs))}>")
                 self.open.append((tag, shown))
+                self.counts[tag] += 1
 
     def handle_startendtag(self, tag: str, attrs: Any) -> None:
         if tag in DROP and not self.skip:
@@ -81,9 +84,10 @@ class _Clean(HTMLParser):
                 while self.skip and self.skip.pop() != tag:
                     pass
             return
-        if any(t == tag for t, _ in self.open):   # (closes what an unclosed tag left open, and ignores a stray end tag)
+        if self.counts[tag]:   # (closes what an unclosed tag left open, and ignores a stray end tag)
             while self.open:
                 last, shown = self.open.pop()
+                self.counts[last] -= 1
                 if shown:
                     self.out.append(f"</{last}>")
                 if last == tag:

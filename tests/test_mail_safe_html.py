@@ -95,6 +95,13 @@ class Limits(unittest.TestCase):
     def test_a_short_message_is_not_cut(self):
         self.assertFalse(safe_html.clean("<p>hi</p>", 20)[1])
 
+    def test_many_unclosed_tags_then_many_stray_end_tags_stay_fast(self):
+        import time
+        started = time.monotonic()
+        out = clean("<div>" * 50_000 + "</span>" * 50_000 + "x")
+        self.assertLess(time.monotonic() - started, 2)
+        self.assertEqual(out.count("<div>"), out.count("</div>"))
+
     def test_nesting_is_bounded_and_garbage_does_not_raise(self):
         out = clean("<div>" * 500 + "deep")
         self.assertLessEqual(out.count("<div>"), safe_html.MAX_DEPTH)
@@ -114,6 +121,7 @@ class FromAMessage(unittest.TestCase):
                b"--B\nContent-Type: text/html; charset=utf-8\n\n<p>two</p>\n--B--\n")
         self.assertEqual(extract.safe_markup(message(two)), ("<p>one</p><hr><p>two</p>", False))   # (an unclosed script in one part doesn't hide the next)
         self.assertEqual(extract.safe_markup(message(two), 3), ("<p>one</p>", True))
+        self.assertEqual(extract.safe_markup(message(eml("<p>one</p>")), 3), ("<p>one</p>", False))   # (exactly the budget, nothing left out)
         amps = two.replace(b"<p>one</p>", b"<p>a&amp;b&lt;c</p>")
         self.assertEqual(extract.safe_markup(message(amps), 7), ("<p>a&amp;b&lt;c</p><hr><p>tw</p>", True))   # (the budget counts characters as written, not as escaped)
         self.assertIsNone(extract.safe_markup({"raw": None}))
