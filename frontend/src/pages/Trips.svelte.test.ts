@@ -51,6 +51,13 @@ describe("what a trip holds", () => {
 });
 
 describe("Trips", () => {
+  it("doesn’t tag a trip you named or changed as edited", async () => {
+    serve([{ ...london, auto: false }]);
+    render(Trips);
+    await screen.findByText("Trip to London");
+    expect(screen.queryByText("Edited")).toBeNull();
+  });
+
   it("lists the trips still to come, soonest first, and the past ones apart", async () => {
     render(Trips);
     const upcoming = await screen.findByRole("list", { name: "Upcoming trips" });
