@@ -36,7 +36,7 @@
 </script>
 
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-3xl font-semibold tracking-tight">Trips</h1>
+  <h1 class="text-4xl font-bold tracking-tight">Trips</h1>
   {#if trips && !adding}<Button onclick={() => (adding = true)}><Plus /> Add a booking</Button>{/if}
 </div>
 
@@ -65,12 +65,12 @@
     {#if list.length}
       <section class="mb-8" aria-labelledby={`trips-${title}`}>
         <h2 id={`trips-${title}`} class="eyebrow mb-2">{title}</h2>
-        <ul class="rows" aria-label={`${title} trips`}>
+        <ul class="flex flex-col gap-3" aria-label={`${title} trips`}>
           {#each list as t (t.id)}
             <li>
-              <a class="row items-start hover:bg-accent/40" href={`#trip/${t.id}`}>
+              <a class="row items-start rounded-2xl border bg-card shadow-card transition-colors hover:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none" href={`#trip/${t.id}`}>
                 <span class="min-w-0 flex-1">
-                  <span class="flex flex-wrap items-center gap-2 font-medium"><span class="break-words">{t.name}</span>{#if !t.auto}<Badge variant="outline">Edited</Badge>{/if}</span>
+                  <span class="flex flex-wrap items-center gap-2 text-lg font-bold tracking-tight"><span class="break-words">{t.name}</span>{#if !t.auto}<Badge variant="outline">Edited</Badge>{/if}</span>
                   <span class="block text-sm text-muted-foreground">{dates(t)}{t.destination ? ` · ${t.destination}` : ""}</span>
                   {#if names(t)}<span class="block break-words text-sm text-muted-foreground">{names(t)}</span>{/if}
                 </span>

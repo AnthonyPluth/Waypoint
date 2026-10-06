@@ -133,7 +133,7 @@
   </div>
 {/snippet}
 
-<h1 class="mb-6 text-3xl font-semibold tracking-tight">Stats</h1>
+<h1 class="mb-6 text-4xl font-bold tracking-tight">Stats</h1>
 
 <div class="mb-6 grid grid-cols-2 gap-3">
   <label class="space-y-1 text-sm font-medium">Who
@@ -174,9 +174,9 @@
     <section aria-label="Totals">
       <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {#each tiles as t (t.label)}
-          <div class="rounded-2xl border bg-card p-4 shadow-sm {t.note ? 'col-span-2 sm:col-span-1' : ''}">
+          <div class="rounded-2xl border bg-card p-4 shadow-card {t.note ? 'col-span-2 sm:col-span-1' : ''}">
             <dt class="eyebrow">{t.label}</dt>
-            <dd class="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{t.value}</dd>
+            <dd class="mt-1 break-words text-3xl font-bold tabular-nums tracking-tight">{t.value}</dd>
             {#if t.note}{#each t.note as line (line)}<dd class="text-sm text-muted-foreground">{line}</dd>{/each}{/if}
           </div>
         {/each}
