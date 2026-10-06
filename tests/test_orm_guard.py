@@ -47,13 +47,17 @@ def _sqlalchemy_names(tree) -> tuple[set[str], set[str]]:
     return texts, modules
 
 
-RAW_SQL = {"tests/test_monitoring.py": 2}
+RAW_SQL = {
+    ("tests/test_monitoring.py", "INSERT INTO seg VALUES (1, :code)"),
+    ("tests/test_monitoring.py", "INSERT INTO seg VALUES (:id, :code)"),
+}
 
 
 def count(path: str) -> int:
     with open(path, encoding="utf-8") as f:
         src = f.read()
     tree = ast.parse(src)
+    rel = os.path.relpath(path, ROOT).replace(os.sep, "/")
     texts, modules = _sqlalchemy_names(tree)
     scopes = {id(tree): _string_names(tree)}
     parents = {}
@@ -84,6 +88,9 @@ def count(path: str) -> int:
             parent = parents.get(id(node))
             if isinstance(parent, ast.keyword) and parent.arg == "server_default":
                 continue
+            first = node.args[0] if node.args else None
+            if isinstance(first, ast.Constant) and (rel, first.value) in RAW_SQL:
+                continue
             n += 1
     return n
 
@@ -96,10 +103,9 @@ def counts() -> dict[str, int]:
             for fn in sorted(files):
                 if fn.endswith(".py"):
                     p = os.path.join(d, fn)
-                    rel = os.path.relpath(p, ROOT).replace(os.sep, "/")
-                    c = count(p) - RAW_SQL.get(rel, 0)
+                    c = count(p)
                     if c:
-                        out[rel] = c
+                        out[os.path.relpath(p, ROOT).replace(os.sep, "/")] = c
     return dict(sorted(out.items()))
 
 
