@@ -138,6 +138,7 @@ class SegmentTraveler(Base):
     segment_id: Mapped[int]
     person_id: Mapped[int | None]
     name: Mapped[str | None]         # as printed, until it's matched to a person
+    seat: Mapped[str | None]         # this traveller's seat on the segment, as typed
 
 
 class SegmentPort(Base):

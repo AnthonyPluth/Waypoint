@@ -31,6 +31,10 @@ Each segment has a kind (flight, hotel, car, train or cruise), a status (confirm
 
 A segment is added to a trip you name, or without one: Waypoint puts it in the trip it belongs to (see below) or makes a new trip. Flights from before Waypoint can be [imported from another app’s CSV export](/waypoint/start/import/).
 
+## Seats
+
+On a flight or train, each traveller has a seat of their own: tick them in the booking’s edit form and a **Seat** field appears under their name (up to 10 characters, as it reads on the boarding pass). The card shows it beside their name, and the calendar event lists the seats by traveller. A seat counts as an edit of the travellers, so a later email won’t change it. Leaving a seat out when changing who is on a booking keeps it. A seat entered on a booking before this (one for all of them) stays on the booking, and moves to the traveller when the booking has only one and is edited.
+
 ## Actions on a booking
 
 Each booking card has buttons for what you'd do next:

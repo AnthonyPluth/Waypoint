@@ -4720,12 +4720,19 @@
           },
           "name": {
             "type": "string"
+          },
+          "seat": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
           "id",
           "person_id",
-          "name"
+          "name",
+          "seat"
         ],
         "additionalProperties": false
       },
@@ -4739,6 +4746,12 @@
             ]
           },
           "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seat": {
             "type": [
               "string",
               "null"

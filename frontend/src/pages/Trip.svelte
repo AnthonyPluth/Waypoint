@@ -275,7 +275,7 @@
     {#each s.travelers as who (who.id)}
       {@const m = membershipFor(s, who, loyalty)}
       <li class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-        <span class="break-words font-medium">{who.name}</span>
+        <span class="break-words font-medium">{who.name}{#if who.seat}{" "}<span class="font-normal text-muted-foreground">· Seat {who.seat}</span>{/if}</span>
         <span class="text-muted-foreground">
           {#if m?.state === "found"}{m.entry.program} <LoyaltyNumber entry={m.entry} />
           {:else if m?.state === "none"}No {m.program} number yet · <a class="underline" href="#people">add one in People</a>

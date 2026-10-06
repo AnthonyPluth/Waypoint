@@ -183,6 +183,38 @@ class HotelAndCarTests(StatsCase):
                          {"New York": "2026-06-01", "London": "2026-06-02", "Paris": "2026-06-10"})
 
 
+class SeatStatsTests(StatsCase):
+    def flight(self, who, *seats, **extra):
+        people = [{"person_id": p, "name": None, "seat": s} for p, s in zip(who, seats, strict=True)]
+        return self.add(self.jane, {**JFK_LHR, **extra}, travelers=people)
+
+    def test_a_persons_stats_count_their_own_seat_and_the_households_count_everyones(self):
+        self.flight([self.jane.person_id, self.sam.person_id], "12A", "12C")
+        self.flight([self.jane.person_id, self.sam.person_id], "14A", "14B", start_local="2026-07-01T19:00", end_local="2026-07-02T07:10",
+                    details={"flight_number": "BA 113", "seat": "99Z", "cabin": "Business"})
+        everyone, jane, sam = (self.stats(self.jane, person)["flights"] for person in (None, self.jane.person_id, self.sam.person_id))
+        self.assertEqual((everyone["count"], jane["count"], sam["count"]), (2, 2, 2))   # (a flight is counted once, whoever is asked)
+        self.assertEqual(everyone["seat_positions"], {"window": 2, "aisle": 1, "middle": 1, "unknown": 0})   # 12A, 12C, 14A, 14B
+        self.assertEqual(jane["seat_positions"], {"window": 2, "aisle": 0, "middle": 0, "unknown": 0})      # 12A, 14A
+        self.assertEqual((sam["seat_positions"], sam["top_seat"]), ({"window": 0, "aisle": 1, "middle": 1, "unknown": 0}, "12C"))
+        self.assertEqual(jane["top_seat"], "12A")
+
+    def test_a_booking_with_no_traveller_seats_uses_its_booking_seat_once_and_one_with_nothing_is_unknown(self):
+        self.mine({**JFK_LHR, "details": {"flight_number": "BA 112", "seat": "12A"}}, {**LHR_JFK, "details": {"flight_number": "BA 117"}})
+        f = self.stats(self.jane)["flights"]
+        self.assertEqual((f["seat_positions"], f["top_seat"]), ({"window": 1, "aisle": 0, "middle": 0, "unknown": 1}, "12A"))
+
+    def test_a_traveller_without_a_seat_is_not_counted_unknown_when_another_has_one(self):
+        self.flight([self.jane.person_id, self.sam.person_id], "12A", None)
+        f = self.stats(self.jane)["flights"]
+        self.assertEqual(f["seat_positions"], {"window": 1, "aisle": 0, "middle": 0, "unknown": 0})
+
+    def test_a_partner_does_not_count_the_seats_of_a_solo_trip(self):
+        self.add(self.sam, JFK_LHR, travelers=[{"person_id": self.sam.person_id, "name": None, "seat": "1A"}])
+        self.assertEqual(self.stats(self.jane)["flights"]["count"], 0)
+        self.assertEqual(self.stats(self.sam)["flights"]["top_seat"], "1A")
+
+
 class StayFigureTests(StatsCase):
     def stay(self, hotel, city, start, end, **extra):
         return {**HOTEL, "origin": hotel, "destination": city, "start_local": f"{start}T15:00", "end_local": f"{end}T10:00", **extra}

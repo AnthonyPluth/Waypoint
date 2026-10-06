@@ -77,8 +77,11 @@ def _travelers(raw: Any) -> list[trips.TravelerIn]:
     found: list[trips.TravelerIn] = []
     for t in raw:
         pid = t.get("person_id")
-        found.append({"person_id": None if pid is None else _id(pid, "Choose travellers from People"),
-                      "name": _text(t, "name", "traveller’s name", NAME_LIMIT)})
+        one: trips.TravelerIn = {"person_id": None if pid is None else _id(pid, "Choose travellers from People"),
+                                 "name": _text(t, "name", "traveller’s name", NAME_LIMIT)}
+        if "seat" in t:
+            one["seat"] = _text(t, "seat", "seat", trips.SEAT_LIMIT)
+        found.append(one)
     return found
 
 

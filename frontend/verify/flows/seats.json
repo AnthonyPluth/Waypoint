@@ -1,0 +1,42 @@
+{
+  "name": "seats",
+  "page": "trips",
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Trips"
+      }
+    },
+    {
+      "click": "a[href^='#trip/']:has-text('London') >> visible=true"
+    },
+    {
+      "wait_for": "ul[aria-label='Bookings']"
+    },
+    {
+      "expect_text": {
+        "selector": "main",
+        "text": "Seat 31A"
+      }
+    },
+    {
+      "scroll_to": "text=Seat 31A >> nth=0"
+    },
+    {
+      "screenshot": "card"
+    },
+    {
+      "click": "button:has-text('Edit') >> nth=0"
+    },
+    {
+      "wait_for": "[aria-label='Seat of Jane Doe']"
+    },
+    {
+      "scroll_to": "fieldset:has-text('Who\u2019s travelling')"
+    },
+    {
+      "screenshot": "form"
+    }
+  ]
+}

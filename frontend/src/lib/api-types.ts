@@ -626,11 +626,13 @@ export interface Traveler {
   id: number;
   person_id: number | null;
   name: string;
+  seat: string | null;
 }
 
 export interface TravelerBody {
   person_id?: number | null;
   name?: string | null;
+  seat?: string | null;
 }
 
 export interface Trip {

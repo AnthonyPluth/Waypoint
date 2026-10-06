@@ -16,7 +16,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Literal, TypedDict, cast
+from typing import Literal, NotRequired, TypedDict, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import delete, select, update
@@ -35,6 +35,7 @@ TIME_UNKNOWN = "time_unknown"
 # imported flight whose file gave no times: it starts and ends at midnight of its day and counts in distance, not time.
 ADDRESS_LIMIT = 300   # the longest address kept
 MAX_PORTS = 40       # a cruise's most ports of call
+SEAT_LIMIT = 10        # the longest seat kept
 DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone", "ship", "deck", TIME_UNKNOWN)
 
 
@@ -66,6 +67,7 @@ class TravelerIn(TypedDict):
     """Someone on a segment: a person (`person_id`), and/or a name as printed on the booking."""
     person_id: int | None
     name: str | None
+    seat: NotRequired[str | None]   # their seat (left out: whatever it was stays; None or empty: none)
 
 
 class PortIn(TypedDict):
@@ -109,6 +111,7 @@ class TravelerOut(TypedDict):
     id: int
     person_id: int | None
     name: str                  # the person's display name, or the name as printed
+    seat: str | None           # their seat on this segment
 
 
 class SegmentOut(TypedDict):
@@ -379,8 +382,24 @@ def _travelers(conn: db.Connection, given: Sequence[TravelerIn]) -> list[Travele
         key: object = pid if pid is not None else (name or "").casefold()
         if key not in seen:
             seen.add(key)
-            kept.append({"person_id": pid, "name": name})
+            one: TravelerIn = {"person_id": pid, "name": name}
+            if "seat" in t:
+                seat = (t["seat"] or "").strip()
+                if len(seat) > SEAT_LIMIT:
+                    raise Invalid(f"A seat is at most {SEAT_LIMIT} characters")
+                one["seat"] = seat or None
+            kept.append(one)
     return kept
+
+
+def _stored(rows: Sequence[SegmentTraveler]) -> list[TravelerIn]:
+    return [{"person_id": t.person_id, "name": t.name, "seat": t.seat} for t in rows]
+
+
+def _keep_seats(given: list[TravelerIn], old: Sequence[TravelerIn]) -> list[TravelerIn]:
+    """The travellers as given, each that doesn't say its seat keeping the seat it had."""
+    seats = {_who(t): t.get("seat") for t in old}
+    return [t if "seat" in t else {**t, "seat": seats.get(_who(t))} for t in given]
 
 
 # ------------------------------------------------------------------------------------------------ reading
@@ -392,7 +411,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
     by_segment: dict[int, list[TravelerOut]] = {}
     for t in travs:
         shown = names.get(t.person_id, "") if t.person_id is not None else ""
-        by_segment.setdefault(t.segment_id, []).append({"id": t.id, "person_id": t.person_id, "name": shown or t.name or ""})
+        by_segment.setdefault(t.segment_id, []).append({"id": t.id, "person_id": t.person_id, "name": shown or t.name or "", "seat": t.seat})
     def last_name(s: Segment) -> str | None:
         who = by_segment.get(s.id, [])
         return who[0]["name"].split()[-1] if who and who[0]["name"] else None
@@ -563,12 +582,20 @@ def refresh(conn: db.Connection, trip: Trip) -> None:
 def _set_travelers(conn: db.Connection, segment_id: int, travelers: Sequence[TravelerIn]) -> None:
     conn.execute(delete(SegmentTraveler).where(SegmentTraveler.segment_id == segment_id))
     for t in travelers:
-        conn.orm.add(SegmentTraveler(segment_id=segment_id, person_id=t["person_id"], name=t["name"]))
+        conn.orm.add(SegmentTraveler(segment_id=segment_id, person_id=t["person_id"], name=t["name"], seat=t.get("seat")))
     conn.orm.flush()
 
 
-def _key(t: TravelerIn) -> tuple[int, str]:
-    return (t["person_id"] if t["person_id"] is not None else -1, t["name"] or "")
+def _who(t: TravelerIn) -> tuple[int, str]:
+    """Which traveller (not their seat): a person by who they are (a row matched from a printed name keeps that name, and a
+    client may not send it), a name as printed compared without case."""
+    if t["person_id"] is not None:
+        return (t["person_id"], "")
+    return (-1, (t["name"] or "").strip().casefold())
+
+
+def _key(t: TravelerIn) -> tuple[int, str, str]:
+    return (*_who(t), t.get("seat") or "")
 
 
 def _involves(travelers: Sequence[TravelerIn], booker: int | None) -> frozenset[int]:
@@ -626,8 +653,8 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
     seg = visibility.visible_segment(conn, viewer, segment_id)
     if seg is None:
         return None
-    old: list[TravelerIn] = [{"person_id": t.person_id, "name": t.name} for t in conn.orm.scalars(
-        select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id).order_by(SegmentTraveler.id)).all()]
+    old: list[TravelerIn] = _stored(conn.orm.scalars(
+        select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id).order_by(SegmentTraveler.id)).all())
     ports_before = ports_of(conn, [seg.id]).get(seg.id, [])
     before = _current(seg, old, ports_before)
     merged: SegmentIn = {**before, **changes}
@@ -644,7 +671,7 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
             merged[zone] = None   # type: ignore[literal-required]   # the old place's zone isn't the new one's
     values = check(conn, merged)
     ports = check_itinerary(merged.get("kind") or "", merged.get("itinerary") or [], _span(values, "start"), _span(values, "end"))
-    travelers = _travelers(conn, merged.get("travelers") or [])
+    travelers = _keep_seats(_travelers(conn, merged.get("travelers") or []), old)
     changed = [f for f in FIELDS if f in values and (decode_details(values[f]) != decode_details(seg.details) if f == "details"
                                                     else values[f] != getattr(seg, f))]
     if sorted(map(_key, travelers)) != sorted(map(_key, old)):
@@ -709,8 +736,8 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
             raise Invalid("The booking couldn’t be added")
         return "added"
     seg = found[0]
-    old: list[TravelerIn] = [{"person_id": t.person_id, "name": t.name} for t in conn.orm.scalars(
-        select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id).order_by(SegmentTraveler.id)).all()]
+    old: list[TravelerIn] = _stored(conn.orm.scalars(
+        select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id).order_by(SegmentTraveler.id)).all())
     locked = decode_locked(seg.locked_fields)
     # (an email that doesn't say who runs the booking or where to manage it doesn't take what the segment has away)
     given: SegmentIn = {**fields}
@@ -753,8 +780,8 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn,
         seg.check_times = bool(fields.get("check_times"))   # (times a person edited or confirmed stand as they are)
         changed.append("check_times")
     if "travelers" not in locked:
-        have = {_key(t) for t in old}
-        extra = [t for t in _travelers(conn, fields.get("travelers") or []) if _key(t) not in have
+        have = {_who(t) for t in old}
+        extra = [t for t in _travelers(conn, fields.get("travelers") or []) if _who(t) not in have
                  and not (t["person_id"] is None and any(o["person_id"] is None and (o["name"] or "").casefold() == (t["name"] or "").casefold()
                                                          for o in old))]
         if extra:

@@ -54,6 +54,7 @@ class Seg:
     provider: str | None
     details: Mapping[str, str] = field(default_factory=dict)
     ports: Sequence[trips.PortIn] = ()   # a cruise's ports of call
+    seats: Sequence[str] = ()            # the seats of the travellers counted (a person's own; the household's, every traveller's), as typed
 
 
 class Named(TypedDict):
@@ -270,10 +271,13 @@ def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Map
         cabin = (s.details.get("cabin") or "").strip()
         if cabin:
             cabins[cabin.title() if cabin.islower() or cabin.isupper() else cabin] += 1
-        seat = re.sub(r"\s+", "", s.details.get("seat") or "").upper()
-        if seat:
-            seats[seat] += 1
-        positions[seat_position(seat)] += 1
+        # Each counted traveller's own seat; a booking with none of theirs has its booking seat, once.
+        own = [t for t in (re.sub(r"\s+", "", x).upper() for x in s.seats) if t]
+        booking = re.sub(r"\s+", "", s.details.get("seat") or "").upper()
+        for seat in own or ([booking] if booking else [""]):
+            if seat:
+                seats[seat] += 1
+            positions[seat_position(seat)] += 1
     airports_out: list[AirportVisit] = []
     for code, n in sorted(visits.items(), key=lambda kv: (-kv[1], kv[0])):
         a = known.get(code)
@@ -461,13 +465,17 @@ def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: in
     if person_id is not None and people.get(conn, person_id) is None:
         return None
     segments = [s for s in visibility.visible_segments(conn, viewer) if s.status != "cancelled"]
+    travelling = visibility.visible_travelers(conn, viewer, [s.id for s in segments])
     if person_id is not None:
-        on = {t.segment_id for t in visibility.visible_travelers(conn, viewer, [s.id for s in segments])
-              if t.person_id == person_id}
+        on = {t.segment_id for t in travelling if t.person_id == person_id}
         segments = [s for s in segments if s.id in on]
+    seats_of: dict[int, list[str]] = {}
+    for t in travelling:
+        if t.seat and (person_id is None or t.person_id == person_id):
+            seats_of.setdefault(t.segment_id, []).append(t.seat)
     ports = trips.ports_of(conn, [s.id for s in segments if s.kind == "cruise"])
     seen = [Seg(s.kind, s.start_local, s.start_zone, s.end_local, s.end_zone, s.origin, s.destination, s.provider,
-                trips.decode_details(s.details), ports.get(s.id, [])) for s in segments]
+                trips.decode_details(s.details), ports.get(s.id, []), seats_of.get(s.id, [])) for s in segments]
     codes = {(p or "").upper() for s in seen if s.kind == "flight" for p in (s.origin, s.destination)}
     known = {a.code: a for a in conn.orm.scalars(select(Airport).where(Airport.code.in_(sorted(codes)))).all()}
     prefixes = {c for s in seen if s.kind == "flight" and (c := _airline_code(s))}
