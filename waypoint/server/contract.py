@@ -559,6 +559,13 @@ class StatsAirline(TypedDict):
     flights: int
 
 
+class StatsMapTrip(TypedDict):
+    trip_id: int
+    name: str
+    start: str                      # the local date, YYYY-MM-DD: a flight's departure, a stay's check-in
+    end: str                        # a flight's arrival, a stay's check-out
+
+
 class StatsRoute(TypedDict):
     a: str                          # A–B and B–A are one route
     b: str
@@ -568,6 +575,7 @@ class StatsRoute(TypedDict):
     a_longitude: float | None
     b_latitude: float | None
     b_longitude: float | None
+    trips: list[StatsMapTrip]       # each flight on it, earliest first
 
 
 class StatsFlightRecord(TypedDict):
@@ -617,6 +625,16 @@ class StatsStayRecord(TypedDict):
     start_local: str                # check-in, local
 
 
+class StatsStayPin(TypedDict):
+    city: str
+    country: str | None             # an ISO code
+    latitude: float                 # roughly the city (its airports' middle); never the hotel's address
+    longitude: float
+    stays: int
+    nights: int
+    trips: list[StatsMapTrip]       # each stay, earliest first
+
+
 class StatsStays(TypedDict):
     nights: int
     chains: list[StatsNamed]
@@ -630,6 +648,7 @@ class StatsStays(TypedDict):
     most_visited_hotel: StatsStayPlace | None
     most_visited_city: StatsStayPlace | None
     busiest_month: str | None       # YYYY-MM, the month with the most nights away
+    pins: list[StatsStayPin]        # the cities stayed in that have a place on the map, most nights first
 
 
 class StatsCars(TypedDict):
