@@ -99,6 +99,8 @@ class Limits(unittest.TestCase):
         out = clean("<div>" * 500 + "deep")
         self.assertLessEqual(out.count("<div>"), safe_html.MAX_DEPTH)
         self.assertEqual(out.count("<div>"), out.count("</div>"))
+        self.assertEqual(clean("<div>" * 45 + "deep" + "</div>" * 45).count("</div>"), safe_html.MAX_DEPTH)
+        self.assertTrue(clean("<div>" * 45 + "deep" + "</div>" * 45 + "<p>after</p>").endswith("</div><p>after</p>"))   # (the cut-off tags' ends don't close the outer ones early)
         clean("<<>><a href=><td colspan=\"<b>\">&#xZZ; <!-- <p> -->")
 
 

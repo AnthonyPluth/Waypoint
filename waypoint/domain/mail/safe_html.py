@@ -40,7 +40,7 @@ class _Clean(HTMLParser):
     def __init__(self, limit: int) -> None:
         super().__init__(convert_charrefs=True)
         self.out: list[str] = []
-        self.open: list[str] = []
+        self.open: list[tuple[str, bool]] = []   # (tag, whether it was written: a tag past MAX_DEPTH is only counted)
         self.skip: list[str] = []
         self.limit = limit
         self.size = 0
@@ -62,9 +62,11 @@ class _Clean(HTMLParser):
         elif tag in KEEP and not self.cut:
             if tag in VOID:
                 self.out.append(f"<{tag}>")
-            elif len(self.open) < MAX_DEPTH:
-                self.out.append(f"<{tag}{self._attributes(tag, dict(attrs))}>")
-                self.open.append(tag)
+            else:
+                shown = len(self.open) < MAX_DEPTH
+                if shown:
+                    self.out.append(f"<{tag}{self._attributes(tag, dict(attrs))}>")
+                self.open.append((tag, shown))
 
     def handle_startendtag(self, tag: str, attrs: Any) -> None:
         if tag in DROP and not self.skip:
@@ -79,9 +81,11 @@ class _Clean(HTMLParser):
                 while self.skip and self.skip.pop() != tag:
                     pass
             return
-        if tag in self.open:   # (closes what an unclosed tag left open, and ignores a stray end tag)
+        if any(t == tag for t, _ in self.open):   # (closes what an unclosed tag left open, and ignores a stray end tag)
             while self.open:
-                self.out.append(f"</{(last := self.open.pop())}>")
+                last, shown = self.open.pop()
+                if shown:
+                    self.out.append(f"</{last}>")
                 if last == tag:
                     break
 
@@ -114,5 +118,7 @@ def clean(html: str, limit: int) -> tuple[str, bool]:
     except (ValueError, RecursionError, AssertionError):
         pass
     while parser.open:
-        parser.out.append(f"</{parser.open.pop()}>")
+        last, shown = parser.open.pop()
+        if shown:
+            parser.out.append(f"</{last}>")
     return "".join(parser.out), parser.cut
