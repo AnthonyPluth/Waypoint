@@ -65,7 +65,7 @@
   const subject = (i: ReviewItem) => i.subject || `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
 
   // The form to add one by hand: what the email can tell (who it's from) filled in, the rest typed as on the booking.
-  type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string };
+  type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; address: string };
   let draft = $state<Draft | null>(null);
   let formError = $state("");
   let saving = $state(false);
@@ -75,8 +75,8 @@
     const s = use ? item.suggestion : null;
     draft = s
       ? { item, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
-          destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "" }
-      : { item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "" };
+          destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", address: "" }
+      : { item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", address: "" };
     formError = "";
     void peek(item);   // (the message beside the form, so the details are read and typed in one place: for everyone who sees the item)
   };
@@ -129,9 +129,10 @@
     const d = draft;
     if (!d) return;
     const flight = d.kind === "flight";
+    if (d.kind === "hotel" && !d.startZone.trim() && !d.address.trim()) { formError = "Enter the hotel’s time zone (for example America/New_York), or its address to work it out from"; return; }
     // The times are typed as they read on the booking, with no offset, and kept where they happen.
     const body = { kind: d.kind as "flight" | "hotel" | "car" | "train", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
-      destination: d.destination, ...(flight ? {} : d.kind === "hotel" ? { start_zone: d.startZone.trim() || null } : { start_zone: d.startZone, end_zone: d.endZone || d.startZone }) };
+      destination: d.destination, ...(flight ? {} : d.kind === "hotel" ? { start_zone: d.startZone.trim() || null, ...(d.address.trim() && { details: { address: d.address.trim() } }) } : { start_zone: d.startZone, end_zone: d.endZone || d.startZone }) };
     let added = false;
     const ok = await act(async () => {
       const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
@@ -255,9 +256,12 @@
                   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off time" : "Arrives"}</span>
                     <Input type="datetime-local" bind:value={d.end} required /></label>
                   {#if d.kind === "hotel"}
+                    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Address</span>
+                      <Input bind:value={d.address} maxlength={300} autocomplete="off" />
+                      <span class="text-muted-foreground">Waypoint works the time zone out from it when you leave the time zone empty.</span></label>
                     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>
                       <Input bind:value={d.startZone} maxlength={64} autocomplete="off" spellcheck={false} placeholder="America/New_York" />
-                      <span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address.</span></label>
+                      <span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address above.</span></label>
                   {:else if d.kind !== "flight"}
                     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it starts</span>
                       <Input bind:value={d.startZone} required maxlength={64} autocomplete="off" spellcheck={false} placeholder="America/New_York" /></label>

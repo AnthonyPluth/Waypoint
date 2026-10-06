@@ -158,15 +158,29 @@ describe("Review", () => {
     expect(calls.find(([p]) => p === "/api/segments")?.[2]).not.toHaveProperty("end_zone");
   });
 
-  it("leaves a stay’s zone empty for the server to work out from the address", async () => {
+  it("sends a stay’s address, and no zone, for the server to work the zone out from", async () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
     await userEvent.selectOptions(screen.getByLabelText("What is it?"), "hotel");
-    await userEvent.type(screen.getByLabelText("Hotel"), "Harbour Hotel, 1 Quay Road, Bristol BS1 4AA, UK");
+    await userEvent.type(screen.getByLabelText("Hotel"), "Harbour Hotel");
+    await userEvent.type(screen.getByLabelText(/^Address/), "1 Quay Road, Bristol BS1 4AA, UK");
     await userEvent.type(screen.getByLabelText("Check-in"), "2026-11-21T15:00");
     await userEvent.type(screen.getByLabelText("Check-out"), "2026-11-27T10:00");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
-    await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({ kind: "hotel", start_zone: null })]));
+    await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({
+      kind: "hotel", start_zone: null, details: { address: "1 Quay Road, Bristol BS1 4AA, UK" } })]));
+  });
+
+  it("asks for a zone or an address for a stay, and sends nothing without either", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.selectOptions(screen.getByLabelText("What is it?"), "hotel");
+    await userEvent.type(screen.getByLabelText("Hotel"), "Harbour Hotel");
+    await userEvent.type(screen.getByLabelText("Check-in"), "2026-11-21T15:00");
+    await userEvent.type(screen.getByLabelText("Check-out"), "2026-11-27T10:00");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("time zone");
+    expect(calls.some(([p]) => p === "/api/segments")).toBe(false);
   });
 
   it("shows why a booking wasn’t added, and keeps what was typed", async () => {
