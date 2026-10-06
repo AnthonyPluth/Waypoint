@@ -242,6 +242,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_logos.py",
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_routes.py",

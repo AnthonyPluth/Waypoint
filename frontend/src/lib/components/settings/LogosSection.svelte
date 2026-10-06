@@ -39,7 +39,7 @@
 
 <section aria-labelledby="logos-title" class="space-y-2">
   <h2 id="logos-title" class="eyebrow px-1">Brand logos</h2>
-  <p class="px-1 text-sm text-muted-foreground">Optional. Shows the logo of each booking’s airline, hotel, rental company or cruise line. Waypoint asks <a class="underline" href="https://www.logo.dev" target="_blank" rel="noopener">Logo.dev</a> for each logo once and keeps it, so your browser never contacts Logo.dev. Logo.dev is told the brand’s name and your key, nothing else: no traveller, date or confirmation code, but it does learn which brands you book. Get a free publishable key (<code class="code rounded bg-muted px-1 normal-case tracking-normal">pk_…</code>) from Logo.dev.</p>
+  <p class="px-1 text-sm text-muted-foreground">Optional. Shows the logo of each booking’s airline, hotel, rental company or cruise line. Waypoint asks <a class="underline" href="https://www.logo.dev" target="_blank" rel="noopener">Logo.dev</a> for each logo once and keeps it, and a hotel’s own brand (Hyatt Place, Courtyard) from Wikidata and Wikimedia Commons, so your browser never contacts any of them. They are told the brand’s name (and Logo.dev your key), nothing else: no traveller, date or confirmation code, but they do learn which brands you book. Get a free publishable key (<code class="code rounded bg-muted px-1 normal-case tracking-normal">pk_…</code>) from Logo.dev.</p>
   <div class="rows">
     {#if problem}
       <div class="row"><p class="text-sm text-signal-ink" role="status">{problem}</p><Button variant="outline" onclick={load}>Try again</Button></div>

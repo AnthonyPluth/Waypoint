@@ -181,7 +181,7 @@ class LogoDevStatus(TypedDict):
     configured: bool                # a publishable key is saved (the key itself never comes back)
     searchable: bool                # a secret key is saved too: Brand Search picks the brand
     with_logo: int                  # brands that have a logo
-    unknown: int                    # brands Logo.dev has none for
+    unknown: int                    # brands that have no logo at the services asked
     waiting: int                    # brands not asked about yet
     last_error: str | None          # why the last round failed (fixed text)
 
@@ -293,6 +293,7 @@ class Segment(TypedDict):
     travelers: list[Traveler]
     itinerary: list[Port]           # a cruise's ports of call in order (empty for anything else)
     logo: str | None                # where Waypoint serves its brand's logo (the airline, hotel, rental company or cruise line), when it has one
+    logo_label: str | None          # a hotel brand's name ("Hyatt Regency") when the logo is its group's, not the brand's own; else null
     links: SegmentLinks              # the card's actions, built by the server
 
 
