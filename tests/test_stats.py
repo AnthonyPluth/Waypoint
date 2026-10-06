@@ -191,6 +191,12 @@ class CabinGroupTests(StatsCase):
                             ("Business Class", "Business"), ("Polaris", "Business"), ("First", "First"), ("First Class", "First")):
             self.assertEqual(stats.cabin_group(name), group, name)
 
+    def test_a_keyword_inside_another_word_is_not_a_match_and_an_accent_is_kept(self):
+        for name in ("Minted Seat", "Remain Seat", "Delight Seat", "Firstborn Seat", "Flexible Seat"):
+            self.assertEqual(stats.cabin_group(name), name, name)
+        self.assertEqual(stats.cabin_group("La Première"), "First")
+        self.assertEqual(stats.cabin_group("Comfort+ Extra"), "Premium Economy")
+
     def test_a_name_with_none_of_the_words_stays_as_written(self):
         self.assertEqual(stats.cabin_group("Zeta Seat"), "Zeta Seat")
         self.assertEqual(stats.cabin_group("zeta seat"), "Zeta Seat")

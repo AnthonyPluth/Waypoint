@@ -221,7 +221,7 @@ def _in(day: date, year: int | None) -> bool:
 
 
 CABIN_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("First", ("first", "la premiere")),
+    ("First", ("first", "la premiere", "la première")),
     ("Business", ("business", "polaris", "delta one", "upper class", "club world", "club europe", "club class", "flagship", "mint")),
     ("Premium Economy", ("premium", "comfort+", "comfort plus", "economy plus", "main cabin extra", "world traveller plus")),
     ("Economy", ("economy", "coach", "main", "basic", "standard", "saver", "tango", "wanna get away", "anytime", "light", "flex",
@@ -235,7 +235,7 @@ def cabin_group(cabin: str) -> str:
     words stays as written, so an unfamiliar one still shows."""
     low = cabin.casefold()
     for group, words in CABIN_GROUPS:
-        if any(w in low for w in words):
+        if any(re.search(rf"(?<![a-z0-9]){re.escape(w)}(?![a-z0-9])", low) for w in words):
             return group
     return cabin.title() if cabin.islower() or cabin.isupper() else cabin
 
