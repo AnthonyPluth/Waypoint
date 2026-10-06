@@ -3,13 +3,13 @@
 import { geoContains, geoEqualEarth, geoPath, type GeoProjection } from "d3-geo";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import type { GeometryCollection, Topology } from "topojson-specification";
-import type { StatsAirport, StatsFlights, StatsRoute } from "./api-types";
+import type { StatsAirport, StatsFlights, StatsMapTrip, StatsRoute, StatsStayPin } from "./api-types";
 
 export const MAP_WIDTH = 960;
 export const MAP_HEIGHT = 500;
 
 export type Dot = { code: string; name: string; city: string | null; visits: number; x: number; y: number; r: number; label: string };
-export type Arc = { key: string; a: string; b: string; flights: number; d: string; width: number; label: string };
+export type Arc = { key: string; a: string; b: string; flights: number; d: string; width: number; label: string; trips: StatsMapTrip[] };
 
 /** A projection that keeps the whole world in the map's box. */
 export function worldProjection(width = MAP_WIDTH, height = MAP_HEIGHT): GeoProjection {
@@ -59,7 +59,7 @@ export function arcs(routes: StatsRoute[], projection: GeoProjection): Arc[] {
   for (const r of routes) {
     const d = arcPath(r, path);
     if (!d) continue;
-    out.push({ key: `${r.a}-${r.b}`, a: r.a, b: r.b, flights: r.flights, d, width: arcWidth(r.flights, most), label: `${r.a} – ${r.b}: ${plural(r.flights, "flight", "flights")}` });
+    out.push({ key: `${r.a}-${r.b}`, a: r.a, b: r.b, flights: r.flights, d, width: arcWidth(r.flights, most), label: `${r.a} – ${r.b}: ${plural(r.flights, "flight", "flights")}`, trips: r.trips });
   }
   return out.sort((x, y) => x.flights - y.flights);
 }
@@ -82,10 +82,11 @@ export function zoomAt(t: Transform, factor: number, px: number, py: number, wid
   return clampPan({ k, x: px - ((px - t.x) / t.k) * k, y: py - ((py - t.y) / t.k) * k }, width, height);
 }
 
-/** The box (in the map's own units) around everything flown: every airport with coordinates and every route's path, or null when
+/** The box (in the map's own units) around everything flown and stayed in: every airport with coordinates, every route's path and every stay's pin, or null when
  *  there is nothing to show. */
-export function flownBounds(flights: StatsFlights, projection: GeoProjection): [[number, number], [number, number]] | null {
+export function flownBounds(flights: StatsFlights, projection: GeoProjection, pins: StatsStayPin[] = []): [[number, number], [number, number]] | null {
   const geometries: Geometry[] = [];
+  for (const p of pins) geometries.push({ type: "Point", coordinates: [p.longitude, p.latitude] });
   for (const a of flights.airports) if (placed(a)) geometries.push({ type: "Point", coordinates: [a.longitude, a.latitude] });
   for (const r of flights.routes) {
     if (r.a_latitude === null || r.a_longitude === null || r.b_latitude === null || r.b_longitude === null) continue;
@@ -116,13 +117,32 @@ export function clampPan(t: Transform, width = MAP_WIDTH, height = MAP_HEIGHT): 
 /** The ISO country codes' outlines that contain one of these airports: the countries shaded as visited. Needs the outlines
  *  (GeoJSON features), so it lives with the data the component loads. */
 export function visitedFeatureIds<F extends { id?: string | number }>(
-  airports: StatsAirport[], features: F[], contains: (f: F, lonLat: [number, number]) => boolean,
+  points: [number, number][], features: F[], contains: (f: F, lonLat: [number, number]) => boolean,
 ): Set<string | number> {
   const out = new Set<string | number>();
-  for (const a of airports) {
-    if (!placed(a)) continue;
-    const f = features.find((x) => x.id !== undefined && contains(x, [a.longitude, a.latitude]));
+  for (const p of points) {
+    const f = features.find((x) => x.id !== undefined && contains(x, p));
     if (f?.id !== undefined) out.add(f.id);
+  }
+  return out;
+}
+
+/** Where you've been, as [longitude, latitude]: every airport flown with coordinates, and every city stayed in. */
+export function visitedPoints(airports: StatsAirport[], pins: StatsStayPin[]): [number, number][] {
+  return [...airports.filter(placed).map((a): [number, number] => [a.longitude, a.latitude]), ...pins.map((p): [number, number] => [p.longitude, p.latitude])];
+}
+
+/** A stay's pin on the map. */
+export type Pin = { key: string; city: string; stays: number; nights: number; x: number; y: number; label: string; trips: StatsMapTrip[] };
+
+/** The pins, most nights first, each at its city's place; the label names the city and what was spent there. */
+export function pins(stays: StatsStayPin[], projection: GeoProjection): Pin[] {
+  const out: Pin[] = [];
+  for (const p of stays) {
+    const at = projection([p.longitude, p.latitude]);
+    if (!at) continue;
+    out.push({ key: `${p.city}-${p.country ?? ""}`, city: p.city, stays: p.stays, nights: p.nights, x: at[0], y: at[1], trips: p.trips,
+      label: `${p.city}: ${plural(p.stays, "stay", "stays")}, ${plural(p.nights, "night", "nights")}` });
   }
   return out;
 }
@@ -136,9 +156,19 @@ export async function loadCountries(): Promise<Country[]> {
   return (feature(topology, topology.objects.countries) as FeatureCollection<Geometry, { name?: string }>).features as Country[];
 }
 
-/** Each country's outline as an SVG path, with whether one of these airports is in it. */
-export function outlinePaths(countries: Country[], airports: StatsAirport[], projection: GeoProjection): { d: string; visited: boolean }[] {
+/** The bundled US state outlines (us-atlas, from the Census Bureau, public domain), a separate download from the countries. */
+export async function loadStates(): Promise<Country[]> {
+  const [{ feature }, atlas] = await Promise.all([import("topojson-client"), import("us-atlas/states-10m.json")]);
+  const topology = atlas.default as unknown as Topology<{ states: GeometryCollection<{ name?: string }> }>;
+  return (feature(topology, topology.objects.states) as FeatureCollection<Geometry, { name?: string }>).features as Country[];
+}
+
+/** The United States' id in the country outlines (ISO 3166-1 numeric): shaded by state instead, once the states are drawn. */
+export const US_ID = "840";
+
+/** Each country's outline as an SVG path, with whether one of these places is in it. */
+export function outlinePaths(countries: Country[], points: [number, number][], projection: GeoProjection): { d: string; visited: boolean }[] {
   const path = geoPath(projection);
-  const visited = visitedFeatureIds(airports, countries, (f, p) => geoContains(f, p));
+  const visited = visitedFeatureIds(points, countries, (f, p) => geoContains(f, p));
   return countries.map((c) => ({ d: path(c) ?? "", visited: visited.has(c.id ?? "") }));
 }

@@ -1,0 +1,12 @@
+{
+  "name": "stats-map-details",
+  "page": "stats",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Stats" } },
+    { "wait_for": "[data-state][data-visited]" },
+    { "scroll_to": "#stats-map-slot" },
+    { "click": "[data-testid='arcs'] [aria-label^='JFK – MCO'] path >> nth=1" },
+    { "wait_for": "[data-testid='map-trips']" },
+    { "screenshot": "route-trips" }
+  ]
+}

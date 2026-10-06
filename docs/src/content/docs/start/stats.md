@@ -38,9 +38,11 @@ A flight’s airline comes from the two-character code its flight number starts 
 
 ## The map
 
-The Stats page draws a world map of everywhere you have flown, for the same person and year as the rest of the page: an arc for each route (thicker for more flights), a dot for each airport (bigger for more visits), and the countries that hold one of your airports shaded. Tap or hover a dot or an arc for its name and count; The map opens zoomed to just the places you have flown (the whole world when they span it), and follows the person and year you pick; drag, pinch or use the buttons to zoom, **Reset** to go back to that view and **World** to see the whole world. Hotel cities without an airport aren’t plotted, and neither is an airport Waypoint doesn’t have coordinates for.
+The Stats page draws a world map of everywhere you have flown and stayed, for the same person and year as the rest of the page: an arc for each route (thicker for more flights), a dot for each airport (bigger for more visits), a small diamond for each city you stayed in, and the countries that hold one of those shaded. The United States is shaded state by state: a state is filled when one of your airports or hotel cities is in it, and the rest of the country is not.
 
-The map is drawn on your device from country outlines bundled with the app ([Natural Earth](https://www.naturalearthdata.com/), public domain, through the `world-atlas` package). It loads no tiles and calls no map service, so no one outside learns where the household goes. Its code and outlines are downloaded only when you open the Stats page.
+Tap or hover a dot, an arc or a diamond for its name and count. Tap an arc or a diamond and the trips on it are listed under the map, each with its name (a link to the trip) and when it happened: a flight’s dates for a route, check-in to check-out for a stay. A stay is placed at the city, roughly where that city’s airports are, never at the hotel’s address; a city with no airport Waypoint knows isn’t plotted, and neither is an airport Waypoint doesn’t have coordinates for. The map opens zoomed to just the places you have been (the whole world when they span it), and follows the person and year you pick; drag, pinch or use the buttons to zoom, **Reset** to go back to that view and **World** to see the whole world.
+
+The map is drawn on your device from outlines bundled with the app: countries from [Natural Earth](https://www.naturalearthdata.com/) (public domain, through the `world-atlas` package) and US states from the Census Bureau (public domain, through `us-atlas`). It loads no tiles and calls no map service, so no one outside learns where the household goes. Its code and outlines are downloaded only when you open the Stats page.
 
 ## Year in review
 

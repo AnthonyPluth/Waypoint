@@ -183,6 +183,32 @@ class HotelAndCarTests(StatsCase):
                          {"New York": "2026-06-01", "London": "2026-06-02", "Paris": "2026-06-10"})
 
 
+class MapDetailTests(StatsCase):
+    def test_a_route_lists_each_flight_with_its_trip_and_dates(self):
+        self.mine(JFK_LHR, LHR_JFK)
+        route = self.stats(self.jane)["flights"]["routes"][0]
+        self.assertEqual([(t["start"], t["end"]) for t in route["trips"]], [("2026-06-01", "2026-06-02"), ("2026-06-08", "2026-06-08")])
+        names = {t["id"]: t["name"] for t in trips.listing(self.c, self.jane)}
+        self.assertTrue(all(t["name"] == names[t["trip_id"]] for t in route["trips"]))
+
+    def test_a_stay_is_pinned_at_its_city_with_its_trip_and_dates(self):
+        self.mine(HOTEL)
+        (pin,) = self.stats(self.jane)["stays"]["pins"]
+        self.assertEqual((pin["city"], pin["country"], pin["stays"], pin["nights"]), ("London", "GB", 1, 6))
+        self.assertAlmostEqual(pin["latitude"], 51.5, delta=0.6)
+        self.assertAlmostEqual(pin["longitude"], 0.0, delta=0.9)
+        self.assertEqual([(t["start"], t["end"]) for t in pin["trips"]], [("2026-06-02", "2026-06-08")])
+
+    def test_a_stay_in_a_city_with_no_airport_has_no_pin_and_a_same_day_stay_none_either(self):
+        self.mine({**HOTEL, "destination": "Nowhereville"}, {**HOTEL, "end_local": "2026-06-02T21:00"})
+        self.assertEqual(self.stats(self.jane)["stays"]["pins"], [])
+
+    def test_the_details_leave_out_a_trip_the_viewer_is_not_on(self):
+        self.mine(JFK_LHR, HOTEL)
+        got = self.stats(Viewer(self.mia))
+        self.assertEqual((got["flights"]["routes"], got["stays"]["pins"]), ([], []))
+
+
 class SeatStatsTests(StatsCase):
     def flight(self, who, *seats, **extra):
         people = [{"person_id": p, "name": None, "seat": s} for p, s in zip(who, seats, strict=True)]

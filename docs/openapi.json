@@ -4494,6 +4494,30 @@
         ],
         "additionalProperties": false
       },
+      "StatsMapTrip": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "end": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "trip_id",
+          "name",
+          "start",
+          "end"
+        ],
+        "additionalProperties": false
+      },
       "StatsNamed": {
         "type": "object",
         "properties": {
@@ -4593,6 +4617,12 @@
               "number",
               "null"
             ]
+          },
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsMapTrip"
+            }
           }
         },
         "required": [
@@ -4603,7 +4633,8 @@
           "a_latitude",
           "a_longitude",
           "b_latitude",
-          "b_longitude"
+          "b_longitude",
+          "trips"
         ],
         "additionalProperties": false
       },
@@ -4628,6 +4659,48 @@
           "aisle",
           "middle",
           "unknown"
+        ],
+        "additionalProperties": false
+      },
+      "StatsStayPin": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "stays": {
+            "type": "integer"
+          },
+          "nights": {
+            "type": "integer"
+          },
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsMapTrip"
+            }
+          }
+        },
+        "required": [
+          "city",
+          "country",
+          "latitude",
+          "longitude",
+          "stays",
+          "nights",
+          "trips"
         ],
         "additionalProperties": false
       },
@@ -4758,6 +4831,12 @@
               "string",
               "null"
             ]
+          },
+          "pins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsStayPin"
+            }
           }
         },
         "required": [
@@ -4772,7 +4851,8 @@
           "longest",
           "most_visited_hotel",
           "most_visited_city",
-          "busiest_month"
+          "busiest_month",
+          "pins"
         ],
         "additionalProperties": false
       },

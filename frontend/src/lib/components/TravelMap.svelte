@@ -1,41 +1,53 @@
 <script lang="ts">
   import { geoContains, geoPath } from "d3-geo";
   import { errMsg } from "$lib/act";
-  import type { StatsFlights } from "$lib/api-types";
+  import type { StatsFlights, StatsMapTrip, StatsStayPin } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
-  import { clampPan, fitBox, flownBounds, IDENTITY, loadCountries, MAP_HEIGHT, MAP_WIDTH, mapData, visitedFeatureIds, worldProjection, zoomAt, type Country, type Transform } from "$lib/map";
+  import { clampPan, fitBox, flownBounds, IDENTITY, loadCountries, loadStates, MAP_HEIGHT, MAP_WIDTH, mapData, pins as stayPins, US_ID, visitedFeatureIds, visitedPoints, worldProjection, zoomAt, type Country, type Transform } from "$lib/map";
+  import { dateLabel } from "$lib/trips";
   import Minus from "@lucide/svelte/icons/minus";
   import Plus from "@lucide/svelte/icons/plus";
 
-  // Everywhere you've flown, drawn here from the outlines bundled with the app (Natural Earth through world-atlas): no tiles,
-  // no map host, nothing sent anywhere. Takes the stats' flights as a prop. Tap or hover an airport or an arc for its name
-  // and count; it opens framed on the places you've flown; drag, pinch or use the buttons to zoom, Reset to return to that view and World to see the whole world.
-  let { flights }: { flights: StatsFlights } = $props();
+  // Everywhere you've flown and stayed, drawn here from the outlines bundled with the app (Natural Earth through world-atlas,
+  // and the Census Bureau's states through us-atlas): no tiles, no map host, nothing sent anywhere. Takes the stats' flights and the
+  // cities stayed in as props. Tap or hover an airport, an arc or a stay for its name and count; an arc or a stay also lists its
+  // trips and when they were. It opens framed on the places you've been; drag, pinch or use the buttons to zoom, Reset to return
+  // to that view and World to see the whole world. The United States is shaded state by state.
+  let { flights, stays = [] }: { flights: StatsFlights; stays?: StatsStayPin[] } = $props();
 
   let countries = $state<Country[] | null>(null);
+  let states = $state<Country[]>([]);
   let loadError = $state("");
 
   async function loadOutlines() {
     loadError = "";
-    try { countries = await loadCountries(); } catch (err) { loadError = errMsg(err); }
+    try { countries = await loadCountries(); } catch (err) { loadError = errMsg(err); return; }
+    try { states = await loadStates(); } catch { states = []; }   // (without the states the United States is shaded as one country)
   }
   $effect(() => { void loadOutlines(); });
 
   const projection = worldProjection();
   const path = geoPath(projection);
   const world = $derived(mapData(flights, projection));
+  const stayDots = $derived(stayPins(stays, projection));
+  const places = $derived(visitedPoints(flights.airports, stays));
   const outlines = $derived((countries ?? []).map((c) => ({ id: c.id, name: c.properties?.name ?? "", d: path(c) ?? "" })));
-  const visited = $derived(countries ? visitedFeatureIds(flights.airports, countries, (f, p) => geoContains(f, p)) : new Set<string | number>());
+  const visited = $derived(countries ? visitedFeatureIds(places, countries, (f, p) => geoContains(f, p)) : new Set<string | number>());
+  const stateOutlines = $derived(states.map((c) => ({ id: c.id, name: c.properties?.name ?? "", d: path(c) ?? "" })));
+  const visitedStates = $derived(states.length ? visitedFeatureIds(places, states, (f, p) => geoContains(f, p)) : new Set<string | number>());
+  const byState = $derived(states.length > 0);
   const sphere = path({ type: "Sphere" }) ?? "";
 
   // What's picked (tap, focus) or pointed at (hover): its label shows under the map, so a finger isn't covering it.
-  let picked = $state<string | null>(null);
+  type Pick = { label: string; trips: StatsMapTrip[] };
+  let picked = $state<Pick | null>(null);
   let hovered = $state<string | null>(null);
-  const caption = $derived(hovered ?? picked);
+  const caption = $derived(hovered ?? picked?.label ?? null);
+  const when = (t: StatsMapTrip) => (t.start === t.end ? dateLabel(t.start) : `${dateLabel(t.start)} – ${dateLabel(t.end)}`);
 
   // Zoom and pan: a transform on the drawing, kept so the world always covers the map's box. It starts framed on the places
   // flown (the stats' filters change them, and the map follows), and "World" shows all of it.
-  const framed = $derived(fitBox(flownBounds(flights, projection)));
+  const framed = $derived(fitBox(flownBounds(flights, projection, stays)));
   let t = $state<Transform>(IDENTITY);
   $effect(() => { t = framed; picked = null; });
   let svg = $state<SVGSVGElement>();
@@ -90,8 +102,8 @@
     return () => el.removeEventListener("wheel", wheel);
   });
 
-  const pick = (label: string) => { if (!dragged) picked = label; };
-  const key = (e: KeyboardEvent, label: string) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); picked = label; } };
+  const pick = (label: string, trips: StatsMapTrip[] = []) => { if (!dragged) picked = { label, trips }; };
+  const key = (e: KeyboardEvent, label: string, trips: StatsMapTrip[] = []) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); picked = { label, trips }; } };
 </script>
 
 <div>
@@ -100,7 +112,7 @@
       <p class="p-6 text-sm text-muted-foreground">The map couldn’t be drawn: {loadError} <Button variant="outline" size="sm" onclick={loadOutlines}>Try again</Button></p>
     {:else}
       <svg
-        bind:this={svg} viewBox="0 0 {MAP_WIDTH} {MAP_HEIGHT}" role="group" aria-label="Map of the airports and routes you’ve flown"
+        bind:this={svg} viewBox="0 0 {MAP_WIDTH} {MAP_HEIGHT}" role="group" aria-label="Map of the airports, routes and stays you’ve been to"
         class="block h-auto w-full touch-pan-y select-none {t.k > 1 ? 'cursor-grab touch-none' : ''}"
         onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up} onpointerleave={(e) => { if (e.pointerType === "mouse") up(e); }}
       >
@@ -108,23 +120,36 @@
         <g transform="translate({t.x} {t.y}) scale({t.k})" data-testid="map-layer">
           <g role="presentation" class="stroke-border" stroke-width="0.5" vector-effect="non-scaling-stroke" onclick={() => { if (!dragged) picked = null; }}>
             {#each outlines as c (c.id ?? c.name)}
-              <path d={c.d} class={visited.has(c.id ?? "") ? "fill-primary/35" : "fill-card"} data-visited={visited.has(c.id ?? "") ? "true" : undefined}><title>{c.name}</title></path>
+              {@const shaded = visited.has(c.id ?? "") && !(byState && c.id === US_ID)}
+              <path d={c.d} class={shaded ? "fill-primary/35" : "fill-card"} data-visited={shaded ? "true" : undefined}><title>{c.name}</title></path>
+            {/each}
+            {#each stateOutlines as c (c.id ?? c.name)}
+              <path d={c.d} class={visitedStates.has(c.id ?? "") ? "fill-primary/35" : "fill-card"} data-state={c.name} data-visited={visitedStates.has(c.id ?? "") ? "true" : undefined}><title>{c.name}</title></path>
             {/each}
           </g>
           <g fill="none" stroke-linecap="round" class="stroke-primary" data-testid="arcs">
             {#each world.arcs as a (a.key)}
               <!-- A wide, invisible stroke under each arc, so a thin one is easy to hit with a finger. -->
-              <g role="button" tabindex="0" aria-label={a.label} onclick={() => pick(a.label)} onkeydown={(e) => key(e, a.label)}
-                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = a.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = a.label)} class="cursor-pointer outline-none focus-visible:[&>path:last-child]:stroke-signal">
+              <g role="button" tabindex="0" aria-label={a.label} onclick={() => pick(a.label, a.trips)} onkeydown={(e) => key(e, a.label, a.trips)}
+                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = a.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: a.label, trips: a.trips })} class="cursor-pointer outline-none focus-visible:[&>path:last-child]:stroke-signal">
                 <path d={a.d} stroke="transparent" stroke-width="14" vector-effect="non-scaling-stroke" />
                 <path d={a.d} stroke-width={a.width} stroke-opacity="0.7" vector-effect="non-scaling-stroke" data-arc={a.key} />
+              </g>
+            {/each}
+          </g>
+          <g data-testid="stays">
+            {#each stayDots as p (p.key)}
+              <g role="button" tabindex="0" aria-label={p.label} onclick={() => pick(p.label, p.trips)} onkeydown={(e) => key(e, p.label, p.trips)}
+                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = p.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: p.label, trips: p.trips })} class="cursor-pointer outline-none [&:focus-visible>rect:last-child]:stroke-foreground">
+                <circle cx={p.x} cy={p.y} r={9 / t.k} fill="transparent" />
+                <rect x={p.x - 4 / t.k} y={p.y - 4 / t.k} width={8 / t.k} height={8 / t.k} transform="rotate(45 {p.x} {p.y})" class="fill-primary stroke-card" stroke-width={1.5 / t.k} data-stay={p.city} />
               </g>
             {/each}
           </g>
           <g data-testid="dots">
             {#each world.dots as d (d.code)}
               <g role="button" tabindex="0" aria-label={d.label} onclick={() => pick(d.label)} onkeydown={(e) => key(e, d.label)}
-                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = d.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = d.label)} class="cursor-pointer outline-none [&:focus-visible>circle:last-child]:stroke-foreground">
+                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = d.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: d.label, trips: [] })} class="cursor-pointer outline-none [&:focus-visible>circle:last-child]:stroke-foreground">
                 <circle cx={d.x} cy={d.y} r={Math.max(d.r / t.k, 9 / t.k)} fill="transparent" />
                 <circle cx={d.x} cy={d.y} r={d.r / t.k} class="fill-signal stroke-card" stroke-width={1.5 / t.k} data-dot={d.code} />
               </g>
@@ -137,8 +162,8 @@
   <div class="mt-2 flex items-start justify-between gap-3">
     <p class="min-h-5 text-sm text-muted-foreground" aria-live="polite">
       {#if caption}<span class="font-medium text-foreground">{caption}</span>
-      {:else if world.dots.length === 0}No airports to show on the map yet.
-      {:else}Tap an airport or a route for its name and count.{/if}
+      {:else if world.dots.length === 0 && stayDots.length === 0}No airports or stays to show on the map yet.
+      {:else}Tap an airport, a route or a stay for its name and count, and for the trips there.{/if}
     </p>
     {#if !loadError}
       <div class="flex shrink-0 gap-1">
@@ -149,4 +174,13 @@
       </div>
     {/if}
   </div>
+  {#if picked && picked.trips.length}
+    <div class="mt-3 rounded-xl border border-border bg-card p-3 text-sm" data-testid="map-trips">
+      <ul class="space-y-1">
+        {#each picked.trips as tr, i (`${tr.trip_id}-${tr.start}-${i}`)}
+          <li class="flex flex-wrap items-baseline justify-between gap-x-3"><a href={`#trip/${tr.trip_id}`} class="font-medium underline underline-offset-2">{tr.name}</a><span class="text-muted-foreground">{when(tr)}</span></li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
 </div>

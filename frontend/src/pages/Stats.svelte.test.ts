@@ -19,7 +19,7 @@ const none: Stats = {
   flights: { count: 0, distance_km: 0, air_seconds: 0, airports: [], airlines: [], countries: [], routes: [], cabins: [], top_seat: null,
     seat_positions: { window: 0, aisle: 0, middle: 0, unknown: 0 }, longest: null, shortest: null, most_visited_airport: null, busiest_month: null,
     times_around_earth: 0, moon_fraction: 0 },
-  stays: { nights: 0, chains: [], cities: [], countries: [], count: 0, average_nights: 0, hotels: [], cities_by_nights: [], longest: null, most_visited_hotel: null, most_visited_city: null, busiest_month: null }, cars: { days: 0, companies: [] }, cruises: { count: 0, nights: 0, sea_days: 0, ports: 0, lines: [] }, places: { countries: [], cities: [] },
+  stays: { nights: 0, chains: [], cities: [], countries: [], count: 0, average_nights: 0, hotels: [], cities_by_nights: [], longest: null, most_visited_hotel: null, most_visited_city: null, busiest_month: null, pins: [] }, cars: { days: 0, companies: [] }, cruises: { count: 0, nights: 0, sea_days: 0, ports: 0, lines: [] }, places: { countries: [], cities: [] },
 };
 const airports = ["JFK", "LHR", "MCO", "SFO", "CDG", "AKL", "LAX"].map((code, i) => ({ code, name: `${code} Airport`, city: `City ${i}`, country: "US", visits: 10 - i, latitude: 1, longitude: 2 }));
 const full: Stats = {
@@ -27,8 +27,8 @@ const full: Stats = {
   flights: {
     ...none.flights, count: 12, distance_km: 52000, air_seconds: 3 * 86400 + 4 * 3600, airports,
     airlines: [{ code: "DL", name: "Delta Air Lines", flights: 7 }, { code: "AA", name: "American Airlines", flights: 5 }],
-    routes: [{ a: "JFK", b: "LHR", flights: 4, distance_km: 5540, a_latitude: 1, a_longitude: 1, b_latitude: 1, b_longitude: 1 },
-      ...["MCO", "SFO", "CDG", "AKL", "LAX"].map((b) => ({ a: "JFK", b, flights: 1, distance_km: 1000, a_latitude: 1, a_longitude: 1, b_latitude: 1, b_longitude: 1 }))],
+    routes: [{ a: "JFK", b: "LHR", flights: 4, distance_km: 5540, a_latitude: 1, a_longitude: 1, b_latitude: 1, b_longitude: 1, trips: [] },
+      ...["MCO", "SFO", "CDG", "AKL", "LAX"].map((b) => ({ a: "JFK", b, flights: 1, distance_km: 1000, a_latitude: 1, a_longitude: 1, b_latitude: 1, b_longitude: 1, trips: [] }))],
     cabins: [{ name: "Economy", count: 8 }, { name: "Business", count: 2 }], top_seat: "12A",
     seat_positions: { window: 6, aisle: 3, middle: 1, unknown: 2 },
     longest: { origin: "JFK", destination: "AKL", distance_km: 14200, start_local: "2026-03-01T22:15", flight_number: "NZ5" },
@@ -39,7 +39,7 @@ const full: Stats = {
     hotels: [{ name: "Harbour Hotel", stays: 2, nights: 6 }, { name: "Quay Inn", stays: 1, nights: 4 }],
     cities_by_nights: [{ name: "London", stays: 2, nights: 6 }, { name: "Paris", stays: 1, nights: 4 }],
     longest: { hotel: "Harbour Hotel", city: "London", nights: 4, start_local: "2026-06-02T15:00" },
-    most_visited_hotel: { name: "Harbour Hotel", stays: 2, nights: 6 }, most_visited_city: { name: "London", stays: 2, nights: 6 }, busiest_month: "2026-06" }, cars: { days: 3, companies: [{ name: "Hertz", count: 1 }] }, cruises: { count: 2, nights: 10, sea_days: 4, ports: 5, lines: [{ name: "Example Cruise Line", count: 2 }] },
+    most_visited_hotel: { name: "Harbour Hotel", stays: 2, nights: 6 }, most_visited_city: { name: "London", stays: 2, nights: 6 }, busiest_month: "2026-06", pins: [] }, cars: { days: 3, companies: [{ name: "Hertz", count: 1 }] }, cruises: { count: 2, nights: 10, sea_days: 4, ports: 5, lines: [{ name: "Example Cruise Line", count: 2 }] },
   places: { countries: [{ name: "US", first_visit: "2025-05-02", visits: 3 }, { name: "GB", first_visit: "2026-06-01", visits: 1 }], cities: [] },
 };
 
