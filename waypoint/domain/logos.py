@@ -36,6 +36,7 @@ from .visibility import Viewer
 PER_ROUND = 20        # brands asked about in one round at most
 REFRESH_DAYS = 30     # a brand is asked about again after this long
 RETRY_AFTER = timedelta(hours=1)   # a brand Wikimedia couldn't be asked about is tried again after this long
+WIKIMEDIA_DOWN = "Wikimedia couldn't be reached, so hotel brand logos will be tried again in an hour"   # (what Settings says)
 FLIGHT_NUMBER = re.compile(r"\s*([A-Za-z0-9]{2})\s*\d{1,4}[A-Za-z]?\s*")
 
 
@@ -73,7 +74,7 @@ _GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     ("Hyatt", (
         ("hyatt regency", "Hyatt Regency"), ("hyatt place", "Hyatt Place"), ("hyatt house", "Hyatt House"), ("grand hyatt", "Grand Hyatt"),
         ("park hyatt", "Park Hyatt"), ("hyatt centric", "Hyatt Centric"), ("andaz", "Andaz"), ("hyatt ziva", "Hyatt Ziva"),
-        ("hyatt zilara", "Hyatt Zilara"), ("thompson", "Thompson Hotels"), ("alila", "Alila Hotels"), ("miraval", "Miraval"),
+        ("hyatt zilara", "Hyatt Zilara"), ("alila", "Alila Hotels"), ("miraval", "Miraval"),
         ("caption by hyatt", "Caption by Hyatt"), ("hyatt studios", "Hyatt Studios"), ("unbound collection", "The Unbound Collection by Hyatt"),
         ("destination by hyatt", "Destination by Hyatt"), ("hyatt vacation club", "Hyatt Vacation Club"), ("tommie", "Tommie Hotels"))),
     ("Marriott", (
@@ -83,14 +84,14 @@ _GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
         ("autograph collection", "Autograph Collection"), ("aloft", "Aloft Hotels"), ("moxy", "Moxy Hotels"), ("four points", "Four Points by Sheraton"),
         ("le meridien", "Le Méridien"), ("ritz carlton", "The Ritz-Carlton"), ("st regis", "The St. Regis"), ("jw marriott", "JW Marriott"),
         ("gaylord", "Gaylord Hotels"), ("w hotel", "W Hotels"), ("ac hotel", "AC Hotels by Marriott"),
-        ("element by westin", "Element Hotels"), ("element", "Element Hotels"), ("tribute portfolio", "Tribute Portfolio"),
+        ("element by westin", "Element Hotels"), ("tribute portfolio", "Tribute Portfolio"),
         ("luxury collection", "The Luxury Collection"), ("delta hotels", "Delta Hotels by Marriott"), ("protea hotel", "Protea Hotels by Marriott"),
         ("design hotels", "Design Hotels"), ("city express", "City Express by Marriott"), ("bvlgari hotel", "Bvlgari Hotels & Resorts"),
         ("marriott vacation club", "Marriott Vacation Club"), ("marriott executive apartments", "Marriott Executive Apartments"))),
     ("Hilton", (
         ("hampton inn", "Hampton by Hilton"), ("hampton by hilton", "Hampton by Hilton"), ("hilton garden inn", "Hilton Garden Inn"),
         ("doubletree", "DoubleTree by Hilton"), ("embassy suites", "Embassy Suites by Hilton"), ("homewood suites", "Homewood Suites by Hilton"),
-        ("home2 suites", "Home2 Suites by Hilton"), ("tru by hilton", "Tru by Hilton"), ("conrad", "Conrad Hotels"),
+        ("home2 suites", "Home2 Suites by Hilton"), ("tru by hilton", "Tru by Hilton"), ("conrad hotel", "Conrad Hotels"),
         ("waldorf astoria", "Waldorf Astoria Hotels"), ("curio collection", "Curio Collection by Hilton"), ("canopy by hilton", "Canopy by Hilton"),
         ("lxr", "LXR Hotels & Resorts"), ("signia by hilton", "Signia by Hilton"), ("tapestry collection", "Tapestry Collection by Hilton"),
         ("motto by hilton", "Motto by Hilton"), ("spark by hilton", "Spark by Hilton"), ("hilton grand vacations", "Hilton Grand Vacations"))),
@@ -109,7 +110,7 @@ _GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
         ("dazzler", "Dazzler by Wyndham"), ("americinn", "AmericInn by Wyndham"), ("knights inn", "Knights Inn"))),
     ("Choice Hotels", (
         ("comfort inn", "Comfort Inn"), ("comfort suites", "Comfort Suites"), ("quality inn", "Quality Inn"), ("sleep inn", "Sleep Inn"),
-        ("clarion", "Clarion Hotels"), ("cambria hotel", "Cambria Hotels"), ("ascend hotel collection", "Ascend Hotel Collection"),
+        ("cambria hotel", "Cambria Hotels"), ("ascend hotel collection", "Ascend Hotel Collection"),
         ("mainstay suites", "MainStay Suites"), ("econo lodge", "Econo Lodge"), ("rodeway inn", "Rodeway Inn"),
         ("suburban extended stay", "Suburban Extended Stay"), ("woodspring suites", "WoodSpring Suites"), ("everhome suites", "Everhome Suites"))),
     ("Best Western", (
@@ -122,7 +123,7 @@ _GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     ("Accor", (
         ("fairmont", "Fairmont Hotels"), ("sofitel", "Sofitel"), ("novotel", "Novotel"), ("pullman", "Pullman Hotels"), ("mercure", "Mercure Hotels"),
         ("raffles", "Raffles Hotels"), ("swissotel", "Swissôtel"), ("movenpick", "Mövenpick Hotels"), ("ibis styles", "ibis Styles"),
-        ("ibis budget", "ibis budget"), ("ibis", "ibis"), ("mgallery", "MGallery"), ("mama shelter", "Mama Shelter"),
+        ("ibis budget", "ibis budget"), ("mgallery", "MGallery"), ("mama shelter", "Mama Shelter"),
         ("grand mercure", "Grand Mercure"), ("adagio", "Adagio"), ("25hours", "25hours Hotels"), ("rixos", "Rixos Hotels"))),
     ("Sonesta", (
         ("royal sonesta", "Royal Sonesta"), ("sonesta es suites", "Sonesta ES Suites"), ("sonesta select", "Sonesta Select"),
@@ -343,6 +344,7 @@ def fetch_due(conn: db.Connection, now: datetime, limit: int = PER_ROUND) -> int
     got = 0
     search_refused = False   # Brand Search said no to the secret key: brands are asked for by name instead
     wikimedia_down = False   # Wikimedia couldn't be asked this round
+    wikimedia_asked = False  # and whether it was asked (and answered)
     for k, name, source in _due(conn, now, limit):
         sub = k in SUB_KEYS
         found: tuple[bytes, str] | None = None
@@ -351,6 +353,7 @@ def fetch_due(conn: db.Connection, now: datetime, limit: int = PER_ROUND) -> int
             if sub and not wikimedia_down:
                 try:
                     found = wikimedia.find_logo(name)
+                    wikimedia_asked = True
                 except wikimedia.Unavailable:
                     wikimedia_down = True
                 if found and _kept_elsewhere(conn, k, found[0]):
@@ -376,7 +379,9 @@ def fetch_due(conn: db.Connection, now: datetime, limit: int = PER_ROUND) -> int
         error: str | None = (f"{now:%b %d %H:%M}: Logo.dev refused the secret key for Brand Search (or your plan doesn't include it), so brands "
                              "were looked up by name instead")
     elif wikimedia_down:
-        error = f"{now:%b %d %H:%M}: Wikimedia couldn't be reached, so hotel brand logos will be tried again in an hour"
+        error = f"{now:%b %d %H:%M}: {WIKIMEDIA_DOWN}"
+    elif not wikimedia_asked and WIKIMEDIA_DOWN in (db.get_setting(conn, sk.LOGODEV_LAST_ERROR) or ""):
+        return got   # (the hotel brands are still waiting out their hour: the warning stays until Wikimedia answers)
     else:
         error = None
     db.set_setting(conn, sk.LOGODEV_LAST_ERROR, error)

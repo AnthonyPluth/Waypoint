@@ -329,7 +329,8 @@ class BrandTests(unittest.TestCase):
             with self.subTest(hotel=hotel):
                 self.assertEqual(logos.sub_brand(hotel), brand)
                 self.assertEqual(logos.brands_of([("hotel", "Hyatt", None, hotel)], {}), [brand])
-        for hotel in ("Harbour Hotel", "Hyatt", "Hyattsville Inn", "Placeholder Hyatt Place", "W Motel", "Glo Inn", "Vib Lodge", "", None):
+        for hotel in ("Harbour Hotel", "Hyatt", "Hyattsville Inn", "Placeholder Hyatt Place", "W Motel", "Glo Inn", "Vib Lodge",
+                      "Thompson Street Inn", "Element Lodge", "Clarion Call Cottage", "Ibis Point Hotel", "Conrad Inn", "", None):
             with self.subTest(hotel=hotel):
                 self.assertIsNone(logos.sub_brand(hotel))
                 self.assertEqual(logos.brands_of([("hotel", "Hyatt", None, hotel)], {}), ["Hyatt"])
@@ -541,8 +542,14 @@ class HotelBrandRoundTests(DbCase):
             self.assertEqual(self.kept(conn)["hyatt"], (PNG, "logodev"))
             self.assertIn("Wikimedia couldn't be reached", logos.status(conn)["last_error"] or "")
             asked = len(self.wiki.calls)
-            logos.fetch_due(conn, NOW + timedelta(minutes=30))   # not yet
-            self.assertEqual(len(self.wiki.calls), asked)
+            for later in (15, 30):   # (the brands are still waiting out their hour: not asked, and the warning is not cleared)
+                logos.fetch_due(conn, NOW + timedelta(minutes=later))
+                self.assertEqual(len(self.wiki.calls), asked)
+                self.assertIn("Wikimedia couldn't be reached", logos.status(conn)["last_error"] or "", later)
+            conn.execute(insert(Segment).values(trip_id=1, kind="car", status="confirmed", provider="Hertz", start_local="2026-10-02T09:00",
+                                                start_zone="Europe/London", end_local="2026-10-03T09:00", end_zone="Europe/London", source="manual"))
+            self.assertEqual(logos.fetch_due(conn, NOW + timedelta(minutes=40)), 1)   # a Logo.dev round meanwhile doesn't clear it either
+            self.assertIn("Wikimedia couldn't be reached", logos.status(conn)["last_error"] or "")
             self.wiki.busy = False
             self.assertEqual(logos.fetch_due(conn, NOW + logos.RETRY_AFTER + timedelta(minutes=1)), 1)
             self.assertEqual(self.kept(conn)["hyatt place"], (PNG2, "wikimedia"))
