@@ -90,6 +90,10 @@ class Arguments(unittest.TestCase):
         a = ps.parse_args(["7", "x.png", "--theme", "light", "--trailer", "A: b"])
         self.assertEqual((a.pr, a.files, a.theme, a.trailer), (7, ["x.png"], "light", ["A: b"]))
 
+    def test_rejects_a_theme_that_is_neither_light_nor_dark(self):
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            ps.parse_args(["7", "--theme", "sepia"])
+
     def test_rejects_a_bad_pr_number(self):
         for bad in (["0"], ["abc"], []):
             with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
