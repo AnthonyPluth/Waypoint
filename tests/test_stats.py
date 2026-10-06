@@ -183,6 +183,54 @@ class HotelAndCarTests(StatsCase):
                          {"New York": "2026-06-01", "London": "2026-06-02", "Paris": "2026-06-10"})
 
 
+class StayFigureTests(StatsCase):
+    def stay(self, hotel, city, start, end, **extra):
+        return {**HOTEL, "origin": hotel, "destination": city, "start_local": f"{start}T15:00", "end_local": f"{end}T10:00", **extra}
+
+    def test_totals_lists_records_and_the_busiest_month(self):
+        self.mine(self.stay("Harbour Hotel", "London", "2026-06-02", "2026-06-08"),            # 6 nights
+                  self.stay("harbour  hotel", "London", "2026-07-01", "2026-07-03"),           # 2 nights, the same hotel written another way
+                  self.stay("Quay Inn", "Paris", "2026-07-10", "2026-07-12"),                   # 2 nights
+                  self.stay("Quay Inn", "Paris", "2026-08-01", "2026-08-03"))                   # 2 nights
+        s = self.stats(self.jane)["stays"]
+        self.assertEqual((s["count"], s["average_nights"], s["nights"]), (4, 3.0, 12))
+        self.assertEqual(s["hotels"], [{"name": "Harbour Hotel", "stays": 2, "nights": 8}, {"name": "Quay Inn", "stays": 2, "nights": 4}])
+        self.assertEqual(s["cities_by_nights"], [{"name": "London", "stays": 2, "nights": 8}, {"name": "Paris", "stays": 2, "nights": 4}])
+        self.assertEqual(s["longest"], {"hotel": "Harbour Hotel", "city": "London", "nights": 6, "start_local": "2026-06-02T15:00"})
+        self.assertEqual((s["most_visited_hotel"], s["most_visited_city"]),
+                         ({"name": "Harbour Hotel", "stays": 2, "nights": 8}, {"name": "London", "stays": 2, "nights": 8}))   # (a tie on stays goes to nights)
+        self.assertEqual(s["busiest_month"], "2026-06")   # 6 nights in June, 2 + 2 in July (4), 2 in August
+
+    def test_a_year_counts_its_own_nights_of_a_stay_across_new_year(self):
+        self.mine(self.stay("Harbour Hotel", "London", "2025-12-30", "2026-01-03"))
+        a, b = (self.stats(self.jane, year=y)["stays"] for y in (2025, 2026))
+        self.assertEqual((a["count"], a["longest"]["nights"], a["busiest_month"]), (1, 2, "2025-12"))
+        self.assertEqual((b["count"], b["hotels"], b["busiest_month"]), (1, [{"name": "Harbour Hotel", "stays": 1, "nights": 2}], "2026-01"))
+        none = self.stats(self.jane, year=2027)["stays"]
+        self.assertEqual((none["count"], none["average_nights"], none["hotels"], none["longest"], none["busiest_month"]), (0, 0.0, [], None, None))
+
+    def test_overlapping_stays_each_count_but_a_night_counts_once_toward_nights_away(self):
+        self.mine(self.stay("Harbour Hotel", "London", "2026-06-02", "2026-06-06"), self.stay("Quay Inn", "London", "2026-06-04", "2026-06-08"))
+        s = self.stats(self.jane)["stays"]
+        self.assertEqual((s["nights"], s["count"], s["average_nights"]), (6, 2, 4.0))
+
+    def test_a_same_day_a_cancelled_and_an_unfinished_stay_are_left_out_and_a_stay_without_names_is_in_the_totals_only(self):
+        gone = self.add(self.jane, self.stay("Gone Inn", "Rome", "2026-05-01", "2026-05-03"), travelers=self.on(self.jane.person_id))
+        trips.edit_segment(self.c, self.jane, gone["id"], {"status": "cancelled"})
+        self.mine(self.stay("Same Day Inn", "Rome", "2026-05-10", "2026-05-10", end_local="2026-05-10T21:00"),
+                  self.stay("Later Inn", "Rome", "2026-09-22", "2026-09-25"),
+                  self.stay(None, None, "2026-06-02", "2026-06-04"))
+        s = self.stats(self.jane)["stays"]
+        self.assertEqual((s["count"], s["nights"], s["hotels"], s["cities_by_nights"]), (1, 2, [], []))
+        self.assertEqual((s["longest"], s["most_visited_hotel"], s["most_visited_city"]),
+                         ({"hotel": None, "city": None, "nights": 2, "start_local": "2026-06-02T15:00"}, None, None))
+
+    def test_a_partner_does_not_see_the_stays_of_a_solo_trip(self):
+        self.add(self.sam, self.stay("Harbour Hotel", "London", "2026-06-02", "2026-06-08"), travelers=self.on(self.sam.person_id))
+        self.assertEqual(self.stats(self.jane)["stays"]["count"], 0)
+        self.assertEqual(self.stats(self.sam)["stays"]["count"], 1)
+
+
 CRUISE = {"kind": "cruise", "origin": "Miami", "destination": "Miami", "provider": "Example Cruise Line",
           "start_local": "2026-03-01T16:30", "start_zone": "America/New_York", "end_local": "2026-03-08T07:00", "end_zone": "America/New_York",
           "itinerary": [{"name": "Nassau", "zone": "America/Nassau", "arrive_local": "2026-03-02T08:00", "depart_local": "2026-03-02T17:00"},

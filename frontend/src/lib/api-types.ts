@@ -587,11 +587,32 @@ export interface StatsSeats {
   unknown: number;
 }
 
+export interface StatsStayPlace {
+  name: string;
+  stays: number;
+  nights: number;
+}
+
+export interface StatsStayRecord {
+  hotel: string | null;
+  city: string | null;
+  nights: number;
+  start_local: string;
+}
+
 export interface StatsStays {
   nights: number;
   chains: StatsNamed[];
   cities: StatsNamed[];
   countries: StatsNamed[];
+  count: number;
+  average_nights: number;
+  hotels: StatsStayPlace[];
+  cities_by_nights: StatsStayPlace[];
+  longest: StatsStayRecord | null;
+  most_visited_hotel: StatsStayPlace | null;
+  most_visited_city: StatsStayPlace | null;
+  busiest_month: string | null;
 }
 
 export interface Traveler {

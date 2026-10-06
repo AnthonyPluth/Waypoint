@@ -70,6 +70,11 @@
     { label: "Airlines", value: count(f.airlines.length) },
     { label: "Countries", value: count(current.places.countries.length) },
     { label: "Nights away", value: count(current.stays.nights) },
+    ...(current.stays.count ? [
+      { label: "Stays", value: count(current.stays.count) },
+      { label: "Average stay", value: `${current.stays.average_nights.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${current.stays.average_nights === 1 ? "night" : "nights"}` },
+      { label: "Hotels", value: count(current.stays.hotels.length) },
+    ] : []),
     ...(current.cruises.count ? [
       { label: "Cruises", value: count(current.cruises.count) },
       { label: "Nights at sea", value: count(current.cruises.nights) },
@@ -84,6 +89,8 @@
     { title: "Airports", rows: f.airports.map((a) => ({ key: a.code, name: a.code, sub: [a.name === a.code ? null : a.name, a.city].filter(Boolean).join(", ") || null, value: plural(a.visits, "visit") })) },
     { title: "Airlines", rows: f.airlines.map((a) => ({ key: `${a.code}/${a.name}`, name: a.name, value: plural(a.flights, "flight") })) },
     { title: "Countries", rows: current.places.countries.map((c) => ({ key: c.name, name: countryName(c.name), sub: `First visit ${dateLabel(c.first_visit)}`, value: plural(c.visits, "visit") })) },
+    { title: "Hotels", rows: current.stays.hotels.map((h) => ({ key: h.name, name: h.name, sub: plural(h.stays, "stay"), value: plural(h.nights, "night") })) },
+    { title: "Cities stayed in", rows: current.stays.cities_by_nights.map((c) => ({ key: c.name, name: c.name, sub: plural(c.stays, "stay"), value: plural(c.nights, "night") })) },
     { title: "Hotel chains", rows: named(current.stays.chains, "stay") },
     { title: "Rental companies", rows: named(current.cars.companies, "rental") },
     { title: "Cruise lines", rows: named(current.cruises.lines, "cruise") },
@@ -92,11 +99,18 @@
   const airportName = (code: string) => f?.airports.find((a) => a.code === code);
   const record = (r: NonNullable<Stats["flights"]["longest"]>) => ({ value: `${r.origin} – ${r.destination}`, detail: `${distance(r.distance_km, unit)} · ${dateLabel(r.start_local.slice(0, 10))}` });
   type Record_ = { label: string; value: string; detail: string };
+  const stayRecords = $derived<Record_[]>(current ? ((st) => [
+    st.longest && { label: "Longest stay", value: [st.longest.hotel, st.longest.city].filter(Boolean).join(", ") || "A stay", detail: `${plural(st.longest.nights, "night")} · ${dateLabel(st.longest.start_local.slice(0, 10))}` },
+    st.most_visited_hotel && { label: "Most-visited hotel", value: st.most_visited_hotel.name, detail: `${plural(st.most_visited_hotel.stays, "stay")} · ${plural(st.most_visited_hotel.nights, "night")}` },
+    st.most_visited_city && { label: "Most-visited city", value: st.most_visited_city.name, detail: `${plural(st.most_visited_city.stays, "stay")} · ${plural(st.most_visited_city.nights, "night")}` },
+    st.busiest_month && { label: "Most nights in a month", value: monthLabel(st.busiest_month), detail: "" },
+  ].filter((r) => !!r) as Record_[])(current.stays) : []);
   const records = $derived<Record_[]>(f ? [
     f.longest && { label: "Longest flight", ...record(f.longest) },
     f.shortest && { label: "Shortest flight", ...record(f.shortest) },
     f.most_visited_airport && { label: "Most-visited airport", value: f.most_visited_airport, detail: airportName(f.most_visited_airport)?.name ?? "" },
     f.busiest_month && { label: "Busiest month", value: monthLabel(f.busiest_month), detail: "" },
+    ...stayRecords,
   ].filter((r) => !!r) as Record_[] : []);
 
   const cabinTotal = $derived(f ? f.cabins.reduce((n, c) => n + c.count, 0) : 0);

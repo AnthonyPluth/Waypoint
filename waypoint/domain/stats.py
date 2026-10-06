@@ -128,11 +128,32 @@ class FlightStats(TypedDict):
     moon_fraction: float
 
 
+class StayPlace(TypedDict):
+    name: str                  # a hotel's name or a city, as first written
+    stays: int
+    nights: int                # the nights spent there, each stay's own (overlapping stays each count theirs)
+
+
+class StayRecord(TypedDict):
+    hotel: str | None
+    city: str | None
+    nights: int
+    start_local: str           # the local date and time of check-in
+
+
 class StayStats(TypedDict):
     nights: int                # nights away in hotels, each night once however many stays overlap it
     chains: list[Named]        # stays by the booking's provider
     cities: list[Named]
     countries: list[Named]
+    count: int                 # stays with at least one night (in the year asked about)
+    average_nights: float      # nights per such stay, to a tenth
+    hotels: list[StayPlace]    # by nights, then stays, then name
+    cities_by_nights: list[StayPlace]
+    longest: StayRecord | None
+    most_visited_hotel: StayPlace | None   # most stays, then most nights
+    most_visited_city: StayPlace | None
+    busiest_month: str | None  # YYYY-MM, the month with the most nights away
 
 
 class CarStats(TypedDict):
@@ -297,7 +318,50 @@ def _stays(stays: Sequence[Seg], year: int | None, city_countries: Mapping[str, 
             cities[s.destination] += 1
             if (country := city_countries.get(s.destination.strip().lower())):
                 countries[country] += 1
-    return {"nights": len(nights), "chains": _ranked(chains), "cities": _ranked(cities), "countries": _ranked(countries)}
+    return {"nights": len(nights), "chains": _ranked(chains), "cities": _ranked(cities), "countries": _ranked(countries),
+            **_stay_figures(stays, year)}  # type: ignore[typeddict-item]
+
+
+def _place_list(found: Mapping[str, list[int]], names: Mapping[str, str]) -> list[StayPlace]:
+    return sorted(({"name": names[k], "stays": v[0], "nights": v[1]} for k, v in found.items()),
+                  key=lambda p: (-p["nights"], -p["stays"], p["name"].casefold()))
+
+
+def _most_visited(places: Sequence[StayPlace]) -> StayPlace | None:
+    return min(places, key=lambda p: (-p["stays"], -p["nights"], p["name"].casefold()), default=None)
+
+
+def _stay_figures(stays: Sequence[Seg], year: int | None) -> dict[str, object]:
+    """What the stats say of the stays that have a night (in the year): how many, the average, the hotels and cities by nights,
+    the longest, and the busiest month. Hotels and cities are matched by name without case or extra spaces."""
+    hotels: dict[str, list[int]] = {}
+    cities: dict[str, list[int]] = {}
+    hotel_names: dict[str, str] = {}
+    city_names: dict[str, str] = {}
+    months: Counter[str] = Counter()
+    longest: StayRecord | None = None
+    total = count = 0
+    for s in stays:
+        spent = {d for d in _nights(s) if _in(d, year)}
+        if not spent:
+            continue
+        count += 1
+        total += len(spent)
+        months.update(f"{d.year}-{d.month:02d}" for d in spent)
+        for name, found, names in ((s.origin, hotels, hotel_names), (s.destination, cities, city_names)):
+            key = " ".join((name or "").split()).casefold()
+            if key:
+                names.setdefault(key, " ".join((name or "").split()))
+                seen = found.setdefault(key, [0, 0])
+                seen[0] += 1
+                seen[1] += len(spent)
+        if longest is None or len(spent) > longest["nights"]:
+            longest = {"hotel": s.origin, "city": s.destination, "nights": len(spent), "start_local": s.start_local}
+    hotel_list, city_list = _place_list(hotels, hotel_names), _place_list(cities, city_names)
+    busiest = min(months, key=lambda m: (-months[m], m), default=None)
+    return {"count": count, "average_nights": round(total / count, 1) if count else 0.0, "hotels": hotel_list,
+            "cities_by_nights": city_list, "longest": longest, "most_visited_hotel": _most_visited(hotel_list),
+            "most_visited_city": _most_visited(city_list), "busiest_month": busiest}
 
 
 def _cars(cars: Sequence[Seg], year: int | None) -> CarStats:
