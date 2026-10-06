@@ -97,11 +97,11 @@ def explain(conn: db.Connection, b: extract.Booking) -> str:
 
 
 def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking, again: bool = False,
-                 touched: list[int] | None = None) -> Literal["added", "updated", "unchanged"] | None:
+                 touched: list[int] | None = None, fill_only: bool = False) -> Literal["added", "updated", "unchanged"] | None:
     found = fields(conn, b)
     if found is None:
         return None
     try:
-        return trips.merge_email_segment(conn, viewer, found, again, touched)
+        return trips.merge_email_segment(conn, viewer, found, again, touched, fill_only)
     except trips.Invalid:
         return None

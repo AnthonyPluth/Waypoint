@@ -5,11 +5,11 @@ import threading
 import time
 import unittest
 import urllib.parse
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import delete, insert, select, update
 
 from tests.privacy import no_leaks
 from tests.shared import TODAY, DbCase
@@ -658,6 +658,22 @@ class LaterScanTests(ScanCase):
         self.assertEqual({k: self.row()[k] for k in ("last_scan", "history_id", "scan_error")},
                          {k: before[k] for k in ("last_scan", "history_id", "scan_error")})
 
+    def test_a_look_back_never_changes_the_times_or_status_of_a_booking_it_already_has(self):
+        self.first()
+        [seg] = self.segments()
+        with db.session() as conn:
+            conn.execute(update(Segment).values(status="cancelled", start_local=(datetime.fromisoformat(seg["start_local"]) + timedelta(days=1)).isoformat(timespec="minutes")))
+            conn.execute(delete(ScannedMessage))
+        self.google.fetched.clear()
+        with no_leaks(self, *CANARIES, database=self.path):
+            result = self.scan(now=NOW + 4 * 3600, backfill=True)
+        self.assertEqual(result.state, "done")
+        self.assertIn("msg-flight_jsonld", self.google.fetched)
+        [after] = self.segments()
+        self.assertEqual(after["status"], "cancelled")
+        self.assertNotEqual(after["start_local"], seg["start_local"])
+        self.assertEqual(len(self.segments()), 1)
+
     def test_a_look_back_that_fails_keeps_the_last_good_state(self):
         self.first()
         good = self.row()
@@ -736,8 +752,8 @@ class FailureTests(ScanCase):
     def test_a_message_that_cannot_be_filed_is_queued_rather_than_stopping_every_scan(self):
         self.put("flight_jsonld", "hotel_jsonld")
         real = ingest.file_booking
-        with mock.patch.object(ingest, "file_booking", side_effect=lambda conn, viewer, b, again=False, touched=None: (
-                (_ for _ in ()).throw(RuntimeError("CANARY-FILE-DETAILS-2Y8W")) if b.kind == "flight" else real(conn, viewer, b, again, touched))):
+        with mock.patch.object(ingest, "file_booking", side_effect=lambda conn, viewer, b, again=False, touched=None, fill_only=False: (
+                (_ for _ in ()).throw(RuntimeError("CANARY-FILE-DETAILS-2Y8W")) if b.kind == "flight" else real(conn, viewer, b, again, touched, fill_only))):
             result = self.scan()
         self.assertEqual((result.state, result.messages, result.bookings, result.review), ("done", 2, 1, 1))
         self.assertEqual(self.scanned(), {"msg-flight_jsonld": "unreadable", "msg-hotel_jsonld": "booking"})
