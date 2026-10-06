@@ -15,7 +15,7 @@ export interface AiSettings {
 }
 
 export interface AiSuggestion {
-  kind: "flight" | "hotel" | "car" | "train";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise";
   origin: string;
   start_local: string;
   end_local: string;

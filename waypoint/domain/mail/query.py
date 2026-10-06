@@ -15,13 +15,28 @@ SENDERS = (
     "amtrak.com", "eurostar.com", "trainline.com", "sncf-connect.com", "raileurope.com",
     "booking.com", "expedia.com", "hotels.com", "airbnb.com", "vrbo.com", "kayak.com", "priceline.com", "orbitz.com",
     "travelocity.com", "agoda.com", "trip.com",
+    "chasetravel.com", "capitalonetravel.com", "perk.com", "travelbank.com", "amextravel.com", "navan.com", "tripactions.com",
+    "egencia.com", "costcotravel.com", "cheapoair.com", "onetravel.com", "hopper.com",
+    "carnival.com", "royalcaribbean.com", "celebritycruises.com", "ncl.com", "princess.com", "hollandamerica.com", "msccruises.com",
+    "virginvoyages.com", "vikingcruises.com", "disneycruise.com", "cunard.com", "seabourn.com", "azamara.com", "oceaniacruises.com",
+    "rssc.com", "silversea.com", "windstarcruises.com", "ponant.com", "lindblad.com", "costacruises.com", "avalonwaterways.com",
+    "uniworld.com", "amawaterways.com", "vacationstogo.com",
 )
-WORDS = ("confirmation", "itinerary", "reservation", "e-ticket", "booking")
+BANK_SENDERS = ("chase.com", "capitalone.com", "americanexpress.com", "aexp.com")
+BANK_SUBJECT_WORDS = ("travel", "trip", "flight", "hotel", "cruise", "itinerary", "e-ticket")
+WORDS = ("confirmation", "itinerary", "reservation", "e-ticket", "booking", "cruise", "sailing")
 LOOKBACK_MONTHS = 18
 
 
 def build(since: date, ignored: Iterable[str] = ()) -> str:
     senders = " OR ".join(SENDERS)
-    words = " OR ".join(f'"{w}"' if "-" in w else w for w in WORDS)
+    banks = " OR ".join(BANK_SENDERS)
+    words = _any(WORDS)
+    subject = _any(BANK_SUBJECT_WORDS)
     skipped = "".join(f" -from:{d}" for d in sorted(set(ignored)))
-    return f"from:({senders}) ({words}) -category:promotions{skipped} after:{since:%Y/%m/%d}"
+    return (f"(from:({senders}) ({words}) OR from:({banks}) subject:({subject}) ({words})) "
+            f"-category:promotions{skipped} after:{since:%Y/%m/%d}")
+
+
+def _any(words: Iterable[str]) -> str:
+    return " OR ".join(f'"{w}"' if "-" in w else w for w in words)

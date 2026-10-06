@@ -23,7 +23,7 @@ Only the message’s plain text, and only for an item in “Couldn’t read” (
 
 ## What comes back
 
-The reply must be JSON with exactly the fields of a booking (kind, provider, confirmation code, origin, destination, start and end times, and zones for hotels, cars and trains). Anything else (an extra field, a time that isn’t a date and time, a confirmation code that isn’t in the email, a reply that isn’t JSON) is thrown away, and the item shows a short note saying so. Waypoint keeps the suggestion’s fields with the review item, never the email or the AI’s reply.
+The reply must be JSON with exactly the fields of a booking (kind, provider, confirmation code, origin, destination, start and end times, and zones for hotels, cars, trains and cruises). Anything else (an extra field, a time that isn’t a date and time, a confirmation code that isn’t in the email, a reply that isn’t JSON) is thrown away, and the item shows a short note saying so. Waypoint keeps the suggestion’s fields with the review item, never the email or the AI’s reply.
 
 A suggestion is a draft. **Check suggestion** opens the same form as **Add by hand**, filled in; you change what’s off and add it. Nothing is saved as a booking until you do.
 

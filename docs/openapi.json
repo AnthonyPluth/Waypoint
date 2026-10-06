@@ -2220,7 +2220,8 @@
               "flight",
               "hotel",
               "car",
-              "train"
+              "train",
+              "cruise"
             ]
           },
           "origin": {

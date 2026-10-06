@@ -102,7 +102,7 @@
     toast.success(`Asked the AI about ${done} ${done === 1 ? "message" : "messages"}`);
   }, { busy: (on) => (asking_all = on) });
 
-  const placeLabels = (kind: string) => kind === "flight" ? ["From (airport code)", "To (airport code)"] : kind === "hotel" ? ["Hotel", ""] : kind === "car" ? ["Pick-up", "Drop-off"] : ["From (station)", "To (station)"];
+  const placeLabels = (kind: string) => kind === "flight" ? ["From (airport code)", "To (airport code)"] : kind === "hotel" ? ["Hotel", ""] : kind === "car" ? ["Pick-up", "Drop-off"] : kind === "cruise" ? ["Embarkation port", "Disembarkation port"] : ["From (station)", "To (station)"];
 
   const closeForm = () => {
     if (draft) delete peeks[draft.item.id];
@@ -115,7 +115,7 @@
     if (!d) return;
     const flight = d.kind === "flight";
     if (d.kind === "hotel" && !d.startZone.trim() && !d.address.trim()) { formError = "Enter the hotel’s time zone (for example America/New_York), or its address to work it out from"; return; }
-    const body = { kind: d.kind as "flight" | "hotel" | "car" | "train", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
+    const body = { kind: d.kind as "flight" | "hotel" | "car" | "train" | "cruise", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
       destination: d.destination, ...(flight ? {} : d.kind === "hotel" ? { start_zone: d.startZone.trim() || null, ...(d.address.trim() && { details: { address: d.address.trim() } }) } : { start_zone: d.startZone, end_zone: d.endZone || d.startZone }) };
     let added = false;
     const ok = await act(async () => {

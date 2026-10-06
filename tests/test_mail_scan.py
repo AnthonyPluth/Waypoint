@@ -177,11 +177,22 @@ class SearchTests(ScanCase):
     def test_the_search_is_for_known_senders_and_booking_words_without_promotions_since_18_months_ago(self):
         self.assertEqual(self.scan().state, "done")
         [q] = self.google.queries
-        self.assertTrue(q.startswith("from:(aa.com OR delta.com"), q)
-        self.assertIn('(confirmation OR itinerary OR reservation OR "e-ticket" OR booking)', q)
+        self.assertTrue(q.startswith("(from:(aa.com OR delta.com"), q)
+        self.assertIn('(confirmation OR itinerary OR reservation OR "e-ticket" OR booking OR cruise OR sailing)', q)
         self.assertIn("-category:promotions", q)
         self.assertTrue(q.endswith("after:2025/03/23"), q)
-        self.assertLess(len(q), 2000)
+        self.assertLess(len(q), 3000)
+
+    def test_the_search_covers_booking_agencies_travel_portals_and_cruise_lines(self):
+        senders = set(query.SENDERS)
+        self.assertLessEqual({"chasetravel.com", "capitalonetravel.com", "perk.com", "amextravel.com", "expedia.com"}, senders)
+        self.assertLessEqual({"carnival.com", "royalcaribbean.com", "ncl.com", "princess.com", "vikingcruises.com", "disneycruise.com"}, senders)
+
+    def test_a_banks_mail_has_to_be_about_travel_to_be_searched(self):
+        q = query.build(date(2026, 1, 31))
+        self.assertIn("OR from:(chase.com OR capitalone.com OR americanexpress.com OR aexp.com) subject:(travel OR trip OR flight OR hotel OR cruise OR itinerary OR \"e-ticket\") (", q)
+        self.assertNotIn("chase.com", query.SENDERS)
+        self.assertNotIn("capitalone.com", query.SENDERS)
 
     def test_a_senders_ignored_by_its_owner_are_left_out_of_the_search(self):
         self.read(lambda conn: __import__("waypoint.domain.mail.review", fromlist=["x"]))
