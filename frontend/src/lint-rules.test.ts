@@ -49,10 +49,10 @@ describe("no .catch(() => {})", () => {
 });
 
 describe("no comments", () => {
-  it("flags line, block and template comments", async () => {
+  it("flags line and block comments, in a component too", async () => {
     expect(await flagged("// says what the next line does\nexport const n = 1;")).toEqual(["waypoint/no-comments"]);
     expect(await flagged("export const n = 1; /* trailing */")).toEqual(["waypoint/no-comments"]);
-    expect(await flagged("<p>hi</p>\n<!-- a note -->\n", "frontend/src/Example.svelte")).toEqual(["waypoint/no-comments"]);
+    expect(await flagged('<script lang="ts">\n  // a note\n  export const n = 1;\n</script>\n', "frontend/src/Example.svelte")).toEqual(["waypoint/no-comments"]);
   });
   it("leaves the tools' directives and strings that look like comments alone", async () => {
     expect(await flagged("// @ts-expect-error: the point of the test\nexport const n: string = 1;")).toEqual([]);

@@ -33,6 +33,10 @@ class CssComments(unittest.TestCase):
         source = "<script>\n  // eslint's job\n</script>\n<style>\n  a { /* why */ color: red; }\n</style>\n"
         self.assertEqual([p.split(" ")[0] for p in no_comments.problems("A.svelte", source)], ["A.svelte:5:"])
 
+    def test_a_svelte_template_comment_is_flagged_and_a_directive_in_it_is_not(self):
+        source = "<script>\n  const html = '<!-- not a comment -->';\n</script>\n<p>hi</p>\n<!-- a note -->\n<!-- svelte-ignore a11y_x -->\n"
+        self.assertEqual([p.split(" ")[0] for p in no_comments.problems("A.svelte", source)], ["A.svelte:5:"])
+
     def test_a_banner_that_a_minifier_keeps_is_not_a_comment(self):
         self.assertEqual(no_comments.problems("a.css", "/*! font license */\na { color: red; }\n"), [])
 

@@ -13,6 +13,8 @@ SKIP = (".semgrep/examples/", "node_modules/")
 PY_DIRECTIVE = re.compile(r"#\s*(noqa|type:|pragma|nosemgrep|nosec|fmt:|isort|ruff:|pyright|mypy|pylint|-\*-|coding[:=])")
 CSS_COMMENT = re.compile(r"/\*(?!!|\s*stylelint-)[\s\S]*?\*/")
 STYLE_BLOCK = re.compile(r"<style\b[^>]*>([\s\S]*?)</style>")
+CODE_BLOCK = re.compile(r"<(script|style)\b[^>]*>[\s\S]*?</\1>")
+HTML_COMMENT = re.compile(r"<!--(?!\s*(eslint-|svelte-ignore|prettier-ignore))[\s\S]*?-->")
 
 
 def python_comments(source: str) -> list[int]:
@@ -45,13 +47,18 @@ def svelte_style_comments(source: str) -> list[int]:
     return found
 
 
+def svelte_template_comments(source: str) -> list[int]:
+    blanked = CODE_BLOCK.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), source)
+    return [blanked.count("\n", 0, m.start()) + 1 for m in HTML_COMMENT.finditer(blanked)]
+
+
 def problems(path: str, source: str) -> list[str]:
     if path.endswith(".py"):
         lines = python_comments(source) + python_docstrings(source)
     elif path.endswith(".css"):
         lines = css_comments(source)
     elif path.endswith(".svelte"):
-        lines = svelte_style_comments(source)
+        lines = svelte_style_comments(source) + svelte_template_comments(source)
     else:
         return []
     return [f"{path}:{n}: a comment or docstring: say it in the code's names, or in the commit message or docs" for n in lines]
