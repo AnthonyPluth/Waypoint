@@ -217,7 +217,7 @@
           <div class="flex items-start justify-between gap-2">
             <p class="flex flex-wrap items-center gap-2 font-medium"><span class="break-words">{p.display_name}</span>
               <Badge variant={p.member ? "default" : "outline"}>{p.member ? "Member" : "Guest"}</Badge></p>
-            <span class="-mt-1 -mr-2 flex shrink-0">
+            <span class="-mt-1 -mr-2 flex shrink-0 gap-1">
               <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Edit ${p.display_name}`} title="Edit" onclick={() => startEdit(p)}><Pencil class="size-4" /></Button>
             {#if !p.member}<Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Remove ${p.display_name}`} title="Remove" onclick={() => { removing = p; asking = true; }}><Trash class="size-4" /></Button>{/if}
             </span>
@@ -245,7 +245,7 @@
                         {/if}</p>
                       {#if itemDetails(m)}<p class="break-words text-muted-foreground">{itemDetails(m)}</p>{/if}
                     </div>
-                    <div class="-mt-1 -mr-2 flex shrink-0">
+                    <div class="-mt-1 -mr-2 flex shrink-0 gap-1">
                       <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Edit ${p.display_name}’s ${m.program}`} title="Edit" onclick={() => startEditId(m)}><Pencil class="size-4" /></Button>
                       <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Remove ${p.display_name}’s ${m.program}`} title="Remove" onclick={() => { idRemoving = m; idAsking = true; }}><Trash class="size-4" /></Button>
                     </div>
