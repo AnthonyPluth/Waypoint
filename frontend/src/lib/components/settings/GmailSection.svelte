@@ -73,14 +73,6 @@
     watching = true;   // a scan that can't start ends at once: look again for a moment to say why
   }, { busy: (on) => (starting = on ? m.id : null) });
 
-  const reread = (m: Mailbox) => act(async () => {
-    const r = await apiCall<"POST /api/mailboxes/{id}/reread">(`/api/mailboxes/${m.id}/reread`, { method: "POST", failed: "Couldn’t start reading again" });
-    if (!r.started) toast("This mailbox is already being read.");
-    await load();
-    watchUntil = Date.now() + 2 * POLL_MS + 500;
-    watching = true;
-  }, { busy: (on) => (starting = on ? m.id : null) });
-
   // Showing a mailbox's unread mail to the household: the box shows what the server kept, and goes back if it refuses.
   const share = (m: Mailbox, box: HTMLInputElement) => act(async () => {
     try {
@@ -131,9 +123,6 @@
             {:else if m.status !== "reconnect"}
               <p class="text-sm text-muted-foreground">{scanned(m) ? `Last scanned ${scanned(m)}.` : "Not scanned yet."}</p>
             {/if}
-            {#if m.status === "connected"}
-              <p class="text-sm text-muted-foreground">Read bookings again re-reads the messages Waypoint already found (it doesn’t search again) and corrects bookings it read wrongly before, such as flight times. Anything you edited stays as you left it.</p>
-            {/if}
             <label class="mt-2 flex items-start gap-2 text-sm">
               <input type="checkbox" class="mt-0.5 size-4 shrink-0" checked={m.share_review} onchange={(e) => share(m, e.currentTarget)} />
               <span>Show this mailbox’s unread mail to the household<span class="block text-muted-foreground">Anyone in the household sees who each one is from and its day in Review, and can add it by hand or dismiss it. Never its subject or text, and only you can open it in Gmail. Off until you turn it on.</span></span>
@@ -145,7 +134,6 @@
             <Badge variant={m.status === "connected" ? "outline" : "secondary"}>{label(m)}</Badge>
             {#if m.status === "reconnect"}<Button disabled={connecting} onclick={connect}>Reconnect</Button>
             {:else}<Button variant="outline" disabled={m.scanning || starting === m.id} onclick={() => scan(m)}>{m.scanning ? "Scanning…" : "Scan now"}</Button>{/if}
-            {#if m.status === "connected"}<Button variant="outline" disabled={m.scanning || starting === m.id} onclick={() => reread(m)}>Read bookings again</Button>{/if}
             <Button variant="outline" onclick={() => { leaving = m; asking = true; }}>Disconnect</Button>
           </div>
         </div>

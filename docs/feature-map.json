@@ -741,9 +741,7 @@
       "method": "POST",
       "path": "/api/mailboxes/{id}/reread",
       "handler": "waypoint/server/api/mailboxes.py:api_mailbox_reread",
-      "web": [
-        "frontend/src/lib/components/settings/GmailSection.svelte"
-      ],
+      "web": [],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mail_scan.py"
