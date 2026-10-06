@@ -7,6 +7,6 @@
   const current = $derived(navFor(route.page));
 </script>
 
-<nav aria-label="Main" class="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+<nav aria-label="Main" class="fixed inset-x-0 bottom-0 z-30 flex border-t border-border/60 bg-background/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
   {#each NAV as item (item.page)}<NavLink {item} current={current === item.page} tab />{/each}
 </nav>
