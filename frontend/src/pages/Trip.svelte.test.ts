@@ -16,10 +16,10 @@ import TripPage from "./Trip.svelte";
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
 const sam: Person = { id: 2, display_name: "Sam Doe", first_name: "Sam", legal_name: null, aliases: [], member: true, links: [] };
 const flight = segment({ id: 1, locked_fields: ["terminal"], manage_url: "https://example.com/manage", links: { app: "https://example.com/manage", directions: null, call: null },
-  travelers: [{ id: 1, person_id: 1, name: "Jane Doe" }, { id: 2, person_id: 2, name: "Sam Doe" }, { id: 3, person_id: null, name: "DOE/MIA MISS" }] });
+  travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }, { id: 2, person_id: 2, name: "Sam Doe", seat: null }, { id: 3, person_id: null, name: "DOE/MIA MISS", seat: null }] });
 const stay = segment({ id: 2, kind: "hotel", provider: "Marriott", origin: "Harbour Hotel", destination: null, start_local: "2026-11-21T15:00", start_zone: "Europe/London",
   end_local: "2026-11-27T10:00", end_zone: "Europe/London", confirmation: "H88231", details: { address: "1 Quay Street, London", phone: "+44 20 7946 0000" },
-  links: { app: null, directions: "https://maps.apple.com/?q=1%20Quay%20Street%2C%20London", call: "tel:+442079460000" }, status: "changed", travelers: [{ id: 4, person_id: 1, name: "Jane Doe" }] });
+  links: { app: null, directions: "https://maps.apple.com/?q=1%20Quay%20Street%2C%20London", call: "tel:+442079460000" }, status: "changed", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] });
 const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: null, statuses: [{
   segment_id: 1, state: "delayed", origin: "JFK", destination: "LHR", dep_scheduled: "2026-11-20T19:00", dep_estimated: "2026-11-20T19:50",
   dep_actual: null, dep_zone: "America/New_York", dep_terminal: "7", dep_gate: "B24", arr_scheduled: "2026-11-21T07:10", arr_estimated: "2026-11-21T08:05",
@@ -210,7 +210,7 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Terminal"), "7");
     await u.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({
-      kind: "flight", origin: "JFK", details: { flight_number: "AA 101", terminal: "7" }, travelers: [{ person_id: 1 }, { person_id: 2 }, { person_id: null, name: "DOE/MIA MISS" }] }) }));
+      kind: "flight", origin: "JFK", details: { flight_number: "AA 101", terminal: "7" }, travelers: [{ person_id: 1, seat: null }, { person_id: 2, seat: null }, { person_id: null, name: "DOE/MIA MISS", seat: null }] }) }));
     await waitFor(() => expect(screen.queryByRole("form")).toBeNull());
   });
 
@@ -275,25 +275,25 @@ describe("Trip", () => {
     await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
     await u.clear(screen.getByLabelText(/From \(airport\)/));
     await u.type(screen.getByLabelText(/From \(airport\)/), "N1");
-    await u.type(screen.getByLabelText("Seat"), "12A");
+    await u.type(screen.getByLabelText("Seat of Jane Doe"), "12A");
     await u.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("A flight’s origin is an airport code like JFK");
     expect(api).not.toHaveBeenCalledWith("/api/segments/1", expect.anything());
-    expect(screen.getByLabelText("Seat")).toHaveValue("12A");
+    expect(screen.getByLabelText("Seat of Jane Doe")).toHaveValue("12A");
   });
 
   it("keeps what was typed and says why when a save fails", async () => {
     render(TripPage);
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
-    await u.type(screen.getByLabelText("Seat"), "12A");
+    await u.type(screen.getByLabelText("Seat of Jane Doe"), "12A");
     vi.mocked(api).mockImplementation(async (path, opts) => {
       if (opts?.method === "POST") throw new Error("Someone on this isn’t in People");
       return held;
     });
     await u.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Someone on this isn’t in People");
-    expect(screen.getByLabelText("Seat")).toHaveValue("12A");
+    expect(screen.getByLabelText("Seat of Jane Doe")).toHaveValue("12A");
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
@@ -323,7 +323,7 @@ describe("Trip", () => {
 
   describe("a flight on two bookings", () => {
     const sams = segment({ id: 5, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, manage_url: "https://example.com/manage/b",
-      links: { app: "https://example.com/manage/b", directions: null, call: null }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe" }] });
+      links: { app: "https://example.com/manage/b", directions: null, call: null }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe", seat: null }] });
     beforeEach(() => { held = trip([flight, sams, stay]); });
 
     it("is one card for the flight with a block for each booking: its code, its travellers, its own Edit and Remove", async () => {
@@ -364,6 +364,52 @@ describe("Trip", () => {
       expect(within(card).getByText("9:30 PM")).toBeInTheDocument();
       expect(within(card).getByText("7:00 PM")).toBeInTheDocument();
       expect(within(card).getAllByText("Departs")).toHaveLength(2);   // (once in each booking's block)
+    });
+  });
+
+  describe("a seat for each traveller", () => {
+    it("shows each traveller's seat beside their name, and nothing for one without", async () => {
+      held = trip([{ ...flight, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: "31A" }, { id: 2, person_id: 2, name: "Sam Doe", seat: "31B" }, { id: 3, person_id: null, name: "DOE/MIA MISS", seat: null }] }]);
+      render(TripPage);
+      await screen.findByRole("heading", { name: "Trip to London" });
+      const who = within(screen.getByRole("heading", { name: "Travellers" }).parentElement!);
+      expect(who.getByText("Jane Doe").closest("li")).toHaveTextContent("Jane Doe · Seat 31A");
+      expect(who.getByText("Sam Doe").closest("li")).toHaveTextContent("Sam Doe · Seat 31B");
+      expect(who.getByText("DOE/MIA MISS").closest("li")).not.toHaveTextContent("Seat");
+    });
+
+    it("has a seat field for each ticked traveller, and sends them", async () => {
+      const u = userEvent.setup();
+      render(TripPage);
+      await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+      expect(screen.queryAllByLabelText("Seat").map((e) => e.getAttribute("aria-label"))).toEqual(["Seat of Jane Doe", "Seat of Sam Doe", "Seat of DOE/MIA MISS"]);   // (each traveller's, none for the whole booking)
+      await u.type(screen.getByLabelText("Seat of Jane Doe"), "31A");
+      await u.type(screen.getByLabelText("Seat of Sam Doe"), " 31B ");
+      await u.type(screen.getByLabelText("Seat of DOE/MIA MISS"), "32A");
+      await u.click(screen.getByRole("checkbox", { name: "Sam Doe" }));
+      expect(screen.queryByLabelText("Seat of Sam Doe")).toBeNull();   // (unticked: no seat to give)
+      await u.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({
+        travelers: [{ person_id: 1, seat: "31A" }, { person_id: null, name: "DOE/MIA MISS", seat: "32A" }] }) }));
+    });
+
+    it("moves a seat entered on the booking onto its one traveller", async () => {
+      held = trip([{ ...flight, details: { flight_number: "AA 101", seat: "14C" }, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }] }]);
+      const u = userEvent.setup();
+      render(TripPage);
+      await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+      expect(screen.getByLabelText("Seat of Jane Doe")).toHaveValue("14C");
+      await u.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({
+        details: { flight_number: "AA 101" }, travelers: [{ person_id: 1, seat: "14C" }] }) }));
+    });
+
+    it("gives a hotel guest no seat field", async () => {
+      held = trip([stay]);
+      const u = userEvent.setup();
+      render(TripPage);
+      await u.click(await screen.findByRole("button", { name: "Edit Harbour Hotel" }));
+      expect(screen.queryByLabelText(/^Seat/)).toBeNull();
     });
   });
 

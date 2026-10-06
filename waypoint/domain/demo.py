@@ -46,7 +46,7 @@ def _at(today: date, days: int, clock: str) -> str:
 def _family_past(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "MCO", "start_local": _at(today, -41, "08:15"), "end_local": _at(today, -41, "11:20"),
-         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 1412", "terminal": "4", "cabin": "Economy", "seat": "22A"}},
+         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 1412", "terminal": "4", "cabin": "Economy"}},
         {"kind": "hotel", "origin": "Lakeside Resort", "start_local": _at(today, -41, "15:00"), "end_local": _at(today, -36, "11:00"),
          "start_zone": "America/New_York", "end_zone": "America/New_York", "confirmation": "H41207", "provider": "Hilton",
          "details": {"address": "100 Lakeshore Drive, Orlando", "room": "Two queens"}},
@@ -58,7 +58,7 @@ def _family_past(today: date) -> list[trips.SegmentIn]:
 def _family_now(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": _at(today, -2, "19:00"), "end_local": _at(today, -1, "07:10"),
-         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy", "seat": "31A"},
+         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy"},
          "manage_url": "https://example.com/manage/KQ7M2X"},
         {"kind": "hotel", "origin": "Harbour Hotel", "start_local": _at(today, -1, "15:00"), "end_local": _at(today, 2, "10:00"),
          "start_zone": "Europe/London", "end_zone": "Europe/London", "confirmation": "H88231", "provider": "Marriott",
@@ -175,8 +175,15 @@ DEMO_MAILBOX = "jane.doe@gmail.example"
 UNREAD: list[tuple[str, int, review.Reason]] = [("example-air.example", 21, "no_markup"), ("example-stays.example", 15, "incomplete")]
 
 
-def _on(*ids: int | None) -> list[trips.TravelerIn]:
-    return [{"person_id": i, "name": None} for i in ids]
+# The seats of the family's flights where each traveller has their own (Jane, Sam, Mia); the other flights keep one on the booking.
+FAMILY_SEATS = {"DL 1412": ("22A", "22B", "22C"), "AA 101": ("31A", "31B", "31C")}
+
+
+def _on(*ids: int | None, seats: tuple[str, ...] = ()) -> list[trips.TravelerIn]:
+    out: list[trips.TravelerIn] = [{"person_id": i, "name": None} for i in ids]
+    for traveler, seat in zip(out, seats, strict=False):
+        traveler["seat"] = seat
+    return out
 
 
 def seed(conn: db.Connection, today: date | None = None) -> int:
@@ -192,7 +199,8 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     jane, sam = (Viewer(people.person_for_sub(conn, sub)) for sub in ("demo-jane", "demo-sam"))
     now_trip = None
     for fields in (*_family_two_years_ago(today), *_family_last_year(today), *_family_past(today), *_family_now(today)):
-        added = trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0])})
+        seats = FAMILY_SEATS.get((fields.get("details") or {}).get("flight_number", ""), ())
+        added = trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0], seats=seats)})
         now_trip = added["trip_id"] if added and (fields.get("details") or {}).get("flight_number") == "AA 102" else now_trip
     for fields in _cruises(today):
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id)})

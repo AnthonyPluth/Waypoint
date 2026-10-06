@@ -139,7 +139,7 @@ describe("wording", () => {
 });
 
 describe("loyalty on a booking", () => {
-  const jane = { id: 1, person_id: 1, name: "Jane Doe" };
+  const jane = { id: 1, person_id: 1, name: "Jane Doe", seat: null };
   it("knows the program a provider's name belongs to", () => {
     expect(programFor(out)).toBe("American AAdvantage");
     expect(programFor(stay)).toBe("Marriott Bonvoy");
@@ -157,7 +157,7 @@ describe("loyalty on a booking", () => {
     const mine = membership();
     expect(membershipFor(out, jane, [mine, membership({ id: 12, person_id: 2 })])).toEqual({ state: "found", entry: mine });
     expect(membershipFor(out, jane, [membership({ program: "Delta SkyMiles" })])).toEqual({ state: "none", program: "American AAdvantage" });
-    expect(membershipFor(out, { id: 2, person_id: null, name: "DOE/MIA MISS" }, [mine])).toEqual({ state: "unmatched" });
+    expect(membershipFor(out, { id: 2, person_id: null, name: "DOE/MIA MISS", seat: null }, [mine])).toEqual({ state: "unmatched" });
     expect(membershipFor(segment({ provider: "Example Air" }), jane, [mine])).toBeNull();
   });
 });
@@ -177,7 +177,7 @@ describe("flightKey", () => {
 describe("bookingCards", () => {
   // The same flight on two reservations: each keeps its own segment (its code, travellers, edits), the card is one.
   const mine = segment({ id: 1, confirmation: "AAAAAA", details: { flight_number: "AA 101" } });
-  const theirs = segment({ id: 2, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 5, person_id: 2, name: "Sam Doe" }] });
+  const theirs = segment({ id: 2, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 5, person_id: 2, name: "Sam Doe", seat: null }] });
 
   it("makes one card of the same flight, date and airports on two bookings, keeping both", () => {
     const [card, ...rest] = bookingCards([mine, theirs]);

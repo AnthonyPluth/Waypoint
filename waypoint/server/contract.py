@@ -244,6 +244,7 @@ class Traveler(TypedDict):
     id: int
     person_id: int | None           # null until the printed name is matched to a person
     name: str                       # the person's name, or the name as printed on the booking
+    seat: str | None                # their seat on this segment
 
 
 class SegmentLinks(TypedDict):
@@ -323,6 +324,7 @@ class SplitBody(TypedDict):
 class TravelerBody(TypedDict):
     person_id: NotRequired[int | None]
     name: NotRequired[str | None]   # as printed on the booking
+    seat: NotRequired[str | None]   # their seat; left out, it stays as it was
 
 
 class SegmentBody(TypedDict):

@@ -155,6 +155,7 @@ segment_travelers = Table(
     Column('segment_id', Integer, refers('segment_travelers', 'segment_id', 'segments.id', 'CASCADE'), nullable=False),
     Column('person_id', Integer, refers('segment_travelers', 'person_id', 'people.id', 'CASCADE')),
     Column('name', Text),
+    Column('seat', Text),
     Index('ix_segment_travelers_segment_id', 'segment_id'),
     Index('ix_segment_travelers_person_id', 'person_id'),
     info={'doc': 'who a segment is for: a person, or until matched to one, the name as printed on the booking'},

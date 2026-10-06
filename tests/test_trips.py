@@ -341,6 +341,50 @@ PORTS = [{"name": "Nassau", "zone": "America/Nassau", "arrive_local": "2026-03-0
          {"name": "Cozumel", "zone": "America/Cancun", "arrive_local": "2026-03-05T08:00", "depart_local": "2026-03-05T17:00"}]
 
 
+class SeatTests(Household):
+    def two(self, **extra):
+        return self.add(self.jane, {**OUT, **extra}, travelers=[{"person_id": self.jane.person_id, "name": None, "seat": " 31a "},
+                                                                {"person_id": self.sam.person_id, "name": None, "seat": "31B"},
+                                                                {"person_id": None, "name": "DOE/MIA MISS", "seat": "32A"}])
+
+    def test_each_traveller_has_their_own_seat_as_typed_and_trimmed(self):
+        seg = self.two()
+        self.assertEqual([(t["name"], t["seat"]) for t in seg["travelers"]], [("Jane Doe", "31a"), ("Sam Doe", "31B"), ("DOE/MIA MISS", "32A")])
+        again = trips.get_segment(self.c, self.jane, seg["id"])
+        assert again
+        self.assertEqual([t["seat"] for t in again["travelers"]], ["31a", "31B", "32A"])
+        self.assertEqual([t["seat"] for t in self.add(self.jane, OUT)["travelers"]], [None])   # (a seat is optional)
+        with self.assertRaisesRegex(trips.Invalid, "at most 10"):
+            self.add(self.jane, OUT, travelers=[{"person_id": self.jane.person_id, "name": None, "seat": "x" * 11}])
+
+    def test_changing_a_seat_locks_the_travellers_and_leaving_the_seats_out_keeps_them(self):
+        seg = self.two()
+        moved = trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": [
+            {"person_id": self.jane.person_id, "name": None, "seat": "12C"}, {"person_id": self.sam.person_id, "name": None, "seat": "31B"},
+            {"person_id": None, "name": "DOE/MIA MISS", "seat": "32A"}]})
+        assert moved
+        self.assertEqual(([t["seat"] for t in moved["travelers"]], moved["locked_fields"]), (["12C", "31B", "32A"], ["travelers"]))
+        quiet = trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": [   # (an assistant or an older client names who is on it, and no seats)
+            {"person_id": self.jane.person_id, "name": None}, {"person_id": self.sam.person_id, "name": None}]})
+        assert quiet
+        self.assertEqual([(t["name"], t["seat"]) for t in quiet["travelers"]], [("Jane Doe", "12C"), ("Sam Doe", "31B")])
+        cleared = trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": [{"person_id": self.jane.person_id, "name": None, "seat": ""}]})
+        assert cleared
+        self.assertEqual([t["seat"] for t in cleared["travelers"]], [None])
+        same = trips.edit_segment(self.c, self.jane, seg["id"], {"status": "changed"})
+        assert same
+        self.assertEqual([t["seat"] for t in same["travelers"]], [None])   # (an edit of something else leaves them alone)
+
+    def test_a_later_email_leaves_the_seats_alone_and_adds_who_it_names(self):
+        seg = self.two(confirmation="SEAT01")
+        mail = {**OUT, "confirmation": "SEAT01", "travelers": [{"person_id": None, "name": "DOE/MIA MISS"}, {"person_id": None, "name": "NEW/PERSON MR"}]}
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, mail), "updated")
+        got = trips.get_segment(self.c, self.jane, seg["id"])
+        assert got
+        self.assertEqual([(t["name"], t["seat"]) for t in got["travelers"]],
+                         [("Jane Doe", "31a"), ("Sam Doe", "31B"), ("DOE/MIA MISS", "32A"), ("NEW/PERSON MR", None)])
+
+
 class CruiseTests(Household):
     def test_a_cruise_keeps_its_ports_in_order_with_their_own_zones(self):
         seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS})
@@ -844,6 +888,14 @@ class CruiseRouteTests(RouteCase):
 
 
 class ApiFieldTests(unittest.TestCase):
+    def test_a_travellers_seat_is_trimmed_at_most_10_characters_and_left_out_when_not_sent(self):
+        got = api.segment_fields({"travelers": [{"person_id": 1, "seat": " 31A "}, {"person_id": 2}, {"name": "DOE/MIA MISS", "seat": ""}]})["travelers"]
+        self.assertEqual([t.get("seat", "left out") for t in got], ["31A", "left out", None])
+        with self.assertRaisesRegex(ApiError, "seat is too long"):
+            api.segment_fields({"travelers": [{"person_id": 1, "seat": "x" * 11}]})
+        with self.assertRaisesRegex(ApiError, 'Send "seat" as text'):
+            api.segment_fields({"travelers": [{"person_id": 1, "seat": 31}]})
+
     def test_an_address_is_trimmed_keeps_its_lines_and_is_at_most_300_characters(self):
         got = api.segment_fields({"details": {"address": "  1 Quay Street\r\nLondon E1 0AA \n", "room": " 4B "}})
         self.assertEqual(got["details"], {"address": "1 Quay Street\nLondon E1 0AA", "room": "4B"})

@@ -5,7 +5,7 @@
   import type { Person, Segment } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
-  import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, type Draft } from "$lib/segment-form";
+  import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, SEAT_LIMIT, SEATED, seatKey, type Draft } from "$lib/segment-form";
 
   // Adding a segment by hand, or editing one. A failed check or save keeps everything typed and says why; what you
   // change here is locked against later emails (the server does that).
@@ -129,9 +129,11 @@
         <legend class="mb-1.5 font-medium">Who’s travelling</legend>
         {#each people as p (p.id)}
           <label class="flex items-center gap-2"><input type="checkbox" value={p.id} bind:group={d.people} class="size-4" /> {p.display_name}</label>
+          {@render seat(seatKey(p.id), p.display_name, d.people.includes(p.id))}
         {/each}
         {#each d.printed as name (name)}
           <label class="flex items-center gap-2"><input type="checkbox" checked onchange={() => (d.printed = d.printed.filter((n) => n !== name))} class="size-4" /> {name} <span class="text-muted-foreground">(name as printed, not in People)</span></label>
+          {@render seat(seatKey(name), name, true)}
         {/each}
       </fieldset>
       {#if error}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{error}</p>{/if}
@@ -142,3 +144,10 @@
     </div>
   </div>
 </form>
+
+{#snippet seat(key: string, name: string, ticked: boolean)}
+  {#if ticked && SEATED.includes(d.kind)}
+    <label class="ml-6 flex items-center gap-2"><span class="text-muted-foreground">Seat</span>
+      <Input class="w-28" bind:value={d.seats[key]} maxlength={SEAT_LIMIT} autocomplete="off" spellcheck={false} aria-label={`Seat of ${name}`} /></label>
+  {/if}
+{/snippet}

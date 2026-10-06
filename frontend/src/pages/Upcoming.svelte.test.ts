@@ -187,7 +187,7 @@ describe("Upcoming", () => {
 
   it("shows a flight on two bookings once, with each booking’s code to copy", async () => {
     at("2026-11-20T09:00:00-05:00");
-    const second = segment({ id: 10, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe" }] });
+    const second = segment({ id: 10, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe", seat: null }] });
     serve([trip([outbound, second, stay, home])]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR", level: 2 })).closest("section")!;

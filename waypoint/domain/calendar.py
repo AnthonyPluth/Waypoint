@@ -138,6 +138,9 @@ def _description(group: Sequence[SegmentOut], trip: TripOut) -> str:
         lines.append("Times differ between bookings:")
         lines += [f"{g['confirmation'] or 'Booking'}: departs {_clock(g['start_local'])}, arrives {_clock(g['end_local'])}" for g in live]
     lines += [f"{label}: {seg['details'][key]}" for key, label in DETAILS if seg["details"].get(key) and key != "flight_number"]
+    seated = [f"{t['name']} {t['seat']}" for g in group for t in g["travelers"] if t["seat"]]
+    if seated:
+        lines.append(f"Seats: {', '.join(dict.fromkeys(seated))}")
     if seg["itinerary"]:
         lines.append("Itinerary:")
         lines += [f"{p['name']}: {_stop(p)}" for p in seg["itinerary"]]

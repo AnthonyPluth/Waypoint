@@ -100,6 +100,12 @@ class CalendarTests(unittest.TestCase):
         self.assertIn("LOCATION:5 Depot Way", self.lines(car))
         self.assertFalse([l for l in self.lines(segment()) if l.startswith("LOCATION")])   # (a flight has none)
 
+    def test_a_flights_description_lists_the_seat_of_each_traveller(self):
+        flight = segment(details={"flight_number": "NZ 6"}, travelers=[
+            {"id": 1, "person_id": 1, "name": "Jane Doe", "seat": "31A"}, {"id": 2, "person_id": 2, "name": "Sam Doe", "seat": "31B"},
+            {"id": 3, "person_id": None, "name": "DOE/MIA MISS", "seat": None}])
+        self.assertIn("DESCRIPTION:Trip: Made-up trip\\nSeats: Jane Doe 31A\\, Sam Doe 31B", "\n".join(self.lines(flight)).replace("\n ", ""))
+
     def test_a_cruise_is_one_event_with_its_itinerary_and_the_terminals_address(self):
         ports = [{"name": "Nassau", "zone": "America/Nassau", "arrive_local": "2026-03-02T08:00", "depart_local": "2026-03-02T17:00"},
                  {"name": "At sea", "zone": "America/Nassau", "arrive_local": None, "depart_local": None}]
