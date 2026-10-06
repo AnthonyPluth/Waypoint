@@ -548,7 +548,7 @@ class StatsAirport(TypedDict):
     name: str                       # the code, for an airport that isn't in the table
     city: str | None
     country: str | None
-    visits: int                     # each departure from it and arrival at it
+    visits: int                     # the times there: arrivals or departures, whichever are more
     latitude: float | None          # for the map; none for an airport that isn't in the table
     longitude: float | None
 
