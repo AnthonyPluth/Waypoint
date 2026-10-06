@@ -68,11 +68,11 @@ npm run build                         # into waypoint/static/app/, which Waypoin
 This site is [Astro Starlight](https://starlight.astro.build) in `docs/`, published to GitHub Pages by `.github/workflows/docs.yml` on every push to `main` that changes it. Each page is a Markdown file in `docs/src/content/docs/`, in a folder per sidebar group (`start/`, `privacy/`, `reference/`, `contributing/`); its front matter sets the title, the description and its place in the group (`sidebar.order`). Images go in `docs/src/assets/`.
 
 ```bash
-make docs          # http://localhost:4321/waypoint/, reloading as you edit
+make docs          # http://localhost:4321/Waypoint/, reloading as you edit
 make docs-build    # builds it into docs/dist and fails on a broken link between pages
 ```
 
-Link to another page by its address, base included: `[Configuration](/Waypoint/reference/configuration/)`, or `/waypoint/start/docker/#errors-and-logs` for a heading. Link to files in the repository with their GitHub address.
+Link to another page by its address, base included: `[Configuration](/Waypoint/reference/configuration/)`, or `/Waypoint/start/docker/#errors-and-logs` for a heading. Link to files in the repository with their GitHub address.
 
 ## Verifying a change in the real app
 

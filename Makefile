@@ -83,7 +83,7 @@ docs/node_modules: docs/package-lock.json
 	cd docs && $(NPM) ci --no-audit --no-fund
 	touch docs/node_modules
 
-# The documentation site (Astro Starlight), with live reload at http://localhost:4321/waypoint/.
+# The documentation site (Astro Starlight), with live reload at http://localhost:4321/Waypoint/.
 docs: docs/node_modules
 	cd docs && $(NPM) run dev
 
