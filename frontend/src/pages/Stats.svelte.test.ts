@@ -94,6 +94,14 @@ describe("Stats", () => {
     for (const name of ["Flights", "Cars", "Cruises"]) expect(screen.queryByRole("region", { name })).toBeNull();
   });
 
+  it("shows just the Cars section for someone who only rented a car", async () => {
+    serve(() => ({ ...full, flights: none.flights, stays: none.stays, cruises: none.cruises }));
+    render(Stats_);
+    const cars = await screen.findByRole("region", { name: "Cars" });
+    expect(within(cars).getByText("Rental days")).toBeInTheDocument();
+    for (const name of ["Flights", "Hotels", "Cruises"]) expect(screen.queryByRole("region", { name })).toBeNull();
+  });
+
   it("counts cruises, nights aboard, sea days and ports, and lists the lines, only when there are cruises", async () => {
     serve(() => full);
     render(Stats_);
