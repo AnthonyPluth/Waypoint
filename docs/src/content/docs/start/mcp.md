@@ -11,7 +11,7 @@ Waypoint serves a [Model Context Protocol](https://modelcontextprotocol.io) endp
 
 ## Connecting
 
-Add Waypoint’s address, `<WAYPOINT_PUBLIC_URL>/mcp`, to the assistant. It’s shown with a copy button under **Settings → AI assistants (MCP)**.
+Add Waypoint’s address, `<WAYPOINT_PUBLIC_URL>/mcp`, to the assistant. It’s shown with a copy button under **Settings → Data → AI assistants (MCP)**.
 
 - Claude Code: `claude mcp add --transport http waypoint https://waypoint.example.com/mcp`
 - Claude on the web or desktop: **Settings → Connectors → Add custom connector**, with the same address.

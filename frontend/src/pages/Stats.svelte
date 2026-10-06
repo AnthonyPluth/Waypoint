@@ -163,7 +163,7 @@
     <div class="row flex-col items-start gap-3 py-6">
       <p class="font-medium">{whoName === "Everyone" ? "Nothing finished" : `Nothing finished for ${whoName}`}{sel.year ? ` in ${sel.year}` : " yet"}.</p>
       <p class="text-sm text-muted-foreground">Stats count flights, stays, rentals and cruises once they’re over.</p>
-      <div class="flex flex-wrap gap-2"><Button href="#trips">Add a trip</Button><Button variant="outline" href="#settings">Import past flights</Button></div>
+      <div class="flex flex-wrap gap-2"><Button href="#trips">Add a trip</Button><Button variant="outline" href="#settings/travel">Import past flights</Button></div>
     </div>
   </div>
 {:else if f}

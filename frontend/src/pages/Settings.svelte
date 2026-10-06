@@ -1,7 +1,7 @@
 <script lang="ts">
   import { act } from "$lib/act";
   import { api } from "$lib/api";
-  import { app } from "$lib/app.svelte";
+  import { app, route } from "$lib/app.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import AiSection from "$lib/components/settings/AiSection.svelte";
@@ -14,12 +14,20 @@
   import RemindersSection from "$lib/components/settings/RemindersSection.svelte";
   import { flightStatus, loadFlightStatus } from "$lib/flightstatus.svelte";
   import { onMount } from "svelte";
+  import { cn } from "$lib/utils";
 
   const s = $derived(app.state);
   const user = $derived(s?.user);
   let signingOut = $state(false);
   const flights = $derived(flightStatus.list);
   onMount(loadFlightStatus);
+
+  // The page's groups, as tabs kept in the address (#settings/mail): what you'd look for together. Coming back from Google
+  // (?gmail=…) lands on the mail tab, where the answer is shown.
+  const TABS = [["account", "Account"], ["mail", "Mail and AI"], ["travel", "Travel"], ["data", "Data"]] as const;
+  type Tab = (typeof TABS)[number][0];
+  const landing: Tab | "" = new URLSearchParams(location.search).has("gmail") ? "mail" : "";
+  const tab = $derived<Tab>((TABS.find(([id]) => id === route.sub)?.[0]) ?? (landing || "account"));
 
   // The server ends the session and says where to go next (the sign-in provider's own sign-out page, or Waypoint's).
   const signOut = () => act(async () => {
@@ -28,9 +36,22 @@
   }, { busy: (on) => (signingOut = on) });
 </script>
 
-<h1 class="mb-6 text-4xl font-bold tracking-tight">Settings</h1>
+<h1 class="mb-4 text-4xl font-bold tracking-tight">Settings</h1>
+
+<nav aria-label="Settings sections" class="-mx-4 mb-6 overflow-x-auto px-4 md:mx-0 md:px-0">
+  <ul class="flex w-max gap-1 rounded-2xl bg-muted p-1 md:w-fit">
+    {#each TABS as [id, label] (id)}
+      <li>
+        <a href={`#settings/${id}`} aria-current={tab === id ? "page" : undefined}
+          class={cn("block rounded-xl px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            tab === id ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground")}>{label}</a>
+      </li>
+    {/each}
+  </ul>
+</nav>
 
 <div class="space-y-8">
+  {#if tab === "account"}
   <section aria-labelledby="account-title" class="space-y-2">
     <h2 id="account-title" class="eyebrow px-1">Account</h2>
     <div class="rows">
@@ -67,20 +88,21 @@
       {/if}
     </dl>
   </section>
+  {:else if tab === "mail"}
+    <GmailSection />
 
-  <GmailSection />
+    <AiSection />
+  {:else if tab === "travel"}
+    <RemindersSection />
 
-  <ImportSection />
+    <DistanceSection />
 
-  <DistanceSection />
+    <LogosSection />
 
-  <AiSection />
+    <ImportSection />
+  {:else}
+    <McpSection />
 
-  <LogosSection />
-
-  <RemindersSection />
-
-  <McpSection />
-
-  <DataSection />
+    <DataSection />
+  {/if}
 </div>

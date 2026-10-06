@@ -266,7 +266,7 @@ describe("Stats", () => {
     const empty = await screen.findByTestId("stats-empty");
     expect(empty).toHaveTextContent("Nothing finished for Jane Doe in 2024.");
     expect(within(empty).getByRole("link", { name: "Add a trip" })).toHaveAttribute("href", "#trips");
-    expect(within(empty).getByRole("link", { name: "Import past flights" })).toHaveAttribute("href", "#settings");
+    expect(within(empty).getByRole("link", { name: "Import past flights" })).toHaveAttribute("href", "#settings/travel");
     expect(screen.getByRole("option", { name: "2024" })).toBeInTheDocument();   // the chosen year stays in the picker
   });
 

@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-**Settings → Import past flights** adds flights from another app’s CSV export, so they show on the [Trips](/Waypoint/start/trips/) page and count in distance and time travelled. You choose the file, see each row as a flight, say who was on them, and only then are the new ones added.
+**Settings → Travel → Import past flights** adds flights from another app’s CSV export, so they show on the [Trips](/Waypoint/start/trips/) page and count in distance and time travelled. You choose the file, see each row as a flight, say who was on them, and only then are the new ones added.
 
 ## What it reads
 

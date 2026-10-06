@@ -10,7 +10,7 @@ Waypoint can show the logo of each booking’s brand (an airline, a hotel chain,
 ## Set it up
 
 1. Make a free account at [logo.dev](https://www.logo.dev) and copy your **publishable key** (it starts with `pk_`).
-2. In **Settings → Brand logos**, paste it and save. Waypoint starts fetching the logos of the brands already in your bookings; they fill in over the next few minutes, and **Fetch them now** asks again for any it hasn’t fetched.
+2. In **Settings → Travel → Brand logos**, paste it and save. Waypoint starts fetching the logos of the brands already in your bookings; they fill in over the next few minutes, and **Fetch them now** asks again for any it hasn’t fetched.
 3. Optionally, paste your **secret key** (`sk_`) too. Waypoint then uses Logo.dev’s Brand Search to find the right brand for a name (a hotel named “Harbour Hotels Lisbon” is matched to “Harbour Hotels”) and keeps no logo rather than a doubtful one. Without it, Logo.dev matches the name itself, which is fine for airlines and big chains and sometimes wrong for a small hotel. Brand Search may not be in a free plan: if Logo.dev refuses it, Waypoint says so in Settings and looks brands up by name as if there were no secret key.
 
 Both keys are saved encrypted, never come back to the page and never appear in a log. Logo.dev’s dashboard lets you limit a key to certain websites: don’t, since Waypoint asks from your server, not from a web page.
