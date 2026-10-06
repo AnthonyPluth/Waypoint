@@ -653,7 +653,7 @@ class VisibilityRouteTests(RouteCase):
                  ("POST", f"/api/trips/{trip}/split", {"segment_ids": segs[:1]}),
                  ("POST", "/api/segments", {**HOTEL, "trip_id": trip})]
         for s in segs:
-            calls += [("GET", f"/api/segments/{s}", None), ("POST", f"/api/segments/{s}", {"status": "cancelled"}),
+            calls += [("GET", f"/api/segments/{s}", None), ("GET", f"/api/segments/{s}/logo", None), ("POST", f"/api/segments/{s}", {"status": "cancelled"}),
                       ("DELETE", f"/api/segments/{s}", None)]
         gone = [(m, p.replace(str(trip), "99999").replace(str(segs[0]), "99998").replace(str(segs[1]), "99997"), b) for m, p, b in calls[:3]]
         for who in ("ben",):
@@ -675,7 +675,8 @@ class VisibilityRouteTests(RouteCase):
     def test_every_trip_and_segment_route_with_an_id_is_covered_above(self):
         covered = {("GET", "/api/trips/{id}"), ("POST", "/api/trips/{id}"), ("DELETE", "/api/trips/{id}"),
                    ("POST", "/api/trips/{id}/merge"), ("POST", "/api/trips/{id}/split"), ("POST", "/api/segments"),
-                   ("GET", "/api/segments/{id}"), ("POST", "/api/segments/{id}"), ("DELETE", "/api/segments/{id}")}
+                   ("GET", "/api/segments/{id}"), ("POST", "/api/segments/{id}"), ("DELETE", "/api/segments/{id}"),
+                   ("GET", "/api/segments/{id}/logo")}
         found = {(m, p) for m, p, _ in ROUTES if p.startswith(("/api/trips/", "/api/segments"))}
         self.assertEqual(found, covered, "a new route that takes a trip or segment goes in the stranger's 404 test")
 

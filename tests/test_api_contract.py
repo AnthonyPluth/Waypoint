@@ -22,6 +22,7 @@ from waypoint.domain.mail import review, scan
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
 from waypoint.server.api import ai as ai_api
+from waypoint.server.api import logos as logos_api
 from waypoint.server.api import backups, flight_import as flight_import_api, flightstatus as flightstatus_api, mailboxes, people, state, stats as stats_api
 from waypoint.server.api import mcp as mcp_api
 from waypoint.server.api import review as review_api
@@ -114,6 +115,7 @@ class Replies(DbCase):
         self.test_mailboxes()
         self.test_review()
         self.test_ai()
+        self.test_logodev()
         self.test_people()
         self.test_trips()
         self.test_stats()
@@ -191,6 +193,13 @@ class Replies(DbCase):
         self.check("POST /api/ai", ai_api.api_ai_save(self.c, {}, {"mode": "local", "ollama_url": "http://ollama.example:1234", "ollama_model": "llama3"}))
         self.check("POST /api/ai", ai_api.api_ai_save(self.c, {}, {"mode": "openrouter", "openrouter_model": "some/model", "openrouter_key": "sk-or-test-1234567"}))
         self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))
+
+    def test_logodev(self):
+        self.check("GET /api/logodev", logos_api.api_logodev(self.c, {}, {}))   # off
+        with mock.patch.object(logos_api.jobs, "fetch_logos_now", return_value=True):
+            self.check("POST /api/logodev", logos_api.api_logodev_save(self.c, {}, {"token": "pk_test-publishable-1234"}))
+            self.check("POST /api/logodev/fetch", logos_api.api_logodev_fetch(self.c, {}, {}))
+        self.check("GET /api/logodev", logos_api.api_logodev(self.c, {}, {}))
 
     def test_people(self):
         self.check("GET /api/people", people.api_people(self.c, {}, {}))   # nobody yet
@@ -348,7 +357,7 @@ class Generated(unittest.TestCase):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
                                      "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan",
                                      "POST /api/mailboxes/{id}/reread",
-                                     "GET /api/ai", "POST /api/ai",
+                                     "GET /api/ai", "POST /api/ai", "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "DELETE /api/review/{id}",
                                      "GET /api/review/{id}/preview", "POST /api/review/{id}/suggest",
                                      "GET /api/people", "POST /api/people",

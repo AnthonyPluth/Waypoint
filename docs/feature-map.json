@@ -337,7 +337,21 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_logos.py",
         "tests/test_mcp.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/segments/{id}/logo",
+      "handler": "waypoint/server/api/logos.py:api_segment_logo",
+      "web": [],
+      "tests": [
+        "tests/test_logos.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -353,6 +367,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_logos.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_trips.py"
@@ -370,6 +385,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_logos.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_trips.py"
@@ -498,6 +514,51 @@
       ],
       "docs": [
         "start/flight-status"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/logodev",
+      "handler": "waypoint/server/api/logos.py:api_logodev",
+      "web": [
+        "frontend/src/lib/components/settings/LogosSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_logos.py"
+      ],
+      "docs": [
+        "start/logos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/logodev",
+      "handler": "waypoint/server/api/logos.py:api_logodev_save",
+      "web": [
+        "frontend/src/lib/components/settings/LogosSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_logos.py"
+      ],
+      "docs": [
+        "start/logos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/logodev/fetch",
+      "handler": "waypoint/server/api/logos.py:api_logodev_fetch",
+      "web": [
+        "frontend/src/lib/components/settings/LogosSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_logos.py"
+      ],
+      "docs": [
+        "start/logos"
       ]
     },
     {

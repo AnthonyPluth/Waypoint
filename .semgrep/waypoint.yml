@@ -152,6 +152,18 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/flightstatus.py"]
 
+  - id: waypoint-logodev-hosts
+    message: >-
+      Only waypoint/providers/logodev.py talks to Logo.dev, so what a request carries (a brand's name, never a traveller, a
+      date or a confirmation code) and the keys stay in one place (AGENTS.md, "Email stays on the server"): call it rather
+      than naming its hosts elsewhere.
+    severity: ERROR
+    languages: [python]
+    pattern-regex: (?i)(img|api)\.logo\.dev
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/providers/logodev.py"]
+
   - id: waypoint-ai-hosts
     message: >-
       Only waypoint/domain/mail/ai.py may send anything to an AI service, and only when the household turned the AI

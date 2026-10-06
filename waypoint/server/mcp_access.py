@@ -44,7 +44,7 @@ SWITCHES = {WRITE: sk.MCP_ALLOW_WRITES}
 # these settings. Importing past flights takes a file, which /mcp (JSON only) can't send.
 BLOCKED = (
     "/api/mcp-settings", "/api/mailboxes", "/api/review", "/api/ai", "/api/backup", "/api/restore", "/api/state", "/api/feed",
-    "/api/reminders", "/api/flight-status/{id}", "/api/import", "/api/loyalty",
+    "/api/reminders", "/api/flight-status/{id}", "/api/import", "/api/loyalty", "/api/logodev",
 )
 
 # GET pages "write" also opens: what its changes need to find what to change. None holds a number or a secret.

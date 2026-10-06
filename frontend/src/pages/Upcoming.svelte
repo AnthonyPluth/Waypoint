@@ -5,6 +5,7 @@
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import BrandLogo from "$lib/components/BrandLogo.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
@@ -99,7 +100,10 @@
     <section class="pass mb-8" aria-labelledby="next-title">
       <div class="flex flex-col gap-3 p-6 md:p-8">
         <p class="eyebrow">{next.state === "now" ? "Under way" : "Next up"}</p>
-        <h2 id="next-title" class="break-words text-2xl font-semibold tracking-tight">{headline(s)}</h2>
+        <div class="flex items-center gap-3">
+          <BrandLogo src={s.logo} size={48} />
+          <h2 id="next-title" class="min-w-0 break-words text-2xl font-semibold tracking-tight">{headline(s)}</h2>
+        </div>
         <p class="text-lg font-medium" data-countdown>
           {next.state === "now" ? when(END_WORD[s.kind], endAt(s) - now) : when(START_WORD[s.kind], startAt(s) - now)}
         </p>
@@ -146,6 +150,7 @@
             {#each day.items as item (`${item.segment.id}-${item.role}`)}
               {@const seg = item.segment}
               <li class="row items-start" class:opacity-60={seg.status === "cancelled"}>
+                <BrandLogo src={seg.logo} size={32} class="mt-0.5" />
                 <div class="min-w-0 flex-1">
                   <p class="break-words font-medium" class:line-through={seg.status === "cancelled"}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${headline(seg)}` : headline(seg)}</p>
                   {#if item.role === "start" && subline(seg)}<p class="break-words text-sm text-muted-foreground">{subline(seg)}</p>{/if}

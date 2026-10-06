@@ -167,6 +167,30 @@ class AiSettings(TypedDict):
     key: Literal["env", "saved"] | None            # where the OpenRouter key comes from; the key itself never comes back
 
 
+# Brand logos (optional, off until a Logo.dev key is saved)
+
+class LogoDevStatus(TypedDict):
+    configured: bool                # a publishable key is saved (the key itself never comes back)
+    searchable: bool                # a secret key is saved too: Brand Search picks the brand
+    with_logo: int                  # brands that have a logo
+    unknown: int                    # brands Logo.dev has none for
+    waiting: int                    # brands not asked about yet
+    last_error: str | None          # why the last round failed (fixed text)
+
+
+class LogoDevFetch(TypedDict):
+    started: bool                   # false when a round of fetching was already running
+
+
+class LogoDevBody(TypedDict):
+    """Settings → Logos. A field left out stays as it was; `clear` forgets the publishable key (and so the secret one too),
+    `clear_secret` forgets only the secret key."""
+    token: NotRequired[str]         # the publishable key, pk_...
+    secret: NotRequired[str]        # the secret key, sk_...
+    clear: NotRequired[bool]
+    clear_secret: NotRequired[bool]
+
+
 class AiBody(TypedDict):
     """Settings → AI. A field left out stays as it was; `openrouter_key: ""` forgets the saved key."""
     mode: Literal["off", "local", "openrouter"]
@@ -259,6 +283,7 @@ class Segment(TypedDict):
     check_times: bool               # an email's times couldn't be settled: the card asks for a look, until they're edited or confirmed
     travelers: list[Traveler]
     itinerary: list[Port]           # a cruise's ports of call in order (empty for anything else)
+    logo: str | None                # where Waypoint serves its brand's logo (the airline, hotel, rental company or cruise line), when it has one
     links: SegmentLinks              # the card's actions, built by the server
 
 

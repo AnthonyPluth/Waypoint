@@ -18,6 +18,7 @@ FEATURE_MAP = json.loads((ROOT / "docs/feature-map.json").read_text())
 NOT_JSON = {
     "GET /api/backup": "a .json.gz file to keep",
     "GET /api/mailboxes/callback": "a redirect back to Settings, where Google sends the browser",
+    "GET /api/segments/{id}/logo": "a brand's logo, an image",
 }
 
 

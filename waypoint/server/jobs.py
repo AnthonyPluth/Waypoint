@@ -1,5 +1,5 @@
 """Background jobs: the sweep that ends Gmail connections, notification devices and calendar feeds whose owners can no longer
-sign in, the flight status checks, the reminders, and the mail scan (every few hours, and on "Scan now")."""
+sign in, the flight status checks, the reminders, the brand logos and the mail scan (every few hours, and on "Scan now")."""
 from __future__ import annotations
 
 import threading
@@ -7,16 +7,18 @@ import time
 from datetime import UTC, date, datetime
 
 from .. import monitoring, oidc
-from ..domain import flightstatus, reminders
+from ..domain import flightstatus, logos, reminders
 from ..domain.mail import scan
 from ..providers import gmail
 from ..storage import db
 
 SUBJECT = "mailto:waypoint@localhost"   # the contact a push service gets with each notification (RFC 8292) when there's no WAYPOINT_PUBLIC_URL; no one's address
+_fetching = threading.Lock()   # a logo round is running
 SWEEP_EVERY = 3600   # seconds
 FLIGHT_STATUS_EVERY = 300   # the checks are at set points before a flight (20 minutes is the closest), so a round this often is enough
 REMINDERS_EVERY = 300   # a reminder is sent in the round after it falls due, so up to five minutes late
 SCAN_EVERY = 4 * 3600
+LOGOS_EVERY = 900    # a round fetches a few brands (logos.PER_ROUND), so a new booking's logo shows up within the hour
 SCAN_FIRST = 300     # the first scan waits this long after Waypoint starts
 
 
@@ -52,6 +54,29 @@ def check_flights() -> None:
             flightstatus.run_due(conn, datetime.now(UTC))
     except Exception as e:   # the next round tries again; never the details (they may name a row)
         monitoring.report(e, values=False)
+
+
+def fetch_logos() -> None:
+    """Fetch the logos of the brands in bookings that Waypoint hasn't asked Logo.dev about (when a key is saved)."""
+    try:
+        with db.session() as conn:
+            logos.fetch_due(conn, datetime.now(UTC))
+    except Exception as e:   # the next round tries again; never the details (they may name a row)
+        monitoring.report(e, values=False)
+
+
+def fetch_logos_now() -> bool:
+    """Start a round of logo fetching in the background (a key was just saved, or "Fetch them now"). False when one is running."""
+    if not _fetching.acquire(blocking=False):
+        return False
+
+    def run() -> None:
+        try:
+            fetch_logos()
+        finally:
+            _fetching.release()
+    threading.Thread(target=run, daemon=True, name="logos-now").start()
+    return True
 
 
 def scan_mailboxes() -> None:
@@ -95,6 +120,7 @@ def start(stop: threading.Event) -> list[threading.Thread]:
     threads = [threading.Thread(target=every, args=(SWEEP_EVERY, sweep_lapsed), daemon=True, name="gmail-lapse-sweep"),
                threading.Thread(target=every, args=(FLIGHT_STATUS_EVERY, check_flights), daemon=True, name="flight-status"),
                threading.Thread(target=every, args=(REMINDERS_EVERY, send_reminders), daemon=True, name="reminders"),
+               threading.Thread(target=every, args=(LOGOS_EVERY, fetch_logos, 60), daemon=True, name="logos"),
                threading.Thread(target=every, args=(SCAN_EVERY, scan_mailboxes, SCAN_FIRST), daemon=True, name="mail-scan")]
     for t in threads:
         t.start()

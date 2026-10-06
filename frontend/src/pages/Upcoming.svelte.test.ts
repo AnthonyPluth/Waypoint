@@ -81,6 +81,15 @@ describe("Upcoming", () => {
     expect(await navigator.clipboard.readText()).toBe("KQ7M2X");
   });
 
+  it("shows a booking’s brand logo on the Next up card and in the day-by-day list, and no image for one without", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([trip([segment({ id: 1, logo: "/api/segments/1/logo" }), stay, home])]);
+    const { container } = render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
+    expect(card.querySelector("img")?.getAttribute("src")).toBe("/api/segments/1/logo");
+    expect([...container.querySelectorAll("img")].map((i) => i.getAttribute("src"))).toEqual(["/api/segments/1/logo", "/api/segments/1/logo"]);
+  });
+
   it("shows the flight’s live status on the Next up card", async () => {
     at("2026-11-20T09:00:00-05:00");
     vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? delayed : { trips: [london] }) as never);

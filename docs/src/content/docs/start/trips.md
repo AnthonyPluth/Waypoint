@@ -67,6 +67,8 @@ When you change a field of a segment, Waypoint remembers it was you and a later 
 
 With a RapidAPI key set, a flight’s card also shows its live status (delays, gate, terminal) beside the booked times, which it never changes. See [Live flight status](/waypoint/start/flight-status/).
 
+With a Logo.dev key saved in Settings, each booking also shows its airline’s, hotel’s, rental company’s or cruise line’s logo. See [Brand logos](/waypoint/start/logos/).
+
 ## In a backup
 
 Trips, segments and their travellers are part of a [backup](/waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list isn’t: every Waypoint has it already.

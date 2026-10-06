@@ -8,6 +8,7 @@
   import DistanceSection from "$lib/components/settings/DistanceSection.svelte";
   import DataSection from "$lib/components/settings/DataSection.svelte";
   import GmailSection from "$lib/components/settings/GmailSection.svelte";
+  import LogosSection from "$lib/components/settings/LogosSection.svelte";
   import ImportSection from "$lib/components/settings/ImportSection.svelte";
   import McpSection from "$lib/components/settings/McpSection.svelte";
   import RemindersSection from "$lib/components/settings/RemindersSection.svelte";
@@ -74,6 +75,8 @@
   <DistanceSection />
 
   <AiSection />
+
+  <LogosSection />
 
   <RemindersSection />
 
