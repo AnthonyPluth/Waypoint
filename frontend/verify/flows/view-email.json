@@ -1,0 +1,14 @@
+{
+  "name": "view-email",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Chicago') >> visible=true" },
+    { "wait_for": "button:has-text('View email')" },
+    { "click": "button:has-text('View email') >> visible=true" },
+    { "wait_for": "[data-testid='message-subject']" },
+    { "expect_text": { "selector": "main", "text": "Your itinerary: flight EX 410" } },
+    { "scroll_to": "[data-testid='message-subject']" },
+    { "screenshot": "booking-email" }
+  ]
+}

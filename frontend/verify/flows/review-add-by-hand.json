@@ -1,0 +1,13 @@
+{
+  "name": "review-add-by-hand",
+  "page": "review",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Review" } },
+    { "wait_for": "[data-testid='review-item']" },
+    { "click": "button:has-text('Add by hand') >> nth=0" },
+    { "wait_for": "[data-testid='message-subject']" },
+    { "expect_text": { "selector": "main", "text": "made-up details" } },
+    { "scroll_to": "[data-testid='preview']" },
+    { "screenshot": "message-beside-form" }
+  ]
+}

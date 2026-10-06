@@ -8,8 +8,9 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, select
 
-from ..storage import db, secretbox
-from ..storage.models import FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentPort, SegmentTraveler, Trip, User
+from ..storage import db, secretbox, stored_mail
+from ..storage.models import (FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentMessage, SegmentPort, SegmentTraveler,
+                              StoredMessage, Trip, User)
 from . import loyalty, people, trips
 from .mail import review
 from .visibility import Viewer
@@ -170,6 +171,14 @@ def _read_from_email(today: date) -> trips.SegmentIn:
     return {"kind": "flight", "origin": "JFK", "destination": "ORD", "start_local": _at(today, 60, "07:00"), "end_local": _at(today, 60, "08:45"),
             "confirmation": "CH3K5P", "provider": "Example Air", "details": {"flight_number": "EX 410"}}
 
+def _message(domain: str, days_ago: int, today: date, subject: str, lines: tuple[str, ...]) -> stored_mail.Content:
+    """A made-up email, as a scan would have kept it (its text and the markup of it)."""
+    return {"subject": subject, "sender_domain": domain, "received": (today - timedelta(days=days_ago)).isoformat(), "text": "\n".join(lines),
+            "html": "".join(f"<p>{line}</p>" for line in lines), "truncated": False}
+
+
+SUBJECTS = {"example-air.example": "Your itinerary", "example-stays.example": "Your reservation", "example-cruises.example": "Your cruise booking"}
+
 # The household's one connected mailbox, and two messages Waypoint couldn't read (sender's domain, days before today, why).
 DEMO_MAILBOX = "jane.doe@gmail.example"
 UNREAD: list[tuple[str, int, review.Reason]] = [("example-air.example", 21, "no_markup"), ("example-stays.example", 15, "incomplete")]
@@ -213,19 +222,27 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id)})
     for fields in _sam_alone(today):
         trips.add_segment(conn, sam, {**fields, "travelers": _on(sam.person_id)})
-    trips.add_segment(conn, jane, {**_read_from_email(today), "travelers": [{"person_id": None, "name": "RIVERA/ALEX MR"}]}, source="email")
+    from_email = trips.add_segment(conn, jane, {**_read_from_email(today), "travelers": [{"person_id": None, "name": "RIVERA/ALEX MR"}]}, source="email")
     box = Mailbox(owner_sub="local", address=DEMO_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
                   status="connected", created=0.0, last_scan=None)
     conn.orm.add(box)
     conn.orm.flush()
     for domain, ago, reason in UNREAD:
         review.add(conn, box.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
+        stored_mail.put(conn, box.id, f"demo-{domain}", _message(domain, ago, today, f"{SUBJECTS[domain]}: made-up details",
+                                                                 ("Hello Jane,", "These are made-up details for the demo.", "Confirmation: DEMO42")), 0.0)
+    if from_email:   # (the email the demo's flight was read from, so its card has a View email button)
+        stored_mail.put(conn, box.id, "demo-read-from-email", _message("example-air.example", 60, today, "Your itinerary: flight EX 410",
+                                                                       ("Hello,", "Your flight EX 410 leaves New York (JFK) at 7:00 am.", "Confirmation: CH3K5P")), 0.0)
+        stored_mail.link(conn, from_email["id"], box.id, "demo-read-from-email")
     shared = Mailbox(owner_sub="demo-sam", address=DEMO_SHARED_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
                      status="connected", created=0.0, last_scan=None, share_review=True)
     conn.orm.add(shared)
     conn.orm.flush()
     for domain, ago, reason in SHARED_UNREAD:
         review.add(conn, shared.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
+        stored_mail.put(conn, shared.id, f"demo-{domain}", _message(domain, ago, today, f"{SUBJECTS[domain]}: made-up details",
+                                                                    ("Hello,", "These are made-up details for the demo.")), 0.0)
     by_name = {p["display_name"]: p["id"] for p in people.everyone(conn)}
     for who, kind, program, number, expiry, notes in MEMBERSHIPS:
         loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number,
@@ -236,4 +253,4 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
 
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
-               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem))
+               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage))
