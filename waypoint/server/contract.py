@@ -113,12 +113,14 @@ class AiSuggestion(TypedDict):
 
 class ReviewItem(TypedDict):
     """One message Waypoint couldn't read, for the member whose mailbox it is and, when its owner shares that mailbox, the
-    household. Never its subject or text: only who it came from and its day (Open in Gmail shows the message, to its owner)."""
+    household. Who it came from, its day and its subject; the message itself comes from `GET /api/review/{id}/preview`."""
     id: int
     address: str                    # the mailbox it came from
     owner: str                      # whose mailbox it is
     mine: bool                      # the signed-in member's own; false: shared with them, and they can only add it by hand or dismiss it
     sender_domain: str              # empty when the message didn't say
+    subject: str | None             # the message's subject; null when the message wasn't kept (an item from before, or its key was lost)
+    has_email: bool                 # the message is kept: Add by hand shows it beside the form, for everyone who sees the item
     received: str | None            # a day, YYYY-MM-DD
     reason: Literal["no_markup", "incomplete", "broken"]   # no booking details in it; some missing; couldn't be opened
     gmail_url: str | None           # opens the message in Gmail; none for someone else's
@@ -148,10 +150,27 @@ class Review(TypedDict):
 
 class Preview(TypedDict):
     """A review item's message as plain text and, when it has an HTML part, as markup rebuilt from an allowlist (no scripts, styles,
-    images or remote loads), fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps none of it."""
+    images or remote loads). Read from the kept copy for anyone who sees the item; an item with none is fetched from Gmail for its
+    mailbox's owner alone, and kept from then on."""
+    subject: str | None
     text: str
     html: str | None                # null: the message has no HTML part
     truncated: bool                 # cut at 30,000 characters
+
+
+class StoredEmail(TypedDict):
+    """A message a booking was made from, as kept: text and markup as in `Preview`, cut at 30,000 characters."""
+    subject: str | None
+    sender_domain: str | None
+    received: str | None            # a day, YYYY-MM-DD
+    text: str
+    html: str | None
+    truncated: bool
+
+
+class SegmentEmails(TypedDict):
+    """The messages a booking was made from (or updated by), newest first, for whoever can see the booking."""
+    emails: list[StoredEmail]
 
 
 class WhoBody(TypedDict):
@@ -294,6 +313,7 @@ class Segment(TypedDict):
     itinerary: list[Port]           # a cruise's ports of call in order (empty for anything else)
     logo: str | None                # where Waypoint serves its brand's logo (the airline, hotel, rental company or cruise line), when it has one
     logo_label: str | None          # a hotel brand's name ("Hyatt Regency") when the logo is its group's, not the brand's own; else null
+    has_email: bool                 # a message it was made from is kept: `GET /api/segments/{id}/emails`
     links: SegmentLinks              # the card's actions, built by the server
 
 

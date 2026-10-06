@@ -12,7 +12,7 @@ from .common import ApiError, server_error
 
 from .api.ai import api_ai, api_ai_save
 from .api.backups import api_backup, api_backup_inspect, api_restore
-from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_edit, api_segment_remove, api_trip,
+from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_edit, api_segment_emails, api_segment_remove, api_trip,
                         api_trip_add, api_trip_edit, api_trip_merge, api_trip_remove, api_trip_split, api_trips)
 from .api.flight_import import api_import, api_import_preview
 from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
@@ -55,6 +55,7 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/segments", api_segment_add),
     ("GET", "/api/segments/{id}", api_segment),
     ("GET", "/api/segments/{id}/logo", api_segment_logo),
+    ("GET", "/api/segments/{id}/emails", api_segment_emails),
     ("POST", "/api/segments/{id}", api_segment_edit),
     ("DELETE", "/api/segments/{id}", api_segment_remove),
     ("GET", "/api/airports/{id}", api_airport),

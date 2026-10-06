@@ -190,8 +190,9 @@ rules:
   - id: waypoint-message-body
     message: >-
       A message's body (Gmail's `payload`, `raw` and `parts`, the decoded text, an email parsed into parts) is read
-      only in waypoint/domain/mail/extract.py, in memory, and what leaves it is the fields of a booking (AGENTS.md,
-      "Email stays on the server"). Pass the message to extract.read() instead of looking inside it.
+      only in waypoint/domain/mail/extract.py, in memory, and what leaves it is the fields of a booking, or the cleaned copy
+      kept while a review item or a booking needs it (extract.keep(); AGENTS.md, "Email stays on the server"). Pass the
+      message to extract.read() or extract.keep() instead of looking inside it.
     severity: ERROR
     languages: [python]
     pattern-either:

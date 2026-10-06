@@ -210,6 +210,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_flight_import.py",
+        "tests/test_mail_scan.py",
         "tests/test_mcp_routes.py",
         "tests/test_routes.py",
         "tests/test_trips.py"
@@ -325,6 +326,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mail_scan.py",
         "tests/test_mcp_routes.py",
         "tests/test_reminders.py",
         "tests/test_trips.py"
@@ -341,6 +343,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_logos.py",
+        "tests/test_mail_scan.py",
         "tests/test_mcp.py",
         "tests/test_trips.py"
       ],
@@ -355,6 +358,22 @@
       "web": [],
       "tests": [
         "tests/test_logos.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/segments/{id}/emails",
+      "handler": "waypoint/server/api/trips.py:api_segment_emails",
+      "web": [
+        "frontend/src/pages/Trip.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py",
         "tests/test_trips.py"
       ],
       "docs": [

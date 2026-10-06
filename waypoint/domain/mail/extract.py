@@ -27,6 +27,7 @@ from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ... import monitoring
+from ...storage.stored_mail import Content
 from . import parsers, safe_html
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
@@ -647,3 +648,27 @@ def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
         except (ValueError, RecursionError, AssertionError):
             continue
     return re.sub(r"\n\s*\n+", "\n", "".join(scanner.parts))[:limit]
+
+
+SUBJECT_LIMIT = 300
+KEPT_LIMIT = 30_000   # characters of a message kept, as text and as markup (the most the app shows)
+
+
+def keep(message: Mapping[str, Any]) -> Content:
+    """What is kept of a message while it is needed (waypoint/storage/stored_mail.py): its subject, the sender's domain and day,
+    its text and its cleaned markup, each cut at KEPT_LIMIT. Never raises: a message that can't be decoded keeps nothing."""
+    data = _decode(message.get("raw"))
+    subject: str | None = None
+    sender: str | None = None
+    received: str | None = None
+    if data is not None:
+        try:
+            parsed = email.message_from_bytes(data, policy=email.policy.default)
+            subject = " ".join(str(parsed.get("Subject") or "").split())[:SUBJECT_LIMIT] or None
+            sender, received = _domain(parsed.get("From")), _day(parsed.get("Date"))
+        except (ValueError, LookupError, TypeError):
+            subject = None
+    text = plain_text(message, KEPT_LIMIT + 1)
+    shown = safe_markup(message, KEPT_LIMIT)
+    return {"subject": subject, "sender_domain": sender, "received": received, "text": text[:KEPT_LIMIT],
+            "html": shown[0] if shown else None, "truncated": len(text) > KEPT_LIMIT or bool(shown and shown[1])}

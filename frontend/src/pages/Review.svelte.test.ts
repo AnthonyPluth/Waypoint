@@ -12,7 +12,7 @@ import { toast } from "svelte-sonner";
 import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
 
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
-  id: 1, address: "ana@gmail.example", owner: "Ana Doe", mine: true, sender_domain: "example-air.example", received: "2026-10-17",
+  id: 1, address: "ana@gmail.example", owner: "Ana Doe", mine: true, sender_domain: "example-air.example", subject: null, has_email: true, received: "2026-10-17",
   reason: "no_markup", gmail_url: "https://mail.google.com/mail/?authuser=ana%40gmail.example#all/abc", suggestion: null, suggestion_error: null, ...extra });
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
@@ -37,10 +37,10 @@ function serve(failOn?: string) {
     if (path === "/api/people") return { people: [jane, mia] } as never;
     if (path === "/api/review") return held as never;
     if (path === "/api/state") return {} as never;
-    if (path === "/api/segments") return {} as never;
+    if (path === "/api/segments") return { id: 42 } as never;
     if (path.endsWith("/preview")) { if (previewFails) throw new Error(previewFails); return { text: PREVIEW, html: null, truncated } as never; }
     if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestion: SUGGESTION })) }; return { ok: true } as never; }
-    if (opts?.method === "DELETE" || path.endsWith("/ignore")) { const id = Number(path.split("/")[3]); held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true } as never; }
+    if (opts?.method === "DELETE" || path.endsWith("/ignore")) { const id = Number(path.split("/")[3]?.split("?")[0]); held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true } as never; }
     if (path.startsWith("/api/review/who/")) { const id = Number(path.split("/")[4]); held = { ...held, who: held.who.filter((w) => w.id !== id) }; return { ok: true, matched: 2 } as never; }
     throw new Error(`unexpected ${path}`);
   });
@@ -59,6 +59,15 @@ describe("Review", () => {
     expect(open).toHaveAttribute("href", "https://mail.google.com/mail/?authuser=ana%40gmail.example#all/abc");
     expect(open).toHaveAttribute("rel", "noopener noreferrer");
     expect(open).toHaveAttribute("target", "_blank");
+  });
+
+  it("names an item by its message's subject, and says who it came from beside it", async () => {
+    held = { items: [item({ subject: "Your itinerary: EX 410" })], who: [], ai: false };
+    render(ReviewPage);
+    const list = await screen.findByRole("list", { name: "Couldn’t read" });
+    expect(within(list).getByText("Your itinerary: EX 410")).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "Add “Your itinerary: EX 410” by hand" })).toBeInTheDocument();   // (the button is named as it reads)
+    expect(within(list).getByText("Sent 2026-10-17 · to ana@gmail.example")).toBeInTheDocument();
   });
 
   it("says what it can when the sender or the day isn’t there", async () => {
@@ -82,13 +91,13 @@ describe("Review", () => {
     expect(screen.queryByRole("button", { name: /Ask AI about all/ })).toBeNull();
   });
 
-  it("adds a shared item by hand without asking Gmail for its message, and dismisses it", async () => {
+  it("opens a shared item's message beside the form like any other, and dismisses it", async () => {
     held = { items: [item({ id: 4, mine: false, owner: "Sam Doe", gmail_url: null }), item({ id: 5, mine: true })], who: [], ai: false };
     render(ReviewPage);
     const row = (await screen.findAllByTestId("review-item"))[0];
     await userEvent.click(within(row).getByRole("button", { name: /by hand/ }));
     expect(await screen.findByLabelText(/Confirmation/)).toBeInTheDocument();
-    expect(calls.some(([path]) => path.endsWith("/preview"))).toBe(false);   // (only its owner's Gmail can give the message)
+    expect(calls).toContainEqual(["/api/review/4/preview", undefined, undefined]);   // (the kept copy: anyone who sees the item may read it)
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await userEvent.click(within(row).getByRole("button", { name: /Dismiss/ }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/4", "DELETE", undefined]));
@@ -126,7 +135,7 @@ describe("Review", () => {
     await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", {
       kind: "flight", start_local: "2027-01-02T07:15", end_local: "2027-01-02T09:40", provider: "Example Air", confirmation: "ZZ9Y8X",
       origin: "BOS", destination: "DEN" }]));
-    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42", "DELETE", undefined]));   // (the booking keeps the message it came from)
     expect(toast.success).toHaveBeenCalledWith("Added to your trips");
     expect(screen.queryByRole("form")).toBeNull();
   });
@@ -278,6 +287,14 @@ describe("Review: the AI’s suggestion", () => {
 });
 
 describe("Review: the message beside the form", () => {
+  it("shows the message's subject above its text beside the form", async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview") ? { subject: "Your itinerary", text: "Gate B12", html: null, truncated: false }
+      : path === "/api/people" ? { people: [] } : held) as never);
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
+    expect(await screen.findByTestId("message-subject")).toHaveTextContent("Your itinerary");
+  });
+
   it("shows the message as plain text beside the form, and has no separate Preview button", async () => {
     render(ReviewPage);
     await screen.findByTestId("review-item");
@@ -326,7 +343,7 @@ describe("Review: the message beside the form", () => {
     truncated = true;
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
-    expect(await screen.findByText(/Cut short here: open it in Gmail for the rest/)).toBeInTheDocument();
+    expect(await screen.findByText(/Cut short here/)).toBeInTheDocument();
   });
 
   it("says why it couldn’t be fetched, and tries again when asked again", async () => {

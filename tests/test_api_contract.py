@@ -7,7 +7,7 @@ import json
 import unittest
 from pathlib import Path
 
-from waypoint.storage import backup, db, secretbox
+from waypoint.storage import backup, db, secretbox, stored_mail
 from waypoint.storage.models import LoyaltyId, Mailbox
 from waypoint.storage import settings_keys as sk
 from unittest import mock
@@ -183,8 +183,13 @@ class Replies(DbCase):
         self.check("GET /api/review", listed)
         self.check("POST /api/review/who/{id}", review_api.api_review_who(self.c, {}, {"person_id": me.person_id}, str(listed["who"][0]["id"])))
         self.check("POST /api/review/{id}/ignore", review_api.api_review_ignore(self.c, {}, {}, str(listed["items"][0]["id"])))
-        with mock.patch.object(scan, "preview", return_value=("Hello.", "<p>Hello.</p>", False)):
-            self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][1]["id"])))
+        self.c.commit()   # (the preview opens a session of its own)
+        stored_mail.put(self.c, box, "m1", {"subject": "Your itinerary", "sender_domain": "air1.example", "received": "2026-10-17", "text": "Hello.",
+                                            "html": "<p>Hello.</p>", "truncated": False}, 1.0)
+        self.c.commit()
+        self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][1]["id"])))   # (the kept copy)
+        with mock.patch.object(scan, "preview", return_value=("Hello.", "<p>Hello.</p>", False)):   # (an item with none: fetched from Gmail)
+            self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][2]["id"])))
         with mock.patch.object(scan, "suggest_now"):
             self.check("POST /api/review/{id}/suggest", review_api.api_review_suggest(None, {}, {}, str(listed["items"][1]["id"])))
         self.check("DELETE /api/review/{id}", review_api.api_review_dismiss(self.c, {}, {}, str(listed["items"][1]["id"])))
@@ -284,6 +289,12 @@ class Replies(DbCase):
                                                       "details": {"seat": "34K"}, "travelers": [{"name": "DOE/JANE MS"}]})
         self.check("POST /api/segments", seg)
         self.check("GET /api/segments/{id}", trips_api.api_segment(self.c, {}, {}, str(seg["id"])))
+        box = self.c.execute(insert(Mailbox).values(owner_sub="u9", address="jane@gmail.example", token=secretbox.encrypt("t"), status="connected",
+                                                    created=1.0)).lastrowid
+        stored_mail.put(self.c, box, "m9", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-02-20", "text": "Hello.",
+                                            "html": None, "truncated": False}, 1.0)   # type: ignore[arg-type]
+        stored_mail.link(self.c, seg["id"], box, "m9")   # type: ignore[arg-type]
+        self.check("GET /api/segments/{id}/emails", trips_api.api_segment_emails(self.c, {}, {}, str(seg["id"])))
         self.check("POST /api/segments/{id}", trips_api.api_segment_edit(self.c, {}, {"status": "changed"}, str(seg["id"])))
         self.check("GET /api/trips", trips_api.api_trips(self.c, {}, {}))
         self.check("GET /api/trips/{id}", trips_api.api_trip(self.c, {}, {}, str(seg["trip_id"])))
@@ -368,7 +379,7 @@ class Generated(unittest.TestCase):
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
-                                     "DELETE /api/segments/{id}", "GET /api/airports/{id}",
+                                     "DELETE /api/segments/{id}", "GET /api/segments/{id}/emails", "GET /api/airports/{id}",
                                      "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",

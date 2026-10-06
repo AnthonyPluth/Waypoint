@@ -810,6 +810,37 @@
         }
       }
     },
+    "/api/segments/{id}/emails": {
+      "get": {
+        "operationId": "api_segment_emails",
+        "x-handler": "waypoint/server/api/trips.py:api_segment_emails",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentEmails"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/airports/{id}": {
       "get": {
         "operationId": "api_airport",
@@ -3364,8 +3395,14 @@
       },
       "Preview": {
         "type": "object",
-        "description": "A review item's message as plain text and, when it has an HTML part, as markup rebuilt from an allowlist (no scripts, styles,\nimages or remote loads), fetched from Gmail when asked and shown to its mailbox's owner alone; Waypoint keeps none of it.",
+        "description": "A review item's message as plain text and, when it has an HTML part, as markup rebuilt from an allowlist (no scripts, styles,\nimages or remote loads). Read from the kept copy for anyone who sees the item; an item with none is fetched from Gmail for its\nmailbox's owner alone, and kept from then on.",
         "properties": {
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "text": {
             "type": "string"
           },
@@ -3380,6 +3417,7 @@
           }
         },
         "required": [
+          "subject",
           "text",
           "html",
           "truncated"
@@ -3542,7 +3580,7 @@
       },
       "ReviewItem": {
         "type": "object",
-        "description": "One message Waypoint couldn't read, for the member whose mailbox it is and, when its owner shares that mailbox, the\nhousehold. Never its subject or text: only who it came from and its day (Open in Gmail shows the message, to its owner).",
+        "description": "One message Waypoint couldn't read, for the member whose mailbox it is and, when its owner shares that mailbox, the\nhousehold. Who it came from, its day and its subject; the message itself comes from `GET /api/review/{id}/preview`.",
         "properties": {
           "id": {
             "type": "integer"
@@ -3558,6 +3596,15 @@
           },
           "sender_domain": {
             "type": "string"
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_email": {
+            "type": "boolean"
           },
           "received": {
             "type": [
@@ -3601,6 +3648,8 @@
           "owner",
           "mine",
           "sender_domain",
+          "subject",
+          "has_email",
           "received",
           "reason",
           "gmail_url",
@@ -3741,6 +3790,9 @@
               "null"
             ]
           },
+          "has_email": {
+            "type": "boolean"
+          },
           "links": {
             "$ref": "#/components/schemas/SegmentLinks"
           }
@@ -3768,6 +3820,7 @@
           "itinerary",
           "logo",
           "logo_label",
+          "has_email",
           "links"
         ],
         "additionalProperties": false
@@ -3960,6 +4013,22 @@
           }
         },
         "required": [],
+        "additionalProperties": false
+      },
+      "SegmentEmails": {
+        "type": "object",
+        "description": "The messages a booking was made from (or updated by), newest first, for whoever can see the booking.",
+        "properties": {
+          "emails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoredEmail"
+            }
+          }
+        },
+        "required": [
+          "emails"
+        ],
         "additionalProperties": false
       },
       "SegmentLinks": {
@@ -4704,6 +4773,51 @@
           "most_visited_hotel",
           "most_visited_city",
           "busiest_month"
+        ],
+        "additionalProperties": false
+      },
+      "StoredEmail": {
+        "type": "object",
+        "description": "A message a booking was made from, as kept: text and markup as in `Preview`, cut at 30,000 characters.",
+        "properties": {
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sender_domain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "received": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "subject",
+          "sender_domain",
+          "received",
+          "text",
+          "html",
+          "truncated"
         ],
         "additionalProperties": false
       },

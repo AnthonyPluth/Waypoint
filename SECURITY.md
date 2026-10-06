@@ -22,9 +22,9 @@ limited to your household, a `WAYPOINT_SECRET_KEY`, and private backups.
 
 Members can connect their Gmail read-only (the `gmail.readonly` scope only; the refresh token is kept encrypted, and disconnecting revokes it at Google). Waypoint scans those mailboxes for bookings, keeping the promises on the
 [Email scanning](https://anthonypluth.github.io/Waypoint/privacy/email-scanning/) page: read-only mailbox access,
-messages searched on Google’s side so only likely bookings are downloaded, bodies read in memory by one module and never stored, logged or sent anywhere but Gmail’s own API (a member can preview the text of a message from their own mailbox: it is fetched when they ask, shown to them alone and kept nowhere),
+messages searched on Google’s side so only likely bookings are downloaded, bodies read in memory by one module and never logged or sent anywhere but Gmail’s own API,
 and nothing sent to a service run by the project. What a scan keeps is the booking’s fields, each message’s Gmail id and, for mail it couldn’t read,
-the sender’s domain and the day. A report about a way around any of those is as serious as one about sign-in.
+the sender’s domain and the day. It also keeps the message itself (its subject, text and markup cleaned of anything that loads or runs), encrypted with `WAYPOINT_SECRET_KEY` like the mailbox token, only while something needs it: a review item waiting on it, or a booking made from it. It is deleted when the item is dismissed (unless a booking was made from it), when the last booking made from it is removed and when the mailbox is disconnected. Anyone who can see the item or the booking can read it, no one else can, and an AI assistant over MCP can’t. A backup holds it, still encrypted, so keep backups private and keep the key. A report about a way around any of those is as serious as one about sign-in.
 
 The secrets Waypoint saves (such as the refresh token for that mailbox access) are encrypted with
 `WAYPOINT_SECRET_KEY`, and so are the copies in backups. Backups also hold everything else in the database, so keep them private.
