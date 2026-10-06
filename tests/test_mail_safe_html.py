@@ -109,6 +109,11 @@ class FromAMessage(unittest.TestCase):
         html = '<html><head><style>p{}</style></head><body><p onclick="x()">Gate <b>B12</b></p><script>evil()</script></body></html>'
         self.assertEqual(extract.safe_markup(message(eml(html))), ("<p>Gate <b>B12</b></p>", False))
         self.assertIsNone(extract.safe_markup(message(eml("Just text", ctype="text/plain"))))
+        two = (b"From: a@example.example\nSubject: s\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=B\n\n"
+               b"--B\nContent-Type: text/html; charset=utf-8\n\n<p>one</p><script>never closed\n"
+               b"--B\nContent-Type: text/html; charset=utf-8\n\n<p>two</p>\n--B--\n")
+        self.assertEqual(extract.safe_markup(message(two)), ("<p>one</p><hr><p>two</p>", False))   # (an unclosed script in one part doesn't hide the next)
+        self.assertEqual(extract.safe_markup(message(two), 3), ("<p>one</p>", True))
         self.assertIsNone(extract.safe_markup({"raw": None}))
 
 

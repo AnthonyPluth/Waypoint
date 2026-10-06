@@ -619,7 +619,14 @@ def safe_markup(message: Mapping[str, Any], limit: int = MAX_PART) -> tuple[str,
     bodies = _bodies(message)
     if bodies is None or not bodies[1]:
         return None
-    return safe_html.clean("<hr>".join(bodies[1]), limit)
+    shown: list[str] = []
+    for part in bodies[1]:   # (one parser for each: an unclosed script or style in one part can't hide the next)
+        markup, cut = safe_html.clean(part, limit)
+        shown.append(markup)
+        limit -= len(re.sub(r"<[^>]*>", "", markup))
+        if cut or limit <= 0:
+            return "<hr>".join(shown), True
+    return "<hr>".join(shown), False
 
 
 def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
