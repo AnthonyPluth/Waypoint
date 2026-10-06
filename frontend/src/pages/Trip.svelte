@@ -227,6 +227,10 @@
     <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} zone={s.start_zone} />{/if}</dd></div>
   <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
     <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</dd></div>
+  {#if s.kind === "hotel" && !untimed(s)}
+    <!-- A stay's zone may have been worked out from its address: say which, so a wrong one is caught. -->
+    <div><dt class="eyebrow">Time zone</dt><dd class="mt-1 text-sm text-muted-foreground" data-testid="stay-zone">{s.start_zone.replaceAll("_", " ")}</dd></div>
+  {/if}
 {/snippet}
 
 {#snippet links(s: Segment)}
