@@ -198,8 +198,7 @@
                 <li class="flex flex-col gap-3 rounded-2xl border border-border bg-background/40 p-4" class:opacity-70={b.status === "cancelled"} data-booking>
                   <p class="flex flex-wrap items-center gap-2">
                     {#if b.confirmation}<span class="text-lg"><CopyCode code={b.confirmation} /></span>{:else}<span class="text-muted-foreground">No confirmation code</span>{/if}
-                    {#if b.status !== "confirmed"}<Badge variant={b.status === "cancelled" ? "destructive" : "secondary"}>{b.status === "cancelled" ? "Cancelled" : "Changed"}</Badge>{/if}
-                    {#if b.locked_fields.length}<Badge variant="outline" title="A later email won’t change what you edited">Edited by you</Badge>{/if}</p>
+                    {#if b.status !== "confirmed"}<Badge variant={b.status === "cancelled" ? "destructive" : "secondary"}>{b.status === "cancelled" ? "Cancelled" : "Changed"}</Badge>{/if}</p>
                   {#if card.timesDiffer && b.status !== "cancelled"}
                     <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render times(b)}</dl>
                   {/if}
@@ -223,8 +222,7 @@
 
 {#snippet heading(s: Segment, cancelled: boolean = s.status === "cancelled")}
   <p class="flex flex-wrap items-center gap-2"><span class="eyebrow">{kindName(s)}</span>
-    {#if cancelled}<Badge variant="destructive">Cancelled</Badge>{:else if s.status !== "confirmed"}<Badge variant="secondary">Changed</Badge>{/if}
-    {#if s.locked_fields.length}<Badge variant="outline" title="A later email won’t change what you edited">Edited by you</Badge>{/if}</p>
+    {#if cancelled}<Badge variant="destructive">Cancelled</Badge>{:else if s.status !== "confirmed"}<Badge variant="secondary">Changed</Badge>{/if}</p>
   <div class="flex items-center gap-3">
     <BrandLogo src={s.logo} label={s.logo_label} size={40} />
     <div class="min-w-0">
