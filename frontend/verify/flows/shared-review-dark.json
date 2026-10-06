@@ -1,0 +1,28 @@
+{
+  "name": "shared-review-dark",
+  "page": "review",
+  "scheme": "dark",
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Review"
+      }
+    },
+    {
+      "wait_for": "[data-testid='review-item']"
+    },
+    {
+      "expect_text": {
+        "selector": "main",
+        "text": "shared with the household"
+      }
+    },
+    {
+      "scroll_to": "#unread-title"
+    },
+    {
+      "screenshot": "shared-item"
+    }
+  ]
+}

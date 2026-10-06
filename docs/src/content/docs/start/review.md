@@ -23,7 +23,11 @@ For each one you can:
 - **Ignore this sender**: later scans skip that sender’s mail for this mailbox, and its other items leave the list.
 - **Dismiss**: it isn’t a booking, so take it off. Waypoint remembers it has read the message, so it doesn’t come back.
 
-Items are private to the member whose mailbox they came from: nobody else sees them, or even that they exist. Waypoint keeps the sender’s domain and the day, never the message’s subject or text.
+Items are private to the member whose mailbox they came from: nobody else sees them, or even that they exist, until that member chooses to share the mailbox. Waypoint keeps the sender’s domain and the day, never the message’s subject or text.
+
+### Sharing a mailbox’s items with the household
+
+In **Settings → Gmail**, each mailbox has a box, **Show this mailbox’s unread mail to the household**, off until its owner ticks it (only the owner can, and unticking it hides the items again at once). While it’s on, every member sees that mailbox’s items in Review, marked with whose mailbox they’re in, and the number on the Review tab counts them. They see the same things the owner does (who it came from, the day, why it couldn’t be read, and what the optional AI read from it) and can **Add by hand** (without the message’s text beside the form, which only its owner’s Gmail can give) or **Dismiss** an item, so anyone can clear the queue. **Open in Gmail**, **Ask AI**, the text beside the form and **Ignore this sender** stay with the mailbox’s owner. A mailbox, and what it shares, ends with its owner’s access.
 
 After each scan, Waypoint’s log says how many messages it read and what stopped the others, as counts of fixed phrases (“12 × no structured booking data”, “3 × unknown airport”, “2 × arrival time”), never which messages or anything they said. Most senders put no machine-readable booking in their emails; those are the ones to add by hand, or to ignore.
 

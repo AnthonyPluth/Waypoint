@@ -71,11 +71,16 @@ class Mailbox(TypedDict):
     scan_error: str | None          # what the last scan couldn't do (the last good state is kept); null once one finishes
     scanning: bool                  # a scan is running now
     scan_notice: str | None         # why the last scan couldn't start (nothing was recorded; it isn't a failed scan), until one does
+    share_review: bool              # its "Couldn't read" items are shown to the household (off until its owner says)
 
 
 class MailboxList(TypedDict):
     configured: bool                # GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set
     mailboxes: list[Mailbox]        # the signed-in member's own
+
+
+class ShareBody(TypedDict):
+    share: bool                     # show this mailbox's "Couldn't read" items to the household, or stop
 
 
 class Started(TypedDict):
@@ -107,14 +112,16 @@ class AiSuggestion(TypedDict):
 
 
 class ReviewItem(TypedDict):
-    """One message Waypoint couldn't read, for the member whose mailbox it is. Never its subject or text: only who it
-    came from and its day (Open in Gmail shows the message)."""
+    """One message Waypoint couldn't read, for the member whose mailbox it is and, when its owner shares that mailbox, the
+    household. Never its subject or text: only who it came from and its day (Open in Gmail shows the message, to its owner)."""
     id: int
     address: str                    # the mailbox it came from
+    owner: str                      # whose mailbox it is
+    mine: bool                      # the signed-in member's own; false: shared with them, and they can only add it by hand or dismiss it
     sender_domain: str              # empty when the message didn't say
     received: str | None            # a day, YYYY-MM-DD
     reason: Literal["no_markup", "incomplete", "broken"]   # no booking details in it; some missing; couldn't be opened
-    gmail_url: str                  # opens the message in Gmail
+    gmail_url: str | None           # opens the message in Gmail; none for someone else's
     suggestion: AiSuggestion | None   # what the optional AI read from it (never its text), pre-filled into Add by hand to confirm or edit
     suggestion_error: str | None    # why the AI gave none, in fixed text
 

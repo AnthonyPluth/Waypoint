@@ -1,0 +1,21 @@
+{
+  "name": "share-mailbox",
+  "page": "settings",
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Settings"
+      }
+    },
+    {
+      "wait_for": "[data-testid='mailbox']"
+    },
+    {
+      "scroll_to": "[data-testid='mailbox']"
+    },
+    {
+      "screenshot": "switch"
+    }
+  ]
+}
