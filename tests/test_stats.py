@@ -191,6 +191,32 @@ class HotelAndCarTests(StatsCase):
                          {"New York": "2026-06-01", "London": "2026-06-02", "Paris": "2026-06-10"})
 
 
+class CabinGroupTests(StatsCase):
+    def test_fare_names_group_into_the_cabin_they_are_in(self):
+        for name, group in (("Economy", "Economy"), ("Basic Economy", "Economy"), ("Economy Standard", "Economy"), ("Tango Plus", "Economy"),
+                            ("Wanna Get Away", "Economy"), ("Main Basic", "Economy"), ("Main Cabin", "Economy"), ("economy", "Economy"),
+                            ("Premium Economy", "Premium Economy"), ("Comfort+", "Premium Economy"), ("Business", "Business"),
+                            ("Business Class", "Business"), ("Polaris", "Business"), ("First", "First"), ("First Class", "First")):
+            self.assertEqual(stats.cabin_group(name), group, name)
+
+    def test_a_keyword_inside_another_word_is_not_a_match_and_an_accent_is_kept(self):
+        for name in ("Minted Seat", "Remain Seat", "Delight Seat", "Firstborn Seat", "Flexible Seat"):
+            self.assertEqual(stats.cabin_group(name), name, name)
+        self.assertEqual(stats.cabin_group("La Première"), "First")
+        self.assertEqual(stats.cabin_group("Comfort+ Extra"), "Premium Economy")
+        self.assertEqual(stats.cabin_group("Economy Comfort"), "Premium Economy")
+        self.assertEqual(stats.cabin_group("Economy Extra"), "Premium Economy")
+
+    def test_a_name_with_none_of_the_words_stays_as_written(self):
+        self.assertEqual(stats.cabin_group("Zeta Seat"), "Zeta Seat")
+        self.assertEqual(stats.cabin_group("zeta seat"), "Zeta Seat")
+
+    def test_the_stats_count_the_groups(self):
+        for cabin in ("Economy", "Basic Economy", "Main Basic", "First"):
+            self.mine({**JFK_LHR, "details": {**JFK_LHR["details"], "cabin": cabin}})
+        self.assertEqual(self.stats(self.jane)["flights"]["cabins"], [{"name": "Economy", "count": 3}, {"name": "First", "count": 1}])
+
+
 class MapDetailTests(StatsCase):
     def test_a_route_lists_each_flight_with_its_trip_and_dates(self):
         self.mine(JFK_LHR, LHR_JFK)
