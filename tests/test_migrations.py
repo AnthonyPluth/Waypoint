@@ -494,6 +494,23 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0017")
             self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 1)
 
+    def test_0019_adds_where_a_logo_came_from_marks_the_ones_from_before_logodev_and_asks_again(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0018")
+            self.assertNotIn("source", {col["name"] for col in sa.inspect(c).get_columns("brand_logos")})
+            c.execute(insert(schema.brand_logos).values(key="harbour hotels", name="Harbour Hotels", logo=b"png", logo_type="image/png", checked="2026-10-01T00:00:00"))
+            c.execute(insert(schema.brand_logos).values(key="nowhere air", name="Nowhere Air", checked="2026-10-01T00:00:00"))
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:
+            rows = {r[0]: r[1:] for r in conn.execute(select(schema.brand_logos.c.key, schema.brand_logos.c.source, schema.brand_logos.c.checked))}
+            self.assertEqual(rows, {"harbour hotels": ("logodev", None), "nowhere air": (None, None)})   # (a brand with no logo has no source)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0018")
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.brand_logos)).scalar(), 2)
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:

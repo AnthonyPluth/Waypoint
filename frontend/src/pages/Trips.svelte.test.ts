@@ -38,6 +38,18 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 const user = () => userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
+describe("what a trip holds", () => {
+  it("shows a small icon for each kind of booking on a trip, named for a screen reader", async () => {
+    serve([trip([segment({ id: 1, kind: "flight" }), segment({ id: 2, kind: "hotel" })], { id: 1, name: "Trip to London" }), trip([segment({ id: 3, kind: "flight" })], { id: 2, name: "Trip to Auckland" })]);
+    render(Trips);
+    await screen.findByText("Trip to London");
+    const icons = screen.getAllByRole("img", { name: /^Includes:/ });
+    expect(icons.map((i) => i.getAttribute("aria-label"))).toEqual(["Includes: flight, stay", "Includes: flight"]);
+    expect(icons[0].querySelectorAll("svg")).toHaveLength(2);
+    expect(icons[1].querySelectorAll("svg")).toHaveLength(1);
+  });
+});
+
 describe("Trips", () => {
   it("lists the trips still to come, soonest first, and the past ones apart", async () => {
     render(Trips);

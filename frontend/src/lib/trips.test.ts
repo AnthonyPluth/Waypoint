@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingCards, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
+import { bookingCards, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -244,5 +244,16 @@ describe("untimed", () => {
   it("is an imported flight whose file gave no times", () => {
     expect(untimed(segment({ details: { time_unknown: "yes" } }))).toBe(true);
     expect(untimed(segment({ details: { flight_number: "DL1001" } }))).toBe(false);
+  });
+});
+
+describe("tripKinds", () => {
+  it("lists what a trip holds once each, in a fixed order, and not what was cancelled", () => {
+    const t = trip([segment({ id: 1, kind: "hotel" }), segment({ id: 2, kind: "flight" }), segment({ id: 3, kind: "flight" }), segment({ id: 4, kind: "car", status: "cancelled" }), segment({ id: 5, kind: "cruise" })]);
+    expect(tripKinds(t)).toEqual(["flight", "hotel", "cruise"]);
+  });
+  it("still shows what a trip was when everything on it is cancelled, and nothing for an empty trip", () => {
+    expect(tripKinds(trip([segment({ kind: "train", status: "cancelled" })]))).toEqual(["train"]);
+    expect(tripKinds(trip([]))).toEqual([]);
   });
 });

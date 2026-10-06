@@ -96,6 +96,7 @@ class BrandLogo(Base):
     logo: Mapped[bytes | None]
     logo_type: Mapped[str | None]
     checked: Mapped[str | None]
+    source: Mapped[str | None]
 
 
 class Trip(Base):

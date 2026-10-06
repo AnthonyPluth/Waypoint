@@ -3748,6 +3748,12 @@
               "null"
             ]
           },
+          "logo_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "links": {
             "$ref": "#/components/schemas/SegmentLinks"
           }
@@ -3774,6 +3780,7 @@
           "travelers",
           "itinerary",
           "logo",
+          "logo_label",
           "links"
         ],
         "additionalProperties": false

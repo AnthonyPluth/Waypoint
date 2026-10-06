@@ -3,13 +3,13 @@
   import { errMsg } from "$lib/act";
   import type { StatsFlights } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
-  import { clampPan, IDENTITY, loadCountries, MAP_HEIGHT, MAP_WIDTH, mapData, visitedFeatureIds, worldProjection, zoomAt, type Country, type Transform } from "$lib/map";
+  import { clampPan, fitBox, flownBounds, IDENTITY, loadCountries, MAP_HEIGHT, MAP_WIDTH, mapData, visitedFeatureIds, worldProjection, zoomAt, type Country, type Transform } from "$lib/map";
   import Minus from "@lucide/svelte/icons/minus";
   import Plus from "@lucide/svelte/icons/plus";
 
   // Everywhere you've flown, drawn here from the outlines bundled with the app (Natural Earth through world-atlas): no tiles,
   // no map host, nothing sent anywhere. Takes the stats' flights as a prop. Tap or hover an airport or an arc for its name
-  // and count; drag, pinch or use the buttons to zoom, and Reset to see the whole world again.
+  // and count; it opens framed on the places you've flown; drag, pinch or use the buttons to zoom, Reset to return to that view and World to see the whole world.
   let { flights }: { flights: StatsFlights } = $props();
 
   let countries = $state<Country[] | null>(null);
@@ -33,8 +33,11 @@
   let hovered = $state<string | null>(null);
   const caption = $derived(hovered ?? picked);
 
-  // Zoom and pan: a transform on the drawing, kept so the world always covers the map's box.
+  // Zoom and pan: a transform on the drawing, kept so the world always covers the map's box. It starts framed on the places
+  // flown (the stats' filters change them, and the map follows), and "World" shows all of it.
+  const framed = $derived(fitBox(flownBounds(flights, projection)));
   let t = $state<Transform>(IDENTITY);
+  $effect(() => { t = framed; picked = null; });
   let svg = $state<SVGSVGElement>();
   const pointers = new Map<number, { x: number; y: number }>();
   let dragged = false;
@@ -76,7 +79,8 @@
     t = zoomAt(t, Math.exp(-e.deltaY / 300), p.x, p.y);
   }
   const zoomBy = (f: number) => (t = zoomAt(t, f, MAP_WIDTH / 2, MAP_HEIGHT / 2));
-  const reset = () => { t = IDENTITY; picked = null; };
+  const reset = () => { t = framed; picked = null; };
+  const showWorld = () => { t = IDENTITY; picked = null; };
 
   // A wheel listener has to be non-passive to stop the page scrolling under a zoom.
   $effect(() => {
@@ -140,7 +144,8 @@
       <div class="flex shrink-0 gap-1">
         <Button variant="outline" size="icon" aria-label="Zoom in" disabled={t.k >= 8} onclick={() => zoomBy(1.6)}><Plus /></Button>
         <Button variant="outline" size="icon" aria-label="Zoom out" disabled={t.k <= 1} onclick={() => zoomBy(1 / 1.6)}><Minus /></Button>
-        <Button variant="outline" size="sm" disabled={t.k === 1} onclick={reset}>Reset</Button>
+        <Button variant="outline" size="sm" disabled={t.k === framed.k && t.x === framed.x && t.y === framed.y} onclick={reset}>Reset</Button>
+        <Button variant="outline" size="sm" disabled={t.k === 1} onclick={showWorld}>World</Button>
       </div>
     {/if}
   </div>

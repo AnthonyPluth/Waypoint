@@ -104,10 +104,11 @@ brand_logos = Table(
     'brand_logos', metadata,
     Column('key', Text, primary_key=True, doc='the brand as a booking names it, lowercased with single spaces (waypoint/domain/logos.py key())'),
     Column('name', Text, nullable=False, doc='the brand as first seen, for Logo.dev to look up'),
-    Column('logo', LargeBinary, doc='the logo itself (downloaded once from Logo.dev, served by Waypoint); NULL when Logo.dev has none'),
+    Column('logo', LargeBinary, doc='the logo itself (downloaded once, served by Waypoint); NULL when there is none'),
     Column('logo_type', Text, doc='image/png, ...'),
-    Column('checked', Text, doc='when Waypoint last asked Logo.dev (ISO, UTC); NULL: not yet'),
-    info={'doc': "logos of the airlines, hotels, rental companies and cruise lines in bookings (fetched from Logo.dev when a key is saved; a cache, not part of a backup)"},
+    Column('checked', Text, doc='when Waypoint last asked for it (ISO, UTC); NULL: not yet'),
+    Column('source', Text, doc="where the logo came from: 'logodev', 'wikimedia' (a hotel sub-brand's, from Wikidata and Commons); NULL: none"),
+    info={'doc': "logos of the airlines, hotels, rental companies and cruise lines in bookings (fetched from Logo.dev, and hotel sub-brands from Wikimedia, when a key is saved; a cache, not part of a backup)"},
 )
 
 trips = Table(
