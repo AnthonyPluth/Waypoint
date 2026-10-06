@@ -56,7 +56,7 @@
   };
 
   const KINDS: [string, string][] = [["flight", "Flight"], ["hotel", "Hotel stay"], ["car", "Car rental"], ["train", "Train"]];
-  const selectClass = "border-input bg-background dark:bg-input/40 w-full rounded-lg border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
+  const selectClass = "border-input bg-card dark:bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
   // ------------------------------------------------------------------------------------------ Couldn't read
   // An item is named by who it came from and when: Waypoint keeps neither the subject nor the text of an email.
@@ -177,7 +177,7 @@
   }
 </script>
 
-<h1 class="mb-6 text-3xl font-semibold tracking-tight">Review</h1>
+<h1 class="mb-6 text-4xl font-bold tracking-tight">Review</h1>
 
 {#if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">

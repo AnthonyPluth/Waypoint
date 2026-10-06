@@ -28,7 +28,7 @@
   }, { busy: (on) => (signingOut = on) });
 </script>
 
-<h1 class="mb-6 text-3xl font-semibold tracking-tight">Settings</h1>
+<h1 class="mb-6 text-4xl font-bold tracking-tight">Settings</h1>
 
 <div class="space-y-8">
   <section aria-labelledby="account-title" class="space-y-2">
