@@ -114,6 +114,8 @@ class FromAMessage(unittest.TestCase):
                b"--B\nContent-Type: text/html; charset=utf-8\n\n<p>two</p>\n--B--\n")
         self.assertEqual(extract.safe_markup(message(two)), ("<p>one</p><hr><p>two</p>", False))   # (an unclosed script in one part doesn't hide the next)
         self.assertEqual(extract.safe_markup(message(two), 3), ("<p>one</p>", True))
+        amps = two.replace(b"<p>one</p>", b"<p>a&amp;b&lt;c</p>")
+        self.assertEqual(extract.safe_markup(message(amps), 7), ("<p>a&amp;b&lt;c</p><hr><p>tw</p>", True))   # (the budget counts characters as written, not as escaped)
         self.assertIsNone(extract.safe_markup({"raw": None}))
 
 

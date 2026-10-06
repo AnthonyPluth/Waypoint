@@ -1269,6 +1269,7 @@ class MailScanApiTests(GoogleCase):
         status, body = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
         self.assertEqual(status, 200)
         self.assertIn("CANARY-BODY-NOMARKUP-6H9C", body["text"])
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", body["html"])   # (the markup is the owner's alone too: Ben's request below is a 404)
         self.assertFalse(body["truncated"])
         self.assertEqual(self.call("ben", "GET", f"/api/review/{item['id']}/preview")[0], 404)
         self.assertEqual(self.call("ana", "GET", "/api/review/9999/preview")[0], 404)

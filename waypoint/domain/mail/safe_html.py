@@ -108,9 +108,9 @@ class _Clean(HTMLParser):
         return ""
 
 
-def clean(html: str, limit: int) -> tuple[str, bool]:
-    """The markup to show for these parts of an HTML message, and whether its text was cut at `limit` characters. Malformed
-    markup is shown as far as it reads."""
+def clean_counted(html: str, limit: int) -> tuple[str, bool, int]:
+    """The markup to show for an HTML part, whether its text was cut at `limit` characters, and how many characters of text it
+    holds. Malformed markup is shown as far as it reads."""
     parser = _Clean(limit)
     try:
         parser.feed(html)
@@ -121,4 +121,10 @@ def clean(html: str, limit: int) -> tuple[str, bool]:
         last, shown = parser.open.pop()
         if shown:
             parser.out.append(f"</{last}>")
-    return "".join(parser.out), parser.cut
+    return "".join(parser.out), parser.cut, parser.size
+
+
+def clean(html: str, limit: int) -> tuple[str, bool]:
+    """The markup to show for an HTML part, and whether its text was cut at `limit` characters."""
+    markup, cut, _size = clean_counted(html, limit)
+    return markup, cut

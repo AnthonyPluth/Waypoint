@@ -621,9 +621,9 @@ def safe_markup(message: Mapping[str, Any], limit: int = MAX_PART) -> tuple[str,
         return None
     shown: list[str] = []
     for part in bodies[1]:   # (one parser for each: an unclosed script or style in one part can't hide the next)
-        markup, cut = safe_html.clean(part, limit)
+        markup, cut, size = safe_html.clean_counted(part, limit)
         shown.append(markup)
-        limit -= len(re.sub(r"<[^>]*>", "", markup))
+        limit -= size
         if cut or limit <= 0:
             return "<hr>".join(shown), True
     return "<hr>".join(shown), False
