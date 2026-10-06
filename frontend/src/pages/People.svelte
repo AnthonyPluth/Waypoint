@@ -129,13 +129,13 @@
   const byKind = (id: number) => KINDS.map(([kind, name]) => ({ kind, name, items: memberships.filter((m) => m.person_id === id && m.kind === kind) })).filter((g) => g.items.length);
   const itemDetails = (m: LoyaltyEntry) => [m.tier, m.expiry && `Expires ${m.expiry}`, m.notes].filter(Boolean).join(" · ");
 
-  const selectClass = "border-input bg-background dark:bg-input/40 w-full rounded-lg border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
+  const selectClass = "border-input bg-card dark:bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
   const details = (p: Person) => [p.legal_name && `Legal name ${p.legal_name}`, p.aliases.length && `Printed as ${p.aliases.join(", ")}`].filter(Boolean).join(" · ");
 </script>
 
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-3xl font-semibold tracking-tight">People</h1>
+  <h1 class="text-4xl font-bold tracking-tight">People</h1>
   {#if people && !draft}<Button onclick={startAdd}><UserPlus /> Add a guest</Button>{/if}
 </div>
 
@@ -153,7 +153,7 @@
           <span class="text-muted-foreground">As on their ID, for matching bookings.</span></label>
         <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name aliases</span>
           <textarea bind:value={draft.aliases} rows="3" autocomplete="off" spellcheck="false" placeholder={"DOE/JANE MS"}
-            class="border-input bg-background dark:bg-input/40 placeholder:text-muted-foreground w-full rounded-lg border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"></textarea>
+            class="border-input bg-card dark:bg-secondary placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"></textarea>
           <span class="text-muted-foreground">How airlines print the name, one per line.</span></label>
         {#if draft.member}<p class="text-sm text-muted-foreground">They’re a household member: their link to their sign-in stays as it is.</p>{/if}
         {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
