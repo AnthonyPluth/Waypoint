@@ -22,6 +22,7 @@ One request asks for one brand by its name (or, with a secret key, by the websit
 ## How the logos are kept
 
 - **Your browser never contacts Logo.dev.** Waypoint downloads each logo once, keeps it in its database and serves it itself, so the page’s content policy stays “images from Waypoint only”. Only a PNG, JPEG, WebP or GIF of 256 KB or less is kept, never an SVG.
+- **A hotel shows its own brand’s logo.** When a hotel’s name starts with one of its group’s brands (“Hyatt Place Chicago” is Hyatt Place, “Courtyard Denver” is Courtyard by Marriott; Waypoint knows the common ones), it is looked up by that brand, so Hyatt Place and Hyatt Regency can have different logos, and by the booking’s provider (“Hyatt”) when Logo.dev has none for the brand. Only the brand’s name is sent, never the rest of the hotel’s name, which is a place.
 - **A logo is shown only on a booking you can see.** It is served through its segment, so who has stayed where isn’t something anyone can find out by asking for a brand.
 - **A brand is asked about once, then again after a month** in case its logo changed. A brand Logo.dev has none for is remembered as such, and a logo Waypoint already has is kept if Logo.dev later loses it.
 - **If Logo.dev can’t be asked** (a refused key, no connection), the round stops, Settings says why, and the brands left are tried again in the next round (every 15 minutes), not a month from now.

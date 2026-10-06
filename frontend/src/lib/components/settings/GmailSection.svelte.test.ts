@@ -11,7 +11,7 @@ import type { Mailbox, MailboxList } from "$lib/api-types";
 import { toast } from "svelte-sonner";
 import GmailSection from "./GmailSection.svelte";
 
-const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, scan_notice: null, ...extra });
+const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, scan_notice: null, share_review: false, ...extra });
 const list = (mailboxes: Mailbox[] = [], configured = true): MailboxList => ({ configured, mailboxes });
 /** Answers GET /api/mailboxes with `reply`; other calls with what `others` says. */
 const serve = (reply: MailboxList, others: (path: string) => unknown = () => ({})) =>
@@ -47,6 +47,36 @@ describe("Settings → Gmail", () => {
     expect(screen.getAllByText("Connected")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Connect another" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reconnect" })).toBeNull();
+  });
+
+  it("shares a mailbox's unread mail with the household only when its owner ticks the box, and the box follows what the server kept", async () => {
+    let shared = false;
+    vi.mocked(api).mockImplementation((async (path: string, opts?: { method?: string; body?: { share: boolean } }) => {
+      if (path === "/api/mailboxes") return list([box({ share_review: shared })]);
+      if (path === "/api/mailboxes/1/share") { shared = opts!.body!.share; return { ok: true }; }
+      return {};
+    }) as never);
+    render(GmailSection);
+    const sharing = await screen.findByRole("checkbox", { name: /Show this mailbox’s unread mail to the household/ });
+    expect(sharing).not.toBeChecked();   // (off until they say)
+    await userEvent.click(sharing);
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/mailboxes/1/share", expect.objectContaining({ method: "POST", body: { share: true } })));
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /Show this mailbox/ })).toBeChecked());
+    expect(toast.success).toHaveBeenCalledWith("Shared with the household");
+    await userEvent.click(screen.getByRole("checkbox", { name: /Show this mailbox/ }));
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /Show this mailbox/ })).not.toBeChecked());
+  });
+
+  it("puts the box back, and says so, when the server refuses to change it", async () => {
+    vi.mocked(api).mockImplementation((async (path: string) => {
+      if (path === "/api/mailboxes") return list([box()]);
+      throw new Error("Refused.");
+    }) as never);
+    render(GmailSection);
+    const sharing = await screen.findByRole("checkbox", { name: /Show this mailbox/ });
+    await userEvent.click(sharing);
+    await waitFor(() => expect(vi.mocked(toast.error)).toHaveBeenCalled());
+    expect(screen.getByRole("checkbox", { name: /Show this mailbox/ })).not.toBeChecked();
   });
 
   it("shows a grant Google dropped as Reconnect, with what happened, not as an error", async () => {

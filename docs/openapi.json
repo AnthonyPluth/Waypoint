@@ -1473,6 +1473,56 @@
         }
       }
     },
+    "/api/mailboxes/{id}/share": {
+      "post": {
+        "operationId": "api_mailbox_share",
+        "x-handler": "waypoint/server/api/mailboxes.py:api_mailbox_share",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/mailboxes/{id}/reread": {
       "post": {
         "operationId": "api_mailbox_reread",
@@ -3004,6 +3054,9 @@
               "string",
               "null"
             ]
+          },
+          "share_review": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -3014,7 +3067,8 @@
           "last_scan",
           "scan_error",
           "scanning",
-          "scan_notice"
+          "scan_notice",
+          "share_review"
         ],
         "additionalProperties": false
       },
@@ -3494,13 +3548,19 @@
       },
       "ReviewItem": {
         "type": "object",
-        "description": "One message Waypoint couldn't read, for the member whose mailbox it is. Never its subject or text: only who it\ncame from and its day (Open in Gmail shows the message).",
+        "description": "One message Waypoint couldn't read, for the member whose mailbox it is and, when its owner shares that mailbox, the\nhousehold. Never its subject or text: only who it came from and its day (Open in Gmail shows the message, to its owner).",
         "properties": {
           "id": {
             "type": "integer"
           },
           "address": {
             "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "mine": {
+            "type": "boolean"
           },
           "sender_domain": {
             "type": "string"
@@ -3519,7 +3579,10 @@
             ]
           },
           "gmail_url": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "suggestion": {
             "anyOf": [
@@ -3541,6 +3604,8 @@
         "required": [
           "id",
           "address",
+          "owner",
+          "mine",
           "sender_domain",
           "received",
           "reason",
@@ -3922,6 +3987,18 @@
           "app",
           "directions",
           "call"
+        ],
+        "additionalProperties": false
+      },
+      "ShareBody": {
+        "type": "object",
+        "properties": {
+          "share": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "share"
         ],
         "additionalProperties": false
       },

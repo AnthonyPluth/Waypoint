@@ -87,7 +87,7 @@ class PeopleTests(DbCase):
     def test_the_demo_household(self):
         added = demo.seed(self.c)
         shown = people.everyone(self.c)
-        self.assertEqual(added, 2 + len(shown) + len(demo.MEMBERSHIPS) + 1 + len(demo.UNREAD)   # (the demo's mailbox and what it couldn't read)
+        self.assertEqual(added, 2 + len(shown) + len(demo.MEMBERSHIPS) + 2 + len(demo.UNREAD) + len(demo.SHARED_UNREAD)   # (the demo's two mailboxes and what they couldn't read)
                          + sum(self.c.orm.scalar(select(func.count()).select_from(m)) or 0 for m in (Trip, Segment, SegmentPort, SegmentTraveler, FlightStatus)))
         self.assertEqual([p["member"] for p in shown], [True, True, False, False])
         self.assertEqual(self.c.orm.scalar(select(func.count()).select_from(User)), 2)

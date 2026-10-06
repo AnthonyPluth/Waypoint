@@ -160,6 +160,21 @@ describe("loyalty on a booking", () => {
     expect(membershipFor(out, { id: 2, person_id: null, name: "DOE/MIA MISS", seat: null }, [mine])).toEqual({ state: "unmatched" });
     expect(membershipFor(segment({ provider: "Example Air" }), jane, [mine])).toBeNull();
   });
+  it("asks a hotel guest for a number only if they booked the room, and shows one anyone has", () => {
+    const sam = { id: 2, person_id: 2, name: "Sam Doe", seat: null };
+    const mia = { id: 3, person_id: null, name: "DOE/MIA MISS", seat: null };
+    const room = segment({ kind: "hotel", provider: "Marriott", booked_by: 1 });
+    const bonvoy = membership({ program: "Marriott Bonvoy" });
+    expect(membershipFor(room, jane, [])).toEqual({ state: "none", program: "Marriott Bonvoy" });   // (the one who booked it)
+    expect(membershipFor(room, jane, [bonvoy])).toEqual({ state: "found", entry: bonvoy });
+    expect(membershipFor(room, sam, [])).toBeNull();   // (no need to say Sam has none)
+    expect(membershipFor(room, mia, [bonvoy])).toBeNull();   // (nor that a printed name isn't matched)
+    const hers = membership({ id: 12, person_id: 2, program: "Marriott Bonvoy" });
+    expect(membershipFor(room, sam, [bonvoy, hers])).toEqual({ state: "found", entry: hers });   // (a number someone has is still shown)
+    expect(membershipFor({ ...room, booked_by: null }, jane, [])).toBeNull();   // (nobody booked it that Waypoint knows)
+    expect(membershipFor(segment({ provider: "American Airlines", booked_by: 1 }), sam, [])).toEqual({ state: "none", program: "American AAdvantage" });   // (a flight: everyone)
+    expect(membershipFor(segment({ provider: "American Airlines", booked_by: 1 }), mia, [])).toEqual({ state: "unmatched" });
+  });
 });
 
 describe("flightKey", () => {

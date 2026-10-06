@@ -375,6 +375,15 @@ class SeatTests(Household):
         assert same
         self.assertEqual([t["seat"] for t in same["travelers"]], [None])   # (an edit of something else leaves them alone)
 
+    def test_leaving_a_seat_out_keeps_it_for_a_traveller_matched_from_a_printed_name(self):
+        seg = self.add(self.jane, OUT, travelers=[{"person_id": None, "name": "DOE/MIA MISS", "seat": "32A"}])
+        mia = self.sam.person_id
+        assert mia is not None
+        self.assertEqual(trips.name_traveler(self.c, self.jane, seg["travelers"][0]["id"], mia), 1)   # (the row keeps the printed name, and now has a person)
+        quiet = trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": [{"person_id": mia, "name": None}]})
+        assert quiet
+        self.assertEqual([t["seat"] for t in quiet["travelers"]], ["32A"])
+
     def test_a_later_email_leaves_the_seats_alone_and_adds_who_it_names(self):
         seg = self.two(confirmation="SEAT01")
         mail = {**OUT, "confirmation": "SEAT01", "travelers": [{"person_id": None, "name": "DOE/MIA MISS"}, {"person_id": None, "name": "NEW/PERSON MR"}]}

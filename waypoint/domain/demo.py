@@ -173,6 +173,9 @@ def _read_from_email(today: date) -> trips.SegmentIn:
 # The household's one connected mailbox, and two messages Waypoint couldn't read (sender's domain, days before today, why).
 DEMO_MAILBOX = "jane.doe@gmail.example"
 UNREAD: list[tuple[str, int, review.Reason]] = [("example-air.example", 21, "no_markup"), ("example-stays.example", 15, "incomplete")]
+# Sam's mailbox, which he shares with the household: what it couldn't read shows in Review for Jane too, marked as his.
+DEMO_SHARED_MAILBOX = "sam.doe@gmail.example"
+SHARED_UNREAD: list[tuple[str, int, review.Reason]] = [("example-cruises.example", 9, "no_markup")]
 
 
 # The seats of the family's flights where each traveller has their own (Jane, Sam, Mia); the other flights keep one on the booking.
@@ -217,6 +220,12 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     conn.orm.flush()
     for domain, ago, reason in UNREAD:
         review.add(conn, box.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
+    shared = Mailbox(owner_sub="demo-sam", address=DEMO_SHARED_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
+                     status="connected", created=0.0, last_scan=None, share_review=True)
+    conn.orm.add(shared)
+    conn.orm.flush()
+    for domain, ago, reason in SHARED_UNREAD:
+        review.add(conn, shared.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
     by_name = {p["display_name"]: p["id"] for p in people.everyone(conn)}
     for who, kind, program, number, tier, expiry, notes in MEMBERSHIPS:
         loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number, "tier": tier,

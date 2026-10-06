@@ -460,11 +460,27 @@ class MigrationTests(unittest.TestCase):
             conn.execute(delete(schema.segments).where(schema.segments.c.id == 1))
             self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.segment_ports)).scalar(), 0)
 
-    def test_0017_adds_a_seat_to_each_traveller_empty_and_takes_it_away_keeping_the_travellers(self):
+    def test_0017_adds_the_sharing_switch_to_mailboxes_off_and_takes_it_away_without_losing_a_review_item(self):
         from alembic import command
         db.init(self.path)
         with db.engine(self.path).begin() as c:
             command.downgrade(db.alembic_config(c), "0016")
+            self.assertNotIn("share_review", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
+            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected"))
+            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m", sender_domain="x.example", reason="no_markup", created=1.0))
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:   # a mailbox from before shares nothing
+            self.assertEqual(conn.execute(select(schema.mailboxes.c.share_review)).scalar(), False)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0016")
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)   # (the cascade took nothing)
+
+    def test_0018_adds_a_seat_to_each_traveller_empty_and_takes_it_away_keeping_the_travellers(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0017")
             self.assertNotIn("seat", {col["name"] for col in sa.inspect(c).get_columns("segment_travelers")})
             c.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
             c.execute(insert(schema.segments).values(id=1, trip_id=1, kind="flight", status="confirmed", start_local="2026-03-01T10:00",
@@ -475,7 +491,7 @@ class MigrationTests(unittest.TestCase):
         with db.session(self.path) as conn:   # a traveller from before has no seat of their own
             self.assertIsNone(conn.execute(select(schema.segment_travelers.c.seat)).scalar())
         with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0016")
+            command.downgrade(db.alembic_config(c), "0017")
             self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 1)
 
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):

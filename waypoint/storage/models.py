@@ -212,6 +212,7 @@ class Mailbox(Base):
     last_error: Mapped[str | None]
     created: Mapped[float | None]
     scan_error: Mapped[str | None]   # what the last scan couldn't do (fixed text); cleared by a scan that finishes
+    share_review: Mapped[bool]       # its owner lets the household see and clear its "Couldn't read" items (off until they say)
 
 
 class MailboxPending(Base):

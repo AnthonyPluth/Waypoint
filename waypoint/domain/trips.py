@@ -587,8 +587,11 @@ def _set_travelers(conn: db.Connection, segment_id: int, travelers: Sequence[Tra
 
 
 def _who(t: TravelerIn) -> tuple[int, str]:
-    """Which traveller (not their seat); a name as printed is compared without case."""
-    return (t["person_id"] if t["person_id"] is not None else -1, t["name"] or "")
+    """Which traveller (not their seat): a person by who they are (a row matched from a printed name keeps that name, and a
+    client may not send it), a name as printed compared without case."""
+    if t["person_id"] is not None:
+        return (t["person_id"], "")
+    return (-1, (t["name"] or "").strip().casefold())
 
 
 def _key(t: TravelerIn) -> tuple[int, str, str]:
