@@ -154,7 +154,7 @@ describe("Trip", () => {
     expect(first.getByRole("heading", { name: "JFK → LHR" })).toBeInTheDocument();
     expect(first.getByText("7:00 PM")).toBeInTheDocument();
     expect(first.getByText("7:10 AM")).toBeInTheDocument();
-    expect(first.getByText("Edited by you")).toBeInTheDocument();
+    expect(first.queryByText("Edited by you")).toBeNull();
     expect(first.getByRole("link", { name: "Manage booking" })).toHaveAttribute("href", "https://example.com/manage");
     // Jane has an AAdvantage number (masked); Sam has none, with a hint; a printed name isn't matched yet.
     expect(first.getByRole("button", { name: "Show and copy American AAdvantage number" })).toHaveTextContent("••••4567");
