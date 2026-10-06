@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { codecovVitePlugin } from "@codecov/vite-plugin";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";

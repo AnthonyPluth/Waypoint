@@ -56,8 +56,9 @@ describe("no comments", () => {
   });
   it("leaves the tools' directives and strings that look like comments alone", async () => {
     expect(await flagged("// @ts-expect-error: the point of the test\nexport const n: string = 1;")).toEqual([]);
-    expect(await flagged('// @vitest-environment jsdom\nexport const u = "https://example.com/a//b";')).toEqual([]);
+    expect(await flagged('// @vitest-' + 'environment jsdom\nexport const u = "https://example.com/a//b";')).toEqual([]);
     expect(await flagged("// svelte-ignore state_referenced_locally\nexport const n = 1;")).toEqual([]);
+    expect(await flagged('/// <reference types="node" />\nexport const n = 1;')).toEqual([]);
   });
 });
 

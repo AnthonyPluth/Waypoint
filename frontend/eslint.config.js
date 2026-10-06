@@ -44,7 +44,7 @@ const waypoint = {
     "no-comments": {
       meta: { type: "problem", schema: [], messages: { comment: "No comments: name things so the code says it, and put the why in the commit message or the docs. Tool directives (eslint-, @ts-, svelte-ignore, @vitest-environment) are the exception." } },
       create(context) {
-        const directive = /^\s*(eslint-|@ts-|svelte-ignore|@vitest|<reference|istanbul|c8 |v8 ignore|prettier-ignore|global )/;
+        const directive = /^\/?\s*(eslint-|@ts-|svelte-ignore|@vitest|<reference|istanbul|c8 |v8 ignore|prettier-ignore|global )/;
         return {
           Program() {
             for (const c of context.sourceCode.getAllComments()) {
