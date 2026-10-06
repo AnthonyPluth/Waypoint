@@ -1,0 +1,36 @@
+{
+  "name": "upcoming-stay-link",
+  "page": "upcoming",
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Upcoming"
+      }
+    },
+    {
+      "wait_for": "ol[aria-label$='day by day'] a[href*='segment=']"
+    },
+    {
+      "scroll_to": "ol[aria-label$='day by day']"
+    },
+    {
+      "screenshot": "list"
+    },
+    {
+      "click": "ol[aria-label$='day by day'] a:has-text('Harbour Hotel') >> visible=true"
+    },
+    {
+      "wait_for": "li.ring-2"
+    },
+    {
+      "expect_text": {
+        "selector": "li.ring-2",
+        "text": "Harbour Hotel"
+      }
+    },
+    {
+      "screenshot": "stay-card"
+    }
+  ]
+}

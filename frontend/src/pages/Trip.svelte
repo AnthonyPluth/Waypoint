@@ -1,6 +1,7 @@
 <script lang="ts">
   import { act, errMsg } from "$lib/act";
   import { route } from "$lib/app.svelte";
+  import { tick } from "svelte";
   import { apiCall } from "$lib/contract";
   import type { LoyaltyEntry, Person, Segment, Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
@@ -54,6 +55,14 @@
     } catch (err) { if (mine !== latest) return; trip = null; loadError = errMsg(err); }
   }
   $effect(() => { void id; form = null; renaming = null; void load(); });
+
+  // A link to one booking (#trip/<id>?segment=<its card's first segment>): once the trip is on screen, scroll to that card and mark it.
+  const wanted = $derived(new URLSearchParams(route.query).get("segment"));
+  $effect(() => {
+    if (!trip || !wanted) return;
+    void cards;
+    tick().then(() => document.getElementById(`segment-${wanted}`)?.scrollIntoView({ block: "start" }));
+  });
 
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
   const kindName = (s: Segment) => KINDS.find(([k]) => k === s.kind)?.[1] ?? s.kind;
@@ -138,7 +147,7 @@
       {@const s = card.lead}
       {@const live = !card.cancelled}
       {#if card.segments.length === 1}
-        <li class="pass" class:opacity-70={s.status === "cancelled"}>
+        <li class="pass scroll-mt-20" id={`segment-${s.id}`} class:ring-2={wanted === String(s.id)} class:ring-ring={wanted === String(s.id)} class:opacity-70={s.status === "cancelled"}>
           <div class="flex flex-col gap-2 p-5 md:p-6">
             {@render heading(s)}
             {#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}
@@ -158,7 +167,7 @@
         </li>
       {:else}
         <!-- One flight on several bookings: the flight once, then a block for each booking. -->
-        <li class="pass" class:opacity-70={card.cancelled} aria-label={`${headline(s)}, on ${card.segments.length} bookings`}>
+        <li class="pass scroll-mt-20" id={`segment-${s.id}`} class:ring-2={wanted === String(s.id)} class:ring-ring={wanted === String(s.id)} class:opacity-70={card.cancelled} aria-label={`${headline(s)}, on ${card.segments.length} bookings`}>
           <div class="flex flex-col gap-2 p-5 md:p-6">
             {@render heading(s, card.cancelled)}
             {#if live && !untimed(s)}<FlightStatus segment={s} />{/if}

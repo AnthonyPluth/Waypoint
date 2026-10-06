@@ -146,6 +146,17 @@ describe("Upcoming", () => {
     expect(within(days).getByText("Check-out: Harbour Hotel")).toBeInTheDocument();
   });
 
+  it("links each booking in the day-by-day list, and the Next up card, to that booking on its trip", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const days = await screen.findByRole("list", { name: "Trip to London, day by day" });
+    expect(within(days).getByRole("link", { name: "Harbour Hotel" })).toHaveAttribute("href", "#trip/1?segment=2");
+    expect(within(days).getByRole("link", { name: "Check-out: Harbour Hotel" })).toHaveAttribute("href", "#trip/1?segment=2");
+    expect(within(days).getByRole("link", { name: "JFK → LHR" })).toHaveAttribute("href", "#trip/1?segment=1");
+    expect(screen.getByRole("link", { name: "Open Trip to London" })).toHaveAttribute("href", "#trip/1?segment=1");   // (the next thing is the flight)
+  });
+
   it("shows a time at its place and, in brackets, yours when your zone differs", async () => {
     at("2026-11-20T09:00:00-05:00");
     serve([london]);
