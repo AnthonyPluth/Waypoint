@@ -8,7 +8,9 @@
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Input } from "$lib/components/ui/input";
+  import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
+  import Trash from "@lucide/svelte/icons/trash";
   import UserPlus from "@lucide/svelte/icons/user-plus";
   import { toast } from "svelte-sonner";
 
@@ -212,8 +214,14 @@
     {#each people as p (p.id)}
       <li class="row items-start">
         <div class="min-w-0 basis-full sm:basis-0 sm:flex-1">
-          <p class="flex flex-wrap items-center gap-2 font-medium"><span class="break-words">{p.display_name}</span>
-            <Badge variant={p.member ? "default" : "outline"}>{p.member ? "Member" : "Guest"}</Badge></p>
+          <div class="flex items-start justify-between gap-2">
+            <p class="flex flex-wrap items-center gap-2 font-medium"><span class="break-words">{p.display_name}</span>
+              <Badge variant={p.member ? "default" : "outline"}>{p.member ? "Member" : "Guest"}</Badge></p>
+            <span class="-mt-1 -mr-2 flex shrink-0">
+              <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Edit ${p.display_name}`} title="Edit" onclick={() => startEdit(p)}><Pencil class="size-4" /></Button>
+            {#if !p.member}<Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Remove ${p.display_name}`} title="Remove" onclick={() => { removing = p; asking = true; }}><Trash class="size-4" /></Button>{/if}
+            </span>
+          </div>
           {#if details(p)}<p class="break-words text-sm text-muted-foreground">{details(p)}</p>{/if}
           {#each p.links as link (`${link.guest}-${link.on}`)}
             <p class="break-words text-sm text-muted-foreground">Linked from guest {link.guest} by {link.by} on {link.on}</p>
@@ -226,8 +234,8 @@
               <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.name}</h3>
               <ul class="mt-1 flex flex-col gap-2">
                 {#each group.items as m (m.id)}
-                  <li class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-                    <div class="min-w-0">
+                  <li class="flex items-start justify-between gap-x-3 text-sm">
+                    <div class="min-w-0 flex-1">
                       <p class="break-words"><span class="font-medium">{m.program}</span>
                         {#if m.readable}
                           <button type="button" class="ml-2 rounded-md px-1.5 py-0.5 font-mono underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
@@ -237,9 +245,9 @@
                         {/if}</p>
                       {#if itemDetails(m)}<p class="break-words text-muted-foreground">{itemDetails(m)}</p>{/if}
                     </div>
-                    <div class="flex gap-2">
-                      <Button variant="outline" size="sm" aria-label={`Edit ${p.display_name}’s ${m.program}`} onclick={() => startEditId(m)}>Edit</Button>
-                      <Button variant="outline" size="sm" aria-label={`Remove ${p.display_name}’s ${m.program}`} onclick={() => { idRemoving = m; idAsking = true; }}>Remove</Button>
+                    <div class="-mt-1 -mr-2 flex shrink-0">
+                      <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Edit ${p.display_name}’s ${m.program}`} title="Edit" onclick={() => startEditId(m)}><Pencil class="size-4" /></Button>
+                      <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Remove ${p.display_name}’s ${m.program}`} title="Remove" onclick={() => { idRemoving = m; idAsking = true; }}><Trash class="size-4" /></Button>
                     </div>
                   </li>
                 {/each}
@@ -249,9 +257,7 @@
         </div>
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" aria-label={`Add a membership for ${p.display_name}`} onclick={() => startAddId(p)}><Plus /> ID</Button>
-          <Button variant="outline" size="sm" aria-label={`Edit ${p.display_name}`} onclick={() => startEdit(p)}>Edit</Button>
           {#if !p.member && canClaim}<Button variant="outline" size="sm" aria-label={`This is me: ${p.display_name}`} onclick={() => { claiming = p; claimAsking = true; }}>This is me</Button>{/if}
-          {#if !p.member}<Button variant="outline" size="sm" aria-label={`Remove ${p.display_name}`} onclick={() => { removing = p; asking = true; }}>Remove</Button>{/if}
         </div>
       </li>
     {/each}
