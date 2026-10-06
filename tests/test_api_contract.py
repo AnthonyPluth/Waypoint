@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 from waypoint.storage import backup, db, secretbox
-from waypoint.storage.models import Mailbox
+from waypoint.storage.models import LoyaltyId, Mailbox
 from waypoint.storage import settings_keys as sk
 from unittest import mock
 
@@ -234,11 +234,12 @@ class Replies(DbCase):
     def test_loyalty(self):
         self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))   # none yet
         who = people.api_person_add(self.c, {}, {"display_name": "Mia Doe"})["id"]
-        body = {"person_id": who, "kind": "airline", "program": "American AAdvantage", "number": "DEMO1234567", "expiry": "2029-01-31"}
+        body = {"person_id": who, "kind": "airline", "program": "American AAdvantage", "number": "DEMO1234567"}
         added = loyalty.api_loyalty_add(self.c, {}, body)
         self.check("POST /api/loyalty", added)
         self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))
-        loyalty.api_loyalty_add(self.c, {}, {**body, "number": "DEMO7654321"})   # a second number for the program: flagged
+        self.c.orm.add(LoyaltyId(person_id=who, kind="airline", program="American AAdvantage", number=secretbox.encrypt("DEMO7654321") or ""))   # (what claiming a guest leaves)
+        self.c.orm.flush()
         self.assertEqual(len(loyalty.api_loyalty(self.c, {}, {})["conflicts"]), 1)
         self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))
         self.check("POST /api/loyalty/{id}", loyalty.api_loyalty_edit(self.c, {}, {**body, "number": None}, str(added["id"])))

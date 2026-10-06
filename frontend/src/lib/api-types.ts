@@ -194,7 +194,6 @@ export interface LoyaltyBody {
   kind: string;
   program: string;
   number?: string | null;
-  tier?: string | null;
   expiry?: string | null;
   notes?: string | null;
 }
@@ -214,7 +213,6 @@ export interface LoyaltyEntry {
   program: string;
   masked: string;
   readable: boolean;
-  tier: string | null;
   expiry: string | null;
   notes: string | null;
 }

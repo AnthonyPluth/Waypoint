@@ -9,13 +9,15 @@ Each person on the [People](/waypoint/start/people/) page, member or guest, has 
 
 ## What you can keep
 
-A membership has a **kind**, a **program**, a **number**, and optionally a tier, an expiry date and notes.
+A membership has a **kind**, a **program**, a **number**, and optionally notes. Known Traveler and redress numbers can also have an expiry date; an airline, hotel or car program’s number doesn’t expire, so those have none.
 
 - **Airline**, **hotel** and **car** programs, such as American AAdvantage, Marriott Bonvoy or Hertz Gold Plus Rewards.
 - **Known Traveler**: TSA PreCheck, Global Entry, NEXUS or SENTRI.
 - **Redress**: a DHS TRIP number.
 
 Each kind has a fixed list of programs. Choose **Other** for one that isn’t listed, and say which in the notes.
+
+A person has one membership in each program: once one is saved, that program is no longer offered for them under **+ ID**, and Waypoint refuses a second one (edit the first instead). **Other** can be used more than once, since it can stand for any program. A person who ended up with two numbers for one program by claiming a guest keeps both, flagged on the People page, and can still edit either.
 
 ## How the numbers are protected
 

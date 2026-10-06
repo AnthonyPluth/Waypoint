@@ -2879,12 +2879,6 @@
               "null"
             ]
           },
-          "tier": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "expiry": {
             "type": [
               "string",
@@ -2948,12 +2942,6 @@
           "readable": {
             "type": "boolean"
           },
-          "tier": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "expiry": {
             "type": [
               "string",
@@ -2974,7 +2962,6 @@
           "program",
           "masked",
           "readable",
-          "tier",
           "expiry",
           "notes"
         ],

@@ -15,11 +15,12 @@ TEXT_LIMIT = 100
 NOTES_LIMIT = 500
 _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {limit} characters)")
 NO_SUCH = "No such membership"
+DUPLICATE = "They already have a membership in that program. Edit that one instead."
 
 
 def fields(body: Mapping[str, Any], *, need_number: bool) -> loyalty.Fields:
     """What a request names, checked. Nothing here quotes a value back: a refusal says which field, never what was in it."""
-    for key in ("kind", "program", "number", "tier", "expiry", "notes"):
+    for key in ("kind", "program", "number", "expiry", "notes"):
         if body.get(key) is not None and not isinstance(body[key], str):
             raise ApiError(f'Send "{key}" as text')
     kind = body.get("kind")
@@ -32,8 +33,11 @@ def fields(body: Mapping[str, Any], *, need_number: bool) -> loyalty.Fields:
     if not isinstance(person, int) or isinstance(person, bool):
         raise ApiError("Choose whose it is")
     number = _v.text(body.get("number"), "number", NUMBER_LIMIT, required=need_number)
+    expiry = _v.day(body.get("expiry"), "expiry")
+    if expiry and kind not in loyalty.EXPIRES:
+        raise ApiError("Only Known Traveler and redress numbers expire")
     return {"person_id": person, "kind": kind, "program": program, "number": number,
-            "tier": _v.text(body.get("tier"), "tier", TEXT_LIMIT), "expiry": _v.day(body.get("expiry"), "expiry"),
+            "expiry": expiry,
             "notes": _v.text(body.get("notes"), "notes", NOTES_LIMIT)}
 
 
@@ -50,6 +54,8 @@ def api_loyalty_add(conn, _q, body: LoyaltyBody) -> LoyaltyEntry:
         return LoyaltyEntry(**loyalty.add(conn, fields(body, need_number=True)))
     except loyalty.NoSuchPerson:
         raise ApiError("No such person", 404) from None
+    except loyalty.Duplicate:
+        raise ApiError(DUPLICATE) from None
 
 
 def api_loyalty_edit(conn, _q, body: LoyaltyBody, loyalty_id) -> LoyaltyEntry:
@@ -58,6 +64,8 @@ def api_loyalty_edit(conn, _q, body: LoyaltyBody, loyalty_id) -> LoyaltyEntry:
         found = loyalty.edit(conn, row_id(loyalty_id, NO_SUCH), fields(body, need_number=False))
     except loyalty.NoSuchPerson:
         raise ApiError("No such person", 404) from None
+    except loyalty.Duplicate:
+        raise ApiError(DUPLICATE) from None
     if found is None:
         raise ApiError(NO_SUCH, 404)
     return LoyaltyEntry(**found)

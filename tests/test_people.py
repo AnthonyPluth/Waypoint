@@ -178,7 +178,7 @@ class ClaimTests(DbCase):
 
     def test_the_guests_loyalty_ids_names_and_bookings_move_over_and_the_guest_is_gone(self):
         loyalty.add(self.c, {"person_id": self.guest, "kind": "airline", "program": "Delta SkyMiles", "number": "CANARY-DL-3381",
-                             "tier": None, "expiry": None, "notes": None})
+                             "expiry": None, "notes": None})
         claimed = people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
         self.assertEqual([m["person_id"] for m in loyalty.everyone(self.c)], [self.member])
         self.assertEqual((claimed["display_name"], claimed["first_name"], claimed["legal_name"]), ("Jane Doe", "Jane", "Jane Q Doe"))
@@ -233,9 +233,9 @@ class ClaimTests(DbCase):
     def test_two_numbers_for_one_program_are_both_kept_and_flagged(self):
         for who, number in ((self.member, "CANARY-AA-1111"), (self.guest, "CANARY-AA-2222")):
             loyalty.add(self.c, {"person_id": who, "kind": "airline", "program": "American AAdvantage", "number": number,
-                                 "tier": None, "expiry": None, "notes": None})
+                                 "expiry": None, "notes": None})
         loyalty.add(self.c, {"person_id": self.guest, "kind": "hotel", "program": "Hilton Honors", "number": "CANARY-HH-3333",
-                             "tier": None, "expiry": None, "notes": None})
+                             "expiry": None, "notes": None})
         self.assertEqual(loyalty.conflicts(self.c), [])
         people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
         self.assertEqual(len(loyalty.everyone(self.c)), 3)
@@ -244,14 +244,14 @@ class ClaimTests(DbCase):
     def test_the_same_number_twice_is_not_a_conflict(self):
         for who in (self.member, self.guest):
             loyalty.add(self.c, {"person_id": who, "kind": "airline", "program": "Delta SkyMiles", "number": "CANARY-DL 4444",
-                                 "tier": None, "expiry": None, "notes": None})
+                                 "expiry": None, "notes": None})
         people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
         self.assertEqual(loyalty.conflicts(self.c), [])
 
     def test_the_merge_writes_no_loyalty_number_anywhere(self):
         number = "CANARY-AAD-9034172"
         loyalty.add(self.c, {"person_id": self.guest, "kind": "airline", "program": "Delta SkyMiles", "number": number,
-                             "tier": None, "expiry": None, "notes": None})
+                             "expiry": None, "notes": None})
         self.c.commit()
         with no_leaks(self, number, database=self.path):
             people.claim_guest(self.c, self.member, self.guest, "2026-10-05")

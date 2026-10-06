@@ -62,7 +62,7 @@ class NameTests(DbCase):
 
 class LoyaltyMatchTests(DbCase):
     def add(self, who, number):
-        loyalty.add(self.c, {"person_id": who, "kind": "airline", "program": "Other", "number": number, "tier": None, "expiry": None,
+        loyalty.add(self.c, {"person_id": who, "kind": "airline", "program": "Other", "number": number, "expiry": None,
                              "notes": None})
 
     def test_a_number_finds_its_person_however_it_is_printed(self):

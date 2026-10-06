@@ -167,7 +167,6 @@ class LoyaltyId(Base):
     kind: Mapped[str]
     program: Mapped[str]
     number: Mapped[str]   # encrypted: read only through waypoint/domain/loyalty.py
-    tier: Mapped[str | None]
     expiry: Mapped[str | None]   # a day, YYYY-MM-DD
     notes: Mapped[str | None]
 

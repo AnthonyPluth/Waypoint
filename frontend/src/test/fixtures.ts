@@ -22,5 +22,5 @@ export const trip = (segments: Segment[], extra: Partial<Trip> = {}): Trip => ({
 });
 
 export const membership = (extra: Partial<LoyaltyEntry> = {}): LoyaltyEntry => ({
-  id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, tier: null, expiry: null, notes: null, ...extra,
+  id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, expiry: null, notes: null, ...extra,
 });

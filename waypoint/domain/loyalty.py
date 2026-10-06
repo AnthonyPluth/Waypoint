@@ -14,6 +14,7 @@ from ..storage.models import LoyaltyId, Person
 
 KINDS = ("airline", "hotel", "car", "known_traveler", "redress")
 OTHER = "Other"
+EXPIRES = ("known_traveler", "redress")   # the kinds whose numbers expire (an airline, hotel or car program's doesn't)
 # The programs to choose from, for each kind (a fixed list: "Other" for any that isn't there).
 PROGRAMS: dict[str, tuple[str, ...]] = {
     "airline": ("Alaska Mileage Plan", "American AAdvantage", "Delta SkyMiles", "JetBlue TrueBlue", "Southwest Rapid Rewards",
@@ -32,7 +33,6 @@ class Fields(TypedDict):
     kind: str
     program: str
     number: str | None
-    tier: str | None
     expiry: str | None
     notes: str | None
 
@@ -44,7 +44,6 @@ class Listed(TypedDict):
     program: str
     masked: str            # MASK and the number's last four characters (all of it masked when it's that short)
     readable: bool         # false: Waypoint's key can't unlock it (a restore under another key); it has to be entered again
-    tier: str | None
     expiry: str | None
     notes: str | None
 
@@ -58,6 +57,10 @@ class Conflict(TypedDict):
 
 class NoSuchPerson(Exception):
     """A membership names someone who isn't in People."""
+
+
+class Duplicate(Exception):
+    """The person already has a membership in that program (a second one in "Other" is fine: it can be any program)."""
 
 
 class Unreadable(Exception):
@@ -74,7 +77,7 @@ def listed(row: LoyaltyId) -> Listed:
     except secretbox.SecretError:
         masked, readable = MASK, False
     return {"id": row.id, "person_id": row.person_id, "kind": row.kind, "program": row.program, "masked": masked,
-            "readable": readable, "tier": row.tier, "expiry": row.expiry, "notes": row.notes}
+            "readable": readable, "expiry": row.expiry, "notes": row.notes}
 
 
 def everyone(conn: db.Connection) -> list[Listed]:
@@ -100,14 +103,27 @@ def _person_exists(conn: db.Connection, person_id: int) -> bool:
     return conn.orm.scalar(select(Person.id).where(Person.id == person_id)) is not None
 
 
+def _holds(conn: db.Connection, fields: Fields, *, besides: int | None = None) -> bool:
+    """Whether the person has a membership (other than `besides`) in this program."""
+    if fields["program"] == OTHER:
+        return False
+    found = select(LoyaltyId.id).where(LoyaltyId.person_id == fields["person_id"], LoyaltyId.kind == fields["kind"],
+                                        LoyaltyId.program == fields["program"])
+    if besides is not None:
+        found = found.where(LoyaltyId.id != besides)
+    return conn.orm.scalar(found.limit(1)) is not None
+
+
 def add(conn: db.Connection, fields: Fields) -> Listed:
-    """Save a membership. Raises NoSuchPerson, and ValueError when there is no number."""
+    """Save a membership. Raises NoSuchPerson, Duplicate (they have one in that program), and ValueError when there is no number."""
     if not _person_exists(conn, fields["person_id"]):
         raise NoSuchPerson()
+    if _holds(conn, fields):
+        raise Duplicate()
     if not fields["number"]:
         raise ValueError("a new membership needs a number")
     row = LoyaltyId(person_id=fields["person_id"], kind=fields["kind"], program=fields["program"],
-                    number=secretbox.encrypt(fields["number"]) or "", tier=fields["tier"], expiry=fields["expiry"],
+                    number=secretbox.encrypt(fields["number"]) or "", expiry=fields["expiry"],
                     notes=fields["notes"])
     conn.orm.add(row)
     conn.orm.flush()
@@ -115,11 +131,17 @@ def add(conn: db.Connection, fields: Fields) -> Listed:
 
 
 def edit(conn: db.Connection, loyalty_id: int, fields: Fields) -> Listed | None:
-    """Change a membership (the number only when one is given). None: there's no such membership. Raises NoSuchPerson."""
+    """Change a membership (the number only when one is given). None: there's no such membership. Raises NoSuchPerson, and
+    Duplicate when it would move to a program the person already has (one left in the program it was in, as a person who was
+    given two by claiming a guest has, can still be edited)."""
     if not _person_exists(conn, fields["person_id"]):
         raise NoSuchPerson()
+    current = conn.orm.get(LoyaltyId, loyalty_id)
+    moved = current is not None and (current.person_id, current.kind, current.program) != (fields["person_id"], fields["kind"], fields["program"])
+    if moved and _holds(conn, fields, besides=loyalty_id):
+        raise Duplicate()
     values = {"person_id": fields["person_id"], "kind": fields["kind"], "program": fields["program"],
-              "tier": fields["tier"], "expiry": fields["expiry"], "notes": fields["notes"]}
+              "expiry": fields["expiry"], "notes": fields["notes"]}
     if fields["number"]:
         values["number"] = secretbox.encrypt(fields["number"])
     if conn.execute(update(LoyaltyId).where(LoyaltyId.id == loyalty_id).values(**values)).rowcount == 0:

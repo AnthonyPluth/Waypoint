@@ -511,6 +511,28 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0018")
             self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.brand_logos)).scalar(), 2)
 
+    def test_0020_drops_the_tier_from_memberships_and_clears_an_expiry_that_an_airline_hotel_or_car_one_had(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0019")
+            self.assertIn("tier", {col["name"] for col in sa.inspect(c).get_columns("loyalty_ids")})
+            c.execute(insert(schema.people).values(id=1, display_name="Pat"))
+            old_loyalty_ids = sa.table("loyalty_ids", *(sa.column(n) for n in ("person_id", "kind", "program", "number", "tier", "expiry")))   # (as it was)
+            for kind, program, expiry in (("airline", "Other", "2029-01-31"), ("hotel", "Other", "2029-01-31"), ("car", "Other", "2029-01-31"),
+                                          ("known_traveler", "Global Entry", "2029-03-31"), ("redress", "DHS TRIP", "2030-01-01")):
+                c.execute(insert(old_loyalty_ids).values(person_id=1, kind=kind, program=program, number="n", tier="Gold", expiry=expiry))
+            command.upgrade(db.alembic_config(c), "head")
+            self.assertNotIn("tier", {col["name"] for col in sa.inspect(c).get_columns("loyalty_ids")})
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:   # only the numbers that expire keep their date
+            got = dict(conn.execute(select(schema.loyalty_ids.c.kind, schema.loyalty_ids.c.expiry)).fetchall())
+            self.assertEqual(got, {"airline": None, "hotel": None, "car": None, "known_traveler": "2029-03-31", "redress": "2030-01-01"})
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0019")
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.loyalty_ids)).scalar(), 5)   # (no row lost)
+            command.upgrade(db.alembic_config(c), "head")
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:
