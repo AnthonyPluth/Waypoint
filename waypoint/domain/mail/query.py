@@ -34,7 +34,7 @@ def build(since: date, ignored: Iterable[str] = ()) -> str:
     words = _any(WORDS)
     subject = _any(BANK_SUBJECT_WORDS)
     skipped = "".join(f" -from:{d}" for d in sorted(set(ignored)))
-    return (f"(from:({senders}) ({words}) OR from:({banks}) subject:({subject}) ({words})) "
+    return (f"((from:({senders}) ({words})) OR (from:({banks}) subject:({subject}) ({words}))) "
             f"-category:promotions{skipped} after:{since:%Y/%m/%d}")
 
 
