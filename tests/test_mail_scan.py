@@ -475,7 +475,9 @@ class ReviewTests(ScanCase):
             text, html, cut = scan.preview("u-jane", item["id"])
         self.assertIn("CANARY-BODY-NOMARKUP-6H9C", text)
         self.assertNotIn("<", text)   # (text, not markup)
-        self.assertTrue(html is None or "CANARY-BODY-NOMARKUP-6H9C" in html)   # (markup only when the message has an HTML part)
+        assert html is not None   # (this message has an HTML part: its markup reaches the caller too, and goes nowhere else)
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", html)
+        self.assertTrue(html.startswith("<p>"))
         self.assertFalse(cut)
         with self.assertRaises(KeyError):
             scan.preview("u-sam", item["id"])   # not Sam's
