@@ -118,3 +118,63 @@ class Spellings(Merging):
         self.merge(self.jane, hotel)
         self.assertEqual(self.merge(self.jane, {**hotel, "provider": "marriott international"}), "unchanged")
         self.assertEqual(self.count(), 1)
+
+
+HOTEL = {"kind": "hotel", "origin": "Harbour Hotel", "destination": None, "start_local": "2026-06-02T15:00",
+         "end_local": "2026-06-08T10:00", "start_zone": "Europe/London", "end_zone": "Europe/London"}
+BY_HAND = {k: v for k, v in HOTEL.items()}
+EMAILED = {**HOTEL, "confirmation": "H88231", "provider": "Marriott International"}
+
+
+class BackfillingByHand(Merging):
+    def test_an_emailed_stay_fills_the_one_added_by_hand_without_a_code(self):
+        self.add(self.jane, BY_HAND)
+        self.assertEqual(self.merge(self.jane, EMAILED), "updated")
+        self.assertEqual(self.count(), 1)
+        [seg] = [s for t in trips.listing(self.c, self.jane) for s in t["segments"]]
+        self.assertEqual((seg["confirmation"], seg["provider"]), ("H88231", "Marriott International"))
+
+    def test_a_name_written_another_way_still_matches(self):
+        self.add(self.jane, BY_HAND)
+        self.assertEqual(self.merge(self.jane, {**EMAILED, "origin": "The Harbour Hotel, London"}), "updated")
+        self.assertEqual(self.count(), 1)
+
+    def test_a_later_email_with_the_same_code_then_matches_by_code(self):
+        self.add(self.jane, BY_HAND)
+        self.merge(self.jane, EMAILED)
+        self.assertEqual(self.merge(self.jane, EMAILED), "unchanged")
+        self.assertEqual(self.count(), 1)
+
+    def test_other_dates_or_another_place_are_another_stay(self):
+        self.add(self.jane, BY_HAND)
+        for number, swap in enumerate(({"end_local": "2026-06-09T10:00"}, {"start_local": "2026-06-03T15:00"}, {"origin": "Castle Hotel"},
+                     {"start_zone": "Europe/Paris", "end_zone": "Europe/Paris"})):
+            with self.subTest(swap=swap):
+                self.assertEqual(self.merge(self.jane, {**EMAILED, **swap, "confirmation": f"X{number}"}), "added")
+
+    def test_two_stays_added_by_hand_that_both_fit_are_left_alone(self):
+        self.add(self.jane, BY_HAND)
+        self.add(self.sam, BY_HAND)
+        self.assertEqual(self.merge(self.jane, EMAILED), "added")
+        self.assertEqual(self.count(), 3)
+
+    def test_a_stay_with_a_code_wins_over_ones_without(self):
+        self.add(self.jane, BY_HAND)
+        self.add(self.jane, {**BY_HAND, "confirmation": "H88231", "provider": "Marriott International"})
+        self.assertEqual(self.merge(self.jane, EMAILED), "unchanged")
+        self.assertEqual(self.count(), 2)
+
+    def test_an_email_without_a_code_does_not_take_over_one_added_by_hand(self):
+        self.add(self.jane, BY_HAND)
+        self.assertEqual(self.merge(self.jane, {**HOTEL, "confirmation": None}), "added")
+
+    def test_a_flight_added_by_hand_is_filled_by_the_same_number_and_day(self):
+        manual = {k: v for k, v in FLIGHT.items() if k != "confirmation"}
+        self.add(self.jane, manual)
+        self.assertEqual(self.merge(self.jane), "updated")
+        self.assertEqual(self.count(), 1)
+
+    def test_a_flight_added_by_hand_with_another_number_is_not_touched(self):
+        manual = {k: v for k, v in FLIGHT.items() if k != "confirmation"}
+        self.add(self.jane, {**manual, "details": {"flight_number": "AA 4002"}})
+        self.assertEqual(self.merge(self.jane), "added")
