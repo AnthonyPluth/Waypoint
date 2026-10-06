@@ -135,7 +135,7 @@ class ScanCase(DbCase):
         self.mia = people.add_guest(self.c, guest("Mia Rose Doe", "DOE/MIA MISS"))["id"]
         assert self.jane.person_id is not None
         loyalty.add(self.c, {"person_id": self.jane.person_id, "kind": "airline", "program": "Other", "number": "FXLOY-4400123",
-                             "tier": None, "expiry": None, "notes": None})
+                             "expiry": None, "notes": None})
         self.mailbox = self.connect("u-jane", ADDRESS, REFRESH)
 
     def connect(self, owner, address, refresh) -> int:

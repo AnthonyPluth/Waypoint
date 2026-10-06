@@ -479,8 +479,7 @@ class LoyaltyEntry(TypedDict):
     program: str                    # one of `programs` for the kind
     masked: str
     readable: bool                  # false when Waypoint's key can't unlock the number (it has to be entered again)
-    tier: str | None
-    expiry: str | None              # YYYY-MM-DD
+    expiry: str | None              # YYYY-MM-DD (Known Traveler and redress numbers only)
     notes: str | None
 
 
@@ -503,7 +502,6 @@ class LoyaltyBody(TypedDict):
     kind: str
     program: str
     number: NotRequired[str | None]
-    tier: NotRequired[str | None]
     expiry: NotRequired[str | None]
     notes: NotRequired[str | None]
 

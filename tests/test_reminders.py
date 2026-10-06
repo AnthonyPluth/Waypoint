@@ -218,7 +218,7 @@ class FeedTests(Reminders):
     def test_the_feed_and_notifications_never_carry_a_loyalty_number(self):
         program = loyalty.PROGRAMS["airline"][0]
         loyalty.add(self.c, {"person_id": self.jane.person_id, "kind": "airline", "program": program, "number": LOYALTY_CANARY,
-                             "tier": None, "expiry": None, "notes": None})
+                             "expiry": None, "notes": None})
         self.device()
         with no_leaks(self, LOYALTY_CANARY, database=self.path):
             text = reminders.feed_text(self.c, "u-jane", NOW)

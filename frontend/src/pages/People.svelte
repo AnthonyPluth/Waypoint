@@ -81,7 +81,7 @@
 
   // Memberships: the form to add one for a person (id null) or change one.
   const KINDS: [string, string][] = [["airline", "Airline"], ["hotel", "Hotel"], ["car", "Car rental"], ["known_traveler", "Known Traveler"], ["redress", "Redress"]];
-  type IdDraft = { id: number | null; person_id: number; kind: string; program: string; number: string; tier: string; expiry: string; notes: string; masked: string };
+  type IdDraft = { id: number | null; person_id: number; kind: string; program: string; number: string; expiry: string; notes: string; masked: string };
   let idDraft = $state<IdDraft | null>(null);
   let idError = $state("");
   let idSaving = $state(false);
@@ -95,9 +95,9 @@
     const held = new Set(memberships.filter((m) => m.person_id === personId && m.kind === kind && m.id !== editing).map((m) => m.program));
     return (programs[kind] ?? []).filter((name) => name === "Other" || name === kept || !held.has(name));
   };
-  const startAddId = (p: Person) => { idDraft = { id: null, person_id: p.id, kind: "airline", program: choices(p.id, "airline")[0] ?? "", number: "", tier: "", expiry: "", notes: "", masked: "" }; idError = ""; };
+  const startAddId = (p: Person) => { idDraft = { id: null, person_id: p.id, kind: "airline", program: choices(p.id, "airline")[0] ?? "", number: "", expiry: "", notes: "", masked: "" }; idError = ""; };
   const startEditId = (m: LoyaltyEntry) => {
-    idDraft = { id: m.id, person_id: m.person_id, kind: m.kind, program: m.program, number: "", tier: m.tier ?? "", expiry: m.expiry ?? "", notes: m.notes ?? "", masked: m.masked };
+    idDraft = { id: m.id, person_id: m.person_id, kind: m.kind, program: m.program, number: "", expiry: m.expiry ?? "", notes: m.notes ?? "", masked: m.masked };
     idError = "";
   };
   const pickKind = (d: IdDraft) => { const open = choices(d.person_id, d.kind, d.id); if (!open.includes(d.program)) d.program = open[0] ?? ""; };
@@ -107,7 +107,7 @@
     const d = idDraft;
     if (!d) return;
     // A number left blank while changing a membership keeps the one saved.
-    const body = { person_id: d.person_id, kind: d.kind, program: d.program, number: d.number, tier: d.tier, expiry: d.expiry, notes: d.notes };
+    const body = { person_id: d.person_id, kind: d.kind, program: d.program, number: d.number, expiry: EXPIRES.includes(d.kind) ? d.expiry : "", notes: d.notes };
     const ok = await act(async () => {
       if (d.id === null) await apiCall<"POST /api/loyalty">("/api/loyalty", { method: "POST", body });
       else await apiCall<"POST /api/loyalty/{id}">(`/api/loyalty/${d.id}`, { method: "POST", body });
@@ -135,8 +135,9 @@
     });
   }
 
+  const EXPIRES = ["known_traveler", "redress"];   // the kinds whose numbers expire (an airline, hotel or car program's doesn't)
   const byKind = (id: number) => KINDS.map(([kind, name]) => ({ kind, name, items: memberships.filter((m) => m.person_id === id && m.kind === kind) })).filter((g) => g.items.length);
-  const itemDetails = (m: LoyaltyEntry) => [m.tier, m.expiry && `Expires ${m.expiry}`, m.notes].filter(Boolean).join(" · ");
+  const itemDetails = (m: LoyaltyEntry) => [m.expiry && `Expires ${m.expiry}`, m.notes].filter(Boolean).join(" · ");
 
   const selectClass = "border-input bg-card dark:bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
@@ -192,10 +193,10 @@
           {#if d.program === "Other"}<span class="text-muted-foreground">Say which program in the notes.</span>{/if}</label>
         <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Number</span>
           <Input bind:value={d.number} required={d.id === null} maxlength={64} autocomplete="off" spellcheck={false} placeholder={d.id === null ? "" : `Leave empty to keep ${d.masked}`} /></label>
-        <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Tier</span>
-          <Input bind:value={d.tier} maxlength={100} autocomplete="off" placeholder="Gold" /></label>
-        <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Expiry</span>
-          <Input type="date" bind:value={d.expiry} autocomplete="off" /></label>
+        {#if EXPIRES.includes(d.kind)}
+          <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Expiry</span>
+            <Input type="date" bind:value={d.expiry} autocomplete="off" /></label>
+        {/if}
         <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Notes</span>
           <Input bind:value={d.notes} maxlength={500} autocomplete="off" /></label>
         {#if idError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{idError}</p>{/if}

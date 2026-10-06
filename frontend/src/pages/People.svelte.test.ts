@@ -16,8 +16,8 @@ const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", lega
 const mia: Person = { id: 2, display_name: "Mia Doe", first_name: "Mia", legal_name: "Mia Rose Doe", aliases: ["DOE/MIA MISS"], member: false, links: [] };
 
 const PROGRAMS = { airline: ["American AAdvantage", "Other"], hotel: ["Marriott Bonvoy", "Other"], car: ["Other"], known_traveler: ["TSA PreCheck", "Other"], redress: ["DHS TRIP", "Other"] };
-const aa: LoyaltyEntry = { id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, tier: "Gold", expiry: null, notes: null };
-const tsa: LoyaltyEntry = { id: 12, person_id: 1, kind: "known_traveler", program: "TSA PreCheck", masked: "••••2345", readable: true, tier: null, expiry: "2029-03-31", notes: null };
+const aa: LoyaltyEntry = { id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, expiry: null, notes: null };
+const tsa: LoyaltyEntry = { id: 12, person_id: 1, kind: "known_traveler", program: "TSA PreCheck", masked: "••••2345", readable: true, expiry: "2029-03-31", notes: null };
 
 /** The server, with its people kept in `held` and their memberships in `ids`: answers the calls the page makes. */
 let held: Person[];
@@ -30,9 +30,9 @@ function serve() {
       const id = Number(path.split("/")[3]);
       if (path.endsWith("/reveal")) return { number: "DEMO1234567" };
       if (opts?.method === "DELETE") { ids = ids.filter((m) => m.id !== id); return { ok: true }; }
-      const b = opts?.body as { person_id: number; kind: string; program: string; number?: string; tier: string; expiry: string; notes: string };
+      const b = opts?.body as { person_id: number; kind: string; program: string; number?: string; expiry: string; notes: string };
       const next: LoyaltyEntry = { id: id || 20, person_id: b.person_id, kind: b.kind, program: b.program, masked: b.number ? `••••${b.number.slice(-4)}` : ids.find((m) => m.id === id)?.masked ?? "••••",
-        readable: true, tier: b.tier || null, expiry: b.expiry || null, notes: b.notes || null };
+        readable: true, expiry: b.expiry || null, notes: b.notes || null };
       ids = id ? ids.map((m) => (m.id === id ? next : m)) : [...ids, next];
       return next;
     }
@@ -184,7 +184,6 @@ describe("People", () => {
     const airline = await screen.findByRole("region", { name: "Jane Doe’s Airline memberships" });
     expect(within(airline).getByText("American AAdvantage")).toBeInTheDocument();
     expect(within(airline).getByText("••••4567")).toBeInTheDocument();
-    expect(within(airline).getByText("Gold")).toBeInTheDocument();
     const kt = screen.getByRole("region", { name: "Jane Doe’s Known Traveler memberships" });
     expect(within(kt).getByText("Expires 2029-03-31")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: /Mia Doe/ })).toBeNull();
@@ -227,7 +226,7 @@ describe("People", () => {
     expect(screen.getByLabelText("Program")).toHaveValue("Marriott Bonvoy");
     await userEvent.type(screen.getByLabelText("Number"), "DEMO55501234");
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
-    expect(api).toHaveBeenCalledWith("/api/loyalty", { method: "POST", body: { person_id: 2, kind: "hotel", program: "Marriott Bonvoy", number: "DEMO55501234", tier: "", expiry: "", notes: "" } });
+    expect(api).toHaveBeenCalledWith("/api/loyalty", { method: "POST", body: { person_id: 2, kind: "hotel", program: "Marriott Bonvoy", number: "DEMO55501234", expiry: "", notes: "" } });
     expect(await screen.findByRole("region", { name: "Mia Doe’s Hotel memberships" })).toBeInTheDocument();
     expect(screen.queryByRole("form")).toBeNull();
   });
@@ -249,14 +248,27 @@ describe("People", () => {
     expect(within(screen.getByLabelText(/^Program/)).getByRole("option", { name: "American AAdvantage" })).toBeInTheDocument();   // (Mia doesn't)
   });
 
+  it("has no Tier, and offers an expiry only for Known Traveler and redress numbers", async () => {
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "Add a membership for Mia Doe" }));
+    expect(screen.queryByLabelText("Tier")).toBeNull();
+    for (const kind of ["airline", "hotel", "car"]) {
+      await userEvent.selectOptions(screen.getByLabelText("Kind"), kind);
+      expect(screen.queryByLabelText("Expiry")).toBeNull();
+    }
+    for (const kind of ["known_traveler", "redress"]) {
+      await userEvent.selectOptions(screen.getByLabelText("Kind"), kind);
+      expect(screen.getByLabelText("Expiry")).toBeInTheDocument();
+    }
+  });
+
   it("changes a membership without asking for the number again", async () => {
     render(People);
     await userEvent.click(await screen.findByRole("button", { name: "Edit Jane Doe’s American AAdvantage" }));
     expect(screen.getByLabelText("Number")).toHaveAttribute("placeholder", "Leave empty to keep ••••4567");
-    await userEvent.clear(screen.getByLabelText("Tier"));
-    await userEvent.type(screen.getByLabelText("Tier"), "Platinum");
+    await userEvent.type(screen.getByLabelText("Notes"), "Platinum");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(api).toHaveBeenCalledWith("/api/loyalty/11", expect.objectContaining({ method: "POST", body: expect.objectContaining({ number: "", tier: "Platinum" }) }));
+    expect(api).toHaveBeenCalledWith("/api/loyalty/11", expect.objectContaining({ method: "POST", body: expect.objectContaining({ number: "", notes: "Platinum" }) }));
     expect(await screen.findByText("Platinum")).toBeInTheDocument();
   });
 

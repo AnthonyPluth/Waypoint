@@ -691,7 +691,7 @@ class LeakTests(Household):
         self.c.execute(insert(FlightStatus).values(flight_number="ZZ1", date="2026-01-01", state="landed", fetched_at=1.0))
         guest = people.add_guest(self.c, {"display_name": canaries[0], "first_name": "Canary", "legal_name": canaries[0], "aliases": [canaries[0]]})
         loyalty.add(self.c, {"person_id": guest["id"], "kind": "airline", "program": "Example Miles", "number": canaries[2],
-                             "tier": None, "expiry": None, "notes": None})
+                             "expiry": None, "notes": None})
         seg = self.book(self.jane, {**OUT, "confirmation": canaries[1]}, travelers=[self.jane.person_id, guest["id"]])
         self.c.commit()
         with no_leaks(self, *canaries):   # nothing printed, logged or sent (the request's address and headers) carries one

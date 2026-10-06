@@ -9,7 +9,7 @@ Each person on the [People](/waypoint/start/people/) page, member or guest, has 
 
 ## What you can keep
 
-A membership has a **kind**, a **program**, a **number**, and optionally a tier, an expiry date and notes.
+A membership has a **kind**, a **program**, a **number**, and optionally notes. Known Traveler and redress numbers can also have an expiry date; an airline, hotel or car program’s number doesn’t expire, so those have none.
 
 - **Airline**, **hotel** and **car** programs, such as American AAdvantage, Marriott Bonvoy or Hertz Gold Plus Rewards.
 - **Known Traveler**: TSA PreCheck, Global Entry, NEXUS or SENTRI.

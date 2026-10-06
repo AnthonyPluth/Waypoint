@@ -22,17 +22,17 @@ GUESTS: list[people.Fields] = [
     {"display_name": "Grandma Joan", "first_name": "Joan", "legal_name": "Joan Marie O’Hare", "aliases": ["OHARE/JOAN MRS"]},
 ]
 
-# Made-up memberships: (person's display name, kind, program, number, tier, expiry, notes).
+# Made-up memberships: (person's display name, kind, program, number, expiry, notes).
 MEMBERSHIPS = [
-    ("Jane Doe", "airline", "American AAdvantage", "DEMO1234567", "Gold", None, None),
-    ("Jane Doe", "airline", "United MileagePlus", "DM987654", None, None, None),
-    ("Jane Doe", "hotel", "Marriott Bonvoy", "DEMO55501234", "Platinum Elite", None, None),
-    ("Jane Doe", "known_traveler", "TSA PreCheck", "TT0000012345", None, "2029-03-31", "Known Traveler Number"),
-    ("Sam Doe", "airline", "Delta SkyMiles", "DEMO7654321", "Silver", None, None),
-    ("Sam Doe", "car", "Hertz Gold Plus Rewards", "DEMO8800123", None, None, None),
-    ("Sam Doe", "known_traveler", "Global Entry", "TT0000067890", None, "2028-11-15", None),
-    ("Mia Doe", "known_traveler", "TSA PreCheck", "TT0000099999", None, None, None),
-    ("Mia Doe", "redress", "DHS TRIP", "DEMO0001234", None, None, None),
+    ("Jane Doe", "airline", "American AAdvantage", "DEMO1234567", None, None),
+    ("Jane Doe", "airline", "United MileagePlus", "DM987654", None, None),
+    ("Jane Doe", "hotel", "Marriott Bonvoy", "DEMO55501234", None, None),
+    ("Jane Doe", "known_traveler", "TSA PreCheck", "TT0000012345", "2029-03-31", "Known Traveler Number"),
+    ("Sam Doe", "airline", "Delta SkyMiles", "DEMO7654321", None, None),
+    ("Sam Doe", "car", "Hertz Gold Plus Rewards", "DEMO8800123", None, None),
+    ("Sam Doe", "known_traveler", "Global Entry", "TT0000067890", "2028-11-15", None),
+    ("Mia Doe", "known_traveler", "TSA PreCheck", "TT0000099999", None, None),
+    ("Mia Doe", "redress", "DHS TRIP", "DEMO0001234", None, None),
 ]
 
 
@@ -227,8 +227,8 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     for domain, ago, reason in SHARED_UNREAD:
         review.add(conn, shared.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
     by_name = {p["display_name"]: p["id"] for p in people.everyone(conn)}
-    for who, kind, program, number, tier, expiry, notes in MEMBERSHIPS:
-        loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number, "tier": tier,
+    for who, kind, program, number, expiry, notes in MEMBERSHIPS:
+        loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number,
                            "expiry": expiry, "notes": notes})
     db.upsert(conn, FlightStatus, {**_flight_status(today), "fetched_at": datetime.now(UTC).timestamp()}, key=["flight_number", "date"])
     return _rows(conn) - before

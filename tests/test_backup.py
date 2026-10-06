@@ -121,7 +121,7 @@ class BackupTests(unittest.TestCase):
         src.close(); dst.close()
 
     def loyalty_rows(self, c):
-        return sorted((m.person_id, m.kind, m.program, secretbox.decrypt(m.number), m.tier, m.expiry, m.notes)
+        return sorted((m.person_id, m.kind, m.program, secretbox.decrypt(m.number), m.expiry, m.notes)
                       for m in c.orm.scalars(select(LoyaltyId)))
 
     def test_loyalty_numbers_come_back_exact_and_stay_encrypted_in_the_file(self):
@@ -130,7 +130,7 @@ class BackupTests(unittest.TestCase):
         src.execute(insert(Person).values(id=pid, display_name="Zoë"))
         for number in ("DEMO ’1234 🐶 %s", "0000012345", "x" * 64):
             src.execute(insert(LoyaltyId).values(person_id=pid, kind="airline", program="Other", number=secretbox.encrypt(number),
-                                                 tier="", expiry=None, notes="n\nl \\ '"))
+                                                 expiry=None, notes="n\nl \\ '"))
         src.commit()
         raw = backup.dump(src)
         self.assertNotIn(b"0000012345", raw)

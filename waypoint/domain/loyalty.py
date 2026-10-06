@@ -14,6 +14,7 @@ from ..storage.models import LoyaltyId, Person
 
 KINDS = ("airline", "hotel", "car", "known_traveler", "redress")
 OTHER = "Other"
+EXPIRES = ("known_traveler", "redress")   # the kinds whose numbers expire (an airline, hotel or car program's doesn't)
 # The programs to choose from, for each kind (a fixed list: "Other" for any that isn't there).
 PROGRAMS: dict[str, tuple[str, ...]] = {
     "airline": ("Alaska Mileage Plan", "American AAdvantage", "Delta SkyMiles", "JetBlue TrueBlue", "Southwest Rapid Rewards",
@@ -32,7 +33,6 @@ class Fields(TypedDict):
     kind: str
     program: str
     number: str | None
-    tier: str | None
     expiry: str | None
     notes: str | None
 
@@ -44,7 +44,6 @@ class Listed(TypedDict):
     program: str
     masked: str            # MASK and the number's last four characters (all of it masked when it's that short)
     readable: bool         # false: Waypoint's key can't unlock it (a restore under another key); it has to be entered again
-    tier: str | None
     expiry: str | None
     notes: str | None
 
@@ -78,7 +77,7 @@ def listed(row: LoyaltyId) -> Listed:
     except secretbox.SecretError:
         masked, readable = MASK, False
     return {"id": row.id, "person_id": row.person_id, "kind": row.kind, "program": row.program, "masked": masked,
-            "readable": readable, "tier": row.tier, "expiry": row.expiry, "notes": row.notes}
+            "readable": readable, "expiry": row.expiry, "notes": row.notes}
 
 
 def everyone(conn: db.Connection) -> list[Listed]:
@@ -124,7 +123,7 @@ def add(conn: db.Connection, fields: Fields) -> Listed:
     if not fields["number"]:
         raise ValueError("a new membership needs a number")
     row = LoyaltyId(person_id=fields["person_id"], kind=fields["kind"], program=fields["program"],
-                    number=secretbox.encrypt(fields["number"]) or "", tier=fields["tier"], expiry=fields["expiry"],
+                    number=secretbox.encrypt(fields["number"]) or "", expiry=fields["expiry"],
                     notes=fields["notes"])
     conn.orm.add(row)
     conn.orm.flush()
@@ -142,7 +141,7 @@ def edit(conn: db.Connection, loyalty_id: int, fields: Fields) -> Listed | None:
     if moved and _holds(conn, fields, besides=loyalty_id):
         raise Duplicate()
     values = {"person_id": fields["person_id"], "kind": fields["kind"], "program": fields["program"],
-              "tier": fields["tier"], "expiry": fields["expiry"], "notes": fields["notes"]}
+              "expiry": fields["expiry"], "notes": fields["notes"]}
     if fields["number"]:
         values["number"] = secretbox.encrypt(fields["number"])
     if conn.execute(update(LoyaltyId).where(LoyaltyId.id == loyalty_id).values(**values)).rowcount == 0:

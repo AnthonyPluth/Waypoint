@@ -61,7 +61,7 @@ class Assistants(ServerCase):
                                     "Rome", cls.sam.person_id)
             for who, number in ((cls.jane, JANE_NUMBER), (cls.sam, SAM_NUMBER)):
                 loyalty.add(conn, {"person_id": who.person_id, "kind": "airline", "program": "Delta SkyMiles", "number": number,
-                                   "tier": None, "expiry": None, "notes": None})
+                                   "expiry": None, "notes": None})
             cls.jane_loyalty = conn.execute(select(loyalty.LoyaltyId.id).where(loyalty.LoyaltyId.person_id == cls.jane.person_id)).scalar()
             cls.sam_loyalty = conn.execute(select(loyalty.LoyaltyId.id).where(loyalty.LoyaltyId.person_id == cls.sam.person_id)).scalar()
 

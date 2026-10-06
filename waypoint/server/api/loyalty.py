@@ -20,7 +20,7 @@ DUPLICATE = "They already have a membership in that program. Edit that one inste
 
 def fields(body: Mapping[str, Any], *, need_number: bool) -> loyalty.Fields:
     """What a request names, checked. Nothing here quotes a value back: a refusal says which field, never what was in it."""
-    for key in ("kind", "program", "number", "tier", "expiry", "notes"):
+    for key in ("kind", "program", "number", "expiry", "notes"):
         if body.get(key) is not None and not isinstance(body[key], str):
             raise ApiError(f'Send "{key}" as text')
     kind = body.get("kind")
@@ -33,8 +33,11 @@ def fields(body: Mapping[str, Any], *, need_number: bool) -> loyalty.Fields:
     if not isinstance(person, int) or isinstance(person, bool):
         raise ApiError("Choose whose it is")
     number = _v.text(body.get("number"), "number", NUMBER_LIMIT, required=need_number)
+    expiry = _v.day(body.get("expiry"), "expiry")
+    if expiry and kind not in loyalty.EXPIRES:
+        raise ApiError("Only Known Traveler and redress numbers expire")
     return {"person_id": person, "kind": kind, "program": program, "number": number,
-            "tier": _v.text(body.get("tier"), "tier", TEXT_LIMIT), "expiry": _v.day(body.get("expiry"), "expiry"),
+            "expiry": expiry,
             "notes": _v.text(body.get("notes"), "notes", NOTES_LIMIT)}
 
 
