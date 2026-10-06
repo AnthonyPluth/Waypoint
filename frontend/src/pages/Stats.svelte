@@ -40,7 +40,7 @@
   });
 
   // The map's code and outlines are a separate download, fetched only once this page has something to draw on it.
-  let TravelMap = $state<Component<{ flights: Stats["flights"] }> | null>(null);
+  let TravelMap = $state<Component<{ flights: Stats["flights"]; stays: Stats["stays"]["pins"] }> | null>(null);
   let mapError = $state("");
   async function loadMap() {
     mapError = "";
@@ -186,7 +186,7 @@
     <section aria-labelledby="map-title" id="stats-map-slot" data-testid="stats-map-slot" class="scroll-mt-20 space-y-3">
       <h3 id="map-title" class="eyebrow px-1">Where you’ve been</h3>
       {#if TravelMap}
-        <TravelMap flights={f} />
+        <TravelMap flights={f} stays={current?.stays.pins ?? []} />
       {:else if mapError}
         <p class="text-sm text-muted-foreground">The map couldn’t load: {mapError} <Button variant="outline" size="sm" onclick={loadMap}>Try again</Button></p>
       {:else}

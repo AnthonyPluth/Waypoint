@@ -25,6 +25,7 @@ from sqlalchemy import func, select
 from ..storage import db
 from ..storage.models import Airline, Airport
 from . import people, trips, visibility
+from .chains import clean, hotel_chain
 from .visibility import Viewer
 
 EARTH_KM = 40075.0        # around the equator
@@ -55,6 +56,7 @@ class Seg:
     details: Mapping[str, str] = field(default_factory=dict)
     ports: Sequence[trips.PortIn] = ()   # a cruise's ports of call
     seats: Sequence[str] = ()            # the seats of the travellers counted (a person's own; the household's, every traveller's), as typed
+    trip_id: int | None = None           # the trip it is on, for the map's details
 
 
 class Named(TypedDict):
@@ -66,6 +68,14 @@ class Place(TypedDict):
     name: str                  # a country's ISO code or a city's name
     first_visit: str           # the local date, YYYY-MM-DD
     visits: int
+
+
+class MapTrip(TypedDict):
+    """A trip a place or a route on the map belongs to, and when: a flight's departure and arrival dates, a stay's check-in and check-out dates."""
+    trip_id: int
+    name: str
+    start: str                 # the local date, YYYY-MM-DD
+    end: str
 
 
 class AirportVisit(TypedDict):
@@ -93,6 +103,7 @@ class RouteCount(TypedDict):
     a_longitude: float | None
     b_latitude: float | None
     b_longitude: float | None
+    trips: list[MapTrip]       # each flight on it, earliest first
 
 
 class FlightRecord(TypedDict):
@@ -142,9 +153,21 @@ class StayRecord(TypedDict):
     start_local: str           # the local date and time of check-in
 
 
+class StayPin(TypedDict):
+    """Where stays were, for the map: a city placed at the position of the airports Waypoint knows in a city of that name (nothing is
+    looked up from the address), so the pin is roughly the city, not the hotel."""
+    city: str
+    country: str | None        # an ISO code
+    latitude: float
+    longitude: float
+    stays: int
+    nights: int
+    trips: list[MapTrip]       # each stay, earliest first
+
+
 class StayStats(TypedDict):
     nights: int                # nights away in hotels, each night once however many stays overlap it
-    chains: list[Named]        # stays by the booking's provider
+    chains: list[Named]        # stays by the hotel's brand (domain/chains.py), else the booking's provider
     cities: list[Named]
     countries: list[Named]
     count: int                 # stays with at least one night (in the year asked about)
@@ -155,6 +178,7 @@ class StayStats(TypedDict):
     most_visited_hotel: StayPlace | None   # most stays, then most nights
     most_visited_city: StayPlace | None
     busiest_month: str | None  # YYYY-MM, the month with the most nights away
+    pins: list[StayPin]        # the cities stayed in that have a place on the map, most nights first
 
 
 class CarStats(TypedDict):
@@ -255,11 +279,12 @@ def _record(origin: str, destination: str, km: float, s: Seg) -> FlightRecord:
             "flight_number": _flight_number(s)}
 
 
-def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Mapping[str, str]) -> FlightStats:
+def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Mapping[str, str], trip_names: Mapping[int, str]) -> FlightStats:
     total_km, air = 0.0, 0.0
     visits: Counter[str] = Counter()
     carriers: Counter[tuple[str | None, str]] = Counter()
     routes: Counter[tuple[str, str]] = Counter()
+    route_trips: dict[tuple[str, str], list[MapTrip]] = {}
     cabins: Counter[str] = Counter()
     seats: Counter[str] = Counter()
     months: Counter[str] = Counter()
@@ -272,7 +297,10 @@ def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Map
         air += (trips.instant(s.end_local, s.end_zone) - trips.instant(s.start_local, s.start_zone)).total_seconds()
         months[s.start_local[:7]] += 1
         visits.update((origin, destination))
-        routes[(min(origin, destination), max(origin, destination))] += 1
+        route = (min(origin, destination), max(origin, destination))
+        routes[route] += 1
+        if (ref := _map_trip(s, trip_names)):
+            route_trips.setdefault(route, []).append(ref)
         here, there = known.get(origin), known.get(destination)
         countries.update(a.country for a in (here, there) if a)
         if here and there:
@@ -310,7 +338,8 @@ def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Map
         routes_out.append({"a": a_code, "b": b_code, "flights": n,
                            "distance_km": round(distance_km((a.latitude, a.longitude), (b.latitude, b.longitude)), 1) if a and b else None,
                            "a_latitude": a.latitude if a else None, "a_longitude": a.longitude if a else None,
-                           "b_latitude": b.latitude if b else None, "b_longitude": b.longitude if b else None})
+                           "b_latitude": b.latitude if b else None, "b_longitude": b.longitude if b else None,
+                           "trips": sorted(route_trips.get((a_code, b_code), []), key=lambda t: (t["start"], t["trip_id"]))})
     top_seat = min(seats.items(), key=lambda kv: (-kv[1], kv[0]))[0] if seats else None
     busiest = min(months.items(), key=lambda kv: (-kv[1], kv[0]))[0] if months else None
     return {
@@ -326,7 +355,34 @@ def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Map
     }
 
 
-def _stays(stays: Sequence[Seg], year: int | None, city_countries: Mapping[str, str]) -> StayStats:
+def _map_trip(s: Seg, trip_names: Mapping[int, str]) -> MapTrip | None:
+    """The trip a segment is on, with its own dates, or None when it has none (or one the viewer can't see)."""
+    if s.trip_id is None or s.trip_id not in trip_names:
+        return None
+    return {"trip_id": s.trip_id, "name": trip_names[s.trip_id], "start": s.start_local[:10], "end": s.end_local[:10]}
+
+
+def _stay_pins(stays: Sequence[Seg], year: int | None, city_countries: Mapping[str, str], city_points: Mapping[str, tuple[float, float]],
+               trip_names: Mapping[int, str]) -> list[StayPin]:
+    found: dict[str, StayPin] = {}
+    for s in stays:
+        spent = {d for d in _nights(s) if _in(d, year)}
+        key = (s.destination or "").strip().lower()
+        if not spent or key not in city_points:
+            continue
+        pin = found.setdefault(key, {"city": (s.destination or "").strip(), "country": city_countries.get(key),
+                                     "latitude": city_points[key][0], "longitude": city_points[key][1], "stays": 0, "nights": 0, "trips": []})
+        pin["stays"] += 1
+        pin["nights"] += len(spent)
+        if (ref := _map_trip(s, trip_names)):
+            pin["trips"].append(ref)
+    for pin in found.values():
+        pin["trips"].sort(key=lambda t: (t["start"], t["trip_id"]))
+    return sorted(found.values(), key=lambda p: (-p["nights"], -p["stays"], p["city"].casefold()))
+
+
+def _stays(stays: Sequence[Seg], year: int | None, city_countries: Mapping[str, str], city_points: Mapping[str, tuple[float, float]],
+           trip_names: Mapping[int, str]) -> StayStats:
     nights: set[date] = set()
     chains: Counter[str] = Counter()
     cities: Counter[str] = Counter()
@@ -336,13 +392,14 @@ def _stays(stays: Sequence[Seg], year: int | None, city_countries: Mapping[str, 
         nights |= spent_in_year
         if year is not None and not spent_in_year:
             continue
-        if s.provider:
-            chains[s.provider] += 1
+        if (chain := hotel_chain(s.provider, s.origin)):
+            chains[chain] += 1
         if s.destination:
             cities[s.destination] += 1
             if (country := city_countries.get(s.destination.strip().lower())):
                 countries[country] += 1
     return {"nights": len(nights), "chains": _ranked(chains), "cities": _ranked(cities), "countries": _ranked(countries),
+            "pins": _stay_pins(stays, year, city_countries, city_points, trip_names),
             **_stay_figures(stays, year)}  # type: ignore[typeddict-item]
 
 
@@ -394,8 +451,8 @@ def _cars(cars: Sequence[Seg], year: int | None) -> CarStats:
     for s in cars:
         out = {d for d in _days(s) if _in(d, year)}
         days |= out
-        if out and s.provider:
-            companies[s.provider] += 1
+        if out and (company := clean(s.provider)):
+            companies[company] += 1
     return {"days": len(days), "companies": _ranked(companies)}
 
 
@@ -467,16 +524,19 @@ def _years(live: Sequence[Seg]) -> list[int]:
 
 
 def build(segments: Iterable[Seg], known: Mapping[str, Airport], airlines: Mapping[str, str],
-          city_countries: Mapping[str, str], *, now: datetime, year: int | None = None) -> Stats:
+          city_countries: Mapping[str, str], *, now: datetime, year: int | None = None,
+          city_points: Mapping[str, tuple[float, float]] | None = None, trip_names: Mapping[int, str] | None = None) -> Stats:
     """The stats of these segments: the finished, uncancelled ones (`segments` already holds only what the person wanted
     counted), in `year` (a calendar year at the places themselves) or for ever. `now` is an aware moment."""
+    city_points, trip_names = city_points or {}, trip_names or {}
     live = [s for s in segments if _finished(s, now)]
     flights = [s for s in live if s.kind == "flight" and (year is None or int(s.start_local[:4]) == year)]
     stays = [s for s in live if s.kind == "hotel"]
     cars = [s for s in live if s.kind == "car"]
     cruises = [s for s in live if s.kind == "cruise"]
     stays_in = [s for s in stays if year is None or any(_in(d, year) for d in _nights(s))]
-    return {"years": _years(live), "flights": _flights(flights, known, airlines), "stays": _stays(stays_in, year, city_countries),
+    return {"years": _years(live), "flights": _flights(flights, known, airlines, trip_names),
+            "stays": _stays(stays_in, year, city_countries, city_points, trip_names),
             "cars": _cars(cars, year), "cruises": _cruises(cruises, year), "places": _places(flights, stays_in, known, city_countries)}
 
 
@@ -495,13 +555,27 @@ def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: in
             seats_of.setdefault(t.segment_id, []).append(t.seat)
     ports = trips.ports_of(conn, [s.id for s in segments if s.kind == "cruise"])
     seen = [Seg(s.kind, s.start_local, s.start_zone, s.end_local, s.end_zone, s.origin, s.destination, s.provider,
-                trips.decode_details(s.details), ports.get(s.id, []), seats_of.get(s.id, [])) for s in segments]
+                trips.decode_details(s.details), ports.get(s.id, []), seats_of.get(s.id, []), s.trip_id) for s in segments]
     codes = {(p or "").upper() for s in seen if s.kind == "flight" for p in (s.origin, s.destination)}
     known = {a.code: a for a in conn.orm.scalars(select(Airport).where(Airport.code.in_(sorted(codes)))).all()}
     prefixes = {c for s in seen if s.kind == "flight" and (c := _airline_code(s))}
     names = dict(conn.execute(select(Airline.code, Airline.name).where(Airline.code.in_(sorted(prefixes)))).fetchall())
     stay_cities = {s.destination.strip().lower() for s in seen if s.kind == "hotel" and s.destination}
-    return build(seen, known, names, _countries_of(conn, stay_cities), now=now, year=year)
+    countries = _countries_of(conn, stay_cities)
+    trip_names = {t.id: t.name for t in visibility.visible_trips(conn, viewer)}
+    return build(seen, known, names, countries, now=now, year=year, city_points=_points_of(conn, countries), trip_names=trip_names)
+
+
+def _points_of(conn: db.Connection, countries: Mapping[str, str]) -> dict[str, tuple[float, float]]:
+    """Where each of these cities (lower case, with the country `_countries_of` settled) is: the middle of its airports there."""
+    if not countries:
+        return {}
+    found: dict[str, list[tuple[float, float]]] = {}
+    for city, country, lat, lon in conn.execute(select(func.lower(Airport.city), Airport.country, Airport.latitude, Airport.longitude)
+                                                .where(func.lower(Airport.city).in_(sorted(countries)))):
+        if countries.get(city) == country:
+            found.setdefault(city, []).append((lat, lon))
+    return {c: (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)) for c, pts in found.items()}
 
 
 def _countries_of(conn: db.Connection, cities: set[str]) -> dict[str, str]:

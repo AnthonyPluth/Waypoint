@@ -570,6 +570,13 @@ export interface StatsFlights {
   moon_fraction: number;
 }
 
+export interface StatsMapTrip {
+  trip_id: number;
+  name: string;
+  start: string;
+  end: string;
+}
+
 export interface StatsNamed {
   name: string;
   count: number;
@@ -595,6 +602,7 @@ export interface StatsRoute {
   a_longitude: number | null;
   b_latitude: number | null;
   b_longitude: number | null;
+  trips: StatsMapTrip[];
 }
 
 export interface StatsSeats {
@@ -602,6 +610,16 @@ export interface StatsSeats {
   aisle: number;
   middle: number;
   unknown: number;
+}
+
+export interface StatsStayPin {
+  city: string;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+  stays: number;
+  nights: number;
+  trips: StatsMapTrip[];
 }
 
 export interface StatsStayPlace {
@@ -630,6 +648,7 @@ export interface StatsStays {
   most_visited_hotel: StatsStayPlace | null;
   most_visited_city: StatsStayPlace | null;
   busiest_month: string | null;
+  pins: StatsStayPin[];
 }
 
 /** A message a booking was made from, as kept: text and markup as in `Preview`, cut at 30,000 characters. */

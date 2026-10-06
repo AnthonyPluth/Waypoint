@@ -65,7 +65,7 @@ A confirmation email that arrives twice (in one mailbox, or in two household mem
 
 ## What your edits keep
 
-When you change a field of a segment, Waypoint remembers it was you and a later email never overwrites it. A segment you have edited is marked **Edited by you** on its card. An email about a booking Waypoint already has updates that segment instead of adding another, and marks it *changed* when its times or places moved, or *cancelled* when the airline says so.
+When you change a field of a segment, Waypoint remembers it was you and a later email never overwrites it. An email about a booking Waypoint already has updates that segment instead of adding another, and marks it *changed* when its times or places moved, or *cancelled* when the airline says so.
 
 ## Live status
 

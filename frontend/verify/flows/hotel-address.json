@@ -33,7 +33,7 @@
       "wait_for": "#segment-address"
     },
     {
-      "scroll_to": "label:has-text('Time zone at the end')"
+      "scroll_to": "label:has-text('Time zone')"
     },
     {
       "screenshot": "hotel-form"
