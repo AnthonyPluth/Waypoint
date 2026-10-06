@@ -4,6 +4,7 @@ import { segment } from "../test/fixtures";
 
 /** A flight that's ready to send, with `extra` changing what a test cares about. */
 const flight = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), origin: "JFK", destination: "LHR", start_local: "2026-11-20T19:00", end_local: "2026-11-21T07:10", people: [1], ...extra });
+const car = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), kind: "car", origin: "Example Rental", start_local: "2026-11-21T15:00", end_local: "2026-11-27T10:00", start_zone: "Europe/London", people: [1], ...extra });
 const hotel = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), kind: "hotel", origin: "Harbour Hotel", start_local: "2026-11-21T15:00", end_local: "2026-11-27T10:00", start_zone: "Europe/London", people: [1], ...extra });
 
 describe("the segment form's messages", () => {
@@ -24,7 +25,7 @@ describe("the segment form's messages", () => {
     expect(problem(flight({ end_local: "" }))).toBe("Enter when it ends");
   });
   it("needs a time zone for anything but a flight, and one that exists", () => {
-    expect(problem(hotel({ start_zone: "" }))).toBe("Enter the time zone of the place (for example America/New_York)");
+    expect(problem(car({ start_zone: "" }))).toBe("Enter the time zone of the place (for example America/New_York)");
     expect(problem(hotel({ start_zone: "Mars/Olympus" }))).toBe("The time zone “Mars/Olympus” isn’t one Waypoint knows (use a name like America/New_York)");
     expect(problem(flight({ end_zone: "Nowhere" }))).toMatch(/isn’t one Waypoint knows/);
   });
@@ -54,9 +55,18 @@ describe("the request the form makes", () => {
     expect(body(flight({ start_zone: "Asia/Tokyo" }))).toMatchObject({ start_zone: "Asia/Tokyo" });
     expect(body(flight())).not.toHaveProperty("start_zone");
   });
-  it("sends a stay's zone for both ends unless the end has its own", () => {
-    expect(body(hotel())).toMatchObject({ start_zone: "Europe/London", end_zone: "Europe/London", origin: "Harbour Hotel" });
-    expect(body(hotel({ end_zone: "Europe/Paris" }))).toMatchObject({ end_zone: "Europe/Paris" });
+  it("sends a stay's one zone, and a rental's for both ends unless the end has its own", () => {
+    expect(body(hotel())).toMatchObject({ start_zone: "Europe/London", origin: "Harbour Hotel" });
+    expect(body(hotel())).not.toHaveProperty("end_zone");
+    expect(body(hotel({ end_zone: "Europe/Paris" }))).not.toHaveProperty("end_zone");   // (a stay is in one place)
+    expect(body(car())).toMatchObject({ start_zone: "Europe/London", end_zone: "Europe/London" });
+    expect(body(car({ end_zone: "Europe/Paris" }))).toMatchObject({ end_zone: "Europe/Paris" });
+  });
+  it("lets a stay leave its zone empty when it has an address to work it out from", () => {
+    expect(problem(hotel({ start_zone: "", details: { address: "1 Quay Street, London" } }))).toBeNull();
+    expect(body(hotel({ start_zone: "", details: { address: "1 Quay Street, London" } }))).toMatchObject({ start_zone: null });   // (null on an edit clears the old zone, so it is worked out again)
+    expect(problem(hotel({ start_zone: "" }))).toBe("Enter the time zone of the stay (for example America/New_York), or its address to work it out from");
+    expect(problem(hotel({ start_zone: "Mars/Olympus" }))).toMatch(/isn’t one Waypoint knows/);
   });
   it("keeps travellers known only by their printed name, and details it has no field for", () => {
     const sent = body(hotel({ printed: ["DOE/MIA MISS"], details: { address: "1 Quay Street", seat: "12A" } }));
