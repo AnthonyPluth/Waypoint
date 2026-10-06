@@ -28,12 +28,12 @@ class Allowed(unittest.TestCase):
 
 class Dropped(unittest.TestCase):
     def test_scripts_styles_forms_and_frames_go_with_what_is_inside(self):
-        for tag in ("script", "style", "iframe", "form", "object", "svg", "noscript", "template", "title", "head"):
+        for tag in ("script", "style", "iframe", "button", "object", "svg", "noscript", "template", "title", "head"):
             with self.subTest(tag=tag):
                 self.assertEqual(clean(f"<p>a</p><{tag}>EVIL <b>x</b></{tag}><p>b</p>"), "<p>a</p><p>b</p>")
 
     def test_a_dropped_tag_inside_a_dropped_tag_does_not_end_it_early(self):
-        self.assertEqual(clean("<form><form>x</form>EVIL</form>ok"), "ok")
+        self.assertEqual(clean("<select><select>x</select>EVIL</select>ok"), "ok")
 
     def test_no_attribute_but_a_links_address_survives(self):
         out = clean('<p style="x" onclick="evil()" class="c" id="i" onmouseover="e()">hi</p><div background="x" style="background:url(http://t.example/p)">d</div>')
@@ -63,6 +63,14 @@ class Dropped(unittest.TestCase):
         self.assertIn("&quot;", out)
 
 
+class Unclosed(unittest.TestCase):
+    def test_a_form_around_the_body_keeps_its_text_without_its_controls(self):
+        self.assertEqual(clean('<form action="https://t.example"><p>Gate B12</p><input name=x><button>Go</button></form>'), "<p>Gate B12</p>")
+
+    def test_a_head_that_was_never_closed_ends_at_the_body(self):
+        self.assertEqual(clean("<html><head><meta name=x><body><p>Gate B12</p></body></html>"), "<p>Gate B12</p>")
+
+
 class Odd(unittest.TestCase):
     def test_self_closed_tags_are_kept_or_dropped_like_the_others(self):
         self.assertEqual(clean("a<br/>b<hr/><script/>c<b/>d<img alt='x'/>"), "a<br>b<hr>c<b></b>dx ")
@@ -71,7 +79,7 @@ class Odd(unittest.TestCase):
         self.assertEqual(clean('<a href="https://[bad">x</a>'), "<a>x</a>")
 
     def test_a_stray_end_tag_inside_a_dropped_one_changes_nothing(self):
-        self.assertEqual(clean("<form></b>EVIL</form>ok"), "ok")
+        self.assertEqual(clean("<select></b>EVIL</select>ok"), "ok")
 
     def test_a_parser_that_gives_up_shows_what_it_had(self):
         with mock.patch.object(safe_html._Clean, "feed", side_effect=ValueError):

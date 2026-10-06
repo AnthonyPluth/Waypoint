@@ -17,8 +17,8 @@ KEEP = {"p", "div", "span", "br", "hr", "b", "strong", "i", "em", "u", "s", "sma
         "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "dl", "dt", "dd", "table", "thead", "tbody", "tfoot", "tr", "td", "th",
         "caption", "a", "center", "font"}   # (font and center only as the text they hold: no attribute of theirs is kept)
 VOID = {"br", "hr"}
-DROP = {"script", "style", "head", "title", "template", "noscript", "iframe", "object", "embed", "svg", "math", "form", "select",
-        "textarea", "button", "audio", "video", "canvas", "applet", "frameset"}   # (with everything inside them)
+DROP = {"script", "style", "head", "title", "template", "noscript", "iframe", "object", "embed", "svg", "math", "select",
+        "textarea", "button", "audio", "video", "canvas", "applet", "frameset"}   # (with everything inside them; a form is only unwrapped, its text stays, as mail often wraps its whole body in one)
 SCHEMES = {"https", "mailto"}
 MAX_DEPTH = 40
 SPAN = re.compile(r"[1-9]\d?")
@@ -47,6 +47,8 @@ class _Clean(HTMLParser):
         self.cut = False
 
     def handle_starttag(self, tag: str, attrs: Any) -> None:
+        if tag == "body" and self.skip and self.skip[0] == "head":
+            self.skip.clear()   # (a head that was never closed ends where the body begins)
         if self.skip:
             if tag in DROP and tag not in VOID:
                 self.skip.append(tag)
