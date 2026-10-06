@@ -96,6 +96,8 @@ describe("People", () => {
     expect(row).not.toBeNull();
     expect(within(row as HTMLElement).getByText("Mia Doe", { selector: "span" })).toBeInTheDocument();   // (inside her own row)
     expect(screen.getAllByRole("heading", { name: /Add a membership/ })).toHaveLength(1);
+    const janes = screen.getByText("Jane Doe", { selector: "span" }).closest("li") as HTMLElement;
+    expect(within(janes).queryByRole("heading", { name: /Add a membership/ })).toBeNull();   // (not in anyone else's row)
   });
 
   it("hides This is me on your own machine, where nobody signs in", async () => {
