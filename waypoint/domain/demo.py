@@ -155,6 +155,11 @@ def _read_from_email(today: date) -> trips.SegmentIn:
     return {"kind": "flight", "origin": "JFK", "destination": "ORD", "start_local": _at(today, 60, "07:00"), "end_local": _at(today, 60, "08:45"),
             "confirmation": "CH3K5P", "provider": "Example Air", "details": {"flight_number": "EX 410"}}
 
+def _held_stay(today: date) -> trips.SegmentIn:
+    return {"kind": "hotel", "origin": "Quay Street Lodge", "destination": None, "start_local": _at(today, 90, "15:00"), "end_local": _at(today, 95, "10:00"),
+            "start_zone": "Europe/London", "end_zone": "Europe/London"}
+
+
 def _message(domain: str, days_ago: int, today: date, subject: str, lines: tuple[str, ...]) -> stored_mail.Content:
     return {"subject": subject, "sender_domain": domain, "received": (today - timedelta(days=days_ago)).isoformat(), "text": "\n".join(lines),
             "html": "".join(f"<p>{line}</p>" for line in lines), "truncated": False}
@@ -201,6 +206,7 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     for fields in _sam_alone(today):
         trips.add_segment(conn, sam, {**fields, "travelers": _on(sam.person_id)})
     from_email = trips.add_segment(conn, jane, {**_read_from_email(today), "travelers": [{"person_id": None, "name": "RIVERA/ALEX MR"}]}, source="email")
+    held_ids = [added["id"] for added in (trips.add_segment(conn, jane, {**_held_stay(today), "travelers": _on(jane.person_id)}) for _ in range(2)) if added]
     box = Mailbox(owner_sub="local", address=DEMO_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
                   status="connected", created=0.0, last_scan=None)
     conn.orm.add(box)
@@ -209,6 +215,10 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
         review.add(conn, box.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
         stored_mail.put(conn, box.id, f"demo-{domain}", _message(domain, ago, today, f"{SUBJECTS[domain]}: made-up details",
                                                                  ("Hello Jane,", "These are made-up details for the demo.", "Confirmation: DEMO42")), 0.0)
+    review.add(conn, box.id, "demo-held-stay", "example-stays.example", (today - timedelta(days=4)).isoformat(), "match", 0.0,
+               [({**_held_stay(today), "confirmation": "DEMO77", "provider": "Example Stays"}, held_ids)])
+    stored_mail.put(conn, box.id, "demo-held-stay", _message("example-stays.example", 4, today, "Your stay: Quay Street Lodge",
+                                                             ("Hello Jane,", "Your stay at Quay Street Lodge is booked.", "Confirmation: DEMO77")), 0.0)
     if from_email:
         stored_mail.put(conn, box.id, "demo-read-from-email", _message("example-air.example", 60, today, "Your itinerary: flight EX 410",
                                                                        ("Hello,", "Your flight EX 410 leaves New York (JFK) at 7:00 am.", "Confirmation: CH3K5P")), 0.0)

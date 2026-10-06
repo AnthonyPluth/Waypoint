@@ -114,12 +114,13 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
         return 0, 0
     made, failed = 0, 0
     touched: list[int] = []
+    held: list[ingest.Held] = []
     for booking in message.bookings:
-        filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill)
+        filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill, held)
         if filed is None:
             failed += 1
             why[ingest.explain(conn, booking)] += 1
-        elif filed != "unchanged":
+        elif filed not in ("unchanged", "ambiguous"):
             made += 1
     usable = len(message.bookings) - failed
     queued = 0
@@ -128,7 +129,10 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
         if not message.bookings and not message.unread:
             why["no structured booking data" if not message.other_markup else "structured data, but no reservation"] += 1
         reason: review.Reason = "broken" if message.broken else "incomplete" if message.markup or message.bookings else "no_markup"
-        review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, reason, now)
+        review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, reason, now, held)
+        queued = 1
+    elif held:
+        review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "match", now, held)
         queued = 1
     if keep is not None and (queued or touched):
         stored_mail.put(conn, mailbox_id, message_id, keep(), now)
@@ -177,7 +181,8 @@ def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) 
     with db.session() as conn:
         cfg = ai.config(conn)
         known = tuple(loyalty.known_numbers(conn)) if cfg else ()
-    if cfg is None:
+        asking = not review.is_match(conn, mailbox_id, message_id)
+    if cfg is None or not asking:
         return
     suggestion: ai.Suggestion | None = None
     error: str | None = None

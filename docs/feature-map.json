@@ -921,6 +921,20 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/api/review/{id}/match",
+      "handler": "waypoint/server/api/review.py:api_review_match",
+      "web": [
+        "frontend/src/pages/Review.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
       "method": "GET",
       "path": "/api/review/{id}/preview",
       "handler": "waypoint/server/api/review.py:api_review_preview",

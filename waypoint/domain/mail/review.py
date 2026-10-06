@@ -8,11 +8,11 @@ from sqlalchemy import delete, func, or_, select, update
 from ...providers import gmail
 from ...storage import db, stored_mail
 from ...storage.models import IgnoredSender, Mailbox, Person, ReviewItem
-from .. import visibility
+from .. import trips, visibility
 from ..visibility import Viewer
 from . import ai
 
-Reason = Literal["no_markup", "incomplete", "broken"]
+Reason = Literal["no_markup", "incomplete", "broken", "match"]
 UNKNOWN_SENDER = ""
 
 
@@ -32,11 +32,17 @@ class ItemOut(TypedDict):
 
 
 def add(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: str | None, received: str | None,
-        reason: Reason, now: float) -> None:
+        reason: Reason, now: float, held: list[tuple[trips.SegmentIn, list[int]]] | None = None) -> None:
+    matches = json.dumps([{"booking": b, "candidates": c} for b, c in held], separators=(",", ":")) if held else None
     db.insert_ignore(conn, ReviewItem, {"mailbox_id": mailbox_id, "message_id": message_id,
                                         "sender_domain": sender_domain or UNKNOWN_SENDER,
-                                        "received": received, "reason": reason, "created": now},
+                                        "received": received, "reason": reason, "created": now, "matches": matches},
                      key=["mailbox_id", "message_id"])
+
+
+def is_match(conn: db.Connection, mailbox_id: int, message_id: str) -> bool:
+    reason = conn.execute(select(ReviewItem.reason).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).scalar()
+    return bool(reason == "match")
 
 
 def set_suggestion(conn: db.Connection, mailbox_id: int, message_id: str, suggestion: ai.Suggestion | None,
@@ -54,7 +60,7 @@ def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
                                ReviewItem.received, ReviewItem.reason, Mailbox.address, Mailbox.owner_sub, Person.display_name,
                                ReviewItem.suggestion, ReviewItem.suggestion_error)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
-                        .outerjoin(Person, Person.user_sub == Mailbox.owner_sub).where(_seen_by(owner))
+                        .outerjoin(Person, Person.user_sub == Mailbox.owner_sub).where(_seen_by(owner), ReviewItem.reason != "match")
                         .order_by(ReviewItem.received.is_(None), ReviewItem.received.desc(), ReviewItem.id.desc())).fetchall()
     subjects = stored_mail.subjects(conn, (r["mailbox_id"] for r in rows))
     return [{"id": r["id"], "address": r["address"], "owner": r["display_name"] or r["address"], "mine": r["owner_sub"] == owner,
@@ -118,3 +124,95 @@ def ignore_sender(conn: db.Connection, owner: str, item_id: int) -> int | None:
 
 def ignored(conn: db.Connection, mailbox_id: int) -> list[str]:
     return list(conn.execute(select(IgnoredSender.domain).where(IgnoredSender.mailbox_id == mailbox_id)).scalars())
+
+
+class CandidateOut(TypedDict):
+    segment_id: int
+    trip_id: int
+    trip_name: str
+    kind: str
+    provider: str | None
+    origin: str | None
+    destination: str | None
+    start_local: str
+    end_local: str
+
+
+class BookingOut(TypedDict):
+    kind: str
+    provider: str | None
+    confirmation: str | None
+    origin: str | None
+    destination: str | None
+    start_local: str
+    end_local: str
+
+
+class MatchOut(TypedDict):
+    item_id: int
+    index: int
+    subject: str | None
+    received: str | None
+    mine: bool
+    booking: BookingOut
+    candidates: list[CandidateOut]
+
+
+def matches(conn: db.Connection, owner: str, viewer: Viewer) -> list[MatchOut]:
+    rows = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.received, ReviewItem.matches,
+                               Mailbox.owner_sub)
+                        .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
+                        .where(_seen_by(owner), ReviewItem.matches.is_not(None))
+                        .order_by(ReviewItem.received.is_(None), ReviewItem.received.desc(), ReviewItem.id.desc())).fetchall()
+    if not rows:
+        return []
+    subjects = stored_mail.subjects(conn, (r["mailbox_id"] for r in rows))
+    seen = {s.id: s for s in visibility.visible_segments(conn, viewer)}
+    names = {t.id: t.name for t in visibility.visible_trips(conn, viewer)}
+    out: list[MatchOut] = []
+    for r in rows:
+        for i, entry in enumerate(json.loads(r["matches"])):
+            b = entry["booking"]
+            out.append({
+                "item_id": r["id"], "index": i, "subject": subjects.get((r["mailbox_id"], r["message_id"])), "received": r["received"],
+                "mine": r["owner_sub"] == owner,
+                "booking": {"kind": b["kind"], "provider": b.get("provider"), "confirmation": b.get("confirmation"),
+                            "origin": b.get("origin"), "destination": b.get("destination"),
+                            "start_local": b["start_local"], "end_local": b["end_local"]},
+                "candidates": [{"segment_id": s.id, "trip_id": s.trip_id, "trip_name": names.get(s.trip_id, ""), "kind": s.kind,
+                                "provider": s.provider, "origin": s.origin, "destination": s.destination,
+                                "start_local": s.start_local, "end_local": s.end_local}
+                               for s in (seen.get(c) for c in entry["candidates"]) if s is not None]})
+    return out
+
+
+def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, index: int, segment_id: int | None) -> bool:
+    row = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.matches)
+                       .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
+                       .where(ReviewItem.id == item_id, _seen_by(owner), ReviewItem.matches.is_not(None))).fetchone()
+    if row is None:
+        return False
+    entries = json.loads(row["matches"])
+    if not 0 <= index < len(entries):
+        return False
+    entry = entries[index]
+    if segment_id is None:
+        added = trips.add_segment(conn, viewer, entry["booking"], source="email")
+        if added is None:
+            raise trips.Invalid("The booking couldn’t be added")
+        target = added["id"]
+    else:
+        if segment_id not in entry["candidates"]:
+            raise trips.Invalid("That isn’t one of the bookings it could be")
+        trips.merge_email_segment(conn, viewer, entry["booking"], into=segment_id)
+        target = segment_id
+    stored_mail.link(conn, target, int(row["mailbox_id"]), str(row["message_id"]))
+    left = [e for i, e in enumerate(entries) if i != index]
+    if left:
+        conn.execute(update(ReviewItem).where(ReviewItem.id == item_id).values(matches=json.dumps(left, separators=(",", ":"))))
+    elif row["reason"] == "match":
+        conn.execute(delete(ReviewItem).where(ReviewItem.id == item_id))
+    else:
+        conn.execute(update(ReviewItem).where(ReviewItem.id == item_id).values(matches=None))
+    stored_mail.prune(conn)
+    return True
