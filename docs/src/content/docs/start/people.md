@@ -17,7 +17,7 @@ The **People** page lists everyone who travels with your household. Every signed
 Waypoint can add someone as a guest before they ever sign in: a booking’s passenger matches nobody, so it’s added as a guest, and a booking then points to that guest. When that person signs in for the first time they become a member of their own, and without a link between the two they would see none of those trips.
 
 - **After you sign in**, if you have no trips and a guest’s name matches yours (their name, legal name or an alias), Upcoming asks “Are you one of these?”. **This is me** links you to that guest; **None of these** hides the question for you.
-- **On the People page**, a guest has a **This is me** button too. You can only link a guest to yourself, never to someone else, and a member can’t be linked this way.
+- **On the People page**, a guest has a **This is me** button too. You can only link a guest to yourself, never to someone else, and a member can’t be linked this way. Once you have linked a guest, the button is hidden on every guest for you.
 
 Linking moves everything on the guest to you in one step: their trips and bookings (including the ones they booked), their loyalty and Known Traveler numbers, and their legal name and aliases, which are added to yours without repeats. You keep your own name and first name (a missing one is filled in from the guest), and the guest is removed. If you both had a number for the same program and they differ, both are kept and People says “Two numbers for …” so you can remove the one that’s wrong. People then shows “Linked from guest … by … on …”.
 
