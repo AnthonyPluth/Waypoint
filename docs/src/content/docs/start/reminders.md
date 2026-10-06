@@ -27,14 +27,14 @@ Notifications go through your browser’s own push service (Google’s, Apple’
 - **Times are where they happen.** Each event’s start and end carry the time zone of their own place, so a flight that leaves Auckland at 22:15 and lands in Los Angeles at 15:10 the same day shows exactly that, wherever your calendar is.
 - **The address is shown once.** It holds a random key; Waypoint keeps only a hash of it, so it can’t show it again. Make a **new address** if you lose it: the old one stops working at once.
 - **Anyone who has the address can see your trips**, so treat it like a password. **Turn off** ends it.
-- The address needs `WAYPOINT_PUBLIC_URL` to be set when sign-in is on (see [Configuration](/waypoint/reference/configuration/)), since it’s the address your calendar app will fetch.
+- The address needs `WAYPOINT_PUBLIC_URL` to be set when sign-in is on (see [Configuration](/Waypoint/reference/configuration/)), since it’s the address your calendar app will fetch.
 
 A calendar app polls the address on its own schedule, often every few hours.
 
 ## When someone loses access
 
-Devices and the feed end when their owner can no longer sign in, the same as browser sessions and [Gmail connections](/waypoint/start/gmail/) do: taken off `OIDC_ALLOWED_EMAILS`, they end at once (within the hour, or when anyone next opens Settings; the feed stops the moment it’s fetched). With `OIDC_ALLOWED_GROUPS`, where Waypoint can only tell when someone signs in, they end `WAYPOINT_SESSION_DAYS` after the person last signed in.
+Devices and the feed end when their owner can no longer sign in, the same as browser sessions and [Gmail connections](/Waypoint/start/gmail/) do: taken off `OIDC_ALLOWED_EMAILS`, they end at once (within the hour, or when anyone next opens Settings; the feed stops the moment it’s fetched). With `OIDC_ALLOWED_GROUPS`, where Waypoint can only tell when someone signs in, they end `WAYPOINT_SESSION_DAYS` after the person last signed in.
 
 ## In a backup
 
-Choices (which reminders you get) are part of a [backup](/waypoint/start/docker/#moving-your-data-from-another-machine). Devices and calendar feeds aren’t: after a restore, turn notifications on again and make a new calendar address.
+Choices (which reminders you get) are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine). Devices and calendar feeds aren’t: after a restore, turn notifications on again and make a new calendar address.

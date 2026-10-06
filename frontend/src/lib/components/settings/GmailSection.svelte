@@ -145,7 +145,7 @@
             <p class="text-sm text-muted-foreground">
               Whoever runs Waypoint creates a Google client and sets <code class="code rounded bg-muted px-1 normal-case tracking-normal">GOOGLE_CLIENT_ID</code>
               and <code class="code rounded bg-muted px-1 normal-case tracking-normal">GOOGLE_CLIENT_SECRET</code>.
-              <a class="underline underline-offset-2" href="https://anthonypluth.github.io/waypoint/start/gmail/" target="_blank" rel="noopener noreferrer">How</a>
+              <a class="underline underline-offset-2" href="https://anthonypluth.github.io/Waypoint/start/gmail/" target="_blank" rel="noopener noreferrer">How</a>
             </p>
           </div>
         </div>

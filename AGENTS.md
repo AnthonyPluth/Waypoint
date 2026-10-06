@@ -1,6 +1,6 @@
 # Agent guide
 
-Instructions for AI coding agents working in Waypoint, a self-hosted travel app for a household (Python backend in `waypoint/`, Svelte web app in `frontend/`). It shows the trips you're on (flights, hotels, rental cars, confirmation numbers), keeps the household's loyalty and Known Traveler numbers, and reads booking emails privately. Human contributors can use it too; [Development](docs/src/content/docs/contributing/development.md) has the long version, and the published docs are at https://anthonypluth.github.io/waypoint/.
+Instructions for AI coding agents working in Waypoint, a self-hosted travel app for a household (Python backend in `waypoint/`, Svelte web app in `frontend/`). It shows the trips you're on (flights, hotels, rental cars, confirmation numbers), keeps the household's loyalty and Known Traveler numbers, and reads booking emails privately. Human contributors can use it too; [Development](docs/src/content/docs/contributing/development.md) has the long version, and the published docs are at https://anthonypluth.github.io/Waypoint/.
 
 ## Layout
 

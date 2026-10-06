@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-Waypoint can show a flight’s live status (on time, delayed, departed, landed, cancelled or diverted), its gate and terminal, and the times it is now expected, beside the booked times on the flight’s card. The booking stays the record: a status is shown next to what you booked and never written over it. Times are the airports’ own clocks, with the airport’s time zone, like every time in Waypoint (see [Trips](/waypoint/start/trips/)).
+Waypoint can show a flight’s live status (on time, delayed, departed, landed, cancelled or diverted), its gate and terminal, and the times it is now expected, beside the booked times on the flight’s card. The booking stays the record: a status is shown next to what you booked and never written over it. Times are the airports’ own clocks, with the airport’s time zone, like every time in Waypoint (see [Trips](/Waypoint/start/trips/)).
 
 The status comes from [AeroDataBox](https://rapidapi.com/aedbx-aedbx/api/aerodatabox), through [RapidAPI](https://rapidapi.com). It is off until you give Waypoint a key, and then only a flight number and a date ever leave your server.
 
@@ -22,7 +22,7 @@ The status comes from [AeroDataBox](https://rapidapi.com/aedbx-aedbx/api/aerodat
    # WAYPOINT_FLIGHT_STATUS_MONTHLY_LIMIT=400
    ```
 
-The key stays in the environment: Waypoint never saves it in the database or in a backup, and never writes it to its log. See [Configuration](/waypoint/reference/configuration/).
+The key stays in the environment: Waypoint never saves it in the database or in a backup, and never writes it to its log. See [Configuration](/Waypoint/reference/configuration/).
 
 ## What a request carries
 

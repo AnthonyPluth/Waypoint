@@ -28,7 +28,7 @@ An app that registers but is never approved is forgotten after a day (and at mos
 
 ## What it can read
 
-An assistant always gets **read**: upcoming flights, stays, rentals and trains, trips and a trip’s segments with who is travelling, people and guests, [stats](/waypoint/start/stats/), and the live [flight status](/waypoint/start/flight-status/) Waypoint already holds (an assistant never makes Waypoint look anything up). Times are the wall-clock times at the place, with its zone, as in the app.
+An assistant always gets **read**: upcoming flights, stays, rentals and trains, trips and a trip’s segments with who is travelling, people and guests, [stats](/Waypoint/start/stats/), and the live [flight status](/Waypoint/start/flight-status/) Waypoint already holds (an assistant never makes Waypoint look anything up). Times are the wall-clock times at the place, with its zone, as in the app.
 The tools are `upcoming`, `list_trips`, `get_trip`, `list_people`, `get_stats` and `flight_status`.
 
 ## Letting it change trips (optional)
@@ -56,7 +56,7 @@ Whatever it was allowed and whatever the switch says, an assistant can never rea
 | `POST /oauth/token` | Codes and refresh tokens for tokens |
 | `POST /oauth/revoke` | Revocation (RFC 7009) |
 
-Access tokens last an hour and refresh tokens 90 days; refresh tokens rotate, and a used one sent again revokes the whole connection. Only hashes of tokens and codes are stored, and none of this goes into [backups](/waypoint/start/docker/#moving-your-data-from-another-machine): reconnect assistants after a restore.
+Access tokens last an hour and refresh tokens 90 days; refresh tokens rotate, and a used one sent again revokes the whole connection. Only hashes of tokens and codes are stored, and none of this goes into [backups](/Waypoint/start/docker/#moving-your-data-from-another-machine): reconnect assistants after a restore.
 
 ## Behind a proxy
 

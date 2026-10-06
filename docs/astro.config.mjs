@@ -5,7 +5,7 @@ import starlightLinksValidator from 'starlight-links-validator';
 
 export default defineConfig({
   site: 'https://anthonypluth.github.io',
-  base: '/waypoint',
+  base: '/Waypoint',
   trailingSlash: 'always',
   integrations: [
     starlight({

@@ -1,7 +1,7 @@
 name: Docs
 
 # The documentation site (docs/, built with Astro Starlight), published to GitHub Pages at
-# https://anthonypluth.github.io/waypoint/. A pull request that changes it only builds it, which also checks every link
+# https://anthonypluth.github.io/Waypoint/. A pull request that changes it only builds it, which also checks every link
 # between pages (starlight-links-validator); a push to main builds and publishes it.
 # Needs Settings → Pages → Build and deployment → Source: "GitHub Actions" once.
 on:

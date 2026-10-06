@@ -28,7 +28,7 @@ One request asks for one brand by its name (or, with a secret key, by the websit
 - **A logo is shown only on a booking you can see.** It is served through its segment, so who has stayed where isn’t something anyone can find out by asking for a brand.
 - **A brand is asked about once, then again after a month** in case its logo changed. A brand Logo.dev has none for is remembered as such, and a logo Waypoint already has is kept if Logo.dev later loses it.
 - **If Logo.dev can’t be asked** (a refused key, no connection), the round stops, Settings says why, and the brands left are tried again in the next round (every 15 minutes), not a month from now. If Wikimedia can’t be asked, only the hotel brands wait, and are tried again in an hour.
-- Logos are a cache, so they aren’t part of a [backup](/waypoint/start/docker/#moving-your-data-from-another-machine); the keys are, encrypted like your other settings.
+- Logos are a cache, so they aren’t part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine); the keys are, encrypted like your other settings.
 - A flight with no airline named on it is shown the logo of the airline its flight number’s code belongs to.
 
-AI assistants connected over [MCP](/waypoint/start/mcp/) can’t reach these settings.
+AI assistants connected over [MCP](/Waypoint/start/mcp/) can’t reach these settings.

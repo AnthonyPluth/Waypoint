@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-**Settings → Import past flights** adds flights from another app’s CSV export, so they show on the [Trips](/waypoint/start/trips/) page and count in distance and time travelled. You choose the file, see each row as a flight, say who was on them, and only then are the new ones added.
+**Settings → Import past flights** adds flights from another app’s CSV export, so they show on the [Trips](/Waypoint/start/trips/) page and count in distance and time travelled. You choose the file, see each row as a flight, say who was on them, and only then are the new ones added.
 
 ## What it reads
 
@@ -34,7 +34,7 @@ Nothing is saved when you choose the file. Each row is shown as a flight and mar
 - **Already in Waypoint**: you already have a flight with the same flight number on that day, or the same route on that day (a flight repeated in the file counts once). A cancelled segment doesn’t count.
 - **Can’t read**: with why (an unknown airport, a date that isn’t a day, a flight the app marks cancelled).
 
-Then you choose **who was on these flights**: you by default, or anyone in [People](/waypoint/start/people/). The new flights become segments from an import, booked by you, and grouped into trips by the usual [grouping](/waypoint/start/trips/#how-segments-are-grouped). As with any trip, you and the people you chose see them, and nobody else.
+Then you choose **who was on these flights**: you by default, or anyone in [People](/Waypoint/start/people/). The new flights become segments from an import, booked by you, and grouped into trips by the usual [grouping](/Waypoint/start/trips/#how-segments-are-grouped). As with any trip, you and the people you chose see them, and nobody else.
 
 Importing the same file again adds nothing.
 
