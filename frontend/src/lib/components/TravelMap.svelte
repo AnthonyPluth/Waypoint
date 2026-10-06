@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { geoContains, geoPath } from "d3-geo";
   import { errMsg } from "$lib/act";
   import type { StatsFlights } from "$lib/api-types";
@@ -35,9 +36,11 @@
 
   // Zoom and pan: a transform on the drawing, kept so the world always covers the map's box. It starts framed on the places
   // flown (the stats' filters change them, and the map follows), and "World" shows all of it.
-  const framed = $derived(fitBox(flownBounds(flights, projection)));
+  const framedNow = $derived(fitBox(flownBounds(flights, projection)));
+  const framedKey = $derived(`${framedNow.k}|${framedNow.x}|${framedNow.y}`);   // (re-framed only when the frame itself changes, not when the same flights arrive again)
+  const framed = $derived.by(() => { void framedKey; return framedNow; });
   let t = $state<Transform>(IDENTITY);
-  $effect(() => { t = framed; picked = null; });
+  $effect(() => { void framedKey; t = untrack(() => framed); picked = null; });
   let svg = $state<SVGSVGElement>();
   const pointers = new Map<number, { x: number; y: number }>();
   let dragged = false;

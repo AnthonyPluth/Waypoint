@@ -120,4 +120,15 @@ describe("TravelMap", () => {
     await rerender({ flights });
     await waitFor(() => expect(scale(container)).toBe(1));
   });
+
+  it("keeps the zoom a person chose when the same flights arrive again", async () => {
+    const { container, rerender } = render(TravelMap, { flights: hawaii });
+    await waitFor(() => expect(scale(container)).toBeGreaterThan(3));
+    const before = scale(container);
+    await userEvent.click(screen.getByRole("button", { name: "Zoom out" }));
+    expect(scale(container)).toBeLessThan(before);
+    const chosen = scale(container);
+    await rerender({ flights: JSON.parse(JSON.stringify(hawaii)) });   // (equal, but a new object: a refetch)
+    expect(scale(container)).toBe(chosen);
+  });
 });
