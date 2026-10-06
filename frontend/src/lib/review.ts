@@ -5,7 +5,7 @@
 // loyalty numbers, dates or hotel names. The tests hold that line with canary values.
 import type { Stats } from "./api-types";
 import { comparisons, count, countryName, distance, duration } from "./stats";
-import { MAP_HEIGHT, MAP_WIDTH, mapData, outlinePaths, worldProjection, type Country } from "./map";
+import { MAP_HEIGHT, MAP_WIDTH, mapData, outlinePaths, visitedPoints, worldProjection, type Country } from "./map";
 
 export type ReviewFacts = {
   year: number;
@@ -94,7 +94,7 @@ export function cardSvg(facts: ReviewFacts, outlines: { d: string; visited: bool
 }
 
 /** The country outlines for these flights, ready for the map and the card. */
-export const outlinesFor = (countries: Country[], stats: Stats) => outlinePaths(countries, stats.flights.airports, worldProjection());
+export const outlinesFor = (countries: Country[], stats: Stats) => outlinePaths(countries, visitedPoints(stats.flights.airports, stats.stays.pins), worldProjection());
 
 /** Draw an SVG to a PNG on a canvas, in the browser; rejects if the browser can't. */
 export function svgToPng(svg: string, width = CARD_WIDTH, height = CARD_HEIGHT): Promise<Blob> {

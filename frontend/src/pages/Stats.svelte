@@ -40,7 +40,7 @@
   });
 
   // The map's code and outlines are a separate download, fetched only once this page has something to draw on it.
-  let TravelMap = $state<Component<{ flights: Stats["flights"] }> | null>(null);
+  let TravelMap = $state<Component<{ flights: Stats["flights"]; stays: Stats["stays"]["pins"] }> | null>(null);
   let mapError = $state("");
   async function loadMap() {
     mapError = "";
@@ -206,7 +206,7 @@
       <h2 id="places-title" class="text-2xl font-bold tracking-tight">Where you’ve been</h2>
       {@render tileGrid([{ label: "Countries", value: count(current.places.countries.length) }])}
       {#if TravelMap}
-        <TravelMap flights={f} />
+        <TravelMap flights={f} stays={current?.stays.pins ?? []} />
       {:else if mapError}
         <p class="text-sm text-muted-foreground">The map couldn’t load: {mapError} <Button variant="outline" size="sm" onclick={loadMap}>Try again</Button></p>
       {:else}

@@ -149,6 +149,14 @@ class HotelAndCarTests(StatsCase):
         self.assertEqual(s["cities"], [{"name": "London", "count": 2}])
         self.assertEqual(s["countries"], [{"name": "GB", "count": 2}])
 
+    def test_the_chain_is_the_hotels_brand_not_the_site_that_sold_it_and_a_rental_is_its_company(self):
+        self.mine({**HOTEL, "provider": "Capital One Travel", "origin": "The Westin Example City"},
+                  {**HOTEL, "provider": "Hotwire", "origin": "Harbour Hotel", "start_local": "2026-07-02T15:00", "end_local": "2026-07-04T10:00"},
+                  {**CAR, "provider": "Hertz (booked via Hotwire 1234567890)"})
+        got = self.stats(self.jane)
+        self.assertEqual(got["stays"]["chains"], [{"name": "Marriott", "count": 1}])
+        self.assertEqual(got["cars"]["companies"], [{"name": "Hertz", "count": 1}])
+
     def test_a_same_day_stay_has_no_nights_and_an_unfinished_one_does_not_count(self):
         self.mine({**HOTEL, "end_local": "2026-06-02T21:00"}, {**HOTEL, "start_local": "2026-09-22T15:00", "end_local": "2026-09-25T10:00"})
         s = self.stats(self.jane)["stays"]
@@ -181,6 +189,32 @@ class HotelAndCarTests(StatsCase):
                                                                                  ("FR", "2026-06-10")])
         self.assertEqual({c["name"]: c["first_visit"] for c in p["cities"]},
                          {"New York": "2026-06-01", "London": "2026-06-02", "Paris": "2026-06-10"})
+
+
+class MapDetailTests(StatsCase):
+    def test_a_route_lists_each_flight_with_its_trip_and_dates(self):
+        self.mine(JFK_LHR, LHR_JFK)
+        route = self.stats(self.jane)["flights"]["routes"][0]
+        self.assertEqual([(t["start"], t["end"]) for t in route["trips"]], [("2026-06-01", "2026-06-02"), ("2026-06-08", "2026-06-08")])
+        names = {t["id"]: t["name"] for t in trips.listing(self.c, self.jane)}
+        self.assertTrue(all(t["name"] == names[t["trip_id"]] for t in route["trips"]))
+
+    def test_a_stay_is_pinned_at_its_city_with_its_trip_and_dates(self):
+        self.mine(HOTEL)
+        (pin,) = self.stats(self.jane)["stays"]["pins"]
+        self.assertEqual((pin["city"], pin["country"], pin["stays"], pin["nights"]), ("London", "GB", 1, 6))
+        self.assertAlmostEqual(pin["latitude"], 51.5, delta=0.6)
+        self.assertAlmostEqual(pin["longitude"], 0.0, delta=0.9)
+        self.assertEqual([(t["start"], t["end"]) for t in pin["trips"]], [("2026-06-02", "2026-06-08")])
+
+    def test_a_stay_in_a_city_with_no_airport_has_no_pin_and_a_same_day_stay_none_either(self):
+        self.mine({**HOTEL, "destination": "Nowhereville"}, {**HOTEL, "end_local": "2026-06-02T21:00"})
+        self.assertEqual(self.stats(self.jane)["stays"]["pins"], [])
+
+    def test_the_details_leave_out_a_trip_the_viewer_is_not_on(self):
+        self.mine(JFK_LHR, HOTEL)
+        got = self.stats(Viewer(self.mia))
+        self.assertEqual((got["flights"]["routes"], got["stays"]["pins"]), ([], []))
 
 
 class SeatStatsTests(StatsCase):

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Stats } from "./api-types";
-import { cardSvg, firstName, mapSvg, reviewFacts, reviewOffered } from "./review";
+import { cardSvg, firstName, mapSvg, outlinesFor, reviewFacts, reviewOffered } from "./review";
+import type { Country } from "./map";
 
 // Canary values sit where the stats carry personal or detailed data; none may reach the card.
 const CANARIES = ["Zelda Quimby", "Quimby", "ZQ7X9K", "Hotel Canarios", "Canario Suites", "ZX 9931", "2026-03-14", "14 Mar", "March 14", "Canary City", "Canary Airways", "FF-123456"];
@@ -14,11 +15,11 @@ const stats = (year: number | null = 2026): Stats => ({
       { code: "LHR", name: "Heathrow", city: "London", country: "GB", visits: 4, latitude: 51.47, longitude: -0.45 },
     ],
     airlines: [{ code: "ZZ", name: "Canary Airways", flights: 12 }],
-    routes: [{ a: "JFK", b: "LHR", flights: 4, distance_km: 5540, a_latitude: 40.64, a_longitude: -73.78, b_latitude: 51.47, b_longitude: -0.45 }],
+    routes: [{ a: "JFK", b: "LHR", flights: 4, distance_km: 5540, a_latitude: 40.64, a_longitude: -73.78, b_latitude: 51.47, b_longitude: -0.45, trips: [] }],
     longest: { origin: "JFK", destination: "LHR", distance_km: 5540, start_local: "2026-03-14T09:00", flight_number: "ZX 9931" },
     shortest: null, most_visited_airport: "JFK", busiest_month: "2026-03", times_around_earth: 1.3, moon_fraction: 0.1353,
   },
-  stays: { nights: 9, chains: [{ name: "Hotel Canarios", count: 2 }], cities: [{ name: "Canario Suites", count: 1 }], countries: [], count: 0, average_nights: 0, hotels: [], cities_by_nights: [], longest: null, most_visited_hotel: null, most_visited_city: null, busiest_month: null },
+  stays: { nights: 9, chains: [{ name: "Hotel Canarios", count: 2 }], cities: [{ name: "Canario Suites", count: 1 }], countries: [], count: 0, average_nights: 0, hotels: [], cities_by_nights: [], longest: null, most_visited_hotel: null, most_visited_city: null, busiest_month: null, pins: [] },
   cars: { days: 0, companies: [] }, cruises: { count: 0, nights: 0, sea_days: 0, ports: 0, lines: [] },
   places: { countries: [{ name: "US", first_visit: "2026-01-02", visits: 3 }, { name: "GB", first_visit: "2026-03-14", visits: 1 }], cities: [] },
 });
@@ -92,5 +93,20 @@ describe("reviewOffered", () => {
     expect(reviewOffered(2025, new Date(2026, 0, 2))).toBe(true);
     expect(reviewOffered(2027, new Date(2026, 11, 20))).toBe(false);
     expect(reviewOffered(null, new Date(2026, 11, 20))).toBe(false);
+  });
+});
+
+describe("the card's country shading", () => {
+  const square = (id: string, west: number, south: number, east: number, north: number): Country => ({
+    type: "Feature", id, properties: {}, geometry: { type: "Polygon", coordinates: [[[west, south], [west, north], [east, north], [east, south], [west, south]]] },
+  });
+  const countries = [square("826", -8, 49, 2, 61), square("250", -5, 42, 8, 51), square("392", 129, 31, 146, 46)];
+
+  it("shades the countries of the airports flown and of the cities stayed in", () => {
+    const base = stats();
+    const withStay = { ...base, flights: { ...base.flights, airports: [base.flights.airports[0]] },
+      stays: { ...base.stays, pins: [{ city: "Paris", country: "FR", latitude: 48.85, longitude: 2.35, stays: 1, nights: 3, trips: [] }] } };
+    expect(outlinesFor(countries, withStay).map((c) => c.visited)).toEqual([false, true, false]);
+    expect(outlinesFor(countries, { ...withStay, stays: { ...withStay.stays, pins: [] } }).map((c) => c.visited)).toEqual([false, false, false]);
   });
 });

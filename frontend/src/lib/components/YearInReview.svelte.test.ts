@@ -15,10 +15,10 @@ const stats = (year: number | null): Stats => ({
   flights: {
     count: 12, distance_km: 52000, air_seconds: 86400, countries: [], cabins: [], top_seat: null, seat_positions: { window: 0, aisle: 0, middle: 0, unknown: 0 },
     airports: [{ code: "JFK", name: "Canary Airport", city: null, country: "US", visits: 6, latitude: 40.64, longitude: -73.78 }, { code: "LHR", name: "Heathrow", city: null, country: "GB", visits: 4, latitude: 51.47, longitude: -0.45 }],
-    airlines: [], routes: [{ a: "JFK", b: "LHR", flights: 4, distance_km: 5540, a_latitude: 40.64, a_longitude: -73.78, b_latitude: 51.47, b_longitude: -0.45 }],
+    airlines: [], routes: [{ a: "JFK", b: "LHR", flights: 4, distance_km: 5540, a_latitude: 40.64, a_longitude: -73.78, b_latitude: 51.47, b_longitude: -0.45, trips: [] }],
     longest: null, shortest: null, most_visited_airport: "JFK", busiest_month: null, times_around_earth: 1.3, moon_fraction: 0.1,
   },
-  stays: { nights: 9, chains: [{ name: "Hotel Canarios", count: 2 }], cities: [], countries: [], count: 0, average_nights: 0, hotels: [], cities_by_nights: [], longest: null, most_visited_hotel: null, most_visited_city: null, busiest_month: null }, cars: { days: 0, companies: [] }, cruises: { count: 0, nights: 0, sea_days: 0, ports: 0, lines: [] },
+  stays: { nights: 9, chains: [{ name: "Hotel Canarios", count: 2 }], cities: [], countries: [], count: 0, average_nights: 0, hotels: [], cities_by_nights: [], longest: null, most_visited_hotel: null, most_visited_city: null, busiest_month: null, pins: [] }, cars: { days: 0, companies: [] }, cruises: { count: 0, nights: 0, sea_days: 0, ports: 0, lines: [] },
   places: { countries: [{ name: "US", first_visit: year ? "2019-05-01" : "2019-05-01", visits: 3 }, { name: "GB", first_visit: "2026-03-14", visits: 1 }], cities: [] },
 });
 
