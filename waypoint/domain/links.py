@@ -1,25 +1,18 @@
-"""The actions on a booking's card: open it in the provider's app, directions, call. Each is a link built here, from a
-booking's own fields, so the web app only draws them. There's no Wallet button: no link opens one pass, and a
-boarding pass in Wallet already comes up on the lock screen near departure."""
 from __future__ import annotations
 
 import re
 from typing import TypedDict
 from urllib.parse import quote, urlsplit
 
-# Provider name (lower case, as `key` makes it) -> (the provider's own host, a path and query with {code} and {name}).
-# An entry goes in only when the URL is confirmed from the provider's public site; a provider without one has no
-# prefilled link and falls back to the booking's own manage link, when it has one. Each entry needs a test in
-# tests/test_links.py that builds the URL for a sample booking (tools/fleet_checks.py checks).
 MANAGE: dict[str, tuple[str, str]] = {}
 
 DIGITS = re.compile(r"\d")
 
 
 class Links(TypedDict):
-    app: str | None          # the provider's manage-trip page: its app opens it if installed, the website if not
-    directions: str | None   # Apple Maps, to the hotel, the rental desk or the cruise terminal
-    call: str | None         # tel: the provider's number
+    app: str | None
+    directions: str | None
+    call: str | None
 
 
 def key(provider: str | None) -> str:
@@ -27,8 +20,6 @@ def key(provider: str | None) -> str:
 
 
 def manage_link(provider: str | None, confirmation: str | None, last_name: str | None) -> str | None:
-    """The provider's manage-trip URL for this booking: https, on the provider's own host, with the code and name
-    URL-encoded; None for a provider with no entry or a booking without what the template needs."""
     entry = MANAGE.get(key(provider))
     if not entry:
         return None
@@ -39,7 +30,6 @@ def manage_link(provider: str | None, confirmation: str | None, last_name: str |
 
 
 def https_only(url: str | None) -> str | None:
-    """A link a person or an email supplied, kept only if it's https with a host (never javascript: or the like)."""
     if not url:
         return None
     parts = urlsplit(url.strip())
@@ -52,7 +42,6 @@ def directions_link(place: str | None) -> str | None:
 
 
 def call_link(phone: str | None) -> str | None:
-    """tel: with the digits (and a leading +) of a number as printed; None if it has fewer than 3."""
     phone = (phone or "").strip()
     digits = "".join(DIGITS.findall(phone))
     if len(digits) < 3:

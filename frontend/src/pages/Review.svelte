@@ -1,7 +1,6 @@
 <script lang="ts" module>
   import type { ReviewItem } from "$lib/api-types";
 
-  // Why Waypoint couldn't read a message, in words (the server sends a fixed code, never anything the message said).
   export const REASONS: Record<ReviewItem["reason"], string> = {
     no_markup: "No booking details found",
     incomplete: "Some details missing",
@@ -10,7 +9,6 @@
 
   const SECOND_LEVEL = new Set(["co", "com", "org", "net", "ac", "gov"]);
 
-  /** A provider's name to start the form with, from the sender's domain: mail.example-air.com → "Example Air". */
   export function providerFrom(domain: string): string {
     const labels = domain.split(".").filter(Boolean);
     const name = labels.length >= 3 && SECOND_LEVEL.has(labels.at(-2) ?? "") ? labels.at(-3) : labels.at(-2) ?? labels[0] ?? "";
@@ -20,7 +18,7 @@
 
 <script lang="ts">
   import { SvelteSet } from "svelte/reactivity";
-  import { act, errMsg } from "$lib/act";
+  import { act, errMsg, ignoreFailure } from "$lib/act";
   import type { Person, Review, WhoIsThis } from "$lib/api-types";
   import { refreshState } from "$lib/app.svelte";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
@@ -33,10 +31,6 @@
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import { toast } from "svelte-sonner";
 
-  // Two lists of what needs a person: mail Waypoint thought was a booking and couldn't read (the member whose mailbox it came
-  // from sees it, and the household too when that member shares the mailbox, who can add it by hand or dismiss it; never its
-  // text), and the names on bookings that aren't matched to anyone yet. A failed load
-  // leaves nothing drawn that could pass for current, with a Try again.
   let review = $state<Review | null>(null);
   let people = $state<Person[]>([]);
   let loadError = $state("");
@@ -50,27 +44,21 @@
   }
   $effect(() => { void load(); });
 
-  // What's waiting is a number on the tab: bring it up to date after anything here changes.
   const settle = async () => {
     await load();
-    await refreshState().catch(() => { /* the number on the tab catches up at the next check-in; nothing to tell anyone */ });
+    await refreshState().catch(ignoreFailure);
   };
 
   const KINDS: [string, string][] = [["flight", "Flight"], ["hotel", "Hotel stay"], ["car", "Car rental"], ["train", "Train"]];
   const selectClass = "border-input bg-card dark:bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
-  // ------------------------------------------------------------------------------------------ Couldn't read
-  // An item is named by its message's subject, and by who it came from and when for one whose message wasn't kept.
   const sender = (i: ReviewItem) => i.sender_domain || "Unknown sender";
   const subject = (i: ReviewItem) => i.subject || `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
 
-  // The form to add one by hand: what the email can tell (who it's from) filled in, the rest typed as on the booking.
   type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; address: string };
   let draft = $state<Draft | null>(null);
   let formError = $state("");
   let saving = $state(false);
-  // With the optional AI’s suggestion, the same form starts filled in with it: the person checks every field and adds it (or
-  // edits it first). Nothing is saved until they do.
   const startAdd = (item: ReviewItem, use = false) => {
     const s = use ? item.suggestion : null;
     draft = s
@@ -78,10 +66,8 @@
           destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", address: "" }
       : { item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", address: "" };
     formError = "";
-    void peek(item);   // (the message beside the form, so the details are read and typed in one place: for everyone who sees the item)
+    void peek(item);
   };
-  // The message, read beside the form: the copy the server kept (an item from before is fetched from its owner's Gmail), held only
-  // in this page while it's open, never in the browser's storage.
   type Peek = { state: "loading" } | { state: "ready"; subject: string | null; text: string; html: string | null; truncated: boolean } | { state: "error"; message: string };
   let peeks = $state<Record<number, Peek>>({});
   async function peek(item: ReviewItem) {
@@ -93,7 +79,6 @@
     } catch (err) { peeks[item.id] = { state: "error", message: errMsg(err) }; }
   }
 
-  // The items whose AI suggestion is being asked for now: any number at once, each with its own "Asking…".
   const asking_ai = new SvelteSet<number>();
   const askAi = (item: ReviewItem) => act(async () => {
     await apiCall<"POST /api/review/{id}/suggest">(`/api/review/${item.id}/suggest`, { method: "POST" });
@@ -130,14 +115,12 @@
     if (!d) return;
     const flight = d.kind === "flight";
     if (d.kind === "hotel" && !d.startZone.trim() && !d.address.trim()) { formError = "Enter the hotel’s time zone (for example America/New_York), or its address to work it out from"; return; }
-    // The times are typed as they read on the booking, with no offset, and kept where they happen.
     const body = { kind: d.kind as "flight" | "hotel" | "car" | "train", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
       destination: d.destination, ...(flight ? {} : d.kind === "hotel" ? { start_zone: d.startZone.trim() || null, ...(d.address.trim() && { details: { address: d.address.trim() } }) } : { start_zone: d.startZone, end_zone: d.endZone || d.startZone }) };
     let added = false;
     const ok = await act(async () => {
       const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
       added = true;
-      // (the booking keeps the message it was added from, for as long as it exists)
       await apiCall<"DELETE /api/review/{id}">(`/api/review/${d.item.id}?segment=${made.id}`, { method: "DELETE" });
     }, { busy: (on) => (saving = on), onError: (m) => (formError = added ? `Added, but couldn’t take it off this list: ${m}` : m) });
     if (!ok) { if (added) { closeForm(); await settle(); } return; }
@@ -160,8 +143,6 @@
     await settle();
   });
 
-  // ------------------------------------------------------------------------------------------ Who is this?
-  // Each name's choice: a person's id, "new" for a guest (named in the field beside it), or nothing yet.
   let chosen = $state<Record<number, string>>({});
   let guestName = $state<Record<number, string>>({});
   let matching = $state<number | null>(null);

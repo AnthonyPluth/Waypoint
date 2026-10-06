@@ -1,9 +1,6 @@
 <script lang="ts">
-  // The logo of a booking's airline, hotel, rental company or cruise line, which the server gives only once Waypoint has fetched one
-  // (waypoint/domain/logos.py). Nothing at all without one, or if the image fails to load. Drawn as it comes, with no tile behind it.
-  // A hotel whose own brand has no logo shows its group's, with the brand's name under it as a small chip ("Hyatt Regency").
   let { src, label = null, size = 40, class: cls = "" }: { src: string | null; label?: string | null; size?: number; class?: string } = $props();
-  let failed = $state<string | null>(null);   // the logo that failed to load
+  let failed = $state<string | null>(null);
 </script>
 
 {#if src && failed !== src}

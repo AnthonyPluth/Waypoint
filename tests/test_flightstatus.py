@@ -1,7 +1,3 @@
-"""Live flight status (waypoint/providers/flightstatus.py, waypoint/domain/flightstatus.py, waypoint/server/api/flightstatus.py):
-parsing recorded AeroDataBox answers, the request that's made, the schedule of checks and the monthly budget, the cache,
-who sees a status, and that a status never changes a booking. AeroDataBox is never called: a fake service stands in for it
-(and its answers in tests/fixtures/aerodatabox/ are made up). Names, codes and flights are invented; airports are real."""
 import json
 import os
 import threading
@@ -34,8 +30,8 @@ BACK = {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": 
         "end_local": "2026-11-27T14:35", "details": {"flight_number": "EX 102"}}
 HOTEL = {"kind": "hotel", "origin": "Harbour Hotel", "start_local": "2026-11-21T15:00", "end_local": "2026-11-27T10:00",
          "start_zone": "Europe/London", "end_zone": "Europe/London"}
-DEPARTS = datetime(2026, 11, 21, 0, 0, tzinfo=UTC)    # OUT: 19:00 in New York (UTC−5)
-ARRIVES = datetime(2026, 11, 21, 7, 10, tzinfo=UTC)   # 07:10 in London
+DEPARTS = datetime(2026, 11, 21, 0, 0, tzinfo=UTC)
+ARRIVES = datetime(2026, 11, 21, 7, 10, tzinfo=UTC)
 EARLY = DEPARTS - timedelta(hours=30)
 
 
@@ -53,7 +49,6 @@ FLIGHT = flightstatus.Flight("EX101", "2026-11-20", "JFK", DEPARTS, ARRIVES)
 
 
 class FakeService(HTTPServer):
-    """AeroDataBox's flight-by-number endpoint: answers `status, body` for any path, and keeps what it was asked."""
 
     def __init__(self):
         class Handler(BaseHTTPRequestHandler):
@@ -74,7 +69,6 @@ class FakeService(HTTPServer):
 
 
 def serve_fake(case) -> FakeService:
-    """A fake AeroDataBox, which the provider is pointed at (with the key set) until the test is cleaned up."""
     fake = FakeService()
     threading.Thread(target=fake.serve_forever, daemon=True).start()
     case.addCleanup(fake.server_close)
@@ -86,8 +80,6 @@ def serve_fake(case) -> FakeService:
         case.addCleanup(p.stop)
     return fake
 
-
-# ------------------------------------------------------------------------------------------------ the provider
 
 class ParseTests(unittest.TestCase):
     def test_a_flight_on_time(self):
@@ -102,7 +94,7 @@ class ParseTests(unittest.TestCase):
                          ("delayed", "2026-11-20T19:00", "2026-11-20T19:50", "B24", "2026-11-21T08:05", "A10"))
 
     def test_a_flight_expected_late_is_delayed_from_15_minutes(self):
-        self.assertEqual(status("expected_but_late").state, "delayed")   # 20 minutes, though the service still says Expected
+        self.assertEqual(status("expected_but_late").state, "delayed")
         late = fixture("expected_but_late")
         late[0]["departure"]["revisedTime"]["local"] = "2026-11-20 19:14-05:00"
         self.assertEqual(service.parse(late).state, "scheduled")   # type: ignore[union-attr]
@@ -124,7 +116,6 @@ class ParseTests(unittest.TestCase):
 
     def test_times_are_the_airports_wall_clock_times_with_their_zones_never_converted(self):
         s = status("on_time")
-        # "2026-11-20 19:00-05:00" is 00:00 UTC on the 21st; what's kept is the 19:00 at JFK, and no offset.
         self.assertEqual((s.dep_scheduled, s.dep_zone), ("2026-11-20T19:00", "America/New_York"))
         odd = fixture("on_time")
         odd[0]["departure"]["scheduledTime"]["local"] = "2026-03-01 22:15+13:00"
@@ -137,7 +128,7 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(status("two_legs", "JFK").destination, "DUB")
         second = status("two_legs", "dub")
         self.assertEqual((second.state, second.dep_gate, second.destination), ("delayed", "C4", "LHR"))
-        self.assertIsNone(service.parse(fixture("two_legs"), "AKL"))   # a flight number's other legs aren't this one
+        self.assertIsNone(service.parse(fixture("two_legs"), "AKL"))
         self.assertEqual(service.parse(fixture("two_legs")).origin, "JFK")   # type: ignore[union-attr]
 
     def test_every_status_the_service_has_maps_to_one_of_ours(self):
@@ -166,8 +157,8 @@ class RequestTests(unittest.TestCase):
         assert s
         self.assertEqual(s.state, "delayed")
         (call,) = self.fake.calls
-        self.assertEqual(call["path"], "/flights/number/EX101/2026-11-20")   # the flight and the date, and no query
-        sent = {k.lower(): v for k, v in call["headers"].items()}   # (header names are case-insensitive)
+        self.assertEqual(call["path"], "/flights/number/EX101/2026-11-20")
+        sent = {k.lower(): v for k, v in call["headers"].items()}
         self.assertEqual(sent["x-rapidapi-key"], KEY)
         self.assertEqual(sent["x-rapidapi-host"], "aerodatabox.p.rapidapi.com")
         self.assertEqual(set(sent) - {"host", "accept", "user-agent", "connection", "accept-encoding"},
@@ -213,9 +204,9 @@ class RequestTests(unittest.TestCase):
 
     def test_the_key_is_never_in_the_log_or_an_error_message(self):
         failures = [(429, service.RateLimited), (401, service.Refused), (500, service.Unavailable)]
-        with no_leaks(self, KEY, sent_ok=True):   # the key is sent on purpose; nowhere else
+        with no_leaks(self, KEY, sent_ok=True):
             for code, error in failures:
-                self.fake.answer = (code, {"message": f"bad key {KEY}", "key": KEY})   # even if the service echoes it back
+                self.fake.answer = (code, {"message": f"bad key {KEY}", "key": KEY})
                 with self.assertRaises(error) as caught:
                     service.fetch("EX101", "2026-11-20")
                 self.assertNotIn(KEY, str(caught.exception))
@@ -234,11 +225,9 @@ class RequestTests(unittest.TestCase):
             with mock.patch.dict(os.environ, {"RAPIDAPI_KEY": KEY}):
                 self.assertNotIn(KEY, monitoring.scrub(text), text)
             self.assertNotIn(KEY, monitoring.scrub(text.replace("the key was", "x-rapidapi-key:")), text)
-        with mock.patch.dict(os.environ, {"RAPIDAPI_KEY": "short"}):   # too short to hide by value: it would blank ordinary words
+        with mock.patch.dict(os.environ, {"RAPIDAPI_KEY": "short"}):
             self.assertEqual(monitoring.scrub("a short answer"), "a short answer")
 
-
-# ------------------------------------------------------------------------------------------------ when a flight is checked
 
 class ScheduleTests(unittest.TestCase):
     def test_the_five_checks(self):
@@ -255,7 +244,7 @@ class ScheduleTests(unittest.TestCase):
 
     def test_each_check_is_made_once(self):
         at = {n: t for t, n in flightstatus.checkpoints(FLIGHT)}
-        last = at["24h"] + timedelta(minutes=3)   # fetched a little after the 24 h mark
+        last = at["24h"] + timedelta(minutes=3)
         for now, want in ((at["24h"] + timedelta(hours=5), False), (at["3h"] - timedelta(minutes=1), False), (at["3h"], True)):
             self.assertEqual(flightstatus.due(FLIGHT, now, last, "scheduled"), want, now)
         for early, name in (("24h", "3h"), ("3h", "1h"), ("1h", "20m"), ("20m", "arrival")):
@@ -275,9 +264,9 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(calls, [t for t, _ in flightstatus.checkpoints(FLIGHT)])
 
     def test_after_downtime_only_the_latest_missed_check_is_made(self):
-        now = DEPARTS - timedelta(minutes=30)   # the 24 h, 3 h and 1 h checks passed while Waypoint was off
+        now = DEPARTS - timedelta(minutes=30)
         self.assertTrue(flightstatus.due(FLIGHT, now, None, None))
-        self.assertFalse(flightstatus.due(FLIGHT, now, now, "scheduled"))   # one call settles all three
+        self.assertFalse(flightstatus.due(FLIGHT, now, now, "scheduled"))
 
     def test_nothing_after_landing_or_a_cancellation_or_a_long_time_after_arrival(self):
         mid = DEPARTS - timedelta(minutes=30)
@@ -305,10 +294,7 @@ class ScheduleTests(unittest.TestCase):
             self.assertEqual(flightstatus.limit(), 400)
 
 
-# ------------------------------------------------------------------------------------------------ the checks, the budget, the cache
-
 class Household(DbCase):
-    """Two members (Jane, Sam), a guest (Mia), the provider pointed at a fake service, and the clock a day before OUT."""
 
     def setUp(self):
         super().setUp()
@@ -332,7 +318,6 @@ class Household(DbCase):
         return self.c.orm.get(FlightStatus, ("EX101", "2026-11-20"))
 
     def used(self, now: datetime | None = None) -> int:
-        """The calls counted, as another connection sees them (so only what was committed)."""
         other = db.connect(self.path)
         try:
             return flightstatus.usage(other, now or self.when("24h")).used
@@ -352,15 +337,15 @@ class CheckTests(Household):
         self.assertEqual(flightstatus.watching(self.c, self.when("3h")), [])
 
     def test_one_call_answers_for_every_traveller_and_segment_on_a_flight(self):
-        self.book(self.jane, OUT, travelers=[self.jane.person_id, self.sam.person_id, self.mia])   # a family on one booking
-        self.book(self.sam, {**OUT, "confirmation": "ZZ9PLU"})   # Sam's own copy of the same flight, on his own trip
+        self.book(self.jane, OUT, travelers=[self.jane.person_id, self.sam.person_id, self.mia])
+        self.book(self.sam, {**OUT, "confirmation": "ZZ9PLU"})
         self.book(self.jane, BACK)
         self.assertEqual([f.number for f in flightstatus.watching(self.c, self.when("3h"))], ["EX101"])
         self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 1)
         self.assertEqual(len(self.fake.calls), 1)
         self.assertEqual(self.fake.calls[0]["path"], "/flights/number/EX101/2026-11-20")
         self.assertEqual(self.cached().state, "delayed")   # type: ignore[union-attr]
-        self.assertEqual(flightstatus.run_due(self.c, self.when("3h", timedelta(minutes=5))), 0)   # and no more until the next check
+        self.assertEqual(flightstatus.run_due(self.c, self.when("3h", timedelta(minutes=5))), 0)
         self.assertEqual(len(self.fake.calls), 1)
 
     def test_what_is_watched_is_a_flight_with_a_number_near_today_that_isnt_cancelled(self):
@@ -388,7 +373,7 @@ class CheckTests(Household):
         self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 1)
         self.assertEqual(self.cached().state, "unknown")   # type: ignore[union-attr]
         self.assertEqual(flightstatus.run_due(self.c, self.when("3h", timedelta(minutes=30))), 0)
-        self.assertEqual(flightstatus.overview(self.c, self.jane, self.when("3h"))["statuses"], [])   # and it shows nothing
+        self.assertEqual(flightstatus.overview(self.c, self.jane, self.when("3h"))["statuses"], [])
         self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)
 
     def test_every_check_from_a_day_out_to_the_arrival_is_made_and_no_more(self):
@@ -410,11 +395,11 @@ class CheckTests(Household):
     def test_answers_go_seven_days_after_the_flight(self):
         for day in ("2026-11-12", "2026-11-13", "2026-11-14", "2026-11-20"):
             self.c.execute(insert(FlightStatus).values(flight_number="EX9", date=day, state="landed", fetched_at=1.0))
-        flightstatus.purge(self.c, datetime(2026, 11, 20, 12, 0, tzinfo=UTC))   # flights on the 13th or before are 7 days gone
+        flightstatus.purge(self.c, datetime(2026, 11, 20, 12, 0, tzinfo=UTC))
         self.c.orm.expire_all()
         self.assertEqual(sorted(r.date for r in self.c.orm.scalars(select(FlightStatus)).all()), ["2026-11-14", "2026-11-20"])
         self.book(self.jane)
-        self.assertEqual(flightstatus.run_due(self.c, datetime(2026, 11, 28, 12, 0, tzinfo=UTC)), 0)   # run_due clears too
+        self.assertEqual(flightstatus.run_due(self.c, datetime(2026, 11, 28, 12, 0, tzinfo=UTC)), 0)
         self.c.orm.expire_all()
         self.assertEqual(list(self.c.orm.scalars(select(FlightStatus)).all()), [])
 
@@ -428,13 +413,13 @@ class BudgetTests(Household):
         self.assertEqual(self.used(), 0)
         flightstatus.run_due(self.c, self.when("24h"))
         flightstatus.run_due(self.c, self.when("3h"))
-        self.assertEqual(self.used(), 2)   # read by another connection: it was committed
+        self.assertEqual(self.used(), 2)
         u = flightstatus.usage(self.c, self.when("3h"))
         self.assertEqual((u.month, u.used, u.limit, u.paused), ("2026-11", 2, 400, None))
 
     def test_the_counter_starts_again_in_a_new_month(self):
         self.set_used(380, month="2026-10")
-        self.assertEqual(flightstatus.usage(self.c, self.when("24h")).used, 0)   # November: nothing used yet
+        self.assertEqual(flightstatus.usage(self.c, self.when("24h")).used, 0)
         flightstatus.run_due(self.c, self.when("24h"))
         self.assertEqual(self.used(), 1)
         self.assertEqual(db.get_setting(self.c, sk.FLIGHT_STATUS_MONTH), "2026-11")
@@ -464,10 +449,10 @@ class BudgetTests(Household):
         u = flightstatus.usage(self.c, self.when("1h"))
         assert u.paused
         self.assertEqual((u.paused.reason, u.paused.until.astimezone().date(), u.paused.until.astimezone().hour),
-                         ("limit", date(2026, 12, 1), 0))   # the 1st, at local midnight
+                         ("limit", date(2026, 12, 1), 0))
         over = flightstatus.overview(self.c, self.jane, self.when("1h"))
         self.assertEqual((over["used"], over["limit"], over["paused"]["reason"]), (400, 400, "limit"))   # type: ignore[index]
-        self.set_used(0, month="2026-10")   # and a new month lifts it
+        self.set_used(0, month="2026-10")
         self.assertIsNone(flightstatus.usage(self.c, self.when("1h")).paused)
 
     def test_the_limit_is_the_households_to_set(self):
@@ -483,17 +468,17 @@ class BudgetTests(Household):
     def test_a_429_pauses_fetching_for_an_hour(self):
         self.fake.answer = (429, {"message": "Too many requests"})
         now = self.when("3h")
-        self.assertEqual(flightstatus.run_due(self.c, now), 1)   # the call that was refused
+        self.assertEqual(flightstatus.run_due(self.c, now), 1)
         u = flightstatus.usage(self.c, now)
         assert u.paused
         self.assertEqual((u.paused.reason, u.paused.until), ("rate", now + timedelta(hours=1)))
         self.fake.answer = (200, fixture("on_time"))
-        self.assertEqual(flightstatus.run_due(self.c, now + timedelta(minutes=30)), 0)   # nothing while it lasts
+        self.assertEqual(flightstatus.run_due(self.c, now + timedelta(minutes=30)), 0)
         self.assertEqual(flightstatus.run_due(self.c, now + timedelta(minutes=59)), 0)
         self.assertEqual(len(self.fake.calls), 1)
         self.assertIsNone(flightstatus.usage(self.c, now + timedelta(hours=1, seconds=1)).paused)
-        self.assertEqual(flightstatus.run_due(self.c, now + timedelta(hours=1, minutes=1)), 0)   # the refused check is used up
-        self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)   # and the next one carries on
+        self.assertEqual(flightstatus.run_due(self.c, now + timedelta(hours=1, minutes=1)), 0)
+        self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)
         self.assertEqual(self.cached().state, "scheduled")   # type: ignore[union-attr]
 
     def test_a_key_rapidapi_refuses_pauses_too_and_a_garbled_pause_is_none(self):
@@ -514,12 +499,12 @@ class BudgetTests(Household):
         self.assertEqual(len(self.fake.calls), 1)
         self.assertEqual(self.used(), 1)
         self.assertIn("Flight status: The flight status service had a problem.", out)
-        self.assertNotIn("EX101", out + err)   # never which flight
+        self.assertNotIn("EX101", out + err)
         self.assertEqual(self.cached().state, "unknown")   # type: ignore[union-attr]
-        for minutes in (5, 10, 60):   # not tried again until the next check, however long the outage
+        for minutes in (5, 10, 60):
             self.assertEqual(flightstatus.run_due(self.c, now + timedelta(minutes=minutes)), 0)
         self.fake.answer = (200, fixture("on_time"))
-        self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)   # the next check goes ahead
+        self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)
         self.assertEqual(self.cached().state, "scheduled")   # type: ignore[union-attr]
         self.assertEqual(self.used(), 2)
 
@@ -575,7 +560,7 @@ class RefreshTests(Household):
             self.assertEqual((len(got["statuses"]), got["used"]), (1, 1))
         self.assertEqual(len(self.fake.calls), 1)
         self.refresh(now + timedelta(minutes=15))
-        self.assertEqual((len(self.fake.calls), self.used(now)), (2, 2))   # 15 minutes on, it asks again, and that counts
+        self.assertEqual((len(self.fake.calls), self.used(now)), (2, 2))
 
     def test_a_flight_that_is_over_is_not_fetched_again(self):
         self.fake.answer = (200, fixture("landed"))
@@ -586,7 +571,7 @@ class RefreshTests(Household):
         self.assertEqual((got["statuses"][0]["state"], len(self.fake.calls)), ("landed", 1))
 
     def test_refresh_is_for_a_flight_you_can_see_and_that_has_a_number(self):
-        self.assertIsNone(self.refresh(self.when("3h"), Viewer(None), self.seg["id"]))   # not theirs: as if there were none
+        self.assertIsNone(self.refresh(self.when("3h"), Viewer(None), self.seg["id"]))
         stranger = Viewer(people.add_guest(self.c, {"display_name": "Joan", "first_name": None, "legal_name": None, "aliases": []})["id"])
         self.assertIsNone(self.refresh(self.when("3h"), stranger))
         self.assertIsNone(self.refresh(self.when("3h"), seg=99999))
@@ -608,7 +593,7 @@ class RefreshTests(Household):
         self.fake.answer = (429, {})
         with self.assertRaises(service.RateLimited):
             self.refresh(self.when("3h"))
-        self.assertEqual(self.used(), 2)   # the refused call counted, though the request raised
+        self.assertEqual(self.used(), 2)
         self.fake.answer = (200, fixture("on_time"))
         got = self.refresh(self.when("3h", timedelta(minutes=20)))
         assert got
@@ -635,7 +620,6 @@ class WhoSeesAStatus(Household):
         self.assertEqual(flightstatus.overview(self.c, self.sam, EARLY)["statuses"], [])
         self.assertEqual(flightstatus.overview(self.c, Viewer(None), EARLY)["statuses"], [])
         self.assertEqual(len(flightstatus.overview(self.c, Viewer(None, household=True), EARLY)["statuses"]), 1)
-        # the counter is the household's, so everyone sees it
         self.assertEqual(flightstatus.overview(self.c, self.sam, EARLY)["limit"], 400)
 
     def test_a_status_for_another_leg_of_the_flight_number_isnt_shown(self):
@@ -674,13 +658,13 @@ class NeverTheBookingTests(Household):
         before = self.rows()
         for name, now in (("delayed_gate_change", self.when("3h")), ("cancelled", self.when("1h")), ("diverted", self.when("20m")),
                           ("landed", ARRIVES)):
-            self.c.execute(FlightStatus.__table__.delete())   # (so each is fetched, not held)
+            self.c.execute(FlightStatus.__table__.delete())
             self.fake.answer = (200, fixture(name))
             flightstatus.refresh(self.c, self.jane, seg["id"], now + timedelta(hours=1))
             flightstatus.run_due(self.c, now)
             flightstatus.overview(self.c, self.jane, now)
             self.assertEqual(self.rows(), before, name)
-        self.assertEqual(self.cached().state, "landed")   # type: ignore[union-attr]   # though it did learn the status
+        self.assertEqual(self.cached().state, "landed")   # type: ignore[union-attr]
         self.assertEqual(trips.get_segment(self.c, self.jane, seg["id"])["status"], "confirmed")   # type: ignore[index]
         self.assertEqual(trips.get_segment(self.c, self.jane, seg["id"])["locked_fields"], ["details"])   # type: ignore[index]
 
@@ -694,10 +678,10 @@ class LeakTests(Household):
                              "expiry": None, "notes": None})
         seg = self.book(self.jane, {**OUT, "confirmation": canaries[1]}, travelers=[self.jane.person_id, guest["id"]])
         self.c.commit()
-        with no_leaks(self, *canaries):   # nothing printed, logged or sent (the request's address and headers) carries one
+        with no_leaks(self, *canaries):
             self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 1)
             flightstatus.refresh(self.c, self.jane, seg["id"], self.when("3h", timedelta(hours=1)))
-        self.assertEqual(len(self.fake.calls), 2)   # the scheduled check, and the Refresh an hour later
+        self.assertEqual(len(self.fake.calls), 2)
         for call in self.fake.calls:
             self.assertEqual(call["path"], "/flights/number/EX101/2026-11-20")
             self.assertEqual({k.lower() for k in call["headers"]} - {"host", "accept", "user-agent", "connection", "accept-encoding"},
@@ -722,7 +706,7 @@ class JobTests(Household):
         self.assertIsNotNone(flightstatus.usage(self.c, self.when("3h")).paused)
         flightstatus.forget_key_pause(self.c)
         self.assertIsNone(flightstatus.usage(self.c, self.when("3h")).paused)
-        flightstatus._pause(self.c, self.when("3h"), "rate")   # a rate limit is Waypoint's to wait out
+        flightstatus._pause(self.c, self.when("3h"), "rate")
         flightstatus.forget_key_pause(self.c)
         self.assertEqual(flightstatus.usage(self.c, self.when("3h")).paused.reason, "rate")   # type: ignore[union-attr]
         for junk in ("", "{", "[1]"):
@@ -741,8 +725,6 @@ class JobTests(Household):
         check.assert_called_once()
         remind.assert_called_once()
 
-
-# ------------------------------------------------------------------------------------------------ the routes
 
 class StatusRoutes(RouteCase):
     env = {**RouteCase.env, "RAPIDAPI_KEY": KEY}
@@ -767,7 +749,7 @@ class StatusRoutes(RouteCase):
         self.assertEqual((ana["enabled"], ana["used"], ana["limit"], ana["paused"]), (True, 0, 400, None))
         self.assertRegex(ana["month"], r"^\d{4}-\d\d$")
         self.assertEqual([(s["segment_id"], s["state"], s["dep_gate"]) for s in ana["statuses"]], [(self.mine["id"], "delayed", "B24")])
-        ben = self.ok("ben", "GET", "/api/flight-status")   # not on it: no status, but the household's counter
+        ben = self.ok("ben", "GET", "/api/flight-status")
         self.assertEqual((ben["statuses"], ben["used"], ben["limit"]), ([], 0, 400))
 
     def test_without_a_key_it_says_so_and_shows_nothing(self):
@@ -784,7 +766,7 @@ class StatusRoutes(RouteCase):
                          [(self.mine["id"], "delayed", "2026-11-20T19:50")])
         self.assertEqual(got["used"], 1)
         self.fetched.assert_called_once_with("EX101", "2026-11-20", "JFK")
-        again = self.ok("ana", "POST", f"/api/flight-status/{self.mine['id']}")   # under 15 minutes: the held answer
+        again = self.ok("ana", "POST", f"/api/flight-status/{self.mine['id']}")
         self.assertEqual((again["used"], len(again["statuses"])), (1, 1))
         self.fetched.assert_called_once()
         self.assertEqual(self.ok("ana", "GET", "/api/flight-status")["used"], 1)
@@ -812,7 +794,7 @@ class StatusRoutes(RouteCase):
                 status_code, err = self.call("ana", "POST", f"/api/flight-status/{self.mine['id']}")
             self.assertEqual((status_code, err), (502, {"error": str(error)}))
             self.assertNotIn(KEY, json.dumps(err))
-            with db.session() as conn:   # (the pause a 429 would make is the domain's: this is the reply)
+            with db.session() as conn:
                 db.set_setting(conn, sk.FLIGHT_STATUS_PAUSED, None)
 
 

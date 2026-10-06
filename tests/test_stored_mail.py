@@ -1,6 +1,3 @@
-"""Messages kept while they are needed (waypoint/storage/stored_mail.py): encrypted at rest, replaced when kept again, held by a
-review item or by the bookings made from them, deleted when nothing holds them, and carried (still encrypted) in a backup.
-Subjects, texts and keys are invented."""
 import json
 from unittest import mock
 
@@ -68,7 +65,7 @@ class KeptMessageTests(DbCase):
             with mock.patch.object(stored_mail, "get", side_effect=AssertionError("opened a message")):
                 stored_mail.subjects(conn, [self.box])
             conn.execute(StoredMessage.__table__.update().values(subject=secretbox.PREFIX + "bad"))
-            self.assertEqual(stored_mail.subjects(conn, [self.box])[(self.box, "m1")], None)   # (a key that is gone: no subject, not an error)
+            self.assertEqual(stored_mail.subjects(conn, [self.box])[(self.box, "m1")], None)
 
     def test_a_booking_keeps_the_messages_it_was_made_from_newest_first(self):
         with db.session() as conn:
@@ -77,7 +74,7 @@ class KeptMessageTests(DbCase):
             self.assertFalse(stored_mail.link(conn, 1, self.box, "none-kept"))
             self.assertTrue(stored_mail.link(conn, 1, self.box, "old"))
             self.assertTrue(stored_mail.link(conn, 1, self.box, "new"))
-            stored_mail.link(conn, 1, self.box, "new")   # (twice is once)
+            stored_mail.link(conn, 1, self.box, "new")
             self.assertEqual([c["subject"] for c in stored_mail.for_segment(conn, 1)], ["Update", "First"])
             self.assertEqual(stored_mail.for_segment(conn, 2), [])
             self.assertEqual(stored_mail.with_messages(conn, [1, 2]), {1})
@@ -95,9 +92,9 @@ class KeptMessageTests(DbCase):
             left = {m for (m,) in conn.execute(select(StoredMessage.message_id))}
             self.assertEqual(left, {"item", "booking", "both"})
             conn.execute(ReviewItem.__table__.delete())
-            self.assertEqual(stored_mail.prune(conn), 1)   # ("item" was held by the item alone)
+            self.assertEqual(stored_mail.prune(conn), 1)
             conn.execute(Segment.__table__.delete().where(Segment.id == 1))
-            self.assertEqual(stored_mail.prune(conn), 2)   # (the booking's, and "both", now that nothing holds them)
+            self.assertEqual(stored_mail.prune(conn), 2)
             self.assertEqual(conn.execute(select(StoredMessage.id)).fetchall(), [])
 
     def test_a_mailbox_that_goes_takes_its_messages_and_the_links(self):
@@ -107,7 +104,7 @@ class KeptMessageTests(DbCase):
             conn.execute(Mailbox.__table__.delete().where(Mailbox.id == self.box))
             self.assertEqual(conn.execute(select(StoredMessage.id)).fetchall(), [])
             self.assertEqual(conn.execute(select(schema.segment_messages.c.segment_id)).fetchall(), [])
-            self.assertEqual(conn.execute(select(Segment.id)).fetchall(), [(1,), (2,)])   # (the bookings stay)
+            self.assertEqual(conn.execute(select(Segment.id)).fetchall(), [(1,), (2,)])
 
     def test_a_backup_carries_kept_messages_encrypted_and_never_in_the_clear(self):
         with db.session() as conn:
@@ -121,12 +118,12 @@ class KeptMessageTests(DbCase):
             self.assertTrue(secretbox.is_encrypted(row[columns.index("subject")]))
             self.assertEqual(len(exported["tables"]["segment_messages"]["rows"]), 1)
             self.assertNotIn(b"CANARY-KEPT", backup.dump(conn))
-            self.assertNotIn(b"CANARY-KEPT", __import__("gzip").decompress(backup.dump(conn)))   # (nor inside the compressed file)
+            self.assertNotIn(b"CANARY-KEPT", __import__("gzip").decompress(backup.dump(conn)))
 
     def test_a_message_kept_before_encryption_is_encrypted_at_start(self):
         with db.session() as conn:
             stored_mail.put(conn, self.box, "m1", CONTENT, 1.0)
-            conn.execute(StoredMessage.__table__.update().values(content=json.dumps(dict(CONTENT))))   # (plaintext, as an earlier version left it)
+            conn.execute(StoredMessage.__table__.update().values(content=json.dumps(dict(CONTENT))))
             self.assertGreaterEqual(secretbox.encrypt_stored(conn), 1)
             self.assertTrue(secretbox.is_encrypted(conn.execute(select(StoredMessage.content)).scalar()))
             self.assertEqual(stored_mail.get(conn, self.box, "m1"), CONTENT)

@@ -1,9 +1,3 @@
-"""Trips and segments, with who is on them, and the airports (by IATA code, with their time zone) that fill in a flight's
-zones.
-
-Revision ID: 0005
-Revises: 0004
-"""
 import gzip
 from pathlib import Path
 

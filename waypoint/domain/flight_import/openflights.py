@@ -1,10 +1,3 @@
-"""OpenFlights' export (My Flights → Export on openflights.org): one row per flight with the columns Date, From, To,
-Flight_Number, Airline, Distance, Duration, Seat, Seat_Type, Class, Reason, Plane, Registration, Trip, Note and the site's
-ids. The airports are IATA or ICAO codes, the date may carry a time of day (the departure's), the duration is HH:MM and the
-class a letter (Y, P, C or F). It has no arrival time. The Note column is never looked at.
-
-The columns are from the layout OpenFlights documents for its CSV import and export; no export from the site was available
-to check them against."""
 from __future__ import annotations
 
 from collections.abc import Sequence

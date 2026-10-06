@@ -1,10 +1,3 @@
-"""Brand logos (`brand_logos`): the logos of the airlines, hotels, rental companies and cruise lines in bookings, fetched from
-Logo.dev once a key is saved in Settings and kept here so the app never asks anyone else for an image. A cache: not part of
-a backup, and nothing else changes.
-
-Revision ID: 0016
-Revises: 0015
-"""
 import sqlalchemy as sa
 from alembic import op
 

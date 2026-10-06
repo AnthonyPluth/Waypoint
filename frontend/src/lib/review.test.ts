@@ -3,7 +3,6 @@ import type { Stats } from "./api-types";
 import { cardSvg, firstName, mapSvg, outlinesFor, reviewFacts, reviewOffered } from "./review";
 import type { Country } from "./map";
 
-// Canary values sit where the stats carry personal or detailed data; none may reach the card.
 const CANARIES = ["Zelda Quimby", "Quimby", "ZQ7X9K", "Hotel Canarios", "Canario Suites", "ZX 9931", "2026-03-14", "14 Mar", "March 14", "Canary City", "Canary Airways", "FF-123456"];
 
 const stats = (year: number | null = 2026): Stats => ({
@@ -25,7 +24,6 @@ const stats = (year: number | null = 2026): Stats => ({
 });
 const allTime = (): Stats => ({ ...stats(null), places: { countries: [{ name: "US", first_visit: "2019-05-01", visits: 9 }, { name: "GB", first_visit: "2026-03-14", visits: 1 }], cities: [] } });
 
-/** Every piece of text in a card, and the markup around it. */
 const textOf = (svg: string) => [...svg.matchAll(/>([^<]+)</g)].map((m) => m[1]).join("\n");
 
 describe("the share card's content", () => {

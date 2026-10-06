@@ -15,7 +15,6 @@ const off: LogoDevStatus = { configured: false, searchable: false, with_logo: 0,
 
 beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); });
 
-/** GET answers `current`; a POST answers what `post` makes of its body (or an error). */
 const serve = (current: LogoDevStatus, post: (path: string, b: Record<string, unknown>) => LogoDevStatus | { started: boolean } | Error = () => current) =>
   vi.mocked(api).mockImplementation(async (p: string, opts?: { method?: string; body?: unknown }) => {
     if (opts?.method !== "POST") return current as never;

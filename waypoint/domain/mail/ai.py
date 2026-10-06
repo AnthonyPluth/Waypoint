@@ -1,18 +1,3 @@
-"""The optional AI fallback for the "Couldn't read" queue: the one module that sends email text to an AI service (Semgrep's
-`waypoint-ai-hosts` keeps the hosts here; AGENTS.md, "Email stays on the server").
-
-It is off unless the household turns it on in Settings, and then it works only on mail already in the review queue, never on
-a booking that was read. Two ways to run it: `local` (an Ollama server on your own network, so the text never leaves it) and
-`openrouter` (every request sets `provider.data_collection: "deny"` and `provider.zdr: true`, so only providers that keep no
-prompts and don't train on them can answer; if none can, the request fails rather than going to one that does).
-
-What goes out is the message's plain text with quoted replies and footers cut and anything that looks like a loyalty, Known
-Traveler or card number replaced (`redact`), and with the household's own saved numbers replaced wherever they appear. The
-reply has to be JSON of exactly the fields of a segment, each checked (`parse`); anything else, and a confirmation code or an
-airport that isn't in the text that was sent (a different trip's), is no suggestion and an error the person sees. A suggestion
-is only ever pre-filled into the form a person confirms or edits: nothing is saved as a booking without them.
-
-Prompts and replies are never logged, and no error message here carries any part of either (nor the key)."""
 from __future__ import annotations
 
 import json
@@ -37,15 +22,14 @@ OPENROUTER: Mode = "openrouter"
 MODES: tuple[Mode, ...] = (OFF, LOCAL, OPENROUTER)
 KEY_ENV = "OPENROUTER_API_KEY"
 TIMEOUT = 30
-MAX_SENT = 12_000        # characters of a message's text that go out
-MAX_REPLY = 1_000_000    # bytes of a reply read
+MAX_SENT = 12_000
+MAX_REPLY = 1_000_000
 KINDS = ("flight", "hotel", "car", "train")
 REMOVED = "[removed]"
 
 
 @dataclass(frozen=True)
 class Hosts:
-    """OpenRouter's address. Tests point it at a fake one (and allow its plain http)."""
     openrouter: str = "https://openrouter.ai/api/v1"
     allow_http: bool = False
 
@@ -54,11 +38,10 @@ HOSTS = Hosts()
 
 
 class AiError(Exception):
-    """The AI couldn't give a suggestion. The message is fixed text, fit to show to the person (never the reply)."""
+    pass
 
 
 class Suggestion(TypedDict, total=False):
-    """The fields of a booking the AI read, as the "Add by hand" form has them. A flight's zones come from its airports."""
     kind: Literal["flight", "hotel", "car", "train"]
     provider: str
     confirmation: str
@@ -74,14 +57,11 @@ class Suggestion(TypedDict, total=False):
 class Config:
     mode: Literal["local", "openrouter"]
     model: str
-    url: str = ""                           # local: the Ollama server's address
-    key: str = field(default="", repr=False)   # openrouter: the key (never shown, logged or sent anywhere but there)
+    url: str = ""
+    key: str = field(default="", repr=False)
 
-
-# ------------------------------------------------------------------------------------------------ configuration
 
 def saved_key(conn: db.Connection) -> tuple[str | None, Literal["env", "saved"] | None]:
-    """The OpenRouter key and where it comes from: the environment's wins over the one saved in Settings."""
     env = (os.environ.get(KEY_ENV) or "").strip()
     if env:
         return env, "env"
@@ -95,8 +75,6 @@ def mode(conn: db.Connection) -> Mode:
 
 
 def config(conn: db.Connection) -> Config | None:
-    """What to send with, read fresh from the settings each time (so turning it off takes effect at the next message,
-    even in a scan that's under way). None: it's off, or isn't set up enough to send."""
     chosen = mode(conn)
     if chosen == "local":
         url, model = db.get_setting(conn, sk.AI_OLLAMA_URL), db.get_setting(conn, sk.AI_OLLAMA_MODEL)
@@ -116,12 +94,10 @@ def clean_model(text: str) -> str | None:
 
 
 def clean_url(text: str) -> str | None:
-    """An Ollama server's address (http or https, a host, no sign-in or query in it), without a trailing slash; None when it
-    isn't one."""
     text = text.strip()
     try:
         parts = urllib.parse.urlsplit(text)
-        _ = parts.port   # (raises for a port that isn't a number)
+        _ = parts.port
     except ValueError:
         return None
     if parts.scheme not in ("http", "https") or not parts.hostname or parts.username or parts.password or parts.query \
@@ -130,14 +106,11 @@ def clean_url(text: str) -> str | None:
     return text.rstrip("/")
 
 
-# ------------------------------------------------------------------------------------------------ what goes out
-
 LABELLED = re.compile(
     r"(?i)(frequent[- ]?flyer|loyalty|member(?:ship)?|rewards?|skymiles|aadvantage|mileageplus|known[- ]traveler|ktn|passid|"
     r"pre-?check|global entry|card(?: number)?|account(?: number)?)([^\n\d]{0,40}?)\b((?-i:[A-Z0-9][A-Z0-9 -]{2,30}\d))\b")
 CARD = re.compile(r"\b\d{4}[ -]\d{4}[ -]\d{4}[ -]\d{1,4}\b|\b\d{4}[ -]\d{6}[ -]\d{4,5}\b")
 LONG = re.compile(r"\b\d{9,}\b")
-# A letter-prefixed ID with no label (TT87654321, ABC1234567): 8 or more characters, mostly digits. A confirmation code is shorter.
 PREFIXED = re.compile(r"\b[A-Z]{1,4}-?\d{7,}\b")
 CUT = re.compile(r"(?im)^(?:on .{5,200} wrote:|-{2,}\s*(?:original message|reply message)\s*-{2,}|-- ?)\s*$")
 FOOTER = re.compile(r"(?i)unsubscribe|manage (?:your )?(?:email )?(?:preferences|subscriptions)|privacy (?:policy|notice)|"
@@ -145,9 +118,6 @@ FOOTER = re.compile(r"(?i)unsubscribe|manage (?:your )?(?:email )?(?:preferences
 
 
 def redact(text: str, known: tuple[str, ...] = ()) -> str:
-    """`text` as it may be sent: quoted replies and everything under a reply header or a "-- " signature cut, footer lines
-    dropped, the household's own saved `known` numbers replaced wherever they're written (with spaces or dashes in them too),
-    and anything labelled as a loyalty, Known Traveler, account or card number, or shaped like one, replaced."""
     cut = CUT.search(text)
     lines = [ln for ln in (text[:cut.start()] if cut else text).splitlines()
              if not ln.lstrip().startswith(">") and not FOOTER.search(ln)]
@@ -176,7 +146,6 @@ SYSTEM = (
 
 
 def request(cfg: Config, text: str) -> tuple[str, dict[str, str], dict[str, Any], bool]:
-    """What to send: the address, headers, JSON body and whether plain http is allowed (an address you set yourself)."""
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": text}]
     if cfg.mode == LOCAL:
         return (cfg.url.rstrip("/") + "/api/chat", {"Content-Type": "application/json"},
@@ -186,8 +155,6 @@ def request(cfg: Config, text: str) -> tuple[str, dict[str, str], dict[str, Any]
             {"model": cfg.model, "messages": messages, "temperature": 0, "response_format": {"type": "json_object"},
              "provider": {"data_collection": "deny", "zdr": True}}, HOSTS.allow_http)
 
-
-# ------------------------------------------------------------------------------------------------ what comes back
 
 NO_BOOKING = "The AI didn’t find a booking in this message."
 BAD_REPLY = "The AI’s answer wasn’t a booking Waypoint could use, so it was left out."
@@ -222,8 +189,6 @@ def _time(value: Any) -> str:
 
 
 def parse(content: Any, sent: str) -> Suggestion:
-    """The booking in the AI's reply, or AiError. `sent` is the text that went out: a confirmation code or an airport that isn't
-    in it came from somewhere else (a hostile or confused reply), so it's refused."""
     if not isinstance(content, str):
         raise AiError(BAD_REPLY)
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip())
@@ -246,7 +211,7 @@ def parse(content: Any, sent: str) -> Suggestion:
         raise AiError(BAD_REPLY)
     start, end = _time(values.get("start_local")), _time(values.get("end_local"))
     if "confirmation" in values and not _in(sent, values["confirmation"]):
-        raise AiError(BAD_REPLY)   # a code that isn't in the message: some other booking's
+        raise AiError(BAD_REPLY)
     if kind == "flight":
         codes = [values["origin"], values.get("destination", "")]
         if not all(IATA.fullmatch(c) and re.search(rf"\b{c}\b", sent) for c in codes):
@@ -258,8 +223,6 @@ def parse(content: Any, sent: str) -> Suggestion:
                 zones[zone] = ZoneInfo(values[zone])
             except (ZoneInfoNotFoundError, ValueError, OSError):
                 raise AiError(BAD_REPLY) from None
-    # The two times are at two places: an end before the start is only wrong where both zones say so (a flight's come from
-    # its airports, which nothing here looks up, so a flight's are not compared; AGENTS.md, "Times are where they happen").
     if len(zones) == 2 and datetime.fromisoformat(end).replace(tzinfo=zones["end_zone"]) \
             < datetime.fromisoformat(start).replace(tzinfo=zones["start_zone"]):
         raise AiError(BAD_REPLY)
@@ -270,7 +233,6 @@ def parse(content: Any, sent: str) -> Suggestion:
 
 
 def _answer(cfg: Config, body: Any) -> Any:
-    """The reply's text out of the service's envelope."""
     if not isinstance(body, dict):
         return None
     if cfg.mode == LOCAL:
@@ -283,8 +245,6 @@ def _answer(cfg: Config, body: Any) -> Any:
 
 
 def suggest(cfg: Config, text: str, known: tuple[str, ...] = ()) -> Suggestion:
-    """Ask the AI what booking `text` (a message's plain text, in memory) holds. The text is redacted first; what's returned
-    is checked field by field. Raises AiError (fixed text) for everything that goes wrong."""
     sent = redact(text, known)
     if not sent:
         raise AiError(NO_BOOKING)
@@ -301,7 +261,7 @@ def suggest(cfg: Config, text: str, known: tuple[str, ...] = ()) -> Suggestion:
         if e.code == 404 and cfg.mode == OPENROUTER:
             raise AiError(NO_PRIVATE_PROVIDER) from None
         raise AiError(FAILED) from None
-    except (OSError, ValueError):   # (URLError, a timeout, a dropped connection, a bad address)
+    except (OSError, ValueError):
         raise AiError(UNREACHABLE) from None
     try:
         reply = json.loads(raw)

@@ -1,21 +1,3 @@
-"""Live flight status within the RapidAPI plan's budget (400 calls a month for the whole household, by default).
-
-The booking stays the record: a status is shown beside a segment's booked times and never written over its fields. The
-answers are cached by (flight number, local departure date) in `flight_status`, which holds nothing personal, so one call
-answers for everyone on a flight, and for every segment that names it.
-
-When a flight is checked (`due`), a pure rule on the booked times, so it can be tested without a clock or a service:
-  * at fixed points before the booked departure (CHECKS: 24 h, 3 h, 1 h and 20 min) and once at the booked arrival, at most
-    five calls a flight; nothing for a flight more than 24 h out, one that has landed, was cancelled or diverted, or one
-    that arrived LATE ago. If Waypoint was off, it makes up only the latest check it missed. A call that fails still
-    uses up its check (it's recorded as attempted, in the database), so an outage costs at most one call per check,
-    never a retry every few minutes.
-  * from 90% of the monthly limit, only the 1 h check; at the limit, none; a "Refresh" press (`refresh`) is the viewer's
-    to make and costs a call too, unless the answer is under REFRESH_AFTER old. A 429, or a key RapidAPI refuses, pauses
-    fetching for an hour. The month is the machine's local month (TZ).
-
-Times stay where they happen: the cache holds the airports' wall-clock times with their zones, and nothing here converts
-one (`trips.instant` only compares)."""
 from __future__ import annotations
 
 import json
@@ -37,31 +19,30 @@ from . import trips, visibility
 from .visibility import Viewer
 
 DEFAULT_LIMIT = 400
-REDUCED_FROM = 0.9                              # of the limit
+REDUCED_FROM = 0.9
 CHECKS = (("24h", timedelta(hours=24)), ("3h", timedelta(hours=3)), ("1h", timedelta(hours=1)),
-          ("20m", timedelta(minutes=20)))       # before the booked departure
-ONE_HOUR = "1h"                                 # the check that survives the 90% mark
-REFRESH_AFTER = timedelta(minutes=15)           # a cached answer this young is what Refresh shows
-LATE = timedelta(hours=6)                       # checks stop this long after the booked arrival
-PAUSE = timedelta(hours=1)                      # after a 429, or a key RapidAPI refuses
-KEEP_DAYS = 7                                   # cached answers go this long after the flight
-OVER = (service.LANDED, service.CANCELLED, service.DIVERTED)   # states with nothing more to learn
+          ("20m", timedelta(minutes=20)))
+ONE_HOUR = "1h"
+REFRESH_AFTER = timedelta(minutes=15)
+LATE = timedelta(hours=6)
+PAUSE = timedelta(hours=1)
+KEEP_DAYS = 7
+OVER = (service.LANDED, service.CANCELLED, service.DIVERTED)
 
 Reason = Literal["limit", "rate", "key"]
-Shown = Literal["scheduled", "delayed", "departed", "landed", "cancelled", "diverted"]   # (an unknown flight shows nothing)
+Shown = Literal["scheduled", "delayed", "departed", "landed", "cancelled", "diverted"]
 
 _lock = threading.Lock()
 
 
 class NotAFlight(ValueError):
-    """The segment isn't a flight with a flight number, so there's no status to fetch (the API's 400)."""
+    pass
 
 
 @dataclass(frozen=True)
 class Flight:
-    """One flight to watch: what a call is for. `departs` and `arrives` are the booked times, as instants (for comparing)."""
-    number: str            # normalized: EX101
-    day: str               # its local departure date
+    number: str
+    day: str
     origin: str | None
     departs: datetime
     arrives: datetime
@@ -75,10 +56,10 @@ class Pause:
 
 @dataclass(frozen=True)
 class Usage:
-    month: str             # "2026-10"
+    month: str
     used: int
     limit: int
-    paused: Pause | None   # why nothing is fetched now, if so
+    paused: Pause | None
 
     @property
     def reduced(self) -> bool:
@@ -102,17 +83,17 @@ class StatusOut(TypedDict):
     arr_zone: str
     arr_terminal: str | None
     arr_gate: str | None
-    delay_minutes: int | None   # how much later than booked it leaves (or left)
-    fetched_at: str             # when the answer came, with its UTC offset
+    delay_minutes: int | None
+    fetched_at: str
 
 
 class PauseOut(TypedDict):
-    until: str                  # with its UTC offset
+    until: str
     reason: Reason
 
 
 class Overview(TypedDict):
-    enabled: bool               # RAPIDAPI_KEY is set
+    enabled: bool
     month: str
     used: int
     limit: int
@@ -120,26 +101,18 @@ class Overview(TypedDict):
     statuses: list[StatusOut]
 
 
-# ------------------------------------------------------------------------------------------------ the schedule
-
 def checkpoints(flight: Flight) -> list[tuple[datetime, str]]:
-    """When the flight is checked: (the moment, its name) in order."""
     return [(flight.departs - before, name) for name, before in CHECKS] + [(flight.arrives, "arrival")]
 
 
 def due(flight: Flight, now: datetime, last: datetime | None, state: str | None, reduced: bool = False) -> bool:
-    """Whether a check is due: the latest checkpoint that has passed (only the 1 h one when `reduced`) is after the last
-    answer (`last`, when it came; `state`, what it said). Early on, nothing has passed, so nothing is fetched."""
     if state in OVER or now > flight.arrives + LATE:
         return False
     passed = [at for at, name in checkpoints(flight) if at <= now and (name == ONE_HOUR or not reduced)]
     return bool(passed) and (last is None or last < passed[-1])
 
 
-# ------------------------------------------------------------------------------------------------ the budget
-
 def limit() -> int:
-    """WAYPOINT_FLIGHT_STATUS_MONTHLY_LIMIT, or 400 when it isn't set to a positive whole number."""
     try:
         n = int((os.environ.get("WAYPOINT_FLIGHT_STATUS_MONTHLY_LIMIT") or "").strip() or DEFAULT_LIMIT)
     except ValueError:
@@ -152,7 +125,6 @@ def _month(now: datetime) -> str:
 
 
 def _calls(conn: db.Connection, month: str) -> int:
-    """The calls made in `month`; a counter from an earlier month is a new month's zero."""
     if db.get_setting(conn, sk.FLIGHT_STATUS_MONTH) != month:
         return 0
     stored = db.get_setting(conn, sk.FLIGHT_STATUS_CALLS) or ""
@@ -171,14 +143,13 @@ def _stored_pause(conn: db.Connection, now: datetime) -> Pause | None:
 def usage(conn: db.Connection, now: datetime) -> Usage:
     month, cap = _month(now), limit()
     used = _calls(conn, month)
-    if used >= cap:   # until the 1st, local time
+    if used >= cap:
         first = datetime.combine(dates.key_start(dates.next_month_key(month)), time.min).astimezone()
         return Usage(month, used, cap, Pause(first, "limit"))
     return Usage(month, used, cap, _stored_pause(conn, now))
 
 
 def _spend(conn: db.Connection, now: datetime) -> None:
-    """Count a call, and keep the count: a request that goes on to fail still used up its call."""
     with _lock:
         month = _month(now)
         db.set_setting(conn, sk.FLIGHT_STATUS_CALLS, str(_calls(conn, month) + 1))
@@ -187,7 +158,6 @@ def _spend(conn: db.Connection, now: datetime) -> None:
 
 
 def forget_key_pause(conn: db.Connection) -> None:
-    """At startup: a pause for a refused key ends, so fixing RAPIDAPI_KEY and restarting takes effect at once."""
     try:
         refused = json.loads(db.get_setting(conn, sk.FLIGHT_STATUS_PAUSED) or "null")["reason"] == "key"
     except (ValueError, TypeError, KeyError):
@@ -201,17 +171,14 @@ def _pause(conn: db.Connection, now: datetime, reason: Reason) -> None:
     conn.commit()
 
 
-# ------------------------------------------------------------------------------------------------ flights and the cache
-
 def _flight(seg: Segment) -> Flight | None:
-    """The flight a segment is, when it's one that can be asked about."""
     if seg.kind != "flight" or seg.status == "cancelled":
         return None
     details = trips.decode_details(seg.details)
-    if trips.untimed(details):   # its times are a placeholder: there's no departure to ask about
+    if trips.untimed(details):
         return None
     raw = details.get("flight_number")
-    number = service.normalize(trips.flight_key(raw) or raw)   # (AA04001 and AA 4001 are one flight: one call)
+    number = service.normalize(trips.flight_key(raw) or raw)
     if not number:
         return None
     return Flight(number, seg.start_local[:10], seg.origin, trips.instant(seg.start_local, seg.start_zone),
@@ -219,8 +186,6 @@ def _flight(seg: Segment) -> Flight | None:
 
 
 def watching(conn: db.Connection, now: datetime) -> list[Flight]:
-    """The flights near enough to matter (a day or two either side of today), once each however many segments or
-    travellers they have, the soonest first."""
     today = now.astimezone().date()
     near = conn.orm.scalars(select(Segment).where(
         Segment.kind == "flight", Segment.start_local >= (today - timedelta(days=2)).isoformat(),
@@ -241,36 +206,31 @@ def _fetched(row: FlightStatus) -> datetime:
 
 
 def _last_call(row: FlightStatus | None) -> datetime | None:
-    """When the flight's last call was made, whether it worked or not: what a check is measured against."""
     if row is None:
         return None
     return datetime.fromtimestamp(max(row.fetched_at, row.attempted_at or 0.0), UTC)
 
 
 def _store(conn: db.Connection, flight: Flight, found: service.Status | None, now: datetime) -> None:
-    """Keep the answer (an unknown flight is kept as one, so it isn't asked about again until the next check)."""
     values = {"flight_number": flight.number, "date": flight.day, "fetched_at": now.timestamp(), "attempted_at": now.timestamp(),
               **{k: getattr(found or service.Status(service.UNKNOWN), k) for k in service.Status.__dataclass_fields__}}
     db.upsert(conn, FlightStatus, values, key=["flight_number", "date"])
 
 
 def purge(conn: db.Connection, now: datetime) -> None:
-    """Remove the answers for flights more than KEEP_DAYS gone."""
     conn.execute(delete(FlightStatus).where(FlightStatus.date <= (now.astimezone().date() - timedelta(days=KEEP_DAYS)).isoformat()))
 
 
 def _note_failure(conn: db.Connection, flight: Flight, now: datetime) -> None:
-    """Record that a call was made and failed, so this check isn't made again (the answer held, if any, stays)."""
     if (row := _cached(conn, flight.number, flight.day)) is not None:
         row.attempted_at = now.timestamp()
-    else:   # (nothing to show: an unknown flight, as far as anyone can tell)
+    else:
         db.upsert(conn, FlightStatus, {"flight_number": flight.number, "date": flight.day, "state": service.UNKNOWN,
                                        "fetched_at": 0.0, "attempted_at": now.timestamp()}, key=["flight_number", "date"])
     conn.commit()
 
 
 def _check(conn: db.Connection, flight: Flight, now: datetime) -> None:
-    """One call for the flight, kept. Raises what the provider raises; a rate limit or a refused key pauses fetching first."""
     _spend(conn, now)
     try:
         found = service.fetch(flight.number, flight.day, flight.origin)
@@ -286,8 +246,6 @@ def _check(conn: db.Connection, flight: Flight, now: datetime) -> None:
 
 
 def run_due(conn: db.Connection, now: datetime) -> int:
-    """The scheduler's round (every few minutes): make the checks that are due, within the budget. Returns how many calls
-    it made. A failure is logged as its fixed message (never the flight), and the next round tries again."""
     if not service.configured():
         return 0
     purge(conn, now)
@@ -310,8 +268,6 @@ def run_due(conn: db.Connection, now: datetime) -> int:
     return made
 
 
-# ------------------------------------------------------------------------------------------------ what the viewer sees
-
 def _delay(row: FlightStatus) -> int | None:
     expected = row.dep_actual or row.dep_estimated
     if not (expected and row.dep_scheduled):
@@ -330,8 +286,6 @@ def _out(seg: Segment, row: FlightStatus) -> StatusOut:
 
 
 def _statuses(conn: db.Connection, segs: Sequence[Segment]) -> list[StatusOut]:
-    """The cached status for each of these segments that has one that's about the same leg (a flight number that flies several
-    legs a day has a status for one of them; the others show none). Nothing for an unknown flight."""
     flights = {s.id: f for s in segs if (f := _flight(s))}
     if not flights:
         return []
@@ -355,14 +309,10 @@ def _overview(conn: db.Connection, now: datetime, statuses: list[StatusOut]) -> 
 
 
 def overview(conn: db.Connection, viewer: Viewer, now: datetime) -> Overview:
-    """The budget, and the status of each of the viewer's flights that has one."""
     return _overview(conn, now, _statuses(conn, visibility.visible_segments(conn, viewer)))
 
 
 def refresh(conn: db.Connection, viewer: Viewer, segment_id: int, now: datetime) -> Overview | None:
-    """The "Refresh" button: fetch this flight's status now, unless the answer held is under REFRESH_AFTER old or the flight
-    is over, or fetching is paused (then what's held, with why). None when the segment isn't the viewer's. Raises NotAFlight,
-    and the provider's errors (their messages are fixed texts)."""
     seg = visibility.visible_segment(conn, viewer, segment_id)
     if seg is None:
         return None

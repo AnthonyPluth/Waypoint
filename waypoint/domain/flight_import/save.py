@@ -1,11 +1,3 @@
-"""From what a file proposes to what Waypoint keeps: each flight marked as new, already in Waypoint or unreadable (`preview`),
-and the confirmed ones added as segments (`save`).
-
-Times are wall-clock times at the airports (AGENTS.md, "Times are where they happen"): a time a file gives with an offset
-(or in UTC) is put at its airport's zone, one without is taken to be the airport's already, and nothing is converted to
-the server's zone. An arrival that gives only a time of day is on the day it first can be after the departure. A flight
-the file gives no (or no usable) times for keeps none: it counts in distance but not in time in the air (its segment
-says `time_unknown` and starts and ends at the same moment, on its day at both airports, so it has no duration)."""
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -20,26 +12,25 @@ from ..visibility import Viewer
 from .formats import Clock, Proposed, Skipped
 
 Status = Literal["new", "exists", "unreadable"]
-MAX_DAYS_AHEAD = 2   # an arrival time with no day is put up to this many days after the departure's
+MAX_DAYS_AHEAD = 2
 
 
 class FlightIn(TypedDict):
-    """A flight to add, as a preview showed it (the segment's own fields are worked out from it)."""
-    day: str                       # the local departure day, YYYY-MM-DD
-    origin: str                    # IATA codes
+    day: str
+    origin: str
     destination: str
     flight_number: NotRequired[str | None]
     airline: NotRequired[str | None]
-    start_local: NotRequired[str | None]   # wall-clock times at the airports; both or neither
+    start_local: NotRequired[str | None]
     end_local: NotRequired[str | None]
     seat: NotRequired[str | None]
     cabin: NotRequired[str | None]
 
 
 class PreviewRow(TypedDict):
-    line: int                      # the row's line in the file (the header is line 1)
+    line: int
     status: Status
-    reason: str | None             # why it's already here or can't be read
+    reason: str | None
     day: str | None
     origin: str | None
     destination: str | None
@@ -54,11 +45,10 @@ class PreviewRow(TypedDict):
 @dataclass(frozen=True)
 class Saved:
     added: int
-    existing: int                  # already in Waypoint (or repeated in what was sent), so left alone
+    existing: int
 
 
 def _at(clock: Clock, fallback_day: str, zone: str) -> datetime:
-    """A time a file gives, as a naive wall-clock time at `zone`."""
     hours, minutes = clock.time.split(":")
     local = datetime.fromisoformat(clock.day or fallback_day).replace(hour=int(hours), minute=int(minutes))
     if clock.offset is None:
@@ -67,7 +57,6 @@ def _at(clock: Clock, fallback_day: str, zone: str) -> datetime:
 
 
 def _times(flight: Proposed, origin_zone: str, destination_zone: str) -> tuple[str, str, str] | None:
-    """(local departure day, departure, arrival) as wall-clock texts, or None when the file doesn't give both."""
     if flight.dep is None or flight.arr is None:
         return None
     dep = _at(flight.dep, flight.day, origin_zone)
@@ -77,13 +66,12 @@ def _times(flight: Proposed, origin_zone: str, destination_zone: str) -> tuple[s
         if arr.replace(tzinfo=ZoneInfo(destination_zone)) >= start:
             return dep.date().isoformat(), dep.strftime("%Y-%m-%dT%H:%M"), arr.strftime("%Y-%m-%dT%H:%M")
         if flight.arr.day or flight.arr.offset is not None:
-            return None   # it says when, and that's before it left: the times can't be right
+            return None
         arr += timedelta(days=1)
     return None
 
 
 def _keys(day: str, number: str | None, origin: str | None, destination: str | None) -> list[tuple[str, ...]]:
-    """What makes two flights the same: the flight number and day, or the route and day."""
     keys: list[tuple[str, ...]] = [("route", day, (origin or "").upper(), (destination or "").upper())]
     if number:
         keys.append(("number", day, number.replace(" ", "").upper()))
@@ -91,7 +79,6 @@ def _keys(day: str, number: str | None, origin: str | None, destination: str | N
 
 
 def _known(conn: db.Connection, viewer: Viewer) -> set[tuple[str, ...]]:
-    """The flights the viewer already has, by `_keys`."""
     found: set[tuple[str, ...]] = set()
     for s in visibility.visible_segments(conn, viewer):
         if s.kind == "flight" and s.status != "cancelled":
@@ -108,8 +95,6 @@ def _row(line: int, status: Status, reason: str | None, **fields: str | None) ->
 
 
 def preview(conn: db.Connection, viewer: Viewer, parsed: Iterable[Proposed | Skipped]) -> list[PreviewRow]:
-    """Each row as the person will see it: new, already in Waypoint (the same flight number and day, or the same route and
-    day, among the viewer's flights or earlier in the file), or unreadable, with why."""
     rows = list(parsed)
     zones = airports.zones(conn, [c for r in rows if isinstance(r, Proposed) for c in (r.origin, r.destination)])
     have = _known(conn, viewer)
@@ -149,8 +134,6 @@ def _segment(flight: FlightIn, zones: Mapping[str, str]) -> trips.SegmentIn:
     details = {k: v for k, v in (("flight_number", flight.get("flight_number")), ("seat", flight.get("seat")),
                                  ("cabin", flight.get("cabin"))) if v}
     if not (start and end):
-        # No times: one moment on its day (the later of the day's two midnights, so it's still that day at both airports),
-        # written at each airport's clock. It has no duration, and both ends are on the same date whichever way it flies.
         day = datetime.fromisoformat(f"{flight['day']}T00:00")
         start = end = f"{flight['day']}T00:00"
         origin, destination = zones.get(flight["origin"].upper()), zones.get(flight["destination"].upper())
@@ -165,10 +148,6 @@ def _segment(flight: FlightIn, zones: Mapping[str, str]) -> trips.SegmentIn:
 
 def save(conn: db.Connection, viewer: Viewer, flights: Sequence[FlightIn],
          travelers: Sequence[trips.TravelerIn]) -> Saved:
-    """Add the flights that aren't here yet as segments from an import, booked by the viewer, with these travellers, in
-    date order so grouping sees them as they happened. One that is already here (or repeated in `flights`) is left alone,
-    so saving the same file again adds nothing. Raises trips.Invalid for a flight that can't be a segment, and then
-    none are added (the caller's transaction rolls back)."""
     have = _known(conn, viewer)
     zones = airports.zones(conn, [c for f in flights for c in (f["origin"], f["destination"])])
     added = existing = 0

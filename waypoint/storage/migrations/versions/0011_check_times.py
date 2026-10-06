@@ -1,9 +1,3 @@
-"""Segments read from an email whose times were marked UTC but may mean the place's own clock, and couldn't be settled from the
-message's text, are flagged so their card can ask for a look.
-
-Revision ID: 0011
-Revises: 0010
-"""
 import sqlalchemy as sa
 from alembic import op
 

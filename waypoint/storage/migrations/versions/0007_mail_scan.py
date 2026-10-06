@@ -1,9 +1,3 @@
-"""Scanning mail: what each scan has looked at (ids only), the "Couldn't read" review queue, the senders a person stopped
-reviewing, and what a mailbox's last scan couldn't do.
-
-Revision ID: 0007
-Revises: 0006
-"""
 import sqlalchemy as sa
 from alembic import op
 

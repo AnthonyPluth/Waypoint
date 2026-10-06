@@ -38,7 +38,6 @@ def sign(claims: dict, kid="k1", key_d=D) -> str:
 
 
 class Provider(BaseHTTPRequestHandler):
-    """A tiny OIDC provider: discovery, keys, and a token endpoint that hands out whatever the test queued."""
     issued = {}
     last_token_request = {}
 
@@ -144,7 +143,7 @@ class OIDCTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body)["user"]["email"], "me@example.com")
         with db.session() as conn:
-            self.assertIn("Alex", conn.execute(select(User.first_name)).scalars())   # remembered as one of the household
+            self.assertIn("Alex", conn.execute(select(User.first_name)).scalars())
             self.assertIsNone(conn.execute(select(AuthSession.token_hash)
                                            .where(AuthSession.token_hash == ck["waypoint_session"])).fetchone())
         self.assertEqual(self.req("/auth/logout", session)[0], 405)
@@ -179,8 +178,8 @@ class OIDCTests(unittest.TestCase):
             status, _, _, _ = self.sign_in(email=who)
         self.assertEqual(status, 403)
         lines = [" ".join(str(a) for a in c.args) for c in printed.call_args_list]
-        self.assertTrue(any(who in line and "OIDC_ALLOWED_EMAILS" in line for line in lines), lines)   # the operator's fix
-        self.assertTrue(any(who in str(c.args[0]) for c in logged.call_args_list))   # through the log, nowhere else
+        self.assertTrue(any(who in line and "OIDC_ALLOWED_EMAILS" in line for line in lines), lines)
+        self.assertTrue(any(who in str(c.args[0]) for c in logged.call_args_list))
 
     def test_someone_not_allowed_is_told_so_and_offered_another_account(self):
         status, _, _, body = self.sign_in(email="stranger@example.com")
@@ -253,7 +252,6 @@ class OIDCTests(unittest.TestCase):
 
 
 class TokenChecks(unittest.TestCase):
-    """verify_id_token on its own, with an EC-signed provider (ES256) and the claims that must be right."""
 
     def setUp(self):
         from cryptography.hazmat.primitives.asymmetric import ec

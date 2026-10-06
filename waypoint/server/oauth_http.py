@@ -1,7 +1,3 @@
-"""OAuth for /mcp over HTTP (waypoint/server/mcp_oauth.py does the work): the endpoints an app calls itself (metadata,
-registration, tokens, revocation), which need no sign-in and no same-site checks, and the consent page, /oauth/authorize,
-where you approve an assistant: the one OAuth page that needs you signed in. The handler (server/handler.py) decides
-who reaches which; these answer them."""
 from __future__ import annotations
 
 import html
@@ -17,15 +13,12 @@ from .common import NOT_READ, BadJson
 if TYPE_CHECKING:
     from .handler import Handler
 
-# What an app calls itself, without a Waypoint session. The consent page, /oauth/authorize, is the one OAuth path that
-# needs you signed in.
 OAUTH_PUBLIC = {"/oauth/register", "/oauth/token", "/oauth/revoke"}
 OAUTH_METADATA = {"/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp",
                   "/.well-known/oauth-authorization-server"}
 
 
 def _answer(h: Handler, status: int, obj: dict | mcp_oauth.OAuthError, www: str | None = None) -> None:
-    """An OAuth answer: never cached (RFC 6749 §5.1), errors as {"error", "error_description"}."""
     if isinstance(obj, mcp_oauth.OAuthError):
         status, obj = obj.status, obj.body()
     extra = {"Pragma": "no-cache", **({"WWW-Authenticate": www} if status == 401 and www else {})}
@@ -38,7 +31,6 @@ def _body(h: Handler) -> bytes | None:
 
 
 def _form(raw: bytes) -> dict[str, str] | None:
-    """An application/x-www-form-urlencoded body, or None if it can't be read or names a parameter twice."""
     try:
         pairs = urllib.parse.parse_qsl(raw.decode(), keep_blank_values=True, strict_parsing=bool(raw), max_num_fields=50)
     except (UnicodeDecodeError, ValueError):
@@ -48,8 +40,6 @@ def _form(raw: bytes) -> dict[str, str] | None:
 
 
 def app_calls(h: Handler, method: str, url) -> None:
-    """The OAuth endpoints an app calls itself (metadata, registration, tokens, revocation). No session and no CORS:
-    an app isn't a web page."""
     iss = mcp_oauth.issuer(h.headers.get("Host"))
     if url.path in OAUTH_METADATA:
         if method != "GET":
@@ -68,7 +58,6 @@ def app_calls(h: Handler, method: str, url) -> None:
     ctype = (h.headers.get("Content-Type") or "").split(";")[0].strip().lower()
     result: dict | mcp_oauth.OAuthError
     if url.path == "/oauth/register":
-        # JSON only: a form on another site can't send it without CORS approval, which Waypoint never gives.
         try:
             meta, is_json = h._read_json(mcp_oauth.MAX_BODY), True
         except BadJson:
@@ -92,7 +81,6 @@ def app_calls(h: Handler, method: str, url) -> None:
             "invalid_request", "Send the parameters as application/x-www-form-urlencoded, each once."))
     authorization = h.headers.get("Authorization")
     www = 'Basic realm="Waypoint"' if authorization else None
-    # Errors are caught inside the session, so what they wrote is kept (a replayed code or refresh token revokes its grant).
     with db.session() as conn:
         try:
             client = mcp_oauth.authenticate_client(conn, form, authorization)
@@ -107,8 +95,6 @@ def app_calls(h: Handler, method: str, url) -> None:
 
 
 def authorize(h: Handler, method: str, url) -> None:
-    """/oauth/authorize: GET checks an app's request and asks you (the consent page); POST is your answer. Reached
-    only signed in (see Handler._route). A request that can't be trusted to go back to the app is shown here instead."""
     iss = mcp_oauth.issuer(h.headers.get("Host"))
     if iss is None:
         return h._page(404, "Assistants can't connect yet", mcp_oauth.unavailable_reason())
@@ -134,7 +120,6 @@ def _consent_ask(h: Handler, url, iss: str) -> None:
         token = mcp_oauth.start_consent(conn, {**req.params(), "sub": user.get("sub")})
     target = urllib.parse.urlsplit(req.redirect_uri)
     name = req.client_name or "An app"
-    # The form's answer redirects to the app, so the page may submit to Waypoint and on to the app's address.
     if target.scheme == "https":
         back = f"https://{target.netloc}"
     else:
@@ -148,9 +133,6 @@ def _consent_ask(h: Handler, url, iss: str) -> None:
 
 
 def consent_page(scope, target, token: str, user: dict, writes_on: bool) -> str:
-    """The consent page's form (inside the page's card): who's approving, where the answer goes, and a box for each
-    scope the app asked for. A box can be ticked only while its switch is on, and is never ticked for you: allowing more
-    than reading is a choice made here, each time."""
     who = user.get("email") or user.get("name") or user.get("sub")
     signed_in = (f"You're signed in as <b>{html.escape(who)}</b>. The assistant will see what you see: the trips you're on, nothing more."
                  if who else "This Waypoint has no sign-in of its own, so anyone who can open it can approve apps.")

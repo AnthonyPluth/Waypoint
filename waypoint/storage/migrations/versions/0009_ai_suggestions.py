@@ -1,9 +1,3 @@
-"""The optional AI fallback's suggestion for a review item (the booking's fields it read, for a person to confirm or edit) and,
-when it gave none, why (fixed text).
-
-Revision ID: 0009
-Revises: 0008
-"""
 import sqlalchemy as sa
 from alembic import op
 

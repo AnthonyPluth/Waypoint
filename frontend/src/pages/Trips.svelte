@@ -11,8 +11,6 @@
   import { dateLabel, dayIn, splitTrips, viewerZone } from "$lib/trips";
   import Plus from "@lucide/svelte/icons/plus";
 
-  // The trips you can see, upcoming and past, filtered by who's travelling (kept in the address as ?who=<id>). A failed load
-  // leaves nothing drawn that could pass for current, with a Try again.
   let trips = $state<Trip[] | null>(null);
   let people = $state<Person[]>([]);
   let loadError = $state("");

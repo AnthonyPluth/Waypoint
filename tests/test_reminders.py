@@ -1,7 +1,3 @@
-"""Reminders and the calendar feed: ICS events that keep each segment's own zone and wall-clock time (across a zone change and
-the date line), a feed that holds only the trips its owner can see under a key kept only as a hash, notifications that
-come once and carry no loyalty number, and devices and feeds that end with their owner's access. Names, codes and
-itineraries are made up; the airports are real."""
 import os
 import secrets
 import time
@@ -24,11 +20,10 @@ from tests.test_trips import Household
 from tests.test_webpush import receiver
 
 NOW = datetime(2026, 11, 19, 12, 0, tzinfo=UTC)
-LATER = datetime(2026, 11, 21, 0, 30, tzinfo=UTC)   # the flights have left: only the day's summary is due
+LATER = datetime(2026, 11, 21, 0, 30, tzinfo=UTC)
 LOYALTY_CANARY = "CANARY-LOYALTY-5550123"
 ENDPOINT = "https://push.example.com/send/abc123"
 
-# Made up: Jane and Mia fly to London from New York and stay in a hotel across the clocks going back; Sam has a trip of his own.
 FLIGHT_OUT = {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-11-20T19:00",
               "end_local": "2026-11-21T07:10", "confirmation": "JANE42", "provider": "Example Air",
               "details": {"flight_number": "EX 101", "seat": "34K"}}
@@ -62,7 +57,7 @@ class CalendarTests(unittest.TestCase):
     def test_a_flight_across_the_date_line_keeps_its_own_zones_and_wall_clock_times(self):
         lines = self.lines(segment())
         self.assertIn("DTSTART;TZID=Pacific/Auckland:20260301T221500", lines)
-        self.assertIn("DTEND;TZID=America/Los_Angeles:20260301T151000", lines)   # it lands "before" it left, on the same date
+        self.assertIn("DTEND;TZID=America/Los_Angeles:20260301T151000", lines)
         self.assertIn("SUMMARY:Flight NZ 6 AKL → LAX", lines)
 
     def test_a_flight_with_no_times_is_an_all_day_event_not_a_midnight_departure(self):
@@ -72,13 +67,13 @@ class CalendarTests(unittest.TestCase):
         self.assertIn("DTSTART;VALUE=DATE:20260308", lines)
         self.assertIn("DTEND;VALUE=DATE:20260309", lines)
         self.assertEqual([l for l in lines if l.startswith("BEGIN:VTIMEZONE") or "T000000" in l or "T030000" in l], [])
-        self.assertNotIn("TZID:America/New_York", self.lines(untimed, segment(id=2)))   # (no zone is described for it)
+        self.assertNotIn("TZID:America/New_York", self.lines(untimed, segment(id=2)))
 
     def test_no_event_time_is_converted_to_utc(self):
         for line in self.lines(segment(), segment(id=2, start_zone="Europe/London", end_zone="America/New_York")):
             if line.startswith(("DTSTART", "DTEND")):
                 self.assertFalse(line.endswith("Z"), line)
-        self.assertIn("DTSTAMP:20261119T120000Z", self.lines(segment()))   # the one UTC time RFC 5545 asks for
+        self.assertIn("DTSTAMP:20261119T120000Z", self.lines(segment()))
 
     def test_a_stay_across_the_clocks_going_back_says_when_they_changed(self):
         stay = segment(id=3, kind="hotel", origin="Harbour Hotel", destination=None, start_local="2026-10-30T15:00",
@@ -88,7 +83,7 @@ class CalendarTests(unittest.TestCase):
         self.assertIn("DTSTART;TZID=America/New_York:20261030T150000", lines)
         self.assertIn("DTEND;TZID=America/New_York:20261103T100000", lines)
         zone = lines[lines.index("TZID:America/New_York"):]
-        i = zone.index("DTSTART:20261101T020000")   # 02:00 on the wall, as the clocks said
+        i = zone.index("DTSTART:20261101T020000")
         self.assertEqual(zone[i - 1:i + 3], ["BEGIN:STANDARD", "DTSTART:20261101T020000", "TZOFFSETFROM:-0400", "TZOFFSETTO:-0500"])
 
     def test_a_stay_and_a_rental_carry_their_address_as_the_location_else_the_place(self):
@@ -98,7 +93,7 @@ class CalendarTests(unittest.TestCase):
         self.assertIn("LOCATION:Harbour Hotel", self.lines(segment(**base, details={})))
         car = segment(**{**base, "kind": "car", "origin": "Airport desk"}, details={"address": "5 Depot Way"})
         self.assertIn("LOCATION:5 Depot Way", self.lines(car))
-        self.assertFalse([l for l in self.lines(segment()) if l.startswith("LOCATION")])   # (a flight has none)
+        self.assertFalse([l for l in self.lines(segment()) if l.startswith("LOCATION")])
 
     def test_a_flights_description_lists_the_seat_of_each_traveller(self):
         flight = segment(details={"flight_number": "NZ 6"}, travelers=[
@@ -159,7 +154,6 @@ def subscription(endpoint=ENDPOINT):
 
 
 class Reminders(Household):
-    """Jane and Sam (members) and Mia (a guest): Jane and Mia travel, Sam has a trip of his own."""
 
     def setUp(self):
         super().setUp()
@@ -185,7 +179,7 @@ class FeedTests(Reminders):
         self.assertNotIn("SAMONLY", jane)
         self.assertIn("SAMONLY", sam)
         self.assertNotIn("JANE42", sam)
-        self.assertEqual(reminders.feed_text(self.c, "u-nobody", NOW).count("BEGIN:VEVENT"), 0)   # no person: nothing is theirs
+        self.assertEqual(reminders.feed_text(self.c, "u-nobody", NOW).count("BEGIN:VEVENT"), 0)
 
     def test_without_sign_in_the_local_household_sees_every_trip(self):
         text = "".join(unfolded(reminders.feed_text(self.c, reminders.LOCAL_OWNER, NOW)))
@@ -237,7 +231,7 @@ class LapseTests(Reminders):
         reminders.set_prefs(self.c, "u-sam", {"check_in": True, "day_of": False})
         jane_key = reminders.new_feed_key(self.c, "u-jane", 1.0)
         sam_key = reminders.new_feed_key(self.c, "u-sam", 1.0)
-        with mock.patch.dict(os.environ, self.ALLOWED):   # Sam's email isn't on the list any more
+        with mock.patch.dict(os.environ, self.ALLOWED):
             self.assertEqual(reminders.end_lapsed(self.c), 1)
             self.assertEqual(reminders.end_lapsed(self.c), 0)
             self.assertEqual(reminders.feed_owner(self.c, jane_key, time.time()), "u-jane")
@@ -245,11 +239,11 @@ class LapseTests(Reminders):
         self.assertEqual([d["id"] for d in reminders.devices(self.c, "u-sam")], [])
         self.assertEqual(len(reminders.devices(self.c, "u-jane")), 1)
         self.assertFalse(reminders.feed_on(self.c, "u-sam"))
-        self.assertEqual(reminders.prefs(self.c, "u-sam"), {"check_in": True, "day_of": True})   # their choices went too
+        self.assertEqual(reminders.prefs(self.c, "u-sam"), {"check_in": True, "day_of": True})
 
     def test_a_feed_is_gone_the_moment_it_is_asked_for_after_the_owner_lapses_and_not_before(self):
         key = reminders.new_feed_key(self.c, "u-sam", 1.0)
-        self.assertEqual(reminders.feed_owner(self.c, key, 2.0), "u-sam")   # (no sign-in: nothing lapses)
+        self.assertEqual(reminders.feed_owner(self.c, key, 2.0), "u-sam")
         with mock.patch.dict(os.environ, self.ALLOWED):
             self.assertIsNone(reminders.feed_owner(self.c, key, 2.0))
             self.assertFalse(reminders.feed_on(self.c, "u-sam"))
@@ -275,20 +269,19 @@ class LapseTests(Reminders):
             jobs.sweep_lapsed()
         self.assertEqual(reminders.devices(self.c, "u-sam"), [])
         with mock.patch.object(reminders, "end_lapsed", side_effect=RuntimeError("boom")):
-            jobs.sweep_lapsed()   # reported without its text, not raised
+            jobs.sweep_lapsed()
 
 
 class SendingTests(Reminders):
     def test_check_in_goes_out_once_in_the_day_before_the_flight_leaves(self):
         self.device()
-        # Leaves 19:00 in New York on the 20th = 00:00 UTC on the 21st; check-in opens 00:00 UTC on the 20th.
-        self.assertEqual(self.due(datetime(2026, 11, 19, 23, 59, tzinfo=UTC), hour=3), 0)   # a minute early
+        self.assertEqual(self.due(datetime(2026, 11, 19, 23, 59, tzinfo=UTC), hour=3), 0)
         self.assertEqual(self.due(datetime(2026, 11, 20, 0, 1, tzinfo=UTC), hour=3), 1)
         (_id, message), = self.sent
         self.assertEqual(message["title"], "Check-in opens")
-        self.assertEqual(message["body"], "Flight EX 101 JFK → LHR leaves Fri 20 Nov at 19:00.")   # the airport's own wall clock
+        self.assertEqual(message["body"], "Flight EX 101 JFK → LHR leaves Fri 20 Nov at 19:00.")
         self.assertEqual(message["url"], f"/#trip/{self.out['trip_id']}")
-        self.assertEqual(self.due(datetime(2026, 11, 20, 0, 6, tzinfo=UTC), hour=3), 0)   # once
+        self.assertEqual(self.due(datetime(2026, 11, 20, 0, 6, tzinfo=UTC), hour=3), 0)
         self.assertEqual(len(self.sent), 1)
 
     def test_nothing_after_the_flight_has_left(self):
@@ -306,7 +299,7 @@ class SendingTests(Reminders):
         self.device()
         trips.edit_segment(self.c, self.jane, self.out["id"], {"start_local": "2026-11-20T00:00", "end_local": "2026-11-20T05:00",
                                                                 "details": {"flight_number": "EX 101", "time_unknown": "yes"}})
-        self.assertEqual(self.due(datetime(2026, 11, 19, 12, 0, tzinfo=UTC), hour=3), 0)   # the hours before midnight: no check-in
+        self.assertEqual(self.due(datetime(2026, 11, 19, 12, 0, tzinfo=UTC), hour=3), 0)
         self.assertEqual(self.due(datetime(2026, 11, 20, 0, 30, tzinfo=UTC), hour=3), 0)
         self.due(LATER, hour=8)
         (_id, message), = self.sent
@@ -322,13 +315,13 @@ class SendingTests(Reminders):
         self.device()
         self.add(self.jane, {**HOTEL, "start_local": "2026-11-20T15:00", "end_local": "2026-11-22T10:00"}, self.out["trip_id"])
         later = LATER
-        self.assertEqual(self.due(later, hour=6), 0)   # before 7:00
+        self.assertEqual(self.due(later, hour=6), 0)
         self.assertEqual(self.due(later, hour=7), 1)
         (_id, message), = self.sent
         self.assertEqual(message["title"], "Today")
         self.assertEqual(message["body"].split("\n"), ["15:00 Hotel check-in Harbour Hotel", "19:00 Flight EX 101 JFK → LHR"])
         self.assertEqual(self.due(later, hour=12), 0)
-        self.assertEqual(self.due(later, hour=12, today=date(2026, 11, 21)), 0)   # nothing starts the next day
+        self.assertEqual(self.due(later, hour=12, today=date(2026, 11, 21)), 0)
 
     def test_a_long_day_names_five_bookings_and_counts_the_rest(self):
         self.device()
@@ -366,7 +359,7 @@ class SendingTests(Reminders):
             else:
                 self.assertIn("EX 7", message["body"])
                 self.assertNotIn("EX 101", message["body"])
-        self.assertEqual(len(self.sent), 2)   # one summary each
+        self.assertEqual(len(self.sent), 2)
 
     def test_every_device_of_a_member_gets_it(self):
         self.device("u-jane", ENDPOINT)
@@ -398,7 +391,7 @@ class SendingTests(Reminders):
         report.assert_called()
         self.assertEqual(report.call_args.kwargs, {"values": False})
         self.assertEqual(self.c.execute(select(ReminderSent.id)).fetchall(), [])
-        self.assertEqual(self.due(datetime(2026, 11, 20, 1, 5, tzinfo=UTC), hour=3), 1)   # the next round gets through
+        self.assertEqual(self.due(datetime(2026, 11, 20, 1, 5, tzinfo=UTC), hour=3), 1)
         self.assertEqual(len(calls), 1)
 
     def test_a_member_with_no_device_is_told_nothing_and_nothing_is_recorded(self):
@@ -410,7 +403,7 @@ class SendingTests(Reminders):
         self.c.commit()
         real = []
         with mock.patch.object(webpush, "send", side_effect=lambda *a, **k: real.append(a) or 201):
-            jobs.send_reminders()   # (whatever day it is: it must not raise)
+            jobs.send_reminders()
         with mock.patch.object(reminders, "run_due", side_effect=RuntimeError("boom")):
             jobs.send_reminders()
 
@@ -442,7 +435,7 @@ class DeviceTests(Reminders):
         made = self.device("u-jane")
         self.assertEqual(reminders.devices(self.c, "u-jane"), [{"id": made["id"], "service": "Notifications to push.example.com", "created": made["created"]}])
         self.assertEqual(reminders.devices(self.c, "u-sam"), [])
-        self.assertFalse(reminders.remove_device(self.c, "u-sam", made["id"]))   # not Sam's to remove
+        self.assertFalse(reminders.remove_device(self.c, "u-sam", made["id"]))
         self.assertTrue(reminders.remove_device(self.c, "u-jane", made["id"]))
         self.assertFalse(reminders.remove_device(self.c, "u-jane", made["id"]))
 
@@ -458,11 +451,10 @@ class DeviceTests(Reminders):
             self.device("u-jane", f"https://push.example.com/send/{i}")
         with self.assertRaises(reminders.Invalid):
             self.device("u-jane", "https://push.example.com/send/one-too-many")
-        self.device("u-jane", "https://push.example.com/send/3")   # one they have already is fine
+        self.device("u-jane", "https://push.example.com/send/3")
 
 
 class RouteCase(ServerCase):
-    """Waypoint with sign-in on, two members (Ana and Ben) with sessions, and a public address."""
     env = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint",
            "OIDC_ALLOWED_EMAILS": "ana@example.com,ben@example.com"}
 
@@ -513,7 +505,7 @@ class ApiTests(RouteCase):
         self.assertEqual((status, added["service"]), (200, "Notifications to push.example.com"))
         self.assertEqual(len(self.call("ana", "GET", "/api/reminders")[1]["devices"]), 1)
         self.assertEqual(self.call("ben", "GET", "/api/reminders")[1]["devices"], [])
-        self.assertEqual(self.call("ben", "DELETE", f"/api/reminders/devices/{added['id']}")[0], 404)   # as one that isn't there
+        self.assertEqual(self.call("ben", "DELETE", f"/api/reminders/devices/{added['id']}")[0], 404)
         self.assertEqual(self.call("ana", "DELETE", "/api/reminders/devices/x")[0], 404)
         self.assertEqual(self.call("ana", "DELETE", f"/api/reminders/devices/{added['id']}"), (200, {"ok": True}))
         self.assertEqual(self.call("ana", "POST", "/api/reminders/devices", {**body, "endpoint": "http://push.example.com/x"})[0], 400)
@@ -536,7 +528,7 @@ class ApiTests(RouteCase):
         self.assertNotEqual(first["url"], second["url"])
         self.assertEqual(self.call("ana", "DELETE", "/api/feed"), (200, {"ok": True}))
         self.assertFalse(self.call("ana", "GET", "/api/reminders")[1]["feed"])
-        self.assertEqual(self.call("ana", "DELETE", "/api/feed"), (200, {"ok": True}))   # already off
+        self.assertEqual(self.call("ana", "DELETE", "/api/feed"), (200, {"ok": True}))
 
     def test_a_lapsed_members_things_end_even_when_someone_else_opens_settings(self):
         self.call("ben", "POST", "/api/feed")
@@ -550,7 +542,6 @@ class ApiTests(RouteCase):
 
 
 class FeedRouteTests(RouteCase):
-    """/feed/<key>.ics: a calendar app can't sign in, so the key in the address does it."""
 
     def setUp(self):
         super().setUp()
@@ -569,7 +560,7 @@ class FeedRouteTests(RouteCase):
         self.assertEqual((status, headers["Content-Type"], headers["Cache-Control"]), (200, "text/calendar; charset=utf-8", "no-store"))
         self.assertIn("DTSTART;TZID=America/New_York:20261120T190000", text)
         self.assertIn("ANAONLY", text)
-        self.assertNotIn("BENONLY", text)   # Ben's own trip isn't in Ana's feed
+        self.assertNotIn("BENONLY", text)
         self.assertIn("BENONLY", "".join(unfolded(fetch(self.base, "GET", self.key("ben"))[2].decode())))
         self.assertEqual(fetch(self.base, "HEAD", self.key())[0], 200)
 
@@ -596,7 +587,7 @@ class FeedRouteTests(RouteCase):
         with mock.patch.dict(os.environ, {"OIDC_ALLOWED_EMAILS": "ben@example.com"}):
             self.assertEqual(fetch(self.base, "GET", path)[0], 404)
         with mock.patch.dict(os.environ, {"OIDC_ALLOWED_EMAILS": "ana@example.com,ben@example.com"}):
-            self.assertEqual(fetch(self.base, "GET", path)[0], 404)   # and it doesn't come back with the access
+            self.assertEqual(fetch(self.base, "GET", path)[0], 404)
 
     def test_the_key_is_not_in_the_log_nor_in_an_error(self):
         path = self.key()
@@ -617,7 +608,6 @@ class FeedRouteTests(RouteCase):
 
 
 class LocalTests(ServerCase):
-    """Without sign-in, on your own machine: the one local household has a feed and sees every trip."""
     unset = ("OIDC_ISSUER", "WAYPOINT_PUBLIC_URL")
 
     def test_the_feed_is_made_at_this_machines_own_address_and_holds_every_trip(self):
@@ -645,7 +635,7 @@ class SignInWithoutAddressTests(ServerCase):
         self.assertEqual(status, 400)
         self.assertIn("WAYPOINT_PUBLIC_URL", got["error"])
         with db.session() as conn:
-            self.assertEqual(conn.execute(select(CalendarFeed.owner_sub)).fetchall(), [])   # nothing was made that couldn't be shown
+            self.assertEqual(conn.execute(select(CalendarFeed.owner_sub)).fetchall(), [])
 
 
 if __name__ == "__main__":

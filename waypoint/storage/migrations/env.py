@@ -1,9 +1,3 @@
-"""Alembic environment for Waypoint.
-
-Waypoint runs its migrations itself on start-up (db.init), handing Alembic an open connection. Run by hand
-(`poetry run alembic upgrade head`, `poetry run alembic revision --autogenerate -m "..."`), it uses DATABASE_URL, or
-the SQLite file in WAYPOINT_DATA.
-"""
 from alembic import context
 from alembic.operations import ops
 
@@ -14,8 +8,6 @@ target_metadata = schema.metadata
 
 
 def same_type(_ctx, _db_col, _model_col, db_type, model_type):
-    """REAL / DOUBLE PRECISION and Float, BIGINT and Integer: the same thing, as far as Waypoint's concerned (older
-    databases were made with the former)."""
     kinds = {"REAL": "float", "FLOAT": "float", "DOUBLE_PRECISION": "float", "DOUBLE": "float",
              "BIGINT": "int", "INTEGER": "int", "TEXT": "text"}
     a, b = kinds.get(type(db_type).__name__.upper()), kinds.get(type(model_type).__name__.upper())
@@ -23,7 +15,6 @@ def same_type(_ctx, _db_col, _model_col, db_type, model_type):
 
 
 def skip_pk_nullability(_ctx, _revision, directives) -> None:
-    """Older SQLite databases report primary-key columns as nullable; that's not a change worth a migration."""
     for script in directives:
         for group in script.upgrade_ops.ops:
             if isinstance(group, ops.ModifyTableOps):
@@ -36,7 +27,7 @@ def skip_pk_nullability(_ctx, _revision, directives) -> None:
 def run(connection) -> None:
     context.configure(connection=connection, target_metadata=target_metadata, compare_type=same_type,
                       process_revision_directives=skip_pk_nullability,
-                      render_as_batch=connection.dialect.name == "sqlite")   # SQLite can't ALTER most things in place
+                      render_as_batch=connection.dialect.name == "sqlite")
     with context.begin_transaction():
         context.run_migrations()
 
@@ -50,7 +41,7 @@ elif context.is_offline_mode():
         context.run_migrations()
 else:
     with db.engine().connect() as connection:
-        if connection.dialect.name == "sqlite":   # as db.migrate does: batch mode's remade tables mustn't cascade
+        if connection.dialect.name == "sqlite":
             connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
             connection.commit()
         run(connection)

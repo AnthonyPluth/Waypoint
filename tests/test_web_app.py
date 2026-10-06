@@ -1,5 +1,3 @@
-"""The web app (frontend/, built into waypoint/static/app/) is Waypoint's page at /: signed in, under the content security
-policy, with a fresh script nonce on its page; its routes and the old /next/ address lead to it."""
 import mimetypes
 import os
 import tempfile
@@ -15,7 +13,6 @@ PAGE = b'<!doctype html><head><script type="module" crossorigin src="/assets/ind
 
 
 def built_app(static: str) -> None:
-    """A stand-in for `npm run build`'s output in `static`/app."""
     os.makedirs(os.path.join(static, "app", "assets"), exist_ok=True)
     with open(os.path.join(static, "app", "index.html"), "wb") as f:
         f.write(PAGE)
@@ -24,7 +21,6 @@ def built_app(static: str) -> None:
 
 
 def serving(static: str):
-    """Serve from `static` (Waypoint's own files) and `static`/app (the built app)."""
     app = os.path.join(static, "app")
     return mock.patch.multiple(server.static, STATIC=static, APP_DIR=app, APP_INDEX=os.path.join(app, "index.html"))
 
@@ -89,12 +85,9 @@ class WebAppTests(ServerCase):
 
 
 class ContentTypeTests(unittest.TestCase):
-    """A file's Content-Type comes from static.CONTENT_TYPES (nothing from the address reaches a header), and is what
-    Python's mimetypes gave for it before, for every file Waypoint ships."""
 
     @staticmethod
     def guessed(path: str) -> str:
-        """What the server sent before: mimetypes' guess, with the three types it added, else octet-stream."""
         for t, ext in (("image/svg+xml", ".svg"), ("font/woff2", ".woff2"), ("application/manifest+json", ".webmanifest")):
             mimetypes.add_type(t, ext)
         return mimetypes.guess_type(path)[0] or "application/octet-stream"

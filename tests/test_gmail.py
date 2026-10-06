@@ -1,6 +1,3 @@
-"""Connecting a Gmail, read-only (waypoint/providers/gmail.py, waypoint/server/api/mailboxes.py), against a fake Google:
-the consent screen's address, the code-for-token trade (with PKCE), the profile, refreshing, revoking, the "Reconnect"
-state, and a connection ending with the person who made it. Google's servers are never called."""
 import hashlib
 import json
 import os
@@ -32,9 +29,6 @@ def b64(b: bytes) -> str:
 
 
 class FakeGoogle(BaseHTTPRequestHandler):
-    """Google's OAuth token and revoke endpoints and Gmail's profile, with what a test needs to steer and to see:
-    `grants` (a code -> what it trades for), `live` (refresh tokens Google honours), `access` (access tokens it honours),
-    `revoked`, `calls` and the failures to give (`refresh_fails`, `revoke_status`)."""
 
     def log_message(self, *a):
         pass
@@ -107,10 +101,9 @@ class Google(HTTPServer):
 
 
 class GoogleCase(ServerCase):
-    """A Waypoint with sign-in on and a Google client set up, two members (Ana and Ben) with sessions, and a fake Google."""
     env = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint", "OIDC_ALLOWED_EMAILS": "ana@example.com,ben@example.com",
            "GOOGLE_CLIENT_ID": CLIENT_ID, "GOOGLE_CLIENT_SECRET": CLIENT_SECRET}
-    fake = FakeGoogle   # the handler of the fake Google (a test of more of Gmail's API gives its own)
+    fake = FakeGoogle
 
     @classmethod
     def setUpClass(cls):
@@ -119,7 +112,7 @@ class GoogleCase(ServerCase):
         cls.google = Google(cls.fake)
         threading.Thread(target=cls.google.serve_forever, daemon=True).start()
         cls.addClassCleanup(cls.google.server_close)
-        cls.addClassCleanup(cls.google.shutdown)   # (runs first)
+        cls.addClassCleanup(cls.google.shutdown)
         patch = mock.patch.object(gmail, "HOSTS", cls.google.hosts())
         patch.start()
         cls.addClassCleanup(patch.stop)
@@ -146,7 +139,6 @@ class GoogleCase(ServerCase):
         return self.req(method, path, body if method != "GET" else None, self.who[who])
 
     def connect(self, who="ana", address="ana@gmail.example", refresh="refresh-token-ana-1", scope=SCOPE, code=None, **grant):
-        """Walk the whole flow: start, consent at (fake) Google, come back. Returns the callback's Location."""
         status, started = self.call(who, "POST", "/api/mailboxes/connect", {})
         self.assertEqual(status, 200, started)
         url = urllib.parse.urlsplit(started["url"])
@@ -183,7 +175,7 @@ class ConnectTests(GoogleCase):
         self.assertEqual(q["redirect_uri"], self.base + "/api/mailboxes/callback")
         self.assertIn("consent", q["prompt"])
         self.assertNotIn("include_granted_scopes", q)
-        with db.session() as conn:   # the state is bound to Ana
+        with db.session() as conn:
             self.assertEqual(conn.execute(select(MailboxPending.owner_sub).where(MailboxPending.state == q["state"])).scalar(), "sub-ana")
 
     def test_connecting_keeps_the_token_encrypted_and_the_address(self):
@@ -194,7 +186,7 @@ class ConnectTests(GoogleCase):
         self.assertTrue(secretbox.is_encrypted(row["token"]))
         self.assertNotIn("canary-refresh-token", row["token"])
         self.assertEqual(secretbox.decrypt(row["token"]), "canary-refresh-token")
-        with db.session() as conn:   # the state was used up
+        with db.session() as conn:
             self.assertEqual(conn.execute(select(MailboxPending.state)).fetchall(), [])
         [m] = self.mailboxes()
         self.assertEqual((m["address"], m["status"], m["last_error"], m["last_scan"]), ("ana@gmail.example", "connected", None, None))
@@ -208,7 +200,7 @@ class ConnectTests(GoogleCase):
         self.assertEqual([m["address"] for m in self.mailboxes("ben")], ["ben@gmail.example"])
         [anas] = self.mailboxes("ana")
         status, body = self.call("ben", "DELETE", f"/api/mailboxes/{anas['id']}")
-        self.assertEqual((status, body["error"]), (404, "Not found"))   # as one that isn't there
+        self.assertEqual((status, body["error"]), (404, "Not found"))
         self.assertEqual(self.google.revoked, [])
         self.assertEqual(len(self.stored()), 2)
 
@@ -216,10 +208,10 @@ class ConnectTests(GoogleCase):
         self.connect("ana", "one@gmail.example", "refresh-one")
         self.connect("ana", "two@gmail.example", "refresh-two")
         self.assertEqual([m["address"] for m in self.mailboxes()], ["one@gmail.example", "two@gmail.example"])
-        with db.session() as conn:   # a scan has got somewhere
+        with db.session() as conn:
             conn.execute(update(Mailbox).where(Mailbox.address == "one@gmail.example").values(history_id="777", status="reconnect",
                                                                                            last_error="Google no longer lets Waypoint read this mailbox."))
-        self.connect("ana", "ONE@gmail.example", "refresh-one-again")   # the same address, however Google spells it
+        self.connect("ana", "ONE@gmail.example", "refresh-one-again")
         rows = {r["address"]: r for r in self.stored()}
         self.assertEqual(sorted(rows), ["one@gmail.example", "two@gmail.example"])
         one = rows["one@gmail.example"]
@@ -230,14 +222,14 @@ class ConnectTests(GoogleCase):
         _, started = self.call("ana", "POST", "/api/mailboxes/connect", {})
         state = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(started["url"]).query))["state"]
         self.google.grants["code-forged"] = {"challenge": "x", "refresh": "r", "scope": SCOPE, "email": "a@gmail.example", "redirect_uri": ""}
-        for who, params in (("ana", {"code": "code-forged", "state": "made-up-state"}),   # a state this Waypoint never made
-                            ("ben", {"code": "code-forged", "state": state}),             # another member's connection
-                            ("ana", {"code": "code-forged"}),                             # no state at all
-                            ("ana", {"state": state})):                                   # no code
+        for who, params in (("ana", {"code": "code-forged", "state": "made-up-state"}),
+                            ("ben", {"code": "code-forged", "state": state}),
+                            ("ana", {"code": "code-forged"}),
+                            ("ana", {"state": state})):
             with self.subTest(who=who, params=sorted(params)):
                 self.assertEqual(self.come_back(who, params), "/?gmail=refused#settings")
         self.assertEqual(self.stored(), [])
-        self.assertEqual([c for c in self.google.calls if c[0] == "/token"], [])   # Google was never asked
+        self.assertEqual([c for c in self.google.calls if c[0] == "/token"], [])
 
     def test_a_connection_can_be_finished_once_and_not_late(self):
         self.connect("ana", "ana@gmail.example", "refresh-ana", code="code-once")
@@ -247,7 +239,7 @@ class ConnectTests(GoogleCase):
         with db.session() as conn:
             conn.execute(update(MailboxPending).values(created=time.time() - gmail.PENDING_TTL - 5))
         self.assertEqual(self.come_back("ana", {"code": "code-again", "state": state}), "/?gmail=refused#settings")
-        self.assertEqual(self.come_back("ana", {"code": "code-again", "state": state}), "/?gmail=refused#settings")   # already used up
+        self.assertEqual(self.come_back("ana", {"code": "code-again", "state": state}), "/?gmail=refused#settings")
 
     def test_a_code_that_was_not_issued_for_this_pkce_challenge_is_refused_by_google(self):
         self.assertEqual(self.connect(challenge="not-the-challenge-for-this-verifier"), "/?gmail=failed#settings")
@@ -264,7 +256,7 @@ class ConnectTests(GoogleCase):
         self.assertEqual(self.connect(refresh="refresh-no-scope", scope="https://www.googleapis.com/auth/userinfo.email"),
                          "/?gmail=scope#settings")
         self.assertEqual(self.stored(), [])
-        self.assertEqual(self.google.revoked, ["refresh-no-scope"])   # and Google was told to forget it
+        self.assertEqual(self.google.revoked, ["refresh-no-scope"])
 
     def test_a_grant_that_isnt_lasting_is_dropped(self):
         self.assertEqual(self.connect(refresh=None), "/?gmail=failed#settings")
@@ -308,13 +300,13 @@ class UseTests(GoogleCase):
         self.assertEqual(self.mailboxes()[0]["status"], "connected")
 
     def test_a_grant_google_no_longer_honours_shows_as_reconnect(self):
-        self.google.live.clear()   # removed at myaccount.google.com/permissions, or expired
+        self.google.live.clear()
         with self.assertRaises(gmail.Reconnect):
             self.token()
         [m] = self.mailboxes()
         self.assertEqual(m["status"], "reconnect")
         self.assertIn("no longer lets Waypoint read", m["last_error"])
-        self.connect("ana", "ana@gmail.example", "refresh-ana-new")   # Reconnect: the same row is repaired
+        self.connect("ana", "ana@gmail.example", "refresh-ana-new")
         [m] = self.mailboxes()
         self.assertEqual((m["status"], m["last_error"]), ("connected", None))
         self.assertEqual(len(self.stored()), 1)
@@ -330,7 +322,7 @@ class UseTests(GoogleCase):
         self.assertEqual(m["last_error"], "Google refused to refresh the connection just now.")
         self.google.refresh_fails = None
         self.token()
-        self.assertEqual(self.mailboxes()[0]["status"], "connected")   # and it clears itself
+        self.assertEqual(self.mailboxes()[0]["status"], "connected")
 
     def test_a_key_that_cant_unlock_the_token_shows_as_reconnect(self):
         with db.session() as conn:
@@ -350,13 +342,13 @@ class UseTests(GoogleCase):
         status, body = self.call("ana", "DELETE", f"/api/mailboxes/{self.row['id']}")
         self.assertEqual(status, 502)
         self.assertIn("still connected", body["error"])
-        self.assertEqual(len(self.stored()), 1)   # not said to be gone while Google still honours it
+        self.assertEqual(len(self.stored()), 1)
         self.google.revoke_status = 200
         self.assertEqual(self.call("ana", "DELETE", f"/api/mailboxes/{self.row['id']}")[0], 200)
         self.assertEqual(self.stored(), [])
 
     def test_a_token_google_already_dropped_is_disconnected_all_the_same(self):
-        self.google.live.clear()   # revoked at Google's side already: it answers 400
+        self.google.live.clear()
         status, body = self.call("ana", "DELETE", f"/api/mailboxes/{self.row['id']}")
         self.assertEqual((status, body["revoked"]), (200, True))
         self.assertEqual(self.stored(), [])
@@ -375,7 +367,6 @@ class UseTests(GoogleCase):
 
 
 class LapseTests(GoogleCase):
-    """Access that outlives the person: a connection ends when its owner can no longer sign in, checked before every use."""
 
     def setUp(self):
         super().setUp()
@@ -395,12 +386,12 @@ class LapseTests(GoogleCase):
                 self.use()
         self.assertEqual(self.stored(), [])
         self.assertEqual(self.google.revoked, ["refresh-ben"])
-        self.assertEqual([c for c in self.google.calls if c[1].get("grant_type") == "refresh_token"], [])   # never used
+        self.assertEqual([c for c in self.google.calls if c[1].get("grant_type") == "refresh_token"], [])
 
     def test_with_groups_it_ends_when_they_last_signed_in_too_long_ago(self):
         groups = {"OIDC_ALLOWED_EMAILS": "", "OIDC_ALLOWED_GROUPS": "household"}
         with mock.patch.dict(os.environ, groups):
-            self.assertTrue(self.use())   # signed in just now
+            self.assertTrue(self.use())
             with db.session() as conn:
                 conn.execute(update(User).where(User.sub == "sub-ben").values(last_seen=time.time() - 15 * 86400))
             with self.assertRaises(gmail.Lapsed):
@@ -411,7 +402,7 @@ class LapseTests(GoogleCase):
         self.connect("ana", "ana@gmail.example", "refresh-ana")
         with mock.patch.dict(os.environ, {"OIDC_ALLOWED_EMAILS": "ana@example.com"}):
             with db.session() as conn:
-                self.assertEqual(gmail.end_lapsed(conn), 1)   # Ben's; Ana may still sign in
+                self.assertEqual(gmail.end_lapsed(conn), 1)
             self.assertEqual([r["owner_sub"] for r in self.stored()], ["sub-ana"])
         self.assertEqual(self.google.revoked, ["refresh-ben"])
         with db.session() as conn:
@@ -429,7 +420,7 @@ class LapseTests(GoogleCase):
             jobs.sweep_lapsed()
         self.assertEqual(self.stored(), [])
         with mock.patch.object(gmail, "end_lapsed", side_effect=RuntimeError("boom")):
-            jobs.sweep_lapsed()   # reported without its text, not raised
+            jobs.sweep_lapsed()
 
     def test_a_lapsed_owners_connection_is_ended_even_if_google_cant_be_told(self):
         self.google.revoke_status = 503
@@ -442,7 +433,7 @@ class LapseTests(GoogleCase):
 class NothingLeaksTests(GoogleCase):
     def test_no_token_or_code_reaches_the_log_or_the_database(self):
         canaries = ("CANARY-CODE-7Q2X", "CANARY-REFRESH-TOKEN-4M8", "CANARY-VERIFIER")
-        with no_leaks(self, *canaries, database=self.path_to_database(), sent_ok=True):   # (what's sent to Google is the point)
+        with no_leaks(self, *canaries, database=self.path_to_database(), sent_ok=True):
             self.assertEqual(self.connect(refresh="CANARY-REFRESH-TOKEN-4M8", code="CANARY-CODE-7Q2X"), "/?gmail=connected#settings")
             [row] = self.stored()
             with db.session() as conn:
@@ -454,7 +445,7 @@ class NothingLeaksTests(GoogleCase):
             self.google.refresh_fails = None
             self.assertEqual(self.connect(refresh="CANARY-REFRESH-TOKEN-4M8", code="CANARY-CODE-7Q2X-B"), "/?gmail=connected#settings")
             self.assertEqual(self.connect(refresh="CANARY-REFRESH-TOKEN-4M8", code="CANARY-CODE-7Q2X-C", challenge="wrong"),
-                             "/?gmail=failed#settings")   # a failure is no more talkative
+                             "/?gmail=failed#settings")
             self.assertEqual(self.call("ana", "DELETE", f"/api/mailboxes/{row['id']}")[0], 200)
         self.assertTrue(access)
 
@@ -480,7 +471,6 @@ class RedirectTests(GoogleCase):
 
 
 class LocalTests(ServerCase):
-    """Without sign-in (on your own machine) everyone is the one local member, and Google comes back to this address."""
     env = {"GOOGLE_CLIENT_ID": CLIENT_ID, "GOOGLE_CLIENT_SECRET": CLIENT_SECRET}
     unset = ("OIDC_ISSUER", "WAYPOINT_PUBLIC_URL")
 
@@ -494,7 +484,6 @@ class LocalTests(ServerCase):
 
 
 class ProviderTests(DbCase):
-    """The provider on its own: what start() keeps, and what finish() says when it isn't given a real connection."""
 
     def setUp(self):
         super().setUp()
@@ -506,7 +495,7 @@ class ProviderTests(DbCase):
         for i in range(3):
             gmail.start(self.c, "sub-a", "https://w.example/api/mailboxes/callback", now=1000.0 + i)
         gmail.start(self.c, "sub-a", "https://w.example/api/mailboxes/callback", now=1000.0 + gmail.PENDING_TTL + 1.5)
-        self.assertEqual(len(self.c.execute(select(MailboxPending.state)).fetchall()), 2)   # the two still within their time
+        self.assertEqual(len(self.c.execute(select(MailboxPending.state)).fetchall()), 2)
         with mock.patch.object(gmail, "MAX_PENDING", 3):
             for i in range(6):
                 gmail.start(self.c, "sub-a", "https://w.example/api/mailboxes/callback", now=5000.0 + i)
@@ -531,7 +520,6 @@ class ProviderTests(DbCase):
 
 
 class StorageTests(DbCase):
-    """The token is a secret like the others: re-encrypted with a new key, encrypted in a backup, and named when it can't be read."""
 
     def add(self, token="refresh-token-1"):
         self.c.execute(insert(Mailbox).values(owner_sub="sub-a", address="a@gmail.example", token=secretbox.encrypt(token),
@@ -546,7 +534,7 @@ class StorageTests(DbCase):
         [row] = data["tables"]["mailboxes"]["rows"]
         self.assertTrue(secretbox.is_encrypted(row[cols.index("token")]))
         self.assertNotIn("canary-refresh-token", json.dumps(data))
-        self.assertNotIn("mailbox_pending", data["tables"])   # a connection still at Google doesn't travel
+        self.assertNotIn("mailbox_pending", data["tables"])
         self.assertEqual(backup.unreadable_secrets(self.c), [])
         self.c.execute(Mailbox.__table__.delete())
         backup.restore(self.c, data)

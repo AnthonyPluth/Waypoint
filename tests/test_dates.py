@@ -1,4 +1,3 @@
-"""Calendar arithmetic (waypoint/dates.py): months of different lengths, leap years, going back, and year ends."""
 import unittest
 from datetime import date
 

@@ -1,15 +1,3 @@
-"""Travel stats: what a person (or the household) has flown, stayed and driven, worked out from the trips the viewer can
-see. `build` is a pure function of the segments, the airports and the airlines it is given; `compute` loads them, only
-through the visibility helper (waypoint/domain/visibility.py), so a viewer's stats never include a trip they can't see
-(AGENTS.md, "You see the trips you're on"): a partner's view of your stats leaves out your solo trips.
-
-What counts: segments that have finished (their end, at their own zone, is not after `now`) and aren't cancelled. A
-calendar year is the segment's own local year (a flight's departure, at the departure airport); a stay's nights and a
-rental's days are counted by their own local dates. A segment with several travellers counts once for the household and
-once for each traveller asked about. Distances are kilometres (the page applies the household's unit). Times in the air
-are the booked departure to the booked arrival, each at its own zone, so a flight across the date line or overnight
-comes out right. An airport that isn't in the table still counts as a flight, an airport visit and a route, but has no
-distance, country or coordinates."""
 from __future__ import annotations
 
 import math
@@ -28,14 +16,11 @@ from . import people, trips, visibility
 from .chains import clean, hotel_chain
 from .visibility import Viewer
 
-EARTH_KM = 40075.0        # around the equator
-MOON_KM = 384400.0        # to the Moon
+EARTH_KM = 40075.0
+MOON_KM = 384400.0
 EARTH_RADIUS_KM = 6371.0088
 FLIGHT_NUMBER = re.compile(r"\s*([A-Za-z0-9]{2})\s*\d{1,4}[A-Za-z]?\s*")
 SEAT = re.compile(r"\s*\d{1,3}\s*([A-Za-z])\s*")
-# The seats a letter places on the common single-aisle (A–F) and wide-body (A–K) layouts: A and the last letter of the row
-# are by the window, the letters beside an aisle are aisle seats, the rest middle. A letter that isn't in a layout this
-# rule knows (a digit-only seat, an I, anything past K) is "unknown".
 SEAT_POSITIONS: dict[str, Literal["window", "aisle", "middle"]] = {
     "A": "window", "B": "middle", "C": "aisle", "D": "aisle", "E": "middle", "F": "window",
     "G": "aisle", "H": "aisle", "J": "middle", "K": "window"}
@@ -44,7 +29,6 @@ SeatPosition = Literal["window", "aisle", "middle", "unknown"]
 
 @dataclass(frozen=True)
 class Seg:
-    """A segment as the stats read it (nothing of who is on it: `compute` picks the segments)."""
     kind: str
     start_local: str
     start_zone: str
@@ -54,9 +38,9 @@ class Seg:
     destination: str | None
     provider: str | None
     details: Mapping[str, str] = field(default_factory=dict)
-    ports: Sequence[trips.PortIn] = ()   # a cruise's ports of call
-    seats: Sequence[str] = ()            # the seats of the travellers counted (a person's own; the household's, every traveller's), as typed
-    trip_id: int | None = None           # the trip it is on, for the map's details
+    ports: Sequence[trips.PortIn] = ()
+    seats: Sequence[str] = ()
+    trip_id: int | None = None
 
 
 class Named(TypedDict):
@@ -65,37 +49,36 @@ class Named(TypedDict):
 
 
 class Place(TypedDict):
-    name: str                  # a country's ISO code or a city's name
-    first_visit: str           # the local date, YYYY-MM-DD
+    name: str
+    first_visit: str
     visits: int
 
 
 class MapTrip(TypedDict):
-    """A trip a place or a route on the map belongs to, and when: a flight's departure and arrival dates, a stay's check-in and check-out dates."""
     trip_id: int
     name: str
-    start: str                 # the local date, YYYY-MM-DD
+    start: str
     end: str
 
 
 class AirportVisit(TypedDict):
     code: str
-    name: str                  # the airport's name; the code when it isn't in the table
+    name: str
     city: str | None
     country: str | None
-    visits: int                # the times there: its arrivals or its departures, whichever are more (a round trip is one visit to each end)
+    visits: int
     latitude: float | None
     longitude: float | None
 
 
 class AirlineCount(TypedDict):
-    code: str | None           # the IATA code in the flight number, when there is one
-    name: str                  # the airline's name; the code for one that isn't in the table; the booking's provider without a number
+    code: str | None
+    name: str
     flights: int
 
 
 class RouteCount(TypedDict):
-    a: str                     # A–B and B–A are one route: the lower code first
+    a: str
     b: str
     flights: int
     distance_km: float | None
@@ -103,7 +86,7 @@ class RouteCount(TypedDict):
     a_longitude: float | None
     b_latitude: float | None
     b_longitude: float | None
-    trips: list[MapTrip]       # each flight on it, earliest first
+    trips: list[MapTrip]
 
 
 class FlightRecord(TypedDict):
@@ -135,72 +118,70 @@ class FlightStats(TypedDict):
     longest: FlightRecord | None
     shortest: FlightRecord | None
     most_visited_airport: str | None
-    busiest_month: str | None  # YYYY-MM, the month with the most departures
+    busiest_month: str | None
     times_around_earth: float
     moon_fraction: float
 
 
 class StayPlace(TypedDict):
-    name: str                  # a hotel's name or a city, as first written
+    name: str
     stays: int
-    nights: int                # the nights spent there, each stay's own (overlapping stays each count theirs)
+    nights: int
 
 
 class StayRecord(TypedDict):
     hotel: str | None
     city: str | None
     nights: int
-    start_local: str           # the local date and time of check-in
+    start_local: str
 
 
 class StayPin(TypedDict):
-    """Where stays were, for the map: a city placed at the position of the airports Waypoint knows in a city of that name (nothing is
-    looked up from the address), so the pin is roughly the city, not the hotel."""
     city: str
-    country: str | None        # an ISO code
+    country: str | None
     latitude: float
     longitude: float
     stays: int
     nights: int
-    trips: list[MapTrip]       # each stay, earliest first
+    trips: list[MapTrip]
 
 
 class StayStats(TypedDict):
-    nights: int                # nights away in hotels, each night once however many stays overlap it
-    chains: list[Named]        # stays by the hotel's brand (domain/chains.py), else the booking's provider
+    nights: int
+    chains: list[Named]
     cities: list[Named]
     countries: list[Named]
-    count: int                 # stays with at least one night (in the year asked about)
-    average_nights: float      # nights per such stay, to a tenth
-    hotels: list[StayPlace]    # by nights, then stays, then name
+    count: int
+    average_nights: float
+    hotels: list[StayPlace]
     cities_by_nights: list[StayPlace]
     longest: StayRecord | None
-    most_visited_hotel: StayPlace | None   # most stays, then most nights
+    most_visited_hotel: StayPlace | None
     most_visited_city: StayPlace | None
-    busiest_month: str | None  # YYYY-MM, the month with the most nights away
-    pins: list[StayPin]        # the cities stayed in that have a place on the map, most nights first
+    busiest_month: str | None
+    pins: list[StayPin]
 
 
 class CarStats(TypedDict):
-    days: int                  # days with a rental car out, each day once
+    days: int
     companies: list[Named]
 
 
 class CruiseStats(TypedDict):
     count: int
-    nights: int                # nights aboard, each night once however many cruises overlap it
-    sea_days: int              # dates strictly between embarking and disembarking with no port of call that day, each once
-    ports: int                 # different ports of call (by name)
-    lines: list[Named]         # cruises by the booking's provider
+    nights: int
+    sea_days: int
+    ports: int
+    lines: list[Named]
 
 
 class PlaceStats(TypedDict):
-    countries: list[Place]     # flights' and hotels' together, earliest first
+    countries: list[Place]
     cities: list[Place]
 
 
 class Stats(TypedDict):
-    years: list[int]           # the years with something finished, newest first, whatever year was asked about
+    years: list[int]
     flights: FlightStats
     stays: StayStats
     cars: CarStats
@@ -209,7 +190,6 @@ class Stats(TypedDict):
 
 
 def distance_km(a: tuple[float, float], b: tuple[float, float]) -> float:
-    """The great-circle distance between two (latitude, longitude) points."""
     (la1, lo1), (la2, lo2) = ((math.radians(x), math.radians(y)) for x, y in (a, b))
     h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2
     return 2 * EARTH_RADIUS_KM * math.asin(min(1.0, math.sqrt(h)))
@@ -229,13 +209,11 @@ def _finished(s: Seg, now: datetime) -> bool:
 
 
 def _days(s: Seg) -> list[date]:
-    """The local dates a stay or rental touches, first to last."""
     first, last = date.fromisoformat(s.start_local[:10]), date.fromisoformat(s.end_local[:10])
     return [first + timedelta(days=i) for i in range((last - first).days + 1)]
 
 
 def _nights(s: Seg) -> set[date]:
-    """The nights of a stay: each local date from check-in up to, not including, check-out."""
     first, last = date.fromisoformat(s.start_local[:10]), date.fromisoformat(s.end_local[:10])
     return {first + timedelta(days=i) for i in range((last - first).days)}
 
@@ -254,9 +232,6 @@ CABIN_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 
 def cabin_group(cabin: str) -> str:
-    """The cabin a fare name or a cabin as an email wrote it belongs to: First, Business, Premium Economy or Economy
-    ("Main Basic", "Tango Plus" and "Wanna Get Away" are fares in economy), by the words in it. A name that holds none of the
-    words stays as written, so an unfamiliar one still shows."""
     low = cabin.casefold()
     for group, words in CABIN_GROUPS:
         if any(re.search(rf"(?<![a-z0-9]){re.escape(w)}(?![a-z0-9])", low) for w in words):
@@ -321,7 +296,6 @@ def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Map
         cabin = (s.details.get("cabin") or "").strip()
         if cabin:
             cabins[cabin_group(cabin)] += 1
-        # Each counted traveller's own seat; a booking with none of theirs has its booking seat, once.
         own = [t for t in (re.sub(r"\s+", "", x).upper() for x in s.seats) if t]
         booking = re.sub(r"\s+", "", s.details.get("seat") or "").upper()
         for seat in own or ([booking] if booking else [""]):
@@ -359,7 +333,6 @@ def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Map
 
 
 def _map_trip(s: Seg, trip_names: Mapping[int, str]) -> MapTrip | None:
-    """The trip a segment is on, with its own dates, or None when it has none (or one the viewer can't see)."""
     if s.trip_id is None or s.trip_id not in trip_names:
         return None
     return {"trip_id": s.trip_id, "name": trip_names[s.trip_id], "start": s.start_local[:10], "end": s.end_local[:10]}
@@ -416,8 +389,6 @@ def _most_visited(places: Sequence[StayPlace]) -> StayPlace | None:
 
 
 def _stay_figures(stays: Sequence[Seg], year: int | None) -> dict[str, object]:
-    """What the stats say of the stays that have a night (in the year): how many, the average, the hotels and cities by nights,
-    the longest, and the busiest month. Hotels and cities are matched by name without case or extra spaces."""
     hotels: dict[str, list[int]] = {}
     cities: dict[str, list[int]] = {}
     hotel_names: dict[str, str] = {}
@@ -460,7 +431,6 @@ def _cars(cars: Sequence[Seg], year: int | None) -> CarStats:
 
 
 def _port_days(port: trips.PortIn) -> set[date]:
-    """The local dates the ship is at a port: from its arrival's date to its departure's (either alone is one day)."""
     days = [date.fromisoformat(t[:10]) for t in (port["arrive_local"], port["depart_local"]) if t]
     return {days[0] + timedelta(days=i) for i in range((max(days) - min(days)).days + 1)} if days else set()
 
@@ -531,7 +501,6 @@ def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Ai
 
 
 def _years(live: Sequence[Seg]) -> list[int]:
-    """The years that have something to count: a flight's departure year, the years a stay's nights or a rental's days fall in."""
     found: set[int] = set()
     for s in live:
         if s.kind == "flight":
@@ -548,8 +517,6 @@ def _years(live: Sequence[Seg]) -> list[int]:
 def build(segments: Iterable[Seg], known: Mapping[str, Airport], airlines: Mapping[str, str],
           city_countries: Mapping[str, str], *, now: datetime, year: int | None = None,
           city_points: Mapping[str, tuple[float, float]] | None = None, trip_names: Mapping[int, str] | None = None) -> Stats:
-    """The stats of these segments: the finished, uncancelled ones (`segments` already holds only what the person wanted
-    counted), in `year` (a calendar year at the places themselves) or for ever. `now` is an aware moment."""
     city_points, trip_names = city_points or {}, trip_names or {}
     live = [s for s in segments if _finished(s, now)]
     flights = [s for s in live if s.kind == "flight" and (year is None or int(s.start_local[:4]) == year)]
@@ -563,7 +530,6 @@ def build(segments: Iterable[Seg], known: Mapping[str, Airport], airlines: Mappi
 
 
 def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: int | None, now: datetime) -> Stats | None:
-    """The stats of `person_id` (None: the whole household) over what `viewer` can see. None when there is no such person."""
     if person_id is not None and people.get(conn, person_id) is None:
         return None
     segments = [s for s in visibility.visible_segments(conn, viewer) if s.status != "cancelled"]
@@ -589,7 +555,6 @@ def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: in
 
 
 def _points_of(conn: db.Connection, countries: Mapping[str, str]) -> dict[str, tuple[float, float]]:
-    """Where each of these cities (lower case, with the country `_countries_of` settled) is: the middle of its airports there."""
     if not countries:
         return {}
     found: dict[str, list[tuple[float, float]]] = {}
@@ -601,8 +566,6 @@ def _points_of(conn: db.Connection, countries: Mapping[str, str]) -> dict[str, t
 
 
 def _countries_of(conn: db.Connection, cities: set[str]) -> dict[str, str]:
-    """The country of each of these cities (lower case): the one with the most airports in a city of that name (London is
-    the United Kingdom's, not Ontario's), none when two tie."""
     if not cities:
         return {}
     found: dict[str, Counter[str]] = {}

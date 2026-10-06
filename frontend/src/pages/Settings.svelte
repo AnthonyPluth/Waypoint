@@ -22,16 +22,11 @@
   const flights = $derived(flightStatus.list);
   onMount(loadFlightStatus);
 
-  // The page's groups, as tabs kept in the address (#settings/mail): what you'd look for together. Coming back from Google
-  // (?gmail=…) lands on the mail tab, where the answer is shown.
   const TABS = [["account", "Account"], ["mail", "Mail and AI"], ["travel", "Travel"], ["data", "Data"]] as const;
   type Tab = (typeof TABS)[number][0];
-  // Read once at start: the OAuth return lands here with ?gmail=, which GmailSection clears on mount. A later bare
-  // `#settings` falls back to Account, which is fine.
   const landing: Tab | "" = new URLSearchParams(location.search).has("gmail") ? "mail" : "";
   const tab = $derived<Tab>((TABS.find(([id]) => id === route.sub)?.[0]) ?? (landing || "account"));
 
-  // The server ends the session and says where to go next (the sign-in provider's own sign-out page, or Waypoint's).
   const signOut = () => act(async () => {
     const r = await api<{ redirect: string }>("/auth/logout", { method: "POST" });
     location.href = r.redirect;

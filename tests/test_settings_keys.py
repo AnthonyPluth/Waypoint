@@ -1,5 +1,3 @@
-"""Settings keys are named once, in waypoint/storage/settings_keys.py: a key typed out at a call site could be misspelled, and a
-misspelled key reads as never set rather than failing."""
 import ast
 import os
 import re
@@ -12,7 +10,6 @@ SQL_KEY = re.compile(r"\bsettings\b.*\bkey\s*(=|LIKE|IN)\s*\(?\s*'", re.I | re.S
 
 
 def sources():
-    """waypoint/**/*.py, parsed. Migrations are left out: they're history, and use the names of their day."""
     for root, dirs, files in os.walk(WAYPOINT):
         dirs[:] = sorted(d for d in dirs if d not in ("migrations", "static", "__pycache__"))
         for name in sorted(files):
@@ -25,7 +22,6 @@ def sources():
 
 
 def literal(node) -> bool:
-    """A string written out in the code: "x", f"x{y}" or "x" + y."""
     if isinstance(node, ast.Constant):
         return isinstance(node.value, str)
     if isinstance(node, ast.JoinedStr):

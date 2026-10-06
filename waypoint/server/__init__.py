@@ -1,11 +1,3 @@
-"""Waypoint's web server: the JSON API and the web app's files. Standard library only.
-
-handler.py serves requests (who may reach what, security headers, limits, reading bodies, sending answers) and has
-serve(); routes.py maps each API path to its handler in api/, one module per area, and answers it (dispatch); static.py
-sends the web app's files; common.py holds what they share. The names below are re-exported so
-`from waypoint import server; server.serve()` and the tests keep working. They are references, not the state itself: to
-change or patch a module's setting (static.STATIC, ...), do it on the module that owns it.
-"""
 # ruff: noqa: F401
 from __future__ import annotations
 

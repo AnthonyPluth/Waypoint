@@ -1,5 +1,3 @@
-/* The few pages Waypoint's server draws itself (signing in, signed out, errors), in the web app's look: a cool light theme by day,
-   near black by night, following the device. The tokens match frontend/src/app.css. */
 @font-face { font-family: "Geist"; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 :root { color-scheme: light dark; --bg: #f2f4f8; --fg: #0e1320; --card: #ffffff; --muted: #586175; --border: #e0e5ee; --primary: #0a63d8;
   --primary-fg: #ffffff; --primary-hover: #0852b3; --hover: rgba(14, 19, 32, 0.06); --shadow: 0 1px 2px rgba(14, 19, 32, 0.05), 0 12px 32px -16px rgba(14, 19, 32, 0.16); }
@@ -19,7 +17,6 @@ button.btn { border: 1px solid var(--border); background: transparent; color: in
 .btn.primary { background: var(--primary); color: var(--primary-fg); }
 .btn.primary:hover { background: var(--primary-hover); }
 :focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
-/* The consent page for connecting an assistant (/oauth/authorize). */
 .choice { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0; padding: 12px; border: 1px solid var(--border);
   border-radius: 12px; font-size: 14px; }
 .choice input { margin-top: 3px; width: 16px; height: 16px; }

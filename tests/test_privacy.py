@@ -1,5 +1,3 @@
-"""tests/privacy.py's no_leaks: it catches a canary wherever Waypoint could let one out, and passes when nothing
-escapes (an encrypted value included)."""
 import io
 import logging
 import unittest
@@ -20,7 +18,6 @@ class NoLeaksTests(unittest.TestCase):
         self.path = own_database(self)
 
     def leaks(self, block):
-        """no_leaks' failure message for `block`, or None when it passes."""
         try:
             with no_leaks(self, CANARY, database=self.path):
                 block()
@@ -32,7 +29,7 @@ class NoLeaksTests(unittest.TestCase):
         def quiet():
             monitoring.log("Scanned the mailbox.")
             with db.session() as conn:
-                db.set_setting(conn, sk.VAPID_PRIVATE_KEY, CANARY)   # a secret: stored encrypted
+                db.set_setting(conn, sk.VAPID_PRIVATE_KEY, CANARY)
         self.assertIsNone(self.leaks(quiet))
 
     def test_the_log(self):
@@ -48,13 +45,13 @@ class NoLeaksTests(unittest.TestCase):
             self.assertIn("what was sent to another service", self.leaks(send))
             self.assertIn("what was sent to another service",
                           self.leaks(lambda: tls.urlopen(f"https://api.example.invalid/x?q={CANARY}", 1)))
-            with no_leaks(self, CANARY, sent_ok=True):   # the one opt-in path checks its own request
+            with no_leaks(self, CANARY, sent_ok=True):
                 send()
 
     def test_the_database(self):
         def store():
             with db.session() as conn:
-                db.set_setting(conn, sk.LAST_BACKUP, CANARY)   # not a secret: stored as it is
+                db.set_setting(conn, sk.LAST_BACKUP, CANARY)
         self.assertIn(f"{CANARY} in settings.value", self.leaks(store))
 
     def test_canaries_must_be_distinctive(self):

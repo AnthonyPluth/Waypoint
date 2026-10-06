@@ -1,8 +1,3 @@
-"""The first schema: who has signed in (users), their browser sessions and sign-ins in progress, and settings.
-
-Revision ID: 0001
-Revises:
-"""
 import sqlalchemy as sa
 from alembic import op
 

@@ -3,7 +3,6 @@ import { bookingCards, clock, dayIn, featuredTrip, flightKey, headline, instant,
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
-// 2026-11-20 12:00 in New York is 17:00 UTC (EST).
 const at = (local: string, zone: string) => instant(local, zone);
 
 describe("instant", () => {
@@ -18,14 +17,11 @@ describe("instant", () => {
 
 describe("local times across zones", () => {
   it("shows the place's own time, and yours in brackets only when your offset then differs", () => {
-    // An 7:00 PM departure from New York, read by someone in Los Angeles: 4:00 PM for them.
     expect(placeTime("2026-11-20T19:00", NY, LA)).toEqual({ text: "7:00 PM", yours: "4:00 PM PST" });
     expect(placeTime("2026-11-20T19:00", NY, NY)).toEqual({ text: "7:00 PM", yours: null });
-    // A zone with the same offset then is the same time: nothing in brackets.
     expect(placeTime("2026-11-20T19:00", NY, "America/Toronto").yours).toBeNull();
   });
   it("says which day it is for you when that isn't the place's day", () => {
-    // 7:10 AM in London on the 21st is 11:10 PM on the 20th in Los Angeles.
     expect(placeTime("2026-11-21T07:10", LON, LA)).toEqual({ text: "7:10 AM", yours: "Nov 20, 11:10 PM PST" });
   });
   it("never converts the place's time to the viewer's or the server's", () => {
@@ -55,7 +51,6 @@ describe("until", () => {
   });
 });
 
-// Flight out 19:00 on the 20th from New York, arriving 07:10 on the 21st in London; a hotel from the 21st to the 27th.
 const out = segment({ id: 1 });
 const stay = segment({ id: 2, kind: "hotel", provider: "Marriott", origin: "Harbour Hotel", destination: null, start_local: "2026-11-21T15:00", start_zone: LON, end_local: "2026-11-27T10:00", end_zone: LON, details: { address: "1 Quay Street, London" } });
 const back = segment({ id: 3, origin: "LHR", destination: "JFK", start_local: "2026-11-27T11:30", start_zone: LON, end_local: "2026-11-27T14:35", end_zone: NY });
@@ -67,7 +62,7 @@ describe("nextUp", () => {
     expect(nextUp([london], now)).toMatchObject({ state: "next", segment: { id: 1 } });
   });
   it("leads with a flight under way (in progress) over what comes later", () => {
-    const now = at("2026-11-21T02:00", NY);   // in the air
+    const now = at("2026-11-21T02:00", NY);
     expect(nextUp([london], now)).toMatchObject({ state: "now", segment: { id: 1 } });
   });
   it("never leads with a flight that has no times: there's nothing to count down to", () => {
@@ -147,7 +142,6 @@ describe("loyalty on a booking", () => {
     expect(programFor(segment({ provider: "Example Air" }))).toBeNull();
     expect(programFor(segment({ provider: null }))).toBeNull();
     expect(programFor(segment({ kind: "train", provider: "Amtrak" }))).toBeNull();
-    // Only a booking of that kind, and only the whole word: a hotel isn't an airline or a car company.
     expect(programFor(segment({ kind: "hotel", provider: "International Inn" }))).toBeNull();
     expect(programFor(segment({ kind: "hotel", provider: "United Suites" }))).toBeNull();
     expect(programFor(segment({ kind: "car", provider: "National Car Rental" }))).toBe("National Emerald Club");
@@ -165,14 +159,14 @@ describe("loyalty on a booking", () => {
     const mia = { id: 3, person_id: null, name: "DOE/MIA MISS", seat: null };
     const room = segment({ kind: "hotel", provider: "Marriott", booked_by: 1 });
     const bonvoy = membership({ program: "Marriott Bonvoy" });
-    expect(membershipFor(room, jane, [])).toEqual({ state: "none", program: "Marriott Bonvoy" });   // (the one who booked it)
+    expect(membershipFor(room, jane, [])).toEqual({ state: "none", program: "Marriott Bonvoy" });
     expect(membershipFor(room, jane, [bonvoy])).toEqual({ state: "found", entry: bonvoy });
-    expect(membershipFor(room, sam, [])).toBeNull();   // (no need to say Sam has none)
-    expect(membershipFor(room, mia, [bonvoy])).toBeNull();   // (nor that a printed name isn't matched)
+    expect(membershipFor(room, sam, [])).toBeNull();
+    expect(membershipFor(room, mia, [bonvoy])).toBeNull();
     const hers = membership({ id: 12, person_id: 2, program: "Marriott Bonvoy" });
-    expect(membershipFor(room, sam, [bonvoy, hers])).toEqual({ state: "found", entry: hers });   // (a number someone has is still shown)
-    expect(membershipFor({ ...room, booked_by: null }, jane, [])).toBeNull();   // (nobody booked it that Waypoint knows)
-    expect(membershipFor(segment({ provider: "American Airlines", booked_by: 1 }), sam, [])).toEqual({ state: "none", program: "American AAdvantage" });   // (a flight: everyone)
+    expect(membershipFor(room, sam, [bonvoy, hers])).toEqual({ state: "found", entry: hers });
+    expect(membershipFor({ ...room, booked_by: null }, jane, [])).toBeNull();
+    expect(membershipFor(segment({ provider: "American Airlines", booked_by: 1 }), sam, [])).toEqual({ state: "none", program: "American AAdvantage" });
     expect(membershipFor(segment({ provider: "American Airlines", booked_by: 1 }), mia, [])).toEqual({ state: "unmatched" });
   });
 });
@@ -190,7 +184,6 @@ describe("flightKey", () => {
 });
 
 describe("bookingCards", () => {
-  // The same flight on two reservations: each keeps its own segment (its code, travellers, edits), the card is one.
   const mine = segment({ id: 1, confirmation: "AAAAAA", details: { flight_number: "AA 101" } });
   const theirs = segment({ id: 2, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 5, person_id: 2, name: "Sam Doe", seat: null }] });
 
@@ -265,7 +258,7 @@ describe("the order of a day's items", () => {
   const last = (segments: Parameters<typeof trip>[0]) => tripDays(trip(segments)).at(-1)!.items.map((i) => `${i.segment.id}:${i.role}`);
 
   it("puts the check-out before the car's return and the car's return before the flight, whatever the times say", () => {
-    expect(last([hotel, car, flight])).toEqual(["1:end", "2:end", "3:start"]);   // (11:00, 08:00 and 09:30 as they show)
+    expect(last([hotel, car, flight])).toEqual(["1:end", "2:end", "3:start"]);
   });
   it("keeps each item's own time, only changing where it sits", () => {
     const items = tripDays(trip([hotel, car, flight])).at(-1)!.items;

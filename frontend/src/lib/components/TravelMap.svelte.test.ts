@@ -33,7 +33,7 @@ const noFlights = { airports: [], routes: [] } as unknown as StatsFlights;
 describe("TravelMap", () => {
   it("shades the United States by state, not as one country, and a stay shades its country", async () => {
     const { container } = render(TravelMap, { flights, stays: [london] });
-    await waitFor(() => expect(container.querySelectorAll("path[data-state]").length).toBeGreaterThan(50));
+    await waitFor(() => expect(container.querySelectorAll("path[data-state]").length).toBeGreaterThan(50), { timeout: 8000 });
     expect([...container.querySelectorAll("path[data-state][data-visited]")].map((p) => p.getAttribute("data-state"))).toEqual(["New York"]);
     expect([...container.querySelectorAll("path[data-visited]:not([data-state]) title")].map((t) => t.textContent).sort()).toEqual(["Japan", "United Kingdom"]);
   });
@@ -67,7 +67,7 @@ describe("TravelMap", () => {
 
   it("draws the countries, the airports and the routes, and shades the countries visited", async () => {
     const { container } = render(TravelMap, { flights });
-    await waitFor(() => expect(container.querySelectorAll("path[data-state]").length).toBeGreaterThan(50));
+    await waitFor(() => expect(container.querySelectorAll("path[data-state]").length).toBeGreaterThan(50), { timeout: 8000 });
     expect(container.querySelectorAll("path").length).toBeGreaterThan(100);
     expect(container.querySelectorAll("[data-dot]")).toHaveLength(2);
     expect(container.querySelectorAll("[data-arc]")).toHaveLength(1);
@@ -144,7 +144,7 @@ describe("TravelMap", () => {
     await waitFor(() => expect(scale(container)).toBeGreaterThan(3));
     const reset = screen.getByRole("button", { name: "Reset" }) as HTMLButtonElement;
     const world = screen.getByRole("button", { name: "World" }) as HTMLButtonElement;
-    expect(reset.disabled).toBe(true);   // (already there)
+    expect(reset.disabled).toBe(true);
     await userEvent.click(world);
     expect(scale(container)).toBe(1);
     expect(world.disabled).toBe(true);

@@ -1,5 +1,3 @@
-"""Loyalty and Known Traveler numbers (People page): listed masked for every signed-in member, saved, changed and removed
-by any member; a number is revealed by its own request, one at a time."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -19,7 +17,6 @@ DUPLICATE = "They already have a membership in that program. Edit that one inste
 
 
 def fields(body: Mapping[str, Any], *, need_number: bool) -> loyalty.Fields:
-    """What a request names, checked. Nothing here quotes a value back: a refusal says which field, never what was in it."""
     for key in ("kind", "program", "number", "expiry", "notes"):
         if body.get(key) is not None and not isinstance(body[key], str):
             raise ApiError(f'Send "{key}" as text')
@@ -42,14 +39,12 @@ def fields(body: Mapping[str, Any], *, need_number: bool) -> loyalty.Fields:
 
 
 def api_loyalty(conn, _q, _b) -> LoyaltyList:
-    """Every membership with its number masked, and the programs to choose from for each kind."""
     return {"loyalty": [LoyaltyEntry(**e) for e in loyalty.everyone(conn)],
             "conflicts": [LoyaltyConflict(**c) for c in loyalty.conflicts(conn)],
             "programs": {k: list(p) for k, p in loyalty.PROGRAMS.items()}}
 
 
 def api_loyalty_add(conn, _q, body: LoyaltyBody) -> LoyaltyEntry:
-    """Save a membership for a member or a guest."""
     try:
         return LoyaltyEntry(**loyalty.add(conn, fields(body, need_number=True)))
     except loyalty.NoSuchPerson:
@@ -59,7 +54,6 @@ def api_loyalty_add(conn, _q, body: LoyaltyBody) -> LoyaltyEntry:
 
 
 def api_loyalty_edit(conn, _q, body: LoyaltyBody, loyalty_id) -> LoyaltyEntry:
-    """Change a membership. Leave the number out to keep the one saved."""
     try:
         found = loyalty.edit(conn, row_id(loyalty_id, NO_SUCH), fields(body, need_number=False))
     except loyalty.NoSuchPerson:
@@ -78,7 +72,6 @@ def api_loyalty_remove(conn, _q, _b, loyalty_id) -> Ok:
 
 
 def api_loyalty_reveal(conn, _q, _b, loyalty_id) -> Revealed:
-    """One membership's number, in the clear (a request of its own, so a page load never carries the numbers)."""
     try:
         number = loyalty.reveal(conn, row_id(loyalty_id, NO_SUCH))
     except loyalty.Unreadable:

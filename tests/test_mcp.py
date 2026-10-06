@@ -1,8 +1,3 @@
-"""The MCP server's promises, against a real Waypoint with sign-in on and two members: an assistant sees exactly what its
-approver sees (visibility, by every tool and by call_endpoint), no loyalty number reaches an assistant, by any
-tool or route (with canary numbers over every tool's output), changes need "write" and its switch, and nothing BLOCKED is
-reachable. OAuth itself is tested in tests/test_mcp_oauth.py and tests/test_mcp_oauth_http.py, the protocol in
-tests/test_mcp_protocol.py and the route list in tests/test_mcp_routes.py. Names, codes and numbers are made up."""
 import base64
 import hashlib
 import json
@@ -23,7 +18,7 @@ from waypoint.storage.models import OAuthGrant, Segment, Trip
 
 VERIFIER = "v" * 50
 CALLBACK = "http://127.0.0.1:1/cb"
-JANE_NUMBER = "CANARY-JANE-48271936"     # made-up numbers, long enough that they can't match by chance
+JANE_NUMBER = "CANARY-JANE-48271936"
 SAM_NUMBER = "CANARY-SAM-90417253"
 READ = ("read",)
 WRITE = ("read", "write")
@@ -39,9 +34,6 @@ def person(name: str) -> dict:
 
 
 class Assistants(ServerCase):
-    """A real Waypoint with sign-in on and two members: Jane (with a London trip and a loyalty number) and Sam (with a Rome
-    trip and a number). Nothing else writes to this database, but each test removes the grants it made and turns the switches
-    off, so the tests don't depend on each other's order."""
     env = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint",
            "OIDC_ALLOWED_EMAILS": "jane@example.com,sam@example.com"}
     unset = ("WAYPOINT_PUBLIC_URL",)
@@ -74,12 +66,12 @@ class Assistants(ServerCase):
         return {"id": seg["trip_id"], "segment": seg["id"]}
 
     def setUp(self):
-        self.path = os.path.join(os.environ["WAYPOINT_DATA"], "waypoint.db")   # (own_database's)
+        self.path = os.path.join(os.environ["WAYPOINT_DATA"], "waypoint.db")
         self.addCleanup(self.forget)
 
     def forget(self):
         with db.session() as conn:
-            conn.execute(delete(OAuthGrant))   # (cascades to their codes and tokens)
+            conn.execute(delete(OAuthGrant))
             mcp_access.set_allow_writes(conn, False)
 
     def switch(self, writes: bool):
@@ -87,11 +79,9 @@ class Assistants(ServerCase):
             mcp_access.set_allow_writes(conn, writes)
 
     def access(self, scopes=READ, sub="u-jane") -> mcp_access.Access:
-        """What a connection approved by `sub` for `scopes` may do, as mcp_http.local_fetch is given it."""
         return mcp_access.Access(frozenset(scopes), None, sub, f"{sub[2:]}@example.com")
 
     def make_token(self, *scopes, sub="u-jane", name="Claude") -> str:
-        """An access token for this Waypoint's /mcp, as if an assistant had connected and `sub` had approved `scopes`."""
         with db.session() as conn:
             c = mcp_oauth.register(conn, {"client_name": name, "redirect_uris": [CALLBACK]})
             challenge = base64.urlsafe_b64encode(hashlib.sha256(VERIFIER.encode()).digest()).rstrip(b"=").decode()
@@ -103,7 +93,6 @@ class Assistants(ServerCase):
         return out["access_token"]
 
     def tool(self, scopes, name, args=None, sub="u-jane"):
-        """A tool's result (parsed), or the ToolError's text, as the assistant sees it."""
         fetch = mcp_http.fetch_for(self.access(scopes, sub))
         try:
             return json.loads(mcp_server.call_tool(name, args or {}, fetch))
@@ -117,7 +106,6 @@ class Assistants(ServerCase):
 
 
 class PagesTests(Assistants):
-    """What mcp_http.local_fetch (the tools' way into Waypoint) reaches, as an assistant."""
 
     def test_reads_the_listed_pages_as_the_approver(self):
         for path in ("trips", "people", "stats", "distance-unit", "flight-status"):
@@ -155,8 +143,6 @@ class PagesTests(Assistants):
 
 
 class VisibilityTests(Assistants):
-    """"You see the trips you're on": an assistant approved by Jane can't read or change a trip only Sam is on, by any tool or
-    by call_endpoint, with every scope and switch on."""
 
     def setUp(self):
         super().setUp()
@@ -176,12 +162,12 @@ class VisibilityTests(Assistants):
                 self.assertNotIn("SAMROM", text)
                 self.assertNotIn("Rome", text)
                 self.assertNotIn("FCO", text)
-        self.assertIn("ZQ4PXD", json.dumps(self.tool(ALL, "upcoming", {"days": 365})))   # (her own does show)
+        self.assertIn("ZQ4PXD", json.dumps(self.tool(ALL, "upcoming", {"days": 365})))
 
     def test_get_trip_for_sams_trip_is_not_found(self):
         self.assertEqual(self.refused(ALL, "get_trip", {"trip_id": self.sam_trip["id"]}), "No such trip")
         absent = self.refused(ALL, "get_trip", {"trip_id": 987654})
-        self.assertEqual(absent, "No such trip")           # the same as one that doesn't exist
+        self.assertEqual(absent, "No such trip")
 
     def test_call_endpoint_cant_read_sams_trip_or_segment(self):
         for path in (f"/api/trips/{self.sam_trip['id']}", f"/api/segments/{self.sam_trip['segment']}"):
@@ -222,8 +208,6 @@ class VisibilityTests(Assistants):
 
 
 class LoyaltyTests(Assistants):
-    """"IDs are for the household": an assistant has no access to loyalty numbers at all (not even the masked listing), by any
-    tool or route, with every scope and switch on; checked with canary numbers over every tool's output."""
 
     ROUTES = (("GET", "/api/loyalty"), ("POST", "/api/loyalty"), ("POST", "/api/loyalty/{id}"), ("DELETE", "/api/loyalty/{id}"),
               ("POST", "/api/loyalty/{id}/reveal"))
@@ -269,8 +253,6 @@ class LoyaltyTests(Assistants):
 
 
 class WriteTests(Assistants):
-    """Changes need the "write" scope and its switch, each checked on every call; a connection approved without it is told
-    to reconnect."""
 
     SEGMENT = {"kind": "hotel", "origin": "Harbour Hotel", "start_local": "2026-12-02T15:00", "end_local": "2026-12-08T10:00",
                "start_zone": "Europe/London", "end_zone": "Europe/London"}
@@ -365,7 +347,6 @@ class WriteTests(Assistants):
 
 
 class LapseTests(Assistants):
-    """"Access that outlives the person": a connection ends the moment its approver can no longer sign in."""
 
     def test_the_connection_stops_working_when_the_approver_is_taken_off_the_list(self):
         token = self.make_token("read", sub="u-sam")
@@ -377,7 +358,7 @@ class LapseTests(Assistants):
             with db.session() as conn:
                 reason = conn.execute(select(OAuthGrant.revoked_reason)).scalar()
         self.assertEqual(reason, "user_removed")
-        with db.session() as conn:                                  # (and it stays ended when they're let back in)
+        with db.session() as conn:
             self.assertIsNone(mcp_http.authorized(conn, f"Bearer {token}", self.base + "/mcp"))
 
 

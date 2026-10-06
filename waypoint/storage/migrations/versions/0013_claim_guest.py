@@ -1,8 +1,3 @@
-"""A member who claims a guest ("This is me"): the guests they were linked from, and whether they turned the suggestion down.
-
-Revision ID: 0013
-Revises: 0012
-"""
 import sqlalchemy as sa
 from alembic import op
 

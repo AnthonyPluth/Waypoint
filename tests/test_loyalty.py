@@ -1,5 +1,3 @@
-"""Loyalty and Known Traveler numbers: kept encrypted, listed masked, revealed one at a time, and never in a log, an error
-reply or a table in the clear."""
 import os
 from unittest import mock
 
@@ -14,7 +12,7 @@ from waypoint.storage.models import LoyaltyId
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
 
-CANARY = "CANARY-AAD-4417029X"   # a made-up membership number, one nothing else uses
+CANARY = "CANARY-AAD-4417029X"
 
 
 def membership(person_id, **kw):
@@ -41,7 +39,7 @@ class StorageTests(DbCase):
         loyalty.add(self.c, membership(who, kind="redress", program="DHS TRIP", number="12"))
         [a, b] = loyalty.everyone(self.c)
         self.assertEqual((a["masked"], a["readable"]), ("••••029X", True))
-        self.assertEqual(b["masked"], "••••")   # too short to show any of it
+        self.assertEqual(b["masked"], "••••")
         self.assertNotIn(CANARY, str(loyalty.everyone(self.c)))
 
     def test_the_list_is_by_person_then_kind_then_program(self):
@@ -82,14 +80,14 @@ class StorageTests(DbCase):
         first = loyalty.add(self.c, membership(who))
         with self.assertRaises(loyalty.Duplicate):
             loyalty.add(self.c, membership(who, number="DEMO7654321"))
-        loyalty.add(self.c, membership(other))                                          # (another person: fine)
-        loyalty.add(self.c, membership(who, kind="hotel", program="Hilton Honors"))      # (another program: fine)
+        loyalty.add(self.c, membership(other))
+        loyalty.add(self.c, membership(who, kind="hotel", program="Hilton Honors"))
         for _ in range(2):
-            loyalty.add(self.c, membership(who, program=loyalty.OTHER))                  # (Other can be any program)
+            loyalty.add(self.c, membership(who, program=loyalty.OTHER))
         second = loyalty.add(self.c, membership(who, program="Delta SkyMiles"))
-        with self.assertRaises(loyalty.Duplicate):                                      # (moving one onto a program they have)
+        with self.assertRaises(loyalty.Duplicate):
             loyalty.edit(self.c, second["id"], membership(who, program="American AAdvantage"))
-        loyalty.edit(self.c, first["id"], membership(who, notes="Gold"))              # (editing it in place is fine)
+        loyalty.edit(self.c, first["id"], membership(who, notes="Gold"))
         self.assertEqual(len([m for m in loyalty.everyone(self.c) if m["person_id"] == who and m["program"] == "American AAdvantage"]), 1)
 
     def test_a_person_who_already_has_two_from_a_claim_can_still_edit_either(self):
@@ -98,7 +96,7 @@ class StorageTests(DbCase):
         self.c.orm.add(LoyaltyId(person_id=who, kind="airline", program="American AAdvantage", number=secretbox.encrypt("DEMO7654321") or ""))
         self.c.orm.flush()
         self.assertEqual(len(loyalty.conflicts(self.c)), 1)
-        self.assertEqual(loyalty.edit(self.c, first["id"], membership(who, notes="Gold"))["notes"], "Gold")   # (not moved: allowed)
+        self.assertEqual(loyalty.edit(self.c, first["id"], membership(who, notes="Gold"))["notes"], "Gold")
 
     def test_removing_a_guest_takes_their_memberships(self):
         who, other = guest(self.c), guest(self.c, "Bo")
@@ -126,7 +124,6 @@ class StorageTests(DbCase):
 
 
 class PrivacyTests(DbCase):
-    """Saving, listing, revealing and a failed save, with a made-up number as the canary."""
 
     def test_the_number_is_never_logged_replied_with_or_stored_in_the_clear(self):
         who = guest(self.c)
@@ -163,7 +160,7 @@ class RouteTests(ServerCase):
         self.assertNotIn("number", added)
         status, listing = self.req("GET", "/api/loyalty")
         self.assertEqual(status, 200)
-        self.assertNotIn("DEMO55501234", str(listing))   # a page load carries no number
+        self.assertNotIn("DEMO55501234", str(listing))
         self.assertIn("Marriott Bonvoy", listing["programs"]["hotel"])
         self.assertEqual(self.req("POST", f"/api/loyalty/{added['id']}/reveal"), (200, {"number": "DEMO55501234"}))
         status, edited = self.req("POST", f"/api/loyalty/{added['id']}",
@@ -197,7 +194,7 @@ class RouteTests(ServerCase):
     def test_what_cannot_be_read_is_a_400_that_never_quotes_the_number(self):
         for body in ({"kind": "boat"}, {"program": "Nope"}, {"program": ""}, {"person_id": "x"}, {"person_id": True},
                      {"number": ""}, {"number": 5}, {"number": "x" * 65}, {"expiry": "31/01/2029"},
-                     {"notes": "x" * 501}, {"expiry": "2029-01-31"}):   # (an airline, hotel or car number doesn't expire)
+                     {"notes": "x" * 501}, {"expiry": "2029-01-31"}):
             with self.subTest(body=str(body)):
                 status, reply = self.save(**body)
                 self.assertEqual(status, 400)
@@ -239,7 +236,7 @@ class FieldTests(DbCase):
             else:
                 with self.assertRaises(ApiError, msg=kind):
                     api.fields(body, need_number=True)
-            self.assertIsNone(api.fields({**body, "expiry": None}, need_number=True)["expiry"])   # (none is always fine)
+            self.assertIsNone(api.fields({**body, "expiry": None}, need_number=True)["expiry"])
 
     def test_a_number_is_needed_to_save_but_not_to_change(self):
         body = {"person_id": 1, "kind": "car", "program": "Other"}

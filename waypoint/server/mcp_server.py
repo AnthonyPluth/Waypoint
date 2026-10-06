@@ -1,13 +1,3 @@
-"""Waypoint's MCP server: the tools that let an AI assistant (Claude and the like) read the household's travel, and, only if
-the household switched it on in Settings and the member allowed it when connecting, change trips. Loyalty and Known Traveler
-numbers are out of its reach altogether.
-
-Waypoint serves it at POST /mcp (waypoint/server/handler.py), to an assistant connected with OAuth (waypoint/server/mcp_oauth.py).
-The assistant is the member who approved it: handle() answers one JSON-RPC message, and every page it reads or change it
-makes goes through the `fetch` it's given (mcp_http.fetch_for), which runs it as that member through the same routes the web
-app uses, allows only the pages and changes mcp_access opens, and checks the connection's scope and its switch ("Let
-assistants change trips") on every call, so turning the switch off takes effect at once. Every changing tool tells the assistant to ask first.
-"""
 from __future__ import annotations
 
 import json
@@ -18,18 +8,16 @@ from typing import Any
 from . import mcp_access
 
 PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
-MAX_TEXT = 200_000   # characters in one reply: enough for years of trips, not enough to flood the assistant's context
+MAX_TEXT = 200_000
 
-Fetch = Callable[..., Any]   # fetch(path, query) reads; fetch(path, query, body) POSTs a change; fetch(path, query, body, "DELETE") deletes
+Fetch = Callable[..., Any]
 
 READ, WRITE = mcp_access.READ, mcp_access.WRITE
 
 
 class ToolError(Exception):
-    """Something to tell the assistant instead of a result (a bad argument, or Waypoint refusing)."""
+    pass
 
-
-# ------------------------------------------------------------------------------------------------ tools
 
 def _schema(props: dict[str, dict] | None = None, required: list[str] | None = None) -> dict:
     out: dict[str, Any] = {"type": "object", "properties": props or {}, "additionalProperties": False}
@@ -51,7 +39,7 @@ def _need(a: dict, name: str) -> int:
         raise ToolError(f"Give a {name}.")
     try:
         if isinstance(raw, float) and not raw.is_integer():
-            raise ValueError(raw)   # (2.7 isn't segment 2)
+            raise ValueError(raw)
         return int(raw)
     except (TypeError, ValueError):
         raise ToolError(f"{name} must be a whole number.") from None
@@ -87,7 +75,6 @@ def list_trips(fetch: Fetch, a: dict) -> Any:
 
 
 def upcoming(fetch: Fetch, a: dict) -> Any:
-    """The next segments (flights, stays, rentals, trains) of every trip, soonest first. Times are wall-clock at the place."""
     today = date.today()
     start = _day(a, "from", today)
     days = min(max(_need(a, "days") if a.get("days") not in (None, "") else 60, 1), 730)
@@ -102,7 +89,6 @@ def upcoming(fetch: Fetch, a: dict) -> Any:
 
 
 def flight_status(fetch: Fetch, a: dict) -> Any:
-    """What's already held (Waypoint doesn't fetch anything new for an assistant)."""
     out = fetch("flight-status", {})
     which = _need(a, "segment_id") if a.get("segment_id") not in (None, "") else None
     statuses = [s for s in out["statuses"] if which is None or s["segment_id"] == which]
@@ -134,10 +120,8 @@ TOOLS: list[dict[str, Any]] = [
      "inputSchema": _schema({"segment_id": _SEGMENT_ID}), "run": flight_status, "needs": (READ,)},
 ]
 
-# ------------------------------------------------------------------------------------------------ changes (opt-in)
 
 _SWITCHES = {WRITE: "Let assistants change trips"}
-# What an assistant allowed "write" is told when it connects: it reads these, the person doesn't.
 WRITE_RULES = (
     "You can change the household's travel: the changing tools, and call_endpoint (list_endpoints) for anything else. Rules: "
     "1) Before every change, say in plain words what you'll change and wait for the person's explicit yes. "
@@ -146,14 +130,11 @@ WRITE_RULES = (
     "never under one blanket yes for several. "
     "3) Times are wall-clock times at the place (start_local in start_zone); never convert them. "
     "Mailboxes, the “Couldn’t read” queue, AI settings, backups, sign-in and these assistant settings are out of reach.")
-# How every changing tool's description ends: the assistant asks first, and for a destructive one, says what goes.
 ASK = "Ask the person before calling this."
 DESTRUCTIVE = "Destructive: tell the person exactly what will be removed or merged and get a clear yes first."
 
 
 def allowed(fetch: Fetch, scopes: tuple[str, ...]) -> bool:
-    """Whether this connection may use every one of `scopes` right now (allowed when it connected, and the switch in
-    Settings). Unsure: no."""
     try:
         return all(fetch("access", {"scope": s}).get("allowed") for s in scopes if s != READ)
     except (ToolError, AttributeError):
@@ -161,7 +142,6 @@ def allowed(fetch: Fetch, scopes: tuple[str, ...]) -> bool:
 
 
 def _refusal(fetch: Fetch, scopes: tuple[str, ...]) -> str:
-    """Why a call can't be made: the switch is off, or this connection wasn't allowed it when it connected."""
     for scope in (s for s in scopes if s != READ):
         try:
             answer = fetch("access", {"scope": scope})
@@ -174,8 +154,6 @@ def _refusal(fetch: Fetch, scopes: tuple[str, ...]) -> str:
 
 def _change(template: str, id_arg: str | None = None, fields: bool = False, extra: tuple[str, ...] = (),
             method: str = "POST") -> Callable[[Fetch, dict], Any]:
-    """A tool that makes one change: POSTs (or DELETEs) to `template` (its {id} from `id_arg`, a number) the `fields`
-    object and any of the `extra` arguments, as the web app's forms send them."""
     def run(fetch: Fetch, a: dict) -> Any:
         path = template.replace("{id}", str(_need(a, id_arg)), 1) if id_arg else template
         body = dict(a.get("fields") or {}) if fields else {}
@@ -190,8 +168,6 @@ def _fields(description: str) -> dict:
 
 def _write_tool(name: str, description: str, run: Callable[[Fetch, dict], Any], props: dict, required: list[str], *,
                 route: tuple[str, str], idempotent: bool = False) -> dict:
-    """A tool that changes something: offered, and run, only while this connection may make changes. Destructive as
-    mcp_access.destructive says of its route."""
     harm = mcp_access.destructive(*route)
     return {"name": name, "description": f"{description} {ASK}" + (f" {DESTRUCTIVE}" if harm else ""),
             "inputSchema": _schema(props, required), "run": run, "needs": (WRITE,),
@@ -264,14 +240,12 @@ BY_NAME = {t["name"]: t for t in ALL_TOOLS}
 
 
 def offered(fetch: Fetch) -> list[dict[str, Any]]:
-    """The tools this server offers: the reading ones, plus the changing ones only while this connection may use them."""
     return [t for t in ALL_TOOLS if t["needs"] == (READ,) or allowed(fetch, t["needs"])]
 
 
 def _annotations(t: dict) -> dict:
     if not t.get("write"):
         return {"readOnlyHint": True, "openWorldHint": False}
-    # A change: the assistant asks you first, and for a destructive one, says what goes
     return {"readOnlyHint": False, "destructiveHint": bool(t.get("destructive")), "idempotentHint": bool(t.get("idempotent")),
             "openWorldHint": False}
 
@@ -288,8 +262,6 @@ def call_tool(name: str, args: dict, fetch: Fetch) -> str:
     return text
 
 
-# ------------------------------------------------------------------------------------------------ the protocol
-
 def _about(fetch: Fetch) -> str:
     about = ("Access to a Waypoint travel app, as the member who connected you: the trips they are on (flights, stays, rentals, "
              "trains), the people who travel, stats and "
@@ -300,7 +272,6 @@ def _about(fetch: Fetch) -> str:
 
 
 def handle(msg: Any, fetch: Fetch) -> dict | None:
-    """One JSON-RPC message in, its reply out (None for a notification)."""
     if not isinstance(msg, dict) or "method" not in msg:
         return None
     mid, method, params = msg.get("id"), msg["method"], msg.get("params") or {}
@@ -311,7 +282,7 @@ def handle(msg: Any, fetch: Fetch) -> dict | None:
     def fail(code: int, message: str) -> dict:
         return {"jsonrpc": "2.0", "id": mid, "error": {"code": code, "message": message}}
 
-    if "id" not in msg:   # notifications (notifications/initialized, /cancelled...) get no reply
+    if "id" not in msg:
         return None
     if method == "initialize":
         asked = params.get("protocolVersion")
@@ -332,6 +303,6 @@ def handle(msg: Any, fetch: Fetch) -> dict | None:
             return ok({"content": [{"type": "text", "text": call_tool(name, args, fetch)}]})
         except ToolError as e:
             return ok({"content": [{"type": "text", "text": str(e)}], "isError": True})
-        except (ValueError, TypeError, KeyError, OverflowError) as e:   # an argument of the wrong kind, or a reply that isn't Waypoint's
+        except (ValueError, TypeError, KeyError, OverflowError) as e:
             return ok({"content": [{"type": "text", "text": f"That didn't work: {type(e).__name__}"}], "isError": True})
     return fail(-32601, f"Method not found: {method}")

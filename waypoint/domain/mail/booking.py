@@ -1,5 +1,3 @@
-"""What a booking read from an email is: the fields of one segment, none of the message's text. Shared by `extract.py` (schema.org
-markup) and the vendor parsers in `parsers/`, which return the same thing."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,7 +9,6 @@ Status = Literal["confirmed", "cancelled"]
 
 @dataclass(frozen=True)
 class Place:
-    """Where a stay or a rental is, as far as the markup says: what finds its time zone."""
     city: str | None = None
     country: str | None = None
 
@@ -19,7 +16,7 @@ class Place:
 @dataclass(frozen=True)
 class Passenger:
     name: str
-    member_number: str | None = None   # a loyalty number printed on the booking (programMembership)
+    member_number: str | None = None
 
 
 @dataclass(frozen=True)
@@ -28,20 +25,19 @@ class Booking:
     status: Status
     confirmation: str | None
     provider: str | None
-    start: str                         # the time as written (ISO 8601, with or without an offset)
+    start: str
     end: str
-    origin: str | None                 # a flight's airport code; a stay's or a rental's place, a station
+    origin: str | None
     destination: str | None
     start_place: Place = Place()
     end_place: Place = Place()
     details: tuple[tuple[str, str], ...] = ()
     manage_url: str | None = None
     passengers: tuple[Passenger, ...] = ()
-    clock_times: frozenset[str] = frozenset()   # the times of day (HH:MM) the message's own text shows, kept only when a time above is marked UTC
+    clock_times: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
 class Parsed:
-    """What a vendor parser found: its bookings, and how many it recognised but couldn't make into one (a missing time or place)."""
     bookings: tuple[Booking, ...] = ()
     unread: int = 0

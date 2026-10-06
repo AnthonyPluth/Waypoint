@@ -1,12 +1,3 @@
-"""Writes waypoint/storage/airlines.tsv.gz, the airlines Waypoint knows by IATA code (the seed of migration 0010's
-`airlines` table): IATA code, ICAO code, name and country, one per line, sorted by IATA code.
-
-    curl -sSLo /tmp/airlines.dat https://raw.githubusercontent.com/jpatokal/openflights/master/data/airlines.dat
-    python3 tools/airlines.py /tmp/airlines.dat
-
-The rows come from OpenFlights' `airlines.dat`, which is under the Open Database License (ODbL 1.0): see NOTICE and the
-"Data sources" docs page. Several airlines, mostly defunct ones, share an IATA code; the active one wins, then the
-lowest OpenFlights id. A changed file ships with a migration that updates the table, never by editing 0010's seed."""
 from __future__ import annotations
 
 import csv
@@ -21,8 +12,6 @@ ICAO = re.compile(r"[A-Z0-9]{3}")
 
 
 def rows(source: Path) -> list[tuple[str, str, str, str]]:
-    """(IATA, ICAO or "", name, country) for each IATA code, from airlines.dat's id, name, alias, IATA, ICAO, callsign,
-    country, active columns (`\\N` and "-" are OpenFlights' blanks)."""
     best: dict[str, tuple[bool, int, tuple[str, str, str, str]]] = {}
     with source.open(encoding="utf-8", newline="") as f:
         for line in csv.reader(f):
@@ -42,11 +31,11 @@ def rows(source: Path) -> list[tuple[str, str, str, str]]:
 
 def main(argv: list[str]) -> int:
     if len(argv) != 2:
-        print(__doc__)
+        print("usage: python3 tools/airlines.py /path/to/airlines.dat")
         return 2
     found = rows(Path(argv[1]))
     lines = "".join("\t".join(r).replace("\n", " ") + "\n" for r in found)
-    with OUT.open("wb") as f, gzip.GzipFile(fileobj=f, mode="wb", mtime=0, filename="") as z:   # (mtime 0: the same bytes each run)
+    with OUT.open("wb") as f, gzip.GzipFile(fileobj=f, mode="wb", mtime=0, filename="") as z:
         z.write(lines.encode("utf-8"))
     print(f"{len(found)} airlines -> {OUT}")
     return 0

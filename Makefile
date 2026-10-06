@@ -32,6 +32,7 @@ python-lint:
 	$(RUFF) check .
 	$(MYPY)
 	$(LINT_IMPORTS)
+	$(PYTHON) tools/no_comments.py
 
 # Waypoint's own rules for the paved paths (.semgrep/waypoint.yml): first that each rule flags its failing examples and only
 # those (.semgrep/examples/), then the code. The ESLint rules' examples are frontend/src/lint-rules.test.ts.

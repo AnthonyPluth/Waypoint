@@ -1,10 +1,3 @@
-"""What the server sends, header by header, for the endpoints with answers of their own (a backup's download and
-uploads), the web app's files and a plain JSON answer; and who may reach them (sign-in, the X-Waypoint header, same-site
-checks).
-
-Pinned exactly, in order, so moving these endpoints around the server can't quietly change a security header, a cache
-policy or a download's name. Only what differs from one request to the next is left out: the Date, a page's script
-nonce, a backup's size and today's date in its name."""
 import gzip
 import http.client
 import json
@@ -31,7 +24,6 @@ PAGE_CSP = CSP.replace("script-src 'self'", "script-src 'nonce-N' 'strict-dynami
 
 
 def security(csp: str = CSP, resource: str = "same-origin") -> list[tuple[str, str]]:
-    """The headers every answer carries, after its own."""
     return [("X-Content-Type-Options", "nosniff"), ("Content-Security-Policy", csp), ("X-Frame-Options", "DENY"),
             ("Referrer-Policy", "no-referrer"), ("Cross-Origin-Opener-Policy", "same-origin-allow-popups"),
             ("Cross-Origin-Resource-Policy", resource), ("Permissions-Policy", PERMISSIONS)]
@@ -65,7 +57,6 @@ class Pinned(unittest.TestCase):
         cls.httpd.server_close()
 
     def send(self, method: str, path: str, body: bytes | None = None, headers: dict | None = None):
-        """(status, the headers in order without Date, body). A page's nonce reads 'nonce-N'."""
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=20)
         try:
             with serving(self.static):
@@ -94,7 +85,7 @@ class Pinned(unittest.TestCase):
         self.assertJson(self.api("POST", "/api/nothing-here", b"{}"), 404, {"error": "Not found"})
 
     def test_a_backup_download(self):
-        today = freeze_today(self)      # the file is named after today
+        today = freeze_today(self)
         code, heads, data = self.send("GET", "/api/backup")
         self.assertEqual(code, 200)
         self.assertIn("users", json.loads(gzip.decompress(data))["tables"])
@@ -112,8 +103,6 @@ class Pinned(unittest.TestCase):
 
     @staticmethod
     def last_backup(wait: float = 5.0) -> str | None:
-        """When the last backup was downloaded, once the server has noted it (just after sending it), or None after
-        `wait` seconds."""
         end = time.monotonic() + wait
         while True:
             with db.session() as conn:
@@ -216,7 +205,6 @@ USER = {"sub": "pin-sub", "email": "pin@example.com", "name": "Pin"}
 
 
 class SignInTests(unittest.TestCase):
-    """With sign-in on: who may reach each endpoint."""
 
     @classmethod
     def setUpClass(cls):

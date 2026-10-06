@@ -1,6 +1,3 @@
-"""A unittest-parallel result class (`--result tests.junit_result.JUnitResult`) that also writes each module's results
-as JUnit XML into $JUNIT_DIR, one file per module run, which CI sends to Codecov's test analytics. The console output is
-unittest-parallel's usual (this prints the failures itself, as unittest-parallel leaves that to a custom result)."""
 import os
 import time
 import unittest

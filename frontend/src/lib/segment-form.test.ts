@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { blank, body, DETAILS, draftOf, problem, type Draft, type Kind } from "./segment-form";
 import { segment } from "../test/fixtures";
 
-/** A flight that's ready to send, with `extra` changing what a test cares about. */
 const flight = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), origin: "JFK", destination: "LHR", start_local: "2026-11-20T19:00", end_local: "2026-11-21T07:10", people: [1], ...extra });
 const car = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), kind: "car", origin: "Example Rental", start_local: "2026-11-21T15:00", end_local: "2026-11-27T10:00", start_zone: "Europe/London", people: [1], ...extra });
 const hotel = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), kind: "hotel", origin: "Harbour Hotel", start_local: "2026-11-21T15:00", end_local: "2026-11-27T10:00", start_zone: "Europe/London", people: [1], ...extra });
@@ -31,9 +30,7 @@ describe("the segment form's messages", () => {
   });
   it("catches an end before the start, comparing at each place's zone", () => {
     expect(problem(hotel({ end_local: "2026-11-21T14:00", start_local: "2026-11-21T15:00" }))).toBe("This ends before it starts (times are compared at their own places’ zones)");
-    // A flight's zones come from its airports, so an arrival that reads earlier on the clock isn't judged here.
     expect(problem(flight({ origin: "NRT", destination: "LAX", start_local: "2026-11-20T17:00", end_local: "2026-11-20T10:00" }))).toBeNull();
-    // With zones given it is: Tokyo 17:00 is 08:00 UTC, so 10:00 in Los Angeles (18:00 UTC) is fine, 00:00 isn't.
     const zones = { start_zone: "Asia/Tokyo", end_zone: "America/Los_Angeles" };
     expect(problem(flight({ ...zones, start_local: "2026-11-20T17:00", end_local: "2026-11-20T10:00" }))).toBeNull();
     expect(problem(flight({ ...zones, start_local: "2026-11-20T17:00", end_local: "2026-11-19T20:00" }))).toMatch(/ends before it starts/);
@@ -58,13 +55,13 @@ describe("the request the form makes", () => {
   it("sends a stay's one zone, and a rental's for both ends unless the end has its own", () => {
     expect(body(hotel())).toMatchObject({ start_zone: "Europe/London", origin: "Harbour Hotel" });
     expect(body(hotel())).not.toHaveProperty("end_zone");
-    expect(body(hotel({ end_zone: "Europe/Paris" }))).not.toHaveProperty("end_zone");   // (a stay is in one place)
+    expect(body(hotel({ end_zone: "Europe/Paris" }))).not.toHaveProperty("end_zone");
     expect(body(car())).toMatchObject({ start_zone: "Europe/London", end_zone: "Europe/London" });
     expect(body(car({ end_zone: "Europe/Paris" }))).toMatchObject({ end_zone: "Europe/Paris" });
   });
   it("lets a stay leave its zone empty when it has an address to work it out from", () => {
     expect(problem(hotel({ start_zone: "", details: { address: "1 Quay Street, London" } }))).toBeNull();
-    expect(body(hotel({ start_zone: "", details: { address: "1 Quay Street, London" } }))).toMatchObject({ start_zone: null });   // (null on an edit clears the old zone, so it is worked out again)
+    expect(body(hotel({ start_zone: "", details: { address: "1 Quay Street, London" } }))).toMatchObject({ start_zone: null });
     expect(problem(hotel({ start_zone: "" }))).toBe("Enter the time zone of the stay (for example America/New_York), or its address to work it out from");
     expect(problem(hotel({ start_zone: "Mars/Olympus" }))).toMatch(/isn’t one Waypoint knows/);
   });
@@ -81,10 +78,10 @@ describe("the request the form makes", () => {
   it("keeps an imported flight untimed until a person sets its times", () => {
     const imported = segment({ start_local: "2025-03-08T00:00", end_local: "2025-03-08T03:00", details: { time_unknown: "yes", seat: "14C" } });
     const d = draftOf(imported);
-    expect(body(d).details).toEqual({ time_unknown: "yes" });   // (the booking's seat is the one traveller's now)
+    expect(body(d).details).toEqual({ time_unknown: "yes" });
     expect(body(d).travelers).toEqual([{ person_id: 1, seat: "14C" }]);
     expect(body({ ...d, start_local: "2025-03-08T09:30" }).details).toEqual({});
-    expect(body({ ...d, seats: { p1: "15A" } }).travelers).toEqual([{ person_id: 1, seat: "15A" }]);   // other edits keep the rest
+    expect(body({ ...d, seats: { p1: "15A" } }).travelers).toEqual([{ person_id: 1, seat: "15A" }]);
   });
 });
 
@@ -132,7 +129,7 @@ describe("a seat for each traveller", () => {
   });
   it("starts from each traveller's seat, and gives a booking's old seat to its one traveller only", () => {
     const jane = { id: 1, person_id: 1, name: "Jane Doe", seat: "12A" }, sam = { id: 2, person_id: 2, name: "Sam Doe", seat: null };
-    expect(draftOf(segment({ details: { seat: "99Z" }, travelers: [jane, sam] })).seats).toEqual({ p1: "12A" });   // (two travellers: whose is 99Z isn't said)
+    expect(draftOf(segment({ details: { seat: "99Z" }, travelers: [jane, sam] })).seats).toEqual({ p1: "12A" });
     expect(body(draftOf(segment({ details: { seat: "99Z" }, travelers: [jane, sam] }))).details).toEqual({ seat: "99Z" });
     expect(draftOf(segment({ details: { seat: "99Z" }, travelers: [sam] })).seats).toEqual({ p2: "99Z" });
   });
@@ -148,7 +145,7 @@ describe("the fields each kind shows", () => {
     expect(names("hotel")).toEqual(["Address", "Room", "Phone"]);
     expect(names("car")).toEqual(["Pick-up address", "Car class", "Phone"]);
     expect(names("cruise")).toEqual(["Ship", "Cabin", "Deck", "Terminal address", "Phone"]);
-    expect(names("flight")).toEqual(["Flight number", "Terminal", "Cabin"]);   // (the seat is each traveller's now, beside their name in the form)
+    expect(names("flight")).toEqual(["Flight number", "Terminal", "Cabin"]);
   });
 
   it("round-trips an address with its lines, and refuses one over the limit", () => {

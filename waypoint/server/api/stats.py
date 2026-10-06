@@ -1,4 +1,3 @@
-"""Travel stats: what a person, or the household, has flown, stayed and driven, over the trips the viewer can see."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -15,8 +14,7 @@ YEARS = range(1900, 3000)
 
 
 def api_stats(conn, q, _b) -> Stats:
-    """GET /api/stats?person=<id|all>&year=<yyyy|all>: both default to all. A person who doesn't exist is a 404."""
-    person, year = q.get("person", ["all"])[0], q.get("year", ["all"])[0]   # (a query’s values are lists)
+    person, year = q.get("person", ["all"])[0], q.get("year", ["all"])[0]
     person_id = None
     if person != "all":
         if not (person.isascii() and person.isdigit() and len(person) < 10):
@@ -38,12 +36,10 @@ def _unit(conn) -> Literal["mi", "km"]:
 
 
 def api_distance_unit(conn, _q, _b) -> DistanceUnit:
-    """GET /api/distance-unit: miles unless the household chose kilometres."""
     return {"distance_unit": _unit(conn)}
 
 
 def api_distance_unit_save(conn, _q, body: DistanceUnitBody) -> DistanceUnit:
-    """POST /api/distance-unit: the household's unit for distances on the Stats page, "mi" or "km"."""
     unit = body.get("distance_unit")
     if unit not in ("mi", "km"):
         raise ApiError("Choose miles or kilometres")

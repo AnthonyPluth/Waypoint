@@ -14,7 +14,6 @@ from tests.shared import DbCase
 
 
 def receiver():
-    """A browser's side of a subscription: its key pair and auth secret."""
     key = ec.generate_private_key(ec.SECP256R1())
     pub = key.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
     return key, w.b64u(pub), os.urandom(16)

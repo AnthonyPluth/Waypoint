@@ -12,16 +12,13 @@
   import { comparisons, count, countryName, distance, duration, monthLabel, parseSelection, selectionQuery, share, statsPath } from "$lib/stats";
   import { dateLabel } from "$lib/trips";
 
-  // Travel stats for one person or everyone, in one year or all time. The choice lives in the address (#stats?who=2&year=2025).
-  // What was loaded is kept with the choice it answers, so numbers for another choice are never drawn as current; a failed
-  // load says so, leaves the pickers working and offers Try again.
   const me = $derived(app.state?.person_id ?? null);
   const sel = $derived(parseSelection(route.query, me));
   const key = $derived(`${sel.who}/${sel.year}`);
 
   let people = $state<Person[]>([]);
   let loaded = $state<{ key: string; stats: Stats } | null>(null);
-  let years = $state<number[]>([]);   // the last years list the server gave, so the picker stays put while the next load runs
+  let years = $state<number[]>([]);
   let failed = $state<{ key: string; message: string } | null>(null);
   let attempt = 0;
 
@@ -35,11 +32,9 @@
   }
   $effect(() => { void load(key, statsPath(sel)); });
   $effect(() => {
-    // The names for the picker: if they don't load, Everyone and your own numbers still work.
-    apiCall<"GET /api/people">("/api/people").then((p) => { people = p.people; }).catch(() => { people = []; });   // (the picker falls back to Everyone)
+    apiCall<"GET /api/people">("/api/people").then((p) => { people = p.people; }).catch(() => { people = []; });
   });
 
-  // The map's code and outlines are a separate download, fetched only once this page has something to draw on it.
   let TravelMap = $state<Component<{ flights: Stats["flights"]; stays: Stats["stays"]["pins"] }> | null>(null);
   let mapError = $state("");
   async function loadMap() {

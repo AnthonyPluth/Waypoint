@@ -1,5 +1,3 @@
-"""Fixes from the September 2026 review of the server: sign-in, slow clients, restore, and smaller hardening (limits,
-backup sizes, secret keys)."""
 import contextlib
 import gzip
 import json
@@ -26,7 +24,7 @@ ENV = ("OIDC_ALLOWED_EMAILS", "OIDC_ALLOWED_GROUPS", "OIDC_ALLOW_ANY_USER", "OID
 
 class SignInTests(unittest.TestCase):
     def setUp(self):
-        own_database(self)   # its sessions are its own, and the environment is put back afterwards
+        own_database(self)
         for k in ENV:
             os.environ.pop(k, None)
         os.environ["OIDC_ALLOWED_EMAILS"] = "me@example.com"
@@ -57,7 +55,7 @@ class SignInTests(unittest.TestCase):
         os.environ["OIDC_ALLOWED_EMAILS"] = "someone@example.com"
         with db.session() as c:
             self.assertIsNone(oidc.session_user(c, "tok"))
-            self.assertIsNone(c.execute(select(AuthSession.token_hash)).fetchone())   # and it's gone for good
+            self.assertIsNone(c.execute(select(AuthSession.token_hash)).fetchone())
         os.environ["OIDC_ALLOWED_EMAILS"] = "me@example.com"
         with db.session() as c:
             self.assertIsNone(oidc.session_user(c, "tok"))
@@ -77,7 +75,7 @@ class ServerTests(ServerCase):
             try:
                 s.sendall(b"GET /healthz HTTP/1.1\r\n")
                 while time.monotonic() - started < 5 and not closed:
-                    s.send(b"X")   # a header byte every 0.1s: each read is quick, the headers never finish
+                    s.send(b"X")
                     time.sleep(0.1)
                     with contextlib.suppress(BlockingIOError):
                         closed = s.recv(1024) == b""
@@ -87,10 +85,9 @@ class ServerTests(ServerCase):
             s.close()
         self.assertTrue(closed)
         self.assertLess(elapsed, 3.5)
-        self.assertEqual(self.open("/healthz")[0], 200)   # everyone else is served as usual
+        self.assertEqual(self.open("/healthz")[0], 200)
 
     def test_a_restore_that_cant_start_yet_is_refused(self):
-        # A restore replaces the whole database (and on Postgres restarts its ids), so not the one the class shares.
         own_database(self)
         with db.session() as c:
             raw = backup.dump(c)
@@ -102,8 +99,6 @@ class ServerTests(ServerCase):
         self.assertEqual(self.open("/api/restore", "POST", raw, headers)[0], 200)
 
     def test_a_header_is_never_split(self):
-        # Any header with a line break in it is refused: the request fails cleanly (500), and nothing of the half-built
-        # answer (not the 200, not the injected cookie) goes out.
         def bad_header(handler, _method):
             handler._send(200, b"ok", "text/plain", extra={"X-Next": "/x\r\nSet-Cookie: stolen=1"})
         with mock.patch.object(server.Handler, "_route", bad_header), mock.patch("waypoint.monitoring.report"):
@@ -112,7 +107,6 @@ class ServerTests(ServerCase):
         self.assertIsNone(h["Set-Cookie"])
         self.assertIsNone(h["X-Next"])
         self.assertIn("reference", json.loads(body)["error"])
-        # The same for a cookie queued for whatever the request answers: the 500 goes out without it.
         def bad_cookie(handler, _method):
             handler._set_cookies.append("waypoint_session=x\r\nX-Injected: 1")
             handler._send(200, b"ok", "text/plain")
@@ -120,7 +114,6 @@ class ServerTests(ServerCase):
             code, h, body = self.open("/api/anything")
         self.assertEqual((code, h["Set-Cookie"], h["X-Injected"]), (500, None, None))
         self.assertIn("reference", json.loads(body)["error"])
-        # A redirect somewhere with a line break in it goes home instead.
         def bad_redirect(handler, _method):
             handler._redirect("/x\r\nSet-Cookie: stolen=1")
         with mock.patch.object(server.Handler, "_route", bad_redirect):
@@ -136,7 +129,6 @@ class LimitsTests(unittest.TestCase):
                 db.number(huge)
 
     def test_the_answer_is_json(self):
-        # An overflowed sum (inf) would otherwise go out as `Infinity`, which no browser reads.
         from waypoint.server import handler
         h = handler.Handler.__new__(handler.Handler)
         sent = []
@@ -177,15 +169,15 @@ class SecretKeyTests(unittest.TestCase):
         secretbox._cache.clear()
         self.addCleanup(secretbox._cache.clear)
         self.c = db.connect(self.path)
-        self.addCleanup(self.c.close)       # (cleanups run last first: the connection closes before the database goes)
+        self.addCleanup(self.c.close)
 
     def test_passphrase_is_stretched_and_old_keys_still_open(self):
         key = os.environ["WAYPOINT_SECRET_KEY"]
         self.assertNotEqual(secretbox._from_passphrase(key), secretbox._from_passphrase_v1(key))
         legacy = secretbox.PREFIX + Fernet(secretbox._from_passphrase_v1(key)).encrypt(b"sk-old").decode()
         self.c.execute(insert(Setting).values(key=sk.VAPID_PRIVATE_KEY, value=legacy))
-        self.assertEqual(db.get_setting(self.c, sk.VAPID_PRIVATE_KEY), "sk-old")   # saved by an earlier version
-        self.assertEqual(secretbox.encrypt_stored(self.c), 1)                    # moved to the stretched key
+        self.assertEqual(db.get_setting(self.c, sk.VAPID_PRIVATE_KEY), "sk-old")
+        self.assertEqual(secretbox.encrypt_stored(self.c), 1)
         stored = self.c.execute(select(Setting.value).where(Setting.key == sk.VAPID_PRIVATE_KEY)).fetchone()[0]
         Fernet(secretbox._from_passphrase(key)).decrypt(stored[len(secretbox.PREFIX):].encode())
         self.assertEqual(db.get_setting(self.c, sk.VAPID_PRIVATE_KEY), "sk-old")

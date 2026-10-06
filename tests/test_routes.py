@@ -1,8 +1,3 @@
-"""Every API route answers a plain request without a server error.
-
-Each route is called once with no parameters, an empty body and a made-up (or a real) id. A route may refuse (4xx)
-what it's sent (and a route that talks to another service answers 502 when that isn't set up), but a 500
-means a handler crashed on input it should have checked."""
 import json
 import unittest
 import urllib.error
@@ -11,7 +6,6 @@ import urllib.request
 from waypoint import server
 from tests.shared import ServerCase, fetch
 
-# Routes that would reach out to another service even with an empty request; they're covered by their own tests.
 NETWORK: set[str] = set()
 
 
@@ -38,8 +32,6 @@ def _noop(*_a):
     return {}
 
 
-# A table of made-up routes, shaped like the ones a real feature adds: a fixed word before an {id} at the same depth,
-# two {id}s, and the same path under two methods.
 SAMPLE = [
     ("GET", "/api/trips", _noop),
     ("POST", "/api/trips/new", _noop),
@@ -51,11 +43,9 @@ SAMPLE = [
 
 
 class TableTests(unittest.TestCase):
-    """routes.Table: ROUTES split up once, found as a scan of ROUTES in order would find them."""
 
     @staticmethod
     def scan(routes, method, path):
-        """The first route whose method (any, for None) and pattern match: how a plain scan would look."""
         parts = path.strip("/").split("/")
         for m, pattern, *_ in routes:
             want = pattern.strip("/").split("/")

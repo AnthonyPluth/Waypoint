@@ -1,8 +1,3 @@
-"""Importing past flights from a CSV export (waypoint/domain/flight_import): each format's parser against made-up exports
-(invented flights on real airports), reading a file (the format from its header, an empty or unknown or too long file), the
-preview (new, already in Waypoint, can't be read), saving (segments from an import, grouped into trips, the same file
-twice adds nothing, times kept where they happen) and AGENTS.md's promises (a trip is seen only by who is on it or booked
-it; a notes column in the file is kept nowhere: no_leaks)."""
 import csv
 import io
 import json
@@ -65,7 +60,7 @@ class ReadTests(unittest.TestCase):
         with self.assertRaises(flight_import.Unreadable):
             flight_import.read(b"\xff\xfe\x00\x01 not text \x80\x81")
         with self.assertRaises(flight_import.Unreadable):
-            flight_import.read(b"Date,From,To\n" + b"x" * 200_000 + b"\n")   # a cell past what the CSV reader takes
+            flight_import.read(b"Date,From,To\n" + b"x" * 200_000 + b"\n")
 
     def test_a_byte_order_mark_and_blank_lines_are_fine_and_lines_count_from_the_header(self):
         data = b"\xef\xbb\xbf" + export("appintheair").replace(b"\n2025-09-19", b"\n\n,,,,,,,,,\n2025-09-19")
@@ -88,10 +83,9 @@ class ParserTests(unittest.TestCase):
         assert isinstance(first, Proposed)
         self.assertEqual((first.day, first.origin, first.destination, first.flight_number, first.airline, first.seat, first.cabin),
                          ("2025-03-01", "JFK", "LAX", "DL1001", "DL", "14C", "Economy"))
-        # the gate times (actual before scheduled), with their offsets kept and not applied
         self.assertEqual((first.dep.time, first.dep.offset, first.arr.time, first.arr.offset), ("08:12", -300, "11:29", -480))
         self.assertEqual([type(r).__name__ for r in rows], ["Proposed", "Proposed", "Proposed", "Proposed", "Skipped", "Skipped"])
-        self.assertIsNone(flights(rows)[1].dep)   # a missing time stays missing
+        self.assertIsNone(flights(rows)[1].dep)
         self.assertIn("cancelled", rows[4].reason)
         self.assertEqual((rows[4].line, rows[5].line), (6, 7))
         self.assertIn("date", rows[5].reason)
@@ -113,7 +107,6 @@ class ParserTests(unittest.TestCase):
         self.assertEqual((first.day, first.flight_number, first.cabin, first.seat, first.dep, first.arr),
                          ("2025-07-04", "BA304", "Economy", "12A", None, None))
         self.assertEqual((second.day, second.dep.time, second.cabin), ("2025-07-11", "18:45", "Business"))
-        # an ICAO code isn't an IATA one: the row can't be read, and says which airport
         skipped = [r for r in rows if isinstance(r, Skipped)]
         self.assertEqual(len(skipped), 1)
         self.assertIn("EGLL", skipped[0].reason)
@@ -148,7 +141,6 @@ class ParserTests(unittest.TestCase):
 
 
 class Importer(Household):
-    """Jane (a member) importing; Sam and Mia are other people."""
 
     def preview(self, name, who=None):
         return flight_import.preview(self.c, who or self.jane, parsed(name).rows)
@@ -177,7 +169,6 @@ class PreviewTests(Importer):
 
     def test_times_are_kept_at_their_airports(self):
         first = self.preview("flighty")[0]
-        # 08:12 in New York and 11:29 in Los Angeles, as the file's offsets say: not converted to anything else
         self.assertEqual((first["start_local"], first["end_local"]), ("2025-03-01T08:12", "2025-03-01T11:29"))
 
     def test_an_offset_that_is_not_the_airports_is_put_at_its_zone(self):
@@ -199,10 +190,10 @@ class PreviewTests(Importer):
 
     def test_the_same_route_and_day_is_the_same_flight_and_so_is_the_same_number_and_day(self):
         self.add(self.jane, {"kind": "flight", "origin": "FRA", "destination": "JFK", "start_local": "2025-09-12T09:00",
-                             "end_local": "2025-09-12T12:00"})                                   # no flight number: the route and day
+                             "end_local": "2025-09-12T12:00"})
         self.add(self.jane, {"kind": "flight", "origin": "XXX", "destination": "YYY", "start_local": "2025-09-19T09:00",
                              "end_local": "2025-09-19T12:00", "start_zone": "UTC", "end_zone": "UTC",
-                             "details": {"flight_number": "LH 401"}})                         # another route, the same number and day
+                             "details": {"flight_number": "LH 401"}})
         self.assertEqual(self.statuses(self.preview("appintheair")), ["exists", "exists", "new"])
 
     def test_a_cancelled_segment_is_not_the_flight(self):
@@ -242,7 +233,7 @@ class SaveTests(Importer):
     def test_flights_are_grouped_into_trips_by_the_usual_grouping(self):
         self.save_new("flighty")
         listing = trips.listing(self.c, self.jane)
-        self.assertEqual([len(t["segments"]) for t in listing], [2, 1])   # JFK→LAX and the way back a week later; SEA→SFO in April
+        self.assertEqual([len(t["segments"]) for t in listing], [2, 1])
         self.save_new("openflights")
         self.assertEqual(len(trips.listing(self.c, self.jane)), 4)
 
@@ -264,9 +255,9 @@ class SaveTests(Importer):
     def test_a_flight_with_no_times_counts_in_distance_but_not_in_time(self):
         self.save_new("flighty")
         seg = next(s for s in self.segments(self.jane) if s.origin == "LAX")
-        self.assertEqual((seg.start_local, seg.end_local), ("2025-03-08T00:00", "2025-03-08T03:00"))   # the same moment: no duration
+        self.assertEqual((seg.start_local, seg.end_local), ("2025-03-08T00:00", "2025-03-08T03:00"))
         self.assertEqual(trips.decode_details(seg.details)["time_unknown"], "yes")
-        self.assertEqual((seg.origin, seg.destination), ("LAX", "JFK"))   # the places, so the distance
+        self.assertEqual((seg.origin, seg.destination), ("LAX", "JFK"))
         self.assertEqual(trips.instant(seg.end_local, seg.end_zone), trips.instant(seg.start_local, seg.start_zone))
 
     def test_a_flight_with_no_times_is_on_one_day_at_both_airports_whichever_way_it_flies(self):
@@ -285,7 +276,7 @@ class SaveTests(Importer):
     def test_giving_an_untimed_flight_real_times_makes_them_real(self):
         self.save_new("flighty")
         seg = next(s for s in self.segments(self.jane) if s.origin == "LAX")
-        trips.edit_segment(self.c, self.jane, seg.id, {"details": {"seat": "3A"}})   # not the times, and no marker sent: still untimed
+        trips.edit_segment(self.c, self.jane, seg.id, {"details": {"seat": "3A"}})
         self.assertEqual(trips.decode_details(self.c.orm.get(Segment, seg.id).details).get("time_unknown"), "yes")
         got = trips.edit_segment(self.c, self.jane, seg.id, {"start_local": "2025-03-08T09:00", "end_local": "2025-03-08T17:30"})
         assert got is not None
@@ -302,7 +293,7 @@ class SaveTests(Importer):
 
     def test_flights_for_a_guest_alone_are_seen_by_the_importer_who_booked_them(self):
         self.save_new("appintheair", travelers=self.on(self.mia))
-        self.assertEqual(len(trips.listing(self.c, self.jane)), 2)   # FRA→JFK with the way back, and MUC→ZRH
+        self.assertEqual(len(trips.listing(self.c, self.jane)), 2)
         self.assertEqual(trips.listing(self.c, self.sam), [])
 
     def test_a_flight_that_cannot_be_a_segment_adds_none(self):
@@ -350,7 +341,7 @@ class RouteTests(RouteCase):
         self.assertEqual(status, 200, preview)
         self.assertEqual((preview["format"], preview["me"]), ("Flighty", self.person["ana"]))
         self.assertEqual([r["status"] for r in preview["rows"]], ["new", "new", "unreadable", "new", "unreadable", "unreadable"])
-        self.assertEqual(self.ok("ana", "GET", "/api/trips"), {"trips": []})   # nothing is saved by a preview
+        self.assertEqual(self.ok("ana", "GET", "/api/trips"), {"trips": []})
         saved = self.ok("ana", "POST", "/api/import", {"flights": self.rows_to_save(preview)})
         self.assertEqual(saved, {"added": 3, "existing": 0})
         listing = self.ok("ana", "GET", "/api/trips")["trips"]
@@ -379,7 +370,7 @@ class RouteTests(RouteCase):
                 status, got = self.call("ana", "POST", "/api/import", body)
                 self.assertEqual(status, 400, got)
                 self.assertTrue(got["error"])
-        self.assertEqual(self.ok("ana", "GET", "/api/trips"), {"trips": []})   # none of those added anything
+        self.assertEqual(self.ok("ana", "GET", "/api/trips"), {"trips": []})
 
     def test_at_most_a_thousand_flights_at_a_time(self):
         _, preview = self.upload("ana", export("appintheair"))
@@ -408,7 +399,6 @@ class RouteTests(RouteCase):
 
 
 class LocalHouseholdTests(ServerCase):
-    """Without sign-in, on your own machine, the local household imports for nobody in particular and sees every trip."""
     unset = ("OIDC_ISSUER",)
 
     def test_the_household_previews_and_saves(self):

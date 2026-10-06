@@ -1,16 +1,3 @@
-"""Generates the feature map: for each route in waypoint/server/routes.py, its handler, the web app files that call it, the
-tests that exercise it and the docs page that describes it. Writes docs/feature-map.json and the page
-docs/src/content/docs/contributing/feature-map.md; `--check` writes nothing and fails when either is out of date, or when
-a route has no test and isn't on tools/feature_map_allowlist.txt (which may only shrink). Standard library only.
-
-How each part is found (all from the code, never by hand):
-- handler: the name `ROUTES` lists, and the module it is imported from (parsed with `ast`, nothing is imported).
-- web app: an `api(`, `apiCall(`, `fetch(` or `EventSource(` call in frontend/src whose address is a string or template literal
-  (`${...}` is an id); its method is the call's `method: "..."`, else GET. Addresses built in a variable aren't seen.
-- tests: a file in tests/ that names the handler, or an address (a literal or an f-string, with the method written
-  next to it when there is one) that the route answers, as the router would.
-- docs: a page in docs/src/content/docs that names the address or the handler, else the page for the route's area
-  (AREA_DOCS below)."""
 from __future__ import annotations
 
 import argparse
@@ -27,7 +14,6 @@ PAGE_OUT = ROOT / "docs/src/content/docs/contributing/feature-map.md"
 ALLOWLIST = ROOT / "tools/feature_map_allowlist.txt"
 DOCS = ROOT / "docs/src/content/docs"
 
-# The docs page for each area (an address's second segment), for a route no page names.
 AREA_DOCS = {
     "ai": "start/ai", "state": "start/docker", "mailboxes": "start/gmail", "backup": "start/docker", "restore": "start/docker",
     "people": "start/people", "loyalty": "start/loyalty", "review": "start/review",
@@ -63,8 +49,6 @@ def segments(path: str) -> list[str]:
 
 
 def answers(rs: list[dict], method: str | None, path: str) -> list[dict]:
-    """The routes that answer `method path`, the first for each method, as the router matches (a literal segment
-    matches the same text or an {id}; a dynamic one only an {id}). A method of None is every method."""
     parts = segments(path)
     found: dict[str, dict] = {}
     for r in rs:
@@ -77,9 +61,8 @@ def answers(rs: list[dict], method: str | None, path: str) -> list[dict]:
 
 
 def call_method(text: str, start: int) -> str | None:
-    """The method of the call that opens at `start`: its literal `method: "X"`, else GET; None when it isn't a literal."""
     depth, end = 0, min(len(text), start + 800)
-    for i in range(text.index("(", start), end):   # to the call's closing parenthesis
+    for i in range(text.index("(", start), end):
         depth += {"(": 1, ")": -1}.get(text[i], 0)
         if depth == 0:
             end = i
@@ -185,7 +168,7 @@ ALLOW_HEADER = """# Routes that have no test yet, as "METHOD /path" (see tools/f
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="write nothing; fail if the map is out of date or a route has no test")
     ap.add_argument("--write-allowlist", action="store_true", help="(re)write the allow-list from the routes with no test now")
     args = ap.parse_args()

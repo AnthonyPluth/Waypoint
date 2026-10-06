@@ -7,16 +7,12 @@
   import { Input } from "$lib/components/ui/input";
   import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, SEAT_LIMIT, SEATED, seatKey, type Draft } from "$lib/segment-form";
 
-  // Adding a segment by hand, or editing one. A failed check or save keeps everything typed and says why; what you
-  // change here is locked against later emails (the server does that).
-  // `focus`: the field to put the cursor in (Add address on a card opens the form at the address).
   let { initial, people, onsaved, oncancel, focus = "" }: { initial: Draft; people: Person[]; onsaved: (s: Segment) => void; oncancel: () => void; focus?: string } = $props();
   // svelte-ignore state_referenced_locally
   let d = $state<Draft>({ ...initial, details: { ...initial.details }, people: [...initial.people], printed: [...initial.printed] });
   let error = $state("");
   let saving = $state(false);
 
-  // A new port starts in the zone of the one before it (or the cruise's own), the usual case for a run of ports.
   const addPort = () => (d.itinerary = [...d.itinerary, { name: "", zone: d.itinerary.at(-1)?.zone ?? d.start_zone, arrive: "", depart: "" }]);
   const movePort = (i: number, by: number) => {
     const next = [...d.itinerary];
@@ -27,7 +23,7 @@
 
   const flight = $derived(d.kind === "flight");
   const editing = $derived(d.id !== null);
-  const zones = (() => { try { return Intl.supportedValuesOf("timeZone"); } catch { return []; } })();   // (an older browser has no list: any name can still be typed)
+  const zones = (() => { try { return Intl.supportedValuesOf("timeZone"); } catch { return []; } })();
 
   async function save(e: SubmitEvent) {
     e.preventDefault();

@@ -1,5 +1,3 @@
-"""Reminders and the calendar feed (Settings → Reminders): the signed-in member's own devices, which reminders they get,
-and their private calendar feed. Each member sees and changes only their own."""
 from __future__ import annotations
 
 import time
@@ -30,20 +28,16 @@ def _view(conn) -> Reminders:
 
 
 def api_reminders(conn, _q, _b) -> Reminders:
-    """Which reminders the member gets, their devices, and whether they have a calendar feed. A device or feed whose owner
-    lost access is ended first (they can't open Settings to turn it off)."""
     reminders.end_lapsed(conn)
     return _view(conn)
 
 
 def api_reminders_set(conn, _q, body: RemindersBody) -> Reminders:
-    """Choose which reminders to get."""
     reminders.set_prefs(conn, owner(), {"check_in": _flag(body, "check_in"), "day_of": _flag(body, "day_of")})
     return _view(conn)
 
 
 def api_device_add(conn, _q, body: DeviceBody) -> ReminderDevice:
-    """Turn notifications on for this browser (its push subscription)."""
     texts = []
     for key in ("endpoint", "p256dh", "auth"):
         if not isinstance(body.get(key), str):
@@ -56,21 +50,17 @@ def api_device_add(conn, _q, body: DeviceBody) -> ReminderDevice:
 
 
 def api_device_remove(conn, _q, _b, device_id) -> Ok:
-    """Stop notifications to one of the member's devices."""
     if not reminders.remove_device(conn, owner(), row_id(device_id, NO_DEVICE)):
         raise ApiError(NO_DEVICE, 404)
     return {"ok": True}
 
 
 def api_feed_make(conn, _q, _b) -> FeedMade:
-    """Make the member's calendar feed, or a new address for it (the old one stops working at once). The address, with its
-    key, is in this answer only: Waypoint keeps just a hash of the key."""
     base = public_base("The calendar feed")
     key = reminders.new_feed_key(conn, owner(), time.time())
     return {"url": f"{base}/feed/{key}.ics"}
 
 
 def api_feed_off(conn, _q, _b) -> Ok:
-    """Turn the member's calendar feed off."""
     reminders.feed_off(conn, owner())
     return {"ok": True}

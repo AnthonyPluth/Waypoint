@@ -1,6 +1,3 @@
-"""OAuth for the MCP endpoint over HTTP: the metadata, registration, the consent page, tokens, revocation and /mcp
-itself, against a real Waypoint (waypoint/server/handler.py). The functions underneath are tested in
-tests/test_mcp_oauth.py."""
 import base64
 import hashlib
 import json
@@ -30,7 +27,6 @@ CALLBACK = "http://127.0.0.1:43210/callback"
 
 
 def forget_oauth(conn, client_ids) -> None:
-    """Remove what these apps (and any consent form left open) made. For a class with a database of its own."""
     grants = select(OAuthGrant.id).where(OAuthGrant.client_id.in_(client_ids))
     conn.execute(delete(OAuthToken).where(OAuthToken.grant_id.in_(grants)))
     conn.execute(delete(OAuthCode).where(OAuthCode.grant_id.in_(grants)))
@@ -64,10 +60,6 @@ class Reply:
 
 
 class OAuthServer(ServerCase):
-    """A real Waypoint on a database of its own (tests/shared.py's own_database, for the whole class; on Postgres its own
-    schema), with no sign-in (so you're "signed in" on this computer). Nothing else writes to it, so another module's
-    tests can't end a session or flip a switch under these. Each test still removes what it made and turns the switches
-    off, so the tests don't depend on each other's order."""
     unset = ("WAYPOINT_PUBLIC_URL", "OIDC_ISSUER")
 
     @classmethod
@@ -78,7 +70,7 @@ class OAuthServer(ServerCase):
 
     def setUp(self):
         self.tag = tag()
-        self.trip = {"name": "Trip " + self.tag}                                  # what a change made through /mcp adds
+        self.trip = {"name": "Trip " + self.tag}
         self.clients: list[str] = []
         self.addCleanup(self.forget)
 
@@ -89,7 +81,6 @@ class OAuthServer(ServerCase):
             mcp_access.set_allow_writes(conn, False)
 
     def mine(self, stmt):
-        """The first column of this statement's first row (`.in_(self.clients)` picks "this test's clients")."""
         with db.session() as conn:
             row = conn.execute(stmt).fetchone()
         return row[0] if row else None
@@ -131,7 +122,6 @@ class OAuthServer(ServerCase):
         return body[start:body.index('"', start)]
 
     def answer(self, page, decision="allow", ids=False, write=False, cookies=None, headers=None, token=None):
-        """The consent form's answer: `ids` and `write` are the boxes ticked."""
         fields = {"consent": token if token is not None else self.consent_token(page), "decision": decision,
                   **({"ids": "1"} if ids else {}), **({"write": "1"} if write else {})}
         ck = {"waypoint_consent": page.cookie("waypoint_consent").value} if cookies is None else cookies
@@ -156,7 +146,6 @@ class OAuthServer(ServerCase):
         return r.json
 
     def granted(self, client, page, **ticked):
-        """The scope of the tokens an app gets when this consent page is answered with these boxes ticked."""
         r = self.exchange(client, self.answer(page, **ticked).query()["code"])
         self.assertEqual(r.status, 200, r.body)
         return r.json["scope"]
@@ -183,7 +172,6 @@ class OAuthServer(ServerCase):
 
 
 class MetadataTests(OAuthServer):
-    """The two metadata documents, and which address Waypoint says it is (WAYPOINT_PUBLIC_URL, never the Host header)."""
 
     def test_the_metadata(self):
         for path in ("/.well-known/oauth-protected-resource/mcp", "/.well-known/oauth-protected-resource"):
@@ -192,7 +180,7 @@ class MetadataTests(OAuthServer):
                 self.assertEqual(r.status, 200)
                 self.assertEqual(r.json, {"resource": self.resource, "authorization_servers": [self.iss],
                                           "scopes_supported": ["read", "write"], "bearer_methods_supported": ["header"]})
-                self.assertIsNone(r.headers.get("Access-Control-Allow-Origin"))   # no CORS
+                self.assertIsNone(r.headers.get("Access-Control-Allow-Origin"))
         m = self.http("GET", "/.well-known/oauth-authorization-server").json
         self.assertEqual(m, mcp_oauth.authorization_server_metadata(self.iss))
         self.assertEqual(m["token_endpoint"], self.iss + "/oauth/token")
@@ -217,7 +205,7 @@ class MetadataTests(OAuthServer):
                 r = self.http("GET", path, headers=host)
                 self.assertEqual(r.status, 404)
                 self.assertIn("WAYPOINT_PUBLIC_URL", r.json["error"])
-            self.assertEqual(self.register().status, 201)                         # on the home address, fine
+            self.assertEqual(self.register().status, 201)
             r = self.http("POST", "/oauth/register", b"{}", {"Content-Type": "application/json", **host})
             self.assertEqual(r.status, 404)
             page = self.http("GET", "/oauth/authorize?client_id=x", headers=host)
@@ -236,7 +224,6 @@ class MetadataTests(OAuthServer):
 
 
 class RegistrationTests(OAuthServer):
-    """Dynamic client registration over HTTP: JSON only, at most 8 KB, and what's refused saves nothing."""
 
     def test_register(self):
         r = self.register()
@@ -254,13 +241,13 @@ class RegistrationTests(OAuthServer):
         r = self.register(client_name="x" * 101)
         self.assertEqual((r.status, r.json["error"]), (400, "invalid_client_metadata"))
         r = self.http("POST", "/oauth/register", json.dumps({"client_name": name, "redirect_uris": [CALLBACK]}).encode(),
-                      {"Content-Type": "application/x-www-form-urlencoded"})   # what a form on another site could send
+                      {"Content-Type": "application/x-www-form-urlencoded"})
         self.assertEqual((r.status, r.json["error"]), (400, "invalid_client_metadata"))
         r = self.http("POST", "/oauth/register", b"{nope", {"Content-Type": "application/json"})
         self.assertEqual(r.status, 400)
         r = self.http("POST", "/oauth/register", json.dumps({"client_name": name, "redirect_uris": [CALLBACK], "x": "y" * 9000}).encode(),
                       {"Content-Type": "application/json"})
-        self.assertEqual(r.status, 413)                                           # over 8 KB
+        self.assertEqual(r.status, 413)
         self.assertEqual(self.http("GET", "/oauth/register").status, 405)
         self.assertEqual(self.mine(select(func.count()).select_from(OAuthClient).where(OAuthClient.name == name)), 0)
         self.assertEqual(self.clients, [])
@@ -272,10 +259,10 @@ class RegistrationTests(OAuthServer):
                          .values(created=time.time() - mcp_oauth.UNCONSENTED_TTL - 60))
             conn.execute(update(OAuthClient).where(OAuthClient.id == recent["client_id"])
                          .values(created=time.time() - mcp_oauth.UNCONSENTED_TTL + 3600))
-        self.client()                                                             # registering tidies up
+        self.client()
         self.assertIsNone(self.mine(select(OAuthClient.id).where(OAuthClient.id == old["client_id"])))
         self.assertIsNotNone(self.mine(select(OAuthClient.id).where(OAuthClient.id == recent["client_id"])))
-        page = self.authorize(old)                                                # and the app is told how to start over
+        page = self.authorize(old)
         self.assertEqual(page.status, 400)
         self.assertIn(b"Remove Waypoint from the assistant and add it again", page.body)
 
@@ -288,14 +275,12 @@ class RegistrationTests(OAuthServer):
         self.clients.extend(f"wpc_{self.tag}{i:02d}" for i in range(53))
         self.client()
         kept = self.mine(select(func.count()).select_from(OAuthClient).where(OAuthClient.name == "Bulk " + self.tag))
-        self.assertEqual(kept, mcp_oauth.MAX_UNCONSENTED - 1)                     # the new one makes fifty
-        self.assertIsNone(self.mine(select(OAuthClient.id).where(OAuthClient.id == f"wpc_{self.tag}00")))   # the oldest went
+        self.assertEqual(kept, mcp_oauth.MAX_UNCONSENTED - 1)
+        self.assertIsNone(self.mine(select(OAuthClient.id).where(OAuthClient.id == f"wpc_{self.tag}00")))
         self.assertIsNotNone(self.mine(select(OAuthClient.id).where(OAuthClient.id == f"wpc_{self.tag}52")))
 
 
 class ConsentTests(OAuthServer):
-    """The consent page: a request it can't trust is shown here, one it can goes back to the app, the boxes for
-    write, and the answer's checks."""
 
     def test_a_bad_app_or_redirect_is_shown_here_never_redirected(self):
         c = self.client()
@@ -330,7 +315,7 @@ class ConsentTests(OAuthServer):
         self.assertIn("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; wants to connect to Waypoint", page)
         self.assertIn("127.0.0.1:43210", page)
         self.assertIn("Read your travel", page)
-        self.assertNotIn("See full ID numbers", page)                             # it didn't ask
+        self.assertNotIn("See full ID numbers", page)
         self.assertNotIn("Change trips", page)
         csp = r.headers["Content-Security-Policy"]
         self.assertIn("form-action 'self' http://127.0.0.1:*", csp)
@@ -341,18 +326,18 @@ class ConsentTests(OAuthServer):
 
     def test_ids_read_is_not_a_scope_so_there_is_no_box_for_it(self):
         c = self.client()
-        r = self.authorize(c, scope="read ids:read")                              # sent back to the app, never a page
+        r = self.authorize(c, scope="read ids:read")
         self.assertEqual((r.status, r.query()["error"], r.query()["state"]), (302, "invalid_scope", "xyz/+&="))
         self.assertNotIn("code", r.query())
         page = self.authorize(c, scope="read write")
         self.assertNotIn("ID numbers", page.body.decode())
         self.assertNotIn('name="ids"', page.body.decode())
         self.writes(True)
-        self.assertEqual(self.granted(c, self.authorize(c, scope="read write"), ids=True), "read")   # a forged box grants nothing
+        self.assertEqual(self.granted(c, self.authorize(c, scope="read write"), ids=True), "read")
 
     def test_the_write_box_follows_its_switch_and_is_never_ticked_for_you(self):
         c = self.client()
-        page = self.authorize(c, scope="read write").body.decode()                # asked, switch off: shown, off, and why
+        page = self.authorize(c, scope="read write").body.decode()
         self.assertIn('type="checkbox" disabled><span><b>Change trips', page)
         self.assertIn("Turn on Let assistants change trips in Settings first", page)
         self.assertNotIn('name="write"', page)
@@ -360,24 +345,24 @@ class ConsentTests(OAuthServer):
         self.writes(True)
         page = self.authorize(c, scope="read write")
         body = page.body.decode()
-        self.assertIn('<input type="checkbox" name="write" value="1"><span><b>Change trips', body)   # on, not ticked
+        self.assertIn('<input type="checkbox" name="write" value="1"><span><b>Change trips', body)
         self.assertIn("Add, change and remove trips, bookings, travellers, people and guests, and the distance unit", body)
         self.assertIn("AI settings, backups, loyalty numbers, sign-in or these assistant settings", body)
-        self.assertEqual(self.granted(c, page), "read")                           # left unticked: read only
+        self.assertEqual(self.granted(c, page), "read")
         self.assertEqual(self.granted(c, self.authorize(c, scope="read write"), write=True), "read write")
         page = self.authorize(c, scope="read")
-        self.assertNotIn("Change trips", page.body.decode())                      # not asked: not there
-        self.assertEqual(self.granted(c, page, write=True), "read")               # nor granted
+        self.assertNotIn("Change trips", page.body.decode())
+        self.assertEqual(self.granted(c, page, write=True), "read")
 
     def test_the_switch_is_read_again_when_you_answer(self):
         c = self.client()
         self.writes(True)
         page = self.authorize(c, scope="read write")
         self.writes(False)
-        self.assertEqual(self.granted(c, page, write=True), "read")               # turned off while the page was open
+        self.assertEqual(self.granted(c, page, write=True), "read")
         self.writes(True)
         page = self.authorize(c, scope="read write")
-        self.assertEqual(self.granted(c, page, write=False), "read")             # you unticked it
+        self.assertEqual(self.granted(c, page, write=False), "read")
 
     def test_allow_and_deny(self):
         c = self.client()
@@ -387,7 +372,7 @@ class ConsentTests(OAuthServer):
         q = r.query()
         self.assertTrue(q["code"].startswith("wpo_"))
         self.assertEqual((q["state"], q["iss"]), ("xyz/+&=", self.iss))
-        self.assertEqual(r.cookie("waypoint_consent").value, "")                  # the cookie is cleared
+        self.assertEqual(r.cookie("waypoint_consent").value, "")
         r = self.answer(self.authorize(c), "deny")
         self.assertEqual((r.query()["error"], r.query()["state"]), ("access_denied", "xyz/+&="))
         self.assertNotIn("code", r.query())
@@ -405,14 +390,12 @@ class ConsentTests(OAuthServer):
                 r = self.answer(page, **kwargs)
                 self.assertEqual(r.status, 403)
                 self.assertIsNone(r.location)
-        r = self.answer(page)                                                     # the real one still works, once
+        r = self.answer(page)
         self.assertEqual(r.status, 302)
         again = self.answer(page, token=token)
         self.assertEqual((again.status, again.location), (403, None))
 
     def test_a_browsers_own_form_post_is_accepted(self):
-        """Under Referrer-Policy: no-referrer a browser sends a page's form post with Origin "null"; it's Waypoint's own
-        page when the browser also says same-origin."""
         c = self.client()
         r = self.answer(self.authorize(c), headers={"Origin": "null", "Sec-Fetch-Site": "same-origin"})
         self.assertEqual(r.status, 302)
@@ -430,7 +413,6 @@ class ConsentTests(OAuthServer):
 
 
 class TokenTests(OAuthServer):
-    """/oauth/token and /oauth/revoke: codes, refusals, a code used twice, confidential clients, refresh and revoking."""
 
     def test_tokens_for_a_code(self):
         c = self.client()
@@ -459,7 +441,7 @@ class TokenTests(OAuthServer):
 
     def test_pkce_is_required_and_only_s256(self):
         c = self.client()
-        wrong = "z" * 50                                                          # a verifier that isn't this request's
+        wrong = "z" * 50
         self.assertEqual(self.exchange(c, self.code(c), code_verifier=wrong).json["error"], "invalid_grant")
         self.assertEqual(self.exchange(c, self.code(c), code_verifier="short").json["error"], "invalid_grant")
         self.assertEqual(self.exchange(c, self.code(c), code_verifier=None).json["error"], "invalid_request")
@@ -473,7 +455,7 @@ class TokenTests(OAuthServer):
         self.assertEqual(first.status, 200)
         again = self.exchange(c, code)
         self.assertEqual((again.status, again.json["error"]), (400, "invalid_grant"))
-        self.assertEqual(self.rpc(first.json["access_token"], "ping").status, 401)   # the tokens from it are gone too
+        self.assertEqual(self.rpc(first.json["access_token"], "ping").status, 401)
         self.assertEqual(self.mine(select(OAuthGrant.revoked_reason).where(OAuthGrant.client_id.in_(self.clients))), "code_reuse")
 
     def test_an_expired_code(self):
@@ -492,7 +474,7 @@ class TokenTests(OAuthServer):
         fields = {"grant_type": "authorization_code", "code": code, "redirect_uri": CALLBACK, "code_verifier": VERIFIER}
         r = self.form("/oauth/token", fields, {"Authorization": wrong})
         self.assertEqual((r.status, r.json["error"], r.headers["WWW-Authenticate"]), (401, "invalid_client", 'Basic realm="Waypoint"'))
-        r = self.form("/oauth/token", {**fields, "client_id": c["client_id"]})       # no secret at all
+        r = self.form("/oauth/token", {**fields, "client_id": c["client_id"]})
         self.assertEqual(r.status, 401)
         r = self.form("/oauth/token", fields, {"Authorization": basic})
         self.assertEqual(r.status, 200, r.body)
@@ -505,14 +487,14 @@ class TokenTests(OAuthServer):
         self.assertEqual(r.status, 200, r.body)
         second = r.json
         self.assertNotEqual(second["refresh_token"], first["refresh_token"])
-        self.assertEqual(second["scope"], "read write")                           # what was approved, no more or less
+        self.assertEqual(second["scope"], "read write")
         self.assertEqual(self.rpc(second["access_token"], "ping").status, 200)
-        self.assertEqual(self.rpc(first["access_token"], "ping").status, 200)     # the old access token lives out its hour
+        self.assertEqual(self.rpc(first["access_token"], "ping").status, 200)
         r = self.form("/oauth/token", {"grant_type": "refresh_token", "refresh_token": second["refresh_token"], "client_id": c["client_id"],
-                                       "scope": "read ids:read"})                 # not a scope at all
+                                       "scope": "read ids:read"})
         self.assertEqual((r.status, r.json["error"]), (400, "invalid_scope"))
         r = self.form("/oauth/token", {"grant_type": "refresh_token", "refresh_token": first["refresh_token"], "client_id": c["client_id"]})
-        self.assertEqual((r.status, r.json["error"]), (400, "invalid_grant"))     # the spent one again: revoke it all
+        self.assertEqual((r.status, r.json["error"]), (400, "invalid_grant"))
         for t in (first, second):
             self.assertEqual(self.rpc(t["access_token"], "ping").status, 401)
         r = self.form("/oauth/token", {"grant_type": "refresh_token", "refresh_token": second["refresh_token"], "client_id": c["client_id"]})
@@ -524,17 +506,17 @@ class TokenTests(OAuthServer):
         t = self.tokens(c)
         r = self.form("/oauth/token", {"grant_type": "refresh_token", "refresh_token": t["refresh_token"], "client_id": other["client_id"]})
         self.assertEqual((r.status, r.json["error"]), (400, "invalid_grant"))
-        self.assertEqual(self.rpc(t["access_token"], "ping").status, 200)         # and it didn't end the real one's
+        self.assertEqual(self.rpc(t["access_token"], "ping").status, 200)
 
     def test_revoke(self):
         c = self.client()
         t = self.tokens(c)
         self.assertEqual(self.rpc(t["access_token"], "ping").status, 200)
         r = self.form("/oauth/revoke", {"token": "wpr_unknown", "client_id": c["client_id"]})
-        self.assertEqual(r.status, 200)                                           # unknown tokens are fine too
+        self.assertEqual(r.status, 200)
         other = self.client()
         r = self.form("/oauth/revoke", {"token": t["refresh_token"], "client_id": other["client_id"]})
-        self.assertEqual(r.status, 200)                                           # another app's token: quietly nothing
+        self.assertEqual(r.status, 200)
         self.assertEqual(self.rpc(t["access_token"], "ping").status, 200)
         r = self.form("/oauth/revoke", {"token": t["refresh_token"], "client_id": c["client_id"], "token_type_hint": "refresh_token"})
         self.assertEqual(r.status, 200)
@@ -553,8 +535,6 @@ class TokenTests(OAuthServer):
 
 
 class McpTests(OAuthServer):
-    """/mcp with a token: who may call it (no token, an expired one, one for another address, a web page), and what a
-    token's scopes and the two switches allow."""
 
     def test_no_token_is_401_pointing_at_the_metadata(self):
         r = self.rpc(None, "ping")
@@ -572,12 +552,12 @@ class McpTests(OAuthServer):
         host = urllib.parse.urlsplit(self.base).netloc
         for origin in ("https://evil.example", "http://evil.example", "null", f"http://{host}.evil.example", "http://127.0.0.1:1"):
             with self.subTest(origin=origin):
-                for token in (t["access_token"], None):                           # refused before the token is even looked at
+                for token in (t["access_token"], None):
                     r = self.rpc(token, "ping", headers={"Origin": origin})
                     self.assertEqual((r.status, r.json), (403, {"error": "Origin not allowed."}))
                     self.assertNotIn("WWW-Authenticate", r.headers)
-        self.assertEqual(self.rpc(t["access_token"], "ping", headers={"Origin": self.base}).status, 200)   # Waypoint's own address
-        self.assertEqual(self.rpc(t["access_token"], "ping").status, 200)         # an app sends no Origin
+        self.assertEqual(self.rpc(t["access_token"], "ping", headers={"Origin": self.base}).status, 200)
+        self.assertEqual(self.rpc(t["access_token"], "ping").status, 200)
 
     def test_an_expired_token_or_one_for_another_resource(self):
         t = self.tokens()
@@ -586,7 +566,7 @@ class McpTests(OAuthServer):
             grants = select(OAuthGrant.id).where(OAuthGrant.client_id == self.clients[-1])
             conn.execute(update(OAuthToken).where(OAuthToken.kind == "access", OAuthToken.grant_id.in_(grants)).values(expires=1))
         self.assertEqual(self.rpc(t["access_token"], "ping").status, 401)
-        with db.session() as conn:   # a token Waypoint issued at another address (another WAYPOINT_PUBLIC_URL)
+        with db.session() as conn:
             c = mcp_oauth.register(conn, {"redirect_uris": [CALLBACK]})
             self.clients.append(c["client_id"])
             params = {"client_id": c["client_id"], "redirect_uri": CALLBACK, "code_challenge": CHALLENGE,
@@ -617,13 +597,13 @@ class McpTests(OAuthServer):
         self.assertIn("create_trip", offered)
         self.assertNotIn("isError", self.call(token, "create_trip", {"fields": self.trip}))
         self.assertEqual(self.trips_made(), 1)
-        self.writes(False)                                                        # off: at once, without revoking
+        self.writes(False)
         self.assertEqual(self.tool_names(token), {x["name"] for x in mcp_server.TOOLS})
         result = self.call(token, "create_trip", {"fields": self.trip})
         self.assertTrue(result["isError"])
         self.assertIn("switched off", result["content"][0]["text"])
         self.assertEqual(self.rpc(token, "ping").status, 200)
-        self.assertEqual(self.trips_made(), 1)                                    # the refused call changed nothing
+        self.assertEqual(self.trips_made(), 1)
 
     def test_no_tool_reaches_a_loyalty_number(self):
         self.writes(True)
@@ -634,15 +614,13 @@ class McpTests(OAuthServer):
             with self.subTest(tool=gone):
                 self.assertNotIn(gone, names)
                 result = self.call(t, gone, {})
-                self.assertTrue(result["isError"])                                # unknown to the server, whatever the scope
+                self.assertTrue(result["isError"])
                 self.assertIn("Unknown tool", result["content"][0]["text"])
 
 
 class EndToEndTests(OAuthServer):
-    """What an assistant does from its first request to a replayed refresh token."""
 
     def test_connect_use_refresh_replay(self):
-        # What an assistant does: find the server's metadata from the 401, register, send you to approve, get tokens.
         challenge = self.rpc(None, "initialize").headers["WWW-Authenticate"]
         prm_url = challenge.split('resource_metadata="')[1].split('"')[0]
         prm = self.http("GET", prm_url).json
@@ -666,13 +644,11 @@ class EndToEndTests(OAuthServer):
         self.writes(False)
         self.assertTrue(self.call(t["access_token"], "create_trip", {"fields": self.trip})["isError"])
         self.writes(True)
-        # Refresh: a new pair; the old refresh token is spent.
         r = self.form(asm["token_endpoint"], {"grant_type": "refresh_token", "refresh_token": t["refresh_token"], "client_id": reg["client_id"]})
         self.assertEqual(r.status, 200, r.body)
         t2 = r.json
         self.assertEqual(t2["scope"], "read write")
         self.assertEqual(self.rpc(t2["access_token"], "ping").status, 200)
-        # Someone replays the old one: the whole connection is revoked, the new tokens included.
         r = self.form(asm["token_endpoint"], {"grant_type": "refresh_token", "refresh_token": t["refresh_token"], "client_id": reg["client_id"]})
         self.assertEqual((r.status, r.json["error"]), (400, "invalid_grant"))
         self.assertEqual(self.rpc(t2["access_token"], "ping").status, 401)
@@ -683,8 +659,6 @@ class EndToEndTests(OAuthServer):
 
 
 class SignInTests(OAuthServer):
-    """With sign-in (OIDC): someone signed out is sent to sign in and comes back to the same consent page, a grant
-    carries who approved it, and it ends when that person can no longer sign in (oidc.access_lapsed)."""
     unset = ()
 
     @classmethod
@@ -694,7 +668,7 @@ class SignInTests(OAuthServer):
         cls.env = {"OIDC_ISSUER": f"http://127.0.0.1:{cls.idp.server_port}", "OIDC_CLIENT_ID": "waypoint",
                    "OIDC_CLIENT_SECRET": "s3cret", "OIDC_ALLOWED_EMAILS": "me@example.com"}
         super().setUpClass()
-        os.environ["WAYPOINT_PUBLIC_URL"] = cls.base                               # (put back with the rest of the environment)
+        os.environ["WAYPOINT_PUBLIC_URL"] = cls.base
         oidc._discovery.clear()
         oidc._jwks.clear()
 
@@ -707,7 +681,6 @@ class SignInTests(OAuthServer):
         oidc._jwks.clear()
 
     def sign_in_as(self, email):
-        """A Waypoint session for `email`, signed in through the test provider."""
         login = self.http("GET", "/auth/login?next=/")
         q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(login.location).query))
         code = "c-" + tag()
@@ -727,7 +700,7 @@ class SignInTests(OAuthServer):
         q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(login.location).query))
         Provider.issued["c-oauth"] = {"nonce": q["nonce"], "challenge": q["code_challenge"], "email": "me@example.com"}
         done = self.http("GET", f"/auth/callback?code=c-oauth&state={q['state']}", cookies={"waypoint_login": login.cookie("waypoint_login").value})
-        self.assertEqual(done.location, back_to)                                  # the whole request survived
+        self.assertEqual(done.location, back_to)
         self.assertEqual(dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(back_to).query))["state"], "xyz/+&=")
         self.session = {"waypoint_session": done.cookie("waypoint_session").value}
         page = self.http("GET", done.location, cookies=self.session)
@@ -740,8 +713,7 @@ class SignInTests(OAuthServer):
             self.assertEqual(conn.execute(select(OAuthGrant.sub, OAuthGrant.email)
                                           .where(OAuthGrant.client_id == c["client_id"])).fetchone()[:],
                              ("user-1", "me@example.com"))
-        self.assertEqual(self.rpc(t["access_token"], "ping").status, 200)       # /mcp needs no session
-        # The answer must come from the person who was shown the page
+        self.assertEqual(self.rpc(t["access_token"], "ping").status, 200)
         page = self.http("GET", done.location, cookies=self.session)
         self.assertEqual(page.status, 200, "the session ended between the two fetches (logged out)")
         self.assertIn(b'name="consent" value="', page.body)
@@ -756,7 +728,7 @@ class SignInTests(OAuthServer):
         t = self.tokens(c)
         self.assertEqual(self.rpc(t["access_token"], "ping").status, 200)
         with mock.patch.dict(os.environ, {"OIDC_ALLOWED_EMAILS": "someone-else@example.com"}):
-            r = self.rpc(t["access_token"], "ping")                               # the very next request
+            r = self.rpc(t["access_token"], "ping")
             self.assertEqual(r.status, 401)
             self.assertEqual(r.headers["WWW-Authenticate"], f'Bearer realm="Waypoint", resource_metadata="{self.iss}'
                                                               '/.well-known/oauth-protected-resource/mcp", error="invalid_token"')
@@ -766,7 +738,7 @@ class SignInTests(OAuthServer):
             self.assertNotIn("access_token", r.json)
             grants = select(OAuthGrant.id).where(OAuthGrant.client_id.in_(self.clients))
             self.assertEqual(self.mine(select(func.count()).select_from(OAuthToken).where(OAuthToken.grant_id.in_(grants))), 0)
-        self.assertEqual(self.rpc(t["access_token"], "ping").status, 401)       # back on the list: still ended (reconnect)
+        self.assertEqual(self.rpc(t["access_token"], "ping").status, 401)
 
     def test_a_person_still_allowed_keeps_their_assistant(self):
         self.session = self.sign_in_as("me@example.com")
@@ -789,7 +761,7 @@ class SignInTests(OAuthServer):
         t = self.tokens()
         groups = {"OIDC_ALLOWED_GROUPS": "household", "WAYPOINT_SESSION_DAYS": "14"}
         with mock.patch.dict(os.environ, groups):
-            self.assertEqual(self.rpc(t["access_token"], "ping").status, 200)     # signed in a moment ago
+            self.assertEqual(self.rpc(t["access_token"], "ping").status, 200)
             with db.session() as conn:
                 conn.execute(update(User).where(User.sub == "user-1").values(last_seen=time.time() - 15 * 86400))
             try:

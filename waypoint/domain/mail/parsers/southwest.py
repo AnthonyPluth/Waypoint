@@ -1,17 +1,3 @@
-"""Southwest Airlines (southwest.com, mail from luv.southwest.com): confirmation, change and cancellation emails, which carry
-no schema.org markup, read from their text. Pure: the HTML and text in, bookings out.
-
-The layout it reads, one leg after another (the times are the airports' wall-clock times; the airline's emails give no zones):
-
-    Confirmation #: K7QW2N
-    Passenger: JANE DOE
-    Rapid Rewards #: 55512340011
-    Flight 1234 Mon, Nov 16, 2026
-    Dallas (Love Field), TX (DAL) 8:05 AM
-    Houston (Hobby), TX (HOU) 9:10 AM (+1 day)
-
-A change email is the same layout with the new times; one that says in its headline that the trip "has been canceled" (or has a "Canceled flights" heading) is read the same way and each
-leg comes out cancelled. A leg whose lines don't fit is counted unread rather than guessed at."""
 from __future__ import annotations
 
 import re
@@ -29,8 +15,8 @@ MEMBER = re.compile(r"rapid rewards(?: account)?\s*(?:#|number)?\s*:?\s*(\d{6,15
 LEG = re.compile(r"flight\s+#?(\d{1,4})\b\D{0,12}([A-Za-z]{3}) (\d{1,2}), (\d{4})", re.IGNORECASE)
 STOP = re.compile(r"\(([A-Z]{3})\)\s+(\d{1,2}):(\d{2}) ?([AP])M(?: \(\+(\d) day\))?", re.IGNORECASE)
 CANCELLED = re.compile(r"\b(?:has|have|was|were) been cancell?ed\b|\bcancell?ation confirmation\b", re.IGNORECASE)
-HEADING = re.compile(r"cancell?ed (?:flights?|trip|reservation)", re.IGNORECASE)   # a section heading of its own line
-HEADLINE = 3   # lines at the top that can say the trip was cancelled (a footer saying "if a flight has been canceled…" can't)
+HEADING = re.compile(r"cancell?ed (?:flights?|trip|reservation)", re.IGNORECASE)
+HEADLINE = 3
 
 
 def _clock(hour: int, minute: int, meridiem: str) -> time | None:
@@ -54,7 +40,7 @@ def _leg(code: str | None, status: str, first: re.Match[str], dep: re.Match[str]
     start = datetime.combine(day, left)
     end = datetime.combine(day + timedelta(days=int(arr[5] or 0)), right)
     if end <= start:
-        return None   # (a red-eye whose email gave no "+1 day": the arrival's day isn't guessed)
+        return None
     return Booking("flight", "cancelled" if status == "cancelled" else "confirmed", code, PROVIDER,
                    start.isoformat(timespec="seconds"), end.isoformat(timespec="seconds"), dep[1].upper(), arr[1].upper(),
                    details=(("flight_number", f"WN {first[1]}"),), passengers=passengers)
@@ -65,7 +51,6 @@ def parse(html: str, text: str) -> Parsed:
     code = next((m[1].upper() for r in rows if (m := CONFIRMATION.fullmatch(r))), None)
     names = [m[1].strip() for r in rows if (m := PASSENGER.fullmatch(r))]
     number = next((m[1] for r in rows if (m := MEMBER.fullmatch(r))), None)
-    # A membership number on a booking for one traveller is theirs; with several, whose it is isn't said.
     passengers = tuple(Passenger(n, number if len(names) == 1 else None) for n in names)
     status = "cancelled" if any(CANCELLED.search(r) for r in rows[:HEADLINE]) or any(HEADING.fullmatch(r) for r in rows) else "confirmed"
     found: list[Booking] = []

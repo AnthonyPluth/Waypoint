@@ -1,16 +1,3 @@
-"""The independent review's two decisions, for .github/workflows/agent-review.yml (run from main's copy, never a pull
-request's). Standard library only.
-
-  agent_review.py detect          Is this an agent's pull request? Reads its commit messages, one JSON string per line,
-                                  on stdin, and its description in $BODY; prints true or false.
-  agent_review.py report OUT.json Turns the reviewer's output (claude --output-format json, with --json-schema) into a
-                                  verdict: writes verdict (pass, blocking or error), description and comment (the PR
-                                  comment, base64) to $GITHUB_OUTPUT. A blocking finding, or output it can't read, fails
-                                  the "Agent review" status, and with it the merge gate.
-
-The reviewer read the pull request's code, so what it says is untrusted: the comment is built here, @mentions are
-defused, and it is never interpolated into a command. A reply that contains $ANTHROPIC_API_KEY or
-$CLAUDE_CODE_OAUTH_TOKEN is not posted."""
 from __future__ import annotations
 
 import base64
@@ -25,7 +12,7 @@ CO_AUTHOR = re.compile(r"^co-authored-by:.*(\bclaude\b|anthropic\.com)", re.IGNO
 BODY_SIGNS = ("Generated with [Claude Code]", "claude.ai/code/session_")
 SEVERITIES = ("blocking", "advisory")
 MAX_COMMENT = 60000
-SECRETS = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN")   # what the reviewer authenticates with (agent-review-run.sh)
+SECRETS = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN")
 
 
 def is_agent(messages: list[str], body: str) -> bool:
@@ -35,8 +22,6 @@ def is_agent(messages: list[str], body: str) -> bool:
 
 
 def structured(output: dict) -> dict | None:
-    """The reviewer's answer: --json-schema's structured_output, else the reply itself as JSON (or its last ```json
-    block)."""
     if isinstance(output.get("structured_output"), dict):
         return output["structured_output"]
     text = output.get("result")
@@ -66,7 +51,6 @@ def findings_of(answer: dict) -> list[dict] | None:
 
 
 def defuse(text: object, limit: int = 4000) -> str:
-    """Untrusted text, safe to put in a comment: no @mentions, no HTML comments (our marker), no runaway length."""
     s = str(text or "").replace("@", "@​").replace("<!--", "&lt;!--")
     return s if len(s) <= limit else s[:limit] + " …"
 
@@ -140,7 +124,7 @@ def main(argv: list[str]) -> int:
     if len(argv) == 2 and argv[0] == "report":
         write_outputs(report(argv[1]))
         return 0
-    print(__doc__, file=sys.stderr)
+    print("usage: agent_review.py detect | agent_review.py report OUT.json", file=sys.stderr)
     return 2
 
 

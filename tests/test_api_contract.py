@@ -1,6 +1,3 @@
-"""The API contract (waypoint/server/contract.py, docs/openapi.json, frontend/src/lib/api-types.ts): each covered route's
-real reply, plus the cases that add fields (a signed-in person, a last backup), matches docs/openapi.json; the
-generated files are current; and tools/api_contract.py describes the types it's given."""
 import ast
 import importlib.util
 import json
@@ -45,7 +42,6 @@ OPENAPI = json.loads((ROOT / "docs/openapi.json").read_text())
 
 
 def problems(value, schema, at="reply") -> list[str]:
-    """What in `value` (parsed JSON) doesn't match `schema` (the JSON schema subset docs/openapi.json uses)."""
     if "$ref" in schema:
         return problems(value, OPENAPI["components"]["schemas"][schema["$ref"].rsplit("/", 1)[1]], at)
     if "anyOf" in schema:
@@ -53,7 +49,7 @@ def problems(value, schema, at="reply") -> list[str]:
         if not all(found):
             return []
         not_null = [f for s, f in zip(schema["anyOf"], found, strict=True) if s != {"type": "null"}]
-        if len(not_null) == 1:   # `X | None`, and it isn't None: what's wrong with it as an X
+        if len(not_null) == 1:
             return not_null[0]
         return [f"{at}: {json.dumps(value)[:80]} is none of the types it can be"]
     if "enum" in schema or "const" in schema:
@@ -97,7 +93,6 @@ def covered() -> set[str]:
 
 
 class Replies(DbCase):
-    """Each covered route's reply, as the server would send it (through JSON), against docs/openapi.json."""
 
     def setUp(self):
         super().setUp()
@@ -148,7 +143,7 @@ class Replies(DbCase):
         _current.user = {"sub": "u1", "name": "Rosa Example", "email": "rosa@example.com"}
         env = {"GOOGLE_CLIENT_ID": "client.example", "GOOGLE_CLIENT_SECRET": "secret"}
         with mock.patch.dict("os.environ", env):
-            self.check("GET /api/mailboxes", mailboxes.api_mailboxes(self.c, {}, {}))   # none yet
+            self.check("GET /api/mailboxes", mailboxes.api_mailboxes(self.c, {}, {}))
             self.check("POST /api/mailboxes/connect", mailboxes.api_mailbox_connect(self.c, {}, {}))
         for status in ("connected", "reconnect", "error"):
             self.c.execute(insert(Mailbox).values(owner_sub="u1", address=f"{status}@gmail.example", token=secretbox.encrypt("t"),
@@ -167,7 +162,7 @@ class Replies(DbCase):
     def test_review(self):
         _current.user = {"sub": "u1", "name": "Rosa Example", "email": "rosa@example.com"}
         oidc.remember_user(self.c, "u1", "rosa@example.com", "Rosa Example")
-        self.check("GET /api/review", review_api.api_review(self.c, {}, {}))   # nothing yet
+        self.check("GET /api/review", review_api.api_review(self.c, {}, {}))
         box = self.c.execute(insert(Mailbox).values(owner_sub="u1", address="rosa@gmail.example", token=secretbox.encrypt("t"),
                                                     status="connected", created=1.0)).lastrowid
         for n, reason in enumerate(("no_markup", "incomplete", "broken")):
@@ -183,32 +178,32 @@ class Replies(DbCase):
         self.check("GET /api/review", listed)
         self.check("POST /api/review/who/{id}", review_api.api_review_who(self.c, {}, {"person_id": me.person_id}, str(listed["who"][0]["id"])))
         self.check("POST /api/review/{id}/ignore", review_api.api_review_ignore(self.c, {}, {}, str(listed["items"][0]["id"])))
-        self.c.commit()   # (the preview opens a session of its own)
+        self.c.commit()
         stored_mail.put(self.c, box, "m1", {"subject": "Your itinerary", "sender_domain": "air1.example", "received": "2026-10-17", "text": "Hello.",
                                             "html": "<p>Hello.</p>", "truncated": False}, 1.0)
         self.c.commit()
-        self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][1]["id"])))   # (the kept copy)
-        with mock.patch.object(scan, "preview", return_value=("Hello.", "<p>Hello.</p>", False)):   # (an item with none: fetched from Gmail)
+        self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][1]["id"])))
+        with mock.patch.object(scan, "preview", return_value=("Hello.", "<p>Hello.</p>", False)):
             self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][2]["id"])))
         with mock.patch.object(scan, "suggest_now"):
             self.check("POST /api/review/{id}/suggest", review_api.api_review_suggest(None, {}, {}, str(listed["items"][1]["id"])))
         self.check("DELETE /api/review/{id}", review_api.api_review_dismiss(self.c, {}, {}, str(listed["items"][1]["id"])))
 
     def test_ai(self):
-        self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))   # off
+        self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))
         self.check("POST /api/ai", ai_api.api_ai_save(self.c, {}, {"mode": "local", "ollama_url": "http://ollama.example:1234", "ollama_model": "llama3"}))
         self.check("POST /api/ai", ai_api.api_ai_save(self.c, {}, {"mode": "openrouter", "openrouter_model": "some/model", "openrouter_key": "sk-or-test-1234567"}))
         self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))
 
     def test_logodev(self):
-        self.check("GET /api/logodev", logos_api.api_logodev(self.c, {}, {}))   # off
+        self.check("GET /api/logodev", logos_api.api_logodev(self.c, {}, {}))
         with mock.patch.object(logos_api.jobs, "fetch_logos_now", return_value=True):
             self.check("POST /api/logodev", logos_api.api_logodev_save(self.c, {}, {"token": "pk_test-publishable-1234"}))
             self.check("POST /api/logodev/fetch", logos_api.api_logodev_fetch(self.c, {}, {}))
         self.check("GET /api/logodev", logos_api.api_logodev(self.c, {}, {}))
 
     def test_people(self):
-        self.check("GET /api/people", people.api_people(self.c, {}, {}))   # nobody yet
+        self.check("GET /api/people", people.api_people(self.c, {}, {}))
         self.check("POST /api/people", people.api_person_add(self.c, {}, {"display_name": "Mia Doe", "aliases": ["DOE/MIA MISS"]}))
         oidc.remember_user(self.c, "u1", "jane.doe@example.com", "Jane Doe")
         listed = people.api_people(self.c, {}, {})
@@ -237,13 +232,13 @@ class Replies(DbCase):
         self.check("POST /api/import", flight_import_api.api_import(self.c, {}, {"flights": flights}))
 
     def test_loyalty(self):
-        self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))   # none yet
+        self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))
         who = people.api_person_add(self.c, {}, {"display_name": "Mia Doe"})["id"]
         body = {"person_id": who, "kind": "airline", "program": "American AAdvantage", "number": "DEMO1234567"}
         added = loyalty.api_loyalty_add(self.c, {}, body)
         self.check("POST /api/loyalty", added)
         self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))
-        self.c.orm.add(LoyaltyId(person_id=who, kind="airline", program="American AAdvantage", number=secretbox.encrypt("DEMO7654321") or ""))   # (what claiming a guest leaves)
+        self.c.orm.add(LoyaltyId(person_id=who, kind="airline", program="American AAdvantage", number=secretbox.encrypt("DEMO7654321") or ""))
         self.c.orm.flush()
         self.assertEqual(len(loyalty.api_loyalty(self.c, {}, {})["conflicts"]), 1)
         self.check("GET /api/loyalty", loyalty.api_loyalty(self.c, {}, {}))
@@ -261,13 +256,13 @@ class Replies(DbCase):
         added = reminders_api.api_device_add(self.c, {}, {"endpoint": endpoint, "p256dh": p256dh, "auth": auth})
         self.check("POST /api/reminders/devices", added)
         self.check("POST /api/feed", reminders_api.api_feed_make(self.c, {}, {}))
-        self.check("GET /api/reminders", reminders_api.api_reminders(self.c, {}, {}))   # with a device and a feed
+        self.check("GET /api/reminders", reminders_api.api_reminders(self.c, {}, {}))
         self.check("DELETE /api/reminders/devices/{id}", reminders_api.api_device_remove(self.c, {}, {}, str(added["id"])))
         self.check("DELETE /api/feed", reminders_api.api_feed_off(self.c, {}, {}))
 
     def test_mcp_settings(self):
         _current.host = "localhost:8765"
-        self.check("GET /api/mcp-settings", mcp_api.api_mcp_settings(self.c, {}, {}))   # nobody connected
+        self.check("GET /api/mcp-settings", mcp_api.api_mcp_settings(self.c, {}, {}))
         self.check("POST /api/mcp-settings/writes", mcp_api.api_mcp_writes(self.c, {}, {"allow": True}))
         client = mcp_oauth.register(self.c, {"client_name": "Claude", "redirect_uris": ["http://127.0.0.1:1/cb"]})
         mcp_oauth.approve(self.c, {"client_id": client["client_id"], "redirect_uri": "http://127.0.0.1:1/cb", "code_challenge": "c" * 43,
@@ -276,12 +271,12 @@ class Replies(DbCase):
         self.c.execute(insert(OAuthToken).values(token_hash="h" * 64, kind="access", grant_id=grant, created=1.0, expires=9e12))
         listed = mcp_api.api_mcp_settings(self.c, {}, {})
         self.assertEqual(len(listed["connections"]), 1)
-        self.check("GET /api/mcp-settings", listed)   # with a connection
+        self.check("GET /api/mcp-settings", listed)
         self.check("DELETE /api/mcp-settings/connections/{id}", mcp_api.api_mcp_revoke(self.c, {}, {}, str(grant)))
 
     def test_trips(self):
         _current.user = {"name": None, "email": None, "local": True}
-        self.check("GET /api/trips", trips_api.api_trips(self.c, {}, {}))   # none yet
+        self.check("GET /api/trips", trips_api.api_trips(self.c, {}, {}))
         made = trips_api.api_trip_add(self.c, {}, {"name": "Cabin weekend"})
         self.check("POST /api/trips", made)
         seg = trips_api.api_segment_add(self.c, {}, {"kind": "flight", "origin": "AKL", "destination": "LAX",
@@ -325,7 +320,7 @@ class Replies(DbCase):
     def test_flight_status(self):
         _current.user = {"name": None, "email": None, "local": True}
         with mock.patch.dict("os.environ", {"RAPIDAPI_KEY": "test-key-12345678"}):
-            self.check("GET /api/flight-status", flightstatus_api.api_flight_statuses(self.c, {}, {}))   # nothing yet
+            self.check("GET /api/flight-status", flightstatus_api.api_flight_statuses(self.c, {}, {}))
             seg = trips_api.api_segment_add(self.c, {}, {"kind": "flight", "origin": "JFK", "destination": "LHR",
                                                           "start_local": "2026-11-20T19:00", "end_local": "2026-11-21T07:10",
                                                           "details": {"flight_number": "EX 101"}})
@@ -336,7 +331,7 @@ class Replies(DbCase):
             self.assertEqual([s["state"] for s in refreshed["statuses"]], ["delayed"])
             self.check("POST /api/flight-status/{id}", refreshed)
             self.check("GET /api/flight-status", flightstatus_api.api_flight_statuses(self.c, {}, {}))
-        db.set_setting(self.c, sk.FLIGHT_STATUS_PAUSED, '{"until": 4102444800, "reason": "rate"}')   # and the paused reply
+        db.set_setting(self.c, sk.FLIGHT_STATUS_PAUSED, '{"until": 4102444800, "reason": "rate"}')
         with mock.patch.dict("os.environ", {"RAPIDAPI_KEY": "test-key-12345678"}):
             paused = flightstatus_api.api_flight_statuses(self.c, {}, {})
         self.assertEqual(paused["paused"]["reason"], "rate")   # type: ignore[index]
@@ -344,7 +339,6 @@ class Replies(DbCase):
 
 
 class Mismatches(unittest.TestCase):
-    """The check above notices a reply that isn't the contract's."""
 
     def test_a_renamed_field_a_wrong_type_and_a_missing_one(self):
         st = {"version": "dev", "database": "sqlite", "user": {"name": None, "email": None, "local": True},
@@ -388,8 +382,8 @@ class Generated(unittest.TestCase):
                                      "DELETE /api/reminders/devices/{id}", "POST /api/feed", "DELETE /api/feed",
                                      "GET /api/mcp-settings", "POST /api/mcp-settings/writes",
                                      "DELETE /api/mcp-settings/connections/{id}"})
-        self.assertNotIn("GET /api/backup", covered())   # typed, but as a download (common.Response)
-        self.assertNotIn("GET /api/mailboxes/callback", covered())   # and this one as a redirect
+        self.assertNotIn("GET /api/backup", covered())
+        self.assertNotIn("GET /api/mailboxes/callback", covered())
 
     def describe(self, annotation: str) -> str:
         types = {"Thing": {"doc": None, "fields": []}}

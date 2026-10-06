@@ -1,11 +1,3 @@
-"""Fails when the backend's tests cover too little of it: the whole app below TOTAL, or any one module where the travel
-features live (DIRS) below EACH. A new module an agent adds has to come with the tests that run it; a total alone
-would let one untested module hide behind the rest. Standard library only.
-
-Reads the JSON report `coverage json` writes (the tests are run with coverage first: `make test-parallel` does both).
-Raise the numbers as coverage grows; lowering one needs a reason in the pull request.
-
-Usage: python tools/coverage_floor.py [coverage.json]"""
 from __future__ import annotations
 
 import json

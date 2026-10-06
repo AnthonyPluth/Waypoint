@@ -1,4 +1,3 @@
-"""The app's state: who's signed in, the version, and what Settings shows."""
 from __future__ import annotations
 
 import os
@@ -20,15 +19,13 @@ def api_state(conn, _q, _b) -> State:
         "version": os.environ.get("WAYPOINT_VERSION") or "dev",
         "database": "postgres" if db.using_postgres() else "sqlite",
         "user": user,
-        "last_backup": with_offset(db.get_setting(conn, sk.LAST_BACKUP)),   # the last backup downloaded from Settings
+        "last_backup": with_offset(db.get_setting(conn, sk.LAST_BACKUP)),
         "review_count": review.count(conn, owner()) + trips.unmatched_count(conn, viewer(conn)),
         "person_id": viewer(conn).person_id,
     }
 
 
 def with_offset(stamp: str | None, utc: bool = False) -> str | None:
-    """A stored timestamp with its UTC offset, so the browser shows it in its own time zone. Settings hold the server's
-    local time ("2026-09-30T07:02:00"); one that has an offset keeps it."""
     if not stamp:
         return stamp
     try:

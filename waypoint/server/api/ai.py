@@ -1,6 +1,3 @@
-"""Settings → AI: the optional fallback that reads mail in the "Couldn't read" queue (waypoint/domain/mail/ai.py). Off unless a
-member turns it on; the setting is the household's. The OpenRouter key is saved encrypted (or comes from the environment) and
-never comes back: the reply only says where it's from."""
 from __future__ import annotations
 
 from ... import validate
@@ -21,13 +18,10 @@ def _settings(conn) -> AiSettings:
 
 
 def api_ai(conn, _q, _b) -> AiSettings:
-    """What the AI fallback is set to (never the key)."""
     return _settings(conn)
 
 
 def api_ai_save(conn, _q, body: AiBody) -> AiSettings:
-    """Choose Off, Local or OpenRouter, with what that one needs. Turning it on needs its address and model (and a key for
-    OpenRouter); a field left out stays as it was, and `openrouter_key: ""` forgets the saved key."""
     mode = body.get("mode")
     if mode not in ai.MODES:
         raise ApiError("Choose Off, Local or OpenRouter")

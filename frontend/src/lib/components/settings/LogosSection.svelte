@@ -7,8 +7,6 @@
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
 
-  // Settings → Brand logos: the household's Logo.dev keys. Off until a publishable key is saved. The keys are typed here once and
-  // never come back: the server only says whether they are saved. Logo.dev is told a brand's name and the key, nothing else.
   let st = $state<LogoDevStatus | null>(null);
   let problem = $state("");
   let token = $state("");

@@ -1,10 +1,3 @@
-// Drives the running app with Playwright and collects proof: a screenshot of each page (full page, and the top of it) at phone, tablet and desktop
-// widths, plus console errors and failed requests. Started by `python run.py verify` (waypoint/verify.py), which owns the
-// demo database and the server; run alone it needs a server that already has the demo data.
-//
-//   node verify/verify.mjs --url http://127.0.0.1:8765 --out ../artifacts/verify [page…]
-//
-// Exits 1 on a console error, an uncaught page error, a 5xx response or a failed scripted step.
 import { chromium } from "@playwright/test";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -13,12 +6,9 @@ import { fileURLToPath } from "node:url";
 
 export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 } };
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "oauth-approve"];
-/** Pages that aren't a route of the app: the server-rendered OAuth approval page, at an address made while seeding (seedAssistants). */
 const OWN_PAGES = ["oauth-approve"];
-export const SCHEMES = ["light", "dark"];   // a flow's colour scheme (the app follows the device's: prefers-color-scheme)
+export const SCHEMES = ["light", "dark"];
 
-/** The browser to launch: the Chromium preinstalled under PLAYWRIGHT_BROWSERS_PATH (or /opt/pw-browsers) when there is
- *  one, whatever its revision, otherwise undefined (Playwright's own download). */
 export function findChromium(env = process.env, exists = existsSync, list = readdirSync) {
   const root = env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers";
   if (!exists(root)) return undefined;
@@ -31,12 +21,8 @@ export function findChromium(env = process.env, exists = existsSync, list = read
   return undefined;
 }
 
-/** The two files one screenshot makes: the full page, and `-top`, just the viewport (the top of the page), which is the one
- *  that fits in a pull request (`make pr-screenshots`). */
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-/** A flow is { name, page?, viewports?, steps: [ { goto | click | select | fill | press | upload | scroll_to | wait_for | expect_text | screenshot } ] }:
- *  see frontend/verify/flows/README.md. Returns the problems with it, [] when it's well formed. */
 const ACTIONS = { goto: "string", click: "string", select: "object", fill: "object", press: "object", upload: "object", scroll_to: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const unknownPages = (names) => names.filter((n) => !PAGES.includes(n));
@@ -56,11 +42,9 @@ export function flowProblems(flow) {
   return out;
 }
 
-const REDIRECT = "http://127.0.0.1:33418/callback";   // where a desktop assistant listens for the answer; nothing is there
+const REDIRECT = "http://127.0.0.1:33418/callback";
 const pkce = () => { const verifier = randomBytes(32).toString("base64url"); return { verifier, challenge: createHash("sha256").update(verifier).digest("base64url") }; };
 
-/** Connects made-up assistants the way real ones do (register, ask, the person allows, trade the code for a token), so Settings →
- *  AI assistants lists them, and registers one more that asks and isn't answered, for the approval page. Returns that page's address. */
 export async function seedAssistants(browser, base) {
   const ctx = await browser.newContext();
   try {
@@ -77,14 +61,14 @@ export async function seedAssistants(browser, base) {
       await page.goto(askUrl(clientId, challenge));
       if (change) await page.locator("input[name=write]").check();
       await page.locator("button[value=allow]").click();
-      await answered;   // the answer is a redirect to an address nothing listens on: the failed request carries it
+      await answered;
       const code = new URL(await answered).searchParams.get("code");
       if (!code) throw new Error(`seeding ${name}: the approval page gave no code`);
       const token = await (await post("/oauth/token", { form: { grant_type: "authorization_code", code, redirect_uri: REDIRECT, client_id: clientId,
         code_verifier: verifier, resource: `${base}/mcp` } })).json();
       if (!token.access_token) throw new Error(`seeding ${name}: no token (${JSON.stringify(token).slice(0, 80)})`);
       if (change) await post("/mcp", { headers: { Authorization: `Bearer ${token.access_token}`, "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
-        data: { jsonrpc: "2.0", id: 1, method: "tools/list" } });   // so Settings can say it was used
+        data: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
       await page.close();
     }
     return askUrl(await register("Claude Desktop"), pkce().challenge);
@@ -104,7 +88,7 @@ async function runStep(page, step, shot) {
   } else if ("press" in step) {
     await page.locator(step.press.selector).first().press(step.press.key, { timeout });
   } else if ("upload" in step) {
-    await page.locator(step.upload.selector).first().setInputFiles(join(REPO, step.upload.file), { timeout });   // a file of the repo (made-up data)
+    await page.locator(step.upload.selector).first().setInputFiles(join(REPO, step.upload.file), { timeout });
   } else if ("scroll_to" in step) {
     await page.locator(step.scroll_to).first().evaluate((el) => el.scrollIntoView({ block: "start" }), undefined, { timeout });
   } else if ("wait_for" in step) {
@@ -142,8 +126,8 @@ async function main() {
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
   const browser = await chromium.launch({ executablePath: findChromium() });
-  const problems = [];   // what makes the run fail
-  const notes = [];      // what's only reported
+  const problems = [];
+  const notes = [];
   const results = [];
   let approveUrl = "";
   try { approveUrl = await seedAssistants(browser, base); }
@@ -170,7 +154,6 @@ async function main() {
       await work(page, shot);
     } catch (e) {
       problems.push(`${where}: ${String(e.message).split("\n")[0]}`);
-      // The failure screenshot is best effort: the step's own error is already recorded above.
       await shot(`${label.replace(/\W+/g, "-")}-FAILED`).catch(() => {});
     }
     for (const c of consoleErrors) problems.push(`${where}: console error: ${c.slice(0, 300)}`);

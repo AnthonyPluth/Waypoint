@@ -73,7 +73,7 @@ describe("Trip", () => {
       : answer(path, opts)) as never);
     render(TripPage);
     await screen.findByRole("list", { name: "Bookings" });
-    expect(screen.getAllByRole("button", { name: /the email for/ })).toHaveLength(1);   // (only the booking made from one)
+    expect(screen.getAllByRole("button", { name: /the email for/ })).toHaveLength(1);
     await userEvent.click(screen.getByRole("button", { name: /View the email for/ }));
     const region = await screen.findByRole("region", { name: /The email for/ });
     expect(await within(region).findByTestId("message-subject")).toHaveTextContent("Your itinerary: EX 410");
@@ -156,7 +156,6 @@ describe("Trip", () => {
     expect(first.getByText("7:10 AM")).toBeInTheDocument();
     expect(first.queryByText("Edited by you")).toBeNull();
     expect(first.getByRole("link", { name: "Manage booking" })).toHaveAttribute("href", "https://example.com/manage");
-    // Jane has an AAdvantage number (masked); Sam has none, with a hint; a printed name isn't matched yet.
     expect(first.getByRole("button", { name: "Show and copy American AAdvantage number" })).toHaveTextContent("••••4567");
     expect(first.getByText(/No American AAdvantage number yet/)).toBeInTheDocument();
     expect(first.getByText(/Not matched to a person/)).toBeInTheDocument();
@@ -228,7 +227,7 @@ describe("Trip", () => {
     expect(await screen.findByText("Waypoint is unreachable")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Trip to London" })).toBeNull();
     serve();
-    document.body.style.pointerEvents = "";   // the dialog's scroll lock lingers in jsdom after it closes
+    document.body.style.pointerEvents = "";
     await u.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
   });
@@ -249,12 +248,12 @@ describe("Trip", () => {
 
   it("opens a booking's edit form right under that booking and scrolls to it, not at the top", async () => {
     const scrollIntoView = vi.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;   // (jsdom has none)
+    Element.prototype.scrollIntoView = scrollIntoView;
     render(TripPage);
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: "Edit Harbour Hotel" }));
     const form = screen.getByRole("listitem", { name: "Edit booking" });
-    expect(form.previousElementSibling).toHaveTextContent("Harbour Hotel");      // under the stay it belongs to, below the flight
+    expect(form.previousElementSibling).toHaveTextContent("Harbour Hotel");
     expect(within(form).getByLabelText("Hotel name")).toBeInTheDocument();
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
     await u.click(within(form).getByRole("button", { name: "Cancel" }));
@@ -297,7 +296,7 @@ describe("Trip", () => {
     vi.mocked(api).mockImplementation(async (_p, opts) => { if (opts?.method === "POST") throw new Error("The name is too long"); return held; });
     await u.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The name is too long");
-    expect(screen.getByLabelText("Trip name")).toHaveValue("Nope");   // what was typed stays
+    expect(screen.getByLabelText("Trip name")).toHaveValue("Nope");
     await u.click(screen.getByRole("button", { name: "Cancel" }));
     expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
   });
@@ -380,13 +379,13 @@ describe("Trip", () => {
       render(TripPage);
       const list = await screen.findByRole("list", { name: "Bookings" });
       const cards = within(list).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
-      expect(cards).toHaveLength(2);   // (the flight once, then the stay)
+      expect(cards).toHaveLength(2);
       expect(within(cards[0]).getAllByRole("heading", { name: "JFK → LHR" })).toHaveLength(1);
       const blocks = within(cards[0]).getAllByRole("listitem").filter((li) => li.hasAttribute("data-booking"));
       expect(blocks).toHaveLength(2);
       expect(within(blocks[0]).getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
       expect(within(blocks[0]).getByText("Jane Doe")).toBeInTheDocument();
-      expect(within(blocks[0]).queryByText("Sam Doe")).toBeInTheDocument();   // (flight's own travellers: Jane, Sam and a printed name)
+      expect(within(blocks[0]).queryByText("Sam Doe")).toBeInTheDocument();
       expect(within(blocks[1]).getByRole("button", { name: "Copy confirmation code BBBBBB" })).toBeInTheDocument();
       expect(within(blocks[1]).getByText("Sam Doe")).toBeInTheDocument();
       expect(within(blocks[1]).queryByText("Jane Doe")).toBeNull();
@@ -394,7 +393,7 @@ describe("Trip", () => {
       expect(within(blocks[0]).getByRole("button", { name: "Edit JFK → LHR booking KQ7M2X" })).toBeInTheDocument();
       expect(within(blocks[1]).getByRole("button", { name: "Edit JFK → LHR booking BBBBBB" })).toBeInTheDocument();
       expect(within(cards[0]).queryByText("Times differ between bookings")).toBeNull();
-      expect(within(cards[0]).getAllByText("Departs")).toHaveLength(1);   // (the times once)
+      expect(within(cards[0]).getAllByText("Departs")).toHaveLength(1);
     });
 
     it("removes the one booking whose Remove was pressed, and keeps the flight", async () => {
@@ -413,7 +412,7 @@ describe("Trip", () => {
       expect(within(card).getByText("Times differ between bookings")).toBeInTheDocument();
       expect(within(card).getByText("9:30 PM")).toBeInTheDocument();
       expect(within(card).getByText("7:00 PM")).toBeInTheDocument();
-      expect(within(card).getAllByText("Departs")).toHaveLength(2);   // (once in each booking's block)
+      expect(within(card).getAllByText("Departs")).toHaveLength(2);
     });
   });
 
@@ -432,12 +431,12 @@ describe("Trip", () => {
       const u = userEvent.setup();
       render(TripPage);
       await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
-      expect(screen.queryAllByLabelText("Seat").map((e) => e.getAttribute("aria-label"))).toEqual(["Seat of Jane Doe", "Seat of Sam Doe", "Seat of DOE/MIA MISS"]);   // (each traveller's, none for the whole booking)
+      expect(screen.queryAllByLabelText("Seat").map((e) => e.getAttribute("aria-label"))).toEqual(["Seat of Jane Doe", "Seat of Sam Doe", "Seat of DOE/MIA MISS"]);
       await u.type(screen.getByLabelText("Seat of Jane Doe"), "31A");
       await u.type(screen.getByLabelText("Seat of Sam Doe"), " 31B ");
       await u.type(screen.getByLabelText("Seat of DOE/MIA MISS"), "32A");
       await u.click(screen.getByRole("checkbox", { name: "Sam Doe" }));
-      expect(screen.queryByLabelText("Seat of Sam Doe")).toBeNull();   // (unticked: no seat to give)
+      expect(screen.queryByLabelText("Seat of Sam Doe")).toBeNull();
       await u.click(screen.getByRole("button", { name: "Save" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({
         travelers: [{ person_id: 1, seat: "31A" }, { person_id: null, name: "DOE/MIA MISS", seat: "32A" }] }) }));
@@ -471,7 +470,7 @@ describe("Trip", () => {
     expect(screen.getAllByText(/number yet/)).toHaveLength(1);
     expect(screen.getByText(/No Marriott Bonvoy number yet/).closest("li")).toHaveTextContent("Jane Doe");
     expect(screen.queryByText(/Not matched to a person/)).toBeNull();
-    expect(screen.getByText("Sam Doe")).toBeInTheDocument();   // (still listed)
+    expect(screen.getByText("Sam Doe")).toBeInTheDocument();
   });
 
   describe("a link to one booking", () => {
@@ -519,7 +518,7 @@ describe("Trip", () => {
       const u = userEvent.setup();
       render(TripPage);
       await screen.findByRole("heading", { name: "Trip to London" });
-      expect(screen.getAllByRole("button", { name: /Add address/ })).toHaveLength(1);   // (not on the flight)
+      expect(screen.getAllByRole("button", { name: /Add address/ })).toHaveLength(1);
       await u.click(await screen.findByRole("button", { name: "Add address to Harbour Hotel" }));
       const field = await screen.findByLabelText("Address");
       expect(field.tagName).toBe("TEXTAREA");

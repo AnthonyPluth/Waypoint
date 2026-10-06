@@ -15,7 +15,6 @@ const off: AiSettings = { mode: "off", ollama_url: "", ollama_model: "", openrou
 
 beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); });
 
-/** GET /api/ai answers `current`; a POST answers what `post` makes of its body (or an error). */
 const serve = (current: AiSettings, post: (b: Record<string, string>) => AiSettings | Error = (b) => ({ ...current, ...b }) as AiSettings) =>
   vi.mocked(api).mockImplementation(async (_p: string, opts?: { method?: string; body?: unknown }) => {
     if (opts?.method !== "POST") return current as never;
@@ -58,7 +57,7 @@ describe("Settings → AI", () => {
     expect(field.placeholder).toMatch(/Saved/);
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(vi.mocked(api).mock.calls.length).toBeGreaterThan(2));
-    expect(JSON.stringify(vi.mocked(api).mock.calls.at(-1))).not.toContain("openrouter_key");   // (left alone, it isn’t sent again)
+    expect(JSON.stringify(vi.mocked(api).mock.calls.at(-1))).not.toContain("openrouter_key");
   });
 
   it("says where a key from the environment comes from, and offers no field for it", async () => {

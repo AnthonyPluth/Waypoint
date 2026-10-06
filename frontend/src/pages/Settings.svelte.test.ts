@@ -83,7 +83,7 @@ describe("Settings tabs", () => {
       ["Account", "#settings/account"], ["Mail and AI", "#settings/mail"], ["Travel", "#settings/travel"], ["Data", "#settings/data"]]);
     expect(tabs().getByRole("link", { name: "Account" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("Signed in as")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Download backup" })).toBeNull();   // (that is on another tab)
+    expect(screen.queryByRole("link", { name: "Download backup" })).toBeNull();
   });
 
   it("shows each group's sections on its own tab", () => {

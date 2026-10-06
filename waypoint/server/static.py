@@ -1,6 +1,3 @@
-"""The files Waypoint serves: the web app (frontend/, built into static/app/), with a fresh script nonce on its page, and
-Waypoint's own (icons, fonts, the service worker, the sign-in pages' look), with their ETags, gzip'd copies and how long
-a browser may keep each. Who may fetch which is the handler's to decide (handler.PUBLIC_FILES); these only send them."""
 from __future__ import annotations
 
 import gzip
@@ -15,9 +12,6 @@ from .common import header_value
 if TYPE_CHECKING:
     from .handler import Handler
 
-# A file's Content-Type, by its extension: the kinds Waypoint ships (static/ and the built web app), as Python's mimetypes
-# named them. Fixed here, so nothing from the address a file was asked for ever reaches a header; anything else is
-# DEFAULT_TYPE.
 CONTENT_TYPES = {
     ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json",
     ".webmanifest": "application/manifest+json", ".txt": "text/plain", ".xml": "application/xml",
@@ -29,22 +23,18 @@ DEFAULT_TYPE = "application/octet-stream"
 
 
 def content_type(path: str) -> str:
-    """The Content-Type a file is sent with (CONTENT_TYPES)."""
     return CONTENT_TYPES.get(os.path.splitext(path)[1].lower(), DEFAULT_TYPE)
 
 STATIC = os.path.realpath(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static"))
-APP_DIR = os.path.join(STATIC, "app")       # the web app, built from frontend/
+APP_DIR = os.path.join(STATIC, "app")
 APP_INDEX = os.path.join(APP_DIR, "index.html")
 _static_files: dict[str, dict] = {}
 _static_lock = threading.Lock()
 
 
 def serve(h: Handler, path: str) -> None:
-    """A GET for anything that isn't the API, sign-in or OAuth: a file, or the web app's page."""
-    if path == "/next" or path.startswith("/next/"):   # where the web app lived while it was being rebuilt
-        return h._redirect("/")                         # (the browser keeps the #page on the way)
-    # The web app's built files (frontend/, built into static/app/), then Waypoint's own (icons, fonts, the service
-    # worker). Anything else is a route of the app itself, so it gets the app's page.
+    if path == "/next" or path.startswith("/next/"):
+        return h._redirect("/")
     rel = path.lstrip("/")
     full = None
     for base in (APP_DIR, STATIC):
@@ -59,7 +49,6 @@ def serve(h: Handler, path: str) -> None:
     ctype = content_type(full)
     gz_ok = "gzip" in (h.headers.get("Accept-Encoding") or "")
     if full == APP_INDEX:
-        # A fresh nonce per page, so only this page's own <script> tags may run (see content_security_policy).
         nonce = secrets.token_urlsafe(16)
         with open(full, "rb") as f:
             data = f.read().replace(b"<script ", f'<script nonce="{nonce}" '.encode())
@@ -72,8 +61,6 @@ def serve(h: Handler, path: str) -> None:
         h._security_headers()
         h.end_headers()
         return None
-    # "no-cache" = keep a copy but check it's current each time (a cheap 304), so updates show up at once. The app's
-    # built files have their content's hash in their name, so they never change and can be kept for good.
     cache = "public, max-age=31536000, immutable" if full.startswith(APP_DIR + os.sep + "assets" + os.sep) else "no-cache"
     return send_file(h, entry["data"], ctype, cache, entry["etag"], gz_ok, None, entry.get("gz"))
 
@@ -84,8 +71,6 @@ def send_file(h: Handler, data: bytes, ctype: str, cache: str, etag: str | None,
         data, encoded = gz or gzip.compress(data, 6), True
     else:
         encoded = False
-    # Each is one of CONTENT_TYPES, a constant or a hash, never the address asked for; checked all the same, before
-    # anything is sent.
     ctype, cache = header_value(ctype), header_value(cache)
     etag = header_value(etag) if etag else None
     extra = {header_value(k): header_value(v) for k, v in (extra or {}).items()}
@@ -112,7 +97,6 @@ def _compressible(ctype: str) -> bool:
 
 
 def _static_entry(full: str) -> dict:
-    """A static file's bytes, ETag and gzip'd copy, kept in memory until the file changes."""
     st = os.stat(full)
     key = (st.st_mtime_ns, st.st_size)
     with _static_lock:

@@ -18,7 +18,6 @@
   import { Toaster } from "svelte-sonner";
   import type { Component } from "svelte";
 
-  // A route's page, by the names in lib/nav.ts. Anything else (an old bookmark, a typo) opens Upcoming.
   const PAGES: Record<string, Component> = { upcoming: Upcoming, trips: Trips, stats: Stats, trip: Trip, people: People, review: Review, settings: Settings };
   const Page = $derived(PAGES[pageFor(route.page)]);
 </script>
@@ -30,7 +29,6 @@
     <main class="min-w-0 flex-1 px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+6rem)] md:px-8 md:pt-8 lg:pb-12">
       <div class="mx-auto max-w-3xl">
         {#if app.sessionExpired}
-          <!-- Above the page, which stays drawn underneath, so an open edit isn't lost; signing in is up to you. -->
           <Alert.Root class="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-20 mb-4 flex flex-wrap items-center justify-between gap-3 border-signal bg-signal-soft text-signal-ink shadow-lg">
             <Alert.Description class="text-signal-ink">Your session expired. Sign in again — what you’re editing stays on this page until you do.</Alert.Description>
             <Button size="sm" onclick={() => { location.href = signInUrl(); }}>Sign in</Button>

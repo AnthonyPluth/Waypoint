@@ -1,8 +1,3 @@
-"""AI assistants over MCP with OAuth: the apps registered to connect, each approval (grant), and their codes and tokens.
-
-Revision ID: 0014
-Revises: 0013
-"""
 import sqlalchemy as sa
 from alembic import op
 

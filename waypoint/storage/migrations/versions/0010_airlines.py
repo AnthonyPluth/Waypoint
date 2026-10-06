@@ -1,8 +1,3 @@
-"""The airlines (by IATA code, with their names), which the stats name a flight's airline from.
-
-Revision ID: 0010
-Revises: 0009
-"""
 import gzip
 from pathlib import Path
 

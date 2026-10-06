@@ -1,5 +1,3 @@
-"""Travel stats: each number, over the trips the viewer can see (AGENTS.md, "You see the trips you're on"), with times
-at their own zones ("Times are where they happen"). Names, codes and itineraries are made up; airports and airlines are real."""
 import gzip
 import unittest
 from pathlib import Path
@@ -21,9 +19,9 @@ from tests.test_trips import Household
 NOW = datetime(2026, 9, 23, 12, 0, tzinfo=UTC)
 AKL_LAX = {"kind": "flight", "origin": "AKL", "destination": "LAX", "start_local": "2026-03-01T22:15",
            "end_local": "2026-03-01T15:10", "provider": "Air New Zealand",
-           "details": {"flight_number": "NZ6", "seat": "34K", "cabin": "economy"}}   # across the date line: 13 h 55 min
+           "details": {"flight_number": "NZ6", "seat": "34K", "cabin": "economy"}}
 JFK_LHR = {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-06-01T19:00",
-           "end_local": "2026-06-02T07:10", "details": {"flight_number": "BA 112", "seat": "12A", "cabin": "Business"}}   # overnight: 7 h 10 min
+           "end_local": "2026-06-02T07:10", "details": {"flight_number": "BA 112", "seat": "12A", "cabin": "Business"}}
 LHR_JFK = {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": "2026-06-08T11:00",
            "end_local": "2026-06-08T14:05", "details": {"flight_number": "BA 117", "seat": "12A", "cabin": "business"}}
 HOTEL = {"kind": "hotel", "origin": "Harbour Hotel", "destination": "London", "provider": "Example Hotels",
@@ -56,9 +54,9 @@ class FlightTests(StatsCase):
     def test_distance_routes_airports_and_records(self):
         self.mine(JFK_LHR, LHR_JFK, AKL_LAX)
         f = self.stats(self.jane)["flights"]
-        self.assertAlmostEqual(f["routes"][0]["distance_km"], 5540, delta=15)   # JFK–LHR, once each way
+        self.assertAlmostEqual(f["routes"][0]["distance_km"], 5540, delta=15)
         self.assertEqual((f["routes"][0]["a"], f["routes"][0]["b"], f["routes"][0]["flights"]), ("JFK", "LHR", 2))
-        self.assertEqual(len(f["routes"]), 2)   # A–B and B–A are one route
+        self.assertEqual(len(f["routes"]), 2)
         self.assertEqual(f["longest"]["origin"], "AKL")
         self.assertAlmostEqual(f["longest"]["distance_km"], 10500, delta=100)
         self.assertEqual((f["shortest"]["origin"], f["shortest"]["flight_number"]), ("JFK", "BA112"))
@@ -102,7 +100,7 @@ class FlightTests(StatsCase):
         self.assertEqual(f["count"], 2)
         by_code = {a["code"]: a for a in f["airports"]}
         self.assertEqual((by_code["ZZZ"]["name"], by_code["ZZZ"]["latitude"], by_code["ZZZ"]["country"]), ("ZZZ", None, None))
-        self.assertEqual(f["shortest"]["origin"], "JFK")   # only the flight with both airports has a distance
+        self.assertEqual(f["shortest"]["origin"], "JFK")
         self.assertEqual(f["longest"], f["shortest"])
         self.assertIsNone(next(r for r in f["routes"] if r["a"] == "LAX")["distance_km"])
         self.assertEqual({c["name"] for c in f["countries"]}, {"US", "GB"})
@@ -111,12 +109,11 @@ class FlightTests(StatsCase):
         self.mine(JFK_LHR, {**LHR_JFK, "status": "cancelled"}, {**AKL_LAX, "start_local": "2026-12-01T22:15",
                                                                  "end_local": "2026-12-01T15:10"})
         self.assertEqual(self.stats(self.jane)["flights"]["count"], 1)
-        before = datetime(2026, 6, 2, 6, 9, tzinfo=UTC)   # 07:10 BST is 06:10 UTC
+        before = datetime(2026, 6, 2, 6, 9, tzinfo=UTC)
         self.assertEqual(self.stats(self.jane, now=before)["flights"]["count"], 0)
         self.assertEqual(self.stats(self.jane, now=datetime(2026, 6, 2, 6, 10, tzinfo=UTC))["flights"]["count"], 1)
 
     def test_a_year_is_the_departures_local_year(self):
-        # 23:30 on New Year's Eve in Auckland is still the 31st in Auckland and the same moment as 10:30 UTC.
         self.mine({**AKL_LAX, "start_local": "2025-12-31T23:30", "end_local": "2025-12-31T17:00"}, JFK_LHR)
         self.assertEqual(self.stats(self.jane, year=2025)["flights"]["count"], 1)
         self.assertEqual(self.stats(self.jane, year=2026)["flights"]["count"], 1)
@@ -143,7 +140,7 @@ class HotelAndCarTests(StatsCase):
     def test_nights_count_overlapping_stays_once(self):
         self.mine(HOTEL, {**HOTEL, "provider": "Other Stays", "start_local": "2026-06-06T15:00", "end_local": "2026-06-10T10:00"})
         s = self.stats(self.jane)["stays"]
-        self.assertEqual(s["nights"], 8)   # June 2–9 (the second stay's nights June 6–9 overlap the first's)
+        self.assertEqual(s["nights"], 8)
         self.assertEqual(s["chains"], [{"name": "Example Hotels", "count": 1}, {"name": "Other Stays", "count": 1}])
         self.assertEqual(s["cities"], [{"name": "London", "count": 2}])
         self.assertEqual(s["countries"], [{"name": "GB", "count": 2}])
@@ -162,7 +159,7 @@ class HotelAndCarTests(StatsCase):
         self.assertEqual((s["nights"], s["chains"]), (0, [{"name": "Example Hotels", "count": 1}]))
 
     def test_a_year_takes_the_nights_in_it(self):
-        self.mine({**HOTEL, "start_local": "2025-12-30T15:00", "end_local": "2026-01-03T10:00"})   # 2 nights in 2025, 2 in 2026
+        self.mine({**HOTEL, "start_local": "2025-12-30T15:00", "end_local": "2026-01-03T10:00"})
         self.assertEqual(self.stats(self.jane, year=2025)["stays"]["nights"], 2)
         self.assertEqual(self.stats(self.jane, year=2026)["stays"]["nights"], 2)
         self.assertEqual(self.stats(self.jane, year=2027)["stays"]["nights"], 0)
@@ -176,7 +173,7 @@ class HotelAndCarTests(StatsCase):
     def test_rental_days_count_each_day_once(self):
         self.mine(CAR, {**CAR, "provider": "Other Rentals", "start_local": "2026-06-04T09:00", "end_local": "2026-06-06T09:00"})
         c = self.stats(self.jane)["cars"]
-        self.assertEqual(c["days"], 4)   # June 3, 4, 5, 6
+        self.assertEqual(c["days"], 4)
         self.assertEqual(c["companies"], [{"name": "Example Rentals", "count": 1}, {"name": "Other Rentals", "count": 1}])
         self.assertEqual(self.stats(self.jane, year=2027)["cars"], {"days": 0, "companies": []})
 
@@ -287,9 +284,9 @@ class SeatStatsTests(StatsCase):
         self.flight([self.jane.person_id, self.sam.person_id], "14A", "14B", start_local="2026-07-01T19:00", end_local="2026-07-02T07:10",
                     details={"flight_number": "BA 113", "seat": "99Z", "cabin": "Business"})
         everyone, jane, sam = (self.stats(self.jane, person)["flights"] for person in (None, self.jane.person_id, self.sam.person_id))
-        self.assertEqual((everyone["count"], jane["count"], sam["count"]), (2, 2, 2))   # (a flight is counted once, whoever is asked)
-        self.assertEqual(everyone["seat_positions"], {"window": 2, "aisle": 1, "middle": 1, "unknown": 0})   # 12A, 12C, 14A, 14B
-        self.assertEqual(jane["seat_positions"], {"window": 2, "aisle": 0, "middle": 0, "unknown": 0})      # 12A, 14A
+        self.assertEqual((everyone["count"], jane["count"], sam["count"]), (2, 2, 2))
+        self.assertEqual(everyone["seat_positions"], {"window": 2, "aisle": 1, "middle": 1, "unknown": 0})
+        self.assertEqual(jane["seat_positions"], {"window": 2, "aisle": 0, "middle": 0, "unknown": 0})
         self.assertEqual((sam["seat_positions"], sam["top_seat"]), ({"window": 0, "aisle": 1, "middle": 1, "unknown": 0}, "12C"))
         self.assertEqual(jane["top_seat"], "12A")
 
@@ -314,18 +311,18 @@ class StayFigureTests(StatsCase):
         return {**HOTEL, "origin": hotel, "destination": city, "start_local": f"{start}T15:00", "end_local": f"{end}T10:00", **extra}
 
     def test_totals_lists_records_and_the_busiest_month(self):
-        self.mine(self.stay("Harbour Hotel", "London", "2026-06-02", "2026-06-08"),            # 6 nights
-                  self.stay("harbour  hotel", "London", "2026-07-01", "2026-07-03"),           # 2 nights, the same hotel written another way
-                  self.stay("Quay Inn", "Paris", "2026-07-10", "2026-07-12"),                   # 2 nights
-                  self.stay("Quay Inn", "Paris", "2026-08-01", "2026-08-03"))                   # 2 nights
+        self.mine(self.stay("Harbour Hotel", "London", "2026-06-02", "2026-06-08"),
+                  self.stay("harbour  hotel", "London", "2026-07-01", "2026-07-03"),
+                  self.stay("Quay Inn", "Paris", "2026-07-10", "2026-07-12"),
+                  self.stay("Quay Inn", "Paris", "2026-08-01", "2026-08-03"))
         s = self.stats(self.jane)["stays"]
         self.assertEqual((s["count"], s["average_nights"], s["nights"]), (4, 3.0, 12))
         self.assertEqual(s["hotels"], [{"name": "Harbour Hotel", "stays": 2, "nights": 8}, {"name": "Quay Inn", "stays": 2, "nights": 4}])
         self.assertEqual(s["cities_by_nights"], [{"name": "London", "stays": 2, "nights": 8}, {"name": "Paris", "stays": 2, "nights": 4}])
         self.assertEqual(s["longest"], {"hotel": "Harbour Hotel", "city": "London", "nights": 6, "start_local": "2026-06-02T15:00"})
         self.assertEqual((s["most_visited_hotel"], s["most_visited_city"]),
-                         ({"name": "Harbour Hotel", "stays": 2, "nights": 8}, {"name": "London", "stays": 2, "nights": 8}))   # (a tie on stays goes to nights)
-        self.assertEqual(s["busiest_month"], "2026-06")   # 6 nights in June, 2 + 2 in July (4), 2 in August
+                         ({"name": "Harbour Hotel", "stays": 2, "nights": 8}, {"name": "London", "stays": 2, "nights": 8}))
+        self.assertEqual(s["busiest_month"], "2026-06")
 
     def test_a_year_counts_its_own_nights_of_a_stay_across_new_year(self):
         self.mine(self.stay("Harbour Hotel", "London", "2025-12-30", "2026-01-03"))
@@ -368,8 +365,7 @@ class CruiseTests(StatsCase):
     def test_nights_aboard_sea_days_and_ports_of_call(self):
         self.mine(CRUISE)
         c = self.stats(self.jane)["cruises"]
-        # nights 1–7 March; days strictly between embarking (1st) and disembarking (8th) are the 2nd–7th; 2nd, 5th and 6th are in port
-        self.assertEqual((c["count"], c["nights"], c["sea_days"], c["ports"]), (1, 7, 3, 2))   # (Nassau twice is one port)
+        self.assertEqual((c["count"], c["nights"], c["sea_days"], c["ports"]), (1, 7, 3, 2))
         self.assertEqual(c["lines"], [{"name": "Example Cruise Line", "count": 1}])
 
     def test_a_night_in_port_is_not_a_sea_day_and_a_port_with_no_times_adds_a_port_but_no_day(self):
@@ -378,7 +374,7 @@ class CruiseTests(StatsCase):
                                                                                      "arrive_local": None, "depart_local": None}]}
         self.mine(overnight)
         c = self.stats(self.jane)["cruises"]
-        self.assertEqual((c["nights"], c["sea_days"], c["ports"]), (7, 4, 2))   # 2nd and 3rd in port; 4th–7th at sea
+        self.assertEqual((c["nights"], c["sea_days"], c["ports"]), (7, 4, 2))
 
     def test_a_year_takes_its_own_nights_and_sea_days_and_the_years_list_has_the_cruise(self):
         spanning = {**CRUISE, "start_local": "2025-12-29T16:30", "end_local": "2026-01-03T07:00", "itinerary": []}
@@ -406,16 +402,16 @@ class CruiseTests(StatsCase):
 
 class VisibilityTests(StatsCase):
     def test_the_household_as_one_user_sees_leaves_out_a_trip_only_another_user_is_on(self):
-        self.mine(JFK_LHR)                       # Jane's
-        self.mine(AKL_LAX, who=self.sam)         # Sam's own: Jane isn't on it
+        self.mine(JFK_LHR)
+        self.mine(AKL_LAX, who=self.sam)
         self.assertEqual(self.stats(self.jane)["flights"]["count"], 1)
         self.assertEqual(self.stats(self.sam)["flights"]["count"], 1)
         self.assertEqual(self.stats(Viewer(None, household=True))["flights"]["count"], 2)
         self.assertEqual(self.stats(Viewer(self.mia))["flights"]["count"], 0)
 
     def test_a_partner_sees_the_stats_of_a_person_without_their_solo_trips(self):
-        self.add(self.jane, JFK_LHR, travelers=self.on(self.jane.person_id, self.sam.person_id))   # together
-        self.add(self.jane, AKL_LAX, travelers=self.on(self.jane.person_id))                        # Jane alone
+        self.add(self.jane, JFK_LHR, travelers=self.on(self.jane.person_id, self.sam.person_id))
+        self.add(self.jane, AKL_LAX, travelers=self.on(self.jane.person_id))
         self.assertEqual(self.stats(self.jane, self.jane.person_id)["flights"]["count"], 2)
         self.assertEqual(self.stats(self.sam, self.jane.person_id)["flights"]["count"], 1)
 
@@ -425,7 +421,7 @@ class VisibilityTests(StatsCase):
         self.assertEqual(self.stats(self.jane, self.mia)["flights"]["count"], 1)
         self.assertEqual(self.stats(self.jane, self.jane.person_id)["flights"]["count"], 2)
         self.assertEqual(self.stats(self.jane, self.joan)["flights"]["count"], 0)
-        self.assertEqual(self.stats(self.sam, self.mia)["flights"]["count"], 0)   # a trip Sam isn't on stays out of his view
+        self.assertEqual(self.stats(self.sam, self.mia)["flights"]["count"], 0)
 
     def test_the_household_counts_a_segment_once_however_many_are_on_it(self):
         self.add(self.jane, JFK_LHR, travelers=self.on(self.jane.person_id, self.mia, self.joan))
@@ -506,15 +502,14 @@ class RouteTests(Household):
 
 
 class StatsRouteTests(test_trips.RouteCase):
-    """GET /api/stats over HTTP, with sign-in: whose trips it adds up, and what it refuses."""
 
     def test_stats_count_only_the_trips_the_viewer_can_see(self):
         ana, ben = self.person["ana"], self.person["ben"]
         self.book("ana", JFK_LHR, travelers=[{"person_id": ana}, {"person_id": ben}])
-        self.book("ana", AKL_LAX, travelers=[{"person_id": ana}])   # Ana alone
+        self.book("ana", AKL_LAX, travelers=[{"person_id": ana}])
         self.book("cy", LHR_JFK, travelers=[{"person_id": self.person["cy"]}])
         self.assertEqual(self.ok("ana", "GET", f"/api/stats?person={ana}&year=2026")["flights"]["count"], 2)
-        self.assertEqual(self.ok("ben", "GET", f"/api/stats?person={ana}&year=2026")["flights"]["count"], 1)   # not her solo trip
+        self.assertEqual(self.ok("ben", "GET", f"/api/stats?person={ana}&year=2026")["flights"]["count"], 1)
         self.assertEqual(self.ok("ben", "GET", "/api/stats?person=all")["flights"]["count"], 1)
         self.assertEqual(self.ok("cy", "GET", "/api/stats")["flights"]["count"], 1)
         mine = self.ok("ana", "GET", "/api/stats?year=2025")

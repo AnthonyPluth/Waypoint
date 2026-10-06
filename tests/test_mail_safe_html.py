@@ -1,5 +1,3 @@
-"""An email's HTML rebuilt for the preview (waypoint/domain/mail/safe_html.py): only an allowlist survives, and nothing the sender
-wrote is passed through. Invented content."""
 import unittest
 from unittest import mock
 
@@ -108,14 +106,14 @@ class Limits(unittest.TestCase):
         self.assertLessEqual(out.count("<div>"), safe_html.MAX_DEPTH)
         self.assertEqual(out.count("<div>"), out.count("</div>"))
         self.assertEqual(clean("<div>" * 45 + "deep" + "</div>" * 45).count("</div>"), safe_html.MAX_DEPTH)
-        self.assertTrue(clean("<div>" * 45 + "deep" + "</div>" * 45 + "<p>after</p>").endswith("</div><p>after</p>"))   # (the cut-off tags' ends don't close the outer ones early)
+        self.assertTrue(clean("<div>" * 45 + "deep" + "</div>" * 45 + "<p>after</p>").endswith("</div><p>after</p>"))
         clean("<<>><a href=><td colspan=\"<b>\">&#xZZ; <!-- <p> -->")
 
 
 class FromAMessage(unittest.TestCase):
     def test_a_message_is_read_in_memory_alone(self):
         html = '<html><body><p>CANARY-BODY-PREVIEW-8M3Q</p></body></html>'
-        with no_leaks(self, "CANARY-BODY-PREVIEW-8M3Q"):   # (it comes back to the caller, and goes nowhere else)
+        with no_leaks(self, "CANARY-BODY-PREVIEW-8M3Q"):
             self.assertEqual(extract.safe_markup(message(eml(html))), ("<p>CANARY-BODY-PREVIEW-8M3Q</p>", False))
 
     def test_a_messages_html_part_is_cleaned_and_a_text_only_message_has_none(self):
@@ -125,11 +123,11 @@ class FromAMessage(unittest.TestCase):
         two = (b"From: a@example.example\nSubject: s\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=B\n\n"
                b"--B\nContent-Type: text/html; charset=utf-8\n\n<p>one</p><script>never closed\n"
                b"--B\nContent-Type: text/html; charset=utf-8\n\n<p>two</p>\n--B--\n")
-        self.assertEqual(extract.safe_markup(message(two)), ("<p>one</p><hr><p>two</p>", False))   # (an unclosed script in one part doesn't hide the next)
+        self.assertEqual(extract.safe_markup(message(two)), ("<p>one</p><hr><p>two</p>", False))
         self.assertEqual(extract.safe_markup(message(two), 3), ("<p>one</p>", True))
-        self.assertEqual(extract.safe_markup(message(eml("<p>one</p>")), 3), ("<p>one</p>", False))   # (exactly the budget, nothing left out)
+        self.assertEqual(extract.safe_markup(message(eml("<p>one</p>")), 3), ("<p>one</p>", False))
         amps = two.replace(b"<p>one</p>", b"<p>a&amp;b&lt;c</p>")
-        self.assertEqual(extract.safe_markup(message(amps), 7), ("<p>a&amp;b&lt;c</p><hr><p>tw</p>", True))   # (the budget counts characters as written, not as escaped)
+        self.assertEqual(extract.safe_markup(message(amps), 7), ("<p>a&amp;b&lt;c</p><hr><p>tw</p>", True))
         self.assertIsNone(extract.safe_markup({"raw": None}))
 
 

@@ -3,7 +3,6 @@
   import NavLink from "$lib/components/NavLink.svelte";
   import { NAV, navFor } from "$lib/nav";
 
-  // From 1024px up: a slim sidebar under the top bar; TabBar takes over below.
   const current = $derived(navFor(route.page));
 </script>
 

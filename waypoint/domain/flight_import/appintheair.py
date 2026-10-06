@@ -1,9 +1,3 @@
-"""App in the Air's export: one row per flight with the columns Date, Flight, From, To, Departure, Arrival, Airline, Seat
-and Class, the airports as codes (or names with the code in brackets) and the times as times of day at the airports.
-
-The layout is NOT confirmed: App in the Air publishes no description of its export and none was available to check, so
-these columns are the ones its flights list shows, and the format is recognised only by that header. A column it names
-differently is read as empty (a flight with no time or seat), never guessed at. The Notes column is never looked at."""
 from __future__ import annotations
 
 from collections.abc import Sequence

@@ -1,15 +1,3 @@
-"""Generates the API contract between the backend and the web app: docs/openapi.json, an OpenAPI description of the
-routes it covers, and from that frontend/src/lib/api-types.ts, their TypeScript types. `--check` writes nothing and
-fails when either is out of date. Standard library only: nothing is imported, the code is read with `ast`.
-
-Where it comes from (all from the code, never by hand):
-- the routes: waypoint/server/routes.py's ROUTES, read as tools/feature_map.py reads it;
-- what each route takes and answers: its handler's annotations. A handler whose return is annotated with a type from
-  waypoint/server/contract.py is covered; its reply is that type, and its body (for a route that takes one) the
-  annotation of its third parameter, also a type from there. Handlers without one aren't in the contract yet.
-- the types: the TypedDicts in waypoint/server/contract.py (see its docstring for the types they may use).
-
-The web app's lib/contract.ts types a call by its route (`apiCall<"GET /api/budget">(address)`) from the `Endpoints` this writes."""
 from __future__ import annotations
 
 import argparse
@@ -19,7 +7,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import feature_map   # (tools/ isn't a package: found through the path above)
+import feature_map
 
 ROOT = feature_map.ROOT
 CONTRACT = ROOT / "waypoint/server/contract.py"
@@ -31,7 +19,6 @@ SCALARS = {"str": {"type": "string"}, "int": {"type": "integer"}, "float": {"typ
 ERROR = {"description": "Refused (4xx) or failed (5xx): what went wrong, to show as it is.",
          "content": {"application/json": {"schema": {
              "type": "object", "properties": {"error": {"type": "string"}}, "required": ["error"]}}}}
-# Waypoint refuses a state change without it (CSRF); the web app's api() sends it.
 CSRF = {"name": "X-Waypoint", "in": "header", "required": True, "schema": {"const": "1"},
         "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."}
 
@@ -41,8 +28,6 @@ class ContractError(Exception):
 
 
 def typeddicts() -> dict[str, dict]:
-    """The TypedDicts in contract.py, by name: {doc, fields: [(name, annotation, required)]}, a subclass's base's
-    fields first."""
     out: dict[str, dict] = {}
     for node in ast.parse(CONTRACT.read_text()).body:
         if not isinstance(node, ast.ClassDef):
@@ -69,8 +54,7 @@ def typeddicts() -> dict[str, dict]:
 
 
 def schema(ann: ast.expr, types: dict[str, dict], used: set[str], where: str) -> dict:
-    """The JSON schema of a type annotation; the TypedDicts it names are added to `used`."""
-    if isinstance(ann, ast.Constant) and isinstance(ann.value, str):   # a string annotation
+    if isinstance(ann, ast.Constant) and isinstance(ann.value, str):
         return schema(ast.parse(ann.value, mode="eval").body, types, used, where)
     if isinstance(ann, ast.Constant) and ann.value is None:
         return {"type": "null"}
@@ -91,11 +75,10 @@ def schema(ann: ast.expr, types: dict[str, dict], used: set[str], where: str) ->
         if ann.value.id == "Literal" and all(isinstance(a, ast.Constant) for a in args):
             values = [a.value for a in args]   # type: ignore[attr-defined]
             return {"const": values[0]} if len(values) == 1 else {"enum": values}
-    raise ContractError(f"{where}: can't describe the type {ast.unparse(ann)} (see waypoint/server/contract.py's docstring)")
+    raise ContractError(f"{where}: can't describe the type {ast.unparse(ann)} (see waypoint/server/contract.py)")
 
 
 def union(members: list[dict]) -> dict:
-    """`A | B`: flattened, with plain types as one list of types, and literal values (and null) as one enum."""
     flat: list[dict] = []
     for m in members:
         flat += m["anyOf"] if set(m) == {"anyOf"} else [m]
@@ -120,7 +103,6 @@ def object_schema(name: str, types: dict[str, dict], used: set[str]) -> dict:
 
 
 def handler_annotations(route: dict, trees: dict[str, ast.Module]) -> tuple[ast.expr | None, ast.expr | None]:
-    """A route's handler's (body annotation, return annotation)."""
     tree = trees.setdefault(route["file"], ast.parse((ROOT / route["file"]).read_text()))
     for node in tree.body:
         if isinstance(node, ast.FunctionDef) and node.name == route["handler"]:
@@ -130,7 +112,6 @@ def handler_annotations(route: dict, trees: dict[str, ast.Module]) -> tuple[ast.
 
 
 def names(ann: ast.expr | None) -> set[str]:
-    """The names an annotation uses (in a string annotation too)."""
     if ann is None:
         return set()
     if isinstance(ann, ast.Constant) and isinstance(ann.value, str):
@@ -139,7 +120,6 @@ def names(ann: ast.expr | None) -> set[str]:
 
 
 def openapi_path(path: str) -> tuple[str, list[str]]:
-    """The route's address in OpenAPI's form, its {id}s numbered when there are several (id, id2, ...)."""
     names: list[str] = []
     parts = []
     for seg in path.split("/"):
@@ -175,7 +155,6 @@ def build() -> dict:
         op["responses"] = {"200": {"description": "OK", "content": {"application/json": {"schema": schema(reply, types, used, where)}}},
                            "default": {"$ref": "#/components/responses/Error"}}
         paths.setdefault(address, {})[r["method"].lower()] = op
-    # The TypedDicts the routes use, and the ones those use, until none is new.
     done: dict[str, dict] = {}
     while missing := sorted(used - set(done)):
         for name in missing:
@@ -189,8 +168,6 @@ def build() -> dict:
         "components": {"schemas": dict(sorted(done.items())), "responses": {"Error": ERROR}},
     }
 
-
-# TypeScript, from the OpenAPI description.
 
 def ts_type(s: dict) -> str:
     if "$ref" in s:
@@ -216,27 +193,13 @@ def field(name: str, s: dict, required: bool) -> str:
     return f"{name}{'' if required else '?'}: {ts_type(s)}"
 
 
-def comment(text: str, indent: str = "") -> list[str]:
-    lines = text.splitlines()
-    if len(lines) == 1:
-        return [f"{indent}/** {lines[0]} */"]
-    return [f"{indent}/**", *[f"{indent} * {ln}".rstrip() for ln in lines], f"{indent} */"]
-
-
 def render_ts(doc: dict) -> str:
-    out = [
-        "// The API contract's types: the request bodies and replies of the routes waypoint/server/contract.py covers.",
-        "// Generated by tools/api_contract.py from docs/openapi.json (`make api-contract`); don't edit by hand.",
-        "// lib/contract.ts's apiCall() types a call by its route, as Endpoints names it: apiCall<\"GET /api/budget\">(address).",
-        "",
-    ]
+    out: list[str] = []
     for name, s in doc["components"]["schemas"].items():
-        out += comment(s["description"]) if s.get("description") else []
         out.append(f"export interface {name} {{")
         out += [f"  {field(k, v, k in s['required'])};" for k, v in s["properties"].items()]
         out += ["}", ""]
-    out += ["/** Each covered route (\"METHOD /path\", as in waypoint/server/routes.py): what it takes and what it answers. */",
-            "export interface Endpoints {"]
+    out.append("export interface Endpoints {")
     for address, ops in doc["paths"].items():
         for method, op in ops.items():
             path = "/".join("{id}" if seg.startswith("{") else seg for seg in address.split("/"))
@@ -252,7 +215,7 @@ def render_json(doc: dict) -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="write nothing; fail if the generated files are out of date")
     args = ap.parse_args()
     try:

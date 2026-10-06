@@ -1,4 +1,3 @@
-// The documentation site, published to GitHub Pages by .github/workflows/docs.yml.
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
@@ -17,7 +16,6 @@ export default defineConfig({
       editLink: { baseUrl: 'https://github.com/AnthonyPluth/waypoint/edit/main/docs/' },
       customCss: ['./src/styles/custom.css'],
       lastUpdated: true,
-      // A broken link between pages fails the build (and so the pull request).
       plugins: [starlightLinksValidator()],
       sidebar: [
         { label: 'Start here', items: [{ autogenerate: { directory: 'start' } }] },

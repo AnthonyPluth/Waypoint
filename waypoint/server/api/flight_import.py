@@ -1,5 +1,3 @@
-"""Importing past flights from another app's CSV export (Settings → Import past flights): the uploaded file is read in
-memory for a preview and dropped; saving takes back only the flights being saved (waypoint/domain/flight_import)."""
 from __future__ import annotations
 
 from typing import Any
@@ -11,8 +9,8 @@ from ..contract import ImportBody, ImportPreview, ImportRow, Imported
 from .trips import MAX_TRAVELERS, viewer
 
 MAX_FILE = 5 * 1024 * 1024
-UPLOAD_ROOM = 64 * 1024        # what the server reads past MAX_FILE so a file just over it gets the message below, not a bare 413
-MAX_FLIGHTS = 1000             # flights saved in one request (a file of up to 10,000 rows goes back in pieces)
+UPLOAD_ROOM = 64 * 1024
+MAX_FLIGHTS = 1000
 _v = validate.Validator(ApiError, empty_file="Choose a CSV file exported from another app.",
                         file_too_large="That file is larger than {limit}.")
 
@@ -38,8 +36,6 @@ def _flight(item: Any) -> flight_import.FlightIn:
 
 @upload(MAX_FILE + UPLOAD_ROOM)
 def api_import_preview(conn, _q, raw: bytes) -> ImportPreview:
-    """Read an uploaded CSV export (Flighty, myFlightRadar24, OpenFlights or App in the Air) and say what each row would
-    add: nothing is saved, and the file is dropped once this answers."""
     file = _v.file(raw, "file", MAX_FILE)
     try:
         parsed = flight_import.read(file)
@@ -51,8 +47,6 @@ def api_import_preview(conn, _q, raw: bytes) -> ImportPreview:
 
 
 def api_import(conn, _q, body: ImportBody) -> Imported:
-    """Add the flights the preview showed as new, booked by the viewer; one already here is left alone, so saving the same
-    file twice adds nothing."""
     who = viewer(conn)
     items = body.get("flights")
     if not isinstance(items, list) or not items or len(items) > MAX_FLIGHTS:

@@ -1,4 +1,3 @@
-"""GET /api/state: who's signed in, the version, the database and the last backup."""
 import os
 from datetime import datetime
 from unittest import mock

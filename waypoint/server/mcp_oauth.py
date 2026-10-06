@@ -1,27 +1,3 @@
-"""OAuth for Waypoint's MCP endpoint: Waypoint is both the authorization server and the resource server (/mcp).
-
-The person approving an app is whoever is signed in to Waypoint (waypoint/oidc.py): there's no other identity provider,
-and the assistant then acts as that member (what they see, nothing more). The pieces: protected-resource metadata (RFC 9728),
-authorization-server metadata (RFC 8414), dynamic client registration (RFC 7591, without the management API of RFC 7592),
-the authorization code flow with PKCE (S256 only), refresh tokens that rotate, with a replayed one revoking its grant,
-revocation (RFC 7009), resource indicators (RFC 8707) and the iss parameter on redirects (RFC 9207). Scopes: "read"
-(always) and "write" (opt-in, any change outside mcp_access.BLOCKED, only while "Let assistants change trips" is on:
-mcp_access.allow_writes). What the consent page says the opt-in allows is CONSENT. Loyalty and Known Traveler numbers are
-out of an assistant's reach whatever it is allowed (mcp_access.BLOCKED).
-
-A grant is one approval on the consent page: the unit Settings lists and revokes. Codes and tokens are random
-(secrets.token_urlsafe(32), with a prefix) and only their sha256 is stored; revoke_grant() ends everything under a
-grant at once. Access tokens last an hour, refresh tokens 90 days (a fresh 90 days on each rotation), codes 10 minutes.
-A grant ends when its approver can no longer sign in (oidc.access_lapsed: see cut_off_reason), checked on every use.
-
-Nothing here makes an outbound request: clients register by POSTing their metadata, and Waypoint never fetches a URL a
-client gives it. Client ID metadata documents (a client_id that is a URL to fetch) aren't supported; adding them needs
-host and IP filtering against request forgery first. oauth_clients.kind and metadata_url are reserved for it.
-
-The functions here are pure over a connection: the HTTP side is in waypoint/server/oauth_http.py. A function that raises
-OAuthError may have written something that must be kept (a replayed code or refresh token revokes its grant first), so
-callers catch it inside their db.session() block, which then commits.
-"""
 from __future__ import annotations
 
 import base64
@@ -42,7 +18,6 @@ from .. import oidc
 from ..storage.models import OAuthClient, OAuthCode, OAuthConsent, OAuthGrant, OAuthToken
 
 SCOPES = ("read", "write")
-# What the consent page says ticking each opt-in scope lets the assistant do (and, switched off, what to do first).
 CONSENT = {
     "write": ("Change trips",
               "Add, change and remove trips, bookings, travellers, people and guests, and the distance unit. "
@@ -50,38 +25,35 @@ CONSENT = {
               "to ask you before every change.",
               "Turn on Let assistants change trips in Settings first. Until then this connection can't make changes."),
 }
-ACCESS_TTL = 3600                 # seconds
+ACCESS_TTL = 3600
 REFRESH_TTL = 90 * 86400
 CODE_TTL = 600
 CONSENT_TTL = 600
-UNCONSENTED_TTL = 24 * 3600       # a registered app nobody approved is dropped after this (a day, to come back to it)
-MAX_UNCONSENTED = 50              # ... and at most this many are kept once they're older than CONSENT_TTL (the oldest go first):
-MAX_UNCONSENTED_ALL = 1000        # a burst of registrations can't push out an app that's connecting right now; this bounds the burst
-KEEP = 30 * 86400                 # spent tokens and revoked grants are kept this long, then deleted
-MAX_BODY = 8 * 1024               # bytes in a request to /oauth/register, /oauth/token or /oauth/revoke
+UNCONSENTED_TTL = 24 * 3600
+MAX_UNCONSENTED = 50
+MAX_UNCONSENTED_ALL = 1000
+KEEP = 30 * 86400
+MAX_BODY = 8 * 1024
 MAX_NAME = 100
 MAX_REDIRECTS = 10
 MAX_URI = 2000
 AUTH_METHODS = ("none", "client_secret_post", "client_secret_basic")
 GRANT_TYPES = ("authorization_code", "refresh_token")
 LOOPBACK = ("127.0.0.1", "::1", "localhost")
-TOUCH_EVERY = 60                  # seconds between updates of a grant's last_used
+TOUCH_EVERY = 60
 
 _HOSTNAME = re.compile(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*")
-_PUBLIC_URL = re.compile(r"https?://[A-Za-z0-9.-]+(?::\d{1,5})?(?:/[A-Za-z0-9._~/-]*)?")   # nothing to escape in a header
+_PUBLIC_URL = re.compile(r"https?://[A-Za-z0-9.-]+(?::\d{1,5})?(?:/[A-Za-z0-9._~/-]*)?")
 _HOST_HEADER = re.compile(r"(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:.]+\])(?::\d{1,5})?")
 _VERIFIER = re.compile(r"[A-Za-z0-9._~-]{43,128}")
 _CHALLENGE = re.compile(r"[A-Za-z0-9_-]{43}")
 
 
-# An app registered long ago and never approved is forgotten, but an assistant may keep its client_id and try again:
-# this page can't send it an error, so it tells the person how to start over.
 UNKNOWN_APP = ("Waypoint doesn't know this app any more (it was never approved, or it was removed). Remove Waypoint from "
                "the assistant and add it again, then connect.")
 
 
 class OAuthError(Exception):
-    """An OAuth error answer: RFC 6749's `error` code and a description (HTTP status 400, or 401 for invalid_client)."""
 
     def __init__(self, error: str, description: str, status: int = 400):
         super().__init__(description)
@@ -92,12 +64,10 @@ class OAuthError(Exception):
 
 
 class PageError(Exception):
-    """An authorization request that can't be sent back to the app (unknown app, or a redirect_uri it didn't register):
-    shown on Waypoint's own page, never redirected."""
+    pass
 
 
 class RedirectError(OAuthError):
-    """An authorization request that's wrong in some other way: the error goes back to the app's verified redirect_uri."""
 
     def __init__(self, error: str, description: str, redirect_uri: str, state: str | None):
         super().__init__(error, description)
@@ -112,11 +82,7 @@ def _same(a: str | None, b: str) -> bool:
     return a is not None and hmac.compare_digest(a, b)
 
 
-# ------------------------------------------------------------------------------------------------ issuer and metadata
-
 def issuer(host: str | None) -> str | None:
-    """Waypoint's address as an OAuth issuer: WAYPOINT_PUBLIC_URL (https://, or http:// on a home address). Without it,
-    http://<Host> only for an address that makes sense only at home (oidc.local_host); otherwise None, and OAuth is off."""
     public = oidc.config()["public_url"]
     if public:
         if not _PUBLIC_URL.fullmatch(public):
@@ -142,7 +108,6 @@ def unavailable_reason() -> str:
 
 
 def resource(iss: str) -> str:
-    """The canonical address of the MCP endpoint (RFC 8707): what every token is for."""
     return iss + "/mcp"
 
 
@@ -164,11 +129,7 @@ def resource_metadata_url(iss: str) -> str:
     return iss + "/.well-known/oauth-protected-resource/mcp"
 
 
-# ------------------------------------------------------------------------------------------------ checking values
-
 def check_redirect_uri(uri: Any) -> str:
-    """A redirect URI an app may register: https://, or http:// to this computer (127.0.0.1, [::1], localhost). No
-    other schemes, fragments or user names."""
     def bad(why: str) -> OAuthError:
         return OAuthError("invalid_redirect_uri", why)
     if not isinstance(uri, str) or not uri or len(uri) > MAX_URI:
@@ -177,7 +138,7 @@ def check_redirect_uri(uri: Any) -> str:
         raise bad("A redirect URI can't contain spaces, control characters, backslashes or non-ASCII characters.")
     try:
         p = urllib.parse.urlsplit(uri)
-        _ = p.port   # raises ValueError for a port that isn't a number
+        _ = p.port
     except ValueError:
         raise bad(f"{uri} isn't a valid URI.") from None
     if "#" in uri:
@@ -197,14 +158,11 @@ def check_redirect_uri(uri: Any) -> str:
 
 
 def _loopback(uri: str) -> tuple[str, str, str] | None:
-    """A loopback redirect URI without its port (RFC 8252 §7.3: a native app gets whatever port is free)."""
     p = urllib.parse.urlsplit(uri)
     return (p.hostname or "", p.path, p.query) if p.scheme == "http" and p.hostname in LOOPBACK else None
 
 
 def redirect_matches(registered: list[str], given: Any) -> bool:
-    """Whether `given` is one of the app's registered redirect URIs: exactly, or for http:// loopback ones, exactly
-    but for the port."""
     try:
         check_redirect_uri(given)
     except OAuthError:
@@ -216,7 +174,6 @@ def redirect_matches(registered: list[str], given: Any) -> bool:
 
 
 def parse_scope(value: Any, error: str = "invalid_scope") -> frozenset[str]:
-    """Space-separated scopes; nothing means "read", and "read" is always included."""
     if value is None or (isinstance(value, str) and not value.strip()):
         return frozenset({"read"})
     if not isinstance(value, str):
@@ -233,7 +190,6 @@ def scope_text(scopes: frozenset[str] | set[str]) -> str:
 
 
 def check_resource(given: Any, canonical: str, error: type[OAuthError] | None = None, **kw: Any) -> None:
-    """`resource`, if sent, must be this MCP endpoint (a trailing slash aside)."""
     if given is None or given == "":
         return
     if not isinstance(given, str) or given.rstrip("/") != canonical:
@@ -248,17 +204,12 @@ def pkce_ok(verifier: Any, challenge: str) -> bool:
 
 
 def with_params(uri: str, params: dict[str, str | None]) -> str:
-    """`uri` with these added to its query (keeping whatever query it has)."""
     p = urllib.parse.urlsplit(uri)
     extra = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
     return urllib.parse.urlunsplit(p._replace(query=(p.query + "&" if p.query else "") + extra))
 
 
-# ------------------------------------------------------------------------------------------------ clients
-
 def register(conn, meta: Any, now: float | None = None) -> dict:
-    """Dynamic client registration (RFC 7591): check an app's metadata, save it, and answer its client_id (and a
-    client_secret if it asked for a method that uses one; only a hash of it is kept)."""
     now = time.time() if now is None else now
 
     def bad(why: str) -> OAuthError:
@@ -318,13 +269,12 @@ def get_client(conn, client_id: Any):
 
 
 def _basic(authorization: str | None) -> tuple[str, str] | None:
-    """HTTP Basic credentials (RFC 6749 §2.3.1: each part form-encoded first), or None if there's no Basic header."""
     value = (authorization or "").strip()
     if value[:6].lower() != "basic ":
         return None
     try:
         user, sep, password = binascii.a2b_base64(value[6:].strip(), strict_mode=True).decode().partition(":")
-    except (ValueError, binascii.Error):   # not base64, or not UTF-8
+    except (ValueError, binascii.Error):
         sep = ""
     if not sep:
         raise OAuthError("invalid_client", "The Basic credentials couldn't be read.", 401)
@@ -332,8 +282,6 @@ def _basic(authorization: str | None) -> tuple[str, str] | None:
 
 
 def authenticate_client(conn, form: dict[str, str], authorization: str | None):
-    """The app making a token or revocation request, checked the way it registered: client_id alone ("none"), or with
-    its secret in the form or a Basic header. OAuthError invalid_client (401) otherwise."""
     basic = _basic(authorization)
     form_id, form_secret = form.get("client_id"), form.get("client_secret")
     if basic and form_secret is not None:
@@ -355,8 +303,6 @@ def authenticate_client(conn, form: dict[str, str], authorization: str | None):
     return client
 
 
-# ------------------------------------------------------------------------------------------------ authorizing
-
 @dataclass(frozen=True)
 class AuthRequest:
     client_id: str
@@ -373,8 +319,6 @@ class AuthRequest:
 
 
 def check_authorize(conn, query: dict[str, list[str]], iss: str) -> AuthRequest:
-    """An authorization request (the query of GET /oauth/authorize). PageError when the app or its redirect_uri can't
-    be trusted; RedirectError for anything else, to send back to that redirect_uri."""
     if any(len(v) > 1 for v in query.values()):
         raise PageError("The request to connect has a parameter more than once. Try connecting again from the app.")
     q = {k: v[0] for k, v in query.items()}
@@ -405,7 +349,6 @@ def check_authorize(conn, query: dict[str, list[str]], iss: str) -> AuthRequest:
 
 
 def start_consent(conn, params: dict, now: float | None = None) -> str:
-    """Keep a checked authorization request (and who was signed in) for the consent form: returns the form's token."""
     now = time.time() if now is None else now
     token = secrets.token_urlsafe(32)
     conn.execute(insert(OAuthConsent).values(token_hash=_hash(token), params=json.dumps(params), created=now))
@@ -413,7 +356,6 @@ def start_consent(conn, params: dict, now: float | None = None) -> str:
 
 
 def take_consent(conn, token: str | None, now: float | None = None) -> dict | None:
-    """The request a consent form was shown for, once (it's gone after this), and only within CONSENT_TTL."""
     now = time.time() if now is None else now
     if not token:
         return None
@@ -422,14 +364,13 @@ def take_consent(conn, token: str | None, now: float | None = None) -> dict | No
     if row is None or not _same(row["token_hash"], h):
         return None
     if conn.execute(delete(OAuthConsent).where(OAuthConsent.token_hash == h)).rowcount != 1:
-        return None   # answered at the same moment by another request
+        return None
     if now - row["created"] > CONSENT_TTL:
         return None
     return json.loads(row["params"])
 
 
 def approve(conn, params: dict, scope: frozenset[str], sub: str | None, email: str | None, now: float | None = None) -> str:
-    """The person allowed the app: a grant for `scope`, and a code for it (returned) that the app trades for tokens."""
     now = time.time() if now is None else now
     grant_id = conn.execute(insert(OAuthGrant).values(client_id=params["client_id"], sub=sub, email=email,
                                                       scope=scope_text(scope), resource=params["resource"],
@@ -441,18 +382,11 @@ def approve(conn, params: dict, scope: frozenset[str], sub: str | None, email: s
     return code
 
 
-# ------------------------------------------------------------------------------------------------ tokens
-
 def cut_off_reason(conn, grant, now: float) -> str | None:
-    """Why a grant must end because of who approved it, or None. An approval lasts only as long as its approver may
-    sign in, judged the way their browser sessions are (oidc.still_allowed): taken off OIDC_ALLOWED_EMAILS, it ends at
-    once ("user_removed"). With OIDC_ALLOWED_GROUPS, where that can be known only at sign-in, it ends WAYPOINT_SESSION_DAYS
-    after the approver last signed in, as a session would ("sign_in_lapsed"). Without sign-in (OIDC off) nothing ends."""
     return oidc.access_lapsed(conn, grant["sub"], grant["email"], now)
 
 
 def _cut_off(conn, grant, now: float) -> bool:
-    """Revoke the grant if its approver may no longer sign in (see cut_off_reason). True if it was."""
     why = cut_off_reason(conn, grant, now)
     if why:
         revoke_grant(conn, grant["id"], why, now)
@@ -473,7 +407,6 @@ def _issue(conn, grant, now: float) -> tuple[dict, str]:
 
 
 def token(conn, client, form: dict[str, str], iss: str, now: float | None = None) -> dict:
-    """POST /oauth/token for an authenticated client: an authorization code or a refresh token for new tokens."""
     now = time.time() if now is None else now
     housekeeping(conn, now)
     canonical = resource(iss)
@@ -496,7 +429,6 @@ def _exchange_code(conn, client, form: dict[str, str], canonical: str, now: floa
     row = conn.execute(select(OAuthCode).where(OAuthCode.code_hash == h)).fetchone()
     if row is None or not _same(row["code_hash"], h):
         raise OAuthError("invalid_grant", "That code isn't valid.")
-    # One use only, even two requests at once: a code sent again means it leaked, so its grant is revoked.
     if conn.execute(update(OAuthCode).where(OAuthCode.code_hash == h, OAuthCode.used.is_(None)).values(used=now)).rowcount != 1:
         revoke_grant(conn, row["grant_id"], "code_reuse", now)
         raise OAuthError("invalid_grant", "That code was already used.")
@@ -522,9 +454,8 @@ def _refresh(conn, client, form: dict[str, str], canonical: str, now: float) -> 
     grant = _grant(conn, row["grant_id"]) if row is not None and _same(row["token_hash"], h) else None
     if row is None or grant is None or grant["client_id"] != client["id"]:
         raise OAuthError("invalid_grant", "That refresh token isn't valid.")
-    if grant["revoked"] is None and _cut_off(conn, grant, now):   # its approver may no longer sign in: no new tokens
+    if grant["revoked"] is None and _cut_off(conn, grant, now):
         raise OAuthError("invalid_grant", "The person who approved this connection can no longer sign in to Waypoint.")
-    # Rotation: each refresh token works once. One used again means two parties have it, so the grant is revoked.
     if row["consumed"] is not None:
         revoke_grant(conn, grant["id"], "refresh_reuse", now)
         raise OAuthError("invalid_grant", "That refresh token was already used; the connection has been revoked.")
@@ -533,7 +464,7 @@ def _refresh(conn, client, form: dict[str, str], canonical: str, now: float) -> 
     if form.get("scope") and not parse_scope(form.get("scope")) <= set(grant["scope"].split()):
         raise OAuthError("invalid_scope", "A refresh can't add scopes the person didn't approve.")
     if conn.execute(update(OAuthToken).where(OAuthToken.token_hash == h, OAuthToken.consumed.is_(None))
-                    .values(consumed=now)).rowcount != 1:   # another request used it at the same moment
+                    .values(consumed=now)).rowcount != 1:
         revoke_grant(conn, grant["id"], "refresh_reuse", now)
         raise OAuthError("invalid_grant", "That refresh token was already used; the connection has been revoked.")
     out, new_hash = _issue(conn, grant, now)
@@ -542,8 +473,6 @@ def _refresh(conn, client, form: dict[str, str], canonical: str, now: float) -> 
 
 
 def revoke(conn, client, presented: str | None, now: float | None = None) -> None:
-    """RFC 7009: revoke the grant an access or refresh token belongs to, if it's this client's. Anything else (an
-    unknown or spent token) is quietly ignored."""
     if not presented:
         return
     h = _hash(presented)
@@ -556,8 +485,6 @@ def revoke(conn, client, presented: str | None, now: float | None = None) -> Non
 
 
 def revoke_grant(conn, grant_id: int, reason: str, now: float | None = None) -> bool:
-    """End a grant and everything under it at once: its codes and tokens are deleted and it's marked revoked. The
-    one way anything is revoked (Settings, /oauth/revoke, a replayed code or refresh token). True if it was live."""
     now = time.time() if now is None else now
     done = conn.execute(update(OAuthGrant).where(OAuthGrant.id == grant_id, OAuthGrant.revoked.is_(None))
                         .values(revoked=now, revoked_reason=reason)).rowcount == 1
@@ -567,7 +494,6 @@ def revoke_grant(conn, grant_id: int, reason: str, now: float | None = None) -> 
 
 
 def access_grant(conn, presented: str, canonical: str, now: float | None = None):
-    """The grant a live access token for `canonical` belongs to (and note it was used), or None."""
     now = time.time() if now is None else now
     if not presented.startswith("wpa_"):
         return None
@@ -579,7 +505,7 @@ def access_grant(conn, presented: str, canonical: str, now: float | None = None)
     if (row is None or not _same(row["token_hash"], h) or row["expires"] <= now or row["revoked"] is not None
             or row["resource"] != canonical):
         return None
-    if _cut_off(conn, row, now):   # checked on every request, so taking someone off the sign-in list ends it at once
+    if _cut_off(conn, row, now):
         return None
     if row["last_used"] is None or now - row["last_used"] > TOUCH_EVERY:
         conn.execute(update(OAuthGrant).where(OAuthGrant.id == row["id"]).values(last_used=now))
@@ -587,11 +513,7 @@ def access_grant(conn, presented: str, canonical: str, now: float | None = None)
     return row
 
 
-# ------------------------------------------------------------------------------------------------ Settings, and tidying
-
 def connections(conn, now: float | None = None) -> list[dict]:
-    """The live grants, newest first: what Settings lists as connected assistants (after ending any whose approver may
-    no longer sign in, so none is listed that no longer works)."""
     cut_off_removed(conn, now)
     has_tokens = exists().where(OAuthToken.grant_id == OAuthGrant.id)
     rows = conn.execute(select(OAuthGrant.id, OAuthClient.name, OAuthGrant.sub, OAuthGrant.email, OAuthGrant.scope,
@@ -604,8 +526,6 @@ def connections(conn, now: float | None = None) -> list[dict]:
 
 
 def cut_off_removed(conn, now: float | None = None) -> None:
-    """Revoke every live grant whose approver may no longer sign in (cut_off_reason). Every use of a grant checks this
-    anyway (a token, a refresh, a code); this is so Settings doesn't list one that no longer works."""
     now = time.time() if now is None else now
     if not oidc.enabled():
         return
@@ -614,9 +534,6 @@ def cut_off_removed(conn, now: float | None = None) -> None:
 
 
 def housekeeping(conn, now: float | None = None) -> None:
-    """Delete what's no longer needed: expired codes and consent forms, tokens spent or expired over KEEP ago, grants
-    never traded for tokens (or whose tokens are all gone), grants revoked over KEEP ago, and apps registered over
-    UNCONSENTED_TTL ago that have no grant."""
     now = time.time() if now is None else now
     conn.execute(delete(OAuthCode).where(OAuthCode.created < now - CODE_TTL))
     conn.execute(delete(OAuthConsent).where(OAuthConsent.created < now - CONSENT_TTL))

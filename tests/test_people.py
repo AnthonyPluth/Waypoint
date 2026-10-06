@@ -1,4 +1,3 @@
-"""People: members made at sign-in, guests added, edited and removed by any member, and the routes that do it."""
 from sqlalchemy import func, select
 
 from waypoint import oidc
@@ -88,9 +87,9 @@ class PeopleTests(DbCase):
     def test_the_demo_household(self):
         added = demo.seed(self.c)
         shown = people.everyone(self.c)
-        self.assertEqual(added, 2 + len(shown) + len(demo.MEMBERSHIPS) + 2 + len(demo.UNREAD) + len(demo.SHARED_UNREAD)   # (the demo's two mailboxes and what they couldn't read)
+        self.assertEqual(added, 2 + len(shown) + len(demo.MEMBERSHIPS) + 2 + len(demo.UNREAD) + len(demo.SHARED_UNREAD)
                          + sum(self.c.orm.scalar(select(func.count()).select_from(m)) or 0 for m in (Trip, Segment, SegmentPort, SegmentTraveler, FlightStatus,
-                                                                                              StoredMessage, SegmentMessage)))   # (and the messages kept for the demo's items and its emailed booking)
+                                                                                              StoredMessage, SegmentMessage)))
         self.assertEqual([p["member"] for p in shown], [True, True, False, False])
         self.assertEqual(self.c.orm.scalar(select(func.count()).select_from(User)), 2)
 
@@ -115,7 +114,6 @@ class FieldTests(DbCase):
 
 
 class PeopleRouteTests(ServerCase):
-    """The routes, as the web app calls them (running without sign-in, so everyone is the local household)."""
 
     def test_add_edit_list_and_remove_a_guest(self):
         status, added = self.req("POST", "/api/people", {"display_name": "Joan O’Hare 🐶", "aliases": ["OHARE/JOAN MRS"]})
@@ -125,7 +123,7 @@ class PeopleRouteTests(ServerCase):
         self.assertEqual((status, edited["display_name"], edited["legal_name"], edited["aliases"]), (200, "Joan", "Joan Marie O’Hare", []))
         status, listing = self.req("GET", "/api/people")
         self.assertEqual(status, 200)
-        self.assertIn(added["id"], [p["id"] for p in listing["people"]])   # (the class shares one database)
+        self.assertIn(added["id"], [p["id"] for p in listing["people"]])
         self.assertEqual(self.req("DELETE", f"/api/people/{added['id']}"), (200, {"ok": True}))
         self.assertNotIn(added["id"], [p["id"] for p in self.req("GET", "/api/people")[1]["people"]])
 
@@ -151,7 +149,6 @@ class PeopleRouteTests(ServerCase):
 
 
 class ClaimTests(DbCase):
-    """A member who was already a guest claims the guest ("This is me"): the guest's trips become theirs (names and numbers here are made up)."""
 
     def setUp(self):
         super().setUp()
@@ -184,7 +181,7 @@ class ClaimTests(DbCase):
         claimed = people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
         self.assertEqual([m["person_id"] for m in loyalty.everyone(self.c)], [self.member])
         self.assertEqual((claimed["display_name"], claimed["first_name"], claimed["legal_name"]), ("Jane Doe", "Jane", "Jane Q Doe"))
-        self.assertEqual(claimed["aliases"], ["J. Doe"])   # (DOE/JANE MS is the member's own name already)
+        self.assertEqual(claimed["aliases"], ["J. Doe"])
         self.assertEqual(claimed["links"], [{"guest": "J. Doe", "by": "Jane Doe", "on": "2026-10-05"}])
         self.assertIsNone(people.get(self.c, self.guest))
         self.c.orm.expire_all()
@@ -197,8 +194,8 @@ class ClaimTests(DbCase):
         people.edit(self.c, self.member, {"display_name": "Janie", "first_name": None, "legal_name": "Jane Doe", "aliases": ["doe/jane"]})
         claimed = people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
         self.assertEqual((claimed["display_name"], claimed["legal_name"]), ("Janie", "Jane Doe"))
-        self.assertEqual((claimed["first_name"]), "Jane")   # (it was empty)
-        self.assertEqual(claimed["aliases"], ["doe/jane", "Jane Q Doe", "J. Doe"])   # (DOE/JANE MS is doe/jane already)
+        self.assertEqual((claimed["first_name"]), "Jane")
+        self.assertEqual(claimed["aliases"], ["doe/jane", "Jane Q Doe", "J. Doe"])
 
     def test_someone_on_the_same_segment_is_not_added_twice(self):
         seg = self.c.orm.scalars(select(Segment)).one()
@@ -262,7 +259,6 @@ class ClaimTests(DbCase):
 
 
 class SuggestionTests(DbCase):
-    """After sign-in, a member with no trips is offered the guests that match their name."""
 
     def setUp(self):
         super().setUp()
@@ -277,7 +273,7 @@ class SuggestionTests(DbCase):
         return [g["id"] for g in people.claim_suggestions(self.c, self.member, name)]
 
     def test_guests_whose_name_matches_the_sign_in_are_offered(self):
-        self.assertEqual(self.ids(), [self.legal, self.jane])   # (by display name Janie < Ms. J Doe)
+        self.assertEqual(self.ids(), [self.legal, self.jane])
         self.assertEqual(self.ids("DOE/JANE MRS"), [self.legal, self.jane])
         self.assertEqual(self.ids("Someone Else"), [])
         self.assertEqual(self.ids(""), [])
@@ -299,11 +295,11 @@ class SuggestionTests(DbCase):
 
     def test_a_guest_is_never_offered_suggestions(self):
         self.assertEqual(people.claim_suggestions(self.c, self.jane, "Jane Doe"), [])
-        people.dismiss_claims(self.c, self.jane)   # (nothing to dismiss for a guest)
+        people.dismiss_claims(self.c, self.jane)
         self.assertFalse(self.c.orm.get(Person, self.jane).claim_dismissed)   # type: ignore[union-attr]
 
     def test_a_member_is_preferred_over_a_guest_with_the_same_name(self):
-        self.assertEqual(people.match_name(self.c, "DOE/JANE MS"), self.member)   # (the guest has this alias too)
+        self.assertEqual(people.match_name(self.c, "DOE/JANE MS"), self.member)
         self.assertEqual(people.match_name(self.c, "Mia Doe"), self.c.orm.scalars(select(Person.id).where(Person.display_name == "Mia Doe")).one())
 
     def test_two_members_with_the_same_name_still_match_neither(self):
@@ -312,7 +308,6 @@ class SuggestionTests(DbCase):
 
 
 class ClaimRouteTests(DbCase):
-    """The routes: only the signed-in member can claim, and only for themselves."""
 
     def setUp(self):
         super().setUp()
@@ -333,7 +328,7 @@ class ClaimRouteTests(DbCase):
 
     def test_the_request_cannot_name_another_member_to_link_to(self):
         self.sign_in("u2", "Bo Example")
-        api.api_person_claim(self.c, {}, {"person_id": self.jane, "member": self.jane}, str(self.guest))   # (a body is ignored)
+        api.api_person_claim(self.c, {}, {"person_id": self.jane, "member": self.jane}, str(self.guest))
         self.assertEqual(people.get(self.c, self.bo)["links"][0]["guest"], "Jane D")   # type: ignore[index]
         self.assertEqual(people.get(self.c, self.jane)["links"], [])   # type: ignore[index]
 
@@ -357,10 +352,10 @@ class ClaimRouteTests(DbCase):
 
     def test_the_suggestion_comes_from_the_sign_in_name_and_none_of_these_hides_it(self):
         self.sign_in()
-        self.assertEqual([g["id"] for g in api.api_claim_suggestions(self.c, {}, {})["guests"]], [])   # (Jane D isn't Jane Doe)
+        self.assertEqual([g["id"] for g in api.api_claim_suggestions(self.c, {}, {})["guests"]], [])
         people.add_guest(self.c, guest(display_name="Jane Doe", aliases=[]))
         self.assertEqual([g["display_name"] for g in api.api_claim_suggestions(self.c, {}, {})["guests"]], ["Jane Doe"])
         self.assertEqual(api.api_claim_dismiss(self.c, {}, {}), {"ok": True})
         self.assertEqual(api.api_claim_suggestions(self.c, {}, {})["guests"], [])
-        self.sign_in("u2", "Bo Example")   # (it was only hidden for Jane)
+        self.sign_in("u2", "Bo Example")
         self.assertEqual(api.api_claim_suggestions(self.c, {}, {})["guests"], [])

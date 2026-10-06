@@ -1,5 +1,3 @@
-"""tools/coverage_floor.py: passes a report at the floor, fails one below it overall or for one module where the travel
-features live."""
 import importlib.util
 import unittest
 from pathlib import Path

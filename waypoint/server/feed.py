@@ -1,6 +1,3 @@
-"""The calendar feed's address, /feed/<key>.ics: a member's calendar subscription. A calendar app can't sign in, so the key in
-the address is what lets it in: 256 random bits, kept only as a hash (waypoint/domain/reminders.py), never written to the log
-(Handler.log_request) and gone when the member turns the feed off, makes a new key, or can no longer sign in."""
 from __future__ import annotations
 
 import re
@@ -16,8 +13,6 @@ ADDRESS = re.compile(r"/feed/([A-Za-z0-9_-]{16,128})\.ics")
 
 
 def serve(path: str, now: float | None = None) -> Response | None:
-    """The feed for this address, or None (a 404, the same for a key that never was, one that was replaced and one whose owner
-    can no longer sign in)."""
     found = ADDRESS.fullmatch(path)
     if not found:
         return None

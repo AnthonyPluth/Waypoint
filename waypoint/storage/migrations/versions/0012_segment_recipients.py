@@ -1,13 +1,3 @@
-"""Who got a booking's confirmation in their own mailbox (`segment_recipients`), and a one-time merge of the duplicates the
-mail scan made before it matched across the household: segments of the same kind, confirmation code and leg (the same
-flight number however it was written, the same places, a start within three days) become the oldest one of them, with the
-travellers of all, any fields a person edited and the worst status, and the people who booked or were on the others still
-see it (as travellers or recipients). Nothing else refers to a segment by id except travellers, which are moved first
-(scanned messages and review items hold a mailbox and a message id only).
-
-Revision ID: 0012
-Revises: 0011
-"""
 import json
 import re
 from datetime import date
@@ -23,7 +13,6 @@ depends_on = None
 NEAR_DAYS = 3
 SUFFIXES = {"inc", "incorporated", "ltd", "limited", "llc", "plc", "corp", "corporation", "co", "company", "gmbh", "ag", "sa", "bv"}
 FLIGHT = re.compile(r"([A-Z0-9]{2,3}?)0*(\d{1,4}[A-Z]?)")
-# The columns a person's edit can lock, as the app names them (waypoint/domain/trips.py FIELDS), but travellers.
 COLUMNS = ("kind", "status", "confirmation", "provider", "start_local", "start_zone", "end_local", "end_zone", "origin",
            "destination", "details", "manage_url")
 WORST = {"confirmed": 0, "changed": 1, "cancelled": 2}
@@ -43,12 +32,10 @@ def upgrade() -> None:
     merge_duplicates(op.get_bind())
 
 
-def downgrade() -> None:   # (the merged segments stay merged)
+def downgrade() -> None:
     op.drop_index('ix_segment_recipients_person_id', table_name='segment_recipients')
     op.drop_table('segment_recipients')
 
-
-# ------------------------------------------------------------------------------------------------ the one-time merge
 
 def _flight(number):
     n = re.sub(r"[\s-]", "", number or "").upper()
@@ -84,7 +71,6 @@ def _same_leg(a, b):
 
 
 def merge_duplicates(conn) -> int:
-    """Fold each duplicate segment into the oldest of its leg. Returns how many were folded."""
     meta = sa.MetaData()
     segments, travelers, trips, recipients = (sa.Table(n, meta, autoload_with=conn)
                                               for n in ('segments', 'segment_travelers', 'trips', 'segment_recipients'))
@@ -107,7 +93,7 @@ def merge_duplicates(conn) -> int:
 def _fold(conn, segments, travelers, trips, recipients, keep, dup) -> None:
     locked_keep, locked_dup = _json(keep["locked_fields"], []), _json(dup["locked_fields"], [])
     changes: dict = {}
-    for f in COLUMNS:   # (a field only the duplicate's person edited keeps their edit; one locked on both stays the oldest's)
+    for f in COLUMNS:
         if f in locked_dup and f not in locked_keep:
             changes[f] = dup[f]
     if "status" not in locked_keep and "status" not in changes and WORST.get(dup["status"], 0) > WORST.get(keep["status"], 0):
@@ -124,7 +110,6 @@ def _fold(conn, segments, travelers, trips, recipients, keep, dup) -> None:
         if not same:
             conn.execute(sa.insert(travelers).values(segment_id=keep["id"], person_id=t.person_id, name=t.name))
             have.append({"person_id": t.person_id, "name": t.name})
-    # Whoever booked the duplicate still sees the booking: it was in their mailbox.
     if dup["booked_by"] is not None and dup["booked_by"] != keep["booked_by"] \
             and not any(h["person_id"] == dup["booked_by"] for h in have):
         conn.execute(sa.insert(recipients).values(segment_id=keep["id"], person_id=dup["booked_by"]))

@@ -1,9 +1,6 @@
 <script lang="ts" module>
-  /** "19:50" from a wall-clock time ("2026-11-20T19:50"): read off as it is, never turned into a Date (which would move it
-   *  into the browser's zone). */
   export const clock = (local: string | null) => (local ? local.slice(11, 16) : "");
 
-  /** " (+1 day)" when the time falls on another day than the booked one. */
   export function dayShift(local: string | null, booked: string | null): string {
     if (!local || !booked) return "";
     const days = Math.round((Date.UTC(+local.slice(0, 4), +local.slice(5, 7) - 1, +local.slice(8, 10)) -
@@ -21,10 +18,6 @@
   import { endAt } from "$lib/trips";
   import { toast } from "svelte-sonner";
 
-  // The live status of one flight segment, beside its booked times (which it never changes): the state, the time the flight
-  // is now expected, the gate and terminal, when the answer came, and a Refresh. Nothing without RAPIDAPI_KEY. A parent
-  // shows it on a flight's card: <FlightStatus {segment} />. The list is loaded by whoever shows it (loadFlightStatus), once
-  // for all the cards on the page. A flight that landed hours ago has nothing left to ask for, so no button.
   let { segment }: { segment: Segment } = $props();
   let busy = $state(false);
 
@@ -39,11 +32,9 @@
   const label = (x: FlightStatus) => (x.state === "delayed" && x.delay_minutes ? `Delayed ${x.delay_minutes} min` : WORDS[x.state]);
   const variant = (x: FlightStatus) => (x.state === "cancelled" || x.state === "diverted" ? "destructive" : x.state === "delayed" ? "secondary" : "outline");
 
-  /** "Terminal 7 · Gate B24" */
   const where = (terminal: string | null, gate: string | null) =>
     [terminal && `Terminal ${terminal}`, gate && `Gate ${gate}`].filter(Boolean).join(" · ");
 
-  // Why nothing is being fetched, as words: the monthly limit lasts to the 1st, the others an hour.
   function pausedText(p: NonNullable<typeof list>["paused"]): string {
     if (!p) return "";
     const until = new Date(p.until);

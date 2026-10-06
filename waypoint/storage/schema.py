@@ -1,4 +1,3 @@
-"""Waypoint's database schema, for SQLite and Postgres alike. Alembic migrations (waypoint/storage/migrations) create and change it."""
 from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, LargeBinary, MetaData, Table, Text, UniqueConstraint, false, text
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
@@ -7,15 +6,10 @@ metadata = MetaData()
 
 
 def refers(table: str, column: str, target: str, ondelete: str) -> ForeignKey:
-    """A foreign key, named fk_<table>_<column>. ondelete is what removing the row it refers to does: CASCADE takes
-    this row with it, SET NULL lets go (deleted_accounts.remove does the rest by hand). Deferrable, so a restore can
-    load rows that refer to each other in any order (backup.restore), but checked at once otherwise."""
     return ForeignKey(target, name=f"fk_{table}_{column}", ondelete=ondelete, deferrable=True, initially="IMMEDIATE")
 
 
-
 class now_text(FunctionElement):
-    """The current time as 'YYYY-MM-DD HH:MM:SS' text (UTC, or the server's local time), on either database."""
     type = Text()
     inherit_cache = True
 
@@ -415,5 +409,4 @@ oauth_consents = Table(
     info={'doc': 'consent pages shown and not yet answered (10 minutes); not in a backup'},
 )
 
-# Tables whose integer id is assigned by the database.
 AUTO_ID = {t.name for t in metadata.tables.values() if 'id' in t.c and t.c.id.autoincrement is True}

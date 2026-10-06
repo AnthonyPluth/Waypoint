@@ -14,14 +14,11 @@
   import UserPlus from "@lucide/svelte/icons/user-plus";
   import { toast } from "svelte-sonner";
 
-  // Everyone who travels: members (they sign in; edit only) and guests (no login; any member adds, edits and removes them).
-  // A failed load leaves nothing drawn that could pass for current, with a Try again.
   let people = $state<Person[] | null>(null);
   let memberships = $state<LoyaltyEntry[]>([]);
   let programs = $state<LoyaltyList["programs"]>({});
   let conflicts = $state<LoyaltyList["conflicts"]>([]);
   let loadError = $state("");
-  // Numbers shown in the clear, by membership id: asked for one at a time, kept only on this page (never in browser storage).
   let revealed = $state<Record<number, string>>({});
 
   async function load() {
@@ -33,7 +30,6 @@
   }
   $effect(() => { void load(); });
 
-  // The form for adding a guest (id null) or editing someone.
   type Draft = { id: number | null; member: boolean; display_name: string; first_name: string; legal_name: string; aliases: string };
   let draft = $state<Draft | null>(null);
   let formError = $state("");
@@ -62,9 +58,6 @@
     await load();
   }
 
-  // "This is me": a signed-in member claims a guest for themselves (not on your own machine, where nobody signs in).
-  // "This is me" is for a signed-in member who hasn't yet been linked to a guest of their own: once their own person has a
-  // linked guest, the button stays off every guest.
   const linked = $derived((people?.find((x) => x.id === app.state?.person_id)?.links.length ?? 0) > 0);
   const canClaim = $derived(!!app.state?.user && !app.state.user.local && !linked);
   let claiming = $state<Person | null>(null);
@@ -82,7 +75,6 @@
     await load();
   });
 
-  // Memberships: the form to add one for a person (id null) or change one.
   const KINDS: [string, string][] = [["airline", "Airline"], ["hotel", "Hotel"], ["car", "Car rental"], ["known_traveler", "Known Traveler"], ["redress", "Redress"]];
   type IdDraft = { id: number | null; person_id: number; kind: string; program: string; number: string; expiry: string; notes: string; masked: string };
   let idDraft = $state<IdDraft | null>(null);
@@ -91,8 +83,6 @@
   let idRemoving = $state<LoyaltyEntry | null>(null);
   let idAsking = $state(false);
 
-  // The programs a person can still pick for a kind: one they already have isn't offered again ("Other" can repeat, and a
-  // membership being edited keeps its own program).
   const choices = (personId: number, kind: string, editing: number | null = null): string[] => {
     const kept = editing === null ? null : memberships.find((m) => m.id === editing)?.program;
     const held = new Set(memberships.filter((m) => m.person_id === personId && m.kind === kind && m.id !== editing).map((m) => m.program));
@@ -109,7 +99,6 @@
     e.preventDefault();
     const d = idDraft;
     if (!d) return;
-    // A number left blank while changing a membership keeps the one saved.
     const body = { person_id: d.person_id, kind: d.kind, program: d.program, number: d.number, expiry: EXPIRES.includes(d.kind) ? d.expiry : "", notes: d.notes };
     const ok = await act(async () => {
       if (d.id === null) await apiCall<"POST /api/loyalty">("/api/loyalty", { method: "POST", body });
@@ -127,18 +116,17 @@
     await load();
   });
 
-  // Tapping a masked number asks the server for that one number, shows it and copies it; tapping it again hides it.
   async function toggle(m: LoyaltyEntry) {
     if (revealed[m.id] !== undefined) { delete revealed[m.id]; return; }
     await act(async () => {
       const { number } = await apiCall<"POST /api/loyalty/{id}/reveal">(`/api/loyalty/${m.id}/reveal`, { method: "POST" });
       revealed[m.id] = number;
       try { await navigator.clipboard.writeText(number); toast.success("Copied"); }
-      catch { toast("Couldn’t copy it: select the number instead."); }   // no clipboard (an insecure page, a refused permission)
+      catch { toast("Couldn’t copy it: select the number instead."); }
     });
   }
 
-  const EXPIRES = ["known_traveler", "redress"];   // the kinds whose numbers expire (an airline, hotel or car program's doesn't)
+  const EXPIRES = ["known_traveler", "redress"];
   const byKind = (id: number) => KINDS.map(([kind, name]) => ({ kind, name, items: memberships.filter((m) => m.person_id === id && m.kind === kind) })).filter((g) => g.items.length);
   const itemDetails = (m: LoyaltyEntry) => [m.expiry && `Expires ${m.expiry}`, m.notes].filter(Boolean).join(" · ");
 

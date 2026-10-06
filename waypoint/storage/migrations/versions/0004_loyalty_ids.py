@@ -1,8 +1,3 @@
-"""Loyalty and Known Traveler numbers: one row per membership, per person. The number is stored encrypted.
-
-Revision ID: 0004
-Revises: 0003
-"""
 import sqlalchemy as sa
 from alembic import op
 

@@ -1,5 +1,3 @@
-"""Where Waypoint looks for its data folder and alembic.ini when nothing is configured: the repository, however deep
-waypoint/storage/db.py sits. A move that changes the depth must not point a plain install at a new, empty data folder."""
 import os
 import unittest
 from unittest import mock
