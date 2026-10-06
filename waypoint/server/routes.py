@@ -21,7 +21,7 @@ from .api.mcp import api_mcp_revoke, api_mcp_settings, api_mcp_writes
 from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, api_person_add, api_person_claim,
                           api_person_edit, api_person_remove)
 from .api.logos import api_logodev, api_logodev_fetch, api_logodev_save, api_segment_logo
-from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_reread, api_mailbox_scan, api_mailboxes
+from .api.mailboxes import api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_reread, api_mailbox_scan, api_mailbox_share, api_mailboxes
 from .api.reminders import (api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
                             api_reminders_set)
 from .api.review import (api_review, api_review_dismiss, api_review_ignore, api_review_preview, api_review_suggest,
@@ -78,6 +78,7 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/mailboxes/callback", api_mailbox_callback),
     ("DELETE", "/api/mailboxes/{id}", api_mailbox_disconnect),
     ("POST", "/api/mailboxes/{id}/scan", api_mailbox_scan),
+    ("POST", "/api/mailboxes/{id}/share", api_mailbox_share),
     ("POST", "/api/mailboxes/{id}/reread", api_mailbox_reread),
     ("GET", "/api/reminders", api_reminders),
     ("POST", "/api/reminders", api_reminders_set),

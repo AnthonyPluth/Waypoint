@@ -239,6 +239,7 @@ mailboxes = Table(
     Column('last_error', Text),
     Column('created', Float),
     Column('scan_error', Text),
+    Column('share_review', Boolean, nullable=False, server_default=false()),
     UniqueConstraint('owner_sub', 'address', name='uq_mailboxes_owner_address'),
     info={'doc': "Gmail accounts members connected (read-only); each belongs to the member who connected it, its refresh token is kept encrypted"},
 )

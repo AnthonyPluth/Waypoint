@@ -437,7 +437,8 @@ class ReviewTests(ScanCase):
         self.assertEqual({(i["reason"], i["sender_domain"], i["received"]) for i in items},
                          {("no_markup", "example-air.example", "2026-10-17"), ("incomplete", "example-air.example", "2026-10-18")})
         nomarkup = next(i for i in items if i["reason"] == "no_markup")
-        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "sender_domain", "received", "reason", "gmail_url", "suggestion", "suggestion_error"}))
+        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "received", "reason", "gmail_url", "suggestion", "suggestion_error"}))
+        self.assertEqual((nomarkup["owner"], nomarkup["mine"]), ("Jane Doe", True))
         self.assertEqual(nomarkup["gmail_url"], "https://mail.google.com/mail/?authuser=jane%40gmail.example#all/msg-no_markup")
         self.assertEqual(self.items("u-sam"), [])
         self.assertEqual(self.scanned(), {"msg-no_markup": "unreadable", "msg-incomplete": "unreadable", "msg-flight_jsonld": "booking"})
@@ -1143,6 +1144,82 @@ class MailScanApiTests(GoogleCase):
             status, body = self.call("ben", method, path, {} if method == "POST" else None)
             self.assertEqual((status, body["error"]), (404, "No such item"), path)
         self.assertEqual(len(self.call("ana", "GET", "/api/review")[1]["items"]), 2)   # still there
+
+    def share(self, who="ana", box=None, on=True):
+        return self.call(who, "POST", f"/api/mailboxes/{box or self.ana_box}/share", {"share": on})
+
+    def test_a_mailbox_shares_its_queue_with_the_household_only_when_its_owner_says_so(self):
+        self.put("no_markup", "incomplete")
+        self.scan_now()
+        self.assertFalse(self.mailboxes()[0]["share_review"])   # (off until they say)
+        self.assertEqual(self.call("ben", "GET", "/api/review")[1]["items"], [])
+        self.assertEqual(self.call("ben", "GET", "/api/state")[1]["review_count"], 0)
+        self.assertEqual(self.share(), (200, {"ok": True}))
+        self.assertTrue(self.mailboxes()[0]["share_review"])
+        seen = self.call("ben", "GET", "/api/review")[1]["items"]
+        self.assertEqual(sorted(i["reason"] for i in seen), ["incomplete", "no_markup"])
+        self.assertEqual({(i["address"], i["owner"], i["mine"], i["gmail_url"]) for i in seen}, {("ana@gmail.example", "Ana", False, None)})
+        self.assertTrue(all(i["mine"] and i["gmail_url"] for i in self.call("ana", "GET", "/api/review")[1]["items"]))
+        self.assertEqual(self.call("ben", "GET", "/api/state")[1]["review_count"], 2)
+        self.assertEqual(self.share(on=False)[0], 200)   # (and it stops at once)
+        self.assertEqual(self.call("ben", "GET", "/api/review")[1]["items"], [])
+        self.assertEqual(self.call("ben", "GET", "/api/state")[1]["review_count"], 0)
+
+    def test_only_a_mailboxs_owner_changes_whether_it_is_shared(self):
+        self.assertEqual(self.share("ben")[0], 404)
+        self.assertEqual(self.share("ben", "abc")[0], 404)
+        self.assertEqual(self.share("ana", 9999)[0], 404)
+        self.assertFalse(self.mailboxes()[0]["share_review"])
+        self.share()
+        self.assertEqual(self.share("ben", on=False)[0], 404)   # (Ben can't turn it off either)
+        self.assertTrue(self.mailboxes()[0]["share_review"])
+        self.assertEqual(self.call("ben", "POST", f"/api/mailboxes/{self.ana_box}/share", {"share": "false"}), (404, {"error": "Not found"}))
+        self.assertEqual(self.call("ana", "POST", f"/api/mailboxes/{self.ana_box}/share", {"share": "false"})[0], 200)   # (the text "false" is off)
+        self.assertFalse(self.mailboxes()[0]["share_review"])
+
+    def test_the_household_can_dismiss_a_shared_item_but_nothing_that_reads_the_owners_gmail(self):
+        self.put("no_markup", "incomplete")
+        self.scan_now()
+        first, second = self.call("ana", "GET", "/api/review")[1]["items"]
+        self.assertEqual(self.call("ben", "DELETE", f"/api/review/{first['id']}")[0], 404)   # (not shared yet)
+        self.share()
+        fetched = len(self.google.fetched)
+        self.assertEqual(self.call("ben", "GET", f"/api/review/{first['id']}/preview")[0], 404)
+        self.assertEqual(self.call("ben", "POST", f"/api/review/{first['id']}/suggest", {})[0], 404)
+        self.assertEqual(self.call("ben", "POST", f"/api/review/{first['id']}/ignore", {})[0], 404)
+        self.assertEqual(len(self.google.fetched), fetched)   # (nothing was fetched from Ana's Gmail for him)
+        self.assertEqual(self.call("ben", "DELETE", f"/api/review/{first['id']}"), (200, {"ok": True}))
+        self.assertEqual([i["id"] for i in self.call("ana", "GET", "/api/review")[1]["items"]], [second["id"]])
+        self.assertEqual(self.call("ben", "DELETE", f"/api/review/{first['id']}")[0], 404)
+
+    def test_what_the_household_sees_of_a_shared_item_holds_nothing_of_the_message(self):
+        self.put("no_markup", "incomplete")
+        self.scan_now()
+        self.share()
+        with no_leaks(self, "CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-NOMARKUP-6H9C", "CANARY-BODY-INCOMPLETE-4N7P"):
+            reply = self.call("ben", "GET", "/api/review")[1]
+            self.call("ben", "GET", "/api/state")
+        self.assertEqual(len(reply["items"]), 2)
+        for canary in ("CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-NOMARKUP-6H9C", "CANARY-BODY-INCOMPLETE-4N7P", "msg-no_markup", "authuser"):
+            self.assertNotIn(canary, json.dumps(reply))
+
+    def test_a_member_who_loses_access_takes_what_their_mailbox_shared_with_them(self):
+        self.put("no_markup")
+        self.scan_now()
+        self.share()
+        self.assertEqual(len(self.call("ben", "GET", "/api/review")[1]["items"]), 1)
+        with mock.patch.dict(os.environ, {"OIDC_ALLOWED_EMAILS": "ben@example.com"}), mock.patch.object(gmail, "_post", return_value={}):   # (Ana may no longer sign in)
+            self.assertEqual(self.call("ben", "GET", "/api/review")[1]["items"], [])
+        self.assertEqual(self.mailboxes("ben"), [])
+
+    def test_a_mailbox_that_goes_takes_what_it_shared_with_it(self):
+        self.put("no_markup")
+        self.scan_now()
+        self.share()
+        self.assertEqual(len(self.call("ben", "GET", "/api/review")[1]["items"]), 1)
+        with mock.patch.object(gmail, "_post", return_value={}):
+            self.assertEqual(self.call("ana", "DELETE", f"/api/mailboxes/{self.ana_box}")[0], 200)
+        self.assertEqual(self.call("ben", "GET", "/api/review")[1]["items"], [])
 
     def test_dismissing_and_ignoring(self):
         self.put("no_markup", "incomplete")

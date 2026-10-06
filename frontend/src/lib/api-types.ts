@@ -234,6 +234,7 @@ export interface Mailbox {
   scan_error: string | null;
   scanning: boolean;
   scan_notice: string | null;
+  share_review: boolean;
 }
 
 export interface MailboxList {
@@ -367,16 +368,18 @@ export interface Review {
 }
 
 /**
- * One message Waypoint couldn't read, for the member whose mailbox it is. Never its subject or text: only who it
- * came from and its day (Open in Gmail shows the message).
+ * One message Waypoint couldn't read, for the member whose mailbox it is and, when its owner shares that mailbox, the
+ * household. Never its subject or text: only who it came from and its day (Open in Gmail shows the message, to its owner).
  */
 export interface ReviewItem {
   id: number;
   address: string;
+  owner: string;
+  mine: boolean;
   sender_domain: string;
   received: string | null;
   reason: "no_markup" | "incomplete" | "broken";
-  gmail_url: string;
+  gmail_url: string | null;
   suggestion: AiSuggestion | null;
   suggestion_error: string | null;
 }
@@ -458,6 +461,10 @@ export interface SegmentLinks {
   app: string | null;
   directions: string | null;
   call: string | null;
+}
+
+export interface ShareBody {
+  share: boolean;
 }
 
 /** Who's signed in. Without sign-in configured (on your own machine), everyone is `local`. */
@@ -715,6 +722,7 @@ export interface Endpoints {
   "POST /api/mailboxes/connect": { body: never; reply: Started };
   "DELETE /api/mailboxes/{id}": { body: never; reply: Disconnected };
   "POST /api/mailboxes/{id}/scan": { body: never; reply: ScanStarted };
+  "POST /api/mailboxes/{id}/share": { body: ShareBody; reply: Ok };
   "POST /api/mailboxes/{id}/reread": { body: never; reply: ScanStarted };
   "GET /api/reminders": { body: never; reply: Reminders };
   "POST /api/reminders": { body: RemindersBody; reply: Reminders };

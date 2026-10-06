@@ -367,6 +367,17 @@ describe("Trip", () => {
     });
   });
 
+  it("tells only the person who booked a hotel room that they have no number for its chain", async () => {
+    loyalty = [];
+    held = trip([{ ...stay, booked_by: 1, travelers: [{ id: 4, person_id: 1, name: "Jane Doe" }, { id: 5, person_id: 2, name: "Sam Doe" }, { id: 6, person_id: null, name: "DOE/MIA MISS" }] }]);
+    render(TripPage);
+    await screen.findByRole("heading", { name: "Trip to London" });
+    expect(screen.getAllByText(/number yet/)).toHaveLength(1);
+    expect(screen.getByText(/No Marriott Bonvoy number yet/).closest("li")).toHaveTextContent("Jane Doe");
+    expect(screen.queryByText(/Not matched to a person/)).toBeNull();
+    expect(screen.getByText("Sam Doe")).toBeInTheDocument();   // (still listed)
+  });
+
   describe("a link to one booking", () => {
     it("scrolls to that booking’s card and marks it, and leaves the others alone", async () => {
       const scroll = vi.fn();
