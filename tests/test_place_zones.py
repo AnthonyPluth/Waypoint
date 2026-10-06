@@ -1,7 +1,27 @@
 """The time zone of a stay from its address (waypoint/domain/place_zones.py): read from the text alone, never looked up. All
 addresses are made up; the state, ZIP and city names are real so the rules have something to settle."""
+import unittest
+
 from tests.shared import DbCase
 from waypoint.domain import place_zones
+
+
+class Tables(unittest.TestCase):
+    def test_every_state_has_zip_prefixes_and_its_exceptions_are_among_them(self):
+        self.assertEqual(set(place_zones.US_STATES), set(place_zones.ZIP_RANGES))
+        for state, (_zone, exceptions) in place_zones.US_STATES.items():
+            for prefix in exceptions:
+                with self.subTest(state=state, prefix=prefix):
+                    self.assertTrue(place_zones._zip_in_state(state, prefix))   # (a typo in either table fails here)
+
+    def test_no_two_states_claim_the_same_zip_prefix_except_where_they_really_overlap(self):
+        owners: dict[int, list[str]] = {}
+        for state in place_zones.ZIP_RANGES:
+            for n in range(1000):
+                if place_zones._zip_in_state(state, f"{n:03d}"):
+                    owners.setdefault(n, []).append(state)
+        shared = {n: s for n, s in owners.items() if len(s) > 1}
+        self.assertEqual(shared, {}, "a ZIP prefix in two states' ranges")
 
 
 class AddressZones(DbCase):
