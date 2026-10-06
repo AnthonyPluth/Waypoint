@@ -82,6 +82,32 @@ export function zoomAt(t: Transform, factor: number, px: number, py: number, wid
   return clampPan({ k, x: px - ((px - t.x) / t.k) * k, y: py - ((py - t.y) / t.k) * k }, width, height);
 }
 
+/** The box (in the map's own units) around everything flown: every airport with coordinates and every route's path, or null when
+ *  there is nothing to show. */
+export function flownBounds(flights: StatsFlights, projection: GeoProjection): [[number, number], [number, number]] | null {
+  const geometries: Geometry[] = [];
+  for (const a of flights.airports) if (placed(a)) geometries.push({ type: "Point", coordinates: [a.longitude, a.latitude] });
+  for (const r of flights.routes) {
+    if (r.a_latitude === null || r.a_longitude === null || r.b_latitude === null || r.b_longitude === null) continue;
+    geometries.push({ type: "LineString", coordinates: [[r.a_longitude, r.a_latitude], [r.b_longitude, r.b_latitude]] });
+  }
+  if (geometries.length === 0) return null;
+  const [[x0, y0], [x1, y1]] = geoPath(projection).bounds({ type: "GeometryCollection", geometries });
+  return Number.isFinite(x0) && Number.isFinite(y0) && Number.isFinite(x1) && Number.isFinite(y1) ? [[x0, y0], [x1, y1]] : null;
+}
+
+/** The zoom and pan that frame a box, centred, with `padding` (a fraction of the box) around it and never closer than
+ *  MAX_ZOOM; a box that is most of the map (or none) is the whole world. A very small box (one airport) is given a minimum
+ *  size so the map doesn't zoom right in on a point. */
+export function fitBox(box: [[number, number], [number, number]] | null, padding = 0.15, width = MAP_WIDTH, height = MAP_HEIGHT): Transform {
+  if (!box) return IDENTITY;
+  const [[x0, y0], [x1, y1]] = box;
+  const w = Math.max(x1 - x0, width / 6) * (1 + 2 * padding), h = Math.max(y1 - y0, height / 6) * (1 + 2 * padding);
+  const k = Math.min(MAX_ZOOM, width / w, height / h);
+  if (k < 1.2) return IDENTITY;
+  return clampPan({ k, x: width / 2 - k * ((x0 + x1) / 2), y: height / 2 - k * ((y0 + y1) / 2) }, width, height);
+}
+
 /** Keep the zoomed map covering its box: you can't drag the world off the screen. */
 export function clampPan(t: Transform, width = MAP_WIDTH, height = MAP_HEIGHT): Transform {
   return { k: t.k, x: Math.min(0, Math.max(width - width * t.k, t.x)), y: Math.min(0, Math.max(height - height * t.k, t.y)) };
