@@ -18,7 +18,7 @@ const stats = (year: number | null = 2026): Stats => ({
     longest: { origin: "JFK", destination: "LHR", distance_km: 5540, start_local: "2026-03-14T09:00", flight_number: "ZX 9931" },
     shortest: null, most_visited_airport: "JFK", busiest_month: "2026-03", times_around_earth: 1.3, moon_fraction: 0.1353,
   },
-  stays: { nights: 9, chains: [{ name: "Hotel Canarios", count: 2 }], cities: [{ name: "Canario Suites", count: 1 }], countries: [] },
+  stays: { nights: 9, chains: [{ name: "Hotel Canarios", count: 2 }], cities: [{ name: "Canario Suites", count: 1 }], countries: [], count: 0, average_nights: 0, hotels: [], cities_by_nights: [], longest: null, most_visited_hotel: null, most_visited_city: null, busiest_month: null },
   cars: { days: 0, companies: [] }, cruises: { count: 0, nights: 0, sea_days: 0, ports: 0, lines: [] },
   places: { countries: [{ name: "US", first_visit: "2026-01-02", visits: 3 }, { name: "GB", first_visit: "2026-03-14", visits: 1 }], cities: [] },
 });

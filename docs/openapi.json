@@ -4484,6 +4484,56 @@
         ],
         "additionalProperties": false
       },
+      "StatsStayPlace": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "stays": {
+            "type": "integer"
+          },
+          "nights": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "stays",
+          "nights"
+        ],
+        "additionalProperties": false
+      },
+      "StatsStayRecord": {
+        "type": "object",
+        "properties": {
+          "hotel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nights": {
+            "type": "integer"
+          },
+          "start_local": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "hotel",
+          "city",
+          "nights",
+          "start_local"
+        ],
+        "additionalProperties": false
+      },
       "StatsStays": {
         "type": "object",
         "properties": {
@@ -4507,13 +4557,75 @@
             "items": {
               "$ref": "#/components/schemas/StatsNamed"
             }
+          },
+          "count": {
+            "type": "integer"
+          },
+          "average_nights": {
+            "type": "number"
+          },
+          "hotels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsStayPlace"
+            }
+          },
+          "cities_by_nights": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsStayPlace"
+            }
+          },
+          "longest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatsStayRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "most_visited_hotel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatsStayPlace"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "most_visited_city": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatsStayPlace"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "busiest_month": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
           "nights",
           "chains",
           "cities",
-          "countries"
+          "countries",
+          "count",
+          "average_nights",
+          "hotels",
+          "cities_by_nights",
+          "longest",
+          "most_visited_hotel",
+          "most_visited_city",
+          "busiest_month"
         ],
         "additionalProperties": false
       },

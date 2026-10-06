@@ -575,11 +575,32 @@ class StatsFlights(TypedDict):
     moon_fraction: float            # of the way to the Moon, 384,400 km
 
 
+class StatsStayPlace(TypedDict):
+    name: str                       # a hotel or a city, as first written
+    stays: int
+    nights: int
+
+
+class StatsStayRecord(TypedDict):
+    hotel: str | None
+    city: str | None
+    nights: int
+    start_local: str                # check-in, local
+
+
 class StatsStays(TypedDict):
     nights: int
     chains: list[StatsNamed]
     cities: list[StatsNamed]
     countries: list[StatsNamed]
+    count: int                      # stays with at least one night
+    average_nights: float           # nights per stay, to a tenth
+    hotels: list[StatsStayPlace]    # by nights
+    cities_by_nights: list[StatsStayPlace]
+    longest: StatsStayRecord | None
+    most_visited_hotel: StatsStayPlace | None
+    most_visited_city: StatsStayPlace | None
+    busiest_month: str | None       # YYYY-MM, the month with the most nights away
 
 
 class StatsCars(TypedDict):

@@ -1,0 +1,40 @@
+{
+  "name": "hotel-stats-dark",
+  "page": "stats",
+  "scheme": "dark",
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Stats"
+      }
+    },
+    {
+      "wait_for": "[aria-label='Totals']"
+    },
+    {
+      "expect_text": {
+        "selector": "main",
+        "text": "Longest stay"
+      }
+    },
+    {
+      "scroll_to": "[aria-label='Totals']"
+    },
+    {
+      "screenshot": "totals"
+    },
+    {
+      "scroll_to": "#records-title"
+    },
+    {
+      "screenshot": "records"
+    },
+    {
+      "scroll_to": "#top-hotels"
+    },
+    {
+      "screenshot": "hotels"
+    }
+  ]
+}
