@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-Settings → **Reminders and calendar** is yours alone: each member chooses their own reminders, devices and calendar feed.
+Settings → Travel → **Reminders and calendar** is yours alone: each member chooses their own reminders, devices and calendar feed.
 
 ## Reminders
 

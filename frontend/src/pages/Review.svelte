@@ -196,7 +196,7 @@
     {#if review.items.length}
       <section aria-labelledby="unread-title" class="space-y-2">
         <h2 id="unread-title" class="eyebrow px-1">Couldn’t read</h2>
-        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Gmail), and then you can add those by hand or dismiss them. Open one in Gmail, or choose Add by hand to read it beside the form. Waypoint keeps each message here, encrypted, so you can read it without Gmail: until the item is dismissed or added, and for as long as a booking you add from it exists.</p>
+        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Mail and AI → Gmail), and then you can add those by hand or dismiss them. Open one in Gmail, or choose Add by hand to read it beside the form. Waypoint keeps each message here, encrypted, so you can read it without Gmail: until the item is dismissed or added, and for as long as a booking you add from it exists.</p>
         {#if unasked.length > 1}
           <div class="px-1"><Button variant="outline" size="sm" disabled={asking_all} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : `Ask AI about all ${unasked.length}`}</Button></div>
         {/if}

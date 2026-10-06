@@ -4,6 +4,9 @@
   "scheme": "dark",
   "steps": [
     {
+      "goto": "#settings/mail"
+    },
+    {
       "expect_text": {
         "selector": "h1",
         "text": "Settings"

@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-**Settings → AI** is off until you turn it on. When it’s on, mail that lands in [Review](/Waypoint/start/review/)’s “Couldn’t read” list from then on is also offered to an AI, which suggests the booking in it. Items already in the list when you turn it on are not offered. A booking Waypoint could already read is never sent.
+**Settings → Mail and AI → AI** is off until you turn it on. When it’s on, mail that lands in [Review](/Waypoint/start/review/)’s “Couldn’t read” list from then on is also offered to an AI, which suggests the booking in it. Items already in the list when you turn it on are not offered. A booking Waypoint could already read is never sent.
 
 ## Choosing where it runs
 

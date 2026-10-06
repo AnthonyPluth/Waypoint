@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-Waypoint reads bookings from Gmail with a Google OAuth client that **you** create in your own Google Cloud project, so no one else’s app sits between your mailbox and your server. This page sets that up once for the household; after that, each member connects their own Gmail from **Settings → Gmail**.
+Waypoint reads bookings from Gmail with a Google OAuth client that **you** create in your own Google Cloud project, so no one else’s app sits between your mailbox and your server. This page sets that up once for the household; after that, each member connects their own Gmail from **Settings → Mail and AI → Gmail**.
 
 Once a Gmail is connected, Waypoint scans it for booking emails: see [Scanning](#scanning) below, and [Email scanning](/Waypoint/privacy/email-scanning/) for what it will and won’t do with a mailbox.
 
@@ -37,7 +37,7 @@ Until both are set, Settings says Gmail isn’t set up and shows no Connect butt
 
 ## Connect a Gmail
 
-Each member opens **Settings → Gmail** and chooses **Connect Gmail**, picks the Google account and agrees to read-only access. A member can connect more than one address (a personal and a work one, say), and sees only their own connections: nobody else’s address or status appears for them.
+Each member opens **Settings → Mail and AI → Gmail** and chooses **Connect Gmail**, picks the Google account and agrees to read-only access. A member can connect more than one address (a personal and a work one, say), and sees only their own connections: nobody else’s address or status appears for them.
 
 - **Reconnect.** If Google stops honouring a connection (you removed Waypoint at [myaccount.google.com/permissions](https://myaccount.google.com/permissions), the grant expired, or Waypoint’s secret key changed), its row says **Reconnect**. Choosing it connects the same address again.
 - **Disconnect.** Waypoint tells Google to revoke its access, then deletes the connection. If Google can’t be reached it keeps the connection and says so, rather than showing it gone while it still works; try again, or remove Waypoint at the Google permissions page.

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from "@testing-library/svelte";
+import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,7 +7,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
-import { app } from "$lib/app.svelte";
+import { app, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { state } from "../test/fixtures";
 import Settings from "./Settings.svelte";
@@ -16,7 +16,7 @@ const file = (name = "backup.json.gz") => new File(["x"], name, { type: "applica
 const inspected = { created: "2026-09-01T10:00:00Z", source: "sqlite", counts: { trips: 3, loyalty_ids: 2 }, current: { trips: 1 }, database: "sqlite" };
 
 beforeEach(() => { vi.mocked(api).mockReset(); app.state = state(); });
-afterEach(() => { app.state = null; flightStatus.list = null; });
+afterEach(() => { app.state = null; flightStatus.list = null; route.sub = ""; route.query = ""; history.replaceState(null, "", "/"); });
 
 describe("Settings flight status", () => {
   const usage = (extra = {}) => ({ enabled: true, month: "2026-11", used: 12, limit: 400, paused: null, statuses: [], ...extra });
@@ -74,7 +74,52 @@ describe("Settings account", () => {
   });
 });
 
+describe("Settings tabs", () => {
+  const tabs = () => within(screen.getByRole("navigation", { name: "Settings sections" }));
+
+  it("opens on Account, with a link to each group kept in the address", () => {
+    render(Settings);
+    expect(tabs().getAllByRole("link").map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["Account", "#settings/account"], ["Mail and AI", "#settings/mail"], ["Travel", "#settings/travel"], ["Data", "#settings/data"]]);
+    expect(tabs().getByRole("link", { name: "Account" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("Signed in as")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Download backup" })).toBeNull();   // (that is on another tab)
+  });
+
+  it("shows each group's sections on its own tab", () => {
+    const heading = (name: string) => screen.queryByRole("heading", { name });
+    const onTab = (sub: string) => { route.sub = sub; return render(Settings); };
+    let view = onTab("mail");
+    expect(heading("Gmail")).not.toBeNull();
+    expect(heading("AI")).not.toBeNull();
+    expect(heading("Account")).toBeNull();
+    view.unmount();
+    view = onTab("travel");
+    for (const name of ["Reminders and calendar", "Distances", "Brand logos", "Import past flights"]) expect(heading(name)).not.toBeNull();
+    expect(heading("Gmail")).toBeNull();
+    view.unmount();
+    view = onTab("data");
+    for (const name of ["AI assistants (MCP)", "Data"]) expect(heading(name)).not.toBeNull();
+    expect(tabs().getByRole("link", { name: "Data" })).toHaveAttribute("aria-current", "page");
+    view.unmount();
+  });
+
+  it("falls back to Account for a tab it doesn't have", () => {
+    route.sub = "nope";
+    render(Settings);
+    expect(tabs().getByRole("link", { name: "Account" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("opens on the mail tab when Google sends you back", () => {
+    history.replaceState(null, "", "/?gmail=connected#settings");
+    render(Settings);
+    expect(tabs().getByRole("link", { name: "Mail and AI" })).toHaveAttribute("aria-current", "page");
+  });
+});
+
 describe("Settings data", () => {
+  beforeEach(() => { route.sub = "data"; });
+
   it("links to the backup download and says when the last one was", () => {
     app.state = state({ last_backup: new Date().toISOString() });
     render(Settings);
