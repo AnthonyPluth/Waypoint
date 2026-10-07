@@ -72,6 +72,16 @@ class WebAppTests(ServerCase):
         self.assertEqual((status, body), (200, b"// service worker"))
         self.assertNotIn("immutable", headers.get("Cache-Control") or "")
 
+    def test_a_static_dir_a_symlink_points_at_is_read(self):
+        with tempfile.TemporaryDirectory() as parent:
+            link = os.path.join(parent, "link")
+            os.symlink(parent, link)
+            static = os.path.join(link, "static")
+            built_app(static)
+            status, headers, body = self.get("/assets/index-abc.js", static=static)
+        self.assertEqual((status, body), (200, b"console.log(1)"))
+        self.assertIn("immutable", headers["Cache-Control"])
+
     def test_never_outside_static(self):
         status, _, body = self.get("/../../server.py")
         self.assertNotIn(b"def serve", body)

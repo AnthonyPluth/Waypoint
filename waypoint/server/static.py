@@ -36,19 +36,20 @@ def serve(h: Handler, path: str) -> None:
     if path == "/next" or path.startswith("/next/"):
         return h._redirect("/")
     rel = path.lstrip("/")
+    app_dir, static, app_index = (os.path.realpath(p) for p in (APP_DIR, STATIC, APP_INDEX))
     full = None
-    for base in (APP_DIR, STATIC):
+    for base in (app_dir, static):
         cand = os.path.realpath(os.path.join(base, rel))
         if rel and cand.startswith(base + os.sep) and os.path.isfile(cand):
             full = cand
             break
-    if full is None or full == APP_INDEX:
-        full = APP_INDEX
+    if full is None or full == app_index:
+        full = app_index
         if not os.path.isfile(full):
             return h._page(404, "The web app isn't built", "Run npm run build in frontend/ (the Docker image does this for you).")
     ctype = content_type(full)
     gz_ok = "gzip" in (h.headers.get("Accept-Encoding") or "")
-    if full == APP_INDEX:
+    if full == app_index:
         nonce = secrets.token_urlsafe(16)
         with open(full, "rb") as f:
             data = f.read().replace(b"<script ", f'<script nonce="{nonce}" '.encode())
@@ -61,7 +62,7 @@ def serve(h: Handler, path: str) -> None:
         h._security_headers()
         h.end_headers()
         return None
-    cache = "public, max-age=31536000, immutable" if full.startswith(APP_DIR + os.sep + "assets" + os.sep) else "no-cache"
+    cache = "public, max-age=31536000, immutable" if full.startswith(app_dir + os.sep + "assets" + os.sep) else "no-cache"
     return send_file(h, entry["data"], ctype, cache, entry["etag"], gz_ok, None, entry.get("gz"))
 
 
