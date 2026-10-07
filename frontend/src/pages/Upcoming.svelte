@@ -10,6 +10,7 @@
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
+  import RouteLine from "$lib/components/RouteLine.svelte";
   import { dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, headline, nextUp, startAt, START_WORD, subline, timesDiffer, tripDays, untimed, viewerZone, when } from "$lib/trips";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
@@ -99,7 +100,7 @@
         <p class="eyebrow flex items-center gap-2">{#if next.state === "now"}<span class="size-2 animate-pulse rounded-full bg-primary motion-reduce:animate-none" aria-hidden="true"></span>{/if}{next.state === "now" ? "Under way" : "Next up"}</p>
         <div class="flex items-center gap-3">
           <BrandLogo src={s.logo} label={s.logo_label} size={48} />
-          <h2 id="next-title" class="min-w-0 break-words text-3xl font-bold tracking-tight md:text-4xl">{headline(s)}</h2>
+          <h2 id="next-title" class="min-w-0 break-words text-3xl font-bold tracking-tight md:text-4xl"><RouteLine segment={s} /></h2>
         </div>
         <p class="w-fit rounded-full bg-primary/12 px-3.5 py-1 text-base font-semibold text-primary" data-countdown>
           {next.state === "now" ? when(END_WORD[s.kind], endAt(s) - now) : when(START_WORD[s.kind], startAt(s) - now)}

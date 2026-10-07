@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ESLint } from "eslint";
 import { describe, expect, it } from "vitest";
@@ -80,5 +81,22 @@ describe("no console", () => {
   });
   it("leaves errors alone", async () => {
     expect(await flagged("console.error(new Error('x'));")).toEqual([]);
+  });
+});
+
+describe("no light theme", () => {
+  it("flags the dark variant, light scheme handling and a light surface", async () => {
+    expect(await flagged('<div class="dark:bg-secondary"></div>', "frontend/src/Example.svelte")).toEqual(["waypoint/no-light-theme"]);
+    expect(await flagged('export const scheme = "prefers-color-scheme";')).toEqual(["waypoint/no-light-theme"]);
+    expect(await flagged(":root { color-scheme: light; }", "frontend/src/app.css")).toEqual(["waypoint/no-light-theme"]);
+    expect(await flagged(":root { --background: #f2f4f8; }", "frontend/src/app.css")).toEqual(["waypoint/no-light-theme"]);
+    expect(await flagged('export const surface = "bg-white";')).toEqual(["waypoint/no-light-theme"]);
+  });
+  it("leaves the dark palette, light ink tokens and a dark stylesheet alone", async () => {
+    const dark = ":root { color-scheme: dark; --background: #07090e; --confirmed-soft: #0c2a1d; --confirmed-ink: #63e6a0; --signal: #f6b73c; }";
+    expect(await flagged(dark, "frontend/src/app.css")).toEqual([]);
+    expect(await flagged('<div class="bg-secondary text-confirmed-ink"></div>', "frontend/src/Example.svelte")).toEqual([]);
+    const css = readFileSync(new URL("./app.css", import.meta.url), "utf8");
+    expect(await flagged(css, "frontend/src/app.css")).toEqual([]);
   });
 });

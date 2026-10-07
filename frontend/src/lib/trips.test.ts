@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingCards, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
+import { bookingCards, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, route, splitTrips, START_WORD, tripKinds, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -130,6 +130,15 @@ describe("wording", () => {
     expect(subline(ship)).toBe("Example Cruise Line · Cabin 9214 · Deck 9");
     expect(headline(segment({ kind: "cruise", origin: null, provider: null, details: {} }))).toBe("Cruise");
     expect([START_WORD.cruise, END_WORD.cruise]).toEqual(["Embarks", "Disembarks"]);
+  });
+
+  it("finds the two ends of a flight or train, and nothing for a segment that has no route", () => {
+    expect(route(out)).toEqual(["JFK", "LHR"]);
+    expect(route(segment({ kind: "train", origin: "NYP", destination: "BOS" }))).toEqual(["NYP", "BOS"]);
+    expect(route(segment({ origin: "JFK", destination: null }))).toBeNull();
+    expect(route(segment({ kind: "hotel", origin: "London" }))).toBeNull();
+    expect(route(segment({ kind: "cruise", origin: "Miami" }))).toBeNull();
+    expect(route(segment({ kind: "car", origin: "SFO airport" }))).toBeNull();
   });
 });
 

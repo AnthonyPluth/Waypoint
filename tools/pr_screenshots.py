@@ -67,7 +67,7 @@ def select_files(paths: Sequence[str], verify_dir: Path = VERIFY_DIR) -> list[Pa
     return chosen
 
 
-def comment_markdown(pr: int, names: Sequence[str], theme: str = "light", slug: str = REPO_SLUG) -> str:
+def comment_markdown(pr: int, names: Sequence[str], theme: str = "dark", slug: str = REPO_SLUG) -> str:
     groups: dict[str, list[str]] = {}
     for name in sorted(names):
         groups.setdefault(viewport_of(name) or "other", []).append(name)
@@ -102,7 +102,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser(prog="pr_screenshots.py", description="Publish make verify screenshots for a PR and print its comment.")
     ap.add_argument("pr", type=int, help="the pull request's number")
     ap.add_argument("files", nargs="*", help="screenshots to publish (default: every *-top.png in artifacts/verify/)")
-    ap.add_argument("--theme", choices=("dark", "light"), default="light", help="the theme the screenshots show (default light)")
+    ap.add_argument("--theme", choices=("dark", "light"), default="dark", help="the theme the screenshots show (default dark; Waypoint is dark only)")
     ap.add_argument("--trailer", action="append", default=[], help="a commit trailer, 'Key: value' (repeatable)")
     ap.add_argument("--remote", default="origin", help=argparse.SUPPRESS)
     args = ap.parse_args(argv)

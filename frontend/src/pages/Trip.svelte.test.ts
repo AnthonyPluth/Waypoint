@@ -375,6 +375,16 @@ describe("Trip", () => {
       links: { app: "https://example.com/manage/b", directions: null, call: null }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe", seat: null }] });
     beforeEach(() => { held = trip([flight, sams, stay]); });
 
+    it("leads every booking with a chip for its status", async () => {
+      held = trip([flight, { ...sams, status: "changed" }, stay]);
+      render(TripPage);
+      const list = await screen.findByRole("list", { name: "Bookings" });
+      const cards = within(list).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+      const blocks = cards.flatMap((card) => within(card).getAllByRole("listitem").filter((li) => li.hasAttribute("data-booking")));
+      expect(blocks.map((block) => within(block).getAllByTestId("status-chip")[0].getAttribute("data-status"))).toEqual(["confirmed", "changed"]);
+      for (const block of blocks) expect(block.querySelector("p")?.firstElementChild).toHaveAttribute("data-testid", "status-chip");
+    });
+
     it("is one card for the flight with a block for each booking: its code, its travellers, its own Edit and Remove", async () => {
       render(TripPage);
       const list = await screen.findByRole("list", { name: "Bookings" });

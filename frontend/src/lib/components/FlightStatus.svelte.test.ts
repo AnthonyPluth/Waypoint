@@ -36,6 +36,7 @@ describe("a flight’s live status", () => {
     render(FlightStatus, { segment: seg });
     const card = screen.getByTestId("flight-status");
     expect(card).toHaveTextContent("Delayed 50 min");
+    expect(screen.getByTestId("status-chip")).toHaveAttribute("data-kind", "live");
     expect(card).toHaveTextContent("Now 19:50 (booked 19:00)");
     expect(card).toHaveTextContent("Terminal 7 · Gate B24");
     expect(card).toHaveTextContent("Arrives 08:05");
@@ -76,6 +77,7 @@ describe("a flight’s live status", () => {
     flightStatus.list = list({ enabled: false });
     const { unmount } = render(FlightStatus, { segment: seg });
     expect(screen.queryByTestId("flight-status")).toBeNull();
+    expect(screen.queryByTestId("status-chip")).toBeNull();
     unmount();
     flightStatus.list = null;
     render(FlightStatus, { segment: seg });

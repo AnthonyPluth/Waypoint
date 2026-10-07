@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (@media (prefers-color-scheme: dark));
 @custom-variant phone (@media (max-width: 767px), (max-height: 500px) and (pointer: coarse));
 @custom-variant desktop (@media not ((max-width: 767px) or ((max-height: 500px) and (pointer: coarse))));
 @custom-variant hoverable (@media (hover: hover));
@@ -9,69 +8,62 @@
 @font-face { font-family: "Geist"; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
   --radius: 1.25rem;
-  --background: #f2f4f8;
-  --foreground: #0e1320;
-  --card: #ffffff;
-  --card-foreground: #0e1320;
-  --popover: #ffffff;
-  --popover-foreground: #0e1320;
-  --primary: #0a63d8;
-  --primary-foreground: #ffffff;
-  --secondary: #e8ecf3;
-  --secondary-foreground: #0e1320;
-  --muted: #e8ecf3;
-  --muted-foreground: #586175;
-  --accent: #e8ecf3;
-  --accent-foreground: #0e1320;
-  --destructive: #c7261d;
-  --border: #e0e5ee;
-  --input: #cdd4e0;
-  --ring: #0a63d8;
-  --signal: #f2a516;
-  --signal-foreground: #3b2500;
-  --signal-soft: #fff0d0;
-  --signal-ink: #7a4600;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #0e1320;
-  --sidebar-accent: #eaeef5;
-  --sidebar-accent-foreground: #0e1320;
-  --sidebar-border: #e0e5ee;
-  --shadow: 0 1px 2px rgb(14 19 32 / 5%), 0 12px 32px -16px rgb(14 19 32 / 16%);
-}
+  --background: #07090e;
+  --foreground: #f3f5f9;
+  --card: #12151d;
+  --card-foreground: #f3f5f9;
+  --popover: #181c26;
+  --popover-foreground: #f3f5f9;
+  --primary: #4f9dff;
+  --primary-foreground: #04101f;
+  --secondary: #1a1e29;
+  --secondary-foreground: #f3f5f9;
+  --muted: #1a1e29;
+  --muted-foreground: #9aa4b8;
+  --accent: #1a1e29;
+  --accent-foreground: #f3f5f9;
+  --destructive: #ff7b72;
+  --border: #232837;
+  --input: #2c3243;
+  --ring: #4f9dff;
+  --signal: #f6b73c;
+  --signal-foreground: #2b1a00;
+  --signal-soft: #34270c;
+  --signal-ink: #ffd58a;
+  --sidebar: #0a0c12;
+  --sidebar-foreground: #f3f5f9;
+  --sidebar-accent: #171b26;
+  --sidebar-accent-foreground: #f3f5f9;
+  --sidebar-border: #1b1f2b;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #07090e;
-    --foreground: #f3f5f9;
-    --card: #12151d;
-    --card-foreground: #f3f5f9;
-    --popover: #181c26;
-    --popover-foreground: #f3f5f9;
-    --primary: #4f9dff;
-    --primary-foreground: #04101f;
-    --secondary: #1a1e29;
-    --secondary-foreground: #f3f5f9;
-    --muted: #1a1e29;
-    --muted-foreground: #9aa4b8;
-    --accent: #1a1e29;
-    --accent-foreground: #f3f5f9;
-    --destructive: #ff7b72;
-    --border: #232837;
-    --input: #2c3243;
-    --ring: #4f9dff;
-    --signal: #f6b73c;
-    --signal-foreground: #2b1a00;
-    --signal-soft: #34270c;
-    --signal-ink: #ffd58a;
-    --sidebar: #0a0c12;
-    --sidebar-foreground: #f3f5f9;
-    --sidebar-accent: #171b26;
-    --sidebar-accent-foreground: #f3f5f9;
-    --sidebar-border: #1b1f2b;
-    --shadow: 0 0 0 1px rgb(255 255 255 / 3%), 0 14px 32px -16px rgb(0 0 0 / 70%);
-  }
+  --confirmed-soft: #0c2a1d;
+  --confirmed-ink: #63e6a0;
+  --changed-soft: #33270a;
+  --changed-ink: #ffcf70;
+  --cancelled-soft: #3a1517;
+  --cancelled-ink: #ff9d95;
+  --ontime-soft: #0d2338;
+  --ontime-ink: #7cc0ff;
+  --delayed-soft: #3a2a06;
+  --delayed-ink: #ffbf47;
+  --airborne-soft: #152436;
+  --airborne-ink: #9fd0ff;
+  --diverted-soft: #251a3d;
+  --diverted-ink: #c4a5ff;
+
+  --elevation-1: 0 1px 2px rgb(0 0 0 / 45%);
+  --elevation-2: 0 0 0 1px rgb(255 255 255 / 3%), 0 14px 32px -16px rgb(0 0 0 / 70%);
+  --elevation-3: 0 0 0 1px rgb(255 255 255 / 4%), 0 24px 48px -20px rgb(0 0 0 / 80%);
+
+  --type-display: 3rem;
+  --type-title: 2.25rem;
+  --type-heading: 1.5rem;
+  --type-subheading: 1.125rem;
+  --type-body: 1rem;
+  --type-small: 0.875rem;
+  --type-micro: 0.75rem;
 }
 
 @theme inline {
@@ -110,7 +102,31 @@
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
-  --shadow-card: var(--shadow);
+  --color-confirmed-soft: var(--confirmed-soft);
+  --color-confirmed-ink: var(--confirmed-ink);
+  --color-changed-soft: var(--changed-soft);
+  --color-changed-ink: var(--changed-ink);
+  --color-cancelled-soft: var(--cancelled-soft);
+  --color-cancelled-ink: var(--cancelled-ink);
+  --color-ontime-soft: var(--ontime-soft);
+  --color-ontime-ink: var(--ontime-ink);
+  --color-delayed-soft: var(--delayed-soft);
+  --color-delayed-ink: var(--delayed-ink);
+  --color-airborne-soft: var(--airborne-soft);
+  --color-airborne-ink: var(--airborne-ink);
+  --color-diverted-soft: var(--diverted-soft);
+  --color-diverted-ink: var(--diverted-ink);
+  --shadow-elevation-1: var(--elevation-1);
+  --shadow-elevation-2: var(--elevation-2);
+  --shadow-elevation-3: var(--elevation-3);
+  --shadow-card: var(--elevation-2);
+  --text-display: var(--type-display);
+  --text-title: var(--type-title);
+  --text-heading: var(--type-heading);
+  --text-subheading: var(--type-subheading);
+  --text-body: var(--type-body);
+  --text-small: var(--type-small);
+  --text-micro: var(--type-micro);
 }
 
 @layer base {
@@ -127,7 +143,7 @@
   .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
   .code { font-family: var(--font-mono); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
   .pass { position: relative; overflow: hidden; color: var(--card-foreground); border: 1px solid var(--border);
-    border-radius: var(--radius-3xl); box-shadow: var(--shadow-card);
+    border-radius: var(--radius-3xl); box-shadow: var(--elevation-2);
     background: linear-gradient(165deg, color-mix(in oklab, var(--primary) 13%, var(--card)) 0%, var(--card) 62%); }
   .pass-tear { position: relative; height: 0; border-top: 1.5px dashed var(--border); }
   .pass-tear::before, .pass-tear::after { content: ""; position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 9999px;
@@ -137,7 +153,7 @@
 }
 
 @layer components {
-  .rows { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-card); }
+  .rows { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--elevation-2); }
   .rows > * + * { border-top: 1px solid var(--border); }
   .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; min-height: 3.5rem; padding: 0.75rem 1rem; }
 }

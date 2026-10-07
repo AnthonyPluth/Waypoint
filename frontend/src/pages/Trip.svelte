@@ -17,7 +17,9 @@
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
   import MessageView from "$lib/components/MessageView.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
+  import RouteLine from "$lib/components/RouteLine.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
+  import StatusChip from "$lib/components/StatusChip.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
   import { bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, subline, untimed } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
@@ -188,9 +190,7 @@
               {#each card.segments as b (b.id)}
                 {@const name = `${headline(b)} booking${b.confirmation ? ` ${b.confirmation}` : ""}`}
                 <li class="flex flex-col gap-3 rounded-2xl border border-border bg-background/40 p-4" class:opacity-70={b.status === "cancelled"} data-booking>
-                  <p class="flex flex-wrap items-center gap-2">
-                    {#if b.confirmation}<span class="text-lg"><CopyCode code={b.confirmation} /></span>{:else}<span class="text-muted-foreground">No confirmation code</span>{/if}
-                    {#if b.status !== "confirmed"}<Badge variant={b.status === "cancelled" ? "destructive" : "secondary"}>{b.status === "cancelled" ? "Cancelled" : "Changed"}</Badge>{/if}</p>
+                  <p class="flex flex-wrap items-center gap-2"><StatusChip status={b.status} />{#if b.confirmation}<span class="text-lg"><CopyCode code={b.confirmation} /></span>{:else}<span class="text-muted-foreground">No confirmation code</span>{/if}</p>
                   {#if card.timesDiffer && b.status !== "cancelled"}
                     <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render times(b)}</dl>
                   {/if}
@@ -213,11 +213,11 @@
 
 {#snippet heading(s: Segment, cancelled: boolean = s.status === "cancelled")}
   <p class="flex flex-wrap items-center gap-2"><span class="eyebrow">{kindName(s)}</span>
-    {#if cancelled}<Badge variant="destructive">Cancelled</Badge>{:else if s.status !== "confirmed"}<Badge variant="secondary">Changed</Badge>{/if}</p>
+    {#if cancelled || s.status !== "confirmed"}<StatusChip status={cancelled ? "cancelled" : s.status} />{/if}</p>
   <div class="flex items-center gap-3">
     <BrandLogo src={s.logo} label={s.logo_label} size={40} />
     <div class="min-w-0">
-      <h2 class="break-words text-2xl font-bold tracking-tight" class:line-through={cancelled}>{headline(s)}</h2>
+      <h2 class="break-words text-2xl font-bold tracking-tight" class:line-through={cancelled}><RouteLine segment={s} /></h2>
       {#if subline(s)}<p class="break-words text-sm text-muted-foreground">{subline(s)}</p>{/if}
     </div>
   </div>

@@ -197,10 +197,15 @@ export function membershipFor(segment: Segment, traveler: Traveler, loyalty: Loy
   return entry ? { state: "found", entry } : booker ? { state: "none", program } : null;
 }
 
+export function route(s: Segment): [string, string] | null {
+  if (s.kind !== "flight" && s.kind !== "train") return null;
+  return s.origin && s.destination ? [s.origin, s.destination] : null;
+}
+
 export function headline(s: Segment): string {
-  const route = [s.origin, s.destination].filter(Boolean).join(" → ");
-  if (s.kind === "flight") return route || "Flight";
-  if (s.kind === "train") return route || "Train";
+  const legs = [s.origin, s.destination].filter(Boolean).join(" → ");
+  if (s.kind === "flight") return legs || "Flight";
+  if (s.kind === "train") return legs || "Train";
   if (s.kind === "hotel") return s.origin || s.provider || "Hotel stay";
   if (s.kind === "cruise") return [s.details.ship || s.provider, s.origin].filter(Boolean).join(" · ") || "Cruise";
   return [s.provider, s.origin].filter(Boolean).join(" · ") || "Car rental";
