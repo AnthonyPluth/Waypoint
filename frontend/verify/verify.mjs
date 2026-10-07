@@ -96,8 +96,13 @@ async function runStep(page, step, shot) {
   } else if ("expect_text" in step) {
     const el = page.locator(step.expect_text.selector).first();
     await el.waitFor({ timeout });
-    const got = await el.innerText();
-    if (!got.includes(step.expect_text.text)) throw new Error(`expected "${step.expect_text.text}" in ${step.expect_text.selector}, found "${got.slice(0, 80)}"`);
+    const until = Date.now() + timeout;
+    let got = await el.innerText();
+    while (!got.includes(step.expect_text.text)) {
+      if (Date.now() >= until) throw new Error(`expected "${step.expect_text.text}" in ${step.expect_text.selector}, found "${got.slice(0, 80)}"`);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      got = await el.innerText();
+    }
   } else if ("screenshot" in step) {
     await shot(step.screenshot);
   }
