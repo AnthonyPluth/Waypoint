@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingCards, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, route, splitTrips, START_WORD, tripKinds, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
+import { bookingCards, CHECK_IN_WINDOW, clock, dayIn, featuredTrip, flightHeadline, flightKey, flightProgress, headline, headlineLine, instant, isPast, membershipFor, nextUp, placeTime, programFor, route, splitTrips, START_WORD, tripKinds, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -48,6 +48,62 @@ describe("until", () => {
     expect(until(3 * 3_600_000)).toBe("3 h");
     expect(until(26 * 3_600_000)).toBe("1 day 2 h");
     expect(until(48 * 3_600_000)).toBe("2 days");
+  });
+});
+
+const flight = segment({ id: 1, start_local: "2026-11-20T19:00", start_zone: NY, end_local: "2026-11-21T07:10", end_zone: LON });
+
+describe("the headline line", () => {
+  const dep = at("2026-11-20T19:00", NY);
+  const arr = at("2026-11-21T07:10", LON);
+  it("counts down to the 24-hour check-in window, the same 24 hours as the reminder", () => {
+    expect(CHECK_IN_WINDOW).toBe(24 * 3_600_000);
+    expect(flightHeadline(flight, dep - 48 * 3_600_000)).toBe("Check-in opens in 1 day");
+    expect(flightHeadline(flight, dep - 25 * 3_600_000)).toBe("Check-in opens in 1 h");
+    expect(flightHeadline(flight, dep - 24 * 3_600_000)).toBe("Check-in is open, departs in 1 day");
+    expect(flightHeadline(flight, dep - 23 * 3_600_000)).toBe("Check-in is open, departs in 23 h");
+    expect(flightHeadline(flight, dep - 60_000 + 1)).toBe("Check-in is open, departs in 1 min");
+  });
+  it("leads under way with the arrival, from take-off to landing", () => {
+    expect(flightHeadline(flight, dep)).toBe("Under way, arrives in 7 h 10 min");
+    expect(flightHeadline(flight, dep + 3 * 3_600_000)).toBe("Under way, arrives in 4 h 10 min");
+    expect(flightHeadline(flight, arr)).toBe("Landed");
+    expect(flightHeadline(flight, arr + 24 * 3_600_000)).toBe("Landed");
+  });
+  it("is nothing for a segment with no times: there is nothing to count down to", () => {
+    const untimedFlight = segment({ ...flight, start_local: "2026-11-20T00:00", end_local: "2026-11-20T00:00", details: { time_unknown: "yes" } });
+    expect(flightHeadline(untimedFlight, dep - 30 * 3_600_000)).toBeNull();
+  });
+  it("is nothing when the flight is cancelled, even now", () => {
+    expect(flightHeadline({ ...flight, status: "cancelled" }, dep + 3 * 3_600_000)).toBeNull();
+  });
+  it("keeps today's words for stays and rentals, and says when they are over", () => {
+    const stay = segment({ id: 2, kind: "hotel", start_local: "2026-11-21T15:00", start_zone: LON, end_local: "2026-11-27T10:00", end_zone: LON });
+    const car = segment({ id: 3, kind: "car", start_local: "2026-11-21T09:00", start_zone: NY, end_local: "2026-11-24T17:00", end_zone: NY });
+    expect(headlineLine(stay, at("2026-11-18T10:00", LON))).toBe("Check-in in 3 days 5 h");
+    expect(headlineLine(car, at("2026-11-21T09:00", NY) - 30_000)).toBe("Pick-up now");
+    expect(headlineLine(car, at("2026-11-22T09:00", NY))).toBe("Drop-off in 2 days 8 h");
+    expect(headlineLine(stay, at("2026-11-27T10:00", LON))).toBeNull();
+  });
+});
+
+describe("the plane's progress", () => {
+  it("leaves the plane at the origin before take-off and at the destination after landing", () => {
+    expect(flightProgress(flight, at("2026-11-20T12:00", NY))).toBe(0);
+    expect(flightProgress(flight, at("2026-11-19T00:00", NY))).toBe(0);
+    expect(flightProgress(flight, at("2026-11-21T07:10", LON))).toBe(1);
+    expect(flightProgress(flight, at("2026-11-21T23:00", LON))).toBe(1);
+  });
+  it("places the plane by the booked times alone, a normal flight and one landing the next day", () => {
+    const hop = segment({ id: 40, start_local: "2026-11-20T10:00", start_zone: NY, end_local: "2026-11-20T18:00", end_zone: NY });
+    expect(flightProgress(hop, at("2026-11-20T12:00", NY))).toBeCloseTo(0.25);
+    expect(flightProgress(hop, at("2026-11-20T14:00", NY))).toBe(0.5);
+    expect(flightProgress(hop, at("2026-11-20T16:00", NY))).toBeCloseTo(0.75);
+    expect(flightProgress(flight, at("2026-11-20T22:35", NY))).toBe(0.5);
+  });
+  it("keeps the plane at the origin when there are no times", () => {
+    const untimedFlight = segment({ start_local: "2026-11-20T00:00", end_local: "2026-11-20T00:00", details: { time_unknown: "yes" } });
+    expect(flightProgress(untimedFlight, at("2026-11-20T12:00", NY))).toBe(0);
   });
 });
 

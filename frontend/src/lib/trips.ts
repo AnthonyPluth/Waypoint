@@ -226,3 +226,30 @@ export function when(word: string, ms: number): string {
   if (ms >= 60_000) return `${word} in ${until(ms)}`;
   return word === "Departs" ? "Departing now" : word === "Arrives" ? "Arriving now" : `${word} now`;
 }
+
+export const CHECK_IN_WINDOW = 24 * 3_600_000;
+
+export function flightHeadline(s: Segment, now: number): string | null {
+  if (s.status === "cancelled" || untimed(s)) return null;
+  const start = startAt(s), end = endAt(s);
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+  if (now >= end) return "Landed";
+  if (now >= start) return `Under way, arrives in ${until(end - now)}`;
+  if (now >= start - CHECK_IN_WINDOW) return `Check-in is open, departs in ${until(start - now)}`;
+  return `Check-in opens in ${until(start - CHECK_IN_WINDOW - now)}`;
+}
+
+export function headlineLine(s: Segment, now: number): string | null {
+  if (s.status === "cancelled" || untimed(s)) return null;
+  if (s.kind === "flight") return flightHeadline(s, now);
+  const start = startAt(s), end = endAt(s);
+  if (Number.isNaN(start) || Number.isNaN(end) || now >= end) return null;
+  return now >= start ? when(END_WORD[s.kind], end - now) : when(START_WORD[s.kind], start - now);
+}
+
+export function flightProgress(s: Segment, now: number): number {
+  if (untimed(s)) return 0;
+  const start = startAt(s), end = endAt(s);
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return 0;
+  return Math.min(1, Math.max(0, (now - start) / (end - start)));
+}
