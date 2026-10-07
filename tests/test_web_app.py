@@ -98,7 +98,8 @@ class ContentTypeTests(unittest.TestCase):
 
     @staticmethod
     def guessed(path: str) -> str:
-        for t, ext in (("image/svg+xml", ".svg"), ("font/woff2", ".woff2"), ("application/manifest+json", ".webmanifest")):
+        for t, ext in (("image/svg+xml", ".svg"), ("font/woff2", ".woff2"), ("application/manifest+json", ".webmanifest"),
+                       ("image/vnd.microsoft.icon", ".ico")):
             mimetypes.add_type(t, ext)
         return mimetypes.guess_type(path)[0] or "application/octet-stream"
 
