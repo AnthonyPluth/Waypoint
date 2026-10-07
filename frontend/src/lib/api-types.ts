@@ -361,6 +361,8 @@ export interface Segment {
   end_zone: string;
   origin: string | null;
   destination: string | null;
+  origin_city: string | null;
+  destination_city: string | null;
   details: Record<string, string>;
   manage_url: string | null;
   source: "manual" | "email" | "import";

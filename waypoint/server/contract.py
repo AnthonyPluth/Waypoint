@@ -250,6 +250,8 @@ class Segment(TypedDict):
     end_zone: str
     origin: str | None
     destination: str | None
+    origin_city: str | None
+    destination_city: str | None
     details: dict[str, str]
     manage_url: str | None
     source: Literal["manual", "email", "import"]

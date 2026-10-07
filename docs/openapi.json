@@ -3752,6 +3752,18 @@
               "null"
             ]
           },
+          "origin_city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination_city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "details": {
             "type": "object",
             "additionalProperties": {
@@ -3830,6 +3842,8 @@
           "end_zone",
           "origin",
           "destination",
+          "origin_city",
+          "destination_city",
           "details",
           "manage_url",
           "source",

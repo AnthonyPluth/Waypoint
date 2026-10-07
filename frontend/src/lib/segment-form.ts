@@ -9,7 +9,7 @@ export const MAX_PORTS = 40;
 export const ADDRESS_LIMIT = 300;
 
 export const DETAILS: Record<Kind, [string, string][]> = {
-  flight: [["flight_number", "Flight number"], ["terminal", "Terminal"], ["cabin", "Cabin"]],
+  flight: [["flight_number", "Flight number"], ["terminal", "Terminal"], ["gate", "Gate"], ["cabin", "Cabin"]],
   hotel: [["address", "Address"], ["room", "Room"], ["phone", "Phone"]],
   car: [["address", "Pick-up address"], ["car_class", "Car class"], ["phone", "Phone"]],
   train: [["cabin", "Class"]],

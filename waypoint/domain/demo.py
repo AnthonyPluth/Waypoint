@@ -50,7 +50,7 @@ def _family_past(today: date) -> list[trips.SegmentIn]:
 def _family_now(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": _at(today, -2, "19:00"), "end_local": _at(today, -1, "07:10"),
-         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy"},
+         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "gate": "45B", "cabin": "Economy"},
          "manage_url": "https://example.com/manage/KQ7M2X"},
         {"kind": "hotel", "origin": "Harbour Hotel", "start_local": _at(today, -1, "15:00"), "end_local": _at(today, 2, "10:00"),
          "start_zone": "Europe/London", "end_zone": "Europe/London", "confirmation": "H88231", "provider": "Marriott",

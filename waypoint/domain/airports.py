@@ -27,6 +27,11 @@ def zones(conn: db.Connection, codes: list[str]) -> dict[str, str]:
     return dict(conn.execute(select(Airport.code, Airport.zone).where(Airport.code.in_(wanted))).fetchall())
 
 
+def city_names(conn: db.Connection, codes: list[str]) -> dict[str, str]:
+    wanted = [c.strip().upper() for c in codes if c]
+    return dict(conn.execute(select(Airport.code, Airport.city).where(Airport.code.in_(wanted))).fetchall()) if wanted else {}
+
+
 def coords(conn: db.Connection, code: str) -> tuple[float, float] | None:
     a = conn.orm.get(Airport, code.strip().upper())
     return (a.latitude, a.longitude) if a else None

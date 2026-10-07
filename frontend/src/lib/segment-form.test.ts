@@ -145,7 +145,7 @@ describe("the fields each kind shows", () => {
     expect(names("hotel")).toEqual(["Address", "Room", "Phone"]);
     expect(names("car")).toEqual(["Pick-up address", "Car class", "Phone"]);
     expect(names("cruise")).toEqual(["Ship", "Cabin", "Deck", "Terminal address", "Phone"]);
-    expect(names("flight")).toEqual(["Flight number", "Terminal", "Cabin"]);
+    expect(names("flight")).toEqual(["Flight number", "Terminal", "Gate", "Cabin"]);
   });
 
   it("round-trips an address with its lines, and refuses one over the limit", () => {

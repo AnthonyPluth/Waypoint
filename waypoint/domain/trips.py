@@ -23,7 +23,7 @@ TIME_UNKNOWN = "time_unknown"
 ADDRESS_LIMIT = 300
 MAX_PORTS = 40
 SEAT_LIMIT = 10
-DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone", "ship", "deck", TIME_UNKNOWN)
+DETAIL_KEYS = ("flight_number", "terminal", "gate", "seat", "cabin", "room", "car_class", "address", "phone", "ship", "deck", TIME_UNKNOWN)
 
 
 def untimed(details: Mapping[str, str]) -> bool:
@@ -106,6 +106,8 @@ class SegmentOut(TypedDict):
     end_zone: str
     origin: str | None
     destination: str | None
+    origin_city: str | None
+    destination_city: str | None
     details: dict[str, str]
     manage_url: str | None
     source: Literal["manual", "email", "import"]
@@ -381,10 +383,16 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
     brands = logos.brand_names(conn, segs, decoded)
     with_logo = logos.have(conn, brands)
     with_mail = stored_mail.with_messages(conn, [s.id for s in segs])
+    flight_cities = airports.city_names(conn, [c for s in segs if s.kind == "flight" for c in (s.origin or "", s.destination or "")])
+
+    def city(s: Segment, code: str | None) -> str | None:
+        return flight_cities.get((code or "").upper()) if s.kind == "flight" else None
+
     out: list[SegmentOut] = [
         {"id": s.id, "trip_id": s.trip_id, "kind": cast(Kind, s.kind), "status": cast(Status, s.status), "confirmation": s.confirmation,
          "provider": s.provider, "start_local": s.start_local, "start_zone": s.start_zone, "end_local": s.end_local,
-         "end_zone": s.end_zone, "origin": s.origin, "destination": s.destination, "details": details,
+         "end_zone": s.end_zone, "origin": s.origin, "destination": s.destination, "origin_city": city(s, s.origin),
+         "destination_city": city(s, s.destination), "details": details,
          "manage_url": s.manage_url, "source": cast(Literal["manual", "email", "import"], s.source), "booked_by": s.booked_by,
          "locked_fields": decode_locked(s.locked_fields), "check_times": bool(s.check_times), "travelers": by_segment.get(s.id, []),
          "itinerary": ports.get(s.id, []), "logo": f"/api/segments/{s.id}/logo" if brand and logos.key(brand) in with_logo else None,
