@@ -14,8 +14,13 @@
   import { segmentChips } from "$lib/status";
   import { dayLabel, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed } from "$lib/trips";
 
-  type Props = { segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string; live?: Snippet; footer?: Snippet };
-  let { segment: s, bookings = [s], now = Date.now(), eyebrow = "", pulse = false, level = 3, class: cls = "", live: liveArea, footer }: Props = $props();
+  type Props = {
+    segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
+    as?: "section" | "li"; id?: string; highlight?: boolean; label?: string; showCode?: boolean; showApp?: boolean; omit?: string[];
+    live?: Snippet; footer?: Snippet; times?: Snippet; details?: Snippet;
+  };
+  let { segment: s, bookings = [s], now = Date.now(), eyebrow = "", pulse = false, level = 3, class: cls = "", as: tag = "section", id, highlight = false, label, showCode = true, showApp = true, omit = [],
+    live: liveArea, footer, times: timesArea, details }: Props = $props();
 
   const flight = $derived(s.kind === "flight");
   const cancelled = $derived(s.status === "cancelled");
@@ -39,16 +44,16 @@
           : s.kind === "cruise" ? [["Ship", s.details.ship], ["Cabin", s.details.room], ["Deck", s.details.deck]]
             : [["Seat", seat], ["Cabin", s.details.cabin]],
   );
-  const facts = $derived(rows.filter((f): f is [string, string] => !!f[1]));
+  const facts = $derived(rows.filter((f): f is [string, string] => !!f[1] && !omit.includes(f[0])));
 </script>
 
-<section class={`pass ${cls}`} class:opacity-70={cancelled} aria-label={headline(s)} data-kind={s.kind} data-progress={flight ? progress : undefined}>
+<svelte:element this={tag} {id} class={`pass scroll-mt-20 ${cls}`} class:ring-2={highlight} class:ring-ring={highlight} class:opacity-70={cancelled} aria-label={label ?? (tag === "section" ? headline(s) : undefined)} data-kind={s.kind} data-progress={flight ? progress : undefined}>
   <div class="flex flex-col gap-4 p-6 md:p-8">
     {#if eyebrow}<p class="eyebrow flex items-center gap-2">{#if pulse}<span class="size-2 animate-pulse rounded-full bg-primary motion-reduce:animate-none" aria-hidden="true"></span>{/if}{eyebrow}</p>{/if}
     <p class="text-heading font-semibold" class:text-primary={!cancelled} class:text-destructive={cancelled} data-headline data-countdown>{passHeadline(s, now)}</p>
     {#if flight}<svelte:element this={`h${level}`} class="sr-only">{headline(s)}</svelte:element>{/if}
 
-    {#if codes.length}
+    {#if showCode && codes.length}
       <div class="flex flex-col gap-1">
         <p class="eyebrow">{codes.length > 1 ? "Confirmations" : "Confirmation"}</p>
         <p class="flex flex-wrap gap-x-4">{#each codes as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="w-fit text-display" />{/each}</p>
@@ -61,7 +66,7 @@
         {#if flight}
           <p class="break-words font-medium" class:line-through={cancelled}>{[s.provider, number].filter(Boolean).join(" ")}</p>
           <p class="text-sm text-muted-foreground">
-            {dayLabel(s.start_local)}{#if unknown}, time not recorded{:else if !differ}, <PlaceTime local={s.start_local} zone={s.start_zone} />{/if}
+            {#if !timesArea}{dayLabel(s.start_local)}{#if unknown}, time not recorded{:else if !differ}, <PlaceTime local={s.start_local} zone={s.start_zone} />{/if}{/if}
           </p>
         {:else}
           <svelte:element this={`h${level}`} class="break-words text-title font-semibold" class:line-through={cancelled}>{headline(s)}</svelte:element>
@@ -69,7 +74,7 @@
       </div>
     </div>
 
-    {#if app}
+    {#if app && showApp}
       <div><Button variant="outline" href={app} target="_blank" rel="noopener noreferrer">{appWord}</Button></div>
     {/if}
 
@@ -80,7 +85,7 @@
           <RouteLine progress={cancelled ? 0 : progress} label="Route, with the plane placed from the booked times" />
         </span>
         <AirportCode code={s.destination ?? "—"} size="medium" class="text-right" />
-        {#if differ}
+        {#if timesArea}{:else if differ}
           <div class="col-span-3 mt-2 flex flex-col gap-1 text-sm">
             <span><Badge variant="secondary">Times differ between bookings</Badge></span>
             {#each bookings as b (b.id)}
@@ -94,6 +99,9 @@
         </div>
         {/if}
       </div>
+      {#if timesArea}{@render timesArea()}{/if}
+    {:else if timesArea}
+      {@render timesArea()}
     {:else}
       <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
         <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
@@ -102,6 +110,7 @@
           <dd class="mt-1 font-medium">{dayLabel(s.end_local)}, {#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</dd></div>
       </dl>
     {/if}
+    {#if details}{@render details()}{/if}
   </div>
 
   <div class="pass-tear" aria-hidden="true"></div>
@@ -121,4 +130,4 @@
     {#if liveArea}{@render liveArea()}{:else if status && chips.live}<p class="text-sm text-muted-foreground" data-live-line>{quiet}</p>{/if}
     {#if footer}<div>{@render footer()}</div>{/if}
   </div>
-</section>
+</svelte:element>
