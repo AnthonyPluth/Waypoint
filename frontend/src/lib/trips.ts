@@ -243,6 +243,7 @@ export function passHeadline(s: Segment, now: number): string {
     return now < to ? when(END_WORD[s.kind], to - now) : PAST_WORD[s.kind];
   }
   if (now < from - CHECK_IN_WINDOW_MS) return `Check-in opens in ${until(from - CHECK_IN_WINDOW_MS - now)}`;
-  if (now < from) return `Check-in is open, departs in ${until(from - now)}`;
-  return now < to ? `Under way, arrives in ${until(to - now)}` : PAST_WORD.flight;
+  if (now < from) return `Check-in is open, ${from - now >= 60_000 ? `departs in ${until(from - now)}` : "departing now"}`;
+  if (now >= to) return PAST_WORD.flight;
+  return `Under way, ${to - now >= 60_000 ? `arrives in ${until(to - now)}` : "arriving now"}`;
 }
