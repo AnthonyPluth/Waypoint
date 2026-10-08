@@ -1,8 +1,27 @@
 <script lang="ts">
   import AirportCode from "$lib/components/AirportCode.svelte";
+  import PassCard from "$lib/components/PassCard.svelte";
   import RouteLine from "$lib/components/RouteLine.svelte";
   import StatusChip from "$lib/components/StatusChip.svelte";
   import { bookingChip, liveChip } from "$lib/status";
+  import { instant } from "$lib/trips";
+  import type { Segment } from "$lib/api-types";
+
+  const flight: Segment = {
+    id: 1, trip_id: 1, kind: "flight", status: "confirmed", confirmation: "K7Q2ZM", provider: "Example Air",
+    start_local: "2026-11-20T07:05", start_zone: "America/Chicago", end_local: "2026-11-20T09:20", end_zone: "America/Los_Angeles",
+    origin: "MSP", destination: "LAX", details: { flight_number: "EA 214", terminal: "1", cabin: "Economy" }, manage_url: "https://example.com/manage",
+    source: "manual", booked_by: null, locked_fields: [], check_times: false, travelers: [{ id: 1, person_id: null, name: "Jane Doe", seat: "14C" }],
+    itinerary: [], logo: null, logo_label: null, has_email: false, links: { app: "https://example.com/manage", directions: null, call: null },
+  };
+  const stay: Segment = {
+    ...flight, id: 2, kind: "hotel", confirmation: "HT5521", provider: "Example Hotels", origin: "Harbour Hotel", destination: null,
+    start_local: "2026-11-20T15:00", start_zone: "America/Los_Angeles", end_local: "2026-11-24T11:00", end_zone: "America/Los_Angeles",
+    details: { address: "1 Quay Street, Los Angeles", room: "412" }, manage_url: null, links: { app: null, directions: null, call: null }, travelers: [],
+  };
+  const flightNow = instant("2026-11-20T07:05", "America/Chicago") - 3 * 3_600_000;
+  const underWayNow = instant("2026-11-20T07:05", "America/Chicago") + 90 * 60_000;
+  const stayNow = instant("2026-11-20T08:00", "America/Los_Angeles");
 
   const booking = (["confirmed", "changed", "cancelled"] as const).map(bookingChip);
   const live = [
@@ -57,6 +76,16 @@
           <span class="flex min-w-0 flex-1 items-center gap-3"><AirportCode code="MSP" size="small" /><RouteLine class="flex-1" progress={r.progress} label={`${r.when}, based on the booked times`} /><AirportCode code="LAX" size="small" /></span>
         </div>
       {/each}
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-3" aria-labelledby="design-pass">
+    <h2 id="design-pass" class="text-heading">Pass card</h2>
+    <p class="text-caption text-muted-foreground">One card for a booking you are planning or checking in for. The headline and the plane come from the booked times only.</p>
+    <div class="grid gap-4 lg:grid-cols-2">
+      <PassCard segment={flight} now={flightNow} />
+      <PassCard segment={flight} now={underWayNow} />
+      <PassCard segment={stay} now={stayNow} />
     </div>
   </section>
 

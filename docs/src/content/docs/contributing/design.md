@@ -39,3 +39,12 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 ## Route line
 
 `RouteLine.svelte` draws origin, destination and a line between them with a plane placed at `progress`, from 0 (departure) to 1 (arrival). Out-of-range or missing values clamp to 0 and 1 (`clampProgress`). Progress comes from the booked times; Waypoint does not need live data for it. Pass `label` to give the line an accessible description, otherwise it is hidden from assistive tech.
+
+## Pass card
+
+`PassCard.svelte` is the one card for a booking you are planning or checking in for, with a variant for each kind (flight, hotel, car, train, cruise). Top to bottom: a headline line, the confirmation code as the largest element (the first focusable control, tap to copy), the flight and its date and departure time, the booking link, then the airport codes with the route line and the times at each airport. Below the tear line are the terminal, gate, seat and cabin, the booking chip and, when live flight status is on, the live chip and a quiet line.
+
+- The headline comes from `passHeadline(segment, now)` in `frontend/src/lib/trips.ts` and uses the booked times only. A flight reads "Check-in opens in …" until `CHECK_IN_WINDOW_HOURS` before departure, then "Check-in is open, departs in …", then "Under way, arrives in …", then "Landed". Live status never changes it. A cancelled segment reads "Cancelled".
+- The plane comes from `routeProgress(segment, now)`: `(now − departure) ÷ (arrival − departure)` on the segment's instants, clamped to 0–1, and 0 for a segment with no times. It never uses live status.
+- Times are the wall-clock times at each place, as stored, with the bracketed "your time" reading when your zone differs.
+- The card does not read the API for gate or city: a gate shows only from live flight status, and the airport name is not shown.
