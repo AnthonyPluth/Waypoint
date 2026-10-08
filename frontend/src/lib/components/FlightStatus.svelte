@@ -11,10 +11,11 @@
 
 <script lang="ts">
   import { act } from "$lib/act";
-  import type { FlightStatus, Segment } from "$lib/api-types";
-  import { Badge } from "$lib/components/ui/badge";
+  import type { Segment } from "$lib/api-types";
+  import StatusChip from "$lib/components/StatusChip.svelte";
   import { Button } from "$lib/components/ui/button";
   import { flightStatus, refreshFlightStatus, statusFor } from "$lib/flightstatus.svelte";
+  import { liveChip } from "$lib/status";
   import { endAt } from "$lib/trips";
   import { toast } from "svelte-sonner";
 
@@ -25,12 +26,6 @@
   const s = $derived(statusFor(segment.id));
   const over = $derived(Date.now() > endAt(segment) + 6 * 3_600_000);
   const asOf = (t: string) => new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t));
-
-  const WORDS: Record<FlightStatus["state"], string> = {
-    scheduled: "On time", delayed: "Delayed", departed: "Departed", landed: "Landed", cancelled: "Cancelled", diverted: "Diverted",
-  };
-  const label = (x: FlightStatus) => (x.state === "delayed" && x.delay_minutes ? `Delayed ${x.delay_minutes} min` : WORDS[x.state]);
-  const variant = (x: FlightStatus) => (x.state === "cancelled" || x.state === "diverted" ? "destructive" : x.state === "delayed" ? "secondary" : "outline");
 
   const where = (terminal: string | null, gate: string | null) =>
     [terminal && `Terminal ${terminal}`, gate && `Gate ${gate}`].filter(Boolean).join(" · ");
@@ -52,7 +47,7 @@
 {#if list?.enabled && (s || !over)}
   <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm" data-testid="flight-status">
     {#if s}
-      <Badge variant={variant(s)} class={s.state === "delayed" ? "bg-signal-soft text-signal-ink border-transparent" : ""}>{label(s)}</Badge>
+      <StatusChip chip={liveChip(s)} small />
       <span class="min-w-0 text-muted-foreground">
         {#if s.state === "landed"}
           Landed {clock(s.arr_actual ?? s.arr_estimated)}{dayShift(s.arr_actual ?? s.arr_estimated, s.arr_scheduled)}

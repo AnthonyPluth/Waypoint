@@ -73,12 +73,42 @@ describe("Upcoming", () => {
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(within(card).getByText("Next up")).toBeInTheDocument();
-    expect(within(card).getByText("Departs in 10 h")).toBeInTheDocument();
-    expect(within(card).getByText("American Airlines AA 101 · Terminal 8")).toBeInTheDocument();
-    expect(within(card).getByText("7:00 PM")).toBeInTheDocument();
+    expect(within(card).getByText("Check-in is open, departs in 10 h")).toBeInTheDocument();
+    expect(within(card).getByText("American Airlines AA 101")).toBeInTheDocument();
+    expect(within(card).getAllByText("7:00 PM")).toHaveLength(2);
     expect(within(card).getByText("8")).toBeInTheDocument();
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(within(card).getByRole("button", { name: "Copy confirmation code KQ7M2X" }));
     expect(await navigator.clipboard.readText()).toBe("KQ7M2X");
+  });
+
+  it("counts down to check-in until it opens, 24 hours before departure", async () => {
+    at("2026-11-18T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
+    expect(within(card).getByText("Next up")).toBeInTheDocument();
+    expect(within(card).getByText("Check-in opens in 1 day 10 h")).toBeInTheDocument();
+  });
+
+  it("puts the plane on the route line from the booked times when the flight is under way", async () => {
+    at("2026-11-20T22:35:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
+    expect(within(card).getByText("Under way")).toBeInTheDocument();
+    expect(within(card).getByRole("img", { name: /booked times/ }).dataset.progress).toBe("0.5");
+    expect(within(card).getByText("Under way, arrives in 3 h 35 min")).toBeInTheDocument();
+  });
+
+  it("leads with the card’s code first, then the route and the times at each airport", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
+    expect(within(card).getAllByRole("button")[0]).toHaveAccessibleName("Copy confirmation code KQ7M2X");
+    expect(within(card).getByText("JFK")).toBeInTheDocument();
+    expect(within(card).getByText("LHR")).toBeInTheDocument();
+    expect(within(card).getByText("Confirmed")).toBeInTheDocument();
   });
 
   it("shows a booking’s brand logo on the Next up card and in the day-by-day list, and no image for one without", async () => {
@@ -115,7 +145,7 @@ describe("Upcoming", () => {
     at("2026-11-20T18:59:40-05:00");
     serve([london]);
     render(Upcoming);
-    expect(await screen.findByText("Departing now")).toBeInTheDocument();
+    expect(await screen.findByText("Check-in is open, departing now")).toBeInTheDocument();
   });
 
   it("calls a flight in the air under way, and counts down to landing", async () => {
@@ -124,7 +154,7 @@ describe("Upcoming", () => {
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(within(card).getByText("Under way")).toBeInTheDocument();
-    expect(within(card).getByText("Arrives in 10 min")).toBeInTheDocument();
+    expect(within(card).getByText("Under way, arrives in 10 min")).toBeInTheDocument();
   });
 
   it("leads with a hotel's address and check-in time once the flight is behind", async () => {

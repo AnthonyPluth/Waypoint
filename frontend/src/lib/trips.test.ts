@@ -293,6 +293,10 @@ describe("the pass headline", () => {
     expect(passHeadline(flight, dep - 24 * HOUR + 60_000)).toBe("Check-in is open, departs in 23 h 59 min");
     expect(passHeadline(flight, dep - 3 * HOUR)).toBe("Check-in is open, departs in 3 h");
   });
+  it("says now rather than in now in the last minute", () => {
+    expect(passHeadline(flight, dep - 20_000)).toBe("Check-in is open, departing now");
+    expect(passHeadline(flight, arr - 20_000)).toBe("Under way, arriving now");
+  });
   it("is under way from departure and landed from arrival", () => {
     expect(passHeadline(flight, dep)).toBe("Under way, arrives in 7 h 10 min");
     expect(passHeadline(flight, arr - 70 * 60_000)).toBe("Under way, arrives in 1 h 10 min");
