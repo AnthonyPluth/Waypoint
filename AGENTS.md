@@ -13,7 +13,7 @@ Instructions for AI coding agents working in Waypoint, a self-hosted travel app 
   - `static/`: the served assets.
 
   A broken boundary fails `make lint`: move the code to where its import is allowed rather than adding an exception. A new provider module gets a contract of its own naming the others.
-- `frontend/`: the web app (Svelte, Vite, Tailwind, Vitest, ESLint). Its look is its own: tokens in `frontend/src/app.css`, light and dark.
+- `frontend/`: the web app (Svelte, Vite, Tailwind, Vitest, ESLint). Its look is its own: tokens in `frontend/src/app.css`; the app is dark only (lint rejects a light palette and `dark:` variants).
 - `tests/`: backend tests, run with `unittest`.
 - `tools/`: scripts for the repo itself; `feature_map.py` generates the feature map, `api_contract.py` the API contract, `fleet_checks.py` the checks that replaced instructions, `pr_screenshots.py` a UI PR's inline screenshots.
 - `docs/`: the documentation site (Starlight), published to GitHub Pages. Pages are Markdown in `docs/src/content/docs/`.
@@ -82,7 +82,7 @@ Review findings on agents' pull requests fall into the same few kinds. Check you
 - **Time zones** (partly checked: lint rejects a bare `date.today()` in background jobs and provider modules and `datetime.utcnow()`; the rest is human-judged). "Today" and scheduled jobs' hours are the machine's local time (`TZ`); a booking's times are its airports' or hotel's. Anything that tells another system about a time (a calendar feed, a reminder) carries the right zone, not UTC by default.
 - **Undo and restore** (human-judged). Putting something back restores exactly what was there, without normalizing it on the way; test the round trip with awkward values.
 - **GitHub Actions** (checked: `tools/fleet_checks.py` checks bash by default, SHA pins with a version comment and paginated `gh api` lists; zizmor checks `persist-credentials`, template injection and pinning; concurrency groups and agents' allowed commands are human-judged). Workflows run bash with `-eo pipefail` (each file's `defaults`); keep it. On a pull request's `closed` event `github.ref` is main's, so build concurrency groups from `github.event.pull_request.number`. Check out with `persist-credentials: false`, pin actions by SHA with the version in a comment, pass event values to scripts as environment variables, paginate `gh api` lists, and allow an agent only the exact commands it needs. Run zizmor on a workflow you change.
-- **Layout** (human-judged). A layout change is checked at phone, tablet (768 px) and desktop widths, not only the one it was written at. Light mode is enough: dark mode needs no verification, and no screenshots of it.
+- **Layout** (human-judged). A layout change is checked at phone, tablet (768 px) and desktop widths, not only the one it was written at.
 
 ## Git and PRs
 

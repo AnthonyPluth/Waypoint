@@ -5,9 +5,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 } };
-export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "oauth-approve"];
+export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];
 const OWN_PAGES = ["oauth-approve"];
-export const SCHEMES = ["light", "dark"];
 
 export function findChromium(env = process.env, exists = existsSync, list = readdirSync) {
   const root = env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers";
@@ -38,7 +37,7 @@ export function flowProblems(flow) {
   }
   if (flow?.page !== undefined && !PAGES.includes(flow.page)) out.push(`unknown page ${flow.page}`);
   for (const v of flow?.viewports ?? []) if (!(v in VIEWPORTS)) out.push(`unknown viewport ${v}`);
-  if (flow?.scheme !== undefined && !SCHEMES.includes(flow.scheme)) out.push(`unknown scheme ${flow.scheme}`);
+  if (flow?.scheme !== undefined) out.push("scheme is not an option: the app is dark only");
   return out;
 }
 
@@ -133,8 +132,8 @@ async function main() {
   try { approveUrl = await seedAssistants(browser, base); }
   catch (e) { problems.push(`seeding the demo assistants: ${String(e.message).split("\n")[0]}`); }
 
-  async function visit(label, viewport, work, scheme = "light") {
-    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: scheme });
+  async function visit(label, viewport, work) {
+    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark" });
     const page = await ctx.newPage();
     const where = `${label} @ ${viewport}`;
     const consoleErrors = [];
@@ -180,7 +179,7 @@ async function main() {
         await page.goto(`${base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
         for (const step of flow.steps) await runStep(page, step, (n) => shot(`flow-${flow.name}-${n}`));
         await shot(`flow-${flow.name}`);
-      }, flow.scheme);
+      });
     }
   }
   await browser.close();

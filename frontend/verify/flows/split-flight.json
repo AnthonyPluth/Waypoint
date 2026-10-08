@@ -1,7 +1,6 @@
 {
   "name": "split-flight",
   "page": "trips",
-  "scheme": "light",
   "viewports": [
     "phone"
   ],
