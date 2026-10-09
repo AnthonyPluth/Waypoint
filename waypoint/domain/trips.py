@@ -365,7 +365,8 @@ def _keep_seats(given: list[TravelerIn], old: Sequence[TravelerIn]) -> list[Trav
     return [t if "seat" in t else {**t, "seat": seats.get(_who(t))} for t in given]
 
 
-def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[SegmentTraveler]) -> list[SegmentOut]:
+def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[SegmentTraveler],
+                  viewer: Viewer | None = None) -> list[SegmentOut]:
     ports = ports_of(conn, [s.id for s in segs if s.kind == "cruise"])
     ids = [t.person_id for t in travs if t.person_id is not None]
     names = people.existing(conn, ids)
@@ -374,8 +375,8 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
         shown = names.get(t.person_id, "") if t.person_id is not None else ""
         by_segment.setdefault(t.segment_id, []).append({"id": t.id, "person_id": t.person_id, "name": shown or t.name or "", "seat": t.seat})
     def last_name(s: Segment) -> str | None:
-        who = by_segment.get(s.id, [])
-        return who[0]["name"].split()[-1] if who and who[0]["name"] else None
+        who = [(t["person_id"], t["name"]) for t in by_segment.get(s.id, [])]
+        return links.last_name(who, viewer.person_id if viewer else None)
 
     decoded = [decode_details(s.details) for s in segs]
     brands = logos.brand_names(conn, segs, decoded)
@@ -398,7 +399,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
 def _trip_outs(conn: db.Connection, viewer: Viewer, trips: Sequence[Trip]) -> list[TripOut]:
     segs = visibility.visible_segments(conn, viewer, [t.id for t in trips])
     travs = visibility.visible_travelers(conn, viewer, [s.id for s in segs])
-    outs = _segment_outs(conn, segs, travs)
+    outs = _segment_outs(conn, segs, travs, viewer)
     return [{"id": t.id, "name": t.name, "start_date": t.start_date, "end_date": t.end_date,
              "destination": t.destination, "notes": t.notes, "auto": t.auto, "booked_by": t.booked_by,
              "segments": [s for s in outs if s["trip_id"] == t.id]} for t in trips]
@@ -415,13 +416,13 @@ def get(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripOut | None:
 
 def get_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> SegmentOut | None:
     seg = visibility.visible_segment(conn, viewer, segment_id)
-    return _segment_outs(conn, [seg], visibility.visible_travelers(conn, viewer, [seg.id]))[0] if seg else None
+    return _segment_outs(conn, [seg], visibility.visible_travelers(conn, viewer, [seg.id]), viewer)[0] if seg else None
 
 
-def _after_change(conn: db.Connection, seg: Segment) -> SegmentOut:
+def _after_change(conn: db.Connection, seg: Segment, viewer: Viewer) -> SegmentOut:
     travs = list(conn.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id)
                                   .order_by(SegmentTraveler.id)).all())
-    return _segment_outs(conn, [seg], travs)[0]
+    return _segment_outs(conn, [seg], travs, viewer)[0]
 
 
 @dataclass(frozen=True)
@@ -580,7 +581,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
     if ports:
         _set_ports(conn, seg.id, ports)
     refresh(conn, trip)
-    return _after_change(conn, seg)
+    return _after_change(conn, seg, viewer)
 
 
 def _seats(travelers: Sequence[TravelerIn], details: Mapping[str, str]) -> set[str]:
@@ -641,7 +642,7 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
     trip = conn.orm.get(Trip, seg.trip_id)
     if trip:
         refresh(conn, trip)
-    return _after_change(conn, seg)
+    return _after_change(conn, seg, viewer)
 
 
 EMAIL_MERGE_DAYS = 3
@@ -887,7 +888,7 @@ def split(conn: db.Connection, viewer: Viewer, trip_id: int, segment_ids: Sequen
 def unmatched(conn: db.Connection, viewer: Viewer) -> list[tuple[SegmentTraveler, SegmentOut]]:
     found = visibility.visible_unmatched(conn, viewer)
     segs = {s.id: s for s in visibility.visible_segments(conn, viewer, None) if s.id in {t.segment_id for t in found}}
-    outs = {s["id"]: s for s in _segment_outs(conn, list(segs.values()), [])}
+    outs = {s["id"]: s for s in _segment_outs(conn, list(segs.values()), [], viewer)}
     return [(t, outs[t.segment_id]) for t in found if t.segment_id in outs]
 
 

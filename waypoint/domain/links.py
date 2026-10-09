@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from typing import TypedDict
 from urllib.parse import quote, urlsplit
 
@@ -17,6 +18,13 @@ class Links(TypedDict):
 
 def key(provider: str | None) -> str:
     return " ".join((provider or "").casefold().split())
+
+
+def last_name(travelers: Sequence[tuple[int | None, str]], person_id: int | None) -> str | None:
+    named = [(who, name.split()) for who, name in travelers if name.split()]
+    own = [words for who, words in named if person_id is not None and who == person_id]
+    chosen = own[0] if own else named[0][1] if named else None
+    return chosen[-1] if chosen else None
 
 
 def manage_link(provider: str | None, confirmation: str | None, last_name: str | None) -> str | None:

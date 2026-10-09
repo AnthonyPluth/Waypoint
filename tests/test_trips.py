@@ -3,17 +3,19 @@ import urllib.parse
 import time
 import unittest
 from datetime import date
+from unittest import mock
 
 from sqlalchemy import delete, func, insert, select
 
-from waypoint import oidc
-from waypoint.domain import airports, demo, people, trips, visibility
+from waypoint import monitoring, oidc
+from waypoint.domain import airports, demo, links, people, trips, visibility
 from waypoint.domain.visibility import Viewer
 from waypoint.server import ROUTES
 from waypoint.server.api import trips as api
 from waypoint.server.common import ApiError
 from waypoint.storage import backup, db
 from waypoint.storage.models import AuthSession, Person, Segment, SegmentTraveler, Trip, User
+from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase, add_database
 
 AUCKLAND_LA = {"kind": "flight", "origin": "AKL", "destination": "LAX", "start_local": "2026-03-01T22:15",
@@ -60,6 +62,51 @@ class LinkTests(Household):
     def test_a_manage_link_that_isnt_https_is_not_offered(self):
         got = self.add(self.jane, {**OUT, "manage_url": "http://example.com/manage"}, None, self.on(self.jane.person_id))
         self.assertEqual(got["links"], {"app": None, "directions": None, "call": None})
+
+
+class PrefilledLinkTests(Household):
+    ENTRY = {"example air": ("www.example.com", "/trip?code={code}&name={name}")}
+
+    def flight(self, who, travelers, provider="Example Air", manage_url=None):
+        fields = {**OUT, "provider": provider, "confirmation": "QZXW7413", "manage_url": manage_url}
+        return self.add(who, fields, None, travelers)
+
+    def test_the_link_uses_the_signed_in_travellers_last_name(self):
+        with mock.patch.dict(links.MANAGE, self.ENTRY):
+            got = self.flight(self.jane, self.on(self.joan, self.jane.person_id))
+            self.assertEqual(got["links"]["app"], "https://www.example.com/trip?code=QZXW7413&name=Doe")
+            got = self.flight(self.sam, [{"person_id": None, "name": "MR AMBROSE LINDQVIST"}, {"person_id": self.sam.person_id, "name": None}])
+            self.assertEqual(got["links"]["app"], "https://www.example.com/trip?code=QZXW7413&name=Doe")
+
+    def test_a_viewer_not_on_the_booking_gets_the_first_travellers_last_name(self):
+        with mock.patch.dict(links.MANAGE, self.ENTRY):
+            got = self.flight(self.jane, [{"person_id": None, "name": "MR AMBROSE LINDQVIST"}, {"person_id": self.mia, "name": None}])
+            self.assertEqual(got["links"]["app"], "https://www.example.com/trip?code=QZXW7413&name=LINDQVIST")
+            seen = trips.get_segment(self.c, self.jane, got["id"])
+            assert seen is not None
+            self.assertEqual(seen["links"]["app"], got["links"]["app"])
+
+    def test_no_traveller_name_keeps_the_manage_link_from_the_email(self):
+        with mock.patch.dict(links.MANAGE, self.ENTRY):
+            got = self.flight(self.jane, [], manage_url="https://mail.example.org/m")
+            self.assertEqual(got["links"]["app"], "https://mail.example.org/m")
+
+    def test_an_airline_with_no_entry_keeps_the_manage_link_from_the_email(self):
+        with mock.patch.dict(links.MANAGE, self.ENTRY):
+            got = self.flight(self.jane, self.on(self.jane.person_id), provider="Nobody Air", manage_url="https://mail.example.org/m")
+            self.assertEqual(got["links"]["app"], "https://mail.example.org/m")
+
+    def test_the_code_and_last_name_reach_no_log_line_or_error_page(self):
+        with mock.patch.dict(links.MANAGE, {"example air": ("www.example.com", "/trip?code={code}&name={name}")}):
+            with no_leaks(self, "QZXW7413", "LINDQVIST", database=None, sent_ok=False):
+                got = self.flight(self.jane, [{"person_id": None, "name": "MR AMBROSE LINDQVIST"}])
+                self.assertIn("QZXW7413", got["links"]["app"] or "")
+                trips.listing(self.c, self.jane)
+                monitoring.log(monitoring.scrub(f"opened {got['links']['app']}"))
+                try:
+                    raise ValueError(f"failed for {got['links']['app']}")
+                except ValueError:
+                    monitoring.report(values=False)
 
 
 class VisibilityTests(Household):
