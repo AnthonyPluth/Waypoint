@@ -157,10 +157,16 @@ describe("loyalty on a booking", () => {
   });
   it("finds the traveller's number for it, or says they have none, or that the name isn't matched", () => {
     const mine = membership();
-    expect(membershipFor(out, jane, [mine, membership({ id: 12, person_id: 2 })])).toEqual({ state: "found", entry: mine });
-    expect(membershipFor(out, jane, [membership({ program: "Delta SkyMiles" })])).toEqual({ state: "none", program: "American AAdvantage" });
+    expect(membershipFor(out, jane, [mine, membership({ id: 12, person_id: 2 })])).toBeNull();
+    expect(membershipFor(out, jane, [membership({ program: "Delta SkyMiles" })])).toBeNull();
     expect(membershipFor(out, { id: 2, person_id: null, name: "DOE/MIA MISS", seat: null }, [mine])).toEqual({ state: "unmatched" });
     expect(membershipFor(segment({ provider: "Example Air" }), jane, [mine])).toBeNull();
+  });
+  it("finds a car renter's number for the rental brand, or says they have none", () => {
+    const hertz = membership({ program: "Hertz Gold Plus Rewards" });
+    const rental = segment({ kind: "car", provider: "Hertz" });
+    expect(membershipFor(rental, jane, [hertz])).toEqual({ state: "found", entry: hertz });
+    expect(membershipFor(rental, jane, [])).toEqual({ state: "none", program: "Hertz Gold Plus Rewards" });
   });
   it("asks a hotel guest for a number only if they booked the room, and shows one anyone has", () => {
     const sam = { id: 2, person_id: 2, name: "Sam Doe", seat: null };
@@ -174,7 +180,7 @@ describe("loyalty on a booking", () => {
     const hers = membership({ id: 12, person_id: 2, program: "Marriott Bonvoy" });
     expect(membershipFor(room, sam, [bonvoy, hers])).toEqual({ state: "found", entry: hers });
     expect(membershipFor({ ...room, booked_by: null }, jane, [])).toBeNull();
-    expect(membershipFor(segment({ provider: "American Airlines", booked_by: 1 }), sam, [])).toEqual({ state: "none", program: "American AAdvantage" });
+    expect(membershipFor(segment({ provider: "American Airlines", booked_by: 1 }), sam, [])).toBeNull();
     expect(membershipFor(segment({ provider: "American Airlines", booked_by: 1 }), mia, [])).toEqual({ state: "unmatched" });
   });
 });
