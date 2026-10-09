@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { viewerZone, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, cityState, upcomingTitle, tripDays, untimed, until, when } from "./trips";
+import { viewerZone, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -402,5 +402,20 @@ describe("the route progress", () => {
   it("keeps the plane at the origin for a segment with no times", () => {
     expect(routeProgress(segment({ details: { time_unknown: "yes" } }), dep + 3_600_000)).toBe(0);
     expect(routeProgress(segment({ start_local: "soon" }), dep)).toBe(0);
+  });
+});
+
+describe("seatsInOrder", () => {
+  it("puts seats in order by row, then letter, without repeats", () => {
+    expect(seatsInOrder("35C, 36D, 36E, 35A, 35B")).toBe("35A, 35B, 35C, 36D, 36E");
+    expect(seatsInOrder("10A, 9B, 9A, 9A")).toBe("9A, 9B, 10A");
+  });
+  it("leaves one seat, no seat and a seat without a letter as they are", () => {
+    expect(seatsInOrder("14C")).toBe("14C");
+    expect(seatsInOrder("31")).toBe("31");
+    expect(seatsInOrder("")).toBe("");
+  });
+  it("orders the seats in a flight's subline", () => {
+    expect(subline(segment({ kind: "flight", provider: "Example Air", details: { flight_number: "EA 1", seat: "12B, 12A" } }), true)).toContain("Seat 12A, 12B");
   });
 });

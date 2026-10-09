@@ -223,11 +223,15 @@ export function upcomingTitle(s: Segment): string {
   return s.kind === "hotel" && s.hotel_brand ? s.hotel_brand : headline(s);
 }
 
+export function seatsInOrder(seats: string): string {
+  return [...new Set(seats.split(",").map((x) => x.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })).join(", ");
+}
+
 export function subline(s: Segment, condensed = false): string {
   const d = s.details;
-  const parts = s.kind === "flight" ? [[s.provider, d.flight_number].filter(Boolean).join(" "), d.aircraft, d.terminal && `Terminal ${d.terminal}`, d.seat && `Seat ${d.seat}`, condensed ? null : d.cabin]
+  const parts = s.kind === "flight" ? [[s.provider, d.flight_number].filter(Boolean).join(" "), d.aircraft, d.terminal && `Terminal ${d.terminal}`, d.seat && `Seat ${seatsInOrder(d.seat)}`, condensed ? null : d.cabin]
     : s.kind === "hotel" ? [condensed ? (s.hotel_brand ? cityState(d.address) : null) : d.address, d.room]
-      : s.kind === "car" ? [d.car_class, d.address] : s.kind === "cruise" ? [s.details.ship ? s.provider : null, d.room && `Cabin ${d.room}`, d.deck && `Deck ${d.deck}`] : [s.provider, d.seat && `Seat ${d.seat}`, d.cabin];
+      : s.kind === "car" ? [d.car_class, d.address] : s.kind === "cruise" ? [s.details.ship ? s.provider : null, d.room && `Cabin ${d.room}`, d.deck && `Deck ${d.deck}`] : [s.provider, d.seat && `Seat ${seatsInOrder(d.seat)}`, d.cabin];
   return parts.filter(Boolean).join(" · ");
 }
 

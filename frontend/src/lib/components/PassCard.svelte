@@ -12,7 +12,7 @@
   import { flightStatus, statusFor } from "$lib/flightstatus.svelte";
   import { isMobile } from "$lib/platform";
   import { segmentChips } from "$lib/status";
-  import { appWord, dayLabel, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed } from "$lib/trips";
+  import { appWord, dayLabel, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed } from "$lib/trips";
 
   type Props = {
     segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
@@ -30,7 +30,7 @@
   const codes = $derived(bookings.filter((b) => b.confirmation));
   const differ = $derived(bookings.length > 1 && timesDiffer(bookings));
   const progress = $derived(routeProgress(s, now));
-  const seat = $derived(s.details.seat || [...new Set(s.travelers.map((t) => t.seat).filter(Boolean))].join(", "));
+  const seat = $derived(seatsInOrder(s.details.seat || s.travelers.map((t) => t.seat).filter(Boolean).join(", ")));
   const number = $derived(s.details.flight_number ?? "");
   const app = $derived(s.links.app ?? s.manage_url);
   const appLabel = $derived(appWord(s, now, isMobile()));
