@@ -306,10 +306,11 @@ def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Map
             cabins[cabin_group(cabin)] += 1
         own = [t for t in (re.sub(r"\s+", "", x).upper() for x in s.seats) if t]
         booking = re.sub(r"\s+", "", s.details.get("seat") or "").upper()
+        without_position = {k: v for k, v in s.details.items() if k != "seat_position"}
         for seat in own or ([booking] if booking else [""]):
             if seat:
                 seats[seat] += 1
-            positions[seat_position(seat, s.details if seat == booking else {k: v for k, v in s.details.items() if k != "seat_position"})] += 1
+            positions[seat_position(seat, s.details if seat == booking or (not booking and len(own) == 1) else without_position)] += 1
     airports_out: list[AirportVisit] = []
     visits = {code: max(arrivals[code], departures[code]) for code in arrivals.keys() | departures.keys()}
     for code, n in sorted(visits.items(), key=lambda kv: (-kv[1], kv[0])):

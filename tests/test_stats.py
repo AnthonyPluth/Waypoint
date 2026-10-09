@@ -311,6 +311,29 @@ class SeatStatsTests(StatsCase):
         shares = self.stats(self.jane)["flights"]["seat_positions"]
         self.assertEqual(shares, {"window": 0, "aisle": 1, "middle": 2, "unknown": 0})
 
+    def test_the_emails_word_goes_when_the_seat_it_was_read_with_changes(self):
+        said = {"flight_number": "BA 112", "cabin": "Economy", "aircraft": "Boeing 777", "seat": "12A", "seat_position": "aisle"}
+        added = self.add(self.jane, {**JFK_LHR, "details": said})
+        edited = trips.edit_segment(self.c, self.jane, added["id"], {"details": {**said, "seat": "12F"}})
+        assert edited
+        self.assertEqual(edited["details"], {k: v for k, v in said.items() if k != "seat_position"} | {"seat": "12F"})
+        self.assertEqual(self.stats(self.jane)["flights"]["seat_positions"], {"window": 0, "aisle": 0, "middle": 1, "unknown": 0})
+        again = trips.edit_segment(self.c, self.jane, added["id"], {"details": {**edited["details"], "seat": "12K", "seat_position": "window"}})
+        assert again
+        self.assertEqual(again["details"]["seat_position"], "window")
+        same = trips.edit_segment(self.c, self.jane, added["id"], {"details": {**again["details"], "terminal": "7"}})
+        assert same
+        self.assertEqual(same["details"]["seat_position"], "window")
+
+    def test_the_emails_word_goes_when_a_travellers_seat_changes_and_applies_to_a_solo_travellers_seat(self):
+        said = {"flight_number": "BA 112", "cabin": "Economy", "aircraft": "Boeing 777", "seat_position": "aisle"}
+        added = self.add(self.jane, {**JFK_LHR, "details": said}, travelers=[{"person_id": self.jane.person_id, "name": None, "seat": "12F"}])
+        self.assertEqual(self.stats(self.jane)["flights"]["seat_positions"], {"window": 0, "aisle": 1, "middle": 0, "unknown": 0})
+        edited = trips.edit_segment(self.c, self.jane, added["id"], {"travelers": [{"person_id": self.jane.person_id, "name": None, "seat": "12E"}]})
+        assert edited
+        self.assertNotIn("seat_position", edited["details"])
+        self.assertEqual(self.stats(self.jane)["flights"]["seat_positions"], {"window": 0, "aisle": 0, "middle": 1, "unknown": 0})
+
     def test_a_booking_with_no_traveller_seats_uses_its_booking_seat_once_and_one_with_nothing_is_unknown(self):
         self.mine({**JFK_LHR, "details": {"flight_number": "BA 112", "seat": "12A"}}, {**LHR_JFK, "details": {"flight_number": "BA 117"}})
         f = self.stats(self.jane)["flights"]
