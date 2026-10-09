@@ -27,7 +27,7 @@
   import Plus from "@lucide/svelte/icons/plus";
   import { toast } from "svelte-sonner";
 
-  let { tripId = null, onchanged = null }: { tripId?: number | null; onchanged?: (() => void) | null } = $props();
+  let { tripId = null, onchanged = null }: { tripId?: number | null; onchanged?: ((movedTo?: number) => void) | null } = $props();
 
   let trip = $state<Trip | null>(null);
   let people = $state<Person[]>([]);
@@ -114,7 +114,7 @@
   async function saved(s: Segment) {
     form = null;
     toast.success("Saved");
-    if (trip && s.trip_id !== trip.id) { location.hash = `#trip/${s.trip_id}`; return; }
+    if (trip && s.trip_id !== trip.id) { if (onchanged) onchanged(s.trip_id); else location.hash = `#trip/${s.trip_id}`; return; }
     onchanged?.();
     await load();
   }

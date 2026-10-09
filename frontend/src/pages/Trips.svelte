@@ -33,6 +33,7 @@
   let picked = $state<number | null>(null);
   const everyTrip = $derived(shown ? [...shown.upcoming, ...shown.past] : []);
   const selected = $derived(everyTrip.find((t) => t.id === picked) ?? everyTrip[0] ?? null);
+  const reloaded = (movedTo?: number) => { if (movedTo) picked = movedTo; void load(); };
   const choose = (e: MouseEvent, t: Trip) => {
     if (!panes.two || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
@@ -98,7 +99,7 @@
   {#if panes.two && selected}
     <div class="grid grid-cols-[22rem_minmax(0,1fr)] items-start gap-8">
       <div class="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto pr-1">{@render list()}</div>
-      <div class="min-w-0" data-testid="trip-pane" aria-label="Selected trip" role="region"><TripPane tripId={selected.id} onchanged={load} /></div>
+      <div class="min-w-0" data-testid="trip-pane" aria-label="Selected trip" role="region">{#key selected.id}<TripPane tripId={selected.id} onchanged={reloaded} />{/key}</div>
     </div>
   {:else}
     {@render list()}
