@@ -15,6 +15,13 @@ describe("flowProblems", () => {
     expect(bad[2]).toMatch(/step 3 must have exactly one of/);
   });
 
+  it("needs a selector and a file name for a download", () => {
+    expect(flowProblems({ ...ok, steps: [{ download: { selector: "button", name: "saved-image" } }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ download: { selector: "button" } }] })).toEqual(["step 1: download needs a selector and a name of letters, digits, - or _"]);
+    expect(flowProblems({ ...ok, steps: [{ download: { name: "saved-image" } }] })).toEqual(["step 1: download needs a selector and a name of letters, digits, - or _"]);
+    expect(flowProblems({ ...ok, steps: [{ download: { selector: "button", name: "../x" } }] })).toHaveLength(1);
+  });
+
   it("takes an option to select by its position", () => {
     expect(flowProblems({ ...ok, steps: [{ select: { selector: "select", index: 2 } }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ select: "x" }] })).toEqual(["step 1: select takes a object"]);

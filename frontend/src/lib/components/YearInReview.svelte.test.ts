@@ -23,7 +23,7 @@ const stats = (year: number | null): Stats => ({
 });
 
 beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(api).mockResolvedValue(stats(null) as never); });
-afterEach(() => { vi.restoreAllMocks(); });
+afterEach(() => { vi.restoreAllMocks(); Reflect.deleteProperty(navigator, "share"); Reflect.deleteProperty(navigator, "canShare"); });
 
 const next = async (n: number) => { for (let i = 0; i < n; i++) await userEvent.click(screen.getByRole("button", { name: "Next" })); };
 const cardText = () => decodeURIComponent((screen.getByTestId("save-card") as HTMLImageElement).src.split(",").slice(1).join(","));
@@ -71,7 +71,6 @@ describe("YearInReview", () => {
     expect(await screen.findByText("Saved the image to your downloads.")).toBeTruthy();
     expect(click).toHaveBeenCalled();
     expect(share).not.toHaveBeenCalled();
-    Reflect.deleteProperty(navigator, "share"); Reflect.deleteProperty(navigator, "canShare");
   });
 
   it("says so when the image can't be made", async () => {

@@ -34,6 +34,7 @@ export function flowProblems(flow) {
     const keys = Object.keys(s).filter((k) => k !== "timeout");
     if (keys.length !== 1 || !(keys[0] in ACTIONS)) out.push(`step ${i + 1} must have exactly one of ${Object.keys(ACTIONS).join(", ")}`);
     else if (typeof s[keys[0]] !== ACTIONS[keys[0]]) out.push(`step ${i + 1}: ${keys[0]} takes a ${ACTIONS[keys[0]]}`);
+    else if (keys[0] === "download" && (typeof s.download?.selector !== "string" || !/^[\w-]+$/.test(s.download?.name ?? ""))) out.push(`step ${i + 1}: download needs a selector and a name of letters, digits, - or _`);
   }
   if (flow?.page !== undefined && !PAGES.includes(flow.page)) out.push(`unknown page ${flow.page}`);
   for (const v of flow?.viewports ?? []) if (!(v in VIEWPORTS)) out.push(`unknown viewport ${v}`);
