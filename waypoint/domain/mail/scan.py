@@ -150,6 +150,13 @@ class NoAi(Exception):
     pass
 
 
+class NotAskable(Exception):
+    pass
+
+
+HOLDS_BOOKINGS = "This item holds bookings to settle, not a message to read."
+
+
 def _again(owner: str, item_id: int) -> tuple[int, str, dict[str, Any]]:
     with db.session() as conn:
         found = review.locate(conn, owner, item_id)
@@ -169,8 +176,11 @@ def preview(owner: str, item_id: int) -> tuple[str, str | None, bool]:
 
 def suggest_now(owner: str, item_id: int, now: float) -> None:
     with db.session() as conn:
-        if review.locate(conn, owner, item_id) is None:
+        found = review.locate(conn, owner, item_id)
+        if found is None:
             raise KeyError(item_id)
+        if review.is_match(conn, *found):
+            raise NotAskable(HOLDS_BOOKINGS)
         if ai.config(conn) is None:
             raise NoAi(NO_AI)
     mailbox_id, message_id, raw = _again(owner, item_id)

@@ -33,7 +33,7 @@ class ItemOut(TypedDict):
 
 def add(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: str | None, received: str | None,
         reason: Reason, now: float, held: list[tuple[trips.SegmentIn, list[int]]] | None = None) -> None:
-    matches = json.dumps([{"booking": b, "candidates": c} for b, c in held], separators=(",", ":")) if held else None
+    matches = json.dumps([{"id": n, "booking": b, "candidates": c} for n, (b, c) in enumerate(held, 1)], separators=(",", ":")) if held else None
     db.insert_ignore(conn, ReviewItem, {"mailbox_id": mailbox_id, "message_id": message_id,
                                         "sender_domain": sender_domain or UNKNOWN_SENDER,
                                         "received": received, "reason": reason, "created": now, "matches": matches},
@@ -150,7 +150,7 @@ class BookingOut(TypedDict):
 
 class MatchOut(TypedDict):
     item_id: int
-    index: int
+    entry: int
     subject: str | None
     received: str | None
     mine: bool
@@ -171,10 +171,11 @@ def matches(conn: db.Connection, owner: str, viewer: Viewer) -> list[MatchOut]:
     names = {t.id: t.name for t in visibility.visible_trips(conn, viewer)}
     out: list[MatchOut] = []
     for r in rows:
-        for i, entry in enumerate(json.loads(r["matches"])):
+        for i, entry in enumerate(json.loads(r["matches"]), 1):
+            entry = {"id": i, **entry}
             b = entry["booking"]
             out.append({
-                "item_id": r["id"], "index": i, "subject": subjects.get((r["mailbox_id"], r["message_id"])), "received": r["received"],
+                "item_id": r["id"], "entry": entry["id"], "subject": subjects.get((r["mailbox_id"], r["message_id"])), "received": r["received"],
                 "mine": r["owner_sub"] == owner,
                 "booking": {"kind": b["kind"], "provider": b.get("provider"), "confirmation": b.get("confirmation"),
                             "origin": b.get("origin"), "destination": b.get("destination"),
@@ -186,16 +187,34 @@ def matches(conn: db.Connection, owner: str, viewer: Viewer) -> list[MatchOut]:
     return out
 
 
-def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, index: int, segment_id: int | None) -> bool:
-    row = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.matches)
-                       .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
-                       .where(ReviewItem.id == item_id, _seen_by(owner), ReviewItem.matches.is_not(None))).fetchone()
+def _held(conn: db.Connection, owner: str, item_id: int) -> Any:
+    return conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.matches)
+                        .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
+                        .where(ReviewItem.id == item_id, _seen_by(owner), ReviewItem.matches.is_not(None))).fetchone()
+
+
+def _entries(row: Any) -> list[dict[str, Any]]:
+    return [{"id": i, **e} for i, e in enumerate(json.loads(row["matches"]), 1)]
+
+
+def _leave(conn: db.Connection, item_id: int, reason: str, left: list[dict[str, Any]]) -> None:
+    if left:
+        conn.execute(update(ReviewItem).where(ReviewItem.id == item_id).values(matches=json.dumps(left, separators=(",", ":"))))
+    elif reason == "match":
+        conn.execute(delete(ReviewItem).where(ReviewItem.id == item_id))
+    else:
+        conn.execute(update(ReviewItem).where(ReviewItem.id == item_id).values(matches=None))
+    stored_mail.prune(conn)
+
+
+def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_id: int, segment_id: int | None) -> bool:
+    row = _held(conn, owner, item_id)
     if row is None:
         return False
-    entries = json.loads(row["matches"])
-    if not 0 <= index < len(entries):
+    entries = _entries(row)
+    entry = next((e for e in entries if e["id"] == entry_id), None)
+    if entry is None:
         return False
-    entry = entries[index]
     if segment_id is None:
         added = trips.add_segment(conn, viewer, entry["booking"], source="email")
         if added is None:
@@ -207,12 +226,16 @@ def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, index:
         trips.merge_email_segment(conn, viewer, entry["booking"], into=segment_id)
         target = segment_id
     stored_mail.link(conn, target, int(row["mailbox_id"]), str(row["message_id"]))
-    left = [e for i, e in enumerate(entries) if i != index]
-    if left:
-        conn.execute(update(ReviewItem).where(ReviewItem.id == item_id).values(matches=json.dumps(left, separators=(",", ":"))))
-    elif row["reason"] == "match":
-        conn.execute(delete(ReviewItem).where(ReviewItem.id == item_id))
-    else:
-        conn.execute(update(ReviewItem).where(ReviewItem.id == item_id).values(matches=None))
-    stored_mail.prune(conn)
+    _leave(conn, item_id, row["reason"], [e for e in entries if e["id"] != entry_id])
+    return True
+
+
+def drop(conn: db.Connection, owner: str, item_id: int, entry_id: int) -> bool:
+    row = _held(conn, owner, item_id)
+    if row is None:
+        return False
+    entries = _entries(row)
+    if not any(e["id"] == entry_id for e in entries):
+        return False
+    _leave(conn, item_id, row["reason"], [e for e in entries if e["id"] != entry_id])
     return True
