@@ -226,6 +226,16 @@ export function when(word: string, ms: number): string {
 export const CHECK_IN_WINDOW_HOURS = 24;
 const CHECK_IN_WINDOW_MS = CHECK_IN_WINDOW_HOURS * 3_600_000;
 
+export function checkInOpen(s: Segment, now: number): boolean {
+  const from = startAt(s);
+  return s.kind === "flight" && s.status !== "cancelled" && !untimed(s) && !Number.isNaN(from) && from - CHECK_IN_WINDOW_MS <= now && now < from;
+}
+
+export function appWord(s: Segment, now: number, mobile: boolean): string {
+  if (checkInOpen(s, now)) return "Check in";
+  return mobile ? "Open in app" : "Manage booking";
+}
+
 const PAST_WORD: Record<Segment["kind"], string> = { flight: "Landed", hotel: "Checked out", car: "Dropped off", train: "Arrived", cruise: "Disembarked" };
 
 export function routeProgress(s: Segment, now: number): number {

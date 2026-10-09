@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { viewerZone, bookingCards, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
+import { viewerZone, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -291,6 +291,28 @@ describe("the order of a day's items", () => {
   });
   it("leaves other days alone", () => {
     expect(tripDays(trip([hotel, car, flight])).map((d) => d.date)).toEqual(["2026-11-05", "2026-11-08"]);
+  });
+});
+
+describe("the check-in button", () => {
+  const flight = segment({ id: 9, start_local: "2026-11-20T19:00", start_zone: NY, end_local: "2026-11-21T07:10", end_zone: LON });
+  const dep = at("2026-11-20T19:00", NY), HOUR = 3_600_000;
+  it("says Check in from exactly 24 hours before departure until it departs", () => {
+    expect(appWord(flight, dep - 24 * HOUR, true)).toBe("Check in");
+    expect(appWord(flight, dep - 24 * HOUR, false)).toBe("Check in");
+    expect(appWord(flight, dep - 1, true)).toBe("Check in");
+  });
+  it("keeps its old label before the window and from departure", () => {
+    expect(appWord(flight, dep - 24 * HOUR - 1, true)).toBe("Open in app");
+    expect(appWord(flight, dep - 24 * HOUR - 1, false)).toBe("Manage booking");
+    expect(appWord(flight, dep, true)).toBe("Open in app");
+    expect(appWord(flight, dep + HOUR, false)).toBe("Manage booking");
+  });
+  it("is only for a flight that is not cancelled and has times", () => {
+    const now = dep - HOUR;
+    expect(checkInOpen({ ...flight, status: "cancelled" }, now)).toBe(false);
+    expect(checkInOpen({ ...flight, kind: "train" }, now)).toBe(false);
+    expect(checkInOpen({ ...flight, details: { time_unknown: "yes" } }, now)).toBe(false);
   });
 });
 

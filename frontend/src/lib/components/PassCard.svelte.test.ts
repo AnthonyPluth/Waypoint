@@ -66,7 +66,15 @@ describe("a flight pass", () => {
     expect(toast.success).toHaveBeenCalledWith("Copied");
   });
   it("offers the booking’s link", () => {
-    render(PassCard, goes({ manage_url: "https://example.com/manage" }));
+    render(PassCard, { ...goes({ manage_url: "https://example.com/manage" }), now: dep - 25 * HOUR });
+    expect(screen.getByRole("link", { name: "Manage booking" })).toHaveAttribute("href", "https://example.com/manage");
+  });
+  it("says Check in from 24 hours before departure until it departs", () => {
+    const manage = { manage_url: "https://example.com/manage" };
+    const inside = render(PassCard, { ...goes(manage), now: dep - 24 * HOUR });
+    expect(screen.getByRole("link", { name: "Check in" })).toHaveAttribute("href", "https://example.com/manage");
+    inside.unmount();
+    render(PassCard, { ...goes(manage), now: dep });
     expect(screen.getByRole("link", { name: "Manage booking" })).toHaveAttribute("href", "https://example.com/manage");
   });
   it("shows a flight with no times as untimed, with the plane at the origin", () => {
