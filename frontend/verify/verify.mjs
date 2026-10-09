@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { animationsRunning, auditPage } from "./a11y.mjs";
 
 export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 } };
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];
@@ -153,8 +154,8 @@ async function main() {
   try { approveUrl = await seedAssistants(browser, base); }
   catch (e) { problems.push(`seeding the demo assistants: ${String(e.message).split("\n")[0]}`, { cause: e }); }
 
-  async function visit(label, viewport, work, allowConsole = []) {
-    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark" });
+  async function visit(label, viewport, work, { audit = true, reducedMotion = "no-preference", allowConsole = [] } = {}) {
+    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark", reducedMotion });
     const page = await ctx.newPage();
     const where = `${label} @ ${viewport}`;
     const consoleErrors = [];
@@ -178,6 +179,7 @@ async function main() {
     };
     try {
       await work(page, shot, saveDownload);
+      if (audit) for (const p of await auditPage(page, viewport)) problems.push(`${where}: a11y ${p}`);
     } catch (e) {
       problems.push(`${where}: ${String(e.message).split("\n")[0]}`);
       await shot(`${label.replace(/\W+/g, "-")}-FAILED`).catch(() => {});
@@ -209,8 +211,15 @@ async function main() {
           catch (e) { throw new Error(`step ${i + 1} (${JSON.stringify(step).slice(0, 80)}): ${String(e.message).split("\n")[0]}`, { cause: e }); }
         }
         await shot(`flow-${flow.name}`);
-      }, flow.allow_console);
+      }, { allowConsole: flow.allow_console });
     }
+  }
+  if (!args.length) for (const name of pages.filter((n) => !OWN_PAGES.includes(n))) {
+    await visit(`reduced motion ${name}`, "phone", async (page) => {
+      await page.goto(`${base}/#${name}`, { waitUntil: "networkidle" });
+      const moving = await animationsRunning(page);
+      if (moving.length) throw new Error(`animations still run under prefers-reduced-motion: ${moving.slice(0, 5).join(", ")}`);
+    }, { audit: false, reducedMotion: "reduce" });
   }
   await browser.close();
 
@@ -219,7 +228,7 @@ async function main() {
   console.log(`verify: ${results.length} visits, ${shots} screenshots in ${out}`);
   for (const n of notes) console.log(`  note: ${n}`);
   for (const p of problems) console.error(`  FAIL: ${p}`);
-  console.log(problems.length ? `verify: FAILED (${problems.length} problem${problems.length === 1 ? "" : "s"})` : "verify: OK, no console errors or 5xx responses");
+  console.log(problems.length ? `verify: FAILED (${problems.length} problem${problems.length === 1 ? "" : "s"})` : "verify: OK, no console errors, 5xx responses or accessibility problems");
   process.exit(problems.length ? 1 : 0);
 }
 

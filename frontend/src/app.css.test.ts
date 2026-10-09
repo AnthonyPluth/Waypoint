@@ -56,3 +56,17 @@ describe("the dark palette", () => {
     expect(contrast(resolve("map-border"), resolve("map-land"))).toBeGreaterThanOrEqual(1.3);
   });
 });
+
+describe("motion", () => {
+  const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  it("switches every animation and transition off under prefers-reduced-motion", () => {
+    expect(reduced).toMatch(/\*, ::before, ::after \{[^}]*animation-duration: 0\.01ms !important/);
+    expect(reduced).toMatch(/transition-duration: 0\.01ms !important/);
+    expect(reduced).toMatch(/animation-iteration-count: 1 !important/);
+  });
+  it("puts no animation outside that switch", () => {
+    const afterSwitch = reduced.slice(reduced.indexOf("}\n}") + 3);
+    expect(afterSwitch.trim()).toBe("");
+    expect(reduced).not.toMatch(/@keyframes|\banimation:|\btransition:/);
+  });
+});

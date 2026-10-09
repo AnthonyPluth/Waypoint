@@ -109,7 +109,7 @@
   {/if}
 
   {#if featured}
-    <h2 class="mb-1 text-title"><a class="underline-offset-2 hover:underline" href={`#trip/${featured.id}`}>{featured.name}</a></h2>
+    <h2 class="mb-1 text-title"><a class="inline-flex items-center phone:min-h-11 underline-offset-2 hover:underline" href={`#trip/${featured.id}`}>{featured.name}</a></h2>
     {#if featured.start_date && featured.end_date}<p class="mb-4 text-caption text-muted-foreground">{dateLabel(featured.start_date)} – {dateLabel(featured.end_date)}</p>{/if}
     <ol class="flex flex-col gap-6" aria-label={`${featured.name}, day by day`}>
       {#each days as day (day.date)}

@@ -120,12 +120,11 @@ describe("Sheet", () => {
     });
   });
 
-  it("slides in normally, and only fades in for someone who asked for reduced motion", () => {
+  it("slides in normally, and has no motion at all for someone who asked for reduced motion", () => {
     const css = readFileSync("src/app.css", "utf8");
     expect(css).toMatch(/\.sheet\[data-side="bottom"\]\[data-state="open"\] \{ animation: sheet-rise/);
-    const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)", css.indexOf(".sheet-overlay")));
-    expect(reduced).toMatch(/\.sheet\[data-state="open"\] \{ animation: sheet-fade-in/);
-    expect(reduced).toMatch(/\.sheet\[data-state="closed"\] \{ animation: sheet-fade-out/);
-    expect(reduced).not.toMatch(/sheet-rise|sheet-slide|translate/);
+    const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(reduced).toMatch(/animation-duration: 0\.01ms !important/);
+    expect(reduced).not.toMatch(/sheet-/);
   });
 });

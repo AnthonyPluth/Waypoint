@@ -98,6 +98,10 @@ export default defineConfig(
     languageOptions: { globals: { ...globals.node } },
   },
   {
+    files: ["frontend/verify/a11y.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     files: ["frontend/**/*.svelte", "frontend/**/*.svelte.ts"],
     languageOptions: { parserOptions: { parser: ts.parser } },
   },

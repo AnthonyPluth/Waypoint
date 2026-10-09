@@ -47,10 +47,10 @@
   const facts = $derived(rows.filter((f): f is [string, string] => !!f[1] && !omit.includes(f[0])));
 </script>
 
-<svelte:element this={tag} {id} class={`pass scroll-mt-20 ${cls}`} class:ring-2={highlight} class:ring-ring={highlight} class:opacity-70={cancelled} aria-label={label ?? (tag === "section" ? headline(s) : undefined)} data-kind={s.kind} data-progress={flight ? progress : undefined}>
+<svelte:element this={tag} {id} class={`pass scroll-mt-20 ${cls}`} class:ring-2={highlight} class:ring-ring={highlight} class:opacity-80={cancelled} aria-label={label ?? (tag === "section" ? headline(s) : undefined)} data-kind={s.kind} data-progress={flight ? progress : undefined}>
   <div class="flex flex-col gap-4 p-6 md:p-8">
     {#if eyebrow}<p class="eyebrow flex items-center gap-2">{#if pulse}<span class="size-2 animate-pulse rounded-full bg-primary motion-reduce:animate-none" aria-hidden="true"></span>{/if}{eyebrow}</p>{/if}
-    <p class="text-heading font-semibold" class:text-primary={!cancelled} class:text-destructive={cancelled} data-headline data-countdown>{passHeadline(s, now)}</p>
+    {#key passHeadline(s, now)}<p class="countdown text-heading font-semibold" class:text-primary={!cancelled} class:text-destructive={cancelled} data-headline data-countdown>{passHeadline(s, now)}</p>{/key}
     {#if flight}<svelte:element this={`h${level}`} class="sr-only">{headline(s)}</svelte:element>{/if}
 
     {#if showCode && codes.length}

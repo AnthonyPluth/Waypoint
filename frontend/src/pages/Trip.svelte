@@ -154,7 +154,7 @@
 </script>
 
 {#if tripId === null}
-  <a class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" href="#trips"><ArrowLeft class="size-4" /> Trips</a>
+  <a class="mb-4 inline-flex items-center gap-1.5 phone:min-h-11 text-sm text-muted-foreground hover:text-foreground" href="#trips"><ArrowLeft class="size-4" /> Trips</a>
 {/if}
 
 {#if lockedCopy}
@@ -248,7 +248,7 @@
               <ul class="flex flex-col gap-4" aria-label={`Bookings of ${headline(s)}`}>
                 {#each card.segments as b (b.id)}
                   {@const name = `${headline(b)} booking${b.confirmation ? ` ${b.confirmation}` : ""}`}
-                  <li class="flex flex-col gap-3 rounded-2xl border border-border bg-surface-2 p-4" class:opacity-70={b.status === "cancelled"} data-booking>
+                  <li class="flex flex-col gap-3 rounded-2xl border border-border bg-surface-2 p-4" class:opacity-80={b.status === "cancelled"} data-booking>
                     <p class="flex flex-wrap items-center gap-2">
                       {#if b.confirmation}<span class="text-lg"><CopyCode code={b.confirmation} /></span>{:else}<span class="text-muted-foreground">No confirmation code</span>{/if}
                       {#if b.status !== "confirmed"}<Badge variant={b.status === "cancelled" ? "destructive" : "secondary"}>{b.status === "cancelled" ? "Cancelled" : "Changed"}</Badge>{/if}</p>
@@ -298,7 +298,7 @@
       <div class="mt-2 text-sm"><p class="eyebrow">{s.kind === "car" ? "Pick-up address" : s.kind === "cruise" ? "Terminal address" : "Address"}</p>
         <CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" /></div>
     {:else if s.status !== "cancelled"}
-      <p class="mt-2 text-sm"><button type="button" class="underline underline-offset-2" onclick={() => edit(s, "segment-address")}
+      <p class="mt-2 text-sm"><button type="button" class="underline underline-offset-2 phone:min-h-11" onclick={() => edit(s, "segment-address")}
         aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
     {/if}
   {/if}

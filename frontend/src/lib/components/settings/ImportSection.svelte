@@ -93,7 +93,7 @@
             {/if}
             <ul class="divide-y rounded-lg bg-muted text-sm">
               {#each preview.rows.slice(0, SHOWN) as r (r.line)}
-                <li class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2" class:opacity-70={r.status !== "new"}>
+                <li class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2" class:opacity-80={r.status !== "new"}>
                   <div class="min-w-0">
                     <p class="font-medium">{r.origin && r.destination ? `${r.origin} → ${r.destination}` : `Line ${r.line}`}{#if r.flight_number}{" "}<span class="text-muted-foreground">{r.flight_number}</span>{/if}</p>
                     <p class="text-muted-foreground">{[r.day ? day(r.day) : null, r.status !== "unreadable" && !r.start_local ? "no times" : null, r.status !== "new" ? r.reason : null].filter(Boolean).join(" · ")}</p>
