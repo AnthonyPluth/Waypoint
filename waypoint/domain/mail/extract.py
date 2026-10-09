@@ -17,7 +17,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ... import monitoring
 from ...storage.stored_mail import Content
-from . import parsers, safe_html
+from .. import seatmaps
+from . import parsers, safe_html, seats
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger
@@ -249,9 +250,12 @@ def _flight(res: Mapping[str, Any]) -> Booking | None:
     if not (IATA.fullmatch(origin) and IATA.fullmatch(destination) and start and end):
         return None
     seat = _node(_node(res.get("reservedTicket")).get("ticketedSeat"))
+    seat_number, seat_position = seats.seat_with_position(_text(seat.get("seatNumber")))
     return Booking("flight", _status(res), _text(res.get("reservationNumber")), _text(airline.get("name")) or code, start, end,
                    origin, destination, details=_details(flight_number=number, terminal=_text(trip.get("departureTerminal")),
-                                                         seat=_text(seat.get("seatNumber")), cabin=_text(seat.get("seatingType"))),
+                                                         seat=seat_number, seat_position=seat_position,
+                                                         aircraft=seatmaps.family(_text(trip.get("aircraft"))),
+                                                         cabin=_text(seat.get("seatingType"))),
                    manage_url=_link(res.get("modifyReservationUrl")) or _link(res.get("url")), passengers=_passengers(res))
 
 

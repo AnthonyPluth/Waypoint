@@ -38,19 +38,19 @@ def _at(today: date, days: int, clock: str) -> str:
 def _family_past(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "MCO", "start_local": _at(today, -41, "08:15"), "end_local": _at(today, -41, "11:20"),
-         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 1412", "terminal": "4", "cabin": "Economy"}},
+         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 1412", "terminal": "4", "cabin": "Economy", "aircraft": "Boeing 737"}},
         {"kind": "hotel", "origin": "Lakeside Resort", "start_local": _at(today, -41, "15:00"), "end_local": _at(today, -36, "11:00"),
          "start_zone": "America/New_York", "end_zone": "America/New_York", "confirmation": "H41207", "provider": "Hilton",
          "details": {"address": "100 Lakeshore Drive, Orlando", "room": "Two queens"}},
         {"kind": "flight", "origin": "MCO", "destination": "JFK", "start_local": _at(today, -36, "17:40"), "end_local": _at(today, -36, "20:10"),
-         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 2190", "cabin": "Economy", "seat": "22C"}},
+         "confirmation": "RB3T6K", "provider": "Delta Air Lines", "details": {"flight_number": "DL 2190", "cabin": "Economy", "seat": "22C", "aircraft": "Airbus A320 family"}},
     ]
 
 
 def _family_now(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": _at(today, -2, "19:00"), "end_local": _at(today, -1, "07:10"),
-         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy"},
+         "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy", "aircraft": "Boeing 777"},
          "manage_url": "https://example.com/manage/KQ7M2X"},
         {"kind": "hotel", "origin": "Harbour Hotel", "start_local": _at(today, -1, "15:00"), "end_local": _at(today, 2, "10:00"),
          "start_zone": "Europe/London", "end_zone": "Europe/London", "confirmation": "H88231", "provider": "Marriott",
@@ -114,7 +114,7 @@ def _cruises(today: date) -> list[trips.SegmentIn]:
 def _joan(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": _at(today, -2, "19:00"), "end_local": _at(today, -1, "07:10"),
-         "confirmation": "MW5T9Z", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy"},
+         "confirmation": "MW5T9Z", "provider": "American Airlines", "details": {"flight_number": "AA 101", "terminal": "8", "cabin": "Economy", "aircraft": "Boeing 777"},
          "manage_url": "https://example.com/manage/MW5T9Z"},
         {"kind": "hotel", "origin": "Camden Guesthouse", "start_local": _at(today, 2, "15:00"), "end_local": _at(today, 4, "10:00"),
          "start_zone": "Europe/London", "end_zone": "Europe/London", "confirmation": "G20417", "provider": "Example Stays"},

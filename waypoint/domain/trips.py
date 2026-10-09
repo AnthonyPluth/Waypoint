@@ -23,7 +23,7 @@ TIME_UNKNOWN = "time_unknown"
 ADDRESS_LIMIT = 300
 MAX_PORTS = 40
 SEAT_LIMIT = 10
-DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone", "ship", "deck", TIME_UNKNOWN)
+DETAIL_KEYS = ("flight_number", "terminal", "seat", "seat_position", "aircraft", "cabin", "room", "car_class", "address", "phone", "ship", "deck", TIME_UNKNOWN)
 
 
 def untimed(details: Mapping[str, str]) -> bool:

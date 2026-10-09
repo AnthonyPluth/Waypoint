@@ -57,6 +57,15 @@ class ParserTests(unittest.TestCase):
         [b] = read(mail(text, ctype="text/plain")).bookings
         self.assertEqual(b.status, "confirmed")
 
+    def test_an_aircraft_named_with_a_leg_is_kept_and_one_on_the_next_leg_is_not(self):
+        text = ("Confirmation #: K7QW2N\nPassenger: JANE DOE\nFlight 77 Mon, Nov 16, 2026\n"
+                "Dallas (Love Field), TX (DAL) 8:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM\n"
+                "Flight 78 Fri, Nov 20, 2026 Boeing 737-800\n"
+                "Houston (Hobby), TX (HOU) 11:50 PM\nDallas (Love Field), TX (DAL) 12:55 AM (+1 day)\n")
+        out, back = read(mail(text, ctype="text/plain")).bookings
+        self.assertEqual(dict(out.details), {"flight_number": "WN 77"})
+        self.assertEqual(dict(back.details), {"flight_number": "WN 78", "aircraft": "Boeing 737"})
+
     def test_a_plain_text_email_is_read_the_same_way(self):
         text = ("Your reservation has been canceled.\nConfirmation #: K7QW2N\nPassenger: JANE DOE\nFlight 77 Mon, Nov 16, 2026\n"
                 "Dallas (Love Field), TX (DAL) 8:05 AM\nHouston (Hobby), TX (HOU) 9:10 AM\n")

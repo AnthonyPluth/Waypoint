@@ -37,6 +37,9 @@
       ],
       "terminal": "5"
     },
+    "aircraft": {
+      "model": "Boeing 777-300ER"
+    },
     "codeshareStatus": "IsOperator",
     "isCargo": false,
     "airline": {

@@ -2717,6 +2717,12 @@
               "string",
               "null"
             ]
+          },
+          "aircraft": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -2824,6 +2830,12 @@
               "string",
               "null"
             ]
+          },
+          "aircraft": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -2838,7 +2850,8 @@
           "start_local",
           "end_local",
           "seat",
-          "cabin"
+          "cabin",
+          "aircraft"
         ],
         "additionalProperties": false
       },

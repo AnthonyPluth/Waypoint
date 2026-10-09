@@ -120,6 +120,7 @@ describe("wording", () => {
   it("names a segment and describes it", () => {
     expect(headline(out)).toBe("JFK → LHR");
     expect(subline(out)).toBe("American Airlines AA 101 · Terminal 8");
+    expect(subline({ ...out, details: { ...out.details, aircraft: "Boeing 737" } })).toBe("American Airlines AA 101 · Boeing 737 · Terminal 8");
     expect(headline(stay)).toBe("Harbour Hotel");
     expect(subline(stay)).toBe("1 Quay Street, London");
     expect(headline(segment({ kind: "car", provider: "Hertz", origin: "SFO airport" }))).toBe("Hertz · SFO airport");
