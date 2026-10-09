@@ -44,6 +44,11 @@ describe("a flight pass", () => {
     for (const text of ["Terminal", "8", "Seat", "14C", "Cabin", "Economy", "Confirmed"]) expect(screen.getByText(text)).toBeInTheDocument();
     expect(screen.queryByText("Gate")).toBeNull();
   });
+  it("lists the travellers' seats in order", () => {
+    const seats = ["35C", "36D", "36E", "35A", "35B"].map((seat, i) => ({ id: i + 1, person_id: i + 1, name: `Traveller ${i + 1}`, seat }));
+    render(PassCard, goes({ details: { flight_number: "AA 101" }, travelers: seats }));
+    expect(screen.getByText("35A, 35B, 35C, 36D, 36E")).toBeInTheDocument();
+  });
   it("leaves out a terminal or a seat it doesn’t have", () => {
     render(PassCard, goes({ details: { flight_number: "AA 101" }, travelers: [] }));
     for (const text of ["Terminal", "Seat", "Cabin", "Gate"]) expect(screen.queryByText(text)).toBeNull();
