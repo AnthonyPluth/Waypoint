@@ -1,7 +1,7 @@
 <script lang="ts">
   import { act, errMsg } from "$lib/act";
   import { apiCall } from "$lib/contract";
-  import type { Person, Trip } from "$lib/api-types";
+  import type { Person, Segment, Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
@@ -11,6 +11,7 @@
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import { dateLabel, dayIn, dayLabel, END_WORD, featuredTrip, headline, nextUp, subline, timesDiffer, tripDays, untimed, viewerZone } from "$lib/trips";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
+  import { Sheet } from "$lib/components/ui/sheet";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
   import { toast } from "svelte-sonner";
 
@@ -20,6 +21,13 @@
   let guests = $state<Person[]>([]);
   let claiming = $state<Person | null>(null);
   let asking = $state(false);
+  let detail = $state<{ segment: Segment; bookings: Segment[] } | null>(null);
+
+  function openDetail(e: MouseEvent, segment: Segment, bookings: Segment[]) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    detail = { segment, bookings };
+  }
 
   async function load() {
     loadError = "";
@@ -114,7 +122,8 @@
                 <BrandLogo src={seg.logo} label={seg.logo_label} size={32} class="mt-0.5" />
                 <div class="min-w-0 flex-1">
                   <p class="break-words text-body font-medium" class:line-through={seg.status === "cancelled"}>
-                    <a class="underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${headline(seg)}` : headline(seg)}</a></p>
+                    <a class="underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}
+                    onclick={(e) => openDetail(e, seg, item.bookings)}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${headline(seg)}` : headline(seg)}</a></p>
                   {#if item.role === "start" && subline(seg)}<p class="break-words text-caption text-muted-foreground">{subline(seg)}</p>{/if}
                   {#if item.role === "start" && item.bookings.length > 1}<p class="text-caption text-muted-foreground">{item.bookings.length} bookings{timesDiffer(item.bookings) ? " · times differ between bookings" : ""}</p>{/if}
                 </div>
@@ -131,6 +140,16 @@
     </ol>
   {/if}
 {/if}
+
+<Sheet bind:open={() => detail !== null, (v) => { if (!v) detail = null; }} title={detail ? headline(detail.segment) : "Booking"}>
+  {#if detail}
+    {@const d = detail}
+    <PassCard segment={d.segment} bookings={d.bookings} {now} level={3} class="mb-4">
+      {#snippet live()}{#if d.segment.kind === "flight" && d.segment.status !== "cancelled" && !untimed(d.segment)}<FlightStatus segment={d.segment} />{/if}{/snippet}
+      {#snippet footer()}<Button href={`#trip/${d.segment.trip_id}?segment=${d.segment.id}`} variant="outline" size="sm" onclick={() => (detail = null)}>Open trip</Button>{/snippet}
+    </PassCard>
+  {/if}
+</Sheet>
 
 <ConfirmDialog bind:open={asking} title={`Link ${claiming?.display_name ?? "this guest"} to you?`} confirmLabel="This is me" busyLabel="Linking…"
   description="Their trips, loyalty and Known Traveler numbers and names become yours, and the guest is removed. This can’t be undone in Waypoint: restoring a backup is the way back."

@@ -21,6 +21,21 @@
       "click": "ol[aria-label$='day by day'] a:has-text('Harbour Hotel') >> visible=true"
     },
     {
+      "wait_for": "[data-slot='sheet']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-slot='sheet']",
+        "text": "Harbour Hotel"
+      }
+    },
+    {
+      "screenshot": "detail-sheet"
+    },
+    {
+      "click": "[data-slot='sheet'] a:has-text('Open trip')"
+    },
+    {
       "wait_for": "li.ring-2"
     },
     {
