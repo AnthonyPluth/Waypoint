@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./api", () => ({ api: vi.fn(), newPage: vi.fn() }));
 vi.mock("./offline.svelte", () => ({ syncSavedTrip: vi.fn() }));
+vi.mock("./early", () => ({ startEarly: vi.fn(), dropEarly: vi.fn() }));
 
 import { api, newPage } from "./api";
 import * as offlineModule from "./offline.svelte";
+import { dropEarly, startEarly } from "./early";
 import { app, boot, checkIn, editing, refreshState, route, setQuery, whenBooted } from "./app.svelte";
 import type { AppState } from "./types";
 
@@ -155,5 +157,26 @@ describe("checking in", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     checkIn();
     expect(api).not.toHaveBeenCalled();
+  });
+});
+
+describe("starting early", () => {
+  it("starts the first page's reads before the state has come back", async () => {
+    vi.mocked(startEarly).mockClear();
+    let order = "";
+    vi.mocked(startEarly).mockImplementation(() => { order += "early "; });
+    vi.mocked(api).mockImplementation(async () => { order += "state "; return state(); });
+    location.hash = "#upcoming";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    await boot();
+    expect(startEarly).toHaveBeenCalledWith("upcoming");
+    expect(order).toBe("early state ");
+  });
+
+  it("drops the early reads when the page changes", () => {
+    vi.mocked(dropEarly).mockClear();
+    location.hash = "#settings";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    expect(dropEarly).toHaveBeenCalled();
   });
 });

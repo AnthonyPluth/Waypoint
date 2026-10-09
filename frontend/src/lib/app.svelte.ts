@@ -1,6 +1,7 @@
 import { api, newPage } from "./api";
 import type { AppState } from "./types";
 import { errMsg } from "./act";
+import { dropEarly, startEarly } from "./early";
 import { syncSavedTrip } from "./offline.svelte";
 
 export const app = $state({
@@ -19,7 +20,7 @@ export const route = $state({ page: "upcoming", sub: "" as string, query: "" as 
 function readHash(): void {
   const [path, query = ""] = (location.hash || "#upcoming").slice(1).split(/\?(.*)/s);
   const [page, sub = ""] = path.split("/");
-  if ((page || "upcoming") !== route.page) newPage();
+  if ((page || "upcoming") !== route.page) { newPage(); dropEarly(); }
   route.page = page || "upcoming";
   route.sub = sub;
   route.query = query;
@@ -48,6 +49,7 @@ let booted = false;
 const onBoot: (() => void)[] = [];
 export function whenBooted(fn: () => void): void { if (booted) fn(); else onBoot.push(fn); }
 export async function boot(): Promise<void> {
+  startEarly(route.page);
   try { await refreshState(); app.bootError = ""; app.offline = false; }
   catch (err) { console.error(err); app.bootError = errMsg(err); app.offline = (err as { status?: number }).status === 0; return; }
   void syncSavedTrip();

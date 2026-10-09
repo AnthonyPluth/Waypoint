@@ -6,6 +6,7 @@
   import { Button } from "$lib/components/ui/button";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
+  import { takeEarlyTrips } from "$lib/early";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
@@ -32,7 +33,9 @@
   async function load() {
     loadError = "";
     try {
-      trips = (await apiCall<"GET /api/trips">("/api/trips")).trips; void loadFlightStatus();
+      const early = takeEarlyTrips("upcoming");
+      trips = (await (early ?? apiCall<"GET /api/trips">("/api/trips"))).trips;
+      if (!early) void loadFlightStatus();
       guests = trips.length ? [] : (await apiCall<"GET /api/people/claim-suggestions">("/api/people/claim-suggestions")).guests;
     } catch (err) { trips = null; guests = []; loadError = errMsg(err); }
   }
