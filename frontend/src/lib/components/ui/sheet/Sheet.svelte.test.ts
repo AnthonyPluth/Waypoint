@@ -127,5 +127,4 @@ describe("Sheet", () => {
     expect(reduced).toMatch(/animation-duration: 0\.01ms !important/);
     expect(reduced).not.toMatch(/sheet-/);
   });
-
 });
