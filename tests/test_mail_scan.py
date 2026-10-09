@@ -673,6 +673,15 @@ class HeldMatchTests(ScanCase):
         self.assertEqual(self.held(), [])
         self.assertEqual(self.read(lambda conn: review.count(conn, "u-jane")), 0)
 
+    def test_dismissing_the_last_held_booking_of_an_item_that_is_also_unread_mail_leaves_the_item(self):
+        first, second = self.by_hand(), self.by_hand()
+        self.read(lambda conn: review.add(conn, self.mailbox, "msg-both", "example-stays.example", "2026-10-18", "incomplete", NOW,
+                                          [({**self.STAY, "confirmation": "H88231"}, [first, second])]))
+        [match] = self.held()
+        self.assertTrue(self.read(lambda conn: review.drop(conn, "u-jane", match["item_id"], match["entry"])))
+        self.assertEqual(self.held(), [])
+        self.assertEqual([i["reason"] for i in self.items()], ["incomplete"])
+
     def test_a_held_item_is_not_something_to_ask_the_ai_about(self):
         self.by_hand()
         self.by_hand()
