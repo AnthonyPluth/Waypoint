@@ -10,6 +10,10 @@ export const count = (n: number): string => Math.round(n).toLocaleString(locale(
 
 export const distance = (km: number, unit: Unit): string => `${count(unit === "mi" ? km / KM_PER_MILE : km)} ${unit}`;
 
+export const compact = (n: number): string => n.toLocaleString(locale(), { notation: "compact", maximumFractionDigits: 1 });
+
+export const compactDistance = (km: number, unit: Unit): string => `${compact(unit === "mi" ? km / KM_PER_MILE : km)} ${unit}`;
+
 export function duration(seconds: number): string {
   const total = Math.max(0, Math.round(seconds / 60));
   const days = Math.floor(total / 1440), hours = Math.floor((total % 1440) / 60), minutes = total % 60;

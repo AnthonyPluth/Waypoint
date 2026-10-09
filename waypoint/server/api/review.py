@@ -11,7 +11,7 @@ from ...domain.mail import ai, review, scan
 from ...providers import gmail
 from ...storage import db
 from ..common import ApiError, own_session, row_id
-from ..contract import Matched, Ok, Preview, Review, ReviewItem, WhoBody
+from ..contract import Matched, MatchBody, Ok, Preview, Review, ReviewItem, ReviewMatch, WhoBody
 from .mailboxes import owner
 from .trips import viewer
 
@@ -22,6 +22,7 @@ _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {li
 def api_review(conn, _q, _b) -> Review:
     gmail.end_lapsed(conn)
     return {"items": [cast(ReviewItem, {**i}) for i in review.listing(conn, owner())],
+            "matches": [cast(ReviewMatch, {**m}) for m in review.matches(conn, owner(), viewer(conn))],
             "who": [{"id": t.id, "name": t.name or "", "segment_id": s["id"], "trip_id": s["trip_id"], "kind": s["kind"],
                      "provider": s["provider"], "origin": s["origin"], "destination": s["destination"],
                      "start_local": s["start_local"], "start_zone": s["start_zone"]}
@@ -33,6 +34,21 @@ def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
     added = (_q.get("segment") or [""])[0]
     booking = (viewer(conn), row_id(added, "No such segment", 400)) if added else None
     if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), booking):
+        raise ApiError(NO_ITEM, 404)
+    return {"ok": True}
+
+
+def api_review_match(conn, _q, body: MatchBody, item_id: str) -> Ok:
+    index = body.get("index")
+    if not isinstance(index, int) or isinstance(index, bool):
+        raise ApiError('Send "index" as a whole number')
+    segment = body.get("segment_id")
+    chosen = None if segment is None else row_id(segment, "No such booking", 400)
+    try:
+        settled = review.settle(conn, owner(), viewer(conn), row_id(item_id, NO_ITEM), index, chosen)
+    except trips.Invalid as e:
+        raise ApiError(str(e)) from e
+    if not settled:
         raise ApiError(NO_ITEM, 404)
     return {"ok": True}
 

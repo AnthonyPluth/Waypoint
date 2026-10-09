@@ -19,7 +19,7 @@
 <script lang="ts">
   import { SvelteSet } from "svelte/reactivity";
   import { act, errMsg, ignoreFailure } from "$lib/act";
-  import type { Person, Review, WhoIsThis } from "$lib/api-types";
+  import type { Person, Review, ReviewMatch, WhoIsThis } from "$lib/api-types";
   import { refreshState } from "$lib/app.svelte";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
@@ -146,7 +146,20 @@
   let chosen = $state<Record<number, string>>({});
   let guestName = $state<Record<number, string>>({});
   let matching = $state<number | null>(null);
-  const what = (w: WhoIsThis) => `${w.kind === "hotel" ? "Stay" : w.kind === "car" ? "Rental" : w.kind === "train" ? "Train" : w.kind === "cruise" ? "Cruise" : "Flight"}${w.origin ? ` ${w.origin}${w.destination ? ` → ${w.destination}` : ""}` : ""} on ${w.start_local.slice(0, 10)}${w.provider ? ` (${w.provider})` : ""}`;
+  const what = (w: Pick<WhoIsThis, "kind" | "origin" | "destination" | "start_local" | "provider">) => `${w.kind === "hotel" ? "Stay" : w.kind === "car" ? "Rental" : w.kind === "train" ? "Train" : w.kind === "cruise" ? "Cruise" : "Flight"}${w.origin ? ` ${w.origin}${w.destination ? ` → ${w.destination}` : ""}` : ""} on ${w.start_local.slice(0, 10)}${w.provider ? ` (${w.provider})` : ""}`;
+
+  let settling = $state<string | null>(null);
+  const matchKey = (m: ReviewMatch) => `${m.item_id}-${m.index}`;
+  const settleMatch = (m: ReviewMatch, segmentId: number | null) => act(async () => {
+    await apiCall<"POST /api/review/{id}/match">(`/api/review/${m.item_id}/match`, { method: "POST", body: { index: m.index, segment_id: segmentId } });
+    toast.success(segmentId === null ? "Added to your trips" : "Filled in");
+    await settle();
+  }, { busy: (on) => (settling = on ? matchKey(m) : null) });
+  const dismissMatch = (m: ReviewMatch) => act(async () => {
+    await apiCall<"DELETE /api/review/{id}">(`/api/review/${m.item_id}`, { method: "DELETE" });
+    toast.success("Dismissed");
+    await settle();
+  }, { busy: (on) => (settling = on ? matchKey(m) : null) });
 
   async function match(w: WhoIsThis) {
     const pick = chosen[w.id];
@@ -168,7 +181,7 @@
   </AlertDescription></Alert>
 {:else if review === null}
   <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading"></div>
-{:else if review.items.length === 0 && review.who.length === 0}
+{:else if review.items.length === 0 && review.who.length === 0 && review.matches.length === 0}
   <div class="flex flex-col items-start gap-3 rounded-2xl border border-dashed p-6 text-muted-foreground">
     <CircleCheck class="size-6 text-primary" aria-hidden="true" />
     <p class="max-w-prose leading-relaxed">Nothing to review. Mail Waypoint can’t read, and names on bookings it can’t match to a person, will show up here.</p>
@@ -259,6 +272,42 @@
                 </form>
               </li>
             {/if}
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
+    {#if review.matches.length}
+      <section aria-labelledby="matches-title" class="space-y-2">
+        <h2 id="matches-title" class="eyebrow px-1">Could be one of your bookings</h2>
+        <p class="px-1 text-sm text-muted-foreground">A booking email fits more than one of the bookings you added yourself, so Waypoint hasn’t guessed. Choose which one it is and the email fills in its confirmation code and link, or add it as a booking of its own.</p>
+        <ul class="rows" aria-label="Could be one of your bookings">
+          {#each review.matches as m (matchKey(m))}
+            <li class="row flex-col items-stretch gap-3" data-testid="match-item">
+              <div class="min-w-0">
+                <p class="break-words font-medium">{what(m.booking)}{m.booking.confirmation ? ` · ${m.booking.confirmation}` : ""}</p>
+                <p class="break-words text-sm text-muted-foreground">{m.subject ?? "A booking email"}{m.received ? ` · ${m.received}` : ""}</p>
+              </div>
+              {#if m.candidates.length}
+                <ul class="space-y-2" aria-label="It could be">
+                  {#each m.candidates as c (c.segment_id)}
+                    <li class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border p-3">
+                      <div class="min-w-0">
+                        <p class="break-words text-sm font-medium">{what(c)}</p>
+                        <p class="break-words text-sm text-muted-foreground">{c.trip_name}</p>
+                      </div>
+                      <Button size="sm" disabled={settling === matchKey(m)} onclick={() => settleMatch(m, c.segment_id)} aria-label={`It’s ${what(c)}`}>It’s this one</Button>
+                    </li>
+                  {/each}
+                </ul>
+              {:else}
+                <p class="text-sm text-muted-foreground">The bookings it could be aren’t yours to see.</p>
+              {/if}
+              <div class="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" disabled={settling === matchKey(m)} onclick={() => settleMatch(m, null)}>It’s a new booking</Button>
+                <Button size="sm" variant="ghost" disabled={settling === matchKey(m)} onclick={() => dismissMatch(m)}>Dismiss</Button>
+              </div>
+            </li>
           {/each}
         </ul>
       </section>

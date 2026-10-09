@@ -12,6 +12,8 @@
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import { isMobile } from "$lib/platform";
+  import { viewport } from "$lib/phone.svelte";
+  import { Sheet } from "$lib/components/ui/sheet";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
   import MessageView from "$lib/components/MessageView.svelte";
@@ -31,6 +33,7 @@
   let loadError = $state("");
   let form = $state<Draft | null>(null);
   let focus = $state("");
+  let inSheet = $state(false);
   let renaming = $state<string | null>(null);
   let renameError = $state("");
   let saving = $state(false);
@@ -85,6 +88,12 @@
   function reveal(node: HTMLElement) {
     const calm = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     node.scrollIntoView?.({ block: "nearest", behavior: calm ? "auto" : "smooth" });
+  }
+
+  function edit(s: Segment, field = "") {
+    focus = field;
+    inSheet = viewport.phone;
+    form = draftOf(s);
   }
 
   const rename = (e: SubmitEvent) => {
@@ -205,12 +214,18 @@
           {/snippet}
         </PassCard>
       {/if}
-      {#if form && form.id !== null && card.segments.some((b) => b.id === form?.id)}
+      {#if form && form.id !== null && !inSheet && card.segments.some((b) => b.id === form?.id)}
         <li use:reveal aria-label="Edit booking"><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></li>
       {/if}
     {/each}
   </ul>
 {/if}
+
+<Sheet bind:open={() => inSheet && form !== null && form.id !== null, (v) => { if (!v) form = null; }} title="Edit this booking">
+  {#if form && form.id !== null}
+    <SegmentForm initial={form} {people} {focus} titled={false} oncancel={() => (form = null)} onsaved={saved} />
+  {/if}
+</Sheet>
 
 {#snippet timeRows(s: Segment)}
   <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
@@ -229,7 +244,7 @@
       <div class="mt-2 text-sm"><p class="eyebrow">{s.kind === "car" ? "Pick-up address" : s.kind === "cruise" ? "Terminal address" : "Address"}</p>
         <CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" /></div>
     {:else if s.status !== "cancelled"}
-      <p class="mt-2 text-sm"><button type="button" class="underline underline-offset-2" onclick={() => { focus = "segment-address"; form = draftOf(s); }}
+      <p class="mt-2 text-sm"><button type="button" class="underline underline-offset-2" onclick={() => edit(s, "segment-address")}
         aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
     {/if}
   {/if}
@@ -302,7 +317,7 @@
 
 {#snippet buttons(s: Segment, name: string)}
   <div class="flex flex-wrap gap-2">
-    <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => { focus = ""; form = draftOf(s); }}>Edit</Button>
+    <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => edit(s)}>Edit</Button>
     <Button variant="outline" size="sm" aria-label={`Remove ${name}`} onclick={() => { removing = s; asking = true; }}>Remove</Button>
   </div>
 {/snippet}

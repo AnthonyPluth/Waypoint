@@ -10,7 +10,7 @@
     { "screenshot": "rename" },
     { "click": "button:has-text('Cancel')" },
     { "click": "ul[aria-label='Bookings'] button[aria-label^='Edit '] >> nth=-1" },
-    { "wait_for": "li[aria-label='Edit booking']" },
-    { "screenshot": "edit-under-booking" }
+    { "wait_for": "li[aria-label='Edit booking'], [data-slot='sheet'] form" },
+    { "screenshot": "edit-booking" }
   ]
 }

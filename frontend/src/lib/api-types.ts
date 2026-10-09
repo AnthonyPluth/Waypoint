@@ -119,6 +119,7 @@ export interface ImportFlight {
   end_local?: string | null;
   seat?: string | null;
   cabin?: string | null;
+  aircraft?: string | null;
 }
 
 export interface ImportPreview {
@@ -140,6 +141,7 @@ export interface ImportRow {
   end_local: string | null;
   seat: string | null;
   cabin: string | null;
+  aircraft: string | null;
 }
 
 export interface Imported {
@@ -214,6 +216,11 @@ export interface Mailbox {
 export interface MailboxList {
   configured: boolean;
   mailboxes: Mailbox[];
+}
+
+export interface MatchBody {
+  index: number;
+  segment_id: number | null;
 }
 
 export interface Matched {
@@ -325,8 +332,31 @@ export interface Revealed {
 
 export interface Review {
   items: ReviewItem[];
+  matches: ReviewMatch[];
   who: WhoIsThis[];
   ai: boolean;
+}
+
+export interface ReviewBooking {
+  kind: "flight" | "hotel" | "car" | "train" | "cruise";
+  provider: string | null;
+  confirmation: string | null;
+  origin: string | null;
+  destination: string | null;
+  start_local: string;
+  end_local: string;
+}
+
+export interface ReviewCandidate {
+  segment_id: number;
+  trip_id: number;
+  trip_name: string;
+  kind: "flight" | "hotel" | "car" | "train" | "cruise";
+  provider: string | null;
+  origin: string | null;
+  destination: string | null;
+  start_local: string;
+  end_local: string;
 }
 
 export interface ReviewItem {
@@ -342,6 +372,16 @@ export interface ReviewItem {
   gmail_url: string | null;
   suggestion: AiSuggestion | null;
   suggestion_error: string | null;
+}
+
+export interface ReviewMatch {
+  item_id: number;
+  index: number;
+  subject: string | null;
+  received: string | null;
+  mine: boolean;
+  booking: ReviewBooking;
+  candidates: ReviewCandidate[];
 }
 
 export interface ScanStarted {
@@ -717,6 +757,7 @@ export interface Endpoints {
   "GET /api/review": { body: never; reply: Review };
   "POST /api/review/who/{id}": { body: WhoBody; reply: Matched };
   "POST /api/review/{id}/ignore": { body: never; reply: Ok };
+  "POST /api/review/{id}/match": { body: MatchBody; reply: Ok };
   "GET /api/review/{id}/preview": { body: never; reply: Preview };
   "POST /api/review/{id}/suggest": { body: never; reply: Ok };
   "DELETE /api/review/{id}": { body: never; reply: Ok };

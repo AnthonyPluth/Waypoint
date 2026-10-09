@@ -13,7 +13,7 @@ import ImportSection from "./ImportSection.svelte";
 
 const row = (line: number, extra: Partial<ImportRow> = {}): ImportRow => ({
   line, status: "new", reason: null, day: "2025-03-01", origin: "JFK", destination: "LAX", flight_number: "DL1001", airline: "DL",
-  start_local: "2025-03-01T08:12", end_local: "2025-03-01T11:29", seat: null, cabin: null, ...extra,
+  start_local: "2025-03-01T08:12", end_local: "2025-03-01T11:29", seat: null, cabin: null, aircraft: null, ...extra,
 });
 const preview = (rows: ImportRow[], me: number | null = 1): ImportPreview => ({ format: "Flighty", me, rows });
 const people = { people: [

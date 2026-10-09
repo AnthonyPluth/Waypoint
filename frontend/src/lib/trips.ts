@@ -191,6 +191,7 @@ export type Membership =
 export function membershipFor(segment: Segment, traveler: Traveler, loyalty: LoyaltyEntry[]): Membership {
   const program = programFor(segment);
   if (!program) return null;
+  if (segment.kind === "flight") return traveler.person_id === null ? { state: "unmatched" } : null;
   const booker = segment.kind !== "hotel" || (traveler.person_id !== null && traveler.person_id === segment.booked_by);
   if (traveler.person_id === null) return booker ? { state: "unmatched" } : null;
   const entry = loyalty.find((m) => m.person_id === traveler.person_id && m.program === program);
@@ -208,7 +209,7 @@ export function headline(s: Segment): string {
 
 export function subline(s: Segment): string {
   const d = s.details;
-  const parts = s.kind === "flight" ? [[s.provider, d.flight_number].filter(Boolean).join(" "), d.terminal && `Terminal ${d.terminal}`, d.seat && `Seat ${d.seat}`, d.cabin]
+  const parts = s.kind === "flight" ? [[s.provider, d.flight_number].filter(Boolean).join(" "), d.aircraft, d.terminal && `Terminal ${d.terminal}`, d.seat && `Seat ${d.seat}`, d.cabin]
     : s.kind === "hotel" ? [d.address, d.room]
       : s.kind === "car" ? [d.car_class, d.address] : s.kind === "cruise" ? [s.details.ship ? s.provider : null, d.room && `Cabin ${d.room}`, d.deck && `Deck ${d.deck}`] : [s.provider, d.seat && `Seat ${d.seat}`, d.cabin];
   return parts.filter(Boolean).join(" · ");

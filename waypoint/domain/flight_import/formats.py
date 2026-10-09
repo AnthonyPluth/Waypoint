@@ -28,6 +28,7 @@ class Proposed:
     arr: Clock | None = None
     seat: str | None = None
     cabin: str | None = None
+    aircraft: str | None = None
 
 
 @dataclass(frozen=True)

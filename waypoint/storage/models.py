@@ -227,6 +227,7 @@ class ReviewItem(Base):
     created: Mapped[float]
     suggestion: Mapped[str | None]
     suggestion_error: Mapped[str | None]
+    matches: Mapped[str | None]
 
 
 class StoredMessage(Base):

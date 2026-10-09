@@ -1,0 +1,11 @@
+{
+  "name": "review-held-match",
+  "page": "review",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Review" } },
+    { "wait_for": "[data-testid='match-item']" },
+    { "expect_text": { "selector": "main", "text": "Quay Street Lodge" } },
+    { "scroll_to": "[data-testid='match-item']" },
+    { "screenshot": "held-match" }
+  ]
+}

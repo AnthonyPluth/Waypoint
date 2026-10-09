@@ -25,7 +25,7 @@ class DemoTests(DbCase):
         day = today.isoformat()
         self.assertEqual(len([t for t in found if (t["end_date"] or "") < day]), 4)
         self.assertEqual(len([t for t in found if (t["start_date"] or "") <= day <= (t["end_date"] or "")]), 1)
-        self.assertEqual(len([t for t in found if (t["start_date"] or "") > day]), 4)
+        self.assertEqual(len([t for t in found if (t["start_date"] or "") > day]), 5)
         self.assertTrue(all(t["segments"] for t in found))
 
     def test_has_a_past_trip_one_in_progress_and_some_to_come(self):

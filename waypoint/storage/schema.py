@@ -270,6 +270,7 @@ review_items = Table(
     Column('created', Float, nullable=False),
     Column('suggestion', Text),
     Column('suggestion_error', Text),
+    Column('matches', Text, doc='for a "match" item: the bookings in the message that could be more than one of the segments added by hand (JSON, a list of {booking, candidates}), for the person to settle'),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_review_items_mailbox_message'),
     info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner (and the household, when they share it); the message itself is in stored_messages; `suggestion` is the booking's fields (JSON) the optional AI read from it, for the person to confirm or edit, and `suggestion_error` why it couldn't (fixed text)"},
 )

@@ -537,6 +537,21 @@ class MigrationTests(unittest.TestCase):
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
 
+    def test_0022_adds_the_column_for_held_matches_and_takes_it_away_leaving_the_items(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            self.assertIn("matches", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
+            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected"))
+            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m", sender_domain="x.example", reason="match", created=1.0,
+                                                          matches='[{"booking": {}, "candidates": [1, 2]}]'))
+            command.downgrade(db.alembic_config(c), "0021")
+            self.assertNotIn("matches", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)
+            command.upgrade(db.alembic_config(c), "head")
+            self.assertIsNone(c.execute(select(schema.review_items.c.matches)).scalar())
+        self.assertEqual(drift(self.path), [])
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:

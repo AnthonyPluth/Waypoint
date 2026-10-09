@@ -86,7 +86,7 @@ class ParseTests(unittest.TestCase):
         s = status("on_time")
         self.assertEqual(s, service.Status(
             state="scheduled", origin="JFK", destination="LHR", dep_scheduled="2026-11-20T19:00", dep_zone="America/New_York",
-            dep_terminal="7", dep_gate="B22", arr_scheduled="2026-11-21T07:10", arr_zone="Europe/London", arr_terminal="5"))
+            dep_terminal="7", dep_gate="B22", arr_scheduled="2026-11-21T07:10", arr_zone="Europe/London", arr_terminal="5", aircraft="Boeing 777-300ER"))
 
     def test_a_delay_with_a_gate_change(self):
         s = status("delayed_gate_change")
@@ -360,6 +360,21 @@ class CheckTests(Household):
         self.assertEqual(flightstatus.watching(self.c, self.when("3h", -timedelta(days=60))), [])
         (f,) = flightstatus.watching(self.c, self.when("3h"))
         self.assertEqual((f.day, f.origin, f.departs, f.arrives), ("2026-11-20", "JFK", DEPARTS, ARRIVES))
+
+    def test_the_aircraft_in_an_answer_fills_an_empty_one_and_never_a_set_or_locked_one(self):
+        empty = self.book(self.jane, OUT)
+        named = self.book(self.jane, {**OUT, "confirmation": "NAMED1", "details": {"flight_number": "EX 101", "aircraft": "Airbus A350"}})
+        locked = self.book(self.jane, {**OUT, "confirmation": "LOCKD1"})
+        trips.edit_segment(self.c, self.jane, locked["id"], {"details": {"flight_number": "EX 101", "terminal": "9"}})
+        other_leg = self.book(self.jane, {**OUT, "confirmation": "OTHER1", "origin": "BOS"})
+        self.fake.answer = (200, fixture("on_time"))
+        self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 1)
+        self.assertEqual(len(self.fake.calls), 1)
+        self.c.orm.expire_all()
+        aircraft = {n: trips.decode_details(self.c.orm.get(Segment, s["id"]).details).get("aircraft")   # type: ignore[union-attr]
+                    for n, s in (("empty", empty), ("named", named), ("locked", locked), ("other", other_leg))}
+        self.assertEqual(aircraft, {"empty": "Boeing 777", "named": "Airbus A350", "locked": None, "other": None})
+        self.assertEqual(self.fake.calls[0]["path"], "/flights/number/EX101/2026-11-20")
 
     def test_nothing_is_fetched_without_a_key(self):
         self.book(self.jane)

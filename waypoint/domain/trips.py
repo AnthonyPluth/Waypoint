@@ -23,7 +23,7 @@ TIME_UNKNOWN = "time_unknown"
 ADDRESS_LIMIT = 300
 MAX_PORTS = 40
 SEAT_LIMIT = 10
-DETAIL_KEYS = ("flight_number", "terminal", "seat", "cabin", "room", "car_class", "address", "phone", "ship", "deck", TIME_UNKNOWN)
+DETAIL_KEYS = ("flight_number", "terminal", "seat", "seat_position", "aircraft", "cabin", "room", "car_class", "address", "phone", "ship", "deck", TIME_UNKNOWN)
 
 
 def untimed(details: Mapping[str, str]) -> bool:
@@ -583,6 +583,16 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
     return _after_change(conn, seg)
 
 
+def _seats(travelers: Sequence[TravelerIn], details: Mapping[str, str]) -> set[str]:
+    return {s for s in (*(t.get("seat") for t in travelers), details.get("seat")) if s}
+
+
+def _stale_position(old: Mapping[str, str], new: dict[str, str], seats_changed: bool) -> dict[str, str]:
+    if seats_changed and "seat_position" in new and new["seat_position"] == old.get("seat_position"):
+        return {k: v for k, v in new.items() if k != "seat_position"}
+    return new
+
+
 def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: SegmentIn) -> SegmentOut | None:
     seg = visibility.visible_segment(conn, viewer, segment_id)
     if seg is None:
@@ -604,6 +614,11 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
     values = check(conn, merged)
     ports = check_itinerary(merged.get("kind") or "", merged.get("itinerary") or [], _span(values, "start"), _span(values, "end"))
     travelers = _keep_seats(_travelers(conn, merged.get("travelers") or []), old)
+    new_details = decode_details(values["details"])
+    kept_details = _stale_position(decode_details(seg.details), new_details,
+                                   _seats(old, decode_details(seg.details)) != _seats(travelers, new_details))
+    if kept_details != new_details:
+        values["details"] = json.dumps(kept_details, ensure_ascii=False) if kept_details else None
     changed = [f for f in FIELDS if f in values and (decode_details(values[f]) != decode_details(seg.details) if f == "details"
                                                     else values[f] != getattr(seg, f))]
     if sorted(map(_key, travelers)) != sorted(map(_key, old)):
@@ -668,15 +683,25 @@ def _same_leg(seg: Segment, values: Mapping[str, str | None], details: Mapping[s
 
 
 def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, again: bool = False,
-                        touched: list[int] | None = None, fill_only: bool = False) -> Literal["added", "updated", "unchanged"]:
+                        touched: list[int] | None = None, fill_only: bool = False, candidates: list[int] | None = None,
+                        into: int | None = None) -> Literal["added", "updated", "unchanged", "ambiguous"]:
     values = check(conn, fields)
     day = (values["start_local"] or "")[:10]
-    found = [s for s in visibility.household_segments(conn, values["kind"] or "") if _same_leg(s, values, fields.get("details") or {})]
-    coded = [s for s in found if s.confirmation]
-    uncoded = [s for s in found if not s.confirmation]
-    seen = {s.id for s in visibility.visible_segments(conn, viewer)} if found else set()
-    uncoded = [s for s in uncoded if s.id in seen]
-    found = coded or (uncoded if len(uncoded) == 1 else [])
+    if into is not None:
+        target = visibility.visible_segment(conn, viewer, into)
+        if target is None:
+            raise Invalid("No such booking")
+        found, seen = [target], {target.id}
+    else:
+        found = [s for s in visibility.household_segments(conn, values["kind"] or "") if _same_leg(s, values, fields.get("details") or {})]
+        coded = [s for s in found if s.confirmation]
+        uncoded = [s for s in found if not s.confirmation]
+        seen = {s.id for s in visibility.visible_segments(conn, viewer)} if found else set()
+        uncoded = [s for s in uncoded if s.id in seen]
+        if candidates is not None and not coded and len(uncoded) > 1:
+            candidates.extend(s.id for s in uncoded)
+            return "ambiguous"
+        found = coded or (uncoded if len(uncoded) == 1 else [])
     if len(found) > 1:
         found.sort(key=lambda s: (abs((date.fromisoformat(s.start_local[:10]) - date.fromisoformat(day)).days), s.id not in seen, s.id))
     if not found:
@@ -706,6 +731,8 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
         code = named.strip().upper()
         if provider_key(seg.provider) == provider_key(named) or (len(code) <= 3 and (flight_key(said.get("flight_number")) or "").startswith(code)):
             given["provider"] = seg.provider
+    if "seat_position" not in (fields.get("details") or {}):
+        said = _stale_position(stored, said, bool(stored.get("seat")) and said.get("seat") != stored.get("seat"))
     incoming = unlocked({**given, "details": said}, locked)
     if fill_only:
         incoming = cast(SegmentIn, {k: v for k, v in incoming.items() if k == "details" or (k in ("provider", "confirmation", "manage_url") and not getattr(seg, k))})

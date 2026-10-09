@@ -51,6 +51,17 @@
   --surface-1: var(--card);
   --surface-2: var(--popover);
   --surface-3: #1f2433;
+  --chart-1: #4f9dff;
+  --chart-2: #f6b73c;
+  --chart-3: #4fd1b0;
+  --chart-4: #c79bff;
+  --map-sea: #0b0e15;
+  --map-land: #1c2230;
+  --map-border: #343c52;
+  --map-visited: #3d7bc7;
+  --map-route: #8fc2ff;
+  --map-airport: #f6b73c;
+  --map-stay: #4fd1b0;
   --elevation-1: var(--shadow);
   --elevation-2: 0 0 0 1px rgb(255 255 255 / 5%), 0 18px 40px -18px rgb(0 0 0 / 80%);
   --elevation-3: 0 0 0 1px rgb(255 255 255 / 7%), 0 28px 60px -20px rgb(0 0 0 / 90%);
@@ -106,6 +117,17 @@
   --color-surface-1: var(--surface-1);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-map-sea: var(--map-sea);
+  --color-map-land: var(--map-land);
+  --color-map-border: var(--map-border);
+  --color-map-visited: var(--map-visited);
+  --color-map-route: var(--map-route);
+  --color-map-airport: var(--map-airport);
+  --color-map-stay: var(--map-stay);
   --shadow-elevation-1: var(--elevation-1);
   --shadow-elevation-2: var(--elevation-2);
   --shadow-elevation-3: var(--elevation-3);
@@ -158,4 +180,36 @@
   .rows { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-card); }
   .rows > * + * { border-top: 1px solid var(--border); }
   .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; min-height: 3.5rem; padding: 0.75rem 1rem; }
+}
+
+@layer components {
+  .sheet-overlay { position: fixed; inset: 0; z-index: 60; background: rgb(0 0 0 / 60%); }
+  .sheet { position: fixed; z-index: 60; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; outline: none;
+    color: var(--card-foreground); background: var(--card); border: 1px solid var(--border); box-shadow: var(--elevation-3); }
+  .sheet[data-side="bottom"] { inset-inline: 0; bottom: 0; max-height: 92dvh; border-bottom: 0; border-radius: var(--radius-3xl) var(--radius-3xl) 0 0;
+    transform: translateY(var(--sheet-drag, 0px)); }
+  .sheet[data-side="right"] { top: 0; right: 0; bottom: 0; width: min(34rem, 100vw); border-top: 0; border-bottom: 0; border-right: 0; }
+  .sheet[data-dragging] { transition: none; }
+  .sheet-handle { display: flex; justify-content: center; padding: 0.75rem 0 0.25rem; touch-action: none; cursor: grab; }
+  .sheet-grip { width: 2.5rem; height: 0.3rem; border-radius: 9999px; background: var(--border); }
+  .sheet .rows { margin-bottom: 0; background: transparent; border: 0; box-shadow: none; }
+  .sheet .row { padding-inline: 0; }
+  .sheet-overlay[data-state="open"] { animation: sheet-fade-in 200ms ease-out; }
+  .sheet-overlay[data-state="closed"] { animation: sheet-fade-out 150ms ease-in forwards; }
+  .sheet[data-side="bottom"][data-state="open"] { animation: sheet-rise 260ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .sheet[data-side="bottom"][data-state="closed"] { animation: sheet-drop 200ms ease-in forwards; }
+  .sheet[data-side="right"][data-state="open"] { animation: sheet-slide-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .sheet[data-side="right"][data-state="closed"] { animation: sheet-slide-out 180ms ease-in forwards; }
+}
+
+@keyframes sheet-fade-in { from { opacity: 0; } }
+@keyframes sheet-fade-out { to { opacity: 0; } }
+@keyframes sheet-rise { from { transform: translateY(100%); } }
+@keyframes sheet-drop { to { transform: translateY(100%); } }
+@keyframes sheet-slide-in { from { transform: translateX(100%); } }
+@keyframes sheet-slide-out { to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet[data-state="open"] { animation: sheet-fade-in 150ms ease-out; }
+  .sheet[data-state="closed"] { animation: sheet-fade-out 100ms ease-in forwards; }
 }

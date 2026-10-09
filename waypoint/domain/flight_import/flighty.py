@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from .. import seatmaps
 from .formats import Numbered, Proposed, Skipped, cell, clock_of, day_of, flight_number_of, places, text_of
 
 SIGNATURE = {"date", "from", "to", "canceled", "gatedeparture(scheduled)", "takeoff(scheduled)"}
@@ -28,5 +29,6 @@ def parse(rows: Sequence[Numbered]) -> list[Proposed | Skipped]:
         airline = text_of(cell(row, "Airline"))
         number = flight_number_of(cell(row, "Flight")) or flight_number_of(f"{airline or ''}{cell(row, 'Flight')}")
         out.append(Proposed(n, day, legs[0], legs[1], flight_number=number, airline=airline, dep=dep, arr=arr,
-                            seat=text_of(cell(row, "Seat"), 10), cabin=text_of(cell(row, "Cabin Class"))))
+                            seat=text_of(cell(row, "Seat"), 10), cabin=text_of(cell(row, "Cabin Class")),
+                            aircraft=seatmaps.family(cell(row, "Aircraft Type Name"))))
     return out

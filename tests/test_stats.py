@@ -82,15 +82,28 @@ class FlightTests(StatsCase):
         f = self.stats(self.jane)["flights"]
         self.assertEqual({c["name"]: c["count"] for c in f["cabins"]}, {"Business": 2, "Economy": 1})
         self.assertEqual(f["top_seat"], "12A")
-        self.assertEqual(f["seat_positions"], {"window": 3, "aisle": 0, "middle": 0, "unknown": 0})
+        self.assertEqual(f["seat_positions"], {"window": 2, "aisle": 0, "middle": 0, "unknown": 1})
 
     def test_seat_positions_and_a_seat_letter_the_rule_cannot_place(self):
-        for seat, position in (("34K", "window"), ("12a", "window"), ("5F", "window"), ("7C", "aisle"), ("7D", "aisle"),
-                               ("9B", "middle"), ("9E", "middle"), ("21I", "unknown"), ("40L", "unknown"), ("12", "unknown"),
-                               ("", "unknown"), (None, "unknown"), ("WAIT", "unknown")):
-            with self.subTest(seat=seat):
-                self.assertEqual(stats.seat_position(seat), position)
-        self.mine({**JFK_LHR, "details": {"seat": "21L"}}, {**LHR_JFK, "details": {"seat": "9B"}}, {**AKL_LAX, "details": {}})
+        a321, b737, b777, a350 = ({"aircraft": a, "cabin": "Economy"} for a in ("Airbus A320 family", "Boeing 737", "Boeing 777", "Airbus A350"))
+        for seat, details, position in (
+                ("12F", b777, "middle"), ("12F", b737, "window"), ("30H", a350, "middle"), ("30K", a350, "window"),
+                ("12K", b777, "window"), ("12G", b777, "aisle"), ("7C", a321, "aisle"), ("9B", a321, "middle"),
+                ("12F", {"aircraft": "Boeing 777"}, "middle"), ("12a", {}, "window"), ("12F", {}, "unknown"),
+                ("12C", {"aircraft": "Dornier 328"}, "unknown"), ("12A", {"aircraft": "Dornier 328"}, "window"),
+                ("2B", {**b737, "cabin": "Business"}, "unknown"), ("2A", {**b737, "cabin": "Business"}, "window"),
+                ("12F", {**b777, "cabin": "Premium Economy"}, "unknown"), ("12C", {**b737, "cabin": "Coach"}, "aisle"),
+                ("12C", {**b737, "cabin": "Y"}, "unknown"),
+                ("12F", {**b737, "seat_position": "Aisle"}, "aisle"), ("12F", {**b777, "seat_position": "window"}, "window"),
+                ("12F", {**b777, "seat_position": "sideways"}, "middle"),
+                ("21I", b777, "unknown"), ("40L", b777, "unknown"), ("12", b777, "unknown"), ("", b777, "unknown"),
+                (None, b777, "unknown"), ("WAIT", b777, "unknown"), ("12", {"seat_position": "window"}, "unknown")):
+            with self.subTest(seat=seat, details=details):
+                self.assertEqual(stats.seat_position(seat, details), position)
+        self.assertEqual(stats.seat_position("12A"), "window")
+        self.assertEqual(stats.seat_position("12C"), "unknown")
+        self.mine({**JFK_LHR, "details": {"seat": "21L"}}, {**LHR_JFK, "details": {"seat": "9B", "aircraft": "Boeing 737"}},
+                  {**AKL_LAX, "details": {}})
         shares = self.stats(self.jane)["flights"]["seat_positions"]
         self.assertEqual(shares, {"window": 0, "aisle": 0, "middle": 1, "unknown": 2})
 
@@ -248,6 +261,24 @@ class VisitCountTests(StatsCase):
         self.assertEqual(cities, {"London": 2})
 
 
+    def test_a_flight_in_and_a_hotel_stay_months_later_are_two_visits(self):
+        self.mine(JFK_LHR, {**HOTEL, "start_local": "2026-09-01T15:00", "end_local": "2026-09-03T10:00"})
+        places = self.stats(self.jane)["places"]
+        self.assertEqual({p["name"]: p["visits"] for p in places["cities"]}["London"], 2)
+        self.assertEqual({p["name"]: p["visits"] for p in places["countries"]}["GB"], 2)
+
+    def test_a_flight_in_and_a_hotel_stay_starting_that_day_are_one_visit(self):
+        self.mine(JFK_LHR, HOTEL)
+        places = self.stats(self.jane)["places"]
+        self.assertEqual({p["name"]: p["visits"] for p in places["cities"]}["London"], 1)
+        self.assertEqual({p["name"]: p["visits"] for p in places["countries"]}["GB"], 1)
+
+    def test_a_stay_a_day_after_the_arrival_is_the_same_visit_and_two_days_after_is_not(self):
+        self.mine(JFK_LHR, {**HOTEL, "start_local": "2026-06-03T15:00", "end_local": "2026-06-04T10:00"})
+        self.assertEqual({p["name"]: p["visits"] for p in self.stats(self.jane)["places"]["cities"]}["London"], 1)
+        self.mine({**HOTEL, "start_local": "2026-06-06T15:00", "end_local": "2026-06-07T10:00"})
+        self.assertEqual({p["name"]: p["visits"] for p in self.stats(self.jane)["places"]["cities"]}["London"], 2)
+
 class MapDetailTests(StatsCase):
     def test_a_route_lists_each_flight_with_its_trip_and_dates(self):
         self.mine(JFK_LHR, LHR_JFK)
@@ -280,15 +311,56 @@ class SeatStatsTests(StatsCase):
         return self.add(self.jane, {**JFK_LHR, **extra}, travelers=people)
 
     def test_a_persons_stats_count_their_own_seat_and_the_households_count_everyones(self):
-        self.flight([self.jane.person_id, self.sam.person_id], "12A", "12C")
+        self.flight([self.jane.person_id, self.sam.person_id], "12A", "12C",
+                    details={"flight_number": "BA 112", "cabin": "Economy", "aircraft": "Boeing 737"})
         self.flight([self.jane.person_id, self.sam.person_id], "14A", "14B", start_local="2026-07-01T19:00", end_local="2026-07-02T07:10",
-                    details={"flight_number": "BA 113", "seat": "99Z", "cabin": "Business"})
+                    details={"flight_number": "BA 113", "seat": "99Z", "cabin": "Economy", "aircraft": "Boeing 737"})
         everyone, jane, sam = (self.stats(self.jane, person)["flights"] for person in (None, self.jane.person_id, self.sam.person_id))
         self.assertEqual((everyone["count"], jane["count"], sam["count"]), (2, 2, 2))
         self.assertEqual(everyone["seat_positions"], {"window": 2, "aisle": 1, "middle": 1, "unknown": 0})
         self.assertEqual(jane["seat_positions"], {"window": 2, "aisle": 0, "middle": 0, "unknown": 0})
         self.assertEqual((sam["seat_positions"], sam["top_seat"]), ({"window": 0, "aisle": 1, "middle": 1, "unknown": 0}, "12C"))
         self.assertEqual(jane["top_seat"], "12A")
+
+    def test_the_emails_word_applies_to_the_booking_seat_only(self):
+        self.flight([self.jane.person_id, self.sam.person_id], "12F", "12E",
+                    details={"flight_number": "BA 112", "cabin": "Economy", "aircraft": "Boeing 777", "seat_position": "window"})
+        self.mine({**LHR_JFK, "details": {"flight_number": "BA 117", "seat": "12F", "seat_position": "aisle"}})
+        shares = self.stats(self.jane)["flights"]["seat_positions"]
+        self.assertEqual(shares, {"window": 0, "aisle": 1, "middle": 2, "unknown": 0})
+
+    def test_the_emails_word_goes_when_the_seat_it_was_read_with_changes(self):
+        said = {"flight_number": "BA 112", "cabin": "Economy", "aircraft": "Boeing 777", "seat": "12A", "seat_position": "aisle"}
+        added = self.add(self.jane, {**JFK_LHR, "details": said})
+        edited = trips.edit_segment(self.c, self.jane, added["id"], {"details": {**said, "seat": "12F"}})
+        assert edited
+        self.assertEqual(edited["details"], {k: v for k, v in said.items() if k != "seat_position"} | {"seat": "12F"})
+        self.assertEqual(self.stats(self.jane)["flights"]["seat_positions"], {"window": 0, "aisle": 0, "middle": 1, "unknown": 0})
+        again = trips.edit_segment(self.c, self.jane, added["id"], {"details": {**edited["details"], "seat": "12K", "seat_position": "window"}})
+        assert again
+        self.assertEqual(again["details"]["seat_position"], "window")
+        same = trips.edit_segment(self.c, self.jane, added["id"], {"details": {**again["details"], "terminal": "7"}})
+        assert same
+        self.assertEqual(same["details"]["seat_position"], "window")
+
+    def test_a_reissued_email_with_a_new_seat_keeps_its_own_word_and_loses_the_old_one_when_it_has_none(self):
+        said = {"flight_number": "BA 112", "cabin": "Economy", "aircraft": "Boeing 777", "seat": "12A", "seat_position": "window"}
+        added = self.add(self.jane, {**JFK_LHR, "confirmation": "ZZ9PLU", "details": said})
+        fields = {**JFK_LHR, "confirmation": "ZZ9PLU", "details": {**said, "seat": "14F"}}
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, fields), "updated")
+        self.assertEqual(trips.get_segment(self.c, self.jane, added["id"])["details"]["seat_position"], "window")   # type: ignore[index]
+        bare = {**JFK_LHR, "confirmation": "ZZ9PLU", "details": {k: v for k, v in said.items() if k != "seat_position"} | {"seat": "15E"}}
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, bare), "updated")
+        self.assertNotIn("seat_position", trips.get_segment(self.c, self.jane, added["id"])["details"])   # type: ignore[index]
+
+    def test_the_emails_word_goes_when_a_travellers_seat_changes_and_applies_to_a_solo_travellers_seat(self):
+        said = {"flight_number": "BA 112", "cabin": "Economy", "aircraft": "Boeing 777", "seat_position": "aisle"}
+        added = self.add(self.jane, {**JFK_LHR, "details": said}, travelers=[{"person_id": self.jane.person_id, "name": None, "seat": "12F"}])
+        self.assertEqual(self.stats(self.jane)["flights"]["seat_positions"], {"window": 0, "aisle": 1, "middle": 0, "unknown": 0})
+        edited = trips.edit_segment(self.c, self.jane, added["id"], {"travelers": [{"person_id": self.jane.person_id, "name": None, "seat": "12E"}]})
+        assert edited
+        self.assertNotIn("seat_position", edited["details"])
+        self.assertEqual(self.stats(self.jane)["flights"]["seat_positions"], {"window": 0, "aisle": 0, "middle": 1, "unknown": 0})
 
     def test_a_booking_with_no_traveller_seats_uses_its_booking_seat_once_and_one_with_nothing_is_unknown(self):
         self.mine({**JFK_LHR, "details": {"flight_number": "BA 112", "seat": "12A"}}, {**LHR_JFK, "details": {"flight_number": "BA 117"}})

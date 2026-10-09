@@ -451,7 +451,7 @@ class ReviewTests(ScanCase):
         with no_leaks(self, "CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-NOMARKUP-6H9C", database=self.path):
             self.scan()
         stored = self.read(lambda conn: dict(conn.execute(select(ReviewItem)).fetchone()))
-        self.assertEqual(sorted(stored), ["created", "id", "mailbox_id", "message_id", "reason", "received", "sender_domain", "suggestion", "suggestion_error"])
+        self.assertEqual(sorted(stored), ["created", "id", "mailbox_id", "matches", "message_id", "reason", "received", "sender_domain", "suggestion", "suggestion_error"])
         self.assertEqual((stored["sender_domain"], stored["received"]), ("example-air.example", "2026-10-17"))
         sealed = self.read(lambda conn: conn.execute(select(StoredMessage.content)).scalar())
         self.assertTrue(secretbox.is_encrypted(sealed))
@@ -567,6 +567,107 @@ class ReviewTests(ScanCase):
         with mock.patch.object(gmail, "_post", return_value={}):
             self.read(lambda conn: gmail.disconnect(conn, self.mailbox, "u-jane"))
         self.assertEqual((self.items(), self.scanned()), ([], {}))
+
+
+class HeldMatchTests(ScanCase):
+    STAY = {"kind": "hotel", "origin": "Harbour Hotel", "destination": None, "start_local": "2026-11-21T15:00", "end_local": "2026-11-27T10:00",
+            "start_zone": "Europe/London", "end_zone": "Europe/London"}
+
+    def by_hand(self, viewer=None, **swaps) -> int:
+        who = viewer or self.jane
+        seg = self.read(lambda conn: trips.add_segment(conn, who, {**self.STAY, **swaps}))
+        assert seg is not None
+        return int(seg["id"])
+
+    def held(self, viewer=None) -> list[review.MatchOut]:
+        who = viewer or self.jane
+        return self.read(lambda conn: review.matches(conn, who and "u-jane", who))
+
+    def test_an_email_that_fits_two_stays_added_by_hand_is_held_for_review_not_added(self):
+        first, second = self.by_hand(), self.by_hand()
+        self.put("hotel_jsonld")
+        result = self.scan()
+        self.assertEqual((result.bookings, result.review), (0, 1))
+        self.assertEqual(len(self.segments()), 2)
+        [match] = self.held()
+        self.assertEqual({c["segment_id"] for c in match["candidates"]}, {first, second})
+        self.assertEqual((match["booking"]["confirmation"], match["booking"]["origin"]), ("H88231", "Harbour Hotel"))
+        self.assertEqual(self.items(), [])
+        self.assertEqual(self.read(lambda conn: review.count(conn, "u-jane")), 1)
+        self.assertEqual(self.scanned(), {"msg-hotel_jsonld": "booking"})
+
+    def test_the_held_item_keeps_neither_the_subject_nor_the_body_outside_the_encrypted_message(self):
+        self.by_hand()
+        self.by_hand()
+        self.put("hotel_jsonld")
+        with no_leaks(self, "CANARY-BODY-HOTEL-5R1M", database=self.path):
+            self.scan()
+        self.assertEqual(len(self.held()), 1)
+
+    def test_it_is_not_sent_to_the_ai(self):
+        self.by_hand()
+        self.by_hand()
+        self.put("hotel_jsonld")
+        with mock.patch("waypoint.domain.mail.scan.ai.suggest") as ask:
+            self.scan()
+        ask.assert_not_called()
+
+    def test_choosing_one_fills_it_keeps_the_email_with_it_and_clears_the_item(self):
+        first, second = self.by_hand(), self.by_hand()
+        self.put("hotel_jsonld")
+        self.scan()
+        [match] = self.held()
+        self.assertTrue(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["index"], second)))
+        by_id = {s["id"]: s for s in self.segments()}
+        self.assertEqual((by_id[second]["confirmation"], by_id[first]["confirmation"]), ("H88231", None))
+        self.assertEqual(self.held(), [])
+        self.assertEqual(self.read(lambda conn: review.count(conn, "u-jane")), 0)
+        self.assertEqual(len(self.read(lambda conn: stored_mail.for_segment(conn, second))), 1)
+
+    def test_saying_it_is_a_new_booking_adds_it_and_leaves_the_others(self):
+        self.by_hand()
+        self.by_hand()
+        self.put("hotel_jsonld")
+        self.scan()
+        [match] = self.held()
+        self.assertTrue(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["index"], None)))
+        segs = self.segments()
+        self.assertEqual(sorted(s["confirmation"] or "" for s in segs), ["", "", "H88231"])
+        self.assertEqual(self.read(lambda conn: review.count(conn, "u-jane")), 0)
+
+    def test_it_cannot_be_settled_into_a_segment_that_was_not_a_candidate_or_twice(self):
+        self.by_hand()
+        self.by_hand()
+        other = self.by_hand(start_local="2026-12-21T15:00", end_local="2026-12-27T10:00")
+        self.put("hotel_jsonld")
+        self.scan()
+        [match] = self.held()
+        with self.assertRaises(trips.Invalid):
+            self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["index"], other))
+        self.assertTrue(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["index"], None)))
+        self.assertFalse(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["index"], None)))
+
+    def test_dismissing_it_drops_it_and_the_kept_message(self):
+        self.by_hand()
+        self.by_hand()
+        self.put("hotel_jsonld")
+        self.scan()
+        [match] = self.held()
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", match["item_id"])))
+        self.assertEqual((self.held(), len(self.segments())), ([], 2))
+        self.assertEqual(self.read(lambda conn: stored_mail.get(conn, self.mailbox, "msg-hotel_jsonld")), None)
+
+    def test_a_household_member_sees_the_item_but_not_candidates_they_cannot_see_and_cannot_settle_into_them(self):
+        mine = [self.by_hand(), self.by_hand()]
+        self.read(lambda conn: conn.execute(update(Mailbox).where(Mailbox.id == self.mailbox).values(share_review=True)))
+        self.put("hotel_jsonld")
+        self.scan()
+        [seen_by_sam] = self.read(lambda conn: review.matches(conn, "u-sam", self.sam))
+        self.assertEqual(seen_by_sam["candidates"], [])
+        self.assertFalse(seen_by_sam["mine"])
+        with self.assertRaises(trips.Invalid):
+            self.read(lambda conn: review.settle(conn, "u-sam", self.sam, seen_by_sam["item_id"], seen_by_sam["index"], mine[0]))
+        self.assertEqual(len(self.held()), 1)
 
 
 class ConcurrentScanTests(ScanCase):
@@ -767,8 +868,8 @@ class FailureTests(ScanCase):
     def test_a_message_that_cannot_be_filed_is_queued_rather_than_stopping_every_scan(self):
         self.put("flight_jsonld", "hotel_jsonld")
         real = ingest.file_booking
-        with mock.patch.object(ingest, "file_booking", side_effect=lambda conn, viewer, b, again=False, touched=None, fill_only=False: (
-                (_ for _ in ()).throw(RuntimeError("CANARY-FILE-DETAILS-2Y8W")) if b.kind == "flight" else real(conn, viewer, b, again, touched, fill_only))):
+        with mock.patch.object(ingest, "file_booking", side_effect=lambda conn, viewer, b, again=False, touched=None, fill_only=False, held=None: (
+                (_ for _ in ()).throw(RuntimeError("CANARY-FILE-DETAILS-2Y8W")) if b.kind == "flight" else real(conn, viewer, b, again, touched, fill_only, held))):
             result = self.scan()
         self.assertEqual((result.state, result.messages, result.bookings, result.review), ("done", 2, 1, 1))
         self.assertEqual(self.scanned(), {"msg-flight_jsonld": "unreadable", "msg-hotel_jsonld": "booking"})
@@ -1310,7 +1411,7 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(sorted(i["reason"] for i in mine["items"]), ["incomplete", "no_markup"])
         item = next(i for i in mine["items"] if i["reason"] == "no_markup")
         self.assertEqual((item["address"], item["sender_domain"], item["received"]), ("ana@gmail.example", "example-air.example", "2026-10-17"))
-        self.assertEqual(self.call("ben", "GET", "/api/review")[1], {"items": [], "who": [], "ai": False})
+        self.assertEqual(self.call("ben", "GET", "/api/review")[1], {"items": [], "matches": [], "who": [], "ai": False})
         for method, path in (("DELETE", f"/api/review/{item['id']}"), ("POST", f"/api/review/{item['id']}/ignore")):
             status, body = self.call("ben", method, path, {} if method == "POST" else None)
             self.assertEqual((status, body["error"]), (404, "No such item"), path)

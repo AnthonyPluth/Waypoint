@@ -7,7 +7,7 @@ from typing import Literal, NotRequired, TypedDict
 from zoneinfo import ZoneInfo
 
 from ...storage import db
-from .. import airports, trips, visibility
+from .. import airports, seatmaps, trips, visibility
 from ..visibility import Viewer
 from .formats import Clock, Proposed, Skipped
 
@@ -25,6 +25,7 @@ class FlightIn(TypedDict):
     end_local: NotRequired[str | None]
     seat: NotRequired[str | None]
     cabin: NotRequired[str | None]
+    aircraft: NotRequired[str | None]
 
 
 class PreviewRow(TypedDict):
@@ -40,6 +41,7 @@ class PreviewRow(TypedDict):
     end_local: str | None
     seat: str | None
     cabin: str | None
+    aircraft: str | None
 
 
 @dataclass(frozen=True)
@@ -89,7 +91,7 @@ def _known(conn: db.Connection, viewer: Viewer) -> set[tuple[str, ...]]:
 def _row(line: int, status: Status, reason: str | None, **fields: str | None) -> PreviewRow:
     shown: PreviewRow = {"line": line, "status": status, "reason": reason, "day": None, "origin": None, "destination": None,
                          "flight_number": None, "airline": None, "start_local": None, "end_local": None, "seat": None,
-                         "cabin": None}
+                         "cabin": None, "aircraft": None}
     shown.update(fields)   # type: ignore[typeddict-item]
     return shown
 
@@ -112,7 +114,7 @@ def preview(conn: db.Connection, viewer: Viewer, parsed: Iterable[Proposed | Ski
         day = times[0] if times else r.day
         fields = {"day": day, "origin": r.origin, "destination": r.destination, "flight_number": r.flight_number,
                   "airline": r.airline, "start_local": times[1] if times else None, "end_local": times[2] if times else None,
-                  "seat": r.seat, "cabin": r.cabin}
+                  "seat": r.seat, "cabin": r.cabin, "aircraft": r.aircraft}
         keys = _keys(day, r.flight_number, r.origin, r.destination)
         if any(k in have for k in keys):
             out.append(_row(r.line, "exists", "Already in Waypoint", **fields))
@@ -132,7 +134,7 @@ def _day(value: str) -> None:
 def _segment(flight: FlightIn, zones: Mapping[str, str]) -> trips.SegmentIn:
     start, end = flight.get("start_local"), flight.get("end_local")
     details = {k: v for k, v in (("flight_number", flight.get("flight_number")), ("seat", flight.get("seat")),
-                                 ("cabin", flight.get("cabin"))) if v}
+                                 ("cabin", flight.get("cabin")), ("aircraft", seatmaps.family(flight.get("aircraft")))) if v}
     if not (start and end):
         day = datetime.fromisoformat(f"{flight['day']}T00:00")
         start = end = f"{flight['day']}T00:00"
