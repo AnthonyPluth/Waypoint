@@ -7,7 +7,7 @@
   import { Input } from "$lib/components/ui/input";
   import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, SEAT_LIMIT, SEATED, seatKey, type Draft } from "$lib/segment-form";
 
-  let { initial, people, onsaved, oncancel, focus = "" }: { initial: Draft; people: Person[]; onsaved: (s: Segment) => void; oncancel: () => void; focus?: string } = $props();
+  let { initial, people, onsaved, oncancel, focus = "", titled = true }: { initial: Draft; people: Person[]; onsaved: (s: Segment) => void; oncancel: () => void; focus?: string; titled?: boolean } = $props();
   // svelte-ignore state_referenced_locally
   let d = $state<Draft>({ ...initial, details: { ...initial.details }, people: [...initial.people], printed: [...initial.printed] });
   let error = $state("");
@@ -41,10 +41,10 @@
   const label = "flex flex-col gap-1.5 text-sm";
 </script>
 
-<form class="rows mb-6" data-editor novalidate onsubmit={save} aria-labelledby="segment-form-title">
+<form class="rows mb-6" data-editor novalidate onsubmit={save} aria-labelledby={titled ? "segment-form-title" : undefined} aria-label={titled ? undefined : editing ? "Edit this booking" : "Add a booking"}>
   <div class="row items-stretch">
     <div class="flex w-full flex-col gap-4">
-      <h2 id="segment-form-title" class="font-medium">{editing ? "Edit this booking" : "Add a booking"}</h2>
+      {#if titled}<h2 id="segment-form-title" class="font-medium">{editing ? "Edit this booking" : "Add a booking"}</h2>{/if}
       {#if editing}<p class="text-sm text-muted-foreground">Anything you change here is kept: a later email won’t put it back.</p>{/if}
       <label class={label}><span class="font-medium">What is it</span>
         <select bind:value={d.kind} disabled={editing} class={selectClass}>

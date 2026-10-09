@@ -8,6 +8,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import { flightStatus } from "$lib/flightstatus.svelte";
+import { viewport } from "$lib/phone.svelte";
 import { segment, trip } from "../test/fixtures";
 import Upcoming from "./Upcoming.svelte";
 
@@ -237,5 +238,48 @@ describe("Upcoming", () => {
     expect(within(card).getByText("Times differ between bookings")).toBeInTheDocument();
     expect(within(card).getByText(/^KQ7M2X: departs/)).toHaveTextContent(/departs Fri, Nov 20, 7:00 PM.*arrives Sat, Nov 21, 7:10 AM/);
     expect(within(card).getByText(/^BBBBBB: departs/)).toHaveTextContent(/departs Fri, Nov 20, 9:30 PM/);
+  });
+});
+
+describe("Upcoming booking detail", () => {
+  beforeEach(() => { viewport.phone = true; });
+  afterEach(() => { viewport.phone = false; });
+
+  it("opens a booking’s full card in a bottom sheet on a phone from the day-by-day list, with a way to the trip", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const list = await screen.findByRole("list", { name: /day by day/ });
+    const link = within(list).getByRole("link", { name: "Harbour Hotel" });
+    await u.click(link);
+    const sheet = await screen.findByRole("dialog", { name: "Harbour Hotel" });
+    expect(sheet).toHaveAttribute("data-side", "bottom");
+    expect(within(sheet).getByRole("link", { name: "Open trip" })).toHaveAttribute("href", `#trip/${london.id}?segment=2`);
+    expect(location.hash).not.toContain("#trip/");
+    await u.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(link).toHaveFocus());
+  });
+
+  it("opens it as a side panel on a larger screen", async () => {
+    viewport.phone = false;
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await u.click(within(await screen.findByRole("list", { name: /day by day/ })).getByRole("link", { name: "Harbour Hotel" }));
+    expect(await screen.findByRole("dialog", { name: "Harbour Hotel" })).toHaveAttribute("data-side", "right");
+  });
+
+  it("leaves the link alone for a modified click", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const link = within(await screen.findByRole("list", { name: /day by day/ })).getByRole("link", { name: "Harbour Hotel" });
+    link.addEventListener("click", (e) => e.preventDefault());
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).keyboard("{Control>}");
+    link.dispatchEvent(new MouseEvent("click", { ctrlKey: true, bubbles: true, cancelable: true }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

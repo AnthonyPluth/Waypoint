@@ -8,6 +8,6 @@
     { "wait_for": "[data-testid='message-subject']" },
     { "expect_text": { "selector": "main", "text": "made-up details" } },
     { "scroll_to": "[data-testid='preview']" },
-    { "screenshot": "message-beside-form" }
+    { "screenshot": "message-with-form" }
   ]
 }
