@@ -9,7 +9,7 @@
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
-  import { dateLabel, dayIn, dayLabel, END_WORD, featuredTrip, headline, nextUp, subline, timesDiffer, tripDays, untimed, viewerZone } from "$lib/trips";
+  import { dateLabel, dayIn, dayLabel, END_WORD, featuredTrip, headline, nextUp, subline, timesDiffer, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
@@ -123,8 +123,8 @@
                 <div class="min-w-0 flex-1">
                   <p class="break-words text-body font-medium" class:line-through={seg.status === "cancelled"}>
                     <a class="underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}
-                    onclick={(e) => openDetail(e, seg, item.bookings)}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${headline(seg)}` : headline(seg)}</a></p>
-                  {#if item.role === "start" && subline(seg)}<p class="break-words text-caption text-muted-foreground">{subline(seg)}</p>{/if}
+                    title={upcomingTitle(seg) === headline(seg) ? undefined : headline(seg)} onclick={(e) => openDetail(e, seg, item.bookings)}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${upcomingTitle(seg)}` : upcomingTitle(seg)}</a></p>
+                  {#if item.role === "start" && subline(seg, true)}<p class="break-words text-caption text-muted-foreground">{subline(seg, true)}</p>{/if}
                   {#if item.role === "start" && item.bookings.length > 1}<p class="text-caption text-muted-foreground">{item.bookings.length} bookings{timesDiffer(item.bookings) ? " · times differ between bookings" : ""}</p>{/if}
                 </div>
                 <p class="text-body font-medium">

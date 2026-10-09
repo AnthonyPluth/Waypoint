@@ -168,6 +168,33 @@ describe("Upcoming", () => {
     expect(within(card).getByText("3:00 PM")).toBeInTheDocument();
   });
 
+  it("leaves a flight's cabin and a hotel's address out of the day-by-day list", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const economy = segment({ id: 1, details: { flight_number: "AA 101", seat: "12A", cabin: "Economy" } });
+    serve([trip([economy, stay])]);
+    render(Upcoming);
+    const days = await screen.findByRole("list", { name: "Trip to London, day by day" });
+    expect(within(days).getByText(/Seat 12A/)).toBeInTheDocument();
+    expect(within(days).queryByText(/Economy/)).toBeNull();
+    expect(within(days).getByText("Harbour Hotel")).toBeInTheDocument();
+    expect(within(days).queryByText(/1 Quay Street/)).toBeNull();
+  });
+
+  it("names a branded hotel by its brand and city in the list, with the full name on hover", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const branded = segment({ id: 2, kind: "hotel", provider: "Hyatt", origin: "Hyatt Place Example Beach Convention Center", hotel_brand: "Hyatt Place", destination: null,
+      start_local: "2026-11-21T15:00", start_zone: LON, end_local: "2026-11-27T10:00", end_zone: LON,
+      details: { address: "100 Example Blvd, Fort Lauderdale, FL 33301, USA" } });
+    serve([trip([outbound, branded])]);
+    render(Upcoming);
+    const days = await screen.findByRole("list", { name: "Trip to London, day by day" });
+    const link = within(days).getByRole("link", { name: "Hyatt Place" });
+    expect(link).toHaveAttribute("title", "Hyatt Place Example Beach Convention Center");
+    expect(within(days).getByText("Fort Lauderdale, FL")).toBeInTheDocument();
+    expect(within(days).queryByText(/100 Example Blvd/)).toBeNull();
+    expect(within(days).getByRole("link", { name: "Check-out: Hyatt Place" })).toBeInTheDocument();
+  });
+
   it("lists the trip day by day, with the stay's check-out on its last day", async () => {
     at("2026-11-20T09:00:00-05:00");
     serve([london]);

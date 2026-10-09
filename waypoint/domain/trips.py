@@ -132,6 +132,7 @@ class SegmentOut(TypedDict):
     days: list[CruiseDay]
     logo: str | None
     logo_label: str | None
+    hotel_brand: str | None
     has_email: bool
     links: links.Links
 
@@ -437,6 +438,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
          "days": cruise_days(s.start_local, s.start_zone, s.end_local, s.end_zone, s.origin, s.destination, ports.get(s.id, [])),
          "logo": f"/api/segments/{s.id}/logo" if brand and logos.key(brand) in with_logo else None,
          "logo_label": logos.chip(s.kind, s.origin, brand) if brand and logos.key(brand) in with_logo else None,
+         "hotel_brand": logos.sub_brand(s.origin) if s.kind == "hotel" else None,
          "has_email": s.id in with_mail,
          "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, details, s.origin)}
         for s, details, brand in zip(segs, decoded, brands, strict=True)]

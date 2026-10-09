@@ -437,6 +437,7 @@ export interface Segment {
   days: CruiseDay[];
   logo: string | null;
   logo_label: string | null;
+  hotel_brand: string | null;
   has_email: boolean;
   links: SegmentLinks;
 }

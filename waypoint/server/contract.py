@@ -324,6 +324,7 @@ class Segment(TypedDict):
     days: list[CruiseDay]
     logo: str | None
     logo_label: str | None
+    hotel_brand: str | None
     has_email: bool
     links: SegmentLinks
 

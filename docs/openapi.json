@@ -4190,6 +4190,12 @@
               "null"
             ]
           },
+          "hotel_brand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "has_email": {
             "type": "boolean"
           },
@@ -4221,6 +4227,7 @@
           "days",
           "logo",
           "logo_label",
+          "hotel_brand",
           "has_email",
           "links"
         ],

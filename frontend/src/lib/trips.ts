@@ -207,10 +207,26 @@ export function headline(s: Segment): string {
   return [s.provider, s.origin].filter(Boolean).join(" · ") || "Car rental";
 }
 
-export function subline(s: Segment): string {
+const COUNTRIES = /^(usa|us|u\.s\.a\.|united states( of america)?)$/i;
+
+export function cityState(address: string | undefined): string {
+  const parts = (address ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length > 1 && COUNTRIES.test(parts[parts.length - 1])) parts.pop();
+  if (parts.length < 2) return "";
+  const last = parts[parts.length - 1].replace(/\s+\d[\dA-Za-z -]*$/, "");
+  if (parts.length === 2) return last;
+  const city = parts[parts.length - 2].replace(/^\d[\d -]*\s+/, "");
+  return `${city}, ${last}`;
+}
+
+export function upcomingTitle(s: Segment): string {
+  return s.kind === "hotel" && s.hotel_brand ? s.hotel_brand : headline(s);
+}
+
+export function subline(s: Segment, condensed = false): string {
   const d = s.details;
-  const parts = s.kind === "flight" ? [[s.provider, d.flight_number].filter(Boolean).join(" "), d.aircraft, d.terminal && `Terminal ${d.terminal}`, d.seat && `Seat ${d.seat}`, d.cabin]
-    : s.kind === "hotel" ? [d.address, d.room]
+  const parts = s.kind === "flight" ? [[s.provider, d.flight_number].filter(Boolean).join(" "), d.aircraft, d.terminal && `Terminal ${d.terminal}`, d.seat && `Seat ${d.seat}`, condensed ? null : d.cabin]
+    : s.kind === "hotel" ? [condensed ? (s.hotel_brand ? cityState(d.address) : null) : d.address, d.room]
       : s.kind === "car" ? [d.car_class, d.address] : s.kind === "cruise" ? [s.details.ship ? s.provider : null, d.room && `Cabin ${d.room}`, d.deck && `Deck ${d.deck}`] : [s.provider, d.seat && `Seat ${d.seat}`, d.cabin];
   return parts.filter(Boolean).join(" · ");
 }
