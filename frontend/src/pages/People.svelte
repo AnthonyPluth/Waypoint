@@ -8,6 +8,8 @@
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Input } from "$lib/components/ui/input";
+  import { Sheet } from "$lib/components/ui/sheet";
+  import { viewport } from "$lib/phone.svelte";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
   import Trash from "@lucide/svelte/icons/trash";
@@ -34,11 +36,13 @@
   let draft = $state<Draft | null>(null);
   let formError = $state("");
   let saving = $state(false);
+  let inSheet = $state(false);
   let removing = $state<Person | null>(null);
   let asking = $state(false);
 
-  const startAdd = () => { draft = { id: null, member: false, display_name: "", first_name: "", legal_name: "", aliases: "" }; formError = ""; };
+  const startAdd = () => { inSheet = viewport.phone; draft = { id: null, member: false, display_name: "", first_name: "", legal_name: "", aliases: "" }; formError = ""; };
   const startEdit = (p: Person) => {
+    inSheet = viewport.phone;
     draft = { id: p.id, member: p.member, display_name: p.display_name, first_name: p.first_name ?? "", legal_name: p.legal_name ?? "", aliases: p.aliases.join("\n") };
     formError = "";
   };
@@ -80,6 +84,7 @@
   let idDraft = $state<IdDraft | null>(null);
   let idError = $state("");
   let idSaving = $state(false);
+  let idInSheet = $state(false);
   let idRemoving = $state<LoyaltyEntry | null>(null);
   let idAsking = $state(false);
 
@@ -88,8 +93,9 @@
     const held = new Set(memberships.filter((m) => m.person_id === personId && m.kind === kind && m.id !== editing).map((m) => m.program));
     return (programs[kind] ?? []).filter((name) => name === "Other" || name === kept || !held.has(name));
   };
-  const startAddId = (p: Person) => { idDraft = { id: null, person_id: p.id, kind: "airline", program: choices(p.id, "airline")[0] ?? "", number: "", expiry: "", notes: "", masked: "" }; idError = ""; };
+  const startAddId = (p: Person) => { idInSheet = viewport.phone; idDraft = { id: null, person_id: p.id, kind: "airline", program: choices(p.id, "airline")[0] ?? "", number: "", expiry: "", notes: "", masked: "" }; idError = ""; };
   const startEditId = (m: LoyaltyEntry) => {
+    idInSheet = viewport.phone;
     idDraft = { id: m.id, person_id: m.person_id, kind: m.kind, program: m.program, number: "", expiry: m.expiry ?? "", notes: m.notes ?? "", masked: m.masked };
     idError = "";
   };
@@ -132,46 +138,53 @@
 
   const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
+  const personFormTitle = (d: Draft) => (d.id === null ? "Add a guest" : `Edit ${d.display_name || "person"}`);
+
+  const personSheetTitle = (d: Draft) => (d.id === null ? "Add a guest" : `Edit ${people?.find((p) => p.id === d.id)?.display_name ?? "person"}`);
+  const idFormTitle = (d: IdDraft) => `${d.id === null ? "Add a membership" : "Edit membership"} for ${people?.find((p) => p.id === d.person_id)?.display_name ?? "this person"}`;
+
   const details = (p: Person) => [p.legal_name && `Legal name ${p.legal_name}`, p.aliases.length && `Printed as ${p.aliases.join(", ")}`].filter(Boolean).join(" · ");
 </script>
 
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-4xl font-bold tracking-tight">People</h1>
+  <h1 class="text-display">People</h1>
   {#if people && !draft}<Button onclick={startAdd}><UserPlus /> Add a guest</Button>{/if}
 </div>
 
-{#if draft}
-  <form class="rows mb-6" data-editor onsubmit={save} aria-labelledby="person-form-title">
-    <div class="row items-stretch">
-      <div class="flex w-full flex-col gap-4">
-        <h2 id="person-form-title" class="font-medium">{draft.id === null ? "Add a guest" : `Edit ${draft.display_name || "person"}`}</h2>
-        <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name</span>
-          <Input bind:value={draft.display_name} required maxlength={100} autocomplete="off" placeholder="How Waypoint shows them" /></label>
-        <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">First name</span>
-          <Input bind:value={draft.first_name} maxlength={100} autocomplete="off" /></label>
-        <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Legal name</span>
-          <Input bind:value={draft.legal_name} maxlength={200} autocomplete="off" />
-          <span class="text-muted-foreground">As on their ID, for matching bookings.</span></label>
-        <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name aliases</span>
-          <textarea bind:value={draft.aliases} rows="3" autocomplete="off" spellcheck="false" placeholder={"DOE/JANE MS"}
-            class="border-input bg-secondary placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"></textarea>
-          <span class="text-muted-foreground">How airlines print the name, one per line.</span></label>
-        {#if draft.member}<p class="text-sm text-muted-foreground">They’re a household member: their link to their sign-in stays as it is.</p>{/if}
-        {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
-        <div class="flex flex-wrap gap-2">
-          <Button type="submit" disabled={saving}>{saving ? "Saving…" : draft.id === null ? "Add guest" : "Save"}</Button>
-          <Button type="button" variant="outline" disabled={saving} onclick={() => (draft = null)}>Cancel</Button>
-        </div>
-      </div>
-    </div>
-  </form>
+{#if draft && !inSheet}
+  <div class="rows mb-6"><div class="row items-stretch">{@render personForm(draft, true)}</div></div>
 {/if}
 
-{#snippet idForm(d: IdDraft)}
-  <form class="mt-2 w-full rounded-2xl border bg-background/40 p-4" data-editor onsubmit={saveId} aria-labelledby="id-form-title">
+{#snippet personForm(d: Draft, titled: boolean)}
+  <form class="flex w-full flex-col gap-4" data-editor onsubmit={save} aria-labelledby={titled ? "person-form-title" : undefined} aria-label={titled ? undefined : personSheetTitle(d)}>
+  <div class="flex w-full flex-col gap-4">
+    {#if titled}<h2 id="person-form-title" class="font-medium">{personFormTitle(d)}</h2>{/if}
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name</span>
+      <Input bind:value={d.display_name} required maxlength={100} autocomplete="off" placeholder="How Waypoint shows them" /></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">First name</span>
+      <Input bind:value={d.first_name} maxlength={100} autocomplete="off" /></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Legal name</span>
+      <Input bind:value={d.legal_name} maxlength={200} autocomplete="off" />
+      <span class="text-muted-foreground">As on their ID, for matching bookings.</span></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name aliases</span>
+      <textarea bind:value={d.aliases} rows="3" autocomplete="off" spellcheck="false" placeholder={"DOE/JANE MS"}
+        class="border-input bg-secondary placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"></textarea>
+      <span class="text-muted-foreground">How airlines print the name, one per line.</span></label>
+    {#if d.member}<p class="text-sm text-muted-foreground">They’re a household member: their link to their sign-in stays as it is.</p>{/if}
+    {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
+    <div class="flex flex-wrap gap-2">
+      <Button type="submit" disabled={saving}>{saving ? "Saving…" : d.id === null ? "Add guest" : "Save"}</Button>
+      <Button type="button" variant="outline" disabled={saving} onclick={() => (draft = null)}>Cancel</Button>
+    </div>
+  </div>
+  </form>
+{/snippet}
+
+{#snippet idForm(d: IdDraft, titled: boolean)}
+  <form class={titled ? "mt-2 w-full rounded-2xl border bg-background/40 p-4" : "w-full"} data-editor onsubmit={saveId} aria-labelledby={titled ? "id-form-title" : undefined} aria-label={titled ? undefined : idFormTitle(d)}>
     <div>
       <div class="flex w-full flex-col gap-4">
-        <h2 id="id-form-title" class="font-medium">{d.id === null ? "Add a membership" : "Edit membership"} for {people?.find((p) => p.id === d.person_id)?.display_name ?? "this person"}</h2>
+        {#if titled}<h2 id="id-form-title" class="font-medium">{idFormTitle(d)}</h2>{/if}
         <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Kind</span>
           <select bind:value={d.kind} onchange={() => pickKind(d)} class={selectClass}>
             {#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}
@@ -257,7 +270,7 @@
           <Button variant="outline" size="sm" aria-label={`Add a membership for ${p.display_name}`} onclick={() => startAddId(p)}><Plus /> ID</Button>
           {#if !p.member && canClaim}<Button variant="outline" size="sm" aria-label={`This is me: ${p.display_name}`} onclick={() => { claiming = p; claimAsking = true; }}>This is me</Button>{/if}
         </div>
-        {#if idDraft && idDraft.person_id === p.id}<div class="basis-full">{@render idForm(idDraft)}</div>{/if}
+        {#if idDraft && idDraft.person_id === p.id && !idInSheet}<div class="basis-full">{@render idForm(idDraft, true)}</div>{/if}
       </li>
     {/each}
   </ul>
@@ -274,3 +287,11 @@
 <ConfirmDialog bind:open={idAsking} title={`Remove ${idRemoving?.program ?? "this membership"}?`} confirmLabel="Remove" busyLabel="Removing…" destructive
   description="Its saved number is deleted. This can’t be undone."
   onconfirm={async () => { const m = idRemoving; return m ? await removeId(m) : true; }} />
+
+<Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v && !saving) draft = null; }} title={draft ? personSheetTitle(draft) : "Person"}>
+  {#if draft}{@render personForm(draft, false)}{/if}
+</Sheet>
+
+<Sheet bind:open={() => idInSheet && idDraft !== null, (v) => { if (!v && !idSaving) idDraft = null; }} title={idDraft ? idFormTitle(idDraft) : "Membership"}>
+  {#if idDraft}{@render idForm(idDraft, false)}{/if}
+</Sheet>
