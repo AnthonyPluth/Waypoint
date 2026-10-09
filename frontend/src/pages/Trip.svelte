@@ -15,9 +15,13 @@
   import { viewport } from "$lib/phone.svelte";
   import { Sheet } from "$lib/components/ui/sheet";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
+  import { askAboutOffline, offline, refreshOffline, saveTripCopy } from "$lib/offline.svelte";
+  import { hasSavedTrip, onLock } from "$lib/offline-vault";
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
   import MessageView from "$lib/components/MessageView.svelte";
+  import OfflineSetup from "$lib/components/OfflineSetup.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
+  import SavedTripLock from "$lib/components/SavedTripLock.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
@@ -39,6 +43,22 @@
   let saving = $state(false);
   let removing = $state<Segment | null>(null);
   let asking = $state(false);
+  let askOffline = $state(false);
+  let lockedCopy = $state(false);
+  let savedCopy = $state<Trip | null>(null);
+
+  const isTrip = (v: unknown): v is Trip => !!v && typeof v === "object" && Array.isArray((v as Trip).segments) && typeof (v as Trip).name === "string";
+  $effect(() => onLock(() => { savedCopy = null; }));
+
+  async function afterOnlineLoad(t: Trip) {
+    await refreshOffline();
+    if (offline.setUp) await saveTripCopy(t);
+    else if (askAboutOffline()) askOffline = true;
+  }
+
+  async function offerSavedCopy() {
+    lockedCopy = navigator.onLine === false && (await hasSavedTrip().catch(() => false));
+  }
 
   type Mail = { state: "loading" } | { state: "ready"; emails: StoredEmail[] } | { state: "error"; message: string };
   let mails = $state<Record<number, Mail | undefined>>({});
@@ -63,15 +83,21 @@
   async function load() {
     const mine = ++latest;
     loadError = "";
+    lockedCopy = false;
     if (!/^\d+$/.test(id)) { trip = null; loadError = "No such trip"; return; }
     try {
       const [t, p, l] = await Promise.all([apiCall<"GET /api/trips/{id}">(`/api/trips/${id}`), apiCall<"GET /api/people">("/api/people"), apiCall<"GET /api/loyalty">("/api/loyalty")]);
       if (mine !== latest) return;
       trip = t; people = p.people; loyalty = l.loyalty;
       void loadFlightStatus();
-    } catch (err) { if (mine !== latest) return; trip = null; loadError = errMsg(err); }
+      void afterOnlineLoad(t);
+    } catch (err) {
+      if (mine !== latest) return;
+      trip = null; loadError = errMsg(err);
+      await offerSavedCopy();
+    }
   }
-  $effect(() => { void id; form = null; renaming = null; void load(); });
+  $effect(() => { void id; form = null; renaming = null; savedCopy = null; void load(); });
 
   const wanted = $derived(new URLSearchParams(route.query).get("segment"));
   $effect(() => {
@@ -125,7 +151,27 @@
 
 <a class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" href="#trips"><ArrowLeft class="size-4" /> Trips</a>
 
-{#if loadError}
+{#if lockedCopy}
+  {#if savedCopy}
+    {@const copy = savedCopy}
+    <div class="mb-6 space-y-1">
+      <h1 class="break-words text-display">{copy.name}</h1>
+      <p class="text-muted-foreground">{dates(copy)}{copy.destination ? ` · ${copy.destination}` : ""}</p>
+      <p class="text-sm text-muted-foreground" role="note">Saved copy from this device. It locks again after 5 minutes without use.</p>
+    </div>
+    <ul class="flex flex-col gap-3" aria-label="Saved bookings">
+      {#each copy.segments as s (s.id)}
+        <li class="rounded-2xl border border-border bg-card p-4">
+          <p class="eyebrow">{eyebrowOf(s)}</p>
+          <p class="mt-1 break-words font-medium">{headline(s)}</p>
+          {#if s.confirmation}<p class="mt-1 text-lg"><CopyCode code={s.confirmation} /></p>{/if}
+        </li>
+      {/each}
+    </ul>
+  {:else}
+    <SavedTripLock onunlocked={(v) => { if (isTrip(v)) savedCopy = v; else throw new Error("unreadable"); }} onremoved={() => (lockedCopy = false)} />
+  {/if}
+{:else if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">
     <span>{loadError}</span><Button variant="outline" onclick={load}>Try again</Button>
   </AlertDescription></Alert>
@@ -220,6 +266,8 @@
     {/each}
   </ul>
 {/if}
+
+<OfflineSetup bind:open={askOffline} onenabled={() => trip && void saveTripCopy(trip)} />
 
 <Sheet bind:open={() => inSheet && form !== null && form.id !== null, (v) => { if (!v) form = null; }} title="Edit this booking">
   {#if form && form.id !== null}

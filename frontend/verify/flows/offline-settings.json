@@ -1,0 +1,10 @@
+{
+  "name": "offline-settings",
+  "page": "settings",
+  "steps": [
+    { "click": "a[href='#settings/data']" },
+    { "expect_text": { "selector": "[data-testid='offline-unavailable']", "text": "isn’t available on this device" } },
+    { "scroll_to": "#offline-title" },
+    { "screenshot": "offline-unavailable" }
+  ]
+}

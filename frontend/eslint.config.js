@@ -17,7 +17,11 @@ const RESTRICTED = {
   },
   storage: {
     selector: "Identifier[name=/^(localStorage|sessionStorage|indexedDB)$/]",
-    message: "Browser storage outlives sign-out and is readable by anything on the device: keep trips, names, codes and loyalty numbers on the server (AGENTS.md, \"Waypoint's promises\").",
+    message: "Browser storage outlives sign-out and is readable by anything on the device: keep trips, names, codes and loyalty numbers on the server; the one thing kept on the device is the encrypted offline trip, which lib/offline-vault.ts alone writes to the Cache API (AGENTS.md, \"Waypoint's promises\").",
+  },
+  cache: {
+    selector: "Identifier[name='caches']",
+    message: "The Cache API is for lib/offline-vault.ts alone: it keeps the saved offline trip as ciphertext that only the device's own check (Face ID, Touch ID or the screen lock) can open, so a copy of the device's stored data never holds a trip, a name or a code in the clear. Save through the vault's save(), never to a cache of your own (AGENTS.md, \"Waypoint's promises\").",
   },
   darkOnly: {
     selector: "Literal[value=/(^|\\s)dark:|prefers-color-scheme/], TemplateElement[value.raw=/(^|\\s)dark:|prefers-color-scheme/], SvelteLiteral[value=/(^|\\s)dark:|prefers-color-scheme/]",
@@ -73,13 +77,14 @@ export default defineConfig(
     rules: {
       "svelte/no-useless-mustaches": "off",
       "svelte/prefer-svelte-reactivity": "off",
-      "no-restricted-syntax": restrict("errorCast", "fetch", "storage", "darkOnly"),
+      "no-restricted-syntax": restrict("errorCast", "fetch", "storage", "cache", "darkOnly"),
       "waypoint/no-silent-catch": "error",
       "no-console": ["error", { allow: ["error", "warn"] }],
     },
     plugins: { waypoint },
   },
-  { files: ["frontend/src/lib/api.ts"], rules: { "no-restricted-syntax": restrict("errorCast", "storage", "darkOnly") } },
+  { files: ["frontend/src/lib/api.ts"], rules: { "no-restricted-syntax": restrict("errorCast", "storage", "cache", "darkOnly") } },
+  { files: ["frontend/src/lib/offline-vault.ts"], rules: { "no-restricted-syntax": restrict("errorCast", "fetch", "storage", "darkOnly") } },
   { files: ["frontend/eslint.config.js", "frontend/src/lint-rules.test.ts", "frontend/src/app.css.test.ts"], rules: { "no-restricted-syntax": restrict("errorCast", "fetch", "storage") } },
   {
     rules: {
