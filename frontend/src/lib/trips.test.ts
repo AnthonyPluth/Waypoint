@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { viewerZone, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
+import { viewerZone, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, cityState, upcomingTitle, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -123,6 +123,30 @@ describe("tripDays", () => {
   });
 });
 
+describe("hotel brand and place", () => {
+  it("reads the city and state from an address", () => {
+    expect(cityState("1 Quay Street, London")).toBe("London");
+    expect(cityState("100 Example Blvd, Fort Lauderdale, FL 33301, USA")).toBe("Fort Lauderdale, FL");
+    expect(cityState("100 Example Blvd, Suite 4, Miami, FL 33101")).toBe("Miami, FL");
+    expect(cityState("10 Rue Exemple, 75001 Paris, France")).toBe("Paris, France");
+    expect(cityState("Somewhere")).toBe("");
+    expect(cityState("100 Example Blvd, USA")).toBe("");
+    expect(cityState(undefined)).toBe("");
+  });
+
+  it("shows the brand with its city, and the full name when there is no brand", () => {
+    const place = segment({ kind: "hotel", origin: "Hyatt Place Example Beach Convention Center", hotel_brand: "Hyatt Place", details: { address: "100 Example Blvd, Fort Lauderdale, FL 33301, USA", room: "412" } });
+    expect(upcomingTitle(place)).toBe("Hyatt Place");
+    expect(subline(place, true)).toBe("Fort Lauderdale, FL · 412");
+    expect(headline(place)).toBe("Hyatt Place Example Beach Convention Center");
+    expect(subline(place)).toBe("100 Example Blvd, Fort Lauderdale, FL 33301, USA · 412");
+    const plain = segment({ kind: "hotel", origin: "Harbour Hotel", details: { address: "1 Quay Street, London" } });
+    expect(upcomingTitle(plain)).toBe("Harbour Hotel");
+    expect(subline(plain, true)).toBe("");
+    expect(upcomingTitle(segment({ origin: "JFK", destination: "LHR", hotel_brand: "Hyatt Place" }))).toBe("JFK → LHR");
+  });
+});
+
 describe("wording", () => {
   it("names a segment and describes it", () => {
     expect(headline(out)).toBe("JFK → LHR");
@@ -130,6 +154,11 @@ describe("wording", () => {
     expect(subline({ ...out, details: { ...out.details, aircraft: "Boeing 737" } })).toBe("American Airlines AA 101 · Boeing 737 · Terminal 8");
     expect(headline(stay)).toBe("Harbour Hotel");
     expect(subline(stay)).toBe("1 Quay Street, London");
+    expect(subline({ ...out, details: { ...out.details, seat: "12A", cabin: "Economy" } })).toBe("American Airlines AA 101 · Terminal 8 · Seat 12A · Economy");
+    expect(subline({ ...out, details: { ...out.details, seat: "12A", cabin: "Economy" } }, true)).toBe("American Airlines AA 101 · Terminal 8 · Seat 12A");
+    expect(subline({ ...stay, details: { address: "1 Quay Street, London", room: "412" } })).toBe("1 Quay Street, London · 412");
+    expect(subline({ ...stay, details: { address: "1 Quay Street, London", room: "412" } }, true)).toBe("412");
+    expect(subline(stay, true)).toBe("");
     expect(headline(segment({ kind: "car", provider: "Hertz", origin: "SFO airport" }))).toBe("Hertz · SFO airport");
     expect(headline(segment({ kind: "train", origin: "NYP", destination: "BOS" }))).toBe("NYP → BOS");
     expect(headline(segment({ kind: "hotel", origin: null, provider: null }))).toBe("Hotel stay");

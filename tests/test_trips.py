@@ -508,6 +508,13 @@ class CruiseTests(Household):
         self.assertEqual([(s["arrive_local"], s["depart_local"], s["recorded"]) for s in days[2]["stops"]],
                          [(None, "2026-03-03T17:00", True), (None, None, False)])
 
+    def test_a_hotel_carries_its_brand_from_its_name_and_nothing_else_does(self):
+        branded = self.add(self.jane, {**HOTEL, "origin": "Hyatt Place Example Beach Convention Center", "confirmation": "BRAND1"})
+        self.assertEqual(branded["hotel_brand"], "Hyatt Place")
+        self.assertEqual(branded["origin"], "Hyatt Place Example Beach Convention Center")
+        self.assertIsNone(self.add(self.jane, HOTEL)["hotel_brand"])
+        self.assertIsNone(self.add(self.jane, {**OUT, "origin": "JFK", "confirmation": "NOHOTEL"})["hotel_brand"])
+
     def test_a_cruise_with_no_ports_and_other_kinds_have_no_days(self):
         self.assertEqual(self.add(self.jane, {**CRUISE, "confirmation": "NOPORTS"})["days"], [])
         self.assertEqual(self.add(self.jane, OUT)["days"], [])

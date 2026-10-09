@@ -12,7 +12,7 @@
     start_local: "2026-11-20T07:05", start_zone: "America/Chicago", end_local: "2026-11-20T09:20", end_zone: "America/Los_Angeles",
     origin: "MSP", destination: "LAX", details: { flight_number: "EA 214", terminal: "1", cabin: "Economy" }, manage_url: "https://example.com/manage",
     source: "manual", booked_by: null, locked_fields: [], check_times: false, travelers: [{ id: 1, person_id: null, name: "Jane Doe", seat: "14C" }],
-    itinerary: [], days: [], logo: null, logo_label: null, has_email: false, links: { app: "https://example.com/manage", directions: null, call: null },
+    itinerary: [], days: [], logo: null, logo_label: null, hotel_brand: null, has_email: false, links: { app: "https://example.com/manage", directions: null, call: null },
   };
   const stay: Segment = {
     ...flight, id: 2, kind: "hotel", confirmation: "HT5521", provider: "Example Hotels", origin: "Harbour Hotel", destination: null,
