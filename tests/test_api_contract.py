@@ -215,7 +215,7 @@ class Replies(DbCase):
         held = review_api.api_review(self.c, {}, {})
         self.assertEqual([len(m["candidates"]) for m in held["matches"]], [2])
         self.check("GET /api/review", held)
-        self.check("POST /api/review/{id}/match", review_api.api_review_match(self.c, {}, {"index": 0, "segment_id": pair[0]}, str(held["matches"][0]["item_id"])))
+        self.check("POST /api/review/{id}/match", review_api.api_review_match(self.c, {}, {"entry": 1, "segment_id": pair[0]}, str(held["matches"][0]["item_id"])))
 
     def test_ai(self):
         self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))

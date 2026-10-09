@@ -22,7 +22,7 @@ const candidate = (extra: Partial<ReviewMatch["candidates"][number]> = {}): Revi
   segment_id: 11, trip_id: 4, trip_name: "Trip to London", kind: "hotel", provider: null, origin: "Harbour Hotel", destination: null,
   start_local: "2026-11-21T15:00", end_local: "2026-11-27T10:00", ...extra });
 const held_match = (extra: Partial<ReviewMatch> = {}): ReviewMatch => ({
-  item_id: 9, index: 0, subject: "Your stay: Harbour Hotel", received: "2026-10-18", mine: true,
+  item_id: 9, entry: 1, subject: "Your stay: Harbour Hotel", received: "2026-10-18", mine: true,
   booking: { kind: "hotel", provider: "Example Hotels", confirmation: "H88231", origin: "Harbour Hotel", destination: null, start_local: "2026-11-21T15:00", end_local: "2026-11-27T10:00" },
   candidates: [candidate(), candidate({ segment_id: 12, trip_id: 5, trip_name: "Second trip" })], ...extra });
 const mia: Person = { id: 2, display_name: "Mia Doe", first_name: null, legal_name: null, aliases: [], member: false, links: [] };
@@ -270,19 +270,19 @@ describe("Review", () => {
     held = { matches: [held_match()], items: [], who: [], ai: false };
     render(ReviewPage);
     await userEvent.click((await screen.findAllByRole("button", { name: /^It’s Stay Harbour Hotel/ }))[1]);
-    await waitFor(() => expect(calls).toContainEqual(["/api/review/9/match", "POST", { index: 0, segment_id: 12 }]));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/9/match", "POST", { entry: 1, segment_id: 12 }]));
     expect(toast.success).toHaveBeenCalledWith("Filled in");
     expect(await screen.findByText(/Nothing to review/)).toBeInTheDocument();
   });
 
   it("adds it as a booking of its own, or dismisses it", async () => {
-    held = { matches: [held_match(), held_match({ item_id: 10 })], items: [], who: [], ai: false };
+    held = { matches: [held_match(), held_match({ item_id: 10, entry: 1 })], items: [], who: [], ai: false };
     render(ReviewPage);
     await userEvent.click((await screen.findAllByRole("button", { name: "It’s a new booking" }))[0]);
-    await waitFor(() => expect(calls).toContainEqual(["/api/review/9/match", "POST", { index: 0, segment_id: null }]));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/9/match", "POST", { entry: 1, segment_id: null }]));
     expect(toast.success).toHaveBeenCalledWith("Added to your trips");
     await userEvent.click(await screen.findByRole("button", { name: "Dismiss" }));
-    await waitFor(() => expect(calls).toContainEqual(["/api/review/10", "DELETE", undefined]));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/10?entry=1", "DELETE", undefined]));
   });
 
   it("says so, and still lets it be added, when none of the candidates are the viewer’s to see", async () => {

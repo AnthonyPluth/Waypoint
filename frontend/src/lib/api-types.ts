@@ -46,6 +46,21 @@ export interface ClaimSuggestions {
   guests: Person[];
 }
 
+export interface CruiseDay {
+  day: number;
+  date: string;
+  sea: boolean;
+  stops: CruiseStop[];
+}
+
+export interface CruiseStop {
+  name: string;
+  zone: string;
+  arrive_local: string | null;
+  depart_local: string | null;
+  recorded: boolean;
+}
+
 export interface DeviceBody {
   endpoint: string;
   p256dh: string;
@@ -219,7 +234,7 @@ export interface MailboxList {
 }
 
 export interface MatchBody {
-  index: number;
+  entry: number;
   segment_id: number | null;
 }
 
@@ -386,7 +401,7 @@ export interface ReviewItem {
 
 export interface ReviewMatch {
   item_id: number;
-  index: number;
+  entry: number;
   subject: string | null;
   received: string | null;
   mine: boolean;
@@ -419,6 +434,7 @@ export interface Segment {
   check_times: boolean;
   travelers: Traveler[];
   itinerary: Port[];
+  days: CruiseDay[];
   logo: string | null;
   logo_label: string | null;
   has_email: boolean;

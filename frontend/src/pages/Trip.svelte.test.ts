@@ -546,28 +546,35 @@ describe("Trip", () => {
       start_local: "2026-03-01T16:30", end_local: "2026-03-08T07:00", confirmation: "CR48210", details: { ship: "Example Voyager", room: "9214", address: "1 Port Boulevard\nMiami" },
       links: { app: null, directions: "https://maps.apple.com/?q=1%20Port%20Boulevard%20Miami", call: null },
       itinerary: [{ name: "Nassau", zone: "America/Nassau", arrive_local: "2026-03-02T08:00", depart_local: "2026-03-02T17:00" },
-                  { name: "Cozumel", zone: "America/Cancun", arrive_local: null, depart_local: null }] });
+                  { name: "Cozumel", zone: "America/Cancun", arrive_local: null, depart_local: null }],
+      days: [
+        { day: 1, date: "2026-03-01", sea: false, stops: [{ name: "Miami", zone: "America/New_York", arrive_local: null, depart_local: "2026-03-01T16:30", recorded: true }] },
+        { day: 2, date: "2026-03-02", sea: false, stops: [{ name: "Nassau", zone: "America/Nassau", arrive_local: "2026-03-02T08:00", depart_local: "2026-03-02T17:00", recorded: true }] },
+        { day: 3, date: "2026-03-03", sea: true, stops: [] },
+        { day: 4, date: "2026-03-04", sea: false, stops: [{ name: "Cozumel", zone: "America/Cancun", arrive_local: null, depart_local: null, recorded: false }] },
+        { day: 5, date: "2026-03-05", sea: false, stops: [{ name: "Miami", zone: "America/New_York", arrive_local: "2026-03-05T07:00", depart_local: null, recorded: true }] }] });
 
     it("lists its ports of call with their local times, its terminal address, and Directions to it", async () => {
       held = trip([ship]);
       render(TripPage);
-      const ports = (await screen.findByText("Ports of call")).closest("[data-itinerary]") as HTMLElement;
-      const rows = within(ports).getAllByRole("listitem");
-      expect(rows).toHaveLength(2);
-      expect(rows[0]).toHaveTextContent("Nassau");
-      expect(rows[0]).toHaveTextContent(/arrives .*8:00 AM.*leaves .*5:00 PM/);
-      expect(rows[1]).toHaveTextContent("Cozumel");
-      expect(rows[1]).toHaveTextContent("Time not recorded");
+      const days = (await screen.findByText("Itinerary")).closest("[data-itinerary]") as HTMLElement;
+      const rows = within(days).getAllByRole("listitem");
+      expect(rows).toHaveLength(5);
+      expect(rows[0]).toHaveTextContent(/Day 1 · Sun, Mar 1\s*Miami\s*leaves .*4:30 PM/);
+      expect(rows[1]).toHaveTextContent(/Day 2 · Mon, Mar 2\s*Nassau\s*arrives .*8:00 AM.*leaves .*5:00 PM/);
+      expect(rows[2]).toHaveTextContent(/Day 3 · Tue, Mar 3\s*Sea day$/);
+      expect(rows[3]).toHaveTextContent(/Day 4 · Wed, Mar 4\s*Cozumel\s*Time not recorded/);
+      expect(rows[4]).toHaveTextContent(/Day 5 · Thu, Mar 5\s*Miami\s*arrives .*7:00 AM/);
       expect(screen.getByText("Terminal address")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", ship.links.directions!);
       expect(screen.getByText("Embarks")).toBeInTheDocument();
     });
 
     it("shows no ports section for a cruise without any", async () => {
-      held = trip([{ ...ship, itinerary: [] }]);
+      held = trip([{ ...ship, itinerary: [], days: [] }]);
       render(TripPage);
       await screen.findByRole("heading", { name: "Example Voyager · Miami" });
-      expect(screen.queryByText("Ports of call")).toBeNull();
+      expect(screen.queryByText("Itinerary")).toBeNull();
     });
 
     it("edits the ports: adds one in the last one’s zone, moves, removes, and sends them in order", async () => {
