@@ -158,7 +158,7 @@
     {#each tiles as t (t.label)}
       <div class="pass p-5">
         <dt class="eyebrow">{t.label}</dt>
-        <dd class="mt-2 break-words text-display font-semibold tabular-nums">{t.value}</dd>
+        <dd class="mt-2 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight sm:text-4xl">{t.value}</dd>
       </div>
     {/each}
   </dl>
