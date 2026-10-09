@@ -325,6 +325,16 @@ class SeatStatsTests(StatsCase):
         assert same
         self.assertEqual(same["details"]["seat_position"], "window")
 
+    def test_a_reissued_email_with_a_new_seat_keeps_its_own_word_and_loses_the_old_one_when_it_has_none(self):
+        said = {"flight_number": "BA 112", "cabin": "Economy", "aircraft": "Boeing 777", "seat": "12A", "seat_position": "window"}
+        added = self.add(self.jane, {**JFK_LHR, "confirmation": "ZZ9PLU", "details": said})
+        fields = {**JFK_LHR, "confirmation": "ZZ9PLU", "details": {**said, "seat": "14F"}}
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, fields), "updated")
+        self.assertEqual(trips.get_segment(self.c, self.jane, added["id"])["details"]["seat_position"], "window")   # type: ignore[index]
+        bare = {**JFK_LHR, "confirmation": "ZZ9PLU", "details": {k: v for k, v in said.items() if k != "seat_position"} | {"seat": "15E"}}
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, bare), "updated")
+        self.assertNotIn("seat_position", trips.get_segment(self.c, self.jane, added["id"])["details"])   # type: ignore[index]
+
     def test_the_emails_word_goes_when_a_travellers_seat_changes_and_applies_to_a_solo_travellers_seat(self):
         said = {"flight_number": "BA 112", "cabin": "Economy", "aircraft": "Boeing 777", "seat_position": "aisle"}
         added = self.add(self.jane, {**JFK_LHR, "details": said}, travelers=[{"person_id": self.jane.person_id, "name": None, "seat": "12F"}])

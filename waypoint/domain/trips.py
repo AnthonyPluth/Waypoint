@@ -721,7 +721,8 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
         code = named.strip().upper()
         if provider_key(seg.provider) == provider_key(named) or (len(code) <= 3 and (flight_key(said.get("flight_number")) or "").startswith(code)):
             given["provider"] = seg.provider
-    said = _stale_position(stored, said, bool(stored.get("seat")) and said.get("seat") != stored.get("seat"))
+    if "seat_position" not in (fields.get("details") or {}):
+        said = _stale_position(stored, said, bool(stored.get("seat")) and said.get("seat") != stored.get("seat"))
     incoming = unlocked({**given, "details": said}, locked)
     if fill_only:
         incoming = cast(SegmentIn, {k: v for k, v in incoming.items() if k == "details" or (k in ("provider", "confirmation", "manage_url") and not getattr(seg, k))})
