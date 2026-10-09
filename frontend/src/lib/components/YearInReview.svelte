@@ -5,15 +5,14 @@
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
   import { loadCountries, type Country } from "$lib/map";
-  import { cardSvg, firstName, mapSvg, outlinesFor, reviewFacts, shareOrDownload, svgToPng } from "$lib/review";
+  import { cardSvg, imageInputs, mapSvg, outlinesFor, reviewFacts, saveImage, svgToPng } from "$lib/review";
   import { count } from "$lib/stats";
 
-  let { stats, person, name = null, onclose }: { stats: Stats; person: number | "all"; name?: string | null; onclose: () => void } = $props();
+  let { stats, person, onclose }: { stats: Stats; person: number | "all"; onclose: () => void } = $props();
 
   let allTime = $state<Stats | null>(null);
   let countries = $state<Country[] | null>(null);
   let step = $state(0);
-  let showName = $state(false);
   let outlinesFailed = $state(false);
   let busy = $state(false);
   let result = $state("");
@@ -26,9 +25,8 @@
 
   const facts = $derived(reviewFacts(stats, allTime));
   const outlines = $derived(countries ? outlinesFor(countries, stats) : []);
-  const mine = $derived(person === "all" ? null : firstName(name));
-  const cardName = $derived(showName ? mine : null);
-  const card = $derived(cardSvg(facts, outlines, cardName));
+  const inputs = $derived(imageInputs(facts));
+  const card = $derived(cardSvg(inputs, outlines));
   const dataUrl = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
   type Card = { id: string; eyebrow: string; big?: string; lines: string[] };
@@ -43,16 +41,16 @@
     ...(facts.cruises.count ? [{ id: "cruises", eyebrow: "At sea", big: `${count(facts.cruises.count)} ${facts.cruises.count === 1 ? "cruise" : "cruises"}`,
       lines: [`${count(facts.cruises.nights)} ${facts.cruises.nights === 1 ? "night" : "nights"} aboard`, `${count(facts.cruises.seaDays)} ${facts.cruises.seaDays === 1 ? "sea day" : "sea days"}`] }] : []),
     { id: "map", eyebrow: "Where you went", lines: [] },
-    { id: "share", eyebrow: "Share", lines: [] },
+    { id: "save", eyebrow: "Save as image", lines: [] },
   ]);
   const current = $derived(cards[Math.min(step, cards.length - 1)]);
   const last = $derived(step >= cards.length - 1);
 
-  async function share() {
+  async function save() {
     busy = true; result = ""; problem = "";
     try {
-      const out = await shareOrDownload(await svgToPng(card), `waypoint-${facts.year}.png`, `My ${facts.year} in travel`);
-      result = out === "shared" ? "Shared." : out === "downloaded" ? "Saved the picture to your downloads." : "";
+      saveImage(await svgToPng(card), `waypoint-${facts.year}.png`);
+      result = "Saved the image to your downloads.";
     } catch (err) { problem = errMsg(err); } finally { busy = false; }
   }
 </script>
@@ -67,33 +65,35 @@
     <Button variant="ghost" size="sm" onclick={onclose}>Close</Button>
   </div>
 
-  <div class="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center gap-4 overflow-y-auto px-6 py-4">
-    <p class="eyebrow">{current.eyebrow} · {facts.year}</p>
+  <div class="mx-auto flex w-full {current.id === "save" ? "max-w-3xl" : "max-w-xl"} flex-1 flex-col gap-4 overflow-y-auto px-6 py-4 [&>:first-child]:mt-auto [&>:last-child]:mb-auto">
+    <p class="eyebrow text-signal-ink">{current.eyebrow} · {facts.year}</p>
     {#if current.id === "map"}
       {#if countries === null}
         <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading the map"></div>
       {:else}
-        <img src={dataUrl(mapSvg(facts, outlines))} alt="Map of the airports and routes flown in {facts.year}" class="w-full rounded-2xl" />
+        <img src={dataUrl(mapSvg(facts, outlines))} alt="Map of the airports and routes flown in {facts.year}" class="w-full rounded-2xl border border-border" />
       {#if outlinesFailed}<p class="text-sm text-muted-foreground" role="status">The country outlines couldn’t load, so the map shows only your airports and routes.</p>{/if}
       {/if}
-    {:else if current.id === "share"}
-      {#if countries === null}
-        <div class="aspect-[4/5] animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Making the picture"></div>
-      {:else}
-        <img src={dataUrl(card)} alt="The picture to share: {facts.year}, {facts.distance}, {facts.flights} flights" class="mx-auto w-full max-w-sm rounded-2xl" data-testid="share-card" />
-      {#if outlinesFailed}<p class="text-sm text-muted-foreground" role="status">The country outlines couldn’t load, so the map shows only your airports and routes.</p>{/if}
-      {/if}
-      {#if mine}
-        <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" bind:checked={showName} class="size-4 accent-primary" /> Show the first name ({mine})</label>
-      {/if}
-      <p class="text-sm text-muted-foreground">Made on this device. It shows totals, the top route, countries and the map: no dates, confirmation codes, loyalty numbers or hotels.</p>
-      <div class="flex flex-wrap items-center gap-3">
-        <Button onclick={share} disabled={busy || countries === null}>{busy ? "Making the picture…" : "Share"}</Button>
-        {#if result}<span class="text-sm text-muted-foreground" role="status">{result}</span>{/if}
+    {:else if current.id === "save"}
+      <div class="grid gap-5 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:items-start">
+        <div class="space-y-2">
+          {#if countries === null}
+            <div class="mx-auto aspect-[4/5] w-full max-w-sm animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Making the image"></div>
+          {:else}
+            <img src={dataUrl(card)} alt="The image to save: {facts.year}, {facts.distance}, {facts.flights} flights" class="mx-auto w-full max-w-sm rounded-2xl border border-border" data-testid="save-card" />
+            {#if outlinesFailed}<p class="text-sm text-muted-foreground" role="status">The country outlines couldn’t load, so the map shows only your airports and routes.</p>{/if}
+          {/if}
+        </div>
+        <div class="space-y-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <Button onclick={save} disabled={busy || countries === null}>{busy ? "Making the image…" : "Save as image"}</Button>
+            {#if result}<span class="text-sm text-muted-foreground" role="status">{result}</span>{/if}
+          </div>
+          {#if problem}<Alert role="alert"><AlertDescription>Couldn’t make the image: {problem}</AlertDescription></Alert>{/if}
+        </div>
       </div>
-      {#if problem}<Alert role="alert"><AlertDescription>Couldn’t make the picture: {problem}</AlertDescription></Alert>{/if}
     {:else}
-      {#if current.big}<p class="text-5xl font-semibold tracking-tight sm:text-6xl">{current.big}</p>{/if}
+      {#if current.big}<p class="text-5xl font-semibold tracking-tight tabular-nums text-foreground sm:text-6xl">{current.big}</p>{/if}
       {#each current.lines as line (line)}<p class="text-lg text-muted-foreground">{line}</p>{/each}
     {/if}
   </div>
