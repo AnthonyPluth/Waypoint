@@ -22,6 +22,29 @@ class ManageLinks(unittest.TestCase):
         self.assertIsNone(links.manage_link(None, "ABC123", "Doe"))
 
 
+class LastName(unittest.TestCase):
+    def test_the_signed_in_travellers_own_name_wins_over_the_first(self):
+        travellers = [(1, "Mia Doe"), (2, "Sam Roe")]
+        self.assertEqual(links.last_name(travellers, 2), "Roe")
+        self.assertEqual(links.last_name(travellers, 1), "Doe")
+
+    def test_otherwise_the_first_traveller_is_used(self):
+        travellers = [(1, "Mia Doe"), (2, "Sam Roe")]
+        self.assertEqual(links.last_name(travellers, 9), "Doe")
+        self.assertEqual(links.last_name(travellers, None), "Doe")
+
+    def test_a_printed_name_uses_its_last_word(self):
+        self.assertEqual(links.last_name([(None, "MS MIA VAN DER DOE")], None), "DOE")
+        self.assertEqual(links.last_name([(None, "  Doe  ")], 3), "Doe")
+
+    def test_nobody_with_a_name_gives_nothing(self):
+        self.assertIsNone(links.last_name([], 1))
+        self.assertIsNone(links.last_name([(1, ""), (None, "   ")], 1))
+
+    def test_a_nameless_traveller_is_skipped_for_the_next(self):
+        self.assertEqual(links.last_name([(1, ""), (2, "Sam Roe")], 1), "Roe")
+
+
 class Others(unittest.TestCase):
     def test_https_only(self):
         self.assertEqual(links.https_only("https://example.com/m"), "https://example.com/m")
@@ -35,6 +58,13 @@ class Others(unittest.TestCase):
         self.assertEqual(links.call_link("800 555 0100"), "tel:8005550100")
         self.assertIsNone(links.call_link("n/a"))
         self.assertIsNone(links.call_link(None))
+
+    def test_a_flight_without_a_last_name_keeps_the_emails_manage_link(self):
+        with mock.patch.dict(links.MANAGE, {"example air": ("www.example.com", "/m?c={code}&n={name}")}):
+            built = links.segment_links("flight", "Example Air", "ABC123", "Doe", "https://mail.example.org/m", {}, "JFK")
+            self.assertEqual(built["app"], "https://www.example.com/m?c=ABC123&n=Doe")
+            kept = links.segment_links("flight", "Example Air", "ABC123", None, "https://mail.example.org/m", {}, "JFK")
+            self.assertEqual(kept["app"], "https://mail.example.org/m")
 
     def test_segment_links(self):
         hotel = links.segment_links("hotel", "Hilton", "H1", "Doe", "https://example.com/m", {"address": "1 Quay St", "phone": "+1 555 010 0100"}, "Harbour")
