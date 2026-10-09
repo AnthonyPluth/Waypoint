@@ -337,3 +337,42 @@ describe("changing a trip in the pane", () => {
     expect(within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[1]).toHaveAttribute("aria-current", "true");
   });
 });
+
+describe("overlapping loads", () => {
+  it("doesn’t let an earlier, slower reply overwrite a newer list", async () => {
+    panes.two = true;
+    const named = (name: string) => trip([segment({ id: 1, trip_id: 1 })], { id: 1, name });
+    let release: (v: unknown) => void = () => {};
+    const slow = new Promise((r) => { release = r; });
+    let holdNext = false;
+    let latestName = "Trip to London";
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (path === "/api/people") return { people: [jane, sam] };
+      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+      const one = /^\/api\/trips\/(\d+)$/.exec(path);
+      if (one && opts?.method === "POST") { latestName = (opts.body as { name: string }).name; return named(latestName); }
+      if (one) return named(latestName);
+      if (holdNext) { holdNext = false; return slow; }
+      return { trips: [named(latestName)] };
+    });
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    const u = user();
+    const rename = async (name: string) => {
+      await u.click(await within(pane).findByRole("button", { name: "Rename trip" }));
+      await u.clear(within(pane).getByLabelText("Trip name"));
+      await u.type(within(pane).getByLabelText("Trip name"), name);
+      await u.click(within(pane).getByRole("button", { name: "Save" }));
+    };
+    holdNext = true;
+    await rename("First name");
+    await waitFor(() => expect(holdNext).toBe(false));
+    await rename("Second name");
+    const upcoming = screen.getByRole("list", { name: "Upcoming trips" });
+    await waitFor(() => expect(within(upcoming).getByText("Second name")).toBeInTheDocument());
+    release({ trips: [named("First name")] });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(within(screen.getByRole("list", { name: "Upcoming trips" })).getByText("Second name")).toBeInTheDocument();
+    expect(screen.queryByText("First name")).toBeNull();
+  });
+});

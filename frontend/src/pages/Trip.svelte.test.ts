@@ -645,6 +645,7 @@ describe("Trip on a phone", () => {
     await screen.findByRole("dialog");
     await u.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    document.body.style.pointerEvents = "";
     await u.click(screen.getByRole("button", { name: "Edit JFK → LHR" }));
     await u.click(await screen.findByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());

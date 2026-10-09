@@ -18,12 +18,15 @@
   let loadError = $state("");
   let adding = $state(false);
 
+  let latest = 0;
   async function load() {
+    const mine = ++latest;
     loadError = "";
     try {
       const [t, p] = await Promise.all([apiCall<"GET /api/trips">("/api/trips"), apiCall<"GET /api/people">("/api/people")]);
+      if (mine !== latest) return;
       trips = t.trips; people = p.people;
-    } catch (err) { trips = null; loadError = errMsg(err); }
+    } catch (err) { if (mine !== latest) return; trips = null; loadError = errMsg(err); }
   }
   $effect(() => { void load(); });
 
