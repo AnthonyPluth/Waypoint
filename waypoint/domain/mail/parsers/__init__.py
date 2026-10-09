@@ -3,13 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..booking import Parsed
-from . import southwest
+from . import disneycruise, southwest
 
 
 Parser = Callable[[str, str], Parsed]
 
 PARSERS: dict[str, Parser] = {
     "southwest.com": southwest.parse,
+    "familyvacations-disneycruise.com": disneycruise.parse,
 }
 
 

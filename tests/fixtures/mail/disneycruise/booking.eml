@@ -1,0 +1,45 @@
+From: Disney Cruise Line <reservations@familyvacations-disneycruise.com>
+To: traveller@gmail.example
+Subject: Bibbidi, bobbidi, booked! (4455667)
+Date: Tue, 06 Oct 2026 10:00:00 -0500
+Message-ID: <fx-dcl-booking@familyvacations-disneycruise.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head><title>x</title><style>td { color: red }</style></head><body>
+<p>Bibbidi, bobbidi, booked! CANARY-BODY-DISNEY-BOOKING-6T2K</p>
+<h2>Cruise Details</h2>
+<table>
+<tr><td>Reservation Number:</td><td>4455667</td></tr>
+<tr><td>Cruise:</td><td>5-Night Bahamian Cruise from Fort Lauderdale</td></tr>
+<tr><td>Embark Date:</td><td>Mon, Nov 16, 2026</td></tr>
+<tr><td>Debark Date:</td><td>Sat, Nov 21, 2026</td></tr>
+<tr><td>Ship:</td><td>Disney Example</td></tr>
+<tr><td>Stateroom:</td><td>8052</td></tr>
+<tr><td>Deck:</td><td>8</td></tr>
+<tr><td>Category:</td><td>Deluxe Oceanview</td></tr>
+</table>
+<h2>Guests</h2>
+<div>Guest 1: JANE DOE</div>
+<div>Castaway Club Number: 77700099911</div>
+<div>Guest 2: SAM DOE</div>
+<div>Castaway Club Number: 77700099922</div>
+<h2>Cruise Itinerary</h2>
+<div>Monday, Nov 16</div>
+<div>FORT LAUDERDALE, FLORIDA</div>
+<div>Onboard: 4:30 PM</div>
+<div>Tuesday, Nov 17</div>
+<div>AT SEA</div>
+<div>Wednesday, Nov 18</div>
+<div>NASSAU, BAHAMAS</div>
+<table><tr><td>Ashore: 8:00 AM</td><td>Onboard: 4:30 PM</td></tr></table>
+<div>Thursday, Nov 19</div>
+<div>CASTAWAY CAY, BAHAMAS</div>
+<div>Ashore: 8:30 AM</div>
+<div>Onboard: 4:45 PM</div>
+<div>Friday, Nov 20</div>
+<div>AT SEA</div>
+<div>Saturday, Nov 21</div>
+<div>FORT LAUDERDALE, FLORIDA</div>
+<div>Ashore: 7:15 AM</div>
+</body></html>

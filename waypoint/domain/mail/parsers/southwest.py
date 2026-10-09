@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, timedelta
 
 from ..booking import Booking, Parsed, Passenger
 from .. import seats
-from ._text import lines
+from ._text import clock, lines
 
 PROVIDER = "Southwest Airlines"
 MAX_LEGS = 50
@@ -20,12 +20,6 @@ HEADING = re.compile(r"cancell?ed (?:flights?|trip|reservation)", re.IGNORECASE)
 HEADLINE = 3
 
 
-def _clock(hour: int, minute: int, meridiem: str) -> time | None:
-    if not (1 <= hour <= 12 and minute < 60):
-        return None
-    return time(hour % 12 + (12 if meridiem.upper() == "P" else 0), minute)
-
-
 def _leg(code: str | None, status: str, first: re.Match[str], dep: re.Match[str], arr: re.Match[str],
          passengers: tuple[Passenger, ...], aircraft: str | None = None) -> Booking | None:
     month = MONTHS.get(first[2].lower())
@@ -35,7 +29,7 @@ def _leg(code: str | None, status: str, first: re.Match[str], dep: re.Match[str]
         day = date(int(first[4]), month, int(first[3]))
     except ValueError:
         return None
-    left, right = _clock(int(dep[2]), int(dep[3]), dep[4]), _clock(int(arr[2]), int(arr[3]), arr[4])
+    left, right = clock(int(dep[2]), int(dep[3]), dep[4]), clock(int(arr[2]), int(arr[3]), arr[4])
     if left is None or right is None or not code:
         return None
     start = datetime.combine(day, left)

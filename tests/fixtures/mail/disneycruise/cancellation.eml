@@ -1,0 +1,11 @@
+From: Disney Cruise Line <reservations@familyvacations-disneycruise.com>
+To: traveller@gmail.example
+Subject: Your reservation has been cancelled (4455667)
+Date: Thu, 08 Oct 2026 10:00:00 -0500
+Message-ID: <fx-dcl-cancel@familyvacations-disneycruise.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>Your reservation 4455667 has been cancelled. CANARY-BODY-DISNEY-CANCEL-5F9D</p>
+</body></html>

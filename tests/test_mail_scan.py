@@ -188,6 +188,11 @@ class SearchTests(ScanCase):
         self.assertLessEqual({"chasetravel.com", "capitalonetravel.com", "perk.com", "amextravel.com", "expedia.com"}, senders)
         self.assertLessEqual({"carnival.com", "royalcaribbean.com", "ncl.com", "princess.com", "vikingcruises.com", "disneycruise.com"}, senders)
 
+    def test_the_search_finds_disneys_booking_mail_from_its_vacations_domain(self):
+        self.assertIn("familyvacations-disneycruise.com", query.SENDERS)
+        self.assertEqual(self.scan().state, "done")
+        self.assertIn("familyvacations-disneycruise.com", self.google.queries[0])
+
     def test_each_branch_of_the_search_is_grouped_so_gmail_cant_read_the_or_across_them(self):
         q = query.build(date(2026, 1, 31))
         words = "(" + query._any(query.WORDS) + ")"
