@@ -41,7 +41,7 @@
     {#each TABS as [id, label] (id)}
       <li>
         <a href={`#settings/${id}`} aria-current={tab === id ? "page" : undefined}
-          class={cn("block rounded-xl px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+          class={cn("block rounded-xl px-4 py-2 phone:py-3 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
             tab === id ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground")}>{label}</a>
       </li>
     {/each}

@@ -9,5 +9,5 @@
   }
 </script>
 
-<button type="button" class={`${multiline ? "whitespace-pre-line break-words text-left" : "code"} rounded-md underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none ${klass}`}
+<button type="button" class={`${multiline ? "whitespace-pre-line break-words text-left" : "code"} rounded-md phone:min-h-11 underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none ${klass}`}
   aria-label={`Copy ${label} ${code}`} onclick={copy}>{code}</button>

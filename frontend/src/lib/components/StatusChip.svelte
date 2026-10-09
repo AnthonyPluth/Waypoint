@@ -12,6 +12,6 @@
   };
 </script>
 
-<span class={`inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full font-semibold ${small ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-0.5 text-xs"} ${TONE[chip.tone]} ${cls}`} data-tone={chip.tone}>
+{#key chip.label}<span class={`status-chip inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full font-semibold ${small ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-0.5 text-xs"} ${TONE[chip.tone]} ${cls}`} data-tone={chip.tone}>
   <span class="size-1.5 rounded-full bg-current" aria-hidden="true"></span>{chip.label}
-</span>
+</span>{/key}

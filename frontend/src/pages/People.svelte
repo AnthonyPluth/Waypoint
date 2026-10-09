@@ -249,7 +249,7 @@
                     <div class="min-w-0 flex-1">
                       <p class="break-words"><span class="font-medium">{m.program}</span>
                         {#if m.readable}
-                          <button type="button" class="ml-2 rounded-md px-1.5 py-0.5 font-mono underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+                          <button type="button" class="ml-2 rounded-md px-1.5 py-0.5 phone:min-h-11 font-mono underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
                             aria-label={revealed[m.id] !== undefined ? `Hide ${m.program} number` : `Show and copy ${m.program} number`} onclick={() => toggle(m)}>{revealed[m.id] ?? m.masked}</button>
                         {:else}
                           <span class="ml-2 text-muted-foreground">Can’t be read with this key: enter it again</span>

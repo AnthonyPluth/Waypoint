@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { animationsRunning, auditPage } from "./a11y.mjs";
 
 export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 } };
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];
@@ -100,7 +101,12 @@ async function runStep(page, step, shot, saveDownload) {
   } else if ("expect_text" in step) {
     const el = page.locator(step.expect_text.selector).first();
     await el.waitFor({ timeout });
-    const got = await el.innerText();
+    const deadline = Date.now() + timeout;
+    let got = await el.innerText();
+    while (!got.includes(step.expect_text.text) && Date.now() < deadline) {
+      await page.waitForTimeout(100);
+      got = await el.innerText();
+    }
     if (!got.includes(step.expect_text.text)) throw new Error(`expected "${step.expect_text.text}" in ${step.expect_text.selector}, found "${got.slice(0, 80)}"`);
   } else if ("screenshot" in step) {
     await shot(step.screenshot);
@@ -137,8 +143,8 @@ async function main() {
   try { approveUrl = await seedAssistants(browser, base); }
   catch (e) { problems.push(`seeding the demo assistants: ${String(e.message).split("\n")[0]}`); }
 
-  async function visit(label, viewport, work) {
-    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark" });
+  async function visit(label, viewport, work, { audit = true, reducedMotion = "no-preference" } = {}) {
+    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark", reducedMotion });
     const page = await ctx.newPage();
     const where = `${label} @ ${viewport}`;
     const consoleErrors = [];
@@ -162,6 +168,7 @@ async function main() {
     };
     try {
       await work(page, shot, saveDownload);
+      if (audit) for (const p of await auditPage(page, viewport)) problems.push(`${where}: a11y ${p}`);
     } catch (e) {
       problems.push(`${where}: ${String(e.message).split("\n")[0]}`);
       await shot(`${label.replace(/\W+/g, "-")}-FAILED`).catch(() => {});
@@ -193,6 +200,13 @@ async function main() {
       });
     }
   }
+  if (!args.length) for (const name of pages.filter((n) => !OWN_PAGES.includes(n))) {
+    await visit(`reduced motion ${name}`, "phone", async (page) => {
+      await page.goto(`${base}/#${name}`, { waitUntil: "networkidle" });
+      const moving = await animationsRunning(page);
+      if (moving.length) throw new Error(`animations still run under prefers-reduced-motion: ${moving.slice(0, 5).join(", ")}`);
+    }, { audit: false, reducedMotion: "reduce" });
+  }
   await browser.close();
 
   writeFileSync(join(out, "report.json"), JSON.stringify({ base, results, problems, notes }, null, 2));
@@ -200,7 +214,7 @@ async function main() {
   console.log(`verify: ${results.length} visits, ${shots} screenshots in ${out}`);
   for (const n of notes) console.log(`  note: ${n}`);
   for (const p of problems) console.error(`  FAIL: ${p}`);
-  console.log(problems.length ? `verify: FAILED (${problems.length} problem${problems.length === 1 ? "" : "s"})` : "verify: OK, no console errors or 5xx responses");
+  console.log(problems.length ? `verify: FAILED (${problems.length} problem${problems.length === 1 ? "" : "s"})` : "verify: OK, no console errors, 5xx responses or accessibility problems");
   process.exit(problems.length ? 1 : 0);
 }
 

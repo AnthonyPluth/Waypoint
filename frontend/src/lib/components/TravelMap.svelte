@@ -120,7 +120,7 @@
           <g fill="none" stroke-linecap="round" class="stroke-map-route" data-testid="arcs">
             {#each world.arcs as a (a.key)}
               <g role="button" tabindex="0" aria-label={a.label} onclick={() => pick(a.label, a.trips)} onkeydown={(e) => key(e, a.label, a.trips)}
-                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = a.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: a.label, trips: a.trips })} class="cursor-pointer outline-none focus-visible:[&>path:last-child]:stroke-foreground">
+                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = a.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: a.label, trips: a.trips })} class="cursor-pointer outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring focus-visible:[&>path:last-child]:stroke-foreground">
                 <path d={a.d} stroke="transparent" stroke-width="14" vector-effect="non-scaling-stroke" />
                 <path d={a.d} stroke-width={a.width} stroke-opacity="0.85" vector-effect="non-scaling-stroke" data-arc={a.key} />
               </g>
@@ -129,7 +129,7 @@
           <g data-testid="stays">
             {#each stayDots as p (p.key)}
               <g role="button" tabindex="0" aria-label={p.label} onclick={() => pick(p.label, p.trips)} onkeydown={(e) => key(e, p.label, p.trips)}
-                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = p.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: p.label, trips: p.trips })} class="cursor-pointer outline-none [&:focus-visible>rect:last-child]:stroke-foreground">
+                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = p.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: p.label, trips: p.trips })} class="cursor-pointer outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring [&:focus-visible>rect:last-child]:stroke-foreground">
                 <circle cx={p.x} cy={p.y} r={9 / t.k} fill="transparent" />
                 <rect x={p.x - 4 / t.k} y={p.y - 4 / t.k} width={8 / t.k} height={8 / t.k} transform="rotate(45 {p.x} {p.y})" class="fill-map-stay stroke-map-sea" stroke-width={1.5 / t.k} data-stay={p.city} />
               </g>
@@ -138,7 +138,7 @@
           <g data-testid="dots">
             {#each world.dots as d (d.code)}
               <g role="button" tabindex="0" aria-label={d.label} onclick={() => pick(d.label)} onkeydown={(e) => key(e, d.label)}
-                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = d.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: d.label, trips: [] })} class="cursor-pointer outline-none [&:focus-visible>circle:last-child]:stroke-foreground">
+                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = d.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: d.label, trips: [] })} class="cursor-pointer outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring [&:focus-visible>circle:last-child]:stroke-foreground">
                 <circle cx={d.x} cy={d.y} r={Math.max(d.r / t.k, 9 / t.k)} fill="transparent" />
                 <circle cx={d.x} cy={d.y} r={d.r / t.k} class="fill-map-airport stroke-map-sea" stroke-width={1.5 / t.k} data-dot={d.code} />
               </g>
@@ -175,7 +175,7 @@
     <div class="mt-3 rounded-2xl border border-border bg-card p-4 text-sm shadow-elevation-1" data-testid="map-trips">
       <ul class="space-y-1">
         {#each picked.trips as tr, i (`${tr.trip_id}-${tr.start}-${i}`)}
-          <li class="flex flex-wrap items-baseline justify-between gap-x-3"><a href={`#trip/${tr.trip_id}`} class="font-medium underline underline-offset-2">{tr.name}</a><span class="text-muted-foreground">{when(tr)}</span></li>
+          <li class="flex flex-wrap items-baseline justify-between gap-x-3"><a href={`#trip/${tr.trip_id}`} class="inline-flex items-center phone:min-h-11 font-medium underline underline-offset-2">{tr.name}</a><span class="text-muted-foreground">{when(tr)}</span></li>
         {/each}
       </ul>
     </div>
