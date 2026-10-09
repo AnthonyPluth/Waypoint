@@ -1,7 +1,6 @@
 {
   "name": "year-in-review",
   "page": "stats",
-  "viewports": ["phone"],
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Stats" } },
     { "select": { "selector": "label:has-text('When') select", "index": 2 } },
@@ -17,7 +16,8 @@
     { "wait_for": "[data-testid=year-in-review] img[alt^='Map of']" },
     { "screenshot": "map" },
     { "click": "button:has-text('Next')" },
-    { "wait_for": "[data-testid=share-card]" },
-    { "screenshot": "share-card" }
+    { "wait_for": "[data-testid=save-card]" },
+    { "screenshot": "save-image" },
+    { "download": { "selector": "button:has-text('Save as image')", "name": "saved-image" } }
   ]
 }

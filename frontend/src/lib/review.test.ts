@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Stats } from "./api-types";
-import { cardSvg, firstName, mapSvg, outlinesFor, reviewFacts, reviewOffered } from "./review";
+import { cardSvg, imageInputs, mapSvg, outlinesFor, reviewFacts, reviewOffered, saveImage, svgToPng } from "./review";
 import type { Country } from "./map";
 
 const CANARIES = ["Zelda Quimby", "Quimby", "ZQ7X9K", "Hotel Canarios", "Canario Suites", "ZX 9931", "2026-03-14", "14 Mar", "March 14", "Canary City", "Canary Airways", "FF-123456"];
@@ -26,26 +27,56 @@ const allTime = (): Stats => ({ ...stats(null), places: { countries: [{ name: "U
 
 const textOf = (svg: string) => [...svg.matchAll(/>([^<]+)</g)].map((m) => m[1]).join("\n");
 
+const withCanaries = (): Stats => {
+  const base = stats();
+  return {
+    ...base,
+    flights: {
+      ...base.flights,
+      routes: [{ ...base.flights.routes[0], trips: [{ trip_id: 7, name: "Canary Trip ZQ7X9K", start: "2026-03-14", end: "2026-03-20" }] }],
+      airlines: [{ code: "ZZ", name: "Canary Airways", flights: 12 }],
+    },
+    stays: { ...base.stays, pins: [{ city: "Canary City", country: "US", latitude: 40, longitude: -73, stays: 1, nights: 3, trips: [{ trip_id: 8, name: "Hotel Canarios FF-123456", start: "2026-03-14", end: "2026-03-17" }] }] },
+  };
+};
+
+describe("the image's inputs", () => {
+  const facts = reviewFacts(withCanaries(), allTime());
+  const inputs = imageInputs(facts);
+
+  it("hold only the allowed totals", () => {
+    expect(Object.keys(inputs).sort()).toEqual(["airTime", "countries", "distance", "flights", "map", "nights", "topAirports", "topRoute", "year"]);
+    expect(Object.keys(inputs.topRoute ?? {}).sort()).toEqual(["a", "b"]);
+    expect(Object.keys(inputs.map).sort()).toEqual(["arcs", "dots"]);
+    expect(inputs.map.dots.every((d) => Object.keys(d).sort().join() === "r,x,y")).toBe(true);
+    expect(inputs.map.arcs.every((a) => Object.keys(a).sort().join() === "d,width")).toBe(true);
+    expect(inputs.topAirports).toEqual(["JFK", "LHR"]);
+  });
+
+  it("order airports with the same number of visits by code", () => {
+    const base = stats();
+    const tied = { ...base, flights: { ...base.flights, airports: [{ ...base.flights.airports[1], code: "ZRH", visits: 5 }, { ...base.flights.airports[0], code: "AMS", visits: 5 }, { ...base.flights.airports[1], code: "BOS", visits: 7 }] } };
+    expect(imageInputs(reviewFacts(tied, allTime())).topAirports).toEqual(["BOS", "AMS", "ZRH"]);
+  });
+
+  it("carry none of the canary values, in the inputs or the drawn image", () => {
+    const everything = [JSON.stringify(inputs), cardSvg(inputs, [{ d: "M0,0L1,1", visited: true }])].join("\n");
+    for (const canary of CANARIES) expect(everything, canary).not.toContain(canary);
+    expect(everything).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+});
+
 describe("the share card's content", () => {
   const facts = reviewFacts(stats(), allTime());
+  const inputs = imageInputs(facts);
 
   it("shows the year, totals, top route and countries", () => {
-    const text = textOf(cardSvg(facts, [], null));
-    for (const want of ["2026", "YEAR IN REVIEW", "12", "JFK – LHR", "United States", "United Kingdom"]) expect(text).toContain(want);
+    const text = textOf(cardSvg(inputs, []));
+    for (const want of ["2026", "YEAR IN REVIEW", "12", "JFK – LHR", "Top airports: JFK · LHR", "United States", "United Kingdom"]) expect(text).toContain(want);
   });
 
-  it.each([null, "Zelda"])("leaves out names, codes, dates, hotels and loyalty numbers (name: %s)", (name) => {
-    const svg = cardSvg(facts, [{ d: "M0,0L1,1", visited: true }], name);
-    for (const canary of CANARIES) expect(svg, canary).not.toContain(canary);
-    expect(svg).not.toMatch(/\d{4}-\d{2}-\d{2}/);
-    expect(JSON.stringify(facts)).not.toContain("Zelda");
-  });
-
-  it("has no name unless 'Show my name' is ticked, and then only the first name", () => {
-    expect(textOf(cardSvg(facts, [], null))).not.toContain("Zelda");
-    const named = textOf(cardSvg(facts, [], firstName("Zelda Quimby")));
-    expect(named).toContain("ZELDA’S YEAR IN REVIEW");
-    expect(named).not.toContain("Quimby");
+  it("never names a person", () => {
+    expect(Object.keys(inputs)).not.toContain("name");
   });
 
   it("leaves personal details out of the map picture too", () => {
@@ -54,9 +85,54 @@ describe("the share card's content", () => {
   });
 
   it("escapes what it writes", () => {
-    const svg = cardSvg(facts, [], "<b>&\"");
+    const svg = cardSvg({ ...inputs, countries: ["<b>&\""] }, []);
     expect(svg).not.toContain("<b>");
-    expect(svg).toContain("&lt;B&gt;&amp;&quot;");
+    expect(svg).toContain("&lt;b&gt;&amp;&quot;");
+  });
+});
+
+describe("drawing the image", () => {
+  afterEach(() => {
+    vi.restoreAllMocks(); vi.unstubAllGlobals();
+    for (const key of ["share", "canShare", "sendBeacon"]) Reflect.deleteProperty(navigator, key);
+  });
+
+  it("makes no network request, and loads only the image it was given as data", async () => {
+    const fetchSpy = vi.fn(), openSpy = vi.fn(), beaconSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.stubGlobal("XMLHttpRequest", class { open = openSpy; });
+    Object.assign(navigator, { sendBeacon: beaconSpy });
+    const loaded: string[] = [];
+    vi.stubGlobal("Image", class {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(value: string) { loaded.push(value); queueMicrotask(() => this.onload?.()); }
+    });
+    const drawImage = vi.fn();
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(((tag: string) => tag === "canvas"
+      ? { width: 0, height: 0, getContext: () => ({ drawImage }), toBlob: (cb: (b: Blob) => void) => cb(new Blob(["png"], { type: "image/png" })) }
+      : realCreate(tag)) as never);
+    const svg = cardSvg(imageInputs(reviewFacts(stats(), allTime())), [{ d: "M0,0L1,1", visited: true }]);
+    const png = await svgToPng(svg);
+    expect(png.type).toBe("image/png");
+    expect(drawImage).toHaveBeenCalledOnce();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].startsWith("data:image/svg+xml")).toBe(true);
+    expect(svg).not.toMatch(/href=|src=|url\(|@import/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(beaconSpy).not.toHaveBeenCalled();
+  });
+
+  it("saves to the device by a download link, without sharing", () => {
+    const share = vi.fn();
+    Object.assign(navigator, { share, canShare: () => true });
+    URL.createObjectURL = vi.fn(() => "blob:x"); URL.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    saveImage(new Blob(["png"], { type: "image/png" }), "waypoint-2026.png");
+    expect(click).toHaveBeenCalledOnce();
+    expect(share).not.toHaveBeenCalled();
   });
 });
 
@@ -72,15 +148,7 @@ describe("reviewFacts", () => {
     quiet.flights = { ...quiet.flights, count: 0, routes: [], airports: [], most_visited_airport: null, distance_km: 0, air_seconds: 0 };
     const f = reviewFacts(quiet, null);
     expect(f.topRoute).toBeNull();
-    expect(cardSvg(f, [], null)).toContain("—");
-  });
-});
-
-describe("firstName", () => {
-  it("is the first word, or nothing", () => {
-    expect(firstName("  Zelda  Quimby ")).toBe("Zelda");
-    expect(firstName("")).toBeNull();
-    expect(firstName(null)).toBeNull();
+    expect(cardSvg(imageInputs(f), [])).toContain("—");
   });
 });
 

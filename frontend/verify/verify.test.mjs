@@ -15,6 +15,13 @@ describe("flowProblems", () => {
     expect(bad[2]).toMatch(/step 3 must have exactly one of/);
   });
 
+  it("needs a selector and a file name for a download", () => {
+    expect(flowProblems({ ...ok, steps: [{ download: { selector: "button", name: "saved-image" } }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ download: { selector: "button" } }] })).toEqual(["step 1: download needs a selector and a name of letters, digits, - or _"]);
+    expect(flowProblems({ ...ok, steps: [{ download: { name: "saved-image" } }] })).toEqual(["step 1: download needs a selector and a name of letters, digits, - or _"]);
+    expect(flowProblems({ ...ok, steps: [{ download: { selector: "button", name: "../x" } }] })).toHaveLength(1);
+  });
+
   it("takes an option to select by its position", () => {
     expect(flowProblems({ ...ok, steps: [{ select: { selector: "select", index: 2 } }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ select: "x" }] })).toEqual(["step 1: select takes a object"]);
@@ -24,6 +31,11 @@ describe("flowProblems", () => {
     const steps = [{ upload: { selector: "input[type=file]", file: "tests/fixtures/flight_import/flighty.csv" } }, { scroll_to: "#import-title" }];
     expect(flowProblems({ ...ok, steps })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ upload: "x" }] })).toEqual(["step 1: upload takes a object"]);
+  });
+
+  it("takes a download to click and save, named", () => {
+    expect(flowProblems({ ...ok, steps: [{ download: { selector: "button", name: "saved-image" } }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ download: "x" }] })).toEqual(["step 1: download takes a object"]);
   });
 
   it("rejects a viewport it doesn't know", () => expect(flowProblems({ ...ok, viewports: ["watch"] })).toEqual(["unknown viewport watch"]));

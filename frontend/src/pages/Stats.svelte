@@ -52,7 +52,6 @@
 
   let reviewing = $state(false);
   const reviewable = $derived(reviewOffered(sel.year, new Date()));
-  const reviewName = $derived(sel.who === "all" ? null : people.find((p) => p.id === sel.who)?.first_name ?? people.find((p) => p.id === sel.who)?.display_name ?? null);
 
   const f = $derived(current?.flights);
   const empty = $derived(!!current && current.flights.count === 0 && current.stays.nights === 0 && current.cars.days === 0 && current.cruises.count === 0);
@@ -276,5 +275,5 @@
 {/if}
 
 {#if reviewing && current && sel.year}
-  <YearInReview stats={current} person={sel.who} name={reviewName} onclose={() => (reviewing = false)} />
+  <YearInReview stats={current} person={sel.who} onclose={() => (reviewing = false)} />
 {/if}
