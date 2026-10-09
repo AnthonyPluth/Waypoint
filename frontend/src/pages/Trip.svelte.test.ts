@@ -645,6 +645,7 @@ describe("Trip on a phone", () => {
     await screen.findByRole("dialog");
     await u.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    document.body.style.pointerEvents = "";
     await u.click(screen.getByRole("button", { name: "Edit JFK → LHR" }));
     await u.click(await screen.findByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -690,5 +691,87 @@ describe("Trip on a phone", () => {
     await u.type(within(sheet).getByLabelText("Seat of Jane Doe"), "12A");
     viewport.phone = false;
     await waitFor(() => expect(within(screen.getByRole("dialog")).getByLabelText("Seat of Jane Doe")).toHaveValue("12A"));
+  });
+});
+
+describe("beside a list of trips", () => {
+  const removeFlightAndConfirm = async (u: ReturnType<typeof userEvent.setup>) => {
+    await u.click(await screen.findByRole("button", { name: "Remove JFK → LHR" }));
+    await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  };
+  const moveOnSave = () => vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1" && opts?.method === "POST" ? segment({ ...flight, trip_id: 7 }) : path === "/api/people" ? { people: [jane, sam] } : path === "/api/loyalty" ? { loyalty, programs: {} } : held) as never);
+
+  it("takes the trip it is given, has no way back to the list, and shows no trip while it loads", async () => {
+    const onchanged = vi.fn();
+    render(TripPage, { tripId: 1, onchanged });
+    expect(screen.getByLabelText("Loading")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Trips/ })).toBeNull();
+    expect(api).toHaveBeenCalledWith("/api/trips/1");
+  });
+
+  it("tells the list after a rename", async () => {
+    const onchanged = vi.fn();
+    render(TripPage, { tripId: 1, onchanged });
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Rename trip" }));
+    await u.clear(screen.getByLabelText("Trip name"));
+    await u.type(screen.getByLabelText("Trip name"), "Lisbon");
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST" ? { ...held, name: "Lisbon" } : held) as never);
+    await u.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onchanged).toHaveBeenCalledTimes(1));
+    expect(onchanged).toHaveBeenCalledWith();
+  });
+
+  it("tells the list after a booking is removed, and keeps showing the trip", async () => {
+    const onchanged = vi.fn();
+    render(TripPage, { tripId: 1, onchanged });
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Remove Harbour Hotel" }));
+    await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(onchanged).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
+    expect(location.hash).toBe("#trip/1");
+  });
+
+  it("tells the list instead of leaving the page when the last booking of an automatic trip is removed", async () => {
+    held = trip([flight], { auto: true });
+    const onchanged = vi.fn();
+    render(TripPage, { tripId: 1, onchanged });
+    await removeFlightAndConfirm(userEvent.setup());
+    expect(onchanged).toHaveBeenCalledTimes(1);
+    expect(location.hash).toBe("#trip/1");
+  });
+
+  it("tells the list which trip a saved booking moved to, without leaving the page", async () => {
+    const onchanged = vi.fn();
+    render(TripPage, { tripId: 1, onchanged });
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+    moveOnSave();
+    await u.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onchanged).toHaveBeenCalledWith(7));
+    expect(location.hash).toBe("#trip/1");
+  });
+});
+
+describe("on its own page", () => {
+  it("goes back to the trips list when the last booking of an automatic trip is removed", async () => {
+    held = trip([flight], { auto: true });
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Remove JFK → LHR" }));
+    await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(location.hash).toBe("#trips"));
+  });
+
+  it("opens the trip a saved booking moved to", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1" && opts?.method === "POST" ? segment({ ...flight, trip_id: 7 }) : path === "/api/people" ? { people: [jane, sam] } : path === "/api/loyalty" ? { loyalty, programs: {} } : held) as never);
+    await u.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(location.hash).toBe("#trip/7"));
   });
 });
