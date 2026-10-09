@@ -95,7 +95,6 @@
             <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground" data-testid="image-contents">
               {#each imageSummary(inputs) as line (line)}<li>{line}</li>{/each}
             </ul>
-            <p class="mt-3 text-sm text-muted-foreground">Nothing else: no names, confirmation codes, loyalty or Known Traveler numbers, dates or hotels. It is drawn on this device and saved to it; nothing is uploaded.</p>
           </section>
         </div>
       </div>
