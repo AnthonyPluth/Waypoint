@@ -13,10 +13,13 @@
 # which skips the same things but reads only ANTHROPIC_API_KEY (never the subscription's token) and also drops Grep and
 # Glob; the flags above do its job for both kinds of secret.
 #
-# Needs: CLAUDE (the claude executable), MODEL, BUDGET (US dollars, the most it may spend), and one of the two secrets.
+# Needs: CLAUDE (the claude executable), MODEL, BUDGET (US dollars, the most it may spend), MAX_TURNS (the most
+# round trips to the model it may take; --max-turns, a print-mode flag the locked version has but its --help doesn't
+# list), and one of the two secrets. Hitting either limit ends the run with an error result, which fails the review
+# rather than passing it (agent_review.py report).
 set -euo pipefail
 
-: "${CLAUDE:?}" "${MODEL:?}" "${BUDGET:?}"
+: "${CLAUDE:?}" "${MODEL:?}" "${BUDGET:?}" "${MAX_TURNS:?}"
 
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
   unset CLAUDE_CODE_OAUTH_TOKEN
@@ -35,6 +38,6 @@ status=0
 "$CLAUDE" --print "$(cat prompt.md)" \
   --tools Read,Grep,Glob --allowedTools Read,Grep,Glob --permission-mode dontAsk --restricted --safe-mode \
   --setting-sources "" --settings '{"disableAllHooks":true}' --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
-  --disable-slash-commands --no-session-persistence --model "$MODEL" --max-budget-usd "$BUDGET" \
+  --disable-slash-commands --no-session-persistence --model "$MODEL" --max-budget-usd "$BUDGET" --max-turns "$MAX_TURNS" \
   --json-schema "$(cat schema.json)" --output-format json > output.json || status=$?
 echo "Claude Code exited with $status"

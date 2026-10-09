@@ -9,7 +9,9 @@
 #     (not a pull_request one), under the name "PR #<n>";
 #   - every other app's check run (CodeQL, Semgrep, Trivy, zizmor, ...) succeeded, and every commit status did, and the
 #     ones in REQUIRED_STATUSES were set at all: "Agent review" (.github/workflows/agent-review.yml) is the independent
-#     review, which fails on an agent's pull request with a blocking finding and passes on anyone else's.
+#     review, which fails on an agent's pull request with a blocking finding and passes on anyone else's. It must be on
+#     the head commit itself: when the review copies a passing verdict forward (a push that only merged main in), it
+#     sets the status on the new head, and a head without one waits.
 # Anything still running makes it "pending". Workflows and apps that aren't about whether the change is sound are left
 # out (IGNORED_*). When it passes on one of Dependabot's pull requests, it merges it (see the end).
 #
