@@ -7,7 +7,6 @@ vi.mock("./early", () => ({ startEarly: vi.fn(), dropEarly: vi.fn() }));
 
 import { api, newPage } from "./api";
 import * as offlineModule from "./offline.svelte";
-import { dropEarly, startEarly } from "./early";
 import { app, boot, checkIn, editing, refreshState, route, setQuery, whenBooted } from "./app.svelte";
 import type { AppState } from "./types";
 
