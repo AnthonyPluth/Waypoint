@@ -8,7 +8,7 @@
   import { unlock, VaultError } from "$lib/offline-vault";
   import { toast } from "svelte-sonner";
 
-  let { onunlocked, onremoved }: { onunlocked: (value: unknown) => void; onremoved?: () => void } = $props();
+  let { onunlocked, onremoved }: { onunlocked: (value: unknown) => void | Promise<void>; onremoved?: () => void } = $props();
 
   const check = deviceCheckName();
   type Phase = "locked" | "working" | "cancelled" | "failed" | "gone";
@@ -18,7 +18,7 @@
   async function open() {
     phase = "working";
     try {
-      onunlocked(await unlock());
+      await onunlocked(await unlock());
     } catch (err) {
       const code = err instanceof VaultError ? err.code : "failed";
       phase = code === "cancelled" ? "cancelled" : code === "passkey-missing" || code === "damaged" || code === "not-set-up" ? "gone" : "failed";

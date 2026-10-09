@@ -1,0 +1,29 @@
+{
+  "name": "offline-trip",
+  "page": "upcoming",
+  "host": "localhost",
+  "allow_console": ["ERR_INTERNET_DISCONNECTED", "Failed to load resource", "Can’t reach Waypoint"],
+  "steps": [
+    { "authenticator": "add" },
+    { "goto": "#settings/data" },
+    { "click": "button:has-text('Set up offline access')" },
+    { "click": "button:has-text('Turn on with')" },
+    { "wait_for": "[data-testid='offline-saved']:text-matches('^\\\\s*Saved [0-9]|^\\\\s*Saved just now')" },
+    { "scroll_to": "#offline-title" },
+    { "screenshot": "saved-on-this-device" },
+    { "goto": "#upcoming" },
+    { "wait_for": "main h1" },
+    { "offline": true },
+    { "reload": true },
+    { "wait_for": "h1:has-text('Saved trip is locked')" },
+    { "screenshot": "locked" },
+    { "click": "button:has-text('Unlock')" },
+    { "wait_for": "[data-testid='offline-banner']" },
+    { "expect_text": { "selector": "[data-testid='offline-banner']", "text": "Offline. Saved" } },
+    { "expect_text": { "selector": "main", "text": "Harbour Hotel" } },
+    { "screenshot": "saved-trip" },
+    { "goto": "#trips" },
+    { "expect_text": { "selector": "main", "text": "This page needs a connection" } },
+    { "offline": false }
+  ]
+}

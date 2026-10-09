@@ -5,6 +5,7 @@
   import TabBar from "$lib/components/TabBar.svelte";
   import TopBar from "$lib/components/TopBar.svelte";
   import { Button } from "$lib/components/ui/button";
+  import OfflineApp from "$lib/components/OfflineApp.svelte";
   import * as Alert from "$lib/components/ui/alert";
   import * as Card from "$lib/components/ui/card";
   import { pageFor } from "$lib/nav";
@@ -35,7 +36,9 @@
             <Button size="sm" onclick={() => { location.href = signInUrl(); }}>Sign in</Button>
           </Alert.Root>
         {/if}
-        {#if app.bootError && !app.state}
+        {#if app.bootError && !app.state && app.offline}
+          <OfflineApp />
+        {:else if app.bootError && !app.state}
           <Card.Root class="mx-auto mt-10 max-w-md">
             <Card.Header>
               <Card.Title>Can’t reach Waypoint</Card.Title>

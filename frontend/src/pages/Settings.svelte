@@ -11,6 +11,7 @@
   import LogosSection from "$lib/components/settings/LogosSection.svelte";
   import ImportSection from "$lib/components/settings/ImportSection.svelte";
   import McpSection from "$lib/components/settings/McpSection.svelte";
+  import { clearSaved } from "$lib/offline";
   import OfflineSection from "$lib/components/settings/OfflineSection.svelte";
   import RemindersSection from "$lib/components/settings/RemindersSection.svelte";
   import { flightStatus, loadFlightStatus } from "$lib/flightstatus.svelte";
@@ -29,6 +30,7 @@
   const tab = $derived<Tab>((TABS.find(([id]) => id === route.sub)?.[0]) ?? (landing || "account"));
 
   const signOut = () => act(async () => {
+    await clearSaved();
     const r = await api<{ redirect: string }>("/auth/logout", { method: "POST" });
     location.href = r.redirect;
   }, { busy: (on) => (signingOut = on) });

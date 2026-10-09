@@ -24,6 +24,7 @@ from .api.reminders import (api_device_add, api_device_remove, api_feed_make, ap
                             api_reminders_set)
 from .api.review import (api_review, api_review_dismiss, api_review_ignore, api_review_match, api_review_preview,
                          api_review_suggest, api_review_who)
+from .api.offline import api_offline
 from .api.state import api_state
 from .api.stats import api_distance_unit, api_distance_unit_save, api_stats
 
@@ -95,6 +96,7 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/mcp-settings/writes", api_mcp_writes),
     ("DELETE", "/api/mcp-settings/connections/{id}", api_mcp_revoke),
     ("GET", "/api/state", api_state),
+    ("GET", "/api/offline", api_offline),
 ]
 
 
