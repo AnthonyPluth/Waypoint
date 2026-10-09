@@ -58,3 +58,4 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 - With `prefers-reduced-motion: reduce` it fades in and out and does not slide.
 - Content that already has a heading of its own should drop it (`SegmentForm`'s `titled={false}`), since the sheet's title names the dialog.
 - Trip page: **Edit** (and **Add address**) opens `SegmentForm` in the sheet on a phone and inline under the booking on a computer. Which one is decided when it opens, so a form being filled in does not jump if the window is resized. Upcoming: a booking in the day-by-day list opens its pass card in the sheet at every width (a modified click still follows the link to the trip page).
+- Review, People: the forms (add by hand with its message, a guest, a membership) open in the sheet on a phone and inline on a computer, decided when they open. Page titles use `text-display`.

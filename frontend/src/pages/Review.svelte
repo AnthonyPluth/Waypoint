@@ -27,6 +27,8 @@
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import MessageView from "$lib/components/MessageView.svelte";
   import { Input } from "$lib/components/ui/input";
+  import { Sheet } from "$lib/components/ui/sheet";
+  import { viewport } from "$lib/phone.svelte";
   import { apiCall } from "$lib/contract";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import { toast } from "svelte-sonner";
@@ -59,7 +61,9 @@
   let draft = $state<Draft | null>(null);
   let formError = $state("");
   let saving = $state(false);
+  let inSheet = $state(false);
   const startAdd = (item: ReviewItem, use = false) => {
+    inSheet = viewport.phone;
     const s = use ? item.suggestion : null;
     draft = s
       ? { item, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
@@ -173,7 +177,63 @@
   }
 </script>
 
-<h1 class="mb-6 text-4xl font-bold tracking-tight">Review</h1>
+<h1 class="mb-6 text-display">Review</h1>
+
+{#snippet addForm(item: ReviewItem, d: Draft, titled: boolean)}
+  {@const labels = placeLabels(d.kind)}
+  <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-labelledby={titled ? `add-${item.id}` : undefined} aria-label={titled ? undefined : "Add this booking by hand"}>
+    {#if titled}<h3 id={`add-${item.id}`} class="font-medium">{d.suggested ? "Check this suggestion" : "Add this booking by hand"}</h3>{/if}
+    {#if d.suggested}<p class="text-sm text-muted-foreground">An AI read the email and suggested this. It can be wrong: check each field against the booking, change what’s off, then add it.</p>{/if}
+    {#if item.received}<p class="text-sm text-muted-foreground">The email was sent {item.received}. Enter the times as they read on the booking, at the place they happen.</p>{/if}
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">What is it?</span>
+      <select bind:value={d.kind} class={selectClass}>{#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}</select></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Provider</span>
+      <Input bind:value={d.provider} maxlength={100} autocomplete="off" /></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Confirmation code</span>
+      <Input bind:value={d.confirmation} maxlength={50} autocomplete="off" spellcheck={false} /></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[0]}</span>
+      <Input bind:value={d.origin} required maxlength={100} autocomplete="off" /></label>
+    {#if labels[1]}
+      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[1]}</span>
+        <Input bind:value={d.destination} required={d.kind === "flight"} maxlength={100} autocomplete="off" /></label>
+    {/if}
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "car" ? "Pick-up time" : "Departs"}</span>
+      <Input type="datetime-local" bind:value={d.start} required /></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off time" : "Arrives"}</span>
+      <Input type="datetime-local" bind:value={d.end} required /></label>
+    {#if d.kind === "hotel"}
+      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Address</span>
+        <Input bind:value={d.address} maxlength={300} autocomplete="off" />
+        <span class="text-muted-foreground">Waypoint works the time zone out from it when you leave the time zone empty.</span></label>
+      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>
+        <Input bind:value={d.startZone} maxlength={64} autocomplete="off" spellcheck={false} placeholder="America/New_York" />
+        <span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address above.</span></label>
+    {:else if d.kind !== "flight"}
+      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it starts</span>
+        <Input bind:value={d.startZone} required maxlength={64} autocomplete="off" spellcheck={false} placeholder="America/New_York" /></label>
+      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it ends</span>
+        <Input bind:value={d.endZone} maxlength={64} autocomplete="off" spellcheck={false} placeholder="Same as where it starts" /></label>
+    {:else}
+      <p class="text-sm text-muted-foreground">A flight’s time zones come from its airports.</p>
+    {/if}
+    {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
+    <div class="flex flex-wrap gap-2">
+      <Button type="submit" disabled={saving}>{saving ? "Adding…" : "Add to my trips"}</Button>
+      <Button type="button" variant="outline" disabled={saving} onclick={closeForm}>Cancel</Button>
+    </div>
+  </form>
+{/snippet}
+
+{#snippet messagePeek(item: ReviewItem)}
+  {@const p = peeks[item.id]}
+  <div class="w-full min-w-0 space-y-2" aria-label={`The message from ${sender(item)}`} role="region">
+    {#if p.state === "loading"}<p class="text-sm text-muted-foreground" role="status">Fetching the message from Gmail…</p>
+    {:else if p.state === "error"}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{p.message}</p>
+    {:else}
+      <MessageView subject={p.subject} text={p.text} html={p.html} truncated={p.truncated} />
+    {/if}
+  </div>
+{/snippet}
 
 {#if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">
@@ -213,64 +273,11 @@
                 <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={`Dismiss “${subject(item)}”`}>Dismiss</Button>
               </div>
             </li>
-            {#if peeks[item.id] && draft?.item.id === item.id}
-              {@const p = peeks[item.id]}
-              <li class="row items-stretch" data-testid="preview">
-                <div class="w-full min-w-0 space-y-2" aria-label={`The message from ${sender(item)}`} role="region">
-                  {#if p.state === "loading"}<p class="text-sm text-muted-foreground" role="status">Fetching the message from Gmail…</p>
-                  {:else if p.state === "error"}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{p.message}</p>
-                  {:else}
-                    <MessageView subject={p.subject} text={p.text} html={p.html} truncated={p.truncated} />
-                  {/if}
-                </div>
-              </li>
+            {#if peeks[item.id] && draft?.item.id === item.id && !inSheet}
+              <li class="row items-stretch" data-testid="preview">{@render messagePeek(item)}</li>
             {/if}
-            {#if draft && draft.item.id === item.id}
-              {@const d = draft}
-              {@const labels = placeLabels(d.kind)}
-              <li class="row items-stretch">
-                <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-labelledby={`add-${item.id}`}>
-                  <h3 id={`add-${item.id}`} class="font-medium">{d.suggested ? "Check this suggestion" : "Add this booking by hand"}</h3>
-                  {#if d.suggested}<p class="text-sm text-muted-foreground">An AI read the email and suggested this. It can be wrong: check each field against the booking, change what’s off, then add it.</p>{/if}
-                  {#if item.received}<p class="text-sm text-muted-foreground">The email was sent {item.received}. Enter the times as they read on the booking, at the place they happen.</p>{/if}
-                  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">What is it?</span>
-                    <select bind:value={d.kind} class={selectClass}>{#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}</select></label>
-                  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Provider</span>
-                    <Input bind:value={d.provider} maxlength={100} autocomplete="off" /></label>
-                  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Confirmation code</span>
-                    <Input bind:value={d.confirmation} maxlength={50} autocomplete="off" spellcheck={false} /></label>
-                  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[0]}</span>
-                    <Input bind:value={d.origin} required maxlength={100} autocomplete="off" /></label>
-                  {#if labels[1]}
-                    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[1]}</span>
-                      <Input bind:value={d.destination} required={d.kind === "flight"} maxlength={100} autocomplete="off" /></label>
-                  {/if}
-                  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "car" ? "Pick-up time" : "Departs"}</span>
-                    <Input type="datetime-local" bind:value={d.start} required /></label>
-                  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off time" : "Arrives"}</span>
-                    <Input type="datetime-local" bind:value={d.end} required /></label>
-                  {#if d.kind === "hotel"}
-                    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Address</span>
-                      <Input bind:value={d.address} maxlength={300} autocomplete="off" />
-                      <span class="text-muted-foreground">Waypoint works the time zone out from it when you leave the time zone empty.</span></label>
-                    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>
-                      <Input bind:value={d.startZone} maxlength={64} autocomplete="off" spellcheck={false} placeholder="America/New_York" />
-                      <span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address above.</span></label>
-                  {:else if d.kind !== "flight"}
-                    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it starts</span>
-                      <Input bind:value={d.startZone} required maxlength={64} autocomplete="off" spellcheck={false} placeholder="America/New_York" /></label>
-                    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it ends</span>
-                      <Input bind:value={d.endZone} maxlength={64} autocomplete="off" spellcheck={false} placeholder="Same as where it starts" /></label>
-                  {:else}
-                    <p class="text-sm text-muted-foreground">A flight’s time zones come from its airports.</p>
-                  {/if}
-                  {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
-                  <div class="flex flex-wrap gap-2">
-                    <Button type="submit" disabled={saving}>{saving ? "Adding…" : "Add to my trips"}</Button>
-                    <Button type="button" variant="outline" disabled={saving} onclick={closeForm}>Cancel</Button>
-                  </div>
-                </form>
-              </li>
+            {#if draft && draft.item.id === item.id && !inSheet}
+              <li class="row items-stretch">{@render addForm(item, draft, true)}</li>
             {/if}
           {/each}
         </ul>
@@ -347,3 +354,12 @@
 <ConfirmDialog bind:open={asking} title={`Ignore ${ignoring?.sender_domain ?? "this sender"}?`} confirmLabel="Ignore" busyLabel="Ignoring…" destructive
   description="Waypoint stops looking at mail from this sender in that mailbox, and their other items leave this list. Other mailboxes aren’t affected."
   onconfirm={async () => { const i = ignoring; return i ? await ignore(i) : true; }} />
+
+<Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v) closeForm(); }} title={draft?.suggested ? "Check this suggestion" : "Add this booking by hand"}>
+  {#if draft}
+    <div class="flex flex-col gap-4">
+      {#if peeks[draft.item.id]}<div data-testid="preview">{@render messagePeek(draft.item)}</div>{/if}
+      {@render addForm(draft.item, draft, false)}
+    </div>
+  {/if}
+</Sheet>

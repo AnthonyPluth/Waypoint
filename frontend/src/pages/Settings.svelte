@@ -33,7 +33,7 @@
   }, { busy: (on) => (signingOut = on) });
 </script>
 
-<h1 class="mb-4 text-4xl font-bold tracking-tight">Settings</h1>
+<h1 class="mb-4 text-display">Settings</h1>
 
 <nav aria-label="Settings sections" class="-mx-4 mb-6 overflow-x-auto px-4 md:mx-0 md:px-0">
   <ul class="flex w-max gap-1 rounded-2xl bg-muted p-1 md:w-fit">

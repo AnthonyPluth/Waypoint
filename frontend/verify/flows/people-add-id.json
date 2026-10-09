@@ -4,8 +4,8 @@
   "steps": [
     { "expect_text": { "selector": "h1", "text": "People" } },
     { "click": "button[aria-label='Add a membership for Sam Doe']" },
-    { "wait_for": "form[aria-labelledby='id-form-title']" },
-    { "scroll_to": "form[aria-labelledby='id-form-title']" },
-    { "screenshot": "form-under-person" }
+    { "wait_for": "form[aria-labelledby='id-form-title'], [data-slot='sheet'] form" },
+    { "scroll_to": "form[aria-labelledby='id-form-title'], [data-slot='sheet'] form" },
+    { "screenshot": "membership-form" }
   ]
 }

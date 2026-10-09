@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
 import type { Person, Review, ReviewItem, ReviewMatch, WhoIsThis } from "$lib/api-types";
+import { viewport } from "$lib/phone.svelte";
 import { toast } from "svelte-sonner";
 import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
 
@@ -529,5 +530,39 @@ describe("Review: Ask AI", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Asked about 0 of 2: Turn on AI suggestions in Settings first."));
     expect(calls.filter((c) => c[0].endsWith("/suggest"))).toHaveLength(1);
+  });
+});
+
+describe("Review on a phone", () => {
+  beforeEach(() => { viewport.phone = true; });
+  afterEach(() => { viewport.phone = false; });
+
+  it("opens Add by hand in a sheet with the message above the form, and Cancel closes it", async () => {
+    render(ReviewPage);
+    const u = userEvent.setup();
+    const open = await screen.findByRole("button", { name: /Add .* by hand/ });
+    await u.click(open);
+    const sheet = await screen.findByRole("dialog", { name: "Add this booking by hand" });
+    expect(sheet).toHaveAttribute("data-side", "bottom");
+    expect(await within(sheet).findByText(/Your flight EX 410/)).toBeInTheDocument();
+    expect(within(sheet).getByLabelText("Provider")).toHaveValue("Example Air");
+    expect(within(sheet).getAllByRole("heading", { name: "Add this booking by hand" })).toHaveLength(1);
+    expect(screen.queryByTestId("review-item")?.closest("ul")?.querySelector("form")).toBeNull();
+    await u.click(within(sheet).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("adds the booking from the sheet and closes it", async () => {
+    render(ReviewPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    const sheet = await screen.findByRole("dialog");
+    await u.type(within(sheet).getByLabelText("From (airport code)"), "JFK");
+    await u.type(within(sheet).getByLabelText("To (airport code)"), "SFO");
+    await u.type(within(sheet).getByLabelText("Departs"), "2026-12-08T08:00");
+    await u.type(within(sheet).getByLabelText("Arrives"), "2026-12-08T11:00");
+    await u.click(within(sheet).getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(calls.some(([path, method]) => path === "/api/segments" && method === "POST")).toBe(true));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 });

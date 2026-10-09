@@ -23,6 +23,10 @@ Linking moves everything on the guest to you in one step: their trips and bookin
 
 Linking can’t be undone in Waypoint; restoring a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) is the way back. Merging two members, or two guests, isn’t supported.
 
+## Adding and editing
+
+**Add a guest** and the pencil beside a person open the name form at the top of the page on a computer, and in a sheet that slides up over the dimmed page on a phone. **+ ID** on a person (and the pencil beside a membership) opens the [membership](/Waypoint/start/loyalty/) form under that person on a computer and in a sheet on a phone. Either way a save that fails keeps what you typed and says why inside the form, and **Cancel**, swiping the sheet down, tapping outside it or Escape closes it without saving. Which one it is is decided when the form opens, so a form being filled in doesn’t jump if the window is resized.
+
 ## Names
 
 Each person has:

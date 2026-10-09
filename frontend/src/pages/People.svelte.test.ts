@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
@@ -9,6 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 import { api } from "$lib/api";
 import type { LoyaltyEntry, LoyaltyList, Person } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
+import { viewport } from "$lib/phone.svelte";
 import { state } from "../test/fixtures";
 import People from "./People.svelte";
 
@@ -315,5 +316,46 @@ describe("People", () => {
     render(People);
     expect(await screen.findByText("Can’t reach Waypoint.")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "People" })).toBeNull();
+  });
+});
+
+describe("People on a phone", () => {
+  beforeEach(() => { viewport.phone = true; });
+  afterEach(() => { viewport.phone = false; });
+
+  it("adds a guest in a sheet and closes it when saved", async () => {
+    render(People);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add a guest/ }));
+    const sheet = await screen.findByRole("dialog", { name: "Add a guest" });
+    expect(sheet).toHaveAttribute("data-side", "bottom");
+    expect(within(sheet).getAllByRole("heading", { name: "Add a guest" })).toHaveLength(1);
+    await u.type(within(sheet).getByLabelText("Name"), "Sam Doe");
+    await u.click(within(sheet).getByRole("button", { name: "Add guest" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(await screen.findByText("Sam Doe")).toBeInTheDocument();
+  });
+
+  it("edits a person in a sheet and Cancel changes nothing", async () => {
+    render(People);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit Mia Doe" }));
+    const sheet = await screen.findByRole("dialog", { name: "Edit Mia Doe" });
+    expect(within(sheet).getByLabelText(/Legal name/)).toHaveValue("Mia Rose Doe");
+    await u.click(within(sheet).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
+  });
+
+  it("adds a membership in a sheet, keeping the masked number rule", async () => {
+    render(People);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Add a membership for Mia Doe" }));
+    const sheet = await screen.findByRole("dialog", { name: "Add a membership for Mia Doe" });
+    await u.type(within(sheet).getByLabelText("Number"), "DEMO7654321");
+    await u.click(within(sheet).getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.queryByText("DEMO7654321")).toBeNull();
+    expect(await screen.findByText("••••4321")).toBeInTheDocument();
   });
 });
