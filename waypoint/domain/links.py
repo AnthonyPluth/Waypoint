@@ -5,7 +5,19 @@ from collections.abc import Sequence
 from typing import TypedDict
 from urllib.parse import quote, urlsplit
 
-MANAGE: dict[str, tuple[str, str]] = {}
+UNITED = ("www.united.com", "/en/us/manageres/mytrips")
+DELTA = ("www.delta.com", "/mytrips/")
+ALASKA = ("www.alaskaair.com", "/booking/reservation-lookup")
+AMERICAN = ("www.aa.com", "/reservation/view/find-your-reservation")
+SOUTHWEST = ("www.southwest.com", "/air/check-in/")
+
+MANAGE: dict[str, tuple[str, str]] = {
+    "united airlines": UNITED, "united": UNITED,
+    "delta air lines": DELTA, "delta": DELTA,
+    "alaska airlines": ALASKA,
+    "american airlines": AMERICAN,
+    "southwest airlines": SOUTHWEST,
+}
 
 DIGITS = re.compile(r"\d")
 
@@ -60,6 +72,7 @@ def call_link(phone: str | None) -> str | None:
 def segment_links(kind: str, provider: str | None, confirmation: str | None, last_name: str | None, manage_url: str | None,
                   details: dict[str, str], origin: str | None) -> Links:
     stay = kind in ("hotel", "car", "cruise")
-    return {"app": manage_link(provider, confirmation, last_name) or https_only(manage_url),
+    airline_page = manage_link(provider, confirmation, last_name) if kind == "flight" else None
+    return {"app": https_only(manage_url) or airline_page,
             "directions": directions_link(details.get("address") or origin) if stay else None,
             "call": call_link(details.get("phone"))}
