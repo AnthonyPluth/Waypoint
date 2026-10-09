@@ -53,6 +53,12 @@ describe("the image's inputs", () => {
     expect(inputs.topAirports).toEqual(["JFK", "LHR"]);
   });
 
+  it("order airports with the same number of visits by code", () => {
+    const base = stats();
+    const tied = { ...base, flights: { ...base.flights, airports: [{ ...base.flights.airports[1], code: "ZRH", visits: 5 }, { ...base.flights.airports[0], code: "AMS", visits: 5 }, { ...base.flights.airports[1], code: "BOS", visits: 7 }] } };
+    expect(imageInputs(reviewFacts(tied, allTime())).topAirports).toEqual(["BOS", "AMS", "ZRH"]);
+  });
+
   it("carry none of the canary values, in the inputs, the drawn image or the list shown on screen", () => {
     const everything = [JSON.stringify(inputs), cardSvg(inputs, [{ d: "M0,0L1,1", visited: true }]), imageSummary(inputs).join("\n")].join("\n");
     for (const canary of CANARIES) expect(everything, canary).not.toContain(canary);
