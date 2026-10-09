@@ -11,6 +11,7 @@
   import LogosSection from "$lib/components/settings/LogosSection.svelte";
   import ImportSection from "$lib/components/settings/ImportSection.svelte";
   import McpSection from "$lib/components/settings/McpSection.svelte";
+  import OfflineSection from "$lib/components/settings/OfflineSection.svelte";
   import RemindersSection from "$lib/components/settings/RemindersSection.svelte";
   import { flightStatus, loadFlightStatus } from "$lib/flightstatus.svelte";
   import { onMount } from "svelte";
@@ -98,6 +99,8 @@
 
     <ImportSection />
   {:else}
+    <OfflineSection />
+
     <McpSection />
 
     <DataSection />

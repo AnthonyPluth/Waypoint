@@ -73,6 +73,30 @@ describe("no browser storage", () => {
   });
 });
 
+describe("the Cache API belongs to the offline vault", () => {
+  const open = 'export const c = caches.open("x");';
+  it("flags caches anywhere but lib/offline-vault.ts", async () => {
+    expect(await flagged(open)).toEqual(["no-restricted-syntax"]);
+    expect(await flagged('export const c = window.caches.open("x");')).toEqual(["no-restricted-syntax"]);
+    expect(await flagged('export const c = self.caches.match("/x");')).toEqual(["no-restricted-syntax"]);
+    expect(await flagged(open, "frontend/src/lib/api.ts")).toEqual(["no-restricted-syntax"]);
+    expect(await flagged("<script lang=\"ts\">\n  caches.delete(\"x\");\n</script>\n", "frontend/src/Example.svelte")).toEqual(["no-restricted-syntax"]);
+  });
+  it("leaves the vault itself alone, and says why in its message", async () => {
+    expect(await flagged(open, "frontend/src/lib/offline-vault.ts")).toEqual([]);
+    const [result] = await eslint.lintText(open, { filePath: `${root}frontend/src/lib/example.ts` });
+    expect(result.messages[0].message).toContain("lib/offline-vault.ts");
+    expect(result.messages[0].message).toContain("ciphertext");
+  });
+  it("keeps the other browser storage banned inside the vault", async () => {
+    expect(await flagged('localStorage.setItem("k", "v");', "frontend/src/lib/offline-vault.ts")).toEqual(["no-restricted-syntax"]);
+    expect(await flagged('export const r = indexedDB.open("w");', "frontend/src/lib/offline-vault.ts")).toEqual(["no-restricted-syntax"]);
+  });
+  it("leaves a variable that merely contains the word alone", async () => {
+    expect(await flagged("export const cachesOpened = 1;")).toEqual([]);
+  });
+});
+
 describe("no console", () => {
   it("flags console.log, info and debug in the web app", async () => {
     expect(await flagged('console.log("trip", 1);')).toEqual(["no-console"]);
