@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/svelte";
+import { tick } from "svelte";
 import { describe, expect, it } from "vitest";
 import type { Tone } from "$lib/status";
 import StatusChip from "./StatusChip.svelte";
@@ -29,5 +30,15 @@ describe("StatusChip", () => {
   it("hides its dot from screen readers", () => {
     render(StatusChip, { chip: { label: "Confirmed", tone: "ok" } });
     expect(screen.getByText("Confirmed").querySelector("[aria-hidden='true']")).not.toBeNull();
+  });
+});
+
+describe("StatusChip motion", () => {
+  it("animates when its label changes, not when it first appears", async () => {
+    const { rerender } = render(StatusChip, { chip: { label: "On time", tone: "ok" } });
+    expect(screen.getByText("On time").classList.contains("status-chip")).toBe(false);
+    await rerender({ chip: { label: "Delayed", tone: "warn" } });
+    await tick();
+    expect(screen.getByText("Delayed").classList.contains("status-chip")).toBe(true);
   });
 });
