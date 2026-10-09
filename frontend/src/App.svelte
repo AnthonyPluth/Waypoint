@@ -8,6 +8,7 @@
   import * as Alert from "$lib/components/ui/alert";
   import * as Card from "$lib/components/ui/card";
   import { pageFor } from "$lib/nav";
+  import Design from "./pages/Design.svelte";
   import People from "./pages/People.svelte";
   import Review from "./pages/Review.svelte";
   import Stats from "./pages/Stats.svelte";
@@ -18,7 +19,7 @@
   import { Toaster } from "svelte-sonner";
   import type { Component } from "svelte";
 
-  const PAGES: Record<string, Component> = { upcoming: Upcoming, trips: Trips, stats: Stats, trip: Trip, people: People, review: Review, settings: Settings };
+  const PAGES: Record<string, Component> = { upcoming: Upcoming, trips: Trips, stats: Stats, trip: Trip, people: People, review: Review, settings: Settings, design: Design };
   const Page = $derived(PAGES[pageFor(route.page)]);
 </script>
 
@@ -55,4 +56,4 @@
   </div>
 </div>
 <TabBar />
-<Toaster theme="system" position="bottom-center" mobileOffset={{ bottom: "calc(env(safe-area-inset-bottom) + 5rem)" }} />
+<Toaster theme="dark" position="bottom-center" mobileOffset={{ bottom: "calc(env(safe-area-inset-bottom) + 5rem)" }} />

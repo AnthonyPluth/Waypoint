@@ -9,17 +9,17 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
-  import BrandLogo from "$lib/components/BrandLogo.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import { isMobile } from "$lib/platform";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
   import MessageView from "$lib/components/MessageView.svelte";
+  import PassCard from "$lib/components/PassCard.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, subline, untimed } from "$lib/trips";
+  import { bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, untimed } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
@@ -47,6 +47,12 @@
     } catch (err) { mails[s.id] = { state: "error", message: errMsg(err) }; }
   }
 
+  let now = $state(Date.now());
+  $effect(() => {
+    const tick = setInterval(() => (now = Date.now()), 30_000);
+    return () => clearInterval(tick);
+  });
+
   const id = $derived(route.sub);
   const appWord = isMobile() ? "Open in app" : "Manage booking";
 
@@ -72,6 +78,7 @@
   });
 
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
+  const eyebrowOf = (s: Segment) => `${kindName(s)} · ${dayLabel(s.start_local)}`;
   const kindName = (s: Segment) => KINDS.find(([k]) => k === s.kind)?.[1] ?? s.kind;
   const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
 
@@ -130,7 +137,7 @@
         {#if renameError}<p class="mt-2 rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{renameError}</p>{/if}
       {:else}
         <div class="flex items-start gap-2">
-          <h1 class="break-words text-4xl font-bold tracking-tight">{t.name}</h1>
+          <h1 class="break-words text-display">{t.name}</h1>
           <Button variant="ghost" size="icon" class="mt-1 shrink-0" aria-label="Rename trip" onclick={() => { renaming = t.name; renameError = ""; }}><Pencil /></Button>
         </div>
       {/if}
@@ -147,62 +154,56 @@
   {#if t.segments.length === 0}
     <p class="text-muted-foreground">Nothing booked on this trip yet.</p>
   {/if}
-  <ul class="flex flex-col gap-4" aria-label="Bookings">
+  <ul class="ml-2 flex flex-col gap-6 border-l-2 border-dashed border-border pl-4 sm:pl-6" aria-label="Bookings">
     {#each cards as card (card.id)}
       {@const s = card.lead}
-      {@const live = !card.cancelled}
       {#if card.segments.length === 1}
-        <li class="pass scroll-mt-20" id={`segment-${s.id}`} class:ring-2={wanted === String(s.id)} class:ring-ring={wanted === String(s.id)} class:opacity-70={s.status === "cancelled"}>
-          <div class="flex flex-col gap-2 p-5 md:p-6">
-            {@render heading(s)}
-            {#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}
-            <dl class="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-              {@render times(s)}
-              {#if s.confirmation}<div><dt class="eyebrow">Confirmation</dt><dd class="mt-1 text-lg"><CopyCode code={s.confirmation} /></dd></div>{/if}
-            </dl>
-            {@render ports(s)}
-            {@render links(s)}
-          </div>
-          <div class="pass-tear" aria-hidden="true"></div>
-          <div class="flex flex-col gap-3 p-5 md:p-6">
-            <h3 class="eyebrow">Travellers</h3>
-            {@render travellerList(s)}
-            {@render buttons(s, headline(s))}
-          </div>
-        </li>
+        <PassCard as="li" id={`segment-${s.id}`} highlight={wanted === String(s.id)} segment={s} {now} level={2} eyebrow={eyebrowOf(s)} showApp={false} omit={["Address"]}>
+          {#snippet times()}<dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(s)}</dl>{/snippet}
+          {#snippet details()}{@render ports(s)}{@render links(s)}{/snippet}
+          {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
+          {#snippet footer()}
+            <div class="flex flex-col gap-3">
+              <h3 class="eyebrow">Travellers</h3>
+              {@render travellerList(s)}
+              {@render buttons(s, headline(s))}
+            </div>
+          {/snippet}
+        </PassCard>
       {:else}
-        <li class="pass scroll-mt-20" id={`segment-${s.id}`} class:ring-2={wanted === String(s.id)} class:ring-ring={wanted === String(s.id)} class:opacity-70={card.cancelled} aria-label={`${headline(s)}, on ${card.segments.length} bookings`}>
-          <div class="flex flex-col gap-2 p-5 md:p-6">
-            {@render heading(s, card.cancelled)}
-            {#if live && !untimed(s)}<FlightStatus segment={s} />{/if}
+        <PassCard as="li" id={`segment-${s.id}`} highlight={wanted === String(s.id)} segment={s} {now} level={2} eyebrow={eyebrowOf(s)} showCode={false} showApp={false}
+          label={`${headline(s)}, on ${card.segments.length} bookings`}>
+          {#snippet times()}
             {#if card.timesDiffer}
-              <p class="mt-2 text-sm font-medium" data-times-differ><Badge variant="secondary">Times differ between bookings</Badge> <span class="text-muted-foreground">Each booking’s times are below.</span></p>
+              <p class="text-sm font-medium" data-times-differ><Badge variant="secondary">Times differ between bookings</Badge> <span class="text-muted-foreground">Each booking’s times are below.</span></p>
             {:else}
-              <dl class="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render times(s)}</dl>
+              <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(s)}</dl>
             {/if}
-          </div>
-          <div class="pass-tear" aria-hidden="true"></div>
-          <div class="flex flex-col gap-4 p-5 md:p-6">
-            <h3 class="eyebrow">Bookings</h3>
-            <ul class="flex flex-col gap-4" aria-label={`Bookings of ${headline(s)}`}>
-              {#each card.segments as b (b.id)}
-                {@const name = `${headline(b)} booking${b.confirmation ? ` ${b.confirmation}` : ""}`}
-                <li class="flex flex-col gap-3 rounded-2xl border border-border bg-background/40 p-4" class:opacity-70={b.status === "cancelled"} data-booking>
-                  <p class="flex flex-wrap items-center gap-2">
-                    {#if b.confirmation}<span class="text-lg"><CopyCode code={b.confirmation} /></span>{:else}<span class="text-muted-foreground">No confirmation code</span>{/if}
-                    {#if b.status !== "confirmed"}<Badge variant={b.status === "cancelled" ? "destructive" : "secondary"}>{b.status === "cancelled" ? "Cancelled" : "Changed"}</Badge>{/if}</p>
-                  {#if card.timesDiffer && b.status !== "cancelled"}
-                    <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render times(b)}</dl>
-                  {/if}
-                  {@render links(b)}
-                  <h4 class="eyebrow">Travellers</h4>
-                  {@render travellerList(b)}
-                  {@render buttons(b, name)}
-                </li>
-              {/each}
-            </ul>
-          </div>
-        </li>
+          {/snippet}
+          {#snippet live()}{#if !card.cancelled && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
+          {#snippet footer()}
+            <div class="flex flex-col gap-4">
+              <h3 class="eyebrow">Bookings</h3>
+              <ul class="flex flex-col gap-4" aria-label={`Bookings of ${headline(s)}`}>
+                {#each card.segments as b (b.id)}
+                  {@const name = `${headline(b)} booking${b.confirmation ? ` ${b.confirmation}` : ""}`}
+                  <li class="flex flex-col gap-3 rounded-2xl border border-border bg-surface-2 p-4" class:opacity-70={b.status === "cancelled"} data-booking>
+                    <p class="flex flex-wrap items-center gap-2">
+                      {#if b.confirmation}<span class="text-lg"><CopyCode code={b.confirmation} /></span>{:else}<span class="text-muted-foreground">No confirmation code</span>{/if}
+                      {#if b.status !== "confirmed"}<Badge variant={b.status === "cancelled" ? "destructive" : "secondary"}>{b.status === "cancelled" ? "Cancelled" : "Changed"}</Badge>{/if}</p>
+                    {#if card.timesDiffer && b.status !== "cancelled"}
+                      <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(b)}</dl>
+                    {/if}
+                    {@render links(b)}
+                    <h4 class="eyebrow">Travellers</h4>
+                    {@render travellerList(b)}
+                    {@render buttons(b, name)}
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          {/snippet}
+        </PassCard>
       {/if}
       {#if form && form.id !== null && card.segments.some((b) => b.id === form?.id)}
         <li use:reveal aria-label="Edit booking"><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></li>
@@ -211,19 +212,7 @@
   </ul>
 {/if}
 
-{#snippet heading(s: Segment, cancelled: boolean = s.status === "cancelled")}
-  <p class="flex flex-wrap items-center gap-2"><span class="eyebrow">{kindName(s)}</span>
-    {#if cancelled}<Badge variant="destructive">Cancelled</Badge>{:else if s.status !== "confirmed"}<Badge variant="secondary">Changed</Badge>{/if}</p>
-  <div class="flex items-center gap-3">
-    <BrandLogo src={s.logo} label={s.logo_label} size={40} />
-    <div class="min-w-0">
-      <h2 class="break-words text-2xl font-bold tracking-tight" class:line-through={cancelled}>{headline(s)}</h2>
-      {#if subline(s)}<p class="break-words text-sm text-muted-foreground">{subline(s)}</p>{/if}
-    </div>
-  </div>
-{/snippet}
-
-{#snippet times(s: Segment)}
+{#snippet timeRows(s: Segment)}
   <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
     <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} zone={s.start_zone} />{/if}</dd></div>
   <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>

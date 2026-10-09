@@ -266,5 +266,27 @@ class ManageLinks(unittest.TestCase):
         self.assertEqual(fc.check_manage_links({}, ""), [])
 
 
+class DarkOnly(unittest.TestCase):
+    def test_the_repository_passes(self):
+        files = fc.dark_only_files()
+        self.assertIn("frontend/index.html", files)
+        self.assertIn("frontend/src/app.css", files)
+        self.assertIn("waypoint/static/page.css", files)
+        self.assertEqual(fc.check_dark_only(files), [])
+
+    def test_a_prefers_color_scheme_query_fails(self):
+        problems = fc.check_dark_only({"frontend/src/x.css": "@media (prefers-color-scheme: light) { :root { --bg: #fff } }"})
+        self.assertEqual(len(problems), 1)
+        self.assertIn("frontend/src/x.css: the app is dark only", problems[0])
+
+    def test_a_stylesheet_or_meta_tag_that_allows_light_fails(self):
+        self.assertEqual(len(fc.check_dark_only({"a.css": ":root { color-scheme: light dark; }"})), 1)
+        self.assertEqual(len(fc.check_dark_only({"i.html": '<meta name="color-scheme" content="light dark">'})), 1)
+        self.assertEqual(len(fc.check_dark_only({"i.html": '<meta name="color-scheme" content="dark">'})), 0)
+
+    def test_dark_only_passes(self):
+        self.assertEqual(fc.check_dark_only({"a.css": ":root { color-scheme: dark; --bg: #07090e }"}), [])
+
+
 if __name__ == "__main__":
     unittest.main()

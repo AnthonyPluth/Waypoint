@@ -82,3 +82,18 @@ describe("no console", () => {
     expect(await flagged("console.error(new Error('x'));")).toEqual([]);
   });
 });
+
+describe("the app is dark only", () => {
+  it("flags a dark: variant in a string, a template and a component's class", async () => {
+    expect(await flagged('export const c = "bg-card dark:bg-secondary";')).toEqual(["no-restricted-syntax"]);
+    expect(await flagged("export const c = `border dark:border-input`;")).toEqual(["no-restricted-syntax"]);
+    expect(await flagged('<div class="flex dark:bg-secondary"></div>\n', "frontend/src/Example.svelte")).toEqual(["no-restricted-syntax"]);
+  });
+  it("flags a prefers-color-scheme query", async () => {
+    expect(await flagged('export const q = "(prefers-color-scheme: light)";')).toEqual(["no-restricted-syntax"]);
+  });
+  it("leaves other variants and plain words alone", async () => {
+    expect(await flagged('export const c = "bg-secondary hover:bg-accent focus-visible:ring-ring";')).toEqual([]);
+    expect(await flagged('export const t = "Dark roast, no variant: here";')).toEqual([]);
+  });
+});
