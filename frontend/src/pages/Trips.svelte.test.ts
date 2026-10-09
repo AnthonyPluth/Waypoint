@@ -9,6 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 import { api } from "$lib/api";
 import type { Person } from "$lib/api-types";
 import { route } from "$lib/app.svelte";
+import { panes } from "$lib/panes.svelte";
 import { segment, trip } from "../test/fixtures";
 import Trips from "./Trips.svelte";
 
@@ -35,7 +36,7 @@ beforeEach(() => {
   location.hash = "#trips";
   serve();
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => { vi.useRealTimers(); panes.two = false; });
 const user = () => userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
 describe("what a trip holds", () => {
@@ -145,5 +146,82 @@ describe("Trips", () => {
     expect(api).not.toHaveBeenCalledWith("/api/segments", expect.anything());
     await u.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("form")).toBeNull();
+  });
+});
+
+describe("the traveller filter’s address", () => {
+  const hashChanged = () => window.dispatchEvent(new HashChangeEvent("hashchange"));
+
+  it("opens on the traveller in the address, writes a new choice back and reads it again", async () => {
+    location.hash = "#trips?who=2";
+    hashChanged();
+    expect(route.query).toBe("who=2");
+    render(Trips);
+    await screen.findByRole("list", { name: "Upcoming trips" });
+    expect(screen.getByLabelText("Travelling")).toHaveValue("2");
+    expect(screen.queryByText("Trip to Orlando")).toBeNull();
+
+    await user().selectOptions(screen.getByLabelText("Travelling"), "Jane Doe");
+    expect(location.hash).toBe("#trips?who=1");
+    route.query = "";
+    hashChanged();
+    expect(route.query).toBe("who=1");
+    await waitFor(() => expect(screen.getByLabelText("Travelling")).toHaveValue("1"));
+    expect(screen.queryByText("Trip to Auckland")).toBeNull();
+    expect(screen.getByText("Trip to Orlando")).toBeInTheDocument();
+
+    await user().selectOptions(screen.getByLabelText("Travelling"), "Everyone");
+    expect(location.hash).toBe("#trips");
+  });
+});
+
+describe("two panes", () => {
+  function serveTrips() {
+    const all = [london, auckland, orlando];
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "/api/people") return { people: [jane, sam] };
+      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+      const one = /^\/api\/trips\/(\d+)$/.exec(path);
+      if (one) return all.find((t) => t.id === Number(one[1]));
+      return { trips: all };
+    });
+  }
+
+  it("shows the first trip beside the list on a wide screen, and the one you pick", async () => {
+    panes.two = true;
+    serveTrips();
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to London" })).toBeInTheDocument();
+    expect(within(pane).queryByRole("link", { name: /^Trips$/ })).toBeNull();
+    const links = within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link");
+    expect(links[0]).toHaveAttribute("aria-current", "true");
+
+    await user().click(links[1]);
+    expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
+    expect(links[1]).toHaveAttribute("aria-current", "true");
+    expect(links[0]).not.toHaveAttribute("aria-current");
+    expect(location.hash).toBe("#trips");
+  });
+
+  it("stays a list that opens the trip page on a phone or tablet", async () => {
+    serveTrips();
+    render(Trips);
+    await screen.findByRole("list", { name: "Upcoming trips" });
+    expect(screen.queryByRole("region", { name: "Selected trip" })).toBeNull();
+    const link = within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[1];
+    expect(link).toHaveAttribute("href", "#trip/2");
+    expect(link).not.toHaveAttribute("aria-current");
+  });
+
+  it("falls back to the first trip left when the filter hides the picked one", async () => {
+    panes.two = true;
+    serveTrips();
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await user().click(within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[1]);
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" });
+    await user().selectOptions(screen.getByLabelText("Travelling"), "Jane Doe");
+    expect(await within(screen.getByRole("region", { name: "Selected trip" })).findByRole("heading", { level: 1, name: "Trip to London" })).toBeInTheDocument();
   });
 });

@@ -27,6 +27,8 @@
   import Plus from "@lucide/svelte/icons/plus";
   import { toast } from "svelte-sonner";
 
+  let { tripId = null, onchanged = null }: { tripId?: number | null; onchanged?: (() => void) | null } = $props();
+
   let trip = $state<Trip | null>(null);
   let people = $state<Person[]>([]);
   let loyalty = $state<LoyaltyEntry[]>([]);
@@ -56,7 +58,7 @@
     return () => clearInterval(tick);
   });
 
-  const id = $derived(route.sub);
+  const id = $derived(tripId === null ? route.sub : String(tripId));
   const appWord = isMobile() ? "Open in app" : "Manage booking";
 
   let latest = 0;
@@ -105,6 +107,7 @@
       trip = await apiCall<"POST /api/trips/{id}">(`/api/trips/${trip.id}`, { method: "POST", body: { name } });
       renaming = null; renameError = "";
       toast.success("Saved");
+      onchanged?.();
     }, { busy: (on) => (saving = on), onError: (m) => (renameError = m) });
   };
 
@@ -112,18 +115,22 @@
     form = null;
     toast.success("Saved");
     if (trip && s.trip_id !== trip.id) { location.hash = `#trip/${s.trip_id}`; return; }
+    onchanged?.();
     await load();
   }
 
   const remove = (s: Segment) => act(async () => {
     await apiCall<"DELETE /api/segments/{id}">(`/api/segments/${s.id}`, { method: "DELETE" });
     toast.success("Removed");
-    if (trip && trip.segments.length === 1 && trip.auto) { location.hash = "#trips"; return; }
+    onchanged?.();
+    if (trip && trip.segments.length === 1 && trip.auto) { if (!onchanged) location.hash = "#trips"; return; }
     await load();
   });
 </script>
 
-<a class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" href="#trips"><ArrowLeft class="size-4" /> Trips</a>
+{#if tripId === null}
+  <a class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" href="#trips"><ArrowLeft class="size-4" /> Trips</a>
+{/if}
 
 {#if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">

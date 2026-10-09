@@ -28,7 +28,7 @@
   <div class="flex flex-1">
     <SideNav />
     <main class="min-w-0 flex-1 px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+6rem)] md:px-8 md:pt-8 lg:pb-12">
-      <div class="mx-auto max-w-3xl">
+      <div class={`mx-auto max-w-3xl ${route.page === "trips" ? "lg:max-w-6xl" : ""}`}>
         {#if app.sessionExpired}
           <Alert.Root class="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-20 mb-4 flex flex-wrap items-center justify-between gap-3 border-signal bg-signal-soft text-signal-ink shadow-lg">
             <Alert.Description class="text-signal-ink">Your session expired. Sign in again — what you’re editing stays on this page until you do.</Alert.Description>
