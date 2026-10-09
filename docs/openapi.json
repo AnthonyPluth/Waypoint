@@ -1950,6 +1950,56 @@
         }
       }
     },
+    "/api/review/{id}/match": {
+      "post": {
+        "operationId": "api_review_match",
+        "x-handler": "waypoint/server/api/review.py:api_review_match",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/review/{id}/preview": {
       "get": {
         "operationId": "api_review_preview",
@@ -3139,6 +3189,25 @@
         ],
         "additionalProperties": false
       },
+      "MatchBody": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer"
+          },
+          "segment_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "index",
+          "segment_id"
+        ],
+        "additionalProperties": false
+      },
       "Matched": {
         "type": "object",
         "properties": {
@@ -3583,6 +3652,12 @@
               "$ref": "#/components/schemas/ReviewItem"
             }
           },
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewMatch"
+            }
+          },
           "who": {
             "type": "array",
             "items": {
@@ -3595,8 +3670,122 @@
         },
         "required": [
           "items",
+          "matches",
           "who",
           "ai"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewBooking": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "flight",
+              "hotel",
+              "car",
+              "train",
+              "cruise"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confirmation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "provider",
+          "confirmation",
+          "origin",
+          "destination",
+          "start_local",
+          "end_local"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewCandidate": {
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "integer"
+          },
+          "trip_id": {
+            "type": "integer"
+          },
+          "trip_name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "flight",
+              "hotel",
+              "car",
+              "train",
+              "cruise"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "segment_id",
+          "trip_id",
+          "trip_name",
+          "kind",
+          "provider",
+          "origin",
+          "destination",
+          "start_local",
+          "end_local"
         ],
         "additionalProperties": false
       },
@@ -3676,6 +3865,51 @@
           "gmail_url",
           "suggestion",
           "suggestion_error"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewMatch": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "integer"
+          },
+          "index": {
+            "type": "integer"
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "received": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mine": {
+            "type": "boolean"
+          },
+          "booking": {
+            "$ref": "#/components/schemas/ReviewBooking"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewCandidate"
+            }
+          }
+        },
+        "required": [
+          "item_id",
+          "index",
+          "subject",
+          "received",
+          "mine",
+          "booking",
+          "candidates"
         ],
         "additionalProperties": false
       },

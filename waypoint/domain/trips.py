@@ -668,15 +668,25 @@ def _same_leg(seg: Segment, values: Mapping[str, str | None], details: Mapping[s
 
 
 def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, again: bool = False,
-                        touched: list[int] | None = None, fill_only: bool = False) -> Literal["added", "updated", "unchanged"]:
+                        touched: list[int] | None = None, fill_only: bool = False, candidates: list[int] | None = None,
+                        into: int | None = None) -> Literal["added", "updated", "unchanged", "ambiguous"]:
     values = check(conn, fields)
     day = (values["start_local"] or "")[:10]
-    found = [s for s in visibility.household_segments(conn, values["kind"] or "") if _same_leg(s, values, fields.get("details") or {})]
-    coded = [s for s in found if s.confirmation]
-    uncoded = [s for s in found if not s.confirmation]
-    seen = {s.id for s in visibility.visible_segments(conn, viewer)} if found else set()
-    uncoded = [s for s in uncoded if s.id in seen]
-    found = coded or (uncoded if len(uncoded) == 1 else [])
+    if into is not None:
+        target = visibility.visible_segment(conn, viewer, into)
+        if target is None:
+            raise Invalid("No such booking")
+        found, seen = [target], {target.id}
+    else:
+        found = [s for s in visibility.household_segments(conn, values["kind"] or "") if _same_leg(s, values, fields.get("details") or {})]
+        coded = [s for s in found if s.confirmation]
+        uncoded = [s for s in found if not s.confirmation]
+        seen = {s.id for s in visibility.visible_segments(conn, viewer)} if found else set()
+        uncoded = [s for s in uncoded if s.id in seen]
+        if candidates is not None and not coded and len(uncoded) > 1:
+            candidates.extend(s.id for s in uncoded)
+            return "ambiguous"
+        found = coded or (uncoded if len(uncoded) == 1 else [])
     if len(found) > 1:
         found.sort(key=lambda s: (abs((date.fromisoformat(s.start_local[:10]) - date.fromisoformat(day)).days), s.id not in seen, s.id))
     if not found:

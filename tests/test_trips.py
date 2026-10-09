@@ -690,7 +690,7 @@ class DemoTests(DbCase):
         jane = Viewer(people.person_for_sub(self.c, "demo-jane"))
         sam = Viewer(people.person_for_sub(self.c, "demo-sam"))
         names = {who: [t["name"] for t in trips.listing(self.c, who)] for who in (jane, sam)}
-        self.assertEqual(len(names[jane]), 8)
+        self.assertEqual(len(names[jane]), 9)
         self.assertEqual(len(names[sam]), 7)
         self.assertEqual(len(set(names[jane]) & set(names[sam])), 6)
         for t in trips.listing(self.c, Viewer(None, household=True)):

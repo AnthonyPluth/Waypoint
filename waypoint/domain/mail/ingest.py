@@ -96,12 +96,20 @@ def explain(conn: db.Connection, b: extract.Booking) -> str:
     return "rejected as a segment"
 
 
+Held = tuple[trips.SegmentIn, list[int]]
+
+
 def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking, again: bool = False,
-                 touched: list[int] | None = None, fill_only: bool = False) -> Literal["added", "updated", "unchanged"] | None:
+                 touched: list[int] | None = None, fill_only: bool = False,
+                 held: list[Held] | None = None) -> Literal["added", "updated", "unchanged", "ambiguous"] | None:
     found = fields(conn, b)
     if found is None:
         return None
+    candidates: list[int] | None = [] if held is not None else None
     try:
-        return trips.merge_email_segment(conn, viewer, found, again, touched, fill_only)
+        outcome = trips.merge_email_segment(conn, viewer, found, again, touched, fill_only, candidates)
+        if outcome == "ambiguous" and held is not None and candidates:
+            held.append((found, candidates))
+        return outcome
     except trips.Invalid:
         return None

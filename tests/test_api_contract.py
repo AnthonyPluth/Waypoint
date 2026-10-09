@@ -189,6 +189,14 @@ class Replies(DbCase):
         with mock.patch.object(scan, "suggest_now"):
             self.check("POST /api/review/{id}/suggest", review_api.api_review_suggest(None, {}, {}, str(listed["items"][1]["id"])))
         self.check("DELETE /api/review/{id}", review_api.api_review_dismiss(self.c, {}, {}, str(listed["items"][1]["id"])))
+        stay = {"kind": "hotel", "origin": "Harbour Hotel", "destination": None, "start_local": "2026-11-21T15:00", "end_local": "2026-11-27T10:00",
+                "start_zone": "Europe/London", "end_zone": "Europe/London"}
+        pair = [trips.add_segment(self.c, me, stay)["id"] for _ in range(2)]   # type: ignore[index]
+        review.add(self.c, box, "m9", "hotel.example", "2026-10-18", "match", 1.0, [({**stay, "confirmation": "H88231", "provider": "Example Hotels"}, pair)])
+        held = review_api.api_review(self.c, {}, {})
+        self.assertEqual([len(m["candidates"]) for m in held["matches"]], [2])
+        self.check("GET /api/review", held)
+        self.check("POST /api/review/{id}/match", review_api.api_review_match(self.c, {}, {"index": 0, "segment_id": pair[0]}, str(held["matches"][0]["item_id"])))
 
     def test_ai(self):
         self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))
@@ -366,7 +374,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan",
                                      "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/share",
                                      "GET /api/ai", "POST /api/ai", "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch",
-                                     "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "DELETE /api/review/{id}",
+                                     "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "DELETE /api/review/{id}",
                                      "GET /api/review/{id}/preview", "POST /api/review/{id}/suggest",
                                      "GET /api/people", "POST /api/people",
                                      "POST /api/people/{id}", "DELETE /api/people/{id}", "POST /api/people/{id}/claim",

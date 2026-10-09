@@ -31,6 +31,16 @@ In **Settings → Mail and AI → Gmail**, each mailbox has a box, **Show this m
 
 After each scan, Waypoint’s log says how many messages it read and what stopped the others, as counts of fixed phrases (“12 × no structured booking data”, “3 × unknown airport”, “2 × arrival time”), never which messages or anything they said. Most senders put no machine-readable booking in their emails; those are the ones to add by hand, or to ignore.
 
+## Could be one of your bookings
+
+When a booking email (one with a confirmation code) fits more than one booking you added by hand without a code (a stay with the same check-in and check-out days, time zone and name, or a flight with the same number, day and airports), Waypoint can’t tell which it is, so it doesn’t add the email and doesn’t guess. An item here shows the email’s booking and each booking it could be, with its trip.
+
+- **It’s this one** fills in that booking with the email’s confirmation code, provider and link (a field you edited by hand is left as it is), and the email is kept with it, as for any booking made from an email.
+- **It’s a new booking** adds the email as a booking of its own.
+- **Dismiss** takes the item off and adds nothing.
+
+The bookings it could be are shown only to people who can see them: someone else in the household who sees the item (a [shared mailbox](#sharing-a-mailboxs-items-with-the-household)) sees it without the bookings that aren’t theirs, and can still add it as a new booking. These items don’t go to the AI. The message itself stays on the server like any other Review item’s.
+
 ## Who is this?
 
 A booking prints each traveller’s name its own way (`DOE/JANE MS`). Waypoint matches a name to a person by the loyalty number on the booking first, then by the person’s display name, legal name or aliases on [People](/Waypoint/start/people/); it never picks between two people with the same name. A name nobody matches stays as printed, and the booking is then visible only to whoever’s mailbox it came from.

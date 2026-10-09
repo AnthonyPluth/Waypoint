@@ -114,8 +114,46 @@ class WhoIsThis(TypedDict):
     start_zone: str
 
 
+class ReviewBooking(TypedDict):
+    kind: Literal["flight", "hotel", "car", "train", "cruise"]
+    provider: str | None
+    confirmation: str | None
+    origin: str | None
+    destination: str | None
+    start_local: str
+    end_local: str
+
+
+class ReviewCandidate(TypedDict):
+    segment_id: int
+    trip_id: int
+    trip_name: str
+    kind: Literal["flight", "hotel", "car", "train", "cruise"]
+    provider: str | None
+    origin: str | None
+    destination: str | None
+    start_local: str
+    end_local: str
+
+
+class ReviewMatch(TypedDict):
+    item_id: int
+    index: int
+    subject: str | None
+    received: str | None
+    mine: bool
+    booking: ReviewBooking
+    candidates: list[ReviewCandidate]
+
+
+class MatchBody(TypedDict):
+    index: int
+    segment_id: int | None
+
+
 class Review(TypedDict):
     items: list[ReviewItem]
+    matches: list[ReviewMatch]
     who: list[WhoIsThis]
     ai: bool
 

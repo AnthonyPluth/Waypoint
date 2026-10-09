@@ -7,7 +7,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
-import type { Person, Review, ReviewItem, WhoIsThis } from "$lib/api-types";
+import type { Person, Review, ReviewItem, ReviewMatch, WhoIsThis } from "$lib/api-types";
 import { toast } from "svelte-sonner";
 import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
 
@@ -17,6 +17,13 @@ const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
   start_local: "2026-12-08T08:00", start_zone: "America/New_York", ...extra });
+const candidate = (extra: Partial<ReviewMatch["candidates"][number]> = {}): ReviewMatch["candidates"][number] => ({
+  segment_id: 11, trip_id: 4, trip_name: "Trip to London", kind: "hotel", provider: null, origin: "Harbour Hotel", destination: null,
+  start_local: "2026-11-21T15:00", end_local: "2026-11-27T10:00", ...extra });
+const held_match = (extra: Partial<ReviewMatch> = {}): ReviewMatch => ({
+  item_id: 9, index: 0, subject: "Your stay: Harbour Hotel", received: "2026-10-18", mine: true,
+  booking: { kind: "hotel", provider: "Example Hotels", confirmation: "H88231", origin: "Harbour Hotel", destination: null, start_local: "2026-11-21T15:00", end_local: "2026-11-27T10:00" },
+  candidates: [candidate(), candidate({ segment_id: 12, trip_id: 5, trip_name: "Second trip" })], ...extra });
 const mia: Person = { id: 2, display_name: "Mia Doe", first_name: null, legal_name: null, aliases: [], member: false, links: [] };
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: null, legal_name: null, aliases: [], member: true, links: [] };
 
@@ -39,13 +46,14 @@ function serve(failOn?: string) {
     if (path === "/api/segments") return { id: 42 } as never;
     if (path.endsWith("/preview")) { if (previewFails) throw new Error(previewFails); return { text: PREVIEW, html: null, truncated } as never; }
     if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestion: SUGGESTION })) }; return { ok: true } as never; }
-    if (opts?.method === "DELETE" || path.endsWith("/ignore")) { const id = Number(path.split("/")[3]?.split("?")[0]); held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true } as never; }
+    if (opts?.method === "DELETE" || path.endsWith("/ignore")) { const id = Number(path.split("/")[3]?.split("?")[0]); held = { ...held, items: held.items.filter((i) => i.id !== id), matches: held.matches.filter((m) => m.item_id !== id) }; return { ok: true } as never; }
+    if (path.endsWith("/match")) { const id = Number(path.split("/")[3]); held = { ...held, matches: held.matches.filter((m) => m.item_id !== id) }; return { ok: true } as never; }
     if (path.startsWith("/api/review/who/")) { const id = Number(path.split("/")[4]); held = { ...held, who: held.who.filter((w) => w.id !== id) }; return { ok: true, matched: 2 } as never; }
     throw new Error(`unexpected ${path}`);
   });
 }
 
-beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; previewFails = suggestFails = ""; suggestGate = null; truncated = false; held = { items: [item()], who: [who()], ai: false }; serve(); });
+beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; previewFails = suggestFails = ""; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
@@ -61,7 +69,7 @@ describe("Review", () => {
   });
 
   it("names an item by its message's subject, and says who it came from beside it", async () => {
-    held = { items: [item({ subject: "Your itinerary: EX 410" })], who: [], ai: false };
+    held = { matches: [], items: [item({ subject: "Your itinerary: EX 410" })], who: [], ai: false };
     render(ReviewPage);
     const list = await screen.findByRole("list", { name: "Couldn’t read" });
     expect(within(list).getByText("Your itinerary: EX 410")).toBeInTheDocument();
@@ -70,7 +78,7 @@ describe("Review", () => {
   });
 
   it("says what it can when the sender or the day isn’t there", async () => {
-    held = { items: [item({ id: 1, reason: "broken", sender_domain: "", received: null }), item({ id: 2 })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 1, reason: "broken", sender_domain: "", received: null }), item({ id: 2 })], who: [], ai: false };
     render(ReviewPage);
     expect(await screen.findByText("Mail from an unknown sender")).toBeInTheDocument();
     expect(screen.getByText("to ana@gmail.example")).toBeInTheDocument();
@@ -79,7 +87,7 @@ describe("Review", () => {
   });
 
   it("shows an item shared by another member with whose mailbox it is, and only Add by hand and Dismiss", async () => {
-    held = { items: [item({ id: 4, mine: false, owner: "Sam Doe", gmail_url: null, address: "sam@gmail.example" })], who: [], ai: true };
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe", gmail_url: null, address: "sam@gmail.example" })], who: [], ai: true };
     render(ReviewPage);
     const row = await screen.findByTestId("review-item");
     expect(row).toHaveTextContent("in Sam Doe’s mailbox, shared with the household");
@@ -91,7 +99,7 @@ describe("Review", () => {
   });
 
   it("opens a shared item's message beside the form like any other, and dismisses it", async () => {
-    held = { items: [item({ id: 4, mine: false, owner: "Sam Doe", gmail_url: null }), item({ id: 5, mine: true })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe", gmail_url: null }), item({ id: 5, mine: true })], who: [], ai: false };
     render(ReviewPage);
     const row = (await screen.findAllByTestId("review-item"))[0];
     await userEvent.click(within(row).getByRole("button", { name: /by hand/ }));
@@ -237,7 +245,7 @@ describe("Review", () => {
   });
 
   it("describes each kind of booking a name is on", async () => {
-    held = { items: [], who: [who({ id: 1, kind: "hotel", origin: "Harbour Hotel", destination: null, provider: null }), who({ id: 2, kind: "car", origin: "SFO", destination: "SFO" }),
+    held = { matches: [], items: [], who: [who({ id: 1, kind: "hotel", origin: "Harbour Hotel", destination: null, provider: null }), who({ id: 2, kind: "car", origin: "SFO", destination: "SFO" }),
       who({ id: 3, kind: "train", origin: null, destination: null })], ai: false };
     render(ReviewPage);
     expect(await screen.findByText("Stay Harbour Hotel on 2026-12-08")).toBeInTheDocument();
@@ -245,8 +253,47 @@ describe("Review", () => {
     expect(screen.getByText("Train on 2026-12-08 (Example Air)")).toBeInTheDocument();
   });
 
+  it("lists a booking email that could be more than one of yours, with each candidate and its trip", async () => {
+    held = { matches: [held_match()], items: [], who: [], ai: false };
+    render(ReviewPage);
+    const list = await screen.findByRole("list", { name: "Could be one of your bookings" });
+    expect(within(list).getByText("Stay Harbour Hotel on 2026-11-21 (Example Hotels) · H88231")).toBeInTheDocument();
+    const options = within(within(list).getByRole("list", { name: "It could be" })).getAllByRole("listitem");
+    expect(options).toHaveLength(2);
+    expect(within(options[0]).getByText("Trip to London")).toBeInTheDocument();
+    expect(within(options[1]).getByText("Second trip")).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing to review/)).toBeNull();
+  });
+
+  it("fills in the one chosen, and the item goes", async () => {
+    held = { matches: [held_match()], items: [], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click((await screen.findAllByRole("button", { name: /^It’s Stay Harbour Hotel/ }))[1]);
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/9/match", "POST", { index: 0, segment_id: 12 }]));
+    expect(toast.success).toHaveBeenCalledWith("Filled in");
+    expect(await screen.findByText(/Nothing to review/)).toBeInTheDocument();
+  });
+
+  it("adds it as a booking of its own, or dismisses it", async () => {
+    held = { matches: [held_match(), held_match({ item_id: 10 })], items: [], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click((await screen.findAllByRole("button", { name: "It’s a new booking" }))[0]);
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/9/match", "POST", { index: 0, segment_id: null }]));
+    expect(toast.success).toHaveBeenCalledWith("Added to your trips");
+    await userEvent.click(await screen.findByRole("button", { name: "Dismiss" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/10", "DELETE", undefined]));
+  });
+
+  it("says so, and still lets it be added, when none of the candidates are the viewer’s to see", async () => {
+    held = { matches: [held_match({ candidates: [], mine: false })], items: [], who: [], ai: false };
+    render(ReviewPage);
+    expect(await screen.findByText("The bookings it could be aren’t yours to see.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^It’s Stay/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "It’s a new booking" })).toBeInTheDocument();
+  });
+
   it("says when nothing is waiting", async () => {
-    held = { items: [], who: [], ai: false };
+    held = { matches: [], items: [], who: [], ai: false };
     render(ReviewPage);
     expect(await screen.findByText(/Nothing to review/)).toBeInTheDocument();
   });
@@ -287,7 +334,7 @@ describe("Review: the AI’s suggestion", () => {
   });
 
   it("starts the form filled in with it, to confirm or edit, and saves only when added", async () => {
-    held = { items: [item({ suggestion })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestion })], who: [], ai: false };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
     expect(screen.getByRole("heading", { name: "Check this suggestion" })).toBeInTheDocument();
@@ -306,7 +353,7 @@ describe("Review: the AI’s suggestion", () => {
   it("opens a cruise suggestion with its port labels and saves its ports and zones", async () => {
     const cruise = { kind: "cruise" as const, provider: "Example Cruise Line", confirmation: "QW4R7T", origin: "Miami", destination: "Nassau",
       start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00", start_zone: "America/New_York", end_zone: "America/Nassau" };
-    held = { items: [item({ suggestion: cruise })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestion: cruise })], who: [], ai: false };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
     expect(screen.getByLabelText("Embarkation port")).toHaveValue("Miami");
@@ -319,7 +366,7 @@ describe("Review: the AI’s suggestion", () => {
   });
 
   it("says why there’s none, and still offers adding by hand", async () => {
-    held = { items: [item({ suggestion_error: "The AI didn’t find a booking in this message." })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestion_error: "The AI didn’t find a booking in this message." })], who: [], ai: false };
     render(ReviewPage);
     expect(await screen.findByText("The AI didn’t find a booking in this message.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Check the AI’s suggestion/ })).toBeNull();
@@ -433,7 +480,7 @@ describe("Review: Ask AI", () => {
   });
 
   it("asks the AI, then offers its suggestion to check", async () => {
-    held = { items: [item()], who: [], ai: true };
+    held = { matches: [], items: [item()], who: [], ai: true };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Ask AI about/ }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1/suggest", "POST", undefined]));
@@ -444,7 +491,7 @@ describe("Review: Ask AI", () => {
   it("asks about several messages at once, each showing its own progress", async () => {
     let open: () => void = () => {};
     suggestGate = new Promise((r) => { open = r; });
-    held = { items: [item(), item({ id: 2 }), item({ id: 3 }), item({ id: 4 })], who: [], ai: true };
+    held = { matches: [], items: [item(), item({ id: 2 }), item({ id: 3 }), item({ id: 4 })], who: [], ai: true };
     render(ReviewPage);
     const asks = await screen.findAllByRole("button", { name: /Ask AI about “/ });
     await userEvent.click(asks[0]);
@@ -460,7 +507,7 @@ describe("Review: Ask AI", () => {
   });
 
   it("says when the AI couldn’t be asked", async () => {
-    held = { items: [item()], who: [], ai: true };
+    held = { matches: [], items: [item()], who: [], ai: true };
     suggestFails = "Turn on AI suggestions in Settings first.";
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Ask AI about/ }));
@@ -468,7 +515,7 @@ describe("Review: Ask AI", () => {
   });
 
   it("asks about every message without a suggestion at once", async () => {
-    held = { items: [item(), item({ id: 2 }), item({ id: 3, suggestion: null })], who: [], ai: true };
+    held = { matches: [], items: [item(), item({ id: 2 }), item({ id: 3, suggestion: null })], who: [], ai: true };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 3" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 3 messages"));
@@ -476,7 +523,7 @@ describe("Review: Ask AI", () => {
   });
 
   it("stops the bulk ask at the first failure and says how far it got", async () => {
-    held = { items: [item(), item({ id: 2 })], who: [], ai: true };
+    held = { matches: [], items: [item(), item({ id: 2 })], who: [], ai: true };
     suggestFails = "Turn on AI suggestions in Settings first.";
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
