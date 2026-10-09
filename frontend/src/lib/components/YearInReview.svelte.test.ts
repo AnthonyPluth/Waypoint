@@ -84,7 +84,7 @@ describe("YearInReview", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("says so on the map and share cards when the country outlines can't load", async () => {
+  it("says so on the map and image cards when the country outlines can't load", async () => {
     const map = await import("$lib/map");
     vi.spyOn(map, "loadCountries").mockRejectedValue(new Error("chunk failed"));
     render(YearInReview, { stats: stats(2026), person: 1, onclose: () => {} });
