@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { comparisons, count, countryName, distance, duration, monthLabel, parseSelection, selectionQuery, share, statsPath } from "./stats";
+import { comparisons, compact, compactDistance, count, countryName, distance, duration, monthLabel, parseSelection, selectionQuery, share, statsPath } from "./stats";
 
 describe("formatting", () => {
+  it("shortens big numbers for the headline row", () => {
+    expect(compact(950)).toBe("950");
+    expect(compact(52000)).toBe("52K");
+    expect(compact(1250000)).toBe("1.3M");
+    expect(compactDistance(52000, "km")).toBe("52K km");
+    expect(compactDistance(52000, "mi")).toBe("32.3K mi");
+  });
+
   it("writes large numbers with separators", () => {
     expect(count(0)).toBe("0");
     expect(count(1234567.4)).toBe("1,234,567");

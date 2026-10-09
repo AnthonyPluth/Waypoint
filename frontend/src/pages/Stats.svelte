@@ -9,7 +9,7 @@
   import TopList, { type Row } from "$lib/components/stats/TopList.svelte";
   import YearInReview from "$lib/components/YearInReview.svelte";
   import { reviewOffered } from "$lib/review";
-  import { comparisons, count, countryName, distance, duration, monthLabel, parseSelection, selectionQuery, share, statsPath } from "$lib/stats";
+  import { comparisons, compactDistance, count, countryName, distance, duration, monthLabel, parseSelection, selectionQuery, share, statsPath } from "$lib/stats";
   import { dateLabel } from "$lib/trips";
 
   const me = $derived(app.state?.person_id ?? null);
@@ -81,6 +81,12 @@
     { label: "Ports of call", value: count(current.cruises.ports) },
   ] : []);
 
+  const headlineTiles = $derived<Tile[]>(current && f ? [
+    ...(f.count ? [{ label: "Flights flown", value: count(f.count) }, { label: "Distance flown", value: compactDistance(f.distance_km, unit) }] : []),
+    ...(current.places.countries.length ? [{ label: "Countries visited", value: count(current.places.countries.length) }] : []),
+    ...(current.stays.nights ? [{ label: "Nights away", value: count(current.stays.nights) }] : []),
+  ] : []);
+
   const named = (rows: { name: string; count: number }[], unitWord: string): Row[] => rows.map((r) => ({ key: r.name, name: r.name, value: plural(r.count, unitWord) }));
   const flightLists = $derived<{ title: string; rows: Row[] }[]>(f ? [
     { title: "Routes", rows: f.routes.map((r) => ({ key: `${r.a}-${r.b}`, name: `${r.a} – ${r.b}`, sub: r.distance_km === null ? null : distance(r.distance_km, unit), value: plural(r.flights, "flight") })) },
@@ -117,17 +123,18 @@
   const cabinTotal = $derived(f ? f.cabins.reduce((n, c) => n + c.count, 0) : 0);
   const seatTotal = $derived(f ? f.seat_positions.window + f.seat_positions.aisle + f.seat_positions.middle : 0);
   const seatBars = $derived(f ? [["Window", f.seat_positions.window], ["Aisle", f.seat_positions.aisle], ["Middle", f.seat_positions.middle]] as [string, number][] : []);
+  const seriesFill = ["bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4"];
   const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 </script>
 
 {#snippet bars(title: string, rows: [string, number][], whole: number)}
   <div class="space-y-2">
     <h4 class="text-sm font-medium">{title}</h4>
-    <ul class="space-y-2">
-      {#each rows as [name, n] (name)}
+    <ul class="space-y-3">
+      {#each rows as [name, n], i (name)}
         <li>
           <div class="flex justify-between text-sm"><span>{name}</span><span class="tabular-nums text-muted-foreground">{share(n, whole)}% · {count(n)}</span></div>
-          <div class="mt-1 h-2 rounded-full bg-muted" aria-hidden="true"><div class="h-2 rounded-full bg-primary" style:width="{share(n, whole)}%"></div></div>
+          <div class="mt-1.5 h-2.5 rounded-full bg-muted" aria-hidden="true"><div class="h-2.5 rounded-full {seriesFill[i % seriesFill.length]}" style:width="{share(n, whole)}%"></div></div>
         </li>
       {/each}
     </ul>
@@ -137,10 +144,21 @@
 {#snippet tileGrid(tiles: Tile[])}
   <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
     {#each tiles as t (t.label)}
-      <div class="rounded-2xl border bg-card p-4 shadow-card {t.note ? 'col-span-2 sm:col-span-1' : ''}">
+      <div class="rounded-2xl border bg-card p-4 shadow-elevation-1 {t.note ? 'col-span-2 sm:col-span-1' : ''}">
         <dt class="eyebrow">{t.label}</dt>
-        <dd class="mt-1 break-words text-3xl font-bold tabular-nums tracking-tight">{t.value}</dd>
+        <dd class="mt-1 break-words text-3xl font-semibold tabular-nums tracking-tight">{t.value}</dd>
         {#if t.note}{#each t.note as line (line)}<dd class="text-sm text-muted-foreground">{line}</dd>{/each}{/if}
+      </div>
+    {/each}
+  </dl>
+{/snippet}
+
+{#snippet headline(tiles: Tile[])}
+  <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="stats-headline">
+    {#each tiles as t (t.label)}
+      <div class="pass p-5">
+        <dt class="eyebrow">{t.label}</dt>
+        <dd class="mt-2 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight sm:text-4xl">{t.value}</dd>
       </div>
     {/each}
   </dl>
@@ -197,6 +215,7 @@
     {#if reviewable && sel.year}
       <Button variant="outline" onclick={() => (reviewing = true)}>See your {sel.year} in review</Button>
     {/if}
+    {#if headlineTiles.length}{@render headline(headlineTiles)}{/if}
     <section aria-labelledby="places-title" id="stats-map-slot" data-testid="stats-map-slot" class="scroll-mt-20 space-y-3">
       <h2 id="places-title" class="text-2xl font-bold tracking-tight">Where you’ve been</h2>
       {@render tileGrid([{ label: "Countries", value: count(current.places.countries.length) }])}

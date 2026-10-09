@@ -97,7 +97,7 @@
 </script>
 
 <div>
-  <div class="relative overflow-hidden rounded-2xl border border-border bg-card">
+  <div class="relative overflow-hidden rounded-3xl border border-border bg-map-sea shadow-elevation-1">
     {#if loadError}
       <p class="p-6 text-sm text-muted-foreground">The map couldn’t be drawn: {loadError} <Button variant="outline" size="sm" onclick={loadOutlines}>Try again</Button></p>
     {:else}
@@ -106,23 +106,23 @@
         class="block h-auto w-full touch-pan-y select-none {t.k > 1 ? 'cursor-grab touch-none' : ''}"
         onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up} onpointerleave={(e) => { if (e.pointerType === "mouse") up(e); }}
       >
-        <path d={sphere} class="fill-muted/60" />
+        <path d={sphere} class="fill-map-sea" />
         <g transform="translate({t.x} {t.y}) scale({t.k})" data-testid="map-layer">
-          <g role="presentation" class="stroke-border" stroke-width="0.5" vector-effect="non-scaling-stroke" onclick={() => { if (!dragged) picked = null; }}>
+          <g role="presentation" class="stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke" onclick={() => { if (!dragged) picked = null; }}>
             {#each outlines as c (c.id ?? c.name)}
               {@const shaded = visited.has(c.id ?? "") && !(byState && c.id === US_ID)}
-              <path d={c.d} class={shaded ? "fill-primary/35" : "fill-card"} data-visited={shaded ? "true" : undefined}><title>{c.name}</title></path>
+              <path d={c.d} class={shaded ? "fill-map-visited" : "fill-map-land"} data-visited={shaded ? "true" : undefined}><title>{c.name}</title></path>
             {/each}
             {#each stateOutlines as c (c.id ?? c.name)}
-              <path d={c.d} class={visitedStates.has(c.id ?? "") ? "fill-primary/35" : "fill-card"} data-state={c.name} data-visited={visitedStates.has(c.id ?? "") ? "true" : undefined}><title>{c.name}</title></path>
+              <path d={c.d} class={visitedStates.has(c.id ?? "") ? "fill-map-visited" : "fill-map-land"} data-state={c.name} data-visited={visitedStates.has(c.id ?? "") ? "true" : undefined}><title>{c.name}</title></path>
             {/each}
           </g>
-          <g fill="none" stroke-linecap="round" class="stroke-primary" data-testid="arcs">
+          <g fill="none" stroke-linecap="round" class="stroke-map-route" data-testid="arcs">
             {#each world.arcs as a (a.key)}
               <g role="button" tabindex="0" aria-label={a.label} onclick={() => pick(a.label, a.trips)} onkeydown={(e) => key(e, a.label, a.trips)}
-                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = a.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: a.label, trips: a.trips })} class="cursor-pointer outline-none focus-visible:[&>path:last-child]:stroke-signal">
+                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = a.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: a.label, trips: a.trips })} class="cursor-pointer outline-none focus-visible:[&>path:last-child]:stroke-foreground">
                 <path d={a.d} stroke="transparent" stroke-width="14" vector-effect="non-scaling-stroke" />
-                <path d={a.d} stroke-width={a.width} stroke-opacity="0.7" vector-effect="non-scaling-stroke" data-arc={a.key} />
+                <path d={a.d} stroke-width={a.width} stroke-opacity="0.85" vector-effect="non-scaling-stroke" data-arc={a.key} />
               </g>
             {/each}
           </g>
@@ -131,7 +131,7 @@
               <g role="button" tabindex="0" aria-label={p.label} onclick={() => pick(p.label, p.trips)} onkeydown={(e) => key(e, p.label, p.trips)}
                 onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = p.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: p.label, trips: p.trips })} class="cursor-pointer outline-none [&:focus-visible>rect:last-child]:stroke-foreground">
                 <circle cx={p.x} cy={p.y} r={9 / t.k} fill="transparent" />
-                <rect x={p.x - 4 / t.k} y={p.y - 4 / t.k} width={8 / t.k} height={8 / t.k} transform="rotate(45 {p.x} {p.y})" class="fill-primary stroke-card" stroke-width={1.5 / t.k} data-stay={p.city} />
+                <rect x={p.x - 4 / t.k} y={p.y - 4 / t.k} width={8 / t.k} height={8 / t.k} transform="rotate(45 {p.x} {p.y})" class="fill-map-stay stroke-map-sea" stroke-width={1.5 / t.k} data-stay={p.city} />
               </g>
             {/each}
           </g>
@@ -140,7 +140,7 @@
               <g role="button" tabindex="0" aria-label={d.label} onclick={() => pick(d.label)} onkeydown={(e) => key(e, d.label)}
                 onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = d.label; }} onpointerleave={() => (hovered = null)} onfocus={() => (picked = { label: d.label, trips: [] })} class="cursor-pointer outline-none [&:focus-visible>circle:last-child]:stroke-foreground">
                 <circle cx={d.x} cy={d.y} r={Math.max(d.r / t.k, 9 / t.k)} fill="transparent" />
-                <circle cx={d.x} cy={d.y} r={d.r / t.k} class="fill-signal stroke-card" stroke-width={1.5 / t.k} data-dot={d.code} />
+                <circle cx={d.x} cy={d.y} r={d.r / t.k} class="fill-map-airport stroke-map-sea" stroke-width={1.5 / t.k} data-dot={d.code} />
               </g>
             {/each}
           </g>
@@ -148,6 +148,14 @@
       </svg>
     {/if}
   </div>
+  {#if !loadError && (world.dots.length || stayDots.length)}
+    <ul class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground" aria-label="Map key" data-testid="map-key">
+      {#if world.dots.length}<li class="flex items-center gap-2"><span class="size-2.5 rounded-full bg-map-airport" aria-hidden="true"></span>Airport</li>{/if}
+      {#if world.arcs.length}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Route</li>{/if}
+      {#if stayDots.length}<li class="flex items-center gap-2"><span class="size-2.5 rotate-45 bg-map-stay" aria-hidden="true"></span>Stay</li>{/if}
+      <li class="flex items-center gap-2"><span class="size-2.5 rounded-sm bg-map-visited" aria-hidden="true"></span>Visited</li>
+    </ul>
+  {/if}
   <div class="mt-2 flex items-start justify-between gap-3">
     <p class="min-h-5 text-sm text-muted-foreground" aria-live="polite">
       {#if caption}<span class="font-medium text-foreground">{caption}</span>
@@ -164,7 +172,7 @@
     {/if}
   </div>
   {#if picked && picked.trips.length}
-    <div class="mt-3 rounded-xl border border-border bg-card p-3 text-sm" data-testid="map-trips">
+    <div class="mt-3 rounded-2xl border border-border bg-card p-4 text-sm shadow-elevation-1" data-testid="map-trips">
       <ul class="space-y-1">
         {#each picked.trips as tr, i (`${tr.trip_id}-${tr.start}-${i}`)}
           <li class="flex flex-wrap items-baseline justify-between gap-x-3"><a href={`#trip/${tr.trip_id}`} class="font-medium underline underline-offset-2">{tr.name}</a><span class="text-muted-foreground">{when(tr)}</span></li>

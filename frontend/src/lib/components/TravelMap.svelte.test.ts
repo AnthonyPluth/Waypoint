@@ -31,6 +31,15 @@ const london = { city: "London", country: "GB", latitude: 51.47, longitude: -0.4
 const noFlights = { airports: [], routes: [] } as unknown as StatsFlights;
 
 describe("TravelMap", () => {
+  it("names what each mark on the map is, only for what is drawn", () => {
+    render(TravelMap, { flights });
+    const key = within(screen.getByTestId("map-key"));
+    expect(key.getByText("Airport")).toBeTruthy();
+    expect(key.getByText("Route")).toBeTruthy();
+    expect(key.getByText("Visited")).toBeTruthy();
+    expect(key.queryByText("Stay")).toBeNull();
+  });
+
   it("shades the United States by state, not as one country, and a stay shades its country", async () => {
     const { container } = render(TravelMap, { flights, stays: [london] });
     await waitFor(() => expect(container.querySelectorAll("path[data-state]").length).toBeGreaterThan(50), { timeout: 8000 });

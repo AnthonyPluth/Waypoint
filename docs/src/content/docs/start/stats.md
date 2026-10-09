@@ -9,7 +9,7 @@ Waypoint adds up what you have flown, stayed and driven. The numbers come from `
 
 ## The Stats page
 
-Pick **who** (you by default, any member or guest, or Everyone) and **when** (All time, or a year that has something to count); the choice is kept in the address, so you can link it. The page is in sections: **Where you’ve been** (the map and the countries), then **Flights**, **Hotels**, **Cars** and **Cruises**, each with its own big numbers and top five lists (Show all lists the rest), and, for flights and hotels, records. Flights also show how far that is around the Earth and toward the Moon, and your cabin and seat split. A section you have nothing finished for isn’t shown. A person or year with nothing finished says so, with links to add a trip or import past flights.
+Pick **who** (you by default, any member or guest, or Everyone) and **when** (All time, or a year that has something to count); the choice is kept in the address, so you can link it. The page opens with a row of big headline totals (flights, distance, countries and nights away, each left out when there is nothing to total). Below it the page is in sections: **Where you’ve been** (the map and the countries), then **Flights**, **Hotels**, **Cars** and **Cruises**, each with its own big numbers and top five lists (Show all lists the rest), and, for flights and hotels, records. Flights also show how far that is around the Earth and toward the Moon, and your cabin and seat split. A section you have nothing finished for isn’t shown. A person or year with nothing finished says so, with links to add a trip or import past flights.
 
 Miles or kilometres is a household setting, under **Settings → Travel → Distances** (`GET` and `POST /api/distance-unit`).
 
@@ -38,7 +38,7 @@ A flight’s airline comes from the two-character code its flight number starts 
 
 ## The map
 
-The Stats page draws a world map of everywhere you have flown and stayed, for the same person and year as the rest of the page: an arc for each route (thicker for more flights), a dot for each airport (bigger for more visits), a small diamond for each city you stayed in, and the countries that hold one of those shaded. The United States is shaded state by state: a state is filled when one of your airports or hotel cities is in it, and the rest of the country is not.
+The Stats page draws a world map of everywhere you have flown and stayed, for the same person and year as the rest of the page: an arc for each route (thicker for more flights), a dot for each airport (bigger for more visits), a small diamond for each city you stayed in, and the countries that hold one of those shaded, with a key under the map naming each mark. The United States is shaded state by state: a state is filled when one of your airports or hotel cities is in it, and the rest of the country is not.
 
 Tap or hover a dot, an arc or a diamond for its name and count. Tap an arc or a diamond and the trips on it are listed under the map, each with its name (a link to the trip) and when it happened: a flight’s dates for a route, check-in to check-out for a stay. A stay is placed at the city, roughly where that city’s airports are, never at the hotel’s address; a city with no airport Waypoint knows isn’t plotted, and neither is an airport Waypoint doesn’t have coordinates for. The map opens zoomed to just the places you have been (the whole world when they span it), and follows the person and year you pick; drag, pinch or use the buttons to zoom, **Reset** to go back to that view and **World** to see the whole world.
 
