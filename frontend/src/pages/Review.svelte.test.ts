@@ -565,4 +565,27 @@ describe("Review on a phone", () => {
     await waitFor(() => expect(calls.some(([path, method]) => path === "/api/segments" && method === "POST")).toBe(true));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
+
+  it("keeps the sheet open while adding, and shows a failure in it with what was typed", async () => {
+    render(ReviewPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    const sheet = await screen.findByRole("dialog");
+    await u.type(within(sheet).getByLabelText("From (airport code)"), "JFK");
+    await u.type(within(sheet).getByLabelText("To (airport code)"), "SFO");
+    await u.type(within(sheet).getByLabelText("Departs"), "2026-12-08T08:00");
+    await u.type(within(sheet).getByLabelText("Arrives"), "2026-12-08T11:00");
+    let fail: (e: Error) => void = () => {};
+    const inner = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string; body?: unknown }) => {
+      if (path === "/api/segments") return new Promise((_, reject) => { fail = reject; });
+      return inner(path, opts as Parameters<typeof inner>[1]);
+    });
+    await u.click(within(sheet).getByRole("button", { name: "Add to my trips" }));
+    await u.keyboard("{Escape}");
+    expect(screen.getByRole("dialog")).toBe(sheet);
+    fail(new Error("Couldn’t add it"));
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent("Couldn’t add it");
+    expect(within(sheet).getByLabelText("From (airport code)")).toHaveValue("JFK");
+  });
 });

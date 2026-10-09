@@ -355,7 +355,7 @@
   description="Waypoint stops looking at mail from this sender in that mailbox, and their other items leave this list. Other mailboxes aren’t affected."
   onconfirm={async () => { const i = ignoring; return i ? await ignore(i) : true; }} />
 
-<Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v) closeForm(); }} title={draft?.suggested ? "Check this suggestion" : "Add this booking by hand"}>
+<Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v && !saving) closeForm(); }} title={draft?.suggested ? "Check this suggestion" : "Add this booking by hand"}>
   {#if draft}
     <div class="flex flex-col gap-4">
       {#if peeks[draft.item.id]}<div data-testid="preview">{@render messagePeek(draft.item)}</div>{/if}

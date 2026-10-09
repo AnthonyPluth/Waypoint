@@ -140,6 +140,7 @@
 
   const personFormTitle = (d: Draft) => (d.id === null ? "Add a guest" : `Edit ${d.display_name || "person"}`);
 
+  const personSheetTitle = (d: Draft) => (d.id === null ? "Add a guest" : `Edit ${people?.find((p) => p.id === d.id)?.display_name ?? "person"}`);
   const idFormTitle = (d: IdDraft) => `${d.id === null ? "Add a membership" : "Edit membership"} for ${people?.find((p) => p.id === d.person_id)?.display_name ?? "this person"}`;
 
   const details = (p: Person) => [p.legal_name && `Legal name ${p.legal_name}`, p.aliases.length && `Printed as ${p.aliases.join(", ")}`].filter(Boolean).join(" · ");
@@ -155,7 +156,7 @@
 {/if}
 
 {#snippet personForm(d: Draft, titled: boolean)}
-  <form class="flex w-full flex-col gap-4" data-editor onsubmit={save} aria-labelledby={titled ? "person-form-title" : undefined} aria-label={titled ? undefined : personFormTitle(d)}>
+  <form class="flex w-full flex-col gap-4" data-editor onsubmit={save} aria-labelledby={titled ? "person-form-title" : undefined} aria-label={titled ? undefined : personSheetTitle(d)}>
   <div class="flex w-full flex-col gap-4">
     {#if titled}<h2 id="person-form-title" class="font-medium">{personFormTitle(d)}</h2>{/if}
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name</span>
@@ -287,10 +288,10 @@
   description="Its saved number is deleted. This can’t be undone."
   onconfirm={async () => { const m = idRemoving; return m ? await removeId(m) : true; }} />
 
-<Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v) draft = null; }} title={draft ? personFormTitle(draft) : "Person"}>
+<Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v && !saving) draft = null; }} title={draft ? personSheetTitle(draft) : "Person"}>
   {#if draft}{@render personForm(draft, false)}{/if}
 </Sheet>
 
-<Sheet bind:open={() => idInSheet && idDraft !== null, (v) => { if (!v) idDraft = null; }} title={idDraft ? idFormTitle(idDraft) : "Membership"}>
+<Sheet bind:open={() => idInSheet && idDraft !== null, (v) => { if (!v && !idSaving) idDraft = null; }} title={idDraft ? idFormTitle(idDraft) : "Membership"}>
   {#if idDraft}{@render idForm(idDraft, false)}{/if}
 </Sheet>

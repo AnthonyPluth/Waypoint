@@ -358,4 +358,27 @@ describe("People on a phone", () => {
     expect(screen.queryByText("DEMO7654321")).toBeNull();
     expect(await screen.findByText("••••4321")).toBeInTheDocument();
   });
+
+  it("keeps the sheet open while a save is in flight and shows the failure in it", async () => {
+    render(People);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit Mia Doe" }));
+    const sheet = await screen.findByRole("dialog", { name: "Edit Mia Doe" });
+    const name = within(sheet).getByLabelText("Name");
+    await u.clear(name);
+    await u.type(name, "Mia R");
+    expect(screen.getByRole("dialog", { name: "Edit Mia Doe" })).toBe(sheet);
+    let fail: (e: Error) => void = () => {};
+    const inner = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (opts?.method === "POST") return new Promise((_, reject) => { fail = reject; });
+      return inner(path, opts);
+    });
+    await u.click(within(sheet).getByRole("button", { name: "Save" }));
+    await u.keyboard("{Escape}");
+    expect(screen.getByRole("dialog")).toBe(sheet);
+    fail(new Error("Couldn’t save"));
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent("Couldn’t save");
+    expect(within(sheet).getByLabelText("Name")).toHaveValue("Mia R");
+  });
 });
