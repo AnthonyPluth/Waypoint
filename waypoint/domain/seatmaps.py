@@ -26,12 +26,10 @@ class Layout:
 
 
 NARROWBODY_3_3 = Layout(window="AF", aisle="CD", middle="BE")
-A220_2_3 = Layout(window="AF", aisle="CD", middle="B")
 WIDEBODY_3_4_3 = Layout(window="AK", aisle="CDGH", middle="BEFJ")
 WIDEBODY_3_3_3 = Layout(window="AK", aisle="CDFG", middle="BEH")
 
 LAYOUTS: dict[str, dict[Cabin, Layout]] = {
-    "Airbus A220": {"economy": A220_2_3},
     "Airbus A320 family": {"economy": NARROWBODY_3_3},
     "Boeing 737": {"economy": NARROWBODY_3_3},
     "Boeing 757": {"economy": NARROWBODY_3_3},

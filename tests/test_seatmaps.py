@@ -28,13 +28,13 @@ class LayoutTests(unittest.TestCase):
 
     def test_positions(self):
         for aircraft, letter, expected in (("Boeing 777", "F", "middle"), ("Boeing 737", "F", "window"), ("Airbus A350", "H", "middle"),
-                                           ("Boeing 787", "G", "aisle"), ("Airbus A220", "B", "middle"), ("Airbus A220", "E", None),
+                                           ("Boeing 787", "G", "aisle"), ("Airbus A220", "B", None),
                                            ("Airbus A330", "C", None), ("Embraer E175", "A", None), (None, "A", None)):
             with self.subTest(aircraft=aircraft, letter=letter):
                 self.assertEqual(seatmaps.position(aircraft, "economy", letter), expected)
 
     def test_a_family_without_a_layout_is_left_out(self):
-        for name in ("Airbus A330", "Airbus A380", "Boeing 767", "Embraer E170", "Embraer E175", "Embraer E190", "Bombardier CRJ"):
+        for name in ("Airbus A220", "Airbus A330", "Airbus A380", "Boeing 767", "Embraer E170", "Embraer E175", "Embraer E190", "Bombardier CRJ"):
             self.assertNotIn(name, seatmaps.LAYOUTS)
 
 
