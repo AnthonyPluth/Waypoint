@@ -20,6 +20,14 @@ export function signInUrl(): string {
   return "/auth/login?next=" + encodeURIComponent(location.pathname + location.hash);
 }
 
+const whenDenied: (() => Promise<void>)[] = [];
+
+export function onDenied(fn: () => Promise<void>): void {
+  whenDenied.push(fn);
+}
+
+const denied = (): Promise<unknown> => Promise.allSettled(whenDenied.map((fn) => fn()));
+
 const OFFLINE = "Can’t reach Waypoint. Check your connection and try again.";
 const UNREACHABLE = "Waypoint is restarting or unreachable. Try again in a moment.";
 
@@ -37,6 +45,7 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
     if (page?.signal.aborted) return new Promise(() => {});
     throw err instanceof TypeError ? new ApiError(OFFLINE, 0) : err;
   }
+  if (res.status === 401 || res.status === 403) await denied();
   if (res.status === 401) {
     const leave = window.dispatchEvent(new CustomEvent("waypoint:signed-out", { cancelable: true, detail: { background: !!opts.background } }));
     if (!leave || opts.background) throw new ApiError("Your session expired. Sign in again to keep going.", 401);

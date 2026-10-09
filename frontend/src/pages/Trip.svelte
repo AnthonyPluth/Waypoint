@@ -333,18 +333,24 @@
 {/snippet}
 
 {#snippet ports(s: Segment)}
-  {#if s.itinerary.length}
+  {#if s.days.length}
     <div class="mt-2 text-sm" data-itinerary>
-      <p class="eyebrow">Ports of call</p>
+      <p class="eyebrow">Itinerary</p>
       <ol class="mt-1 flex flex-col gap-2">
-        {#each s.itinerary as p, i (i)}
-          <li class="flex flex-wrap items-baseline justify-between gap-x-3">
-            <span class="break-words font-medium">{p.name}</span>
-            <span class="text-muted-foreground">
-              {#if p.arrive_local}{dayLabel(p.arrive_local)}, arrives <PlaceTime local={p.arrive_local} zone={p.zone} />{#if p.depart_local}, leaves <PlaceTime local={p.depart_local} zone={p.zone} />{/if}
-              {:else if p.depart_local}{dayLabel(p.depart_local)}, leaves <PlaceTime local={p.depart_local} zone={p.zone} />
-              {:else}Time not recorded{/if}
-            </span>
+        {#each s.days as d (d.day)}
+          <li class="flex flex-wrap items-baseline justify-between gap-x-3" data-day={d.day}>
+            <span class="break-words"><span class="text-muted-foreground">Day {d.day} · {dayLabel(`${d.date}T00:00`)}</span>{" "}<span class="font-medium">{#if d.sea}Sea day{:else}{d.stops.map((p) => p.name).join(", ")}{/if}</span></span>
+            {#if !d.sea}
+              <span class="text-muted-foreground">
+                {#each d.stops as p, i (i)}
+                  {#if i}<br />{/if}
+                  {#if p.arrive_local}arrives <PlaceTime local={p.arrive_local} zone={p.zone} />{#if p.depart_local}, leaves <PlaceTime local={p.depart_local} zone={p.zone} />{/if}
+                  {:else if p.depart_local}leaves <PlaceTime local={p.depart_local} zone={p.zone} />
+                  {:else if p.recorded}In port
+                  {:else}Time not recorded{/if}
+                {/each}
+              </span>
+            {/if}
           </li>
         {/each}
       </ol>

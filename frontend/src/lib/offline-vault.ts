@@ -34,8 +34,10 @@ export class VaultError extends Error {
 export type Support = { ok: true } | { ok: false; reason: string };
 
 type Sealed = { iv: string; data: string };
-type StoredKeys = { v: number; credentialId: string; publicKey: string; wrappedKey: Sealed };
-type StoredTrip = { v: number; ephemeralPublicKey: string; iv: string; data: string };
+type StoredKeys = { v: number; credentialId: string; publicKey: string; wrappedKey: Sealed; off?: boolean };
+type StoredTrip = { v: number; ephemeralPublicKey: string; iv: string; data: string; savedAt?: number; expiresAt?: number | null };
+
+export type SavedInfo = { savedAt: number; expiresAt: number | null };
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
@@ -124,7 +126,8 @@ const isText = (x: unknown): x is string => typeof x === "string";
 
 function validKeys(x: StoredKeys | null): StoredKeys | null {
   if (x === null) return null;
-  if (x.v !== VERSION || !isText(x.credentialId) || !isText(x.publicKey) || !x.wrappedKey || !isText(x.wrappedKey.iv) || !isText(x.wrappedKey.data)) {
+  if (x.v !== VERSION || !isText(x.credentialId) || !isText(x.publicKey) || !x.wrappedKey || !isText(x.wrappedKey.iv) || !isText(x.wrappedKey.data)
+    || (x.off !== undefined && typeof x.off !== "boolean")) {
     throw new VaultError("damaged", DAMAGED);
   }
   return x;
@@ -132,7 +135,8 @@ function validKeys(x: StoredKeys | null): StoredKeys | null {
 
 function validTrip(x: StoredTrip | null): StoredTrip | null {
   if (x === null) return null;
-  if (x.v !== VERSION || !isText(x.ephemeralPublicKey) || !isText(x.iv) || !isText(x.data)) throw new VaultError("damaged", DAMAGED);
+  const stamp = (n: unknown) => n === undefined || n === null || Number.isFinite(n);
+  if (x.v !== VERSION || !isText(x.ephemeralPublicKey) || !isText(x.iv) || !isText(x.data) || !stamp(x.savedAt) || !stamp(x.expiresAt)) throw new VaultError("damaged", DAMAGED);
   return x;
 }
 
@@ -144,6 +148,30 @@ export async function isSetUp(): Promise<boolean> {
 
 export async function hasSavedTrip(): Promise<boolean> {
   return (await isSetUp()) && validTrip(await read<StoredTrip>(TRIP_URL)) !== null;
+}
+
+export async function savedInfo(): Promise<SavedInfo | null> {
+  if (!(await isSetUp())) return null;
+  const stored = validTrip(await read<StoredTrip>(TRIP_URL));
+  if (!stored) return null;
+  return { savedAt: stored.savedAt ?? 0, expiresAt: stored.expiresAt ?? null };
+}
+
+export async function isSavingOff(): Promise<boolean> {
+  return (await storedKeys())?.off === true;
+}
+
+export async function setSavingOff(off: boolean): Promise<void> {
+  const keys = await storedKeys();
+  if (!keys) throw new VaultError("not-set-up", "Offline access isn’t set up on this device.");
+  const next: StoredKeys = { ...keys };
+  if (off) next.off = true; else delete next.off;
+  await write(KEYS_URL, next);
+}
+
+export async function clearTrip(): Promise<void> {
+  lock();
+  if (typeof caches !== "undefined") await (await caches.open(CACHE_NAME)).delete(TRIP_URL);
 }
 
 export async function support(): Promise<Support> {
@@ -257,9 +285,9 @@ async function saveKey(shared: ArrayBuffer, ephemeralPublic: Bytes, recipientPub
   );
 }
 
-export async function save(value: unknown): Promise<boolean> {
+export async function save(value: unknown, info?: SavedInfo): Promise<boolean> {
   const keys = await storedKeys();
-  if (!keys) return false;
+  if (!keys || keys.off) return false;
   const recipientPublic = fromBase64(keys.publicKey);
   const recipient = await crypto.subtle.importKey("raw", recipientPublic, CURVE, false, []);
   const ephemeral = await crypto.subtle.generateKey(CURVE, false, ["deriveBits"]);
@@ -268,7 +296,7 @@ export async function save(value: unknown): Promise<boolean> {
   const aes = await saveKey(shared, ephemeralPublic, recipientPublic, "encrypt");
   const iv = random(12);
   const sealed = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: SAVE_AAD }, aes, text(JSON.stringify(value)));
-  const stored: StoredTrip = { v: VERSION, ephemeralPublicKey: toBase64(ephemeralPublic), iv: toBase64(iv), data: toBase64(new Uint8Array(sealed)) };
+  const stored: StoredTrip = { v: VERSION, ephemeralPublicKey: toBase64(ephemeralPublic), iv: toBase64(iv), data: toBase64(new Uint8Array(sealed)), ...info };
   await write(TRIP_URL, stored);
   return true;
 }

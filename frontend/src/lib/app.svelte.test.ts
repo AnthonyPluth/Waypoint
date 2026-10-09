@@ -2,8 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./api", () => ({ api: vi.fn(), newPage: vi.fn() }));
+vi.mock("./offline.svelte", () => ({ syncSavedTrip: vi.fn() }));
 
 import { api, newPage } from "./api";
+import * as offlineModule from "./offline.svelte";
 import { app, boot, checkIn, editing, refreshState, route, setQuery, whenBooted } from "./app.svelte";
 import type { AppState } from "./types";
 
@@ -96,6 +98,16 @@ describe("boot", () => {
     expect(app.bootError).toBe("Failed to fetch");
   });
 
+  it("knows the connection is gone when the request never reached Waypoint", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(api).mockRejectedValue(Object.assign(new Error("Can’t reach Waypoint."), { status: 0 }));
+    await boot();
+    expect(app.offline).toBe(true);
+    vi.mocked(api).mockRejectedValue(Object.assign(new Error("Server error"), { status: 500 }));
+    await boot();
+    expect(app.offline).toBe(false);
+  });
+
   it("loads state once, and runs whenBooted callbacks", async () => {
     vi.mocked(api).mockResolvedValue(state());
     const early = vi.fn();
@@ -109,6 +121,17 @@ describe("boot", () => {
     expect(late).toHaveBeenCalledOnce();
     await boot();
     expect(early).toHaveBeenCalledOnce();
+  });
+
+  it("saves the current trip each time it loads online", async () => {
+    vi.mocked(api).mockResolvedValue(state());
+    vi.mocked(offlineModule.syncSavedTrip).mockClear();
+    await boot();
+    expect(offlineModule.syncSavedTrip).toHaveBeenCalledTimes(1);
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(offlineModule.syncSavedTrip).toHaveBeenCalledTimes(2);
+    window.dispatchEvent(new Event("online"));
+    expect(offlineModule.syncSavedTrip).toHaveBeenCalledTimes(3);
   });
 });
 

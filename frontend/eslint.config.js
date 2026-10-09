@@ -17,11 +17,11 @@ const RESTRICTED = {
   },
   storage: {
     selector: "Identifier[name=/^(localStorage|sessionStorage|indexedDB)$/]",
-    message: "Browser storage outlives sign-out and is readable by anything on the device: keep trips, names, codes and loyalty numbers on the server; the one thing kept on the device is the encrypted offline trip, which lib/offline-vault.ts alone writes to the Cache API (AGENTS.md, \"Waypoint's promises\").",
+    message: "Browser storage outlives sign-out and is readable by anything on the device: keep trips, names, codes and loyalty numbers on the server; the one thing kept on the device is the signed-in person's own copy of their current trip, saved by lib/offline.ts, shown only to them, never sent anywhere else and cleared on sign-out, on a 401 or 403, when saving is turned off and 3 days after the trip ends, encrypted by lib/offline-vault.ts, which alone writes it to the Cache API (AGENTS.md, \"Waypoint's promises\").",
   },
   cache: {
     selector: "Identifier[name='caches']",
-    message: "The Cache API is for lib/offline-vault.ts alone: it keeps the saved offline trip as ciphertext that only the device's own check (Face ID, Touch ID or the screen lock) can open, so a copy of the device's stored data never holds a trip, a name or a code in the clear. Save through the vault's save(), never to a cache of your own (AGENTS.md, \"Waypoint's promises\").",
+    message: "The Cache API is for lib/offline-vault.ts alone: it keeps the saved offline trip as ciphertext that only the device's own check (Face ID, Touch ID or the screen lock) can open, so a copy of the device's stored data never holds a trip, a name, a code or a message in the clear, and never a loyalty or Known Traveler number. Save only through lib/offline.ts and the vault's save(), never to a cache of your own (AGENTS.md, \"Waypoint's promises\").",
   },
   darkOnly: {
     selector: "Literal[value=/(^|\\s)dark:|prefers-color-scheme/], TemplateElement[value.raw=/(^|\\s)dark:|prefers-color-scheme/], SvelteLiteral[value=/(^|\\s)dark:|prefers-color-scheme/]",

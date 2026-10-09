@@ -2234,6 +2234,27 @@
           }
         }
       }
+    },
+    "/api/offline": {
+      "get": {
+        "operationId": "api_offline",
+        "x-handler": "waypoint/server/api/offline.py:api_offline",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Offline"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2430,6 +2451,67 @@
         },
         "required": [
           "guests"
+        ],
+        "additionalProperties": false
+      },
+      "CruiseDay": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "integer"
+          },
+          "date": {
+            "type": "string"
+          },
+          "sea": {
+            "type": "boolean"
+          },
+          "stops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CruiseStop"
+            }
+          }
+        },
+        "required": [
+          "day",
+          "date",
+          "sea",
+          "stops"
+        ],
+        "additionalProperties": false
+      },
+      "CruiseStop": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "zone": {
+            "type": "string"
+          },
+          "arrive_local": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "depart_local": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recorded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "zone",
+          "arrive_local",
+          "depart_local",
+          "recorded"
         ],
         "additionalProperties": false
       },
@@ -3345,6 +3427,51 @@
         ],
         "additionalProperties": false
       },
+      "Offline": {
+        "type": "object",
+        "properties": {
+          "trip": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Trip"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfflineMessages"
+            }
+          }
+        },
+        "required": [
+          "trip",
+          "messages"
+        ],
+        "additionalProperties": false
+      },
+      "OfflineMessages": {
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "integer"
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoredEmail"
+            }
+          }
+        },
+        "required": [
+          "segment_id",
+          "emails"
+        ],
+        "additionalProperties": false
+      },
       "Ok": {
         "type": "object",
         "properties": {
@@ -4045,6 +4172,12 @@
               "$ref": "#/components/schemas/Port"
             }
           },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CruiseDay"
+            }
+          },
           "logo": {
             "type": [
               "string",
@@ -4085,6 +4218,7 @@
           "check_times",
           "travelers",
           "itinerary",
+          "days",
           "logo",
           "logo_label",
           "has_email",

@@ -448,6 +448,20 @@ class CruiseTests(StatsCase):
         c = self.stats(self.jane)["cruises"]
         self.assertEqual((c["nights"], c["sea_days"], c["ports"]), (7, 4, 2))
 
+    def test_the_sea_days_listed_on_the_trip_are_the_ones_counted_here(self):
+        overnight = [{"name": "Reykjavik", "zone": "Atlantic/Reykjavik", "arrive_local": "2026-03-02T08:00", "depart_local": "2026-03-03T17:00"},
+                     {"name": "Akureyri", "zone": "Atlantic/Reykjavik", "arrive_local": None, "depart_local": None}]
+        listed = 0
+        for n, ports in enumerate((CRUISE["itinerary"], overnight)):
+            later = f"2026-0{3 + 2 * n}"
+            moved = {**CRUISE, "confirmation": f"C{n}", "start_local": CRUISE["start_local"].replace("2026-03", later),
+                     "end_local": CRUISE["end_local"].replace("2026-03", later),
+                     "itinerary": [{**p, **{k: p[k].replace("2026-03", later) for k in ("arrive_local", "depart_local") if p[k]}} for p in ports]}
+            seg = self.add(self.jane, moved, travelers=self.on(self.jane.person_id))
+            listed += sum(day["sea"] for day in seg["days"])
+            self.assertTrue(any(not day["sea"] for day in seg["days"][1:-1]))
+        self.assertEqual((listed, self.stats(self.jane)["cruises"]["sea_days"]), (7, 7))
+
     def test_a_year_takes_its_own_nights_and_sea_days_and_the_years_list_has_the_cruise(self):
         spanning = {**CRUISE, "start_local": "2025-12-29T16:30", "end_local": "2026-01-03T07:00", "itinerary": []}
         self.mine(spanning)

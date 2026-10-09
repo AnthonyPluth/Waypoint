@@ -439,11 +439,6 @@ def _cars(cars: Sequence[Seg], year: int | None) -> CarStats:
     return {"days": len(days), "companies": _ranked(companies)}
 
 
-def _port_days(port: trips.PortIn) -> set[date]:
-    days = [date.fromisoformat(t[:10]) for t in (port["arrive_local"], port["depart_local"]) if t]
-    return {days[0] + timedelta(days=i) for i in range((max(days) - min(days)).days + 1)} if days else set()
-
-
 def _cruises(cruises: Sequence[Seg], year: int | None) -> CruiseStats:
     nights: set[date] = set()
     sea: set[date] = set()
@@ -452,13 +447,13 @@ def _cruises(cruises: Sequence[Seg], year: int | None) -> CruiseStats:
     for s in cruises:
         aboard = {d for d in _nights(s) if _in(d, year)}
         nights |= aboard
-        in_port = set().union(*(_port_days(p) for p in s.ports)) if s.ports else set()
+        in_port = set().union(*(trips.port_days(p) for p in s.ports)) if s.ports else set()
         first = date.fromisoformat(s.start_local[:10])
         sea |= {d for d in _nights(s) if d > first and d not in in_port and _in(d, year)}
         if not aboard:
             continue
         ports |= {p["name"].strip().casefold() for p in s.ports
-                  if year is None or not (days := _port_days(p)) or any(_in(d, year) for d in days)}
+                  if year is None or not (days := trips.port_days(p)) or any(_in(d, year) for d in days)}
         if s.provider:
             lines[s.provider] += 1
     counted = [s for s in cruises if any(_in(d, year) for d in _nights(s))]

@@ -6,9 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
+import { toast } from "svelte-sonner";
 import { api } from "$lib/api";
 import { app, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
+import * as offlineModule from "$lib/offline";
 import { state } from "../test/fixtures";
 import Settings from "./Settings.svelte";
 
@@ -64,6 +66,26 @@ describe("Settings account", () => {
     expect(api).toHaveBeenCalledWith("/auth/logout", { method: "POST" });
     await waitFor(() => expect(fake.href).toBe("/auth/signed-out"));
     vi.unstubAllGlobals();
+  });
+
+  it("clears the trip saved on this device before the session ends", async () => {
+    const order: string[] = [];
+    vi.spyOn(offlineModule, "clearSaved").mockImplementation(async () => { order.push("cleared"); });
+    vi.mocked(api).mockImplementation((async (path: string) => { order.push(path); return { redirect: "/auth/signed-out" }; }) as never);
+    vi.stubGlobal("location", { href: "", pathname: "/", hash: "" });
+    render(Settings);
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(order).toContain("/auth/logout"));
+    expect(order.indexOf("cleared")).toBeLessThan(order.indexOf("/auth/logout"));
+    vi.unstubAllGlobals();
+  });
+
+  it("stays signed in, and says why, when the saved trip can't be removed", async () => {
+    vi.spyOn(offlineModule, "clearSaved").mockRejectedValue(new Error("Couldn’t remove the saved trip from this device."));
+    render(Settings);
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn’t remove the saved trip from this device."));
+    expect(api).not.toHaveBeenCalledWith("/auth/logout", expect.anything());
   });
 
   it("shows the version and the database", () => {

@@ -328,6 +328,7 @@
         "tests/test_api_contract.py",
         "tests/test_mail_scan.py",
         "tests/test_mcp_routes.py",
+        "tests/test_offline.py",
         "tests/test_reminders.py",
         "tests/test_trips.py"
       ],
@@ -392,6 +393,7 @@
         "tests/test_logos.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
+        "tests/test_offline.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -1046,6 +1048,21 @@
       ],
       "docs": [
         "start/docker"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/offline",
+      "handler": "waypoint/server/api/offline.py:api_offline",
+      "web": [
+        "frontend/src/lib/offline.ts"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_offline.py"
+      ],
+      "docs": [
+        "start/offline"
       ]
     }
   ]

@@ -25,6 +25,7 @@ function serve() {
   vi.mocked(api).mockImplementation(async (path) => {
     if (path === "/api/people") return { people: [] };
     if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+    if (path === "/api/offline") return { trip: held, messages: [] };
     return held;
   });
 }
@@ -38,7 +39,7 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
   vi.mocked(api).mockReset();
   held = { ...trip([flight]), name: "Trip to Springfield" };
-  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, damaged: false, supported: true, reason: "", declined: false });
+  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false });
   route.page = "trip"; route.sub = "1"; route.query = ""; location.hash = "#trip/1";
   withDevice();
   serve();

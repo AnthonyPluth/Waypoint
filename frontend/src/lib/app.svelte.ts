@@ -1,10 +1,12 @@
 import { api, newPage } from "./api";
 import type { AppState } from "./types";
 import { errMsg } from "./act";
+import { syncSavedTrip } from "./offline.svelte";
 
 export const app = $state({
   state: null as AppState | null,
   bootError: "" as string,
+  offline: false,
   sessionExpired: false,
 });
 
@@ -46,15 +48,16 @@ let booted = false;
 const onBoot: (() => void)[] = [];
 export function whenBooted(fn: () => void): void { if (booted) fn(); else onBoot.push(fn); }
 export async function boot(): Promise<void> {
-  try { await refreshState(); app.bootError = ""; }
-  catch (err) { console.error(err); app.bootError = errMsg(err); return; }
+  try { await refreshState(); app.bootError = ""; app.offline = false; }
+  catch (err) { console.error(err); app.bootError = errMsg(err); app.offline = (err as { status?: number }).status === 0; return; }
+  void syncSavedTrip();
   if (booted) return;
   booted = true;
   onBoot.splice(0).forEach((fn) => fn());
 }
-window.addEventListener("online", () => { if (!booted) boot(); });
+window.addEventListener("online", () => { if (!booted) boot(); else void syncSavedTrip(); });
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && booted) checkIn();
+  if (document.visibilityState === "visible" && booted) { checkIn(); void syncSavedTrip(); }
 });
 export function checkIn(): void {
   if (app.sessionExpired) return;
