@@ -18,7 +18,7 @@ SENDERS = (
     "chasetravel.com", "capitalonetravel.com", "perk.com", "travelbank.com", "amextravel.com", "navan.com", "tripactions.com",
     "egencia.com", "costcotravel.com", "cheapoair.com", "onetravel.com", "hopper.com",
     "carnival.com", "royalcaribbean.com", "celebritycruises.com", "ncl.com", "princess.com", "hollandamerica.com", "msccruises.com",
-    "virginvoyages.com", "vikingcruises.com", "disneycruise.com", "cunard.com", "seabourn.com", "azamara.com", "oceaniacruises.com",
+    "virginvoyages.com", "vikingcruises.com", "disneycruise.com", "familyvacations-disneycruise.com", "cunard.com", "seabourn.com", "azamara.com", "oceaniacruises.com",
     "rssc.com", "silversea.com", "windstarcruises.com", "ponant.com", "lindblad.com", "costacruises.com", "avalonwaterways.com",
     "uniworld.com", "amawaterways.com", "vacationstogo.com",
 )

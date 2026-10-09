@@ -9,6 +9,8 @@ from . import extract
 
 
 def _zone(conn: db.Connection, b: extract.Booking, code: str | None, place: extract.Place) -> str | None:
+    if b.kind == "cruise":
+        return b.start_zone if code == b.origin else b.end_zone
     if b.kind == "flight":
         known = airports.lookup(conn, code) if code else None
         return known["zone"] if known else None
@@ -82,6 +84,8 @@ def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
                             "check_times": guessed}
     if b.passengers:
         out["travelers"] = travelers(conn, b.passengers)
+    if b.ports:
+        out["itinerary"] = [{"name": p.name, "zone": p.zone, "arrive_local": p.arrive_local, "depart_local": p.depart_local} for p in b.ports]
     return out
 
 

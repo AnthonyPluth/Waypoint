@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-Kind = Literal["flight", "hotel", "car", "train"]
+Kind = Literal["flight", "hotel", "car", "train", "cruise"]
 Status = Literal["confirmed", "cancelled"]
 
 
@@ -17,6 +17,14 @@ class Place:
 class Passenger:
     name: str
     member_number: str | None = None
+
+
+@dataclass(frozen=True)
+class Port:
+    name: str
+    zone: str
+    arrive_local: str | None
+    depart_local: str | None
 
 
 @dataclass(frozen=True)
@@ -35,6 +43,9 @@ class Booking:
     manage_url: str | None = None
     passengers: tuple[Passenger, ...] = ()
     clock_times: frozenset[str] = frozenset()
+    start_zone: str | None = None
+    end_zone: str | None = None
+    ports: tuple[Port, ...] = ()
 
 
 @dataclass(frozen=True)

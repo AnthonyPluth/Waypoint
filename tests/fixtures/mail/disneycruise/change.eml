@@ -1,0 +1,15 @@
+From: Disney Cruise Line <reservations@familyvacations-disneycruise.com>
+To: traveller@gmail.example
+Subject: Your reservation has changed (4455667)
+Date: Wed, 07 Oct 2026 10:00:00 -0500
+Message-ID: <fx-dcl-change@familyvacations-disneycruise.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>Your reservation has been updated. CANARY-BODY-DISNEY-CHANGE-8W3N</p>
+<table>
+<tr><td>Reservation Number:</td><td>4455667</td></tr>
+<tr><td>Stateroom:</td><td>9120</td></tr>
+</table>
+</body></html>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import time
 from html.parser import HTMLParser
 
 BLOCKS = {"p", "div", "br", "tr", "li", "h1", "h2", "h3", "h4", "table", "section", "hr"}
@@ -47,3 +48,9 @@ def lines(html: str, text: str) -> list[str]:
     else:
         raw = text
     return [line for line in (re.sub(r"[ \t\r\f\v\xa0]+", " ", ln).strip() for ln in raw.split("\n")) if line]
+
+
+def clock(hour: int, minute: int, meridiem: str) -> time | None:
+    if not (1 <= hour <= 12 and minute < 60):
+        return None
+    return time(hour % 12 + (12 if meridiem.upper() == "P" else 0), minute)

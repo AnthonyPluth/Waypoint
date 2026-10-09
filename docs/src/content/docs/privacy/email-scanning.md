@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::note[What’s built]
-Members connect a Gmail read-only (see [Google OAuth client for Gmail](/Waypoint/start/gmail/)), and Waypoint scans it for bookings in schema.org markup, falling back to a parser for senders without it (Southwest so far), and queuing what it can’t read in [Review](/Waypoint/start/review/). The optional AI suggestions below are built.
+Members connect a Gmail read-only (see [Google OAuth client for Gmail](/Waypoint/start/gmail/)), and Waypoint scans it for bookings in schema.org markup, falling back to a parser for senders without it (Southwest and Disney Cruise Line so far), and queuing what it can’t read in [Review](/Waypoint/start/review/). The optional AI suggestions below are built.
 :::
 
 Waypoint’s main way of learning about a booking is to read the confirmation email in a Gmail account you connect. The rules it keeps:
@@ -22,7 +22,7 @@ Waypoint’s main way of learning about a booking is to read the confirmation em
 Waypoint tries the cheapest, most reliable method first and falls through:
 
 1. **schema.org markup** (built). Many airlines, hotels, rental companies and railways embed structured data (`FlightReservation`, `LodgingReservation`, `RentalCarReservation`, `TrainReservation`) in the email for Gmail’s own cards. Waypoint reads it directly.
-2. **Per-vendor parsers** (started: Southwest Airlines). For senders without markup, a parser written for that vendor’s email reads its text for the same fields, and for its change and cancellation emails. A parser only ever sees the message’s text in memory, and keeps nothing of it. More vendors come one at a time.
+2. **Per-vendor parsers** (started: Southwest Airlines and Disney Cruise Line). For senders without markup, a parser written for that vendor’s email reads its text for the same fields, and for its change and cancellation emails. A parser only ever sees the message’s text in memory, and keeps nothing of it. Disney Cruise Line’s parser reads the booking confirmation: the sailing, its ship, stateroom and deck, each guest’s name (never their Castaway Club number) and the ports of call with their times at each port’s own zone; a re-sent confirmation updates the same booking, a port it doesn’t know goes to review, and its change and cancellation emails aren’t read yet. More vendors come one at a time.
 3. **A “Couldn’t read” review queue** (built). What neither method understands lands in a queue where you can open it in Gmail, add the booking by hand, ignore the sender or dismiss it. Nothing is guessed silently.
 
 ## Optional AI suggestions
