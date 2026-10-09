@@ -1,0 +1,13 @@
+{
+  "name": "more-menu",
+  "page": "upcoming",
+  "viewports": ["phone", "tablet"],
+  "steps": [
+    { "click": "nav[aria-label='Main'] >> visible=true >> button:has-text('More')" },
+    { "wait_for": "#more-menu" },
+    { "screenshot": "open" },
+    { "click": "#more-menu a[href='#people']" },
+    { "expect_text": { "selector": "h1", "text": "People" } },
+    { "screenshot": "people" }
+  ]
+}
