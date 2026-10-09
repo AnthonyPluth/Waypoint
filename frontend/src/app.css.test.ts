@@ -65,6 +65,8 @@ describe("motion", () => {
     expect(reduced).toMatch(/animation-iteration-count: 1 !important/);
   });
   it("puts no animation outside that switch", () => {
-    expect(css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)") + reduced.length)).toBe("");
+    const afterSwitch = reduced.slice(reduced.indexOf("}\n}") + 3);
+    expect(afterSwitch.trim()).toBe("");
+    expect(reduced).not.toMatch(/@keyframes|\banimation:|\btransition:/);
   });
 });
