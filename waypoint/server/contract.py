@@ -396,6 +396,7 @@ class ImportRow(TypedDict):
     end_local: str | None
     seat: str | None
     cabin: str | None
+    aircraft: str | None
 
 
 class ImportPreview(TypedDict):
@@ -414,6 +415,7 @@ class ImportFlight(TypedDict):
     end_local: NotRequired[str | None]
     seat: NotRequired[str | None]
     cabin: NotRequired[str | None]
+    aircraft: NotRequired[str | None]
 
 
 class ImportBody(TypedDict):

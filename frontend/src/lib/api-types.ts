@@ -119,6 +119,7 @@ export interface ImportFlight {
   end_local?: string | null;
   seat?: string | null;
   cabin?: string | null;
+  aircraft?: string | null;
 }
 
 export interface ImportPreview {
@@ -140,6 +141,7 @@ export interface ImportRow {
   end_local: string | null;
   seat: string | null;
   cabin: string | null;
+  aircraft: string | null;
 }
 
 export interface Imported {

@@ -28,7 +28,7 @@ def _flight(item: Any) -> flight_import.FlightIn:
         "day": _v.day(item.get("day"), "day", required=True),
         "origin": _text(item.get("origin"), "origin", 3) or "",
         "destination": _text(item.get("destination"), "destination", 3) or ""}
-    for key, limit in (("flight_number", 12), ("airline", 100), ("start_local", 19), ("end_local", 19), ("seat", 10), ("cabin", 100)):
+    for key, limit in (("flight_number", 12), ("airline", 100), ("start_local", 19), ("end_local", 19), ("seat", 10), ("cabin", 100), ("aircraft", 100)):
         if key in item:
             flight[key] = _text(item[key], key.replace("_", " "), limit)   # type: ignore[literal-required]
     return flight

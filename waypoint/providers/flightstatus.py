@@ -73,6 +73,7 @@ class Status:
     arr_zone: str | None = None
     arr_terminal: str | None = None
     arr_gate: str | None = None
+    aircraft: str | None = None
 
 
 def key() -> str | None:
@@ -114,6 +115,7 @@ def parse_flight(flight: Any) -> Status | None:
     if not isinstance(flight, dict) or not (flight.get("status") or flight.get("departure") or flight.get("arrival")):
         return None
     dep, arr = _side(flight.get("departure")), _side(flight.get("arrival"))
+    aircraft: dict[str, Any] = flight["aircraft"] if isinstance(flight.get("aircraft"), dict) else {}
     raw = flight.get("status")
     state = STATE_OF.get(raw.replace(" ", "").lower(), UNKNOWN) if isinstance(raw, str) else UNKNOWN
     expected = dep["actual"] or dep["estimated"]
@@ -123,7 +125,7 @@ def parse_flight(flight: Any) -> Status | None:
                   dep_scheduled=dep["scheduled"], dep_estimated=dep["estimated"], dep_actual=dep["actual"], dep_zone=dep["zone"],
                   dep_terminal=dep["terminal"], dep_gate=dep["gate"],
                   arr_scheduled=arr["scheduled"], arr_estimated=arr["estimated"], arr_actual=arr["actual"], arr_zone=arr["zone"],
-                  arr_terminal=arr["terminal"], arr_gate=arr["gate"])
+                  arr_terminal=arr["terminal"], arr_gate=arr["gate"], aircraft=_text(aircraft.get("model"), 60))
 
 
 def parse(body: Any, origin: str | None = None) -> Status | None:

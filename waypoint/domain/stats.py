@@ -6,13 +6,13 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from typing import Literal, TypedDict
+from typing import Literal, TypedDict, cast
 
 from sqlalchemy import func, select
 
 from ..storage import db
 from ..storage.models import Airline, Airport
-from . import people, trips, visibility
+from . import people, seatmaps, trips, visibility
 from .chains import clean, hotel_chain
 from .visibility import Viewer
 
@@ -21,9 +21,6 @@ MOON_KM = 384400.0
 EARTH_RADIUS_KM = 6371.0088
 FLIGHT_NUMBER = re.compile(r"\s*([A-Za-z0-9]{2})\s*\d{1,4}[A-Za-z]?\s*")
 SEAT = re.compile(r"\s*\d{1,3}\s*([A-Za-z])\s*")
-SEAT_POSITIONS: dict[str, Literal["window", "aisle", "middle"]] = {
-    "A": "window", "B": "middle", "C": "aisle", "D": "aisle", "E": "middle", "F": "window",
-    "G": "aisle", "H": "aisle", "J": "middle", "K": "window"}
 SeatPosition = Literal["window", "aisle", "middle", "unknown"]
 
 
@@ -195,9 +192,20 @@ def distance_km(a: tuple[float, float], b: tuple[float, float]) -> float:
     return 2 * EARTH_RADIUS_KM * math.asin(min(1.0, math.sqrt(h)))
 
 
-def seat_position(seat: str | None) -> SeatPosition:
+def seat_position(seat: str | None, details: Mapping[str, str] | None = None) -> SeatPosition:
     found = SEAT.fullmatch(seat or "")
-    return SEAT_POSITIONS.get(found.group(1).upper(), "unknown") if found else "unknown"
+    if not found:
+        return "unknown"
+    said = ((details or {}).get("seat_position") or "").strip().casefold()
+    if said in ("window", "aisle", "middle"):
+        return cast(SeatPosition, said)
+    letter = found.group(1).upper()
+    if letter == "A":
+        return "window"
+    cabin = cabin_group((details or {}).get("cabin") or "Economy")
+    if cabin != "Economy":
+        return "unknown"
+    return seatmaps.position((details or {}).get("aircraft"), "economy", letter) or "unknown"
 
 
 def _ranked(counts: Mapping[str, int]) -> list[Named]:
@@ -298,10 +306,11 @@ def _flights(flights: Sequence[Seg], known: Mapping[str, Airport], airlines: Map
             cabins[cabin_group(cabin)] += 1
         own = [t for t in (re.sub(r"\s+", "", x).upper() for x in s.seats) if t]
         booking = re.sub(r"\s+", "", s.details.get("seat") or "").upper()
+        without_position = {k: v for k, v in s.details.items() if k != "seat_position"}
         for seat in own or ([booking] if booking else [""]):
             if seat:
                 seats[seat] += 1
-            positions[seat_position(seat)] += 1
+            positions[seat_position(seat, s.details if seat == booking or (not booking and len(own) == 1) else without_position)] += 1
     airports_out: list[AirportVisit] = []
     visits = {code: max(arrivals[code], departures[code]) for code in arrivals.keys() | departures.keys()}
     for code, n in sorted(visits.items(), key=lambda kv: (-kv[1], kv[0])):

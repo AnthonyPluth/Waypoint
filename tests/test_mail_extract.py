@@ -43,6 +43,22 @@ class FixtureTests(unittest.TestCase):
         self.assertEqual(b.manage_url, "https://example-air.example/manage/QX7M2K")
         self.assertEqual(b.passengers, (extract.Passenger("Jane Doe", "FXLOY-4400123"),))
 
+    def test_the_seats_word_and_the_aircraft_in_json_ld(self):
+        node = ('{"@type":"FlightReservation","reservationNumber":"ABC123","underName":{"name":"Jane Doe"},'
+                '"reservedTicket":{"ticketedSeat":{"seatNumber":"Seat 14A (Window)","seatingType":"Economy"}},'
+                '"reservationFor":{"@type":"Flight","flightNumber":"EX 7","aircraft":{"@type":"Vehicle","name":"Boeing 737-800"},'
+                '"airline":{"iataCode":"EX","name":"Example Air"},"departureAirport":{"iataCode":"JFK"},'
+                '"departureTime":"2026-11-20T19:00:00-05:00","arrivalAirport":{"iataCode":"LHR"},"arrivalTime":"2026-11-21T07:10:00Z"}}')
+        [b] = extract.read(message(ld(node))).bookings
+        self.assertEqual(dict(b.details), {"flight_number": "EX 7", "seat": "14A", "seat_position": "window",
+                                           "aircraft": "Boeing 737", "cabin": "Economy"})
+        plain = node.replace("Seat 14A (Window)", "14C").replace('{"@type":"Vehicle","name":"Boeing 737-800"}', '"Airbus A321neo"')
+        [b] = extract.read(message(ld(plain))).bookings
+        self.assertEqual(dict(b.details), {"flight_number": "EX 7", "seat": "14C", "aircraft": "Airbus A320 family", "cabin": "Economy"})
+        unknown = node.replace('{"@type":"Vehicle","name":"Boeing 737-800"}', '"Dornier 328"')
+        [b] = extract.read(message(ld(unknown))).bookings
+        self.assertNotIn("aircraft", dict(b.details))
+
     def test_a_flight_in_microdata(self):
         [b] = fixture("flight_microdata").bookings
         self.assertEqual((b.kind, b.confirmation, b.origin, b.destination, b.start, b.end),

@@ -41,3 +41,5 @@ A plan allows few calls a month, so Waypoint spends them carefully:
 Answers are kept in the database for seven days after the flight and hold no personal data. They aren’t part of a backup: they’re fetched again.
 
 Push notifications for delays and gate changes aren’t part of this; they’re planned for when reminders exist.
+
+The aircraft model in an answer Waypoint already fetched is kept on the flight when the booking has none (it is used to tell window, aisle and middle seats apart, and shown beside the flight number). It never replaces an aircraft that is already there or a booking you have edited, and it costs no extra request.

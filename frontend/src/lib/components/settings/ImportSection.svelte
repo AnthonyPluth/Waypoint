@@ -56,7 +56,7 @@
       for (let i = 0; i < rows.length; i += BATCH) {
         const flights = rows.slice(i, i + BATCH).map((r) => ({
           day: r.day!, origin: r.origin!, destination: r.destination!, flight_number: r.flight_number, airline: r.airline,
-          start_local: r.start_local, end_local: r.end_local, seat: r.seat, cabin: r.cabin,
+          start_local: r.start_local, end_local: r.end_local, seat: r.seat, cabin: r.cabin, aircraft: r.aircraft,
         }));
         const r = await apiCall<"POST /api/import">("/api/import", { method: "POST", body: { flights, person_ids: travelling }, failed: "Couldn’t add the flights" });
         added += r.added; existing += r.existing;

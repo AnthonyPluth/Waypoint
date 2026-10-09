@@ -18,7 +18,7 @@ Waypoint recognises the export from its header row. A file whose columns match n
 | **OpenFlights** | My Flights → Export | Date (with the time of day when it has one), From, To, Flight_Number, Airline, Seat, Class |
 | **App in the Air** | its flight export | Date, Flight, From, To, Departure, Arrival, Airline, Seat, Class |
 
-Only the flight itself is read: its day, flight number, airline, the two airports, the times, the seat and the cabin. Notes columns, booking references and anything else in the file are never looked at, so they can’t be kept.
+Only the flight itself is read: its day, flight number, airline, the two airports, the times, the seat, the cabin and the aircraft type (from Flighty’s Aircraft Type Name, myFlightRadar24’s Aircraft and OpenFlights’ Plane columns, kept when it is one Waypoint knows). Notes columns, booking references and anything else in the file are never looked at, so they can’t be kept.
 
 :::caution
 These layouts come from what each app is documented or commonly reported to export. No export file from the apps themselves was available to check them against, and for **App in the Air** in particular no published description of its export was found, so its columns are a best reading of its flights list. A column named differently from the table is read as empty: the flight is still imported, without that time or seat. If an export of yours doesn’t import as you’d expect, [open an issue](https://github.com/AnthonyPluth/Waypoint/issues) describing its header row (not its flights).

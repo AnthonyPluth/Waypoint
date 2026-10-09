@@ -101,6 +101,12 @@ class ParserTests(unittest.TestCase):
         self.assertIsInstance(rows[3], Skipped)
         self.assertIn("origin", rows[3].reason)
 
+    def test_an_aircraft_column_is_read_as_the_family_the_seat_tables_use(self):
+        for name, aircraft in (("flighty", "Airbus A320 family"), ("myflightradar24", "Airbus A380"), ("openflights", "Airbus A320 family")):
+            with self.subTest(name=name):
+                self.assertEqual(flights(parsed(name).rows)[0].aircraft, aircraft)
+        self.assertIsNone(flights(parsed("appintheair").rows)[0].aircraft)
+
     def test_openflights(self):
         rows = parsed("openflights").rows
         first, second, bare = flights(rows)
@@ -153,7 +159,7 @@ class Importer(Household):
         new = [r for r in self.preview(name, who) if r["status"] == "new"]
         mine = travelers if travelers is not None else [{"person_id": who.person_id, "name": None}]
         return flight_import.save(self.c, who, [{k: r[k] for k in ("day", "origin", "destination", "flight_number", "airline",
-                                                                    "start_local", "end_local", "seat", "cabin")} for r in new], mine)
+                                                                    "start_local", "end_local", "seat", "cabin", "aircraft")} for r in new], mine)
 
 
 class PreviewTests(Importer):
@@ -225,7 +231,7 @@ class SaveTests(Importer):
         seg = next(s for s in found if s.origin == "JFK")
         self.assertEqual((seg.kind, seg.start_local, seg.start_zone, seg.end_local, seg.end_zone, seg.provider),
                          ("flight", "2025-03-01T08:12", "America/New_York", "2025-03-01T11:29", "America/Los_Angeles", "DL"))
-        self.assertEqual(trips.decode_details(seg.details), {"flight_number": "DL1001", "seat": "14C", "cabin": "Economy"})
+        self.assertEqual(trips.decode_details(seg.details), {"flight_number": "DL1001", "seat": "14C", "cabin": "Economy", "aircraft": "Airbus A320 family"})
         got = trips.get_segment(self.c, self.jane, seg.id)
         assert got is not None
         self.assertEqual(got["travelers"][0]["person_id"], self.jane.person_id)
@@ -244,7 +250,7 @@ class SaveTests(Importer):
                 self.assertGreater(first.added, 0)
                 before = len(self.segments(self.jane))
                 again = flight_import.save(self.c, self.jane, [
-                    {k: r[k] for k in ("day", "origin", "destination", "flight_number", "airline", "start_local", "end_local", "seat", "cabin")}
+                    {k: r[k] for k in ("day", "origin", "destination", "flight_number", "airline", "start_local", "end_local", "seat", "cabin", "aircraft")}
                     for r in self.preview(name) if r["status"] == "exists"], [{"person_id": self.jane.person_id, "name": None}])
                 self.assertEqual((again.added, len(self.segments(self.jane))), (0, before))
                 self.assertEqual(self.statuses_of_all_new(name), 0)
@@ -333,7 +339,7 @@ class RouteTests(RouteCase):
         return status, json.loads(body or b"{}")
 
     def rows_to_save(self, preview):
-        return [{k: r[k] for k in ("day", "origin", "destination", "flight_number", "airline", "start_local", "end_local", "seat", "cabin")}
+        return [{k: r[k] for k in ("day", "origin", "destination", "flight_number", "airline", "start_local", "end_local", "seat", "cabin", "aircraft")}
                 for r in preview["rows"] if r["status"] == "new"]
 
     def test_preview_then_save_then_the_same_file_again(self):

@@ -15,7 +15,7 @@ from ..providers import flightstatus as service
 from ..storage import db
 from ..storage import settings_keys as sk
 from ..storage.models import FlightStatus, Segment
-from . import trips, visibility
+from . import seatmaps, trips, visibility
 from .visibility import Viewer
 
 DEFAULT_LIMIT = 400
@@ -213,8 +213,22 @@ def _last_call(row: FlightStatus | None) -> datetime | None:
 
 def _store(conn: db.Connection, flight: Flight, found: service.Status | None, now: datetime) -> None:
     values = {"flight_number": flight.number, "date": flight.day, "fetched_at": now.timestamp(), "attempted_at": now.timestamp(),
-              **{k: getattr(found or service.Status(service.UNKNOWN), k) for k in service.Status.__dataclass_fields__}}
+              **{k: getattr(found or service.Status(service.UNKNOWN), k) for k in service.Status.__dataclass_fields__ if k != "aircraft"}}
     db.upsert(conn, FlightStatus, values, key=["flight_number", "date"])
+
+
+def _note_aircraft(conn: db.Connection, flight: Flight, found: service.Status | None) -> None:
+    family = seatmaps.family(found.aircraft) if found else None
+    if not family:
+        return
+    for seg in conn.orm.scalars(select(Segment).where(Segment.kind == "flight", Segment.start_local.like(f"{flight.day}%"))).all():
+        mine = _flight(seg)
+        if mine is None or mine.number != flight.number or (flight.origin and (seg.origin or "").upper() != flight.origin.upper()):
+            continue
+        details = trips.decode_details(seg.details)
+        if details.get("aircraft") or "details" in trips.decode_locked(seg.locked_fields):
+            continue
+        seg.details = json.dumps({**details, "aircraft": family}, ensure_ascii=False)
 
 
 def purge(conn: db.Connection, now: datetime) -> None:
@@ -242,6 +256,7 @@ def _check(conn: db.Connection, flight: Flight, now: datetime) -> None:
             _pause(conn, now, "key")
         raise
     _store(conn, flight, found, now)
+    _note_aircraft(conn, flight, found)
     conn.commit()
 
 

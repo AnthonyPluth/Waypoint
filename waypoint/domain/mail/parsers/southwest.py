@@ -4,6 +4,7 @@ import re
 from datetime import date, datetime, time, timedelta
 
 from ..booking import Booking, Parsed, Passenger
+from .. import seats
 from ._text import lines
 
 PROVIDER = "Southwest Airlines"
@@ -26,7 +27,7 @@ def _clock(hour: int, minute: int, meridiem: str) -> time | None:
 
 
 def _leg(code: str | None, status: str, first: re.Match[str], dep: re.Match[str], arr: re.Match[str],
-         passengers: tuple[Passenger, ...]) -> Booking | None:
+         passengers: tuple[Passenger, ...], aircraft: str | None = None) -> Booking | None:
     month = MONTHS.get(first[2].lower())
     if month is None:
         return None
@@ -43,7 +44,7 @@ def _leg(code: str | None, status: str, first: re.Match[str], dep: re.Match[str]
         return None
     return Booking("flight", "cancelled" if status == "cancelled" else "confirmed", code, PROVIDER,
                    start.isoformat(timespec="seconds"), end.isoformat(timespec="seconds"), dep[1].upper(), arr[1].upper(),
-                   details=(("flight_number", f"WN {first[1]}"),), passengers=passengers)
+                   details=(("flight_number", f"WN {first[1]}"), *((("aircraft", aircraft),) if aircraft else ())), passengers=passengers)
 
 
 def parse(html: str, text: str) -> Parsed:
@@ -63,7 +64,7 @@ def parse(html: str, text: str) -> Parsed:
             break
         dep = STOP.search(rows[i + 1]) if i + 1 < len(rows) else None
         arr = STOP.search(rows[i + 2]) if i + 2 < len(rows) else None
-        made = _leg(code, status, first, dep, arr, passengers) if dep and arr else None
+        made = _leg(code, status, first, dep, arr, passengers, seats.aircraft_in(" ".join(rows[i:i + 3]))) if dep and arr else None
         if made is None:
             unread += 1
         elif made not in found:
