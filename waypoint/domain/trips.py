@@ -4,7 +4,7 @@ import json
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Literal, NotRequired, TypedDict, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -93,6 +93,21 @@ class TravelerOut(TypedDict):
     seat: str | None
 
 
+class CruiseStop(TypedDict):
+    name: str
+    zone: str
+    arrive_local: str | None
+    depart_local: str | None
+    recorded: bool
+
+
+class CruiseDay(TypedDict):
+    day: int
+    date: str
+    sea: bool
+    stops: list[CruiseStop]
+
+
 class SegmentOut(TypedDict):
     id: int
     trip_id: int
@@ -114,6 +129,7 @@ class SegmentOut(TypedDict):
     check_times: bool
     travelers: list[TravelerOut]
     itinerary: list[PortIn]
+    days: list[CruiseDay]
     logo: str | None
     logo_label: str | None
     has_email: bool
@@ -228,6 +244,35 @@ def check_itinerary(kind: str, given: Sequence[PortIn], start: tuple[str, str], 
     if last > instant(*end):
         raise Invalid("A port of call is after the cruise ends")
     return kept
+
+
+def port_days(port: PortIn) -> set[date]:
+    days = [date.fromisoformat(t[:10]) for t in (port["arrive_local"], port["depart_local"]) if t]
+    return {days[0] + timedelta(days=i) for i in range((max(days) - min(days)).days + 1)} if days else set()
+
+
+def _stop(port: PortIn, day: date) -> CruiseStop:
+    on = {k: v if v and date.fromisoformat(v[:10]) == day else None for k, v in (("arrive_local", port["arrive_local"]), ("depart_local", port["depart_local"]))}
+    return {"name": port["name"], "zone": port["zone"], "arrive_local": on["arrive_local"], "depart_local": on["depart_local"],
+            "recorded": bool(port["arrive_local"] or port["depart_local"])}
+
+
+def cruise_days(start_local: str, start_zone: str, end_local: str, end_zone: str, origin: str | None, destination: str | None,
+                ports: Sequence[PortIn]) -> list[CruiseDay]:
+    if not ports:
+        return []
+    first, last = date.fromisoformat(start_local[:10]), date.fromisoformat(end_local[:10])
+    stops: dict[date, list[CruiseStop]] = {first + timedelta(days=i): [] for i in range((last - first).days + 1)}
+    stops[first].append({"name": origin or "Embarkation", "zone": start_zone, "arrive_local": None, "depart_local": start_local, "recorded": True})
+    anchor = first
+    for port in ports:
+        days = sorted(d for d in port_days(port) if d in stops)
+        for d in days or [anchor]:
+            stops[d].append(_stop(port, d))
+        anchor = days[-1] if days else anchor
+    if last != first:
+        stops[last].append({"name": destination or "Disembarkation", "zone": end_zone, "arrive_local": end_local, "depart_local": None, "recorded": True})
+    return [{"day": n, "date": d.isoformat(), "sea": not stops[d], "stops": stops[d]} for n, d in enumerate(sorted(stops), 1)]
 
 
 def decode_details(raw: str | None) -> dict[str, str]:
@@ -388,7 +433,9 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
          "end_zone": s.end_zone, "origin": s.origin, "destination": s.destination, "details": details,
          "manage_url": s.manage_url, "source": cast(Literal["manual", "email", "import"], s.source), "booked_by": s.booked_by,
          "locked_fields": decode_locked(s.locked_fields), "check_times": bool(s.check_times), "travelers": by_segment.get(s.id, []),
-         "itinerary": ports.get(s.id, []), "logo": f"/api/segments/{s.id}/logo" if brand and logos.key(brand) in with_logo else None,
+         "itinerary": ports.get(s.id, []),
+         "days": cruise_days(s.start_local, s.start_zone, s.end_local, s.end_zone, s.origin, s.destination, ports.get(s.id, [])),
+         "logo": f"/api/segments/{s.id}/logo" if brand and logos.key(brand) in with_logo else None,
          "logo_label": logos.chip(s.kind, s.origin, brand) if brand and logos.key(brand) in with_logo else None,
          "has_email": s.id in with_mail,
          "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, details, s.origin)}

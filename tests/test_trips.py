@@ -488,6 +488,30 @@ class CruiseTests(Household):
         self.assertEqual(trips.get_segment(self.c, self.jane, seg["id"])["itinerary"], PORTS)
         self.assertEqual(self.add(self.jane, {**CRUISE, "confirmation": "NOPORTS"})["itinerary"], [])
 
+    def test_a_cruise_lists_every_day_with_embark_first_disembark_last_and_sea_days_between(self):
+        seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS})
+        days = seg["days"]
+        self.assertEqual([d["day"] for d in days], list(range(1, 9)))
+        self.assertEqual([d["date"] for d in days][::7], ["2026-03-01", "2026-03-08"])
+        self.assertEqual([d["sea"] for d in days], [False, False, True, True, False, True, True, False])
+        self.assertEqual(days[0]["stops"], [{"name": "Miami", "zone": "America/New_York", "arrive_local": None, "depart_local": "2026-03-01T16:30", "recorded": True}])
+        self.assertEqual(days[1]["stops"], [{**PORTS[0], "recorded": True}])
+        self.assertEqual(days[7]["stops"], [{"name": "Miami", "zone": "America/New_York", "arrive_local": "2026-03-08T07:00", "depart_local": None, "recorded": True}])
+        self.assertEqual(days[2]["stops"], [])
+
+    def test_an_overnight_in_port_is_not_a_sea_day_and_a_port_with_no_times_keeps_its_row(self):
+        overnight = [{"name": "Reykjavik", "zone": "Atlantic/Reykjavik", "arrive_local": "2026-03-02T08:00", "depart_local": "2026-03-03T17:00"},
+                     {"name": "Akureyri", "zone": "Atlantic/Reykjavik", "arrive_local": None, "depart_local": None}]
+        days = self.add(self.jane, {**CRUISE, "itinerary": overnight})["days"]
+        self.assertEqual([(d["day"], d["sea"], [s["name"] for s in d["stops"]]) for d in days[1:4]],
+                         [(2, False, ["Reykjavik"]), (3, False, ["Reykjavik", "Akureyri"]), (4, True, [])])
+        self.assertEqual([(s["arrive_local"], s["depart_local"], s["recorded"]) for s in days[2]["stops"]],
+                         [(None, "2026-03-03T17:00", True), (None, None, False)])
+
+    def test_a_cruise_with_no_ports_and_other_kinds_have_no_days(self):
+        self.assertEqual(self.add(self.jane, {**CRUISE, "confirmation": "NOPORTS"})["days"], [])
+        self.assertEqual(self.add(self.jane, OUT)["days"], [])
+
     def test_a_cruise_with_a_bad_itinerary_is_refused_and_says_why(self):
         for ports, why in (([{**PORTS[0], "name": " "}], "Name port 1"), ([{**PORTS[0], "zone": "Nowhere/Land"}], "port 1"),
                            ([{**PORTS[0], "arrive_local": "soon"}], "arrival"),

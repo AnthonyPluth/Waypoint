@@ -2433,6 +2433,67 @@
         ],
         "additionalProperties": false
       },
+      "CruiseDay": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "integer"
+          },
+          "date": {
+            "type": "string"
+          },
+          "sea": {
+            "type": "boolean"
+          },
+          "stops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CruiseStop"
+            }
+          }
+        },
+        "required": [
+          "day",
+          "date",
+          "sea",
+          "stops"
+        ],
+        "additionalProperties": false
+      },
+      "CruiseStop": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "zone": {
+            "type": "string"
+          },
+          "arrive_local": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "depart_local": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recorded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "zone",
+          "arrive_local",
+          "depart_local",
+          "recorded"
+        ],
+        "additionalProperties": false
+      },
       "DeviceBody": {
         "type": "object",
         "properties": {
@@ -4045,6 +4106,12 @@
               "$ref": "#/components/schemas/Port"
             }
           },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CruiseDay"
+            }
+          },
           "logo": {
             "type": [
               "string",
@@ -4085,6 +4152,7 @@
           "check_times",
           "travelers",
           "itinerary",
+          "days",
           "logo",
           "logo_label",
           "has_email",

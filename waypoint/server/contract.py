@@ -275,6 +275,21 @@ class Port(TypedDict):
     depart_local: str | None
 
 
+class CruiseStop(TypedDict):
+    name: str
+    zone: str
+    arrive_local: str | None
+    depart_local: str | None
+    recorded: bool
+
+
+class CruiseDay(TypedDict):
+    day: int
+    date: str
+    sea: bool
+    stops: list[CruiseStop]
+
+
 class Segment(TypedDict):
     id: int
     trip_id: int
@@ -296,6 +311,7 @@ class Segment(TypedDict):
     check_times: bool
     travelers: list[Traveler]
     itinerary: list[Port]
+    days: list[CruiseDay]
     logo: str | None
     logo_label: str | None
     has_email: bool
