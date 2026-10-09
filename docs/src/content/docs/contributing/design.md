@@ -49,6 +49,10 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 - Times are the wall-clock times at each place, as stored, with the bracketed "your time" reading when your zone differs.
 - The card does not read the API for gate or city: a gate shows only from live flight status, and the airport name is not shown.
 
+## Navigation
+
+Below the `lg` breakpoint (phones and tablets) `TabBar.svelte` shows Upcoming, Trips, Stats and Review (with its count of items waiting) and a More button. More is a disclosure (`aria-expanded`, `aria-controls`) that opens a list with People and Settings; it closes on Escape (focus returns to the button), on a tap elsewhere and when the page changes. While People or Settings is the current page, More is marked with `aria-current` and says which page in its accessible name, and the page's link in the list carries `aria-current="page"`. The Settings avatar link in `TopBar.svelte` stays at every width. From `lg` up, `SideNav.svelte` lists all six pages. Which page goes where is `TABS` and `MORE` in `frontend/src/lib/nav.ts`.
+
 ## Sheet
 
 `ui/sheet/Sheet.svelte` is the one panel for detail and editing that sits over a page. It is built on bits-ui's `Dialog`, the primitive `ConfirmDialog` uses, with its own layout: `ConfirmDialog` is a centred confirmation with a fixed form, so it could not be extended into a sheet and the two share only the primitive. Pass `title` (the dialog's name), an optional `description` and bind `open`.

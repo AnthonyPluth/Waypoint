@@ -3,17 +3,18 @@
   import type { NavItem } from "$lib/nav";
   import { cn } from "$lib/utils";
 
-  let { item, current, tab = false }: { item: NavItem; current: boolean; tab?: boolean } = $props();
+  let { item, current, tab = false, menu = false }: { item: NavItem; current: boolean; tab?: boolean; menu?: boolean } = $props();
   const waiting = $derived(item.badge && app.state ? item.badge(app.state) : 0);
 </script>
 
 <a href={`#${item.page}`} aria-current={current ? "page" : undefined}
   class={cn("relative flex items-center transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-    tab ? "min-h-14 flex-1 flex-col justify-center gap-0.5 text-xs font-medium" : "h-10 gap-3 rounded-xl px-3 text-sm font-medium",
+    tab ? "min-h-14 flex-1 flex-col justify-center gap-0.5 text-xs font-medium" : "h-11 gap-3 rounded-xl px-3 text-sm font-medium",
     current
-      ? tab ? "text-primary" : "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+      ? tab ? "text-primary" : menu ? "bg-surface-3 font-semibold text-foreground" : "bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-elevation-1"
       : "text-muted-foreground hover:text-foreground " + (tab ? "" : "hover:bg-sidebar-accent/60"))}>
   {#if tab && current}<span class="absolute top-0 h-0.5 w-10 rounded-full bg-primary" aria-hidden="true"></span>{/if}
+  {#if !tab && !menu && current}<span class="absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary" aria-hidden="true"></span>{/if}
   <span class="relative flex">
     <item.icon class={tab ? "size-6" : cn("size-5", current && "text-primary")} />
     {#if waiting && tab}<span class="absolute -top-1 -right-2 min-w-4 rounded-full bg-signal px-1 text-center text-[10px] leading-4 font-semibold text-signal-foreground" aria-hidden="true" data-testid="nav-badge">{waiting > 99 ? "99+" : waiting}</span>{/if}

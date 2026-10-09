@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { initials, NAV, navFor, pageFor } from "./nav";
+import { initials, inMore, MORE, NAV, navFor, pageFor, TABS } from "./nav";
 
 describe("nav", () => {
   it("has Upcoming first, which is where an unknown route goes", () => {
@@ -7,6 +7,15 @@ describe("nav", () => {
     expect(pageFor("settings")).toBe("settings");
     expect(pageFor("budget")).toBe("upcoming");
     expect(pageFor("")).toBe("upcoming");
+  });
+
+  it("puts four pages in the tab bar and People and Settings under More, so every page is reachable", () => {
+    expect(TABS.map((n) => n.page)).toEqual(["upcoming", "trips", "stats", "review"]);
+    expect(MORE.map((n) => n.page)).toEqual(["people", "settings"]);
+    expect([...TABS, ...MORE].map((n) => n.page).sort()).toEqual(NAV.map((n) => n.page).sort());
+    expect(inMore(navFor("people"))).toBe(true);
+    expect(inMore(navFor("design"))).toBe(true);
+    expect(inMore(navFor("trip"))).toBe(false);
   });
 
   it("opens a trip from Trips, which stays lit while you're on it", () => {

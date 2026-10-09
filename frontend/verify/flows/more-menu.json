@@ -1,0 +1,19 @@
+{
+  "name": "more-menu",
+  "page": "upcoming",
+  "viewports": ["phone", "tablet"],
+  "steps": [
+    { "click": "button:has-text('More')" },
+    { "wait_for": "#more-menu" },
+    { "screenshot": "open" },
+    { "click": "#more-menu a[href='#people']" },
+    { "expect_text": { "selector": "h1", "text": "People" } },
+    { "click": "button:has-text('More')" },
+    { "wait_for": "#more-menu" },
+    { "screenshot": "people-current" },
+    { "click": "#more-menu a[href='#settings']" },
+    { "expect_text": { "selector": "h1", "text": "Settings" } },
+    { "expect_text": { "selector": "main", "text": "Version" } },
+    { "screenshot": "settings" }
+  ]
+}

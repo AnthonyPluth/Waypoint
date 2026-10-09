@@ -4,6 +4,7 @@ import Luggage from "@lucide/svelte/icons/luggage";
 import ChartColumn from "@lucide/svelte/icons/chart-column";
 import Users from "@lucide/svelte/icons/users";
 import Inbox from "@lucide/svelte/icons/inbox";
+import Ellipsis from "@lucide/svelte/icons/ellipsis";
 import Settings from "@lucide/svelte/icons/settings";
 import type { AppState } from "./types";
 
@@ -17,6 +18,17 @@ export const NAV: NavItem[] = [
   { page: "review", label: "Review", icon: Inbox, badge: (s) => s.review_count },
   { page: "settings", label: "Settings", icon: Settings },
 ];
+
+const TAB_PAGES = ["upcoming", "trips", "stats", "review"];
+const MORE_PAGES = ["people", "settings"];
+
+const only = (pages: string[]): NavItem[] => NAV.filter((n) => pages.includes(n.page));
+
+export const TABS: NavItem[] = only(TAB_PAGES);
+export const MORE: NavItem[] = only(MORE_PAGES);
+export const MORE_TAB = { label: "More", icon: Ellipsis };
+
+export const inMore = (page: string): boolean => MORE_PAGES.includes(page);
 
 const INSIDE: Record<string, string> = { trip: "trips", design: "settings" };
 
