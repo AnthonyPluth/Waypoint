@@ -5,8 +5,6 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from .. import seatmaps
-
 Row = Mapping[str, str]
 Numbered = tuple[int, Row]
 
@@ -96,10 +94,6 @@ def flight_number_of(cell: str) -> str | None:
 def text_of(cell: str | None, limit: int = 100) -> str | None:
     kept = (cell or "").strip()
     return kept[:limit] or None
-
-
-def aircraft_of(cell: str) -> str | None:
-    return seatmaps.family(cell)
 
 
 def cell(row: Row, *names: str) -> str:
