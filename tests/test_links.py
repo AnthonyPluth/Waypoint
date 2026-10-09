@@ -59,12 +59,50 @@ class Others(unittest.TestCase):
         self.assertIsNone(links.call_link("n/a"))
         self.assertIsNone(links.call_link(None))
 
+    def test_the_emails_manage_link_comes_before_the_airlines_page(self):
+        built = links.segment_links("flight", "United Airlines", "ABC123", "Doe", "https://mail.example.org/m", {}, "JFK")
+        self.assertEqual(built["app"], "https://mail.example.org/m")
+
+    def test_a_flight_without_a_manage_link_gets_the_airlines_page(self):
+        built = links.segment_links("flight", "United Airlines", "ABC123", "Doe", None, {}, "JFK")
+        self.assertEqual(built["app"], "https://www.united.com/en/us/manageres/mytrips")
+        insecure = links.segment_links("flight", "Delta", "ABC123", "Doe", "http://example.com/m", {}, "JFK")
+        self.assertEqual(insecure["app"], "https://www.delta.com/mytrips/")
+
+    def test_only_a_flight_gets_the_airlines_page(self):
+        self.assertIsNone(links.segment_links("hotel", "Delta", "H1", "Doe", None, {}, "Harbour")["app"])
+        self.assertIsNone(links.segment_links("flight", "Nobody Air", "ABC123", "Doe", None, {}, "JFK")["app"])
+
+    def test_the_airlines_page_carries_nothing_from_the_booking(self):
+        code, name = "ZQXJ7K", "Quillfeather"
+        for provider in links.MANAGE:
+            built = links.segment_links("flight", provider, code, name, None, {}, "JFK")["app"]
+            self.assertTrue(built and built.startswith("https://") and "?" not in built, provider)
+            self.assertNotIn(code.lower(), built.lower())
+            self.assertNotIn(name.lower(), built.lower())
+
+    def test_each_airline_is_known_by_its_common_names(self):
+        expected = {
+            "united airlines": "https://www.united.com/en/us/manageres/mytrips",
+            "united": "https://www.united.com/en/us/manageres/mytrips",
+            "delta air lines": "https://www.delta.com/mytrips/",
+            "delta": "https://www.delta.com/mytrips/",
+            "alaska airlines": "https://www.alaskaair.com/booking/reservation-lookup",
+            "american airlines": "https://www.aa.com/reservation/view/find-your-reservation",
+            "southwest airlines": "https://www.southwest.com/air/check-in/",
+        }
+        self.assertEqual(set(links.MANAGE), set(expected))
+        for provider, url in expected.items():
+            self.assertEqual(links.manage_link(provider, None, None), url, provider)
+            self.assertEqual(links.manage_link(provider.upper(), "ABC123", "Doe"), url, provider)
+
     def test_a_flight_without_a_last_name_keeps_the_emails_manage_link(self):
         with mock.patch.dict(links.MANAGE, {"example air": ("www.example.com", "/m?c={code}&n={name}")}):
-            built = links.segment_links("flight", "Example Air", "ABC123", "Doe", "https://mail.example.org/m", {}, "JFK")
-            self.assertEqual(built["app"], "https://www.example.com/m?c=ABC123&n=Doe")
-            kept = links.segment_links("flight", "Example Air", "ABC123", None, "https://mail.example.org/m", {}, "JFK")
-            self.assertEqual(kept["app"], "https://mail.example.org/m")
+            for name in ("Doe", None):
+                built = links.segment_links("flight", "Example Air", "ABC123", name, "https://mail.example.org/m", {}, "JFK")
+                self.assertEqual(built["app"], "https://mail.example.org/m")
+            self.assertEqual(links.segment_links("flight", "Example Air", "ABC123", "Doe", None, {}, "JFK")["app"], "https://www.example.com/m?c=ABC123&n=Doe")
+            self.assertIsNone(links.segment_links("flight", "Example Air", "ABC123", None, None, {}, "JFK")["app"])
 
     def test_segment_links(self):
         hotel = links.segment_links("hotel", "Hilton", "H1", "Doe", "https://example.com/m", {"address": "1 Quay St", "phone": "+1 555 010 0100"}, "Harbour")
