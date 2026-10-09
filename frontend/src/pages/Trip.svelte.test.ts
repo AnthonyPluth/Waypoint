@@ -41,7 +41,7 @@ function serve() {
 beforeEach(() => {
   vi.mocked(api).mockReset();
   held = trip([flight, stay]);
-  loyalty = [membership()];
+  loyalty = [membership(), membership({ id: 12, kind: "hotel", program: "Marriott Bonvoy", masked: "••••8899" })];
   route.page = "trip"; route.sub = "1"; route.query = ""; location.hash = "#trip/1";
   serve();
 });
@@ -156,28 +156,31 @@ describe("Trip", () => {
     expect(first.getByText("7:10 AM")).toBeInTheDocument();
     expect(first.queryByText("Edited by you")).toBeNull();
     expect(first.getByRole("link", { name: "Manage booking" })).toHaveAttribute("href", "https://example.com/manage");
-    expect(first.getByRole("button", { name: "Show and copy American AAdvantage number" })).toHaveTextContent("••••4567");
-    expect(first.getByText(/No American AAdvantage number yet/)).toBeInTheDocument();
+    expect(first.queryByRole("button", { name: /American AAdvantage number/ })).toBeNull();
+    expect(first.queryByText(/American AAdvantage/)).toBeNull();
+    expect(first.queryByText(/••••4567/)).toBeNull();
+    expect(first.queryByText(/number yet/)).toBeNull();
+    expect(first.getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
     expect(first.getByText(/Not matched to a person/)).toBeInTheDocument();
     const hotel = within(cards[1]);
     expect(hotel.getByText("Changed")).toBeInTheDocument();
-    expect(hotel.getByText(/No Marriott Bonvoy number yet/)).toBeInTheDocument();
+    expect(hotel.getByRole("button", { name: "Show and copy Marriott Bonvoy number" })).toHaveTextContent("••••8899");
   });
 
   it("reveals a number only when asked, copies it, and hides it again", async () => {
     render(TripPage);
     const u = userEvent.setup();
-    const button = await screen.findByRole("button", { name: "Show and copy American AAdvantage number" });
+    const button = await screen.findByRole("button", { name: "Show and copy Marriott Bonvoy number" });
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/reveal"), expect.anything());
     await u.click(button);
-    expect(await screen.findByRole("button", { name: "Hide American AAdvantage number" })).toHaveTextContent("DEMO1234567");
+    expect(await screen.findByRole("button", { name: "Hide Marriott Bonvoy number" })).toHaveTextContent("DEMO1234567");
     expect(await navigator.clipboard.readText()).toBe("DEMO1234567");
-    await u.click(screen.getByRole("button", { name: "Hide American AAdvantage number" }));
-    expect(screen.getByRole("button", { name: "Show and copy American AAdvantage number" })).toHaveTextContent("••••4567");
+    await u.click(screen.getByRole("button", { name: "Hide Marriott Bonvoy number" }));
+    expect(screen.getByRole("button", { name: "Show and copy Marriott Bonvoy number" })).toHaveTextContent("••••8899");
   });
 
   it("says a number can't be read with this key rather than showing nothing", async () => {
-    loyalty = [membership({ readable: false, masked: "••••" })];
+    loyalty = [membership({ id: 12, kind: "hotel", program: "Marriott Bonvoy", readable: false, masked: "••••" })];
     render(TripPage);
     expect(await screen.findByText(/Can’t be read with this key/)).toBeInTheDocument();
   });
