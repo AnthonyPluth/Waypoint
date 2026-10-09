@@ -26,6 +26,11 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ upload: "x" }] })).toEqual(["step 1: upload takes a object"]);
   });
 
+  it("takes a download to click and save, named", () => {
+    expect(flowProblems({ ...ok, steps: [{ download: { selector: "button", name: "saved-image" } }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ download: "x" }] })).toEqual(["step 1: download takes a object"]);
+  });
+
   it("rejects a viewport it doesn't know", () => expect(flowProblems({ ...ok, viewports: ["watch"] })).toEqual(["unknown viewport watch"]));
 
   it("rejects a page the app doesn't have, so a typo can't pass for a clean run", () => {

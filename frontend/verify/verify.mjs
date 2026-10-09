@@ -22,7 +22,7 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-const ACTIONS = { goto: "string", click: "string", select: "object", fill: "object", press: "object", upload: "object", scroll_to: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const unknownPages = (names) => names.filter((n) => !PAGES.includes(n));
 
@@ -74,7 +74,7 @@ export async function seedAssistants(browser, base) {
   } finally { await ctx.close(); }
 }
 
-async function runStep(page, step, shot) {
+async function runStep(page, step, shot, saveDownload) {
   const timeout = step.timeout ?? 10000;
   if ("goto" in step) {
     await page.goto(step.goto.startsWith("#") ? `${page.url().split("#")[0]}${step.goto}` : step.goto);
@@ -88,6 +88,10 @@ async function runStep(page, step, shot) {
     await page.locator(step.press.selector).first().press(step.press.key, { timeout });
   } else if ("upload" in step) {
     await page.locator(step.upload.selector).first().setInputFiles(join(REPO, step.upload.file), { timeout });
+  } else if ("download" in step) {
+    const pending = page.waitForEvent("download", { timeout });
+    await page.locator(step.download.selector).first().click({ timeout });
+    await saveDownload(step.download.name, await pending);
   } else if ("scroll_to" in step) {
     await page.locator(step.scroll_to).first().evaluate((el) => el.scrollIntoView({ block: "start" }), undefined, { timeout });
   } else if ("wait_for" in step) {
@@ -149,8 +153,14 @@ async function main() {
       await page.screenshot({ path: join(out, top) });
       files.push(top);
     };
+    const saveDownload = async (name, download) => {
+      const { full, top } = screenshotFiles(name, viewport);
+      await download.saveAs(join(out, full));
+      await download.saveAs(join(out, top));
+      files.push(full, top);
+    };
     try {
-      await work(page, shot);
+      await work(page, shot, saveDownload);
     } catch (e) {
       problems.push(`${where}: ${String(e.message).split("\n")[0]}`);
       await shot(`${label.replace(/\W+/g, "-")}-FAILED`).catch(() => {});
@@ -175,9 +185,9 @@ async function main() {
   for (const flow of flows) {
     if (args.length && !args.includes(flow.page ?? "upcoming")) continue;
     for (const viewport of flow.viewports ?? Object.keys(VIEWPORTS)) {
-      await visit(`flow ${flow.name}`, viewport, async (page, shot) => {
+      await visit(`flow ${flow.name}`, viewport, async (page, shot, saveDownload) => {
         await page.goto(`${base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
-        for (const step of flow.steps) await runStep(page, step, (n) => shot(`flow-${flow.name}-${n}`));
+        for (const step of flow.steps) await runStep(page, step, (n) => shot(`flow-${flow.name}-${n}`), (n, d) => saveDownload(`flow-${flow.name}-${n}`, d));
         await shot(`flow-${flow.name}`);
       });
     }

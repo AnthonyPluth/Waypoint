@@ -23,86 +23,71 @@ const stats = (year: number | null): Stats => ({
 });
 
 beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(api).mockResolvedValue(stats(null) as never); });
-afterEach(() => { vi.restoreAllMocks(); Reflect.deleteProperty(navigator, "share"); Reflect.deleteProperty(navigator, "canShare"); });
+afterEach(() => { vi.restoreAllMocks(); });
 
 const next = async (n: number) => { for (let i = 0; i < n; i++) await userEvent.click(screen.getByRole("button", { name: "Next" })); };
-const cardText = () => decodeURIComponent((screen.getByTestId("share-card") as HTMLImageElement).src.split(",").slice(1).join(","));
+const cardText = () => decodeURIComponent((screen.getByTestId("save-card") as HTMLImageElement).src.split(",").slice(1).join(","));
 
 describe("YearInReview", () => {
   it("steps through the cards to the one to share, and asks for the all-time numbers of the same person", async () => {
-    render(YearInReview, { stats: stats(2026), person: 1, name: "Zelda Quimby", onclose: () => {} });
+    render(YearInReview, { stats: stats(2026), person: 1, onclose: () => {} });
     expect(screen.getByText("32,311 mi")).toBeTruthy();
     await next(1); expect(screen.getByText("12 flights")).toBeTruthy();
     await next(1); expect(await screen.findByText("1 new this year: United Kingdom")).toBeTruthy();
     await next(1); expect(screen.getByText("JFK – LHR")).toBeTruthy();
     await next(1); expect(screen.getByText("9 nights")).toBeTruthy();
     await next(2);
-    expect(await screen.findByTestId("share-card")).toBeTruthy();
+    expect(await screen.findByTestId("save-card")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Next" }).hasAttribute("disabled")).toBe(true);
     expect(vi.mocked(api).mock.calls.map((c) => c[0])).toContain("/api/stats?person=1&year=all");
   });
 
   it("adds a card for cruises, with the nights aboard and the sea days, only when there were cruises", async () => {
     const withCruise = { ...stats(2026), cruises: { count: 2, nights: 10, sea_days: 1, ports: 3, lines: [] } };
-    render(YearInReview, { stats: withCruise, person: 1, name: null, onclose: () => {} });
+    render(YearInReview, { stats: withCruise, person: 1, onclose: () => {} });
     await next(5);
     expect(screen.getByText("2 cruises")).toBeTruthy();
     expect(screen.getByText("10 nights aboard")).toBeTruthy();
     expect(screen.getByText("1 sea day")).toBeTruthy();
   });
 
-  it("puts the first name on the card only when 'Show the first name' is ticked", async () => {
-    render(YearInReview, { stats: stats(2026), person: 1, name: "Zelda Quimby", onclose: () => {} });
-    await next(6);
-    await screen.findByTestId("share-card");
-    expect(cardText()).not.toContain("Zelda");
-    await userEvent.click(screen.getByLabelText(/Show the first name \(Zelda\)/));
-    expect(cardText()).toContain("ZELDA’S YEAR IN REVIEW");
-    expect(cardText()).not.toContain("Quimby");
-    expect(cardText()).not.toContain("Hotel Canarios");
-  });
-
-  it("offers no name for everyone's numbers", async () => {
-    render(YearInReview, { stats: stats(2026), person: "all", name: "Zelda", onclose: () => {} });
-    await next(6);
-    await screen.findByTestId("share-card");
-    expect(screen.queryByLabelText(/Show the first name/)).toBeNull();
-  });
-
-  it("hands the picture to the share sheet when the browser can share a file", async () => {
-    const share = vi.fn(async () => {});
-    Object.assign(navigator, { share, canShare: () => true });
+  it("lists what the image will show before it is saved, with no names, numbers or hotels", async () => {
     render(YearInReview, { stats: stats(2026), person: 1, onclose: () => {} });
     await next(6);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Share" }).hasAttribute("disabled")).toBe(false));
-    await userEvent.click(screen.getByRole("button", { name: "Share" }));
-    await waitFor(() => expect(share).toHaveBeenCalled());
-    expect((share.mock.calls[0] as unknown as [{ files: File[] }])[0].files[0].name).toBe("waypoint-2026.png");
-    expect(await screen.findByText("Shared.")).toBeTruthy();
+    await screen.findByTestId("save-card");
+    const list = screen.getByTestId("image-contents").textContent ?? "";
+    expect(list).toContain("12 flights");
+    expect(list).toContain("Top route: JFK – LHR");
+    expect(list).toContain("Top airports: JFK, LHR");
+    expect(list).not.toContain("Hotel Canarios");
+    expect(cardText()).not.toContain("Hotel Canarios");
+    expect(screen.queryByLabelText(/first name/i)).toBeNull();
   });
 
-  it("downloads the picture where sharing isn't available", async () => {
+  it("saves the image to the downloads, and does not open a share sheet", async () => {
+    const share = vi.fn();
+    Object.assign(navigator, { share, canShare: () => true });
     URL.createObjectURL = vi.fn(() => "blob:x"); URL.revokeObjectURL = vi.fn();
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     render(YearInReview, { stats: stats(2026), person: 1, onclose: () => {} });
     await next(6);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Share" }).hasAttribute("disabled")).toBe(false));
-    await userEvent.click(screen.getByRole("button", { name: "Share" }));
-    expect(await screen.findByText("Saved the picture to your downloads.")).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save as image" }).hasAttribute("disabled")).toBe(false));
+    await userEvent.click(screen.getByRole("button", { name: "Save as image" }));
+    expect(await screen.findByText("Saved the image to your downloads.")).toBeTruthy();
     expect(click).toHaveBeenCalled();
+    expect(share).not.toHaveBeenCalled();
+    Reflect.deleteProperty(navigator, "share"); Reflect.deleteProperty(navigator, "canShare");
   });
 
-  it("says so when the picture can't be made, and says nothing when the share sheet is closed", async () => {
+  it("says so when the image can't be made", async () => {
     const { svgToPng } = await import("$lib/review");
     vi.mocked(svgToPng).mockRejectedValueOnce(new Error("no canvas"));
     render(YearInReview, { stats: stats(2026), person: 1, onclose: () => {} });
     await next(6);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Share" }).hasAttribute("disabled")).toBe(false));
-    await userEvent.click(screen.getByRole("button", { name: "Share" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save as image" }).hasAttribute("disabled")).toBe(false));
+    await userEvent.click(screen.getByRole("button", { name: "Save as image" }));
     expect((await screen.findByRole("alert")).textContent).toContain("no canvas");
-    Object.assign(navigator, { share: vi.fn(async () => { throw new DOMException("closed", "AbortError"); }), canShare: () => true });
-    await userEvent.click(screen.getByRole("button", { name: "Share" }));
-    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("says so on the map and share cards when the country outlines can't load", async () => {
@@ -112,7 +97,7 @@ describe("YearInReview", () => {
     await next(5);
     expect(await screen.findByText(/country outlines couldn’t load/)).toBeTruthy();
     await next(1);
-    expect(screen.getByTestId("share-card")).toBeTruthy();
+    expect(screen.getByTestId("save-card")).toBeTruthy();
     expect(screen.getByText(/country outlines couldn’t load/)).toBeTruthy();
   });
 
