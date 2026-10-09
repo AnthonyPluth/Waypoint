@@ -261,6 +261,24 @@ class VisitCountTests(StatsCase):
         self.assertEqual(cities, {"London": 2})
 
 
+    def test_a_flight_in_and_a_hotel_stay_months_later_are_two_visits(self):
+        self.mine(JFK_LHR, {**HOTEL, "start_local": "2026-09-01T15:00", "end_local": "2026-09-03T10:00"})
+        places = self.stats(self.jane)["places"]
+        self.assertEqual({p["name"]: p["visits"] for p in places["cities"]}["London"], 2)
+        self.assertEqual({p["name"]: p["visits"] for p in places["countries"]}["GB"], 2)
+
+    def test_a_flight_in_and_a_hotel_stay_starting_that_day_are_one_visit(self):
+        self.mine(JFK_LHR, HOTEL)
+        places = self.stats(self.jane)["places"]
+        self.assertEqual({p["name"]: p["visits"] for p in places["cities"]}["London"], 1)
+        self.assertEqual({p["name"]: p["visits"] for p in places["countries"]}["GB"], 1)
+
+    def test_a_stay_a_day_after_the_arrival_is_the_same_visit_and_two_days_after_is_not(self):
+        self.mine(JFK_LHR, {**HOTEL, "start_local": "2026-06-03T15:00", "end_local": "2026-06-04T10:00"})
+        self.assertEqual({p["name"]: p["visits"] for p in self.stats(self.jane)["places"]["cities"]}["London"], 1)
+        self.mine({**HOTEL, "start_local": "2026-06-06T15:00", "end_local": "2026-06-07T10:00"})
+        self.assertEqual({p["name"]: p["visits"] for p in self.stats(self.jane)["places"]["cities"]}["London"], 2)
+
 class MapDetailTests(StatsCase):
     def test_a_route_lists_each_flight_with_its_trip_and_dates(self):
         self.mine(JFK_LHR, LHR_JFK)

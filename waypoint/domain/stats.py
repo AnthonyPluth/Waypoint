@@ -465,16 +465,31 @@ def _cruises(cruises: Sequence[Seg], year: int | None) -> CruiseStats:
     return {"count": len(counted), "nights": len(nights), "sea_days": len(sea), "ports": len(ports), "lines": _ranked(lines)}
 
 
+Span = tuple[date, date]
+
+
+def _visit_count(spans: Iterable[Span]) -> int:
+    groups, reach = 0, None
+    for start, end in sorted(spans):
+        if reach is None or start > reach + timedelta(days=1):
+            groups += 1
+        reach = end if reach is None else max(reach, end)
+    return groups
+
+
 def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Airport],
             city_countries: Mapping[str, str]) -> PlaceStats:
     countries: dict[str, list[str]] = {}
     cities: dict[str, list[str]] = {}
-    came: dict[str, Counter[str]] = {"country": Counter(), "city": Counter()}
-    went: dict[str, Counter[str]] = {"country": Counter(), "city": Counter()}
-    stayed: dict[str, list[tuple[date, date]]] = {}
+    came: dict[str, dict[str, list[Span]]] = {"country": {}, "city": {}}
+    went: dict[str, dict[str, list[Span]]] = {"country": {}, "city": {}}
+    stayed: dict[str, dict[str, list[Span]]] = {"country": {}, "city": {}}
 
     def seen(into: dict[str, list[str]], name: str, day: str) -> None:
         into.setdefault(name, []).append(day)
+
+    def note(into: dict[str, dict[str, list[Span]]], kind: str, name: str, first: str, last: str) -> None:
+        into[kind].setdefault(name, []).append((date.fromisoformat(first[:10]), date.fromisoformat(last[:10])))
     for s in flights:
         there, here = known.get((s.destination or "").upper()), known.get((s.origin or "").upper())
         for a, local in ((here, s.start_local), (there, s.end_local)):
@@ -483,28 +498,25 @@ def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Ai
                 seen(cities, a.city, local[:10])
         for kind in ("country", "city"):
             if there and (not here or getattr(here, kind) != getattr(there, kind)):
-                came[kind][getattr(there, kind)] += 1
+                note(came, kind, getattr(there, kind), s.end_local, s.end_local)
             if here and (not there or getattr(here, kind) != getattr(there, kind)):
-                went[kind][getattr(here, kind)] += 1
+                note(went, kind, getattr(here, kind), s.start_local, s.start_local)
     for s in stays:
         if s.destination:
-            seen(cities, s.destination.strip(), s.start_local[:10])
-            stayed.setdefault(s.destination.strip(), []).append((date.fromisoformat(s.start_local[:10]), date.fromisoformat(s.end_local[:10])))
-            if (country := city_countries.get(s.destination.strip().lower())):
+            city = s.destination.strip()
+            seen(cities, city, s.start_local[:10])
+            note(stayed, "city", city, s.start_local, s.end_local)
+            if (country := city_countries.get(city.lower())):
                 seen(countries, country, s.start_local[:10])
+                note(stayed, "country", country, s.start_local, s.end_local)
 
-    def stay_visits(name: str) -> int:
-        spans = sorted(stayed.get(name, []))
-        groups, reach = 0, None
-        for start, end in spans:
-            if reach is None or start > reach + timedelta(days=1):
-                groups += 1
-            reach = end if reach is None else max(reach, end)
-        return groups
+    def visits(kind: str, name: str) -> int:
+        arrivals, departures = came[kind].get(name, []), went[kind].get(name, [])
+        flown = arrivals if _visit_count(arrivals) >= _visit_count(departures) else departures
+        return max(_visit_count([*flown, *stayed[kind].get(name, [])]), 1)
 
     def listed(found: dict[str, list[str]], kind: str) -> list[Place]:
-        return sorted(({"name": n, "first_visit": min(days),
-                        "visits": max(came[kind][n], went[kind][n], stay_visits(n) if kind == "city" else 0, 1)}
+        return sorted(({"name": n, "first_visit": min(days), "visits": visits(kind, n)}
                        for n, days in found.items()), key=lambda p: (p["first_visit"], p["name"]))
     return {"countries": listed(countries, "country"), "cities": listed(cities, "city")}
 
