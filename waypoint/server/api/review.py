@@ -31,6 +31,11 @@ def api_review(conn, _q, _b) -> Review:
 
 
 def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
+    held = (_q.get("entry") or [""])[0]
+    if held:
+        if not review.drop(conn, owner(), row_id(item_id, NO_ITEM), row_id(held, "No such booking", 400)):
+            raise ApiError(NO_ITEM, 404)
+        return {"ok": True}
     added = (_q.get("segment") or [""])[0]
     booking = (viewer(conn), row_id(added, "No such segment", 400)) if added else None
     if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), booking):
@@ -39,13 +44,13 @@ def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
 
 
 def api_review_match(conn, _q, body: MatchBody, item_id: str) -> Ok:
-    index = body.get("index")
-    if not isinstance(index, int) or isinstance(index, bool):
-        raise ApiError('Send "index" as a whole number')
+    entry = body.get("entry")
+    if not isinstance(entry, int) or isinstance(entry, bool):
+        raise ApiError('Send "entry" as a whole number')
     segment = body.get("segment_id")
     chosen = None if segment is None else row_id(segment, "No such booking", 400)
     try:
-        settled = review.settle(conn, owner(), viewer(conn), row_id(item_id, NO_ITEM), index, chosen)
+        settled = review.settle(conn, owner(), viewer(conn), row_id(item_id, NO_ITEM), entry, chosen)
     except trips.Invalid as e:
         raise ApiError(str(e)) from e
     if not settled:
@@ -123,7 +128,7 @@ def api_review_suggest(_conn, _q, _b, item_id: str) -> Ok:
         scan.suggest_now(owner(), row_id(item_id, NO_ITEM), time.time())
     except KeyError:
         raise ApiError(NO_ITEM, 404) from None
-    except scan.NoAi as e:
+    except (scan.NoAi, scan.NotAskable) as e:
         raise ApiError(str(e)) from e
     except gmail.MessageGone:
         raise ApiError(GONE, 404) from None

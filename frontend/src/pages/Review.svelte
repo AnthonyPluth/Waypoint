@@ -153,14 +153,14 @@
   const what = (w: Pick<WhoIsThis, "kind" | "origin" | "destination" | "start_local" | "provider">) => `${w.kind === "hotel" ? "Stay" : w.kind === "car" ? "Rental" : w.kind === "train" ? "Train" : w.kind === "cruise" ? "Cruise" : "Flight"}${w.origin ? ` ${w.origin}${w.destination ? ` → ${w.destination}` : ""}` : ""} on ${w.start_local.slice(0, 10)}${w.provider ? ` (${w.provider})` : ""}`;
 
   let settling = $state<string | null>(null);
-  const matchKey = (m: ReviewMatch) => `${m.item_id}-${m.index}`;
+  const matchKey = (m: ReviewMatch) => `${m.item_id}-${m.entry}`;
   const settleMatch = (m: ReviewMatch, segmentId: number | null) => act(async () => {
-    await apiCall<"POST /api/review/{id}/match">(`/api/review/${m.item_id}/match`, { method: "POST", body: { index: m.index, segment_id: segmentId } });
+    await apiCall<"POST /api/review/{id}/match">(`/api/review/${m.item_id}/match`, { method: "POST", body: { entry: m.entry, segment_id: segmentId } });
     toast.success(segmentId === null ? "Added to your trips" : "Filled in");
     await settle();
   }, { busy: (on) => (settling = on ? matchKey(m) : null) });
   const dismissMatch = (m: ReviewMatch) => act(async () => {
-    await apiCall<"DELETE /api/review/{id}">(`/api/review/${m.item_id}`, { method: "DELETE" });
+    await apiCall<"DELETE /api/review/{id}">(`/api/review/${m.item_id}?entry=${m.entry}`, { method: "DELETE" });
     toast.success("Dismissed");
     await settle();
   }, { busy: (on) => (settling = on ? matchKey(m) : null) });

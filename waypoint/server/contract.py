@@ -138,7 +138,7 @@ class ReviewCandidate(TypedDict):
 
 class ReviewMatch(TypedDict):
     item_id: int
-    index: int
+    entry: int
     subject: str | None
     received: str | None
     mine: bool
@@ -147,7 +147,7 @@ class ReviewMatch(TypedDict):
 
 
 class MatchBody(TypedDict):
-    index: int
+    entry: int
     segment_id: int | None
 
 

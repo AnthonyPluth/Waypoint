@@ -219,7 +219,7 @@ export interface MailboxList {
 }
 
 export interface MatchBody {
-  index: number;
+  entry: number;
   segment_id: number | null;
 }
 
@@ -376,7 +376,7 @@ export interface ReviewItem {
 
 export interface ReviewMatch {
   item_id: number;
-  index: number;
+  entry: number;
   subject: string | null;
   received: string | null;
   mine: boolean;
