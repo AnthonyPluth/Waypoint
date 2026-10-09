@@ -169,16 +169,14 @@ class OfflineRouteTests(ServerCase):
         seg = self.ok("ana")["trip"]["segments"][0]
         self.assertEqual((seg["start_local"][11:], seg["start_zone"], seg["end_zone"]), ("19:00", "America/New_York", "Europe/London"))
 
-    def test_the_route_is_a_get_and_the_only_one(self):
-        self.assertEqual([m for m, p, *_ in ROUTES if p == "/api/offline"], ["GET"])
-
-
-class NothingLeaks(OfflineRouteTests):
     def test_reading_the_projection_logs_and_sends_nothing(self):
         seg = self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
         self.keep_message(seg["id"], MESSAGE_CANARY)
         with no_leaks(self, MESSAGE_CANARY):
             self.ok("ana")
+
+    def test_the_route_is_a_get_and_the_only_one(self):
+        self.assertEqual([m for m, p, *_ in ROUTES if p == "/api/offline"], ["GET"])
 
 
 if __name__ == "__main__":

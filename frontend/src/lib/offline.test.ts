@@ -6,7 +6,7 @@ vi.mock("./contract", () => ({ apiCall: vi.fn() }));
 import { apiCall } from "./contract";
 import { api } from "./api";
 import { ignoreFailure } from "./act";
-import { ago, expiryOf, isSavedCopy } from "./offline";
+import { ago, clearSaved, expiryOf, isSavedCopy } from "./offline";
 import { clearOnDenied, offline, refreshOffline, switchSaving, syncSavedTrip } from "./offline.svelte";
 import { hasSavedTrip, lock, setUp, unlock } from "./offline-vault";
 import { installDevice, type Device } from "../test/webauthn";
@@ -174,6 +174,31 @@ describe("clearing", () => {
     await refreshOffline();
     expect(offline.hasCopy).toBe(false);
     expect(await hasSavedTrip()).toBe(false);
+  });
+});
+
+describe("clearing while a save is under way", () => {
+  it("is not undone by a save that was already asking the server", async () => {
+    await setUp();
+    await syncSavedTrip();
+    let release!: (v: unknown) => void;
+    vi.mocked(apiCall).mockImplementation((() => new Promise((r) => { release = r; })) as never);
+    const saving = syncSavedTrip();
+    await vi.advanceTimersByTimeAsync(0);
+    const clearing = clearSaved();
+    release(projection);
+    await Promise.all([saving, clearing]);
+    expect(await hasSavedTrip()).toBe(false);
+  });
+
+  it("says so, after one retry, when the device won't let the copy go", async () => {
+    await setUp();
+    await syncSavedTrip();
+    const real = device.cacheStorage.open.getMockImplementation()!;
+    let tries = 0;
+    device.cacheStorage.open.mockImplementation((async () => ({ ...(await real()), delete: async () => { tries++; throw new Error("busy"); } })) as never);
+    await expect(clearSaved()).rejects.toThrow("Couldn’t remove the saved trip from this device.");
+    expect(tries).toBe(2);
   });
 });
 

@@ -36,16 +36,34 @@ export function whenExpired(fn: () => void): void {
   onExpired = fn;
 }
 
+async function expire(): Promise<void> {
+  try {
+    await clearSaved();
+    onExpired();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 export function watchExpiry(info: SavedInfo | null): void {
   if (expiryTimer) clearTimeout(expiryTimer);
   expiryTimer = null;
   if (!info || info.expiresAt === null) return;
-  expiryTimer = setTimeout(() => { void clearSaved().then(onExpired); }, Math.min(Math.max(0, info.expiresAt - Date.now()), LONGEST_TIMER));
+  expiryTimer = setTimeout(() => { void expire(); }, Math.min(Math.max(0, info.expiresAt - Date.now()), LONGEST_TIMER));
 }
+
+let inFlight: Promise<SavedInfo | null> | null = null;
+let clears = 0;
 
 export async function clearSaved(): Promise<void> {
   watchExpiry(null);
-  try { await clearTrip(); } catch { console.error("Couldn’t clear the saved trip"); }
+  clears++;
+  await inFlight?.catch(() => null);
+  try {
+    await clearTrip();
+  } catch {
+    try { await clearTrip(); } catch { throw new Error("Couldn’t remove the saved trip from this device."); }
+  }
 }
 
 export async function dropIfExpired(info: SavedInfo | null): Promise<boolean> {
@@ -54,12 +72,12 @@ export async function dropIfExpired(info: SavedInfo | null): Promise<boolean> {
   return true;
 }
 
-let inFlight: Promise<SavedInfo | null> | null = null;
-
 async function replaceSaved(): Promise<SavedInfo | null> {
   if (!(await isSetUp()) || (await isSavingOff())) return null;
+  const before = clears;
   const projection = await apiCall<"GET /api/offline">("/api/offline");
-  if (!projection.trip) { await clearSaved(); return null; }
+  if (clears !== before) return null;
+  if (!projection.trip) { watchExpiry(null); await clearTrip(); return null; }
   const info: SavedInfo = { savedAt: Date.now(), expiresAt: expiryOf(projection) };
   const copy: SavedCopy = { ...projection, savedAt: info.savedAt };
   if (!(await save(copy, info))) return null;
