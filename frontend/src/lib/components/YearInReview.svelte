@@ -5,7 +5,7 @@
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
   import { loadCountries, type Country } from "$lib/map";
-  import { cardSvg, imageInputs, imageSummary, mapSvg, outlinesFor, reviewFacts, saveImage, svgToPng } from "$lib/review";
+  import { cardSvg, imageInputs, mapSvg, outlinesFor, reviewFacts, saveImage, svgToPng } from "$lib/review";
   import { count } from "$lib/stats";
 
   let { stats, person, onclose }: { stats: Stats; person: number | "all"; onclose: () => void } = $props();
@@ -90,12 +90,6 @@
             {#if result}<span class="text-sm text-muted-foreground" role="status">{result}</span>{/if}
           </div>
           {#if problem}<Alert role="alert"><AlertDescription>Couldn’t make the image: {problem}</AlertDescription></Alert>{/if}
-          <section class="rounded-2xl border border-border bg-card p-4" aria-labelledby="image-contents">
-            <h2 id="image-contents" class="text-sm font-semibold">The image will show</h2>
-            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground" data-testid="image-contents">
-              {#each imageSummary(inputs) as line (line)}<li>{line}</li>{/each}
-            </ul>
-          </section>
         </div>
       </div>
     {:else}

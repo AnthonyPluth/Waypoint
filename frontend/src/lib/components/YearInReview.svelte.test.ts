@@ -51,15 +51,10 @@ describe("YearInReview", () => {
     expect(screen.getByText("1 sea day")).toBeTruthy();
   });
 
-  it("lists what the image will show before it is saved, with no names, numbers or hotels", async () => {
+  it("keeps names, numbers and hotels off the card and has no first-name option", async () => {
     render(YearInReview, { stats: stats(2026), person: 1, onclose: () => {} });
     await next(6);
     await screen.findByTestId("save-card");
-    const list = screen.getByTestId("image-contents").textContent ?? "";
-    expect(list).toContain("12 flights");
-    expect(list).toContain("Top route: JFK – LHR");
-    expect(list).toContain("Top airports: JFK, LHR");
-    expect(list).not.toContain("Hotel Canarios");
     expect(cardText()).not.toContain("Hotel Canarios");
     expect(screen.queryByLabelText(/first name/i)).toBeNull();
   });

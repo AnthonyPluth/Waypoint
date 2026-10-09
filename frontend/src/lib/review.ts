@@ -51,19 +51,6 @@ export const imageInputs = (facts: ReviewFacts): ImageInputs => ({
   map: { dots: facts.map.dots.map((d) => ({ x: d.x, y: d.y, r: d.r })), arcs: facts.map.arcs.map((a) => ({ d: a.d, width: a.width })) },
 });
 
-export function imageSummary(inputs: ImageInputs): string[] {
-  const countries = inputs.countries.length;
-  return [
-    `The year, ${inputs.year}`,
-    `${inputs.distance} travelled, ${count(inputs.flights)} ${inputs.flights === 1 ? "flight" : "flights"} and ${inputs.airTime} in the air`,
-    `${count(inputs.nights)} ${inputs.nights === 1 ? "night" : "nights"} away`,
-    `${countries} ${countries === 1 ? "country" : "countries"}${countries ? `: ${inputs.countries.join(", ")}` : ""}`,
-    ...(inputs.topRoute ? [`Top route: ${inputs.topRoute.a} – ${inputs.topRoute.b}`] : []),
-    ...(inputs.topAirports.length ? [`Top airports: ${inputs.topAirports.join(", ")}`] : []),
-    "The map of the airports and routes",
-  ];
-}
-
 const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const INK = "#f3f5f9", MUTED = "#9aa4b8", ACCENT = "#8fc2ff", SIGNAL = "#f6b73c", BG = "#07090e", LAND = "#1c2230", VISITED = "#3d7bc7", EDGE = "#343c52";
 const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";

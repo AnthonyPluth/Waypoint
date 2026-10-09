@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Stats } from "./api-types";
-import { cardSvg, imageInputs, imageSummary, mapSvg, outlinesFor, reviewFacts, reviewOffered, saveImage, svgToPng } from "./review";
+import { cardSvg, imageInputs, mapSvg, outlinesFor, reviewFacts, reviewOffered, saveImage, svgToPng } from "./review";
 import type { Country } from "./map";
 
 const CANARIES = ["Zelda Quimby", "Quimby", "ZQ7X9K", "Hotel Canarios", "Canario Suites", "ZX 9931", "2026-03-14", "14 Mar", "March 14", "Canary City", "Canary Airways", "FF-123456"];
@@ -59,8 +59,8 @@ describe("the image's inputs", () => {
     expect(imageInputs(reviewFacts(tied, allTime())).topAirports).toEqual(["BOS", "AMS", "ZRH"]);
   });
 
-  it("carry none of the canary values, in the inputs, the drawn image or the list shown on screen", () => {
-    const everything = [JSON.stringify(inputs), cardSvg(inputs, [{ d: "M0,0L1,1", visited: true }]), imageSummary(inputs).join("\n")].join("\n");
+  it("carry none of the canary values, in the inputs or the drawn image", () => {
+    const everything = [JSON.stringify(inputs), cardSvg(inputs, [{ d: "M0,0L1,1", visited: true }])].join("\n");
     for (const canary of CANARIES) expect(everything, canary).not.toContain(canary);
     expect(everything).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
@@ -89,14 +89,6 @@ describe("the share card's content", () => {
     const svg = cardSvg({ ...inputs, countries: ["<b>&\""] }, []);
     expect(svg).not.toContain("<b>");
     expect(svg).toContain("&lt;b&gt;&amp;&quot;");
-  });
-
-  it("describes what it will show, in words", () => {
-    const lines = imageSummary(inputs);
-    expect(lines).toContain("Top route: JFK – LHR");
-    expect(lines).toContain("Top airports: JFK, LHR");
-    expect(lines).toContain("2 countries: United States, United Kingdom");
-    expect(imageSummary({ ...inputs, topRoute: null, topAirports: [], countries: [], flights: 1, nights: 1 }).join("\n")).not.toContain("Top");
   });
 });
 
