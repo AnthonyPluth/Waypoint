@@ -1,6 +1,7 @@
 {
   "name": "open-settings",
   "page": "upcoming",
+  "viewports": ["desktop"],
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Upcoming" } },
     { "click": "a[href='#settings'] >> visible=true" },
