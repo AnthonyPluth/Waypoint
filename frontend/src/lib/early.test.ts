@@ -5,10 +5,11 @@ vi.mock("./api", () => ({ api: vi.fn(), newPage: vi.fn() }));
 vi.mock("./flightstatus.svelte", () => ({ loadFlightStatus: vi.fn() }));
 
 import { api } from "./api";
-import { dropEarly, startEarly, takeEarlyTrips } from "./early";
+import { dropEarly, EARLY_FRESH_MS, startEarly, takeEarlyTrips } from "./early";
 import { loadFlightStatus } from "./flightstatus.svelte";
 
 beforeEach(() => {
+  vi.useRealTimers();
   dropEarly();
   vi.mocked(api).mockReset().mockResolvedValue({ trips: [] });
   vi.mocked(loadFlightStatus).mockReset();
@@ -58,5 +59,15 @@ describe("taking the early read", () => {
     dropEarly();
     startEarly("trips");
     await Promise.resolve();
+  });
+
+  it("is not used once it is old, so a slow or retried start never shows stale trips", () => {
+    vi.useFakeTimers();
+    startEarly("upcoming");
+    vi.advanceTimersByTime(EARLY_FRESH_MS + 1);
+    expect(takeEarlyTrips("upcoming")).toBeNull();
+    startEarly("upcoming");
+    vi.advanceTimersByTime(EARLY_FRESH_MS);
+    expect(takeEarlyTrips("upcoming")).not.toBeNull();
   });
 });

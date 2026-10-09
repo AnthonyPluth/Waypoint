@@ -49,7 +49,7 @@ let booted = false;
 const onBoot: (() => void)[] = [];
 export function whenBooted(fn: () => void): void { if (booted) fn(); else onBoot.push(fn); }
 export async function boot(): Promise<void> {
-  startEarly(route.page);
+  if (!booted) { dropEarly(); startEarly(route.page); }
   try { await refreshState(); app.bootError = ""; app.offline = false; }
   catch (err) { console.error(err); app.bootError = errMsg(err); app.offline = (err as { status?: number }).status === 0; return; }
   void syncSavedTrip();
