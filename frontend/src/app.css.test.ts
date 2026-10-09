@@ -43,4 +43,16 @@ describe("the dark palette", () => {
       expect(contrast(resolve("muted-foreground"), resolve(surface))).toBeGreaterThanOrEqual(4.5);
     }
   });
+  it.each(["chart-1", "chart-2", "chart-3", "chart-4"])("draws %s legibly on the card and the page", (series) => {
+    expect(contrast(resolve(series), resolve("card"))).toBeGreaterThanOrEqual(3);
+    expect(contrast(resolve(series), resolve("background"))).toBeGreaterThanOrEqual(3);
+  });
+  it.each(["map-route", "map-airport", "map-stay", "map-visited"])("draws %s legibly on the sea and the land", (mark) => {
+    expect(contrast(resolve(mark), resolve("map-sea"))).toBeGreaterThanOrEqual(3);
+    expect(contrast(resolve(mark), resolve("map-land"))).toBeGreaterThanOrEqual(3);
+  });
+  it("tells the land from the sea and its borders from the land", () => {
+    expect(contrast(resolve("map-land"), resolve("map-sea"))).toBeGreaterThanOrEqual(1.1);
+    expect(contrast(resolve("map-border"), resolve("map-land"))).toBeGreaterThanOrEqual(1.3);
+  });
 });

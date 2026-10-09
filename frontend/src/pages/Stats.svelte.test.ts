@@ -175,6 +175,22 @@ describe("Stats", () => {
     expect(within(slot).getByRole("heading", { name: "Where you’ve been" })).toBeInTheDocument();
   });
 
+  it("leads with the headline totals, left out where there is nothing to total", async () => {
+    serve(() => full);
+    render(Stats_);
+    const headline = within(await screen.findByTestId("stats-headline"));
+    for (const [label, value] of [["Flights flown", "12"], ["Distance flown", "32.3K mi"], ["Countries visited", "2"], ["Nights away", "9"]]) {
+      expect(within(headline.getByText(label).closest("div")!).getByText(value)).toBeInTheDocument();
+    }
+  });
+
+  it("has no headline row for a person with nothing finished", async () => {
+    serve(() => none);
+    render(Stats_);
+    await screen.findByTestId("stats-empty");
+    expect(screen.queryByTestId("stats-headline")).toBeNull();
+  });
+
   it("uses kilometres when the household does", async () => {
     serve(() => ({ ...full, distance_unit: "km" }));
     render(Stats_);
