@@ -10,6 +10,7 @@ import { api } from "$lib/api";
 import type { LoyaltyEntry, Person, Trip as TripT } from "$lib/api-types";
 import { route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
+import { viewport } from "$lib/phone.svelte";
 import { membership, segment, trip } from "../test/fixtures";
 import TripPage from "./Trip.svelte";
 
@@ -599,5 +600,92 @@ describe("Trip", () => {
       await u.click(screen.getByRole("button", { name: "Edit JFK → LHR" }));
       expect(screen.queryByText("Ports of call", { selector: "legend" })).toBeNull();
     });
+  });
+});
+
+describe("Trip on a phone", () => {
+  beforeEach(() => { viewport.phone = true; });
+  afterEach(() => { viewport.phone = false; });
+
+  it("opens Edit in a sheet, not under the booking, and Cancel closes it with focus back on Edit", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    const edit = await screen.findByRole("button", { name: "Edit Harbour Hotel" });
+    await u.click(edit);
+    const sheet = await screen.findByRole("dialog", { name: "Edit this booking" });
+    expect(sheet).toHaveAttribute("data-side", "bottom");
+    expect(within(sheet).getByLabelText("Hotel name")).toBeInTheDocument();
+    expect(screen.queryByRole("listitem", { name: "Edit booking" })).toBeNull();
+    expect(within(sheet).getAllByRole("heading", { name: "Edit this booking" })).toHaveLength(1);
+    await u.click(within(sheet).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(edit).toHaveFocus());
+  });
+
+  it("saves from the sheet, closes it and reloads the same page", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+    const sheet = await screen.findByRole("dialog");
+    await u.clear(within(sheet).getByLabelText("Terminal"));
+    await u.type(within(sheet).getByLabelText("Terminal"), "7");
+    await u.click(within(sheet).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({ details: { flight_number: "AA 101", terminal: "7" } }) }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
+  });
+
+  it("closes the sheet with Escape and its close button, and the booking is untouched", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+    await screen.findByRole("dialog");
+    await u.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await u.click(screen.getByRole("button", { name: "Edit JFK → LHR" }));
+    await u.click(await screen.findByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
+  });
+
+  it("keeps what was typed and says why inside the sheet when a save fails", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+    const sheet = await screen.findByRole("dialog");
+    await u.type(within(sheet).getByLabelText("Seat of Jane Doe"), "12A");
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (opts?.method === "POST") throw new Error("Someone on this isn’t in People");
+      return held;
+    });
+    await u.click(within(sheet).getByRole("button", { name: "Save" }));
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent("Someone on this isn’t in People");
+    expect(screen.getByRole("dialog")).toBe(sheet);
+    expect(within(sheet).getByLabelText("Seat of Jane Doe")).toHaveValue("12A");
+    expect(within(sheet).getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
+  it("opens Add address in the sheet too", async () => {
+    held = trip([flight, { ...stay, details: {} }]);
+    render(TripPage);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Add address to Harbour Hotel" }));
+    expect(within(await screen.findByRole("dialog")).getByLabelText("Address")).toBeInTheDocument();
+  });
+
+  it("still adds a booking inline at the top", async () => {
+    render(TripPage);
+    await userEvent.setup().click(await screen.findByRole("button", { name: /Add a booking/ }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Add a booking" })).toBeInTheDocument();
+  });
+
+  it("keeps the form where it opened if the screen turns into a desktop one", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+    const sheet = await screen.findByRole("dialog");
+    await u.type(within(sheet).getByLabelText("Seat of Jane Doe"), "12A");
+    viewport.phone = false;
+    await waitFor(() => expect(within(screen.getByRole("dialog")).getByLabelText("Seat of Jane Doe")).toHaveValue("12A"));
   });
 });
