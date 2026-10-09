@@ -143,7 +143,6 @@ class Previous(unittest.TestCase):
             self.assertIn("Drops rows", out.read_text())
 
 
-@unittest.skipUnless(Path("/bin/bash").exists(), "needs bash")
 class Plan(unittest.TestCase):
 
     def setUp(self):
