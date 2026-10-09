@@ -3,7 +3,8 @@
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
-  import { offline, refreshOffline, removeOffline } from "$lib/offline.svelte";
+  import { ago } from "$lib/offline";
+  import { offline, refreshOffline, removeOffline, switchSaving } from "$lib/offline.svelte";
   import { deviceCheckName } from "$lib/platform";
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
@@ -11,7 +12,14 @@
   const check = deviceCheckName();
   let setting = $state(false);
   let asking = $state(false);
-  onMount(refreshOffline);
+  let changing = $state(false);
+  let now = $state(Date.now());
+  onMount(() => { void refreshOffline(); now = Date.now(); });
+
+  async function toggle(on: boolean) {
+    changing = true;
+    try { await switchSaving(on); } finally { changing = false; now = Date.now(); }
+  }
 
   async function removeIt() {
     await removeOffline();
@@ -28,14 +36,20 @@
     {:else if offline.setUp}
       <div class="row">
         <div class="min-w-0">
-          <p class="font-medium">On for this device</p>
-          <p class="text-sm text-muted-foreground">The saved trip is encrypted and opens offline only with {check}.{offline.hasCopy ? "" : " Nothing is saved yet: open a trip while online."}</p>
+          <p class="font-medium">{offline.off ? "Off on this device" : "On for this device"}</p>
+          <p class="text-sm text-muted-foreground">The saved trip is encrypted and opens offline only with {check}.</p>
+          <p class="text-sm text-muted-foreground" data-testid="offline-saved">
+            {#if offline.hasCopy && offline.savedAt}Saved {ago(offline.savedAt, now)}.{:else if offline.hasCopy}A trip is saved on this device.{:else if offline.off}Nothing is saved on this device.{:else}Nothing is saved yet: your current trip is saved when you open Waypoint online.{/if}
+          </p>
         </div>
-        <Badge variant="outline">On</Badge>
+        <label class="flex shrink-0 items-center gap-2 text-sm">
+          <input type="checkbox" role="switch" class="size-5 accent-primary" checked={!offline.off} disabled={changing} onchange={(e) => toggle(e.currentTarget.checked)} />
+          Save my current trip on this device
+        </label>
       </div>
       <div class="row">
         <p class="min-w-0 text-sm text-muted-foreground">Removing it deletes the saved trip and the key from this device.</p>
-        <Button variant="outline" onclick={() => (asking = true)}>Remove saved trip</Button>
+        <Button variant="outline" onclick={() => (asking = true)}>Remove from this device</Button>
       </div>
     {:else if offline.damaged}
       <div class="row">
@@ -43,7 +57,7 @@
           <p class="font-medium">The saved trip can’t be read</p>
           <p class="text-sm text-muted-foreground">Remove it, then set up offline access again.</p>
         </div>
-        <Button variant="outline" onclick={() => (asking = true)}>Remove saved trip</Button>
+        <Button variant="outline" onclick={() => (asking = true)}>Remove from this device</Button>
       </div>
     {:else if !offline.supported}
       <div class="row" data-testid="offline-unavailable">

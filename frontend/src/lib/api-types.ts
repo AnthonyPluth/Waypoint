@@ -253,6 +253,16 @@ export interface MergeBody {
   merge: number;
 }
 
+export interface Offline {
+  trip: Trip | null;
+  messages: OfflineMessages[];
+}
+
+export interface OfflineMessages {
+  segment_id: number;
+  emails: StoredEmail[];
+}
+
 export interface Ok {
   ok: boolean;
 }
@@ -765,4 +775,5 @@ export interface Endpoints {
   "POST /api/mcp-settings/writes": { body: McpWritesBody; reply: McpWritesBody };
   "DELETE /api/mcp-settings/connections/{id}": { body: never; reply: Ok };
   "GET /api/state": { body: never; reply: State };
+  "GET /api/offline": { body: never; reply: Offline };
 }

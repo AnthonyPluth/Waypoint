@@ -22,7 +22,7 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-const ACTIONS = { goto: "string", click: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", wait_for: "string", expect_text: "object", screenshot: "string" };
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const unknownPages = (names) => names.filter((n) => !PAGES.includes(n));
 
@@ -38,6 +38,8 @@ export function flowProblems(flow) {
   }
   if (flow?.page !== undefined && !PAGES.includes(flow.page)) out.push(`unknown page ${flow.page}`);
   for (const v of flow?.viewports ?? []) if (!(v in VIEWPORTS)) out.push(`unknown viewport ${v}`);
+  if (flow?.host !== undefined && !/^[\w.-]+$/.test(flow.host)) out.push("host is a host name such as localhost");
+  if (flow?.allow_console !== undefined && !(Array.isArray(flow.allow_console) && flow.allow_console.every((t) => typeof t === "string"))) out.push("allow_console is a list of texts");
   if (flow?.scheme !== undefined) out.push("scheme is not an option: the app is dark only");
   return out;
 }
@@ -77,7 +79,16 @@ export async function seedAssistants(browser, base) {
 
 async function runStep(page, step, shot, saveDownload) {
   const timeout = step.timeout ?? 10000;
-  if ("goto" in step) {
+  if ("authenticator" in step) {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("WebAuthn.enable");
+    await cdp.send("WebAuthn.addVirtualAuthenticator", { options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true,
+      hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true, hasPrf: true } });
+  } else if ("offline" in step) {
+    await page.context().setOffline(step.offline);
+  } else if ("reload" in step) {
+    await page.reload({ waitUntil: "domcontentloaded", timeout });
+  } else if ("goto" in step) {
     await page.goto(step.goto.startsWith("#") ? `${page.url().split("#")[0]}${step.goto}` : step.goto);
   } else if ("click" in step) {
     await page.locator(step.click).first().click({ timeout });
@@ -135,9 +146,9 @@ async function main() {
   const results = [];
   let approveUrl = "";
   try { approveUrl = await seedAssistants(browser, base); }
-  catch (e) { problems.push(`seeding the demo assistants: ${String(e.message).split("\n")[0]}`); }
+  catch (e) { problems.push(`seeding the demo assistants: ${String(e.message).split("\n")[0]}`, { cause: e }); }
 
-  async function visit(label, viewport, work) {
+  async function visit(label, viewport, work, allowConsole = []) {
     const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark" });
     const page = await ctx.newPage();
     const where = `${label} @ ${viewport}`;
@@ -166,7 +177,7 @@ async function main() {
       problems.push(`${where}: ${String(e.message).split("\n")[0]}`);
       await shot(`${label.replace(/\W+/g, "-")}-FAILED`).catch(() => {});
     }
-    for (const c of consoleErrors) problems.push(`${where}: console error: ${c.slice(0, 300)}`);
+    for (const c of consoleErrors.filter((c) => !allowConsole.some((t) => c.includes(t)))) problems.push(`${where}: console error: ${c.slice(0, 300)}`);
     results.push({ label, viewport, screenshots: files, consoleErrors });
     await ctx.close();
   }
@@ -187,10 +198,13 @@ async function main() {
     if (args.length && !args.includes(flow.page ?? "upcoming")) continue;
     for (const viewport of flow.viewports ?? Object.keys(VIEWPORTS)) {
       await visit(`flow ${flow.name}`, viewport, async (page, shot, saveDownload) => {
-        await page.goto(`${base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
-        for (const step of flow.steps) await runStep(page, step, (n) => shot(`flow-${flow.name}-${n}`), (n, d) => saveDownload(`flow-${flow.name}-${n}`, d));
+        await page.goto(`${flow.host ? base.replace("127.0.0.1", flow.host) : base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
+        for (const [i, step] of flow.steps.entries()) {
+          try { await runStep(page, step, (n) => shot(`flow-${flow.name}-${n}`), (n, d) => saveDownload(`flow-${flow.name}-${n}`, d)); }
+          catch (e) { throw new Error(`step ${i + 1} (${JSON.stringify(step).slice(0, 80)}): ${String(e.message).split("\n")[0]}`, { cause: e }); }
+        }
         await shot(`flow-${flow.name}`);
-      });
+      }, flow.allow_console);
     }
   }
   await browser.close();

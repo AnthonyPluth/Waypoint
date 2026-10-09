@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-66 routes; 0 have no test yet.
+67 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -32,11 +32,11 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `DELETE /api/trips/{id}` | `trips.py:api_trip_remove` | - | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_monitoring.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/merge` | `trips.py:api_trip_merge` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/split` | `trips.py:api_trip_split` | - | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
-| `POST /api/segments` | `trips.py:api_segment_add` | `lib/components/SegmentForm.svelte`, `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py`, `test_mcp_routes.py`, `test_reminders.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `POST /api/segments` | `trips.py:api_segment_add` | `lib/components/SegmentForm.svelte`, `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py`, `test_mcp_routes.py`, `test_offline.py`, `test_reminders.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/segments/{id}` | `trips.py:api_segment` | - | `test_api_contract.py`, `test_logos.py`, `test_mail_scan.py`, `test_mcp.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/segments/{id}/logo` | `logos.py:api_segment_logo` | - | `test_logos.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/segments/{id}/emails` | `trips.py:api_segment_emails` | `pages/Trip.svelte` | `test_api_contract.py`, `test_mail_scan.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
-| `POST /api/segments/{id}` | `trips.py:api_segment_edit` | `lib/components/SegmentForm.svelte` | `test_api_contract.py`, `test_logos.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `POST /api/segments/{id}` | `trips.py:api_segment_edit` | `lib/components/SegmentForm.svelte` | `test_api_contract.py`, `test_logos.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_offline.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `DELETE /api/segments/{id}` | `trips.py:api_segment_remove` | `pages/Trip.svelte` | `test_api_contract.py`, `test_logos.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/airports/{id}` | `trips.py:api_airport` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/import/preview` | `flight_import.py:api_import_preview` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/Waypoint/start/import/) |
@@ -79,3 +79,4 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/mcp-settings/writes` | `mcp.py:api_mcp_writes` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `DELETE /api/mcp-settings/connections/{id}` | `mcp.py:api_mcp_revoke` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `GET /api/state` | `state.py:api_state` | `lib/app.svelte.ts` | `test_api_contract.py`, `test_api_state.py`, `test_backup.py`, `test_http_pinned.py`, `test_http_server.py`, `test_mail_scan.py`, `test_monitoring.py`, `test_security.py`, `test_server.py`, `test_server_errors.py` | [start/docker](/Waypoint/start/docker/) |
+| `GET /api/offline` | `offline.py:api_offline` | `lib/offline.ts` | `test_api_contract.py`, `test_offline.py` | [start/offline](/Waypoint/start/offline/) |

@@ -9,6 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 import { api } from "$lib/api";
 import { app, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
+import * as offlineModule from "$lib/offline";
 import { state } from "../test/fixtures";
 import Settings from "./Settings.svelte";
 
@@ -63,6 +64,18 @@ describe("Settings account", () => {
     await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(api).toHaveBeenCalledWith("/auth/logout", { method: "POST" });
     await waitFor(() => expect(fake.href).toBe("/auth/signed-out"));
+    vi.unstubAllGlobals();
+  });
+
+  it("clears the trip saved on this device before the session ends", async () => {
+    const order: string[] = [];
+    vi.spyOn(offlineModule, "clearSaved").mockImplementation(async () => { order.push("cleared"); });
+    vi.mocked(api).mockImplementation((async (path: string) => { order.push(path); return { redirect: "/auth/signed-out" }; }) as never);
+    vi.stubGlobal("location", { href: "", pathname: "/", hash: "" });
+    render(Settings);
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(order).toContain("/auth/logout"));
+    expect(order.indexOf("cleared")).toBeLessThan(order.indexOf("/auth/logout"));
     vi.unstubAllGlobals();
   });
 

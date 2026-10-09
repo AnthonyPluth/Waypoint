@@ -2,7 +2,7 @@
 import { webcrypto } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installDevice, type Behaviour, type Device } from "../test/webauthn";
-import { hasSavedTrip, isSetUp, isUnlocked, lock, onLock, remove, save, setUp, support, unlock, VaultError, WHY_BROWSER, WHY_DEVICE } from "./offline-vault";
+import { clearTrip, hasSavedTrip, isSavingOff, isSetUp, isUnlocked, lock, onLock, remove, save, savedInfo, setSavingOff, setUp, support, unlock, VaultError, WHY_BROWSER, WHY_DEVICE } from "./offline-vault";
 
 const CANARY = "CANARY-Hotel-Zebra-4471";
 const TRIP = { id: 7, name: "Trip to Springfield", note: CANARY, segments: [{ id: 1, confirmation: "ZZ9QQ1" }] };
@@ -423,5 +423,68 @@ describe("a device that can't do it", () => {
     const failed = await failure(setUp());
     expect(failed.code).toBe("failed");
     expect(device.writes).toEqual([]);
+  });
+});
+
+describe("what the app may see without unlocking", () => {
+  it("reports when it was saved and when it runs out, in the clear and nothing else about the trip", async () => {
+    await setUp();
+    expect(await savedInfo()).toBeNull();
+    await save(TRIP, { savedAt: 1_700_000_000_000, expiresAt: 1_700_300_000_000 });
+    expect(await savedInfo()).toEqual({ savedAt: 1_700_000_000_000, expiresAt: 1_700_300_000_000 });
+    expect(Object.keys(device.fields("/offline-vault/trip")).sort()).toEqual(["data", "ephemeralPublicKey", "expiresAt", "iv", "savedAt", "v"]);
+    expect(device.appears(CANARY)).toBe(false);
+  });
+
+  it("reports nothing before it is set up, and a missing time as unknown", async () => {
+    expect(await savedInfo()).toBeNull();
+    await setUp();
+    await save(TRIP);
+    expect(await savedInfo()).toEqual({ savedAt: 0, expiresAt: null });
+  });
+
+  it("says a stored time that isn't a number is damaged", async () => {
+    await ready();
+    device.files.set("/offline-vault/trip", new TextEncoder().encode(JSON.stringify({ ...device.fields("/offline-vault/trip"), savedAt: "soon" })));
+    expect((await failure(savedInfo())).code).toBe("damaged");
+  });
+});
+
+describe("the switch", () => {
+  it("keeps saving off in the key file, saves nothing while off and keeps the setup", async () => {
+    await setUp();
+    expect(await isSavingOff()).toBe(false);
+    await setSavingOff(true);
+    expect(await isSavingOff()).toBe(true);
+    expect(await save(TRIP)).toBe(false);
+    expect(device.files.size).toBe(1);
+    expect(await isSetUp()).toBe(true);
+    await setSavingOff(false);
+    expect(device.fields("/offline-vault/keys").off).toBeUndefined();
+    expect(await save(TRIP)).toBe(true);
+  });
+
+  it("needs the setup, and says a switch that isn't true or false is damaged", async () => {
+    expect((await failure(setSavingOff(true))).code).toBe("not-set-up");
+    await setUp();
+    device.files.set("/offline-vault/keys", new TextEncoder().encode(JSON.stringify({ ...device.fields("/offline-vault/keys"), off: "maybe" })));
+    expect((await failure(isSavingOff())).code).toBe("damaged");
+  });
+});
+
+describe("clearing only the trip", () => {
+  it("deletes the saved trip and locks, and leaves the key for the next save", async () => {
+    await ready();
+    await unlock();
+    await clearTrip();
+    expect(isUnlocked()).toBe(false);
+    expect([...device.files.keys()]).toEqual(["/offline-vault/keys"]);
+    expect(await hasSavedTrip()).toBe(false);
+    expect(await save(TRIP)).toBe(true);
+  });
+
+  it("does nothing in a browser without the Cache API", async () => {
+    vi.stubGlobal("caches", undefined);
+    await expect(clearTrip()).resolves.toBeUndefined();
   });
 });

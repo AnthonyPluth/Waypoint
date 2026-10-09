@@ -178,6 +178,16 @@ class SegmentEmails(TypedDict):
     emails: list[StoredEmail]
 
 
+class OfflineMessages(TypedDict):
+    segment_id: int
+    emails: list[StoredEmail]
+
+
+class Offline(TypedDict):
+    trip: Trip | None
+    messages: list[OfflineMessages]
+
+
 class WhoBody(TypedDict):
     person_id: NotRequired[int]
     new_guest: NotRequired[str]

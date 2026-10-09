@@ -2,6 +2,7 @@ import ast
 import importlib.util
 import json
 import unittest
+from datetime import date
 from pathlib import Path
 
 from waypoint.storage import backup, db, secretbox, stored_mail
@@ -26,6 +27,7 @@ from waypoint.server.api import review as review_api
 from waypoint.server import mcp_oauth
 from waypoint.storage.models import OAuthGrant, OAuthToken
 from waypoint.providers import flightstatus as flight_service
+from waypoint.server.api import offline as offline_api
 from waypoint.server.api import trips as trips_api
 from waypoint.server.api import loyalty
 from waypoint.server.api import reminders as reminders_api
@@ -113,6 +115,7 @@ class Replies(DbCase):
         self.test_logodev()
         self.test_people()
         self.test_trips()
+        self.test_offline()
         self.test_stats()
         self.test_import()
         self.test_flight_status()
@@ -120,6 +123,22 @@ class Replies(DbCase):
         self.test_reminders()
         self.test_mcp_settings()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
+
+    def test_offline(self):
+        _current.user = {"name": None, "email": None, "local": True}
+        self.check("GET /api/offline", offline_api.api_offline(self.c, {}, {}))
+        today = date.today()
+        seg = trips_api.api_segment_add(self.c, {}, {"kind": "flight", "origin": "AKL", "destination": "LAX",
+                                                      "start_local": f"{today:%Y-%m-%d}T22:15", "end_local": f"{today:%Y-%m-%d}T23:50",
+                                                      "travelers": [{"name": "DOE/JANE MS"}]})
+        box = self.c.execute(insert(Mailbox).values(owner_sub="u8", address="joan@gmail.example", token=secretbox.encrypt("t"), status="connected",
+                                                    created=1.0)).lastrowid
+        stored_mail.put(self.c, box, "m8", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-02-20", "text": "Hello.",
+                                            "html": None, "truncated": False}, 1.0)   # type: ignore[arg-type]
+        stored_mail.link(self.c, seg["id"], box, "m8")   # type: ignore[arg-type]
+        found = offline_api.api_offline(self.c, {}, {})
+        self.assertEqual([m["segment_id"] for m in found["messages"]], [seg["id"]])
+        self.check("GET /api/offline", found)
 
     def test_state(self):
         _current.user = {"name": None, "email": None, "local": True}
@@ -382,7 +401,7 @@ class Generated(unittest.TestCase):
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
-                                     "DELETE /api/segments/{id}", "GET /api/segments/{id}/emails", "GET /api/airports/{id}",
+                                     "DELETE /api/segments/{id}", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",

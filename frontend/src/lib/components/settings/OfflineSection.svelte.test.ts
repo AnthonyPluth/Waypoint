@@ -7,7 +7,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { installDevice, type Behaviour, type Device } from "../../../test/webauthn";
 import { offline } from "$lib/offline.svelte";
-import { lock, save, setUp } from "$lib/offline-vault";
+import { hasSavedTrip, isSavingOff, lock, save, setUp } from "$lib/offline-vault";
 import OfflineSection from "./OfflineSection.svelte";
 
 let device: Device;
@@ -15,7 +15,7 @@ const withDevice = (b: Behaviour = {}) => { device = installDevice(b); };
 
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
-  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, damaged: false, supported: true, reason: "", declined: false });
+  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false });
   withDevice();
 });
 afterEach(() => { lock(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -55,10 +55,35 @@ describe("Settings → Offline access", () => {
     const user = userEvent.setup();
     expect(await screen.findByText("On for this device")).toBeInTheDocument();
     expect(screen.queryByText(/Nothing is saved yet/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Remove saved trip" }));
+    await user.click(screen.getByRole("button", { name: "Remove from this device" }));
     await user.click(await screen.findByRole("button", { name: "Remove" }));
     expect(await screen.findByRole("button", { name: "Set up offline access" })).toBeInTheDocument();
     expect(device.files.size).toBe(0);
+  });
+
+  it("shows when the trip was saved", async () => {
+    await setUp();
+    await save({ id: 1 }, { savedAt: Date.now() - 3 * 3_600_000, expiresAt: null });
+    render(OfflineSection);
+    expect(await screen.findByTestId("offline-saved")).toHaveTextContent("Saved 3 h ago.");
+  });
+
+  it("turns saving off with the switch, clearing the copy, and back on", async () => {
+    await setUp();
+    await save({ id: 1 }, { savedAt: Date.now(), expiresAt: null });
+    render(OfflineSection);
+    const user = userEvent.setup();
+    const toggle = await screen.findByRole("switch", { name: "Save my current trip on this device" });
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+    await waitFor(() => expect(screen.getByRole("switch")).not.toBeChecked());
+    expect(await isSavingOff()).toBe(true);
+    expect(await hasSavedTrip()).toBe(false);
+    expect(screen.getByText("Off on this device")).toBeInTheDocument();
+    expect(screen.getByTestId("offline-saved")).toHaveTextContent("Nothing is saved on this device.");
+    await user.click(screen.getByRole("switch"));
+    await waitFor(() => expect(screen.getByRole("switch")).toBeChecked());
+    expect(await isSavingOff()).toBe(false);
   });
 
   it("offers to remove a saved trip that can't be read", async () => {
@@ -67,7 +92,7 @@ describe("Settings → Offline access", () => {
     render(OfflineSection);
     const user = userEvent.setup();
     expect(await screen.findByText("The saved trip can’t be read")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Remove saved trip" }));
+    await user.click(screen.getByRole("button", { name: "Remove from this device" }));
     await user.click(await screen.findByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Set up offline access" })).toBeInTheDocument());
   });
