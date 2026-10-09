@@ -4,15 +4,18 @@
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "click": "a[href^='#trip/']:has-text('London') >> visible=true" },
+    { "wait_for": "h1:has-text('London')" },
     { "wait_for": "ul[aria-label='Bookings']" },
     { "expect_text": { "selector": "main", "text": "Check-in" } },
     { "screenshot": "flight-trip" },
     { "goto": "#trips" },
     { "click": "a[href^='#trip/']:has-text('Orlando') >> visible=true" },
+    { "wait_for": "h1:has-text('Orlando')" },
     { "wait_for": "ul[aria-label='Bookings']" },
     { "screenshot": "hotel-trip" },
     { "goto": "#trips" },
     { "click": "a[href^='#trip/']:has-text('San Francisco') >> visible=true" },
+    { "wait_for": "h1:has-text('San Francisco')" },
     { "wait_for": "ul[aria-label='Bookings']" },
     { "expect_text": { "selector": "main", "text": "Pick-up" } },
     { "screenshot": "car-trip" }

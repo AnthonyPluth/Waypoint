@@ -78,7 +78,7 @@
             {#each group as t (t.id)}
               {@const current = panes.two && selected?.id === t.id}
               <li>
-                <a class="block rounded-2xl border bg-card p-4 shadow-card transition-colors hover:bg-surface-3 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {current ? 'border-primary bg-surface-2' : 'border-border'}"
+                <a class="block h-full rounded-2xl border bg-card p-4 shadow-card transition-colors hover:bg-surface-3 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {current ? 'border-primary bg-surface-2' : 'border-border'}"
                   href={`#trip/${t.id}`} aria-current={current ? "true" : undefined} onclick={(e) => choose(e, t)}>
                   <span class="flex items-start justify-between gap-3">
                     <span class="min-w-0 break-words text-lg font-bold tracking-tight">{t.name}</span>
