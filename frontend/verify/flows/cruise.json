@@ -21,6 +21,12 @@
       }
     },
     {
+      "expect_text": {
+        "selector": "[data-itinerary]",
+        "text": "Sea day"
+      }
+    },
+    {
       "scroll_to": "[data-itinerary]"
     },
     {
