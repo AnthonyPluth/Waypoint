@@ -221,3 +221,29 @@ export function when(word: string, ms: number): string {
   if (ms >= 60_000) return `${word} in ${until(ms)}`;
   return word === "Departs" ? "Departing now" : word === "Arrives" ? "Arriving now" : `${word} now`;
 }
+
+export const CHECK_IN_WINDOW_HOURS = 24;
+const CHECK_IN_WINDOW_MS = CHECK_IN_WINDOW_HOURS * 3_600_000;
+
+const PAST_WORD: Record<Segment["kind"], string> = { flight: "Landed", hotel: "Checked out", car: "Dropped off", train: "Arrived", cruise: "Disembarked" };
+
+export function routeProgress(s: Segment, now: number): number {
+  const from = startAt(s), to = endAt(s);
+  if (untimed(s) || Number.isNaN(from) || Number.isNaN(to)) return 0;
+  if (to <= from) return now >= to ? 1 : 0;
+  return Math.min(1, Math.max(0, (now - from) / (to - from)));
+}
+
+export function passHeadline(s: Segment, now: number): string {
+  if (s.status === "cancelled") return "Cancelled";
+  const from = startAt(s), to = endAt(s);
+  if (untimed(s) || Number.isNaN(from) || Number.isNaN(to)) return "Time not recorded";
+  if (s.kind !== "flight") {
+    if (now < from) return when(START_WORD[s.kind], from - now);
+    return now < to ? when(END_WORD[s.kind], to - now) : PAST_WORD[s.kind];
+  }
+  if (now < from - CHECK_IN_WINDOW_MS) return `Check-in opens in ${until(from - CHECK_IN_WINDOW_MS - now)}`;
+  if (now < from) return `Check-in is open, ${from - now >= 60_000 ? `departs in ${until(from - now)}` : "departing now"}`;
+  if (now >= to) return PAST_WORD.flight;
+  return `Under way, ${to - now >= 60_000 ? `arrives in ${until(to - now)}` : "arriving now"}`;
+}

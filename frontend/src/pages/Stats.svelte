@@ -117,7 +117,7 @@
   const cabinTotal = $derived(f ? f.cabins.reduce((n, c) => n + c.count, 0) : 0);
   const seatTotal = $derived(f ? f.seat_positions.window + f.seat_positions.aisle + f.seat_positions.middle : 0);
   const seatBars = $derived(f ? [["Window", f.seat_positions.window], ["Aisle", f.seat_positions.aisle], ["Middle", f.seat_positions.middle]] as [string, number][] : []);
-  const selectClass = "border-input bg-card dark:bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
+  const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 </script>
 
 {#snippet bars(title: string, rows: [string, number][], whole: number)}

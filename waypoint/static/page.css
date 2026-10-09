@@ -1,10 +1,6 @@
 @font-face { font-family: "Geist"; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
-:root { color-scheme: light dark; --bg: #f2f4f8; --fg: #0e1320; --card: #ffffff; --muted: #586175; --border: #e0e5ee; --primary: #0a63d8;
-  --primary-fg: #ffffff; --primary-hover: #0852b3; --hover: rgba(14, 19, 32, 0.06); --shadow: 0 1px 2px rgba(14, 19, 32, 0.05), 0 12px 32px -16px rgba(14, 19, 32, 0.16); }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #07090e; --fg: #f3f5f9; --card: #12151d; --muted: #9aa4b8; --border: #232837; --primary: #4f9dff; --primary-fg: #04101f;
-    --primary-hover: #7ab6ff; --hover: rgba(243, 245, 249, 0.07); --shadow: 0 0 0 1px rgba(255, 255, 255, 0.03), 0 14px 32px -16px rgba(0, 0, 0, 0.7); }
-}
+:root { color-scheme: dark; --bg: #07090e; --fg: #f3f5f9; --card: #12151d; --muted: #9aa4b8; --border: #232837; --primary: #4f9dff;
+  --primary-fg: #04101f; --primary-hover: #7ab6ff; --hover: rgba(243, 245, 249, 0.07); --shadow: 0 0 0 1px rgba(255, 255, 255, 0.03), 0 14px 32px -16px rgba(0, 0, 0, 0.7); }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 0 16px; background: var(--bg); color: var(--fg); line-height: 1.5; -webkit-font-smoothing: antialiased;
   font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }

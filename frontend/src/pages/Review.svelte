@@ -50,7 +50,7 @@
   };
 
   const KINDS: [string, string][] = [["flight", "Flight"], ["hotel", "Hotel stay"], ["car", "Car rental"], ["train", "Train"]];
-  const selectClass = "border-input bg-card dark:bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
+  const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
   const sender = (i: ReviewItem) => i.sender_domain || "Unknown sender";
   const subject = (i: ReviewItem) => i.subject || `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;

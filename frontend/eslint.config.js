@@ -19,6 +19,10 @@ const RESTRICTED = {
     selector: "Identifier[name=/^(localStorage|sessionStorage|indexedDB)$/]",
     message: "Browser storage outlives sign-out and is readable by anything on the device: keep trips, names, codes and loyalty numbers on the server (AGENTS.md, \"Waypoint's promises\").",
   },
+  darkOnly: {
+    selector: "Literal[value=/(^|\\s)dark:|prefers-color-scheme/], TemplateElement[value.raw=/(^|\\s)dark:|prefers-color-scheme/], SvelteLiteral[value=/(^|\\s)dark:|prefers-color-scheme/]",
+    message: "The app is dark only: write the dark values directly, with no `dark:` variant and no light palette (tokens in src/app.css).",
+  },
 };
 const restrict = (...names) => ["error", ...names.map((n) => RESTRICTED[n])];
 
@@ -69,13 +73,14 @@ export default defineConfig(
     rules: {
       "svelte/no-useless-mustaches": "off",
       "svelte/prefer-svelte-reactivity": "off",
-      "no-restricted-syntax": restrict("errorCast", "fetch", "storage"),
+      "no-restricted-syntax": restrict("errorCast", "fetch", "storage", "darkOnly"),
       "waypoint/no-silent-catch": "error",
       "no-console": ["error", { allow: ["error", "warn"] }],
     },
     plugins: { waypoint },
   },
-  { files: ["frontend/src/lib/api.ts"], rules: { "no-restricted-syntax": restrict("errorCast", "storage") } },
+  { files: ["frontend/src/lib/api.ts"], rules: { "no-restricted-syntax": restrict("errorCast", "storage", "darkOnly") } },
+  { files: ["frontend/eslint.config.js", "frontend/src/lint-rules.test.ts", "frontend/src/app.css.test.ts"], rules: { "no-restricted-syntax": restrict("errorCast", "fetch", "storage") } },
   {
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", {

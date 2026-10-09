@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { bookingCards, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
+import { describe, expect, it, vi } from "vitest";
+import { viewerZone, bookingCards, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -27,6 +27,13 @@ describe("local times across zones", () => {
   it("never converts the place's time to the viewer's or the server's", () => {
     for (const mine of [NY, LON, AKL, LA, "UTC"]) expect(placeTime("2026-11-20T19:00", NY, mine).text).toBe("7:00 PM");
     expect(clock("2026-03-01T22:15")).toBe("10:15 PM");
+  });
+  it("brackets the time in the zone the device is in, so on the east coast it reads EDT", () => {
+    const device = vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ timeZone: NY } as Intl.ResolvedDateTimeFormatOptions);
+    expect(viewerZone()).toBe(NY);
+    expect(placeTime("2026-07-20T19:00", "America/Chicago")).toEqual({ text: "7:00 PM", yours: "8:00 PM EDT" });
+    expect(placeTime("2026-07-20T19:00", NY)).toEqual({ text: "7:00 PM", yours: null });
+    device.mockRestore();
   });
   it("tells the day in a zone", () => { expect(dayIn(Date.UTC(2026, 10, 21, 3, 0), NY)).toBe("2026-11-20"); });
 });
@@ -277,5 +284,65 @@ describe("the order of a day's items", () => {
   });
   it("leaves other days alone", () => {
     expect(tripDays(trip([hotel, car, flight])).map((d) => d.date)).toEqual(["2026-11-05", "2026-11-08"]);
+  });
+});
+
+describe("the pass headline", () => {
+  const flight = segment({ id: 9, start_local: "2026-11-20T19:00", start_zone: NY, end_local: "2026-11-21T07:10", end_zone: LON });
+  const dep = at("2026-11-20T19:00", NY), arr = at("2026-11-21T07:10", LON), HOUR = 3_600_000;
+  it("uses the same 24 hours as the check-in reminder", () => { expect(CHECK_IN_WINDOW_HOURS).toBe(24); });
+  it("counts down to check-in more than 24 hours out", () => {
+    expect(passHeadline(flight, dep - 30 * HOUR)).toBe("Check-in opens in 6 h");
+    expect(passHeadline(flight, dep - 24 * HOUR - 60_000)).toBe("Check-in opens in 1 min");
+  });
+  it("is open from exactly 24 hours before departure", () => {
+    expect(passHeadline(flight, dep - 24 * HOUR)).toBe("Check-in is open, departs in 1 day");
+    expect(passHeadline(flight, dep - 24 * HOUR + 60_000)).toBe("Check-in is open, departs in 23 h 59 min");
+    expect(passHeadline(flight, dep - 3 * HOUR)).toBe("Check-in is open, departs in 3 h");
+  });
+  it("says now rather than in now in the last minute", () => {
+    expect(passHeadline(flight, dep - 20_000)).toBe("Check-in is open, departing now");
+    expect(passHeadline(flight, arr - 20_000)).toBe("Under way, arriving now");
+  });
+  it("is under way from departure and landed from arrival", () => {
+    expect(passHeadline(flight, dep)).toBe("Under way, arrives in 7 h 10 min");
+    expect(passHeadline(flight, arr - 70 * 60_000)).toBe("Under way, arrives in 1 h 10 min");
+    expect(passHeadline(flight, arr)).toBe("Landed");
+    expect(passHeadline(flight, arr + 5 * HOUR)).toBe("Landed");
+  });
+  it("says so for a flight with no times, and never reads a cancelled one as current", () => {
+    expect(passHeadline(segment({ details: { time_unknown: "yes" } }), dep)).toBe("Time not recorded");
+    expect(passHeadline(segment({ status: "cancelled" }), dep - 3 * HOUR)).toBe("Cancelled");
+    expect(passHeadline(segment({ status: "cancelled" }), dep + HOUR)).toBe("Cancelled");
+  });
+  it("keeps the words stays, cars, trains and cruises already have", () => {
+    expect(passHeadline(stay, at("2026-11-21T10:00", LON))).toBe("Check-in in 5 h");
+    expect(passHeadline(stay, at("2026-11-23T10:00", LON))).toBe("Check-out in 4 days");
+    expect(passHeadline(stay, at("2026-11-27T10:00", LON))).toBe("Checked out");
+    expect(passHeadline(segment({ kind: "car" }), dep - HOUR)).toBe("Pick-up in 1 h");
+    expect(passHeadline(segment({ kind: "train" }), dep + HOUR)).toBe("Arrives in 6 h 10 min");
+    expect(passHeadline(segment({ kind: "cruise" }), arr + HOUR)).toBe("Disembarked");
+  });
+});
+
+describe("the route progress", () => {
+  const flight = segment({ start_local: "2026-11-20T19:00", start_zone: NY, end_local: "2026-11-21T07:10", end_zone: LON });
+  const dep = at("2026-11-20T19:00", NY), arr = at("2026-11-21T07:10", LON);
+  it("waits at the origin, moves along the flight and rests at the destination", () => {
+    expect(routeProgress(flight, dep - 5_000_000)).toBe(0);
+    expect(routeProgress(flight, dep)).toBe(0);
+    expect(routeProgress(flight, dep + (arr - dep) / 2)).toBe(0.5);
+    expect(routeProgress(flight, arr)).toBe(1);
+    expect(routeProgress(flight, arr + 5_000_000)).toBe(1);
+  });
+  it("counts a flight across the date line by instants, not by the clock", () => {
+    const over = segment({ origin: "SYD", destination: "LAX", start_local: "2026-11-20T10:00", start_zone: "Australia/Sydney", end_local: "2026-11-20T06:00", end_zone: LA });
+    const from = at("2026-11-20T10:00", "Australia/Sydney"), to = at("2026-11-20T06:00", LA);
+    expect(to).toBeGreaterThan(from);
+    expect(routeProgress(over, (from + to) / 2)).toBeCloseTo(0.5, 5);
+  });
+  it("keeps the plane at the origin for a segment with no times", () => {
+    expect(routeProgress(segment({ details: { time_unknown: "yes" } }), dep + 3_600_000)).toBe(0);
+    expect(routeProgress(segment({ start_local: "soon" }), dep)).toBe(0);
   });
 });

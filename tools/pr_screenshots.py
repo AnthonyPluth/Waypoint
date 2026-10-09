@@ -67,11 +67,11 @@ def select_files(paths: Sequence[str], verify_dir: Path = VERIFY_DIR) -> list[Pa
     return chosen
 
 
-def comment_markdown(pr: int, names: Sequence[str], theme: str = "light", slug: str = REPO_SLUG) -> str:
+def comment_markdown(pr: int, names: Sequence[str], slug: str = REPO_SLUG) -> str:
     groups: dict[str, list[str]] = {}
     for name in sorted(names):
         groups.setdefault(viewport_of(name) or "other", []).append(name)
-    out = [f"## Screenshots (`make verify`, made-up demo data, {theme} theme)", ""]
+    out = ["## Screenshots (`make verify`, made-up demo data)", ""]
     for key in (*WIDTHS, "other"):
         if key not in groups:
             continue
@@ -102,7 +102,6 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser(prog="pr_screenshots.py", description="Publish make verify screenshots for a PR and print its comment.")
     ap.add_argument("pr", type=int, help="the pull request's number")
     ap.add_argument("files", nargs="*", help="screenshots to publish (default: every *-top.png in artifacts/verify/)")
-    ap.add_argument("--theme", choices=("dark", "light"), default="light", help="the theme the screenshots show (default light)")
     ap.add_argument("--trailer", action="append", default=[], help="a commit trailer, 'Key: value' (repeatable)")
     ap.add_argument("--remote", default="origin", help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
@@ -182,7 +181,7 @@ def main(argv: Sequence[str], cwd: Path | None = None, env: dict[str, str] | Non
         print(f"pr_screenshots: {e}", file=sys.stderr)
         return 1
     print(f"pr_screenshots: {'pushed' if pushed else 'already up to date:'} {len(files)} file(s) in {BRANCH}/pr-{args.pr}/", file=sys.stderr)
-    print(comment_markdown(args.pr, [f.name for f in files], args.theme))
+    print(comment_markdown(args.pr, [f.name for f in files]))
     return 0
 
 

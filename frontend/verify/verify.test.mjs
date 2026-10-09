@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findChromium, flowProblems, PAGES, SCHEMES, screenshotFiles, unknownPages } from "./verify.mjs";
+import { findChromium, flowProblems, PAGES, screenshotFiles, unknownPages } from "./verify.mjs";
 
 describe("flowProblems", () => {
   const ok = { name: "open-settings", page: "upcoming", steps: [{ goto: "#settings" }, { click: "text=Settings", timeout: 500 }] };
@@ -34,13 +34,12 @@ describe("flowProblems", () => {
     expect(unknownPages(PAGES)).toEqual([]);
   });
 
-  it("takes a light or dark scheme and rejects another", () => {
-    expect(SCHEMES).toEqual(["light", "dark"]);
-    expect(flowProblems({ ...ok, scheme: "dark" })).toEqual([]);
-    expect(flowProblems({ ...ok, scheme: "sepia" })).toEqual(["unknown scheme sepia"]);
+  it("rejects a scheme: the app is dark only", () => {
+    expect(flowProblems({ ...ok, scheme: "dark" })).toEqual(["scheme is not an option: the app is dark only"]);
+    expect(flowProblems(ok)).toEqual([]);
   });
 
-  it("has the app's pages", () => expect(PAGES).toEqual(["upcoming", "trips", "stats", "people", "review", "settings", "oauth-approve"]));
+  it("has the app's pages", () => expect(PAGES).toEqual(["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"]));
 });
 
 describe("screenshotFiles", () => {

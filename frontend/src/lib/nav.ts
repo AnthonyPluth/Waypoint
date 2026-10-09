@@ -18,7 +18,7 @@ export const NAV: NavItem[] = [
   { page: "settings", label: "Settings", icon: Settings },
 ];
 
-const INSIDE: Record<string, string> = { trip: "trips" };
+const INSIDE: Record<string, string> = { trip: "trips", design: "settings" };
 
 export const pageFor = (route: string): string => (route in INSIDE ? route : NAV.find((n) => n.page === route)?.page ?? NAV[0].page);
 

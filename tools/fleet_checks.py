@@ -278,6 +278,19 @@ def check_workflows() -> list[str]:
     return problems
 
 
+LIGHT_THEME = re.compile(r"prefers-color-scheme|color-scheme\s*:[^;}]*\blight\b|name=[\"']color-scheme[\"'][^>]*content=[\"'][^\"']*\blight\b")
+THEMED_FILES = ("frontend/index.html", "frontend/src/**/*.css", "waypoint/static/*.css")
+
+
+def dark_only_files(root: Path = ROOT) -> dict[str, str]:
+    return {str(p.relative_to(root)): p.read_text() for pattern in THEMED_FILES for p in sorted(root.glob(pattern)) if p.is_file()}
+
+
+def check_dark_only(files: dict[str, str]) -> list[str]:
+    return [f"{name}: the app is dark only, so no light palette and no prefers-color-scheme (tokens live in frontend/src/app.css)"
+            for name, text in files.items() if LIGHT_THEME.search(text)]
+
+
 def check_manage_links(table: dict, tests_text: str) -> list[str]:
     problems = []
     for provider, (host, _path) in table.items():
@@ -295,6 +308,7 @@ def main(argv: list[str] | None = None) -> int:
     problems = check_migrations(migrations(), MIGRATION_TESTS.read_text())
     problems += check_parsers(parser_vendors(), (PARSERS / "__init__.py").read_text())
     problems += check_workflows()
+    problems += check_dark_only(dark_only_files())
     sys.path.insert(0, str(ROOT))
     from waypoint.domain import links
     problems += check_manage_links(links.MANAGE, (ROOT / "tests/test_links.py").read_text())
@@ -309,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
     if not problems:
         print("Fleet checks passed: one migration head, migrations tested, mail parsers registered with fixtures and a test"
               + (", commit trailers, no test removed or skipped without a reason" if args.commits else "")
-              + ", workflow conventions, manage links tested.")
+              + ", workflow conventions, dark only, manage links tested.")
     return 1 if problems else 0
 
 
