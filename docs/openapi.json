@@ -3205,7 +3205,7 @@
       "MatchBody": {
         "type": "object",
         "properties": {
-          "index": {
+          "entry": {
             "type": "integer"
           },
           "segment_id": {
@@ -3216,7 +3216,7 @@
           }
         },
         "required": [
-          "index",
+          "entry",
           "segment_id"
         ],
         "additionalProperties": false
@@ -3887,7 +3887,7 @@
           "item_id": {
             "type": "integer"
           },
-          "index": {
+          "entry": {
             "type": "integer"
           },
           "subject": {
@@ -3917,7 +3917,7 @@
         },
         "required": [
           "item_id",
-          "index",
+          "entry",
           "subject",
           "received",
           "mine",

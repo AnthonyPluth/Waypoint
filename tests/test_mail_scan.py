@@ -617,7 +617,7 @@ class HeldMatchTests(ScanCase):
         self.put("hotel_jsonld")
         self.scan()
         [match] = self.held()
-        self.assertTrue(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["index"], second)))
+        self.assertTrue(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["entry"], second)))
         by_id = {s["id"]: s for s in self.segments()}
         self.assertEqual((by_id[second]["confirmation"], by_id[first]["confirmation"]), ("H88231", None))
         self.assertEqual(self.held(), [])
@@ -630,7 +630,7 @@ class HeldMatchTests(ScanCase):
         self.put("hotel_jsonld")
         self.scan()
         [match] = self.held()
-        self.assertTrue(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["index"], None)))
+        self.assertTrue(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["entry"], None)))
         segs = self.segments()
         self.assertEqual(sorted(s["confirmation"] or "" for s in segs), ["", "", "H88231"])
         self.assertEqual(self.read(lambda conn: review.count(conn, "u-jane")), 0)
@@ -643,9 +643,44 @@ class HeldMatchTests(ScanCase):
         self.scan()
         [match] = self.held()
         with self.assertRaises(trips.Invalid):
-            self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["index"], other))
-        self.assertTrue(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["index"], None)))
-        self.assertFalse(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["index"], None)))
+            self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["entry"], other))
+        self.assertTrue(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["entry"], None)))
+        self.assertFalse(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, match["item_id"], match["entry"], None)))
+
+    def two_in_one_item(self) -> tuple[list[review.MatchOut], int]:
+        self.by_hand()
+        self.by_hand()
+        self.put("hotel_jsonld")
+        self.scan()
+        [only] = self.held()
+        other = {**self.STAY, "origin": "Quay Hotel", "confirmation": "H99999", "provider": "Example Hotels", "start_local": "2026-12-01T15:00", "end_local": "2026-12-04T10:00"}
+        ids = [self.by_hand(), self.by_hand()]
+        self.read(lambda conn: conn.execute(update(ReviewItem).where(ReviewItem.id == only["item_id"]).values(
+            matches=json.dumps([{"id": 1, "booking": {**self.STAY, "confirmation": "H88231"}, "candidates": ids},
+                                {"id": 2, "booking": other, "candidates": ids}]))))
+        return self.held(), only["item_id"]
+
+    def test_each_held_booking_is_settled_or_dismissed_by_its_own_id_leaving_the_rest(self):
+        [first, second], item = self.two_in_one_item()
+        self.assertEqual((first["entry"], second["entry"]), (1, 2))
+        self.assertTrue(self.read(lambda conn: review.drop(conn, "u-jane", item, 1)))
+        [left] = self.held()
+        self.assertEqual((left["entry"], left["booking"]["confirmation"]), (2, "H99999"))
+        self.assertFalse(self.read(lambda conn: review.drop(conn, "u-jane", item, 1)))
+        self.assertFalse(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, item, 1, None)))
+        self.assertEqual([m["booking"]["confirmation"] for m in self.held()], ["H99999"])
+        self.assertTrue(self.read(lambda conn: review.settle(conn, "u-jane", self.jane, item, 2, None)))
+        self.assertEqual(self.held(), [])
+        self.assertEqual(self.read(lambda conn: review.count(conn, "u-jane")), 0)
+
+    def test_a_held_item_is_not_something_to_ask_the_ai_about(self):
+        self.by_hand()
+        self.by_hand()
+        self.put("hotel_jsonld")
+        self.scan()
+        [match] = self.held()
+        with self.assertRaises(scan.NotAskable):
+            scan.suggest_now("u-jane", match["item_id"], NOW)
 
     def test_dismissing_it_drops_it_and_the_kept_message(self):
         self.by_hand()
@@ -666,7 +701,7 @@ class HeldMatchTests(ScanCase):
         self.assertEqual(seen_by_sam["candidates"], [])
         self.assertFalse(seen_by_sam["mine"])
         with self.assertRaises(trips.Invalid):
-            self.read(lambda conn: review.settle(conn, "u-sam", self.sam, seen_by_sam["item_id"], seen_by_sam["index"], mine[0]))
+            self.read(lambda conn: review.settle(conn, "u-sam", self.sam, seen_by_sam["item_id"], seen_by_sam["entry"], mine[0]))
         self.assertEqual(len(self.held()), 1)
 
 
@@ -1416,6 +1451,44 @@ class MailScanApiTests(GoogleCase):
             status, body = self.call("ben", method, path, {} if method == "POST" else None)
             self.assertEqual((status, body["error"]), (404, "No such item"), path)
         self.assertEqual(len(self.call("ana", "GET", "/api/review")[1]["items"]), 2)
+
+    def held_for_ana(self) -> dict:
+        stay = {"kind": "hotel", "origin": "Harbour Hotel", "start_local": "2026-11-21T15:00", "end_local": "2026-11-27T10:00",
+                "start_zone": "Europe/London", "end_zone": "Europe/London"}
+        for _ in range(2):
+            self.assertEqual(self.call("ana", "POST", "/api/segments", stay)[0], 200)
+        self.put("hotel_jsonld")
+        self.scan_now()
+        [held] = self.call("ana", "GET", "/api/review")[1]["matches"]
+        return held
+
+    def test_the_match_route_refuses_what_it_cannot_do_and_only_its_owner_settles_it(self):
+        held = self.held_for_ana()
+        path = f"/api/review/{held['item_id']}/match"
+        for body, status, error in (({"entry": "1", "segment_id": None}, 400, 'Send "entry" as a whole number'),
+                                    ({"entry": True, "segment_id": None}, 400, 'Send "entry" as a whole number'),
+                                    ({"entry": 1, "segment_id": "x"}, 400, "No such booking"),
+                                    ({"entry": 9, "segment_id": None}, 404, "No such item"),
+                                    ({"entry": 1, "segment_id": 99999}, 400, "That isn’t one of the bookings it could be")):
+            self.assertEqual(self.call("ana", "POST", path, body)[0:2], (status, {"error": error}), body)
+        self.assertEqual(self.call("ben", "POST", path, {"entry": 1, "segment_id": None})[0:2], (404, {"error": "No such item"}))
+        self.assertEqual(self.call("ana", "POST", "/api/review/99999/match", {"entry": 1, "segment_id": None})[0], 404)
+        self.assertEqual(self.call("ana", "DELETE", f"/api/review/{held['item_id']}?entry=9")[0:2], (404, {"error": "No such item"}))
+        self.assertEqual(self.call("ana", "DELETE", f"/api/review/{held['item_id']}?entry=x")[0], 400)
+        self.assertEqual(self.call("ben", "DELETE", f"/api/review/{held['item_id']}?entry=1")[0], 404)
+        self.assertEqual(len(self.call("ana", "GET", "/api/review")[1]["matches"]), 1)
+        self.assertEqual(self.call("ana", "POST", path, {"entry": 1, "segment_id": None})[0:2], (200, {"ok": True}))
+        self.assertEqual(self.call("ana", "GET", "/api/review")[1]["matches"], [])
+
+    def test_a_held_item_cannot_be_asked_about(self):
+        held = self.held_for_ana()
+        status, body = self.call("ana", "POST", f"/api/review/{held['item_id']}/suggest", {})
+        self.assertEqual((status, body["error"]), (400, scan.HOLDS_BOOKINGS))
+
+    def test_dismissing_one_held_booking_leaves_the_item_until_none_is_left(self):
+        held = self.held_for_ana()
+        self.assertEqual(self.call("ana", "DELETE", f"/api/review/{held['item_id']}?entry={held['entry']}")[0:2], (200, {"ok": True}))
+        self.assertEqual(self.call("ana", "GET", "/api/review")[1]["matches"], [])
 
     def share(self, who="ana", box=None, on=True):
         return self.call(who, "POST", f"/api/mailboxes/{box or self.ana_box}/share", {"share": on})

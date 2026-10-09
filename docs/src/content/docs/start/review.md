@@ -37,7 +37,7 @@ When a booking email (one with a confirmation code) fits more than one booking y
 
 - **It’s this one** fills in that booking with the email’s confirmation code, provider and link (a field you edited by hand is left as it is), and the email is kept with it, as for any booking made from an email.
 - **It’s a new booking** adds the email as a booking of its own.
-- **Dismiss** takes the item off and adds nothing.
+- **Dismiss** takes that booking off and adds nothing. If the same email held another booking, that one stays until you settle it too.
 
 The bookings it could be are shown only to people who can see them: someone else in the household who sees the item (a [shared mailbox](#sharing-a-mailboxs-items-with-the-household)) sees it without the bookings that aren’t theirs, and can still add it as a new booking. These items don’t go to the AI. The message itself stays on the server like any other Review item’s.
 
