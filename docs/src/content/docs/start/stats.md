@@ -46,7 +46,7 @@ The map is drawn on your device from outlines bundled with the app: countries fr
 
 ## Year in review
 
-Pick a person and a year and the Stats page offers **See your year in review**: a short run of full-screen cards (distance and how it compares, flights and time in the air, countries and the ones new that year, the top route and airport, nights away, the map) and a last card to share. It is offered from December 1 for the current year, and any time for past years.
+Pick a person and a year and the Stats page offers **See your year in review**: a short run of full-screen cards (distance and how it compares, flights and time in the air, countries and the ones new that year, the top route and airport, nights away, the map) and a last card to save as an image. It is offered from December 1 for the current year, and any time for past years.
 
 The last card is **Save as image**. Before you save, it shows the picture and a list of what the picture contains: the year, distance, flights and time in the air, nights away, the countries, the top route and top airports (as airport codes), and the map. The picture is drawn on your device, in the browser, and saved to your downloads as a PNG. Nothing is uploaded and no request is made, and there is no button to share it to other apps or a link: you choose what to do with the file.
 
