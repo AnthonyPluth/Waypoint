@@ -23,7 +23,7 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-const ACTIONS = { goto: "string", click: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", wait_for: "string", expect_text: "object", screenshot: "string" };
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const unknownPages = (names) => names.filter((n) => !PAGES.includes(n));
 
@@ -93,6 +93,8 @@ async function runStep(page, step, shot, saveDownload) {
     await page.goto(step.goto.startsWith("#") ? `${page.url().split("#")[0]}${step.goto}` : step.goto);
   } else if ("click" in step) {
     await page.locator(step.click).first().click({ timeout });
+  } else if ("hover" in step) {
+    await page.locator(step.hover).first().hover({ timeout });
   } else if ("select" in step) {
     await page.locator(step.select.selector).first().selectOption({ index: step.select.index }, { timeout });
   } else if ("fill" in step) {

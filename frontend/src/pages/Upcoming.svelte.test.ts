@@ -312,6 +312,37 @@ describe("Upcoming booking detail", () => {
   });
 });
 
+describe("Upcoming day-by-day rows", () => {
+  const rowsOf = async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const list = await screen.findByRole("list", { name: /day by day/ });
+    return within(list).getAllByRole("listitem").filter((li) => li.classList.contains("row"));
+  };
+
+  it("gives each row one link, named as before, that carries the stretched hit area over the whole row", async () => {
+    const rows = await rowsOf();
+    expect(rows.map((r) => within(r).getAllByRole("link").map((a) => a.textContent))).toEqual([["JFK → LHR"], ["Harbour Hotel"], ["Check-out: Harbour Hotel"], ["LHR → JFK"]]);
+    for (const row of rows) {
+      expect(row).toHaveClass("row-tap");
+      const link = within(row).getByRole("link");
+      expect(link).toHaveClass("row-tap-link");
+      expect(row.querySelectorAll("a, button, [onclick]")).toHaveLength(1);
+    }
+  });
+
+  it("opens the same booking from the link of a row whose time, logo and subline sit under the stretched area", async () => {
+    const rows = await rowsOf();
+    const row = rows[1];
+    expect(within(row).getByText("Harbour Hotel").closest("a")).toBe(within(row).getByRole("link"));
+    expect(row.querySelector("time")).not.toBeNull();
+    expect(row.querySelector("time")!.closest("a")).toBeNull();
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(within(row).getByRole("link"));
+    expect(await screen.findByRole("dialog", { name: "Harbour Hotel" })).toBeInTheDocument();
+  });
+});
+
 describe("the reads started before the page opened", () => {
   it("uses them instead of asking again", async () => {
     vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? delayed : { trips: [london] }) as never);
