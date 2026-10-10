@@ -341,7 +341,7 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Hotel name"), "Harbour Hotel");
     await u.type(screen.getByLabelText(/^Check-in/), "2026-11-21T15:00");
     await u.type(screen.getByLabelText(/^Check-out/), "2026-11-27T10:00");
-    await u.type(screen.getByLabelText(/^Time zone/), "Europe/London");
+    await u.selectOptions(screen.getByLabelText(/^Time zone/), "Europe/London");
     await u.click(screen.getByLabelText("Sam Doe"));
     await u.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({

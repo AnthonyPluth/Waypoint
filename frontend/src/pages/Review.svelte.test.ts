@@ -159,7 +159,7 @@ describe("Review", () => {
     await userEvent.type(screen.getByLabelText("Check-out"), "2026-11-27T10:00");
     expect(screen.queryByLabelText("Time zone where it starts")).toBeNull();
     expect(screen.queryByLabelText("Time zone where it ends")).toBeNull();
-    await userEvent.type(screen.getByLabelText(/^Time zone/), "Europe/London");
+    await userEvent.selectOptions(screen.getByLabelText(/^Time zone/), "Europe/London");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({
       kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London" })]));
