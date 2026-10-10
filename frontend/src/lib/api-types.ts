@@ -268,6 +268,10 @@ export interface MergeBody {
   merge: number;
 }
 
+export interface MoveBody {
+  trip_id: number | null;
+}
+
 export interface Offline {
   trip: Trip | null;
   messages: OfflineMessages[];
@@ -752,6 +756,7 @@ export interface Endpoints {
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };
   "DELETE /api/segments/{id}": { body: never; reply: Ok };
   "GET /api/segments/{id}/emails": { body: never; reply: SegmentEmails };
+  "POST /api/segments/{id}/move": { body: MoveBody; reply: Trip };
   "GET /api/airports/{id}": { body: never; reply: Airport };
   "POST /api/import/preview": { body: never; reply: ImportPreview };
   "POST /api/import": { body: ImportBody; reply: Imported };

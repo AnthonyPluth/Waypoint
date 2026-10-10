@@ -132,7 +132,7 @@
     <ul class="space-y-3">
       {#each rows as [name, n], i (name)}
         <li>
-          <div class="flex justify-between text-sm"><span>{name}</span><span class="tabular-nums text-muted-foreground">{share(n, whole)}% · {count(n)}</span></div>
+          <div class="flex justify-between gap-3 text-sm"><span class="min-w-0 truncate" title={name}>{name}</span><span class="shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">{share(n, whole)}% · {count(n)}</span></div>
           <div class="mt-1.5 h-2.5 rounded-full bg-muted" aria-hidden="true"><div class="h-2.5 rounded-full {seriesFill[i % seriesFill.length]}" style:width="{share(n, whole)}%"></div></div>
         </li>
       {/each}
@@ -169,7 +169,7 @@
       <h3 class="eyebrow px-1">{title}</h3>
       <dl class="rows">
         {#each items as r (r.label)}
-            <div class="row"><dt class="text-muted-foreground">{r.label}</dt><dd class="text-right font-medium">{r.value}{#if r.detail}<span class="block text-sm font-normal text-muted-foreground">{r.detail}</span>{/if}</dd></div>
+            <div class="row flex-nowrap"><dt class="min-w-0 flex-1 truncate text-muted-foreground" title={r.label}>{r.label}</dt><dd class="max-w-[60%] break-words text-right font-medium">{r.value}{#if r.detail}<span class="block text-sm font-normal text-muted-foreground">{r.detail}</span>{/if}</dd></div>
         {/each}
       </dl>
     </div>

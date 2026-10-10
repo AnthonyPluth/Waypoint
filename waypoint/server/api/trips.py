@@ -8,7 +8,7 @@ from ... import validate
 from ...domain import airports, people, trips
 from ...domain.visibility import Viewer
 from ..common import ApiError, _current, row_id
-from ..contract import (Airport, MergeBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
+from ..contract import (Airport, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
                         TripList)
 
 NAME_LIMIT = 100
@@ -202,6 +202,13 @@ def api_segment_remove(conn, _q, _b, segment_id) -> Ok:
     if not trips.delete_segment(conn, who, row_id(segment_id, NO_SEGMENT)):
         raise ApiError(NO_SEGMENT, 404)
     return {"ok": True}
+
+
+def api_segment_move(conn, _q, body: MoveBody, segment_id) -> Trip:
+    who, this = viewer(conn), row_id(segment_id, NO_SEGMENT)
+    target = body.get("trip_id")
+    into = None if target is None else _id(target, "Choose the trip to move this into")
+    return _trip(_run(lambda: trips.move_segment(conn, who, this, into), NO_SEGMENT))
 
 
 def api_airport(conn, _q, _b, code) -> Airport:

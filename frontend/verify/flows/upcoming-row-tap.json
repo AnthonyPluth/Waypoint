@@ -1,0 +1,60 @@
+{
+  "name": "upcoming-row-tap",
+  "page": "upcoming",
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Upcoming"
+      }
+    },
+    {
+      "wait_for": "ol[aria-label$='day by day'] li.row-tap time"
+    },
+    {
+      "scroll_to": "ol[aria-label$='day by day']"
+    },
+    {
+      "hover": "ol[aria-label$='day by day'] li.row-tap:has-text('Harbour Hotel') >> visible=true"
+    },
+    {
+      "screenshot": "hover"
+    },
+    {
+      "press": {
+        "selector": "ol[aria-label$='day by day'] li.row-tap:has-text('Harbour Hotel') a >> visible=true",
+        "key": "Shift"
+      }
+    },
+    {
+      "screenshot": "focus"
+    },
+    {
+      "click": "ol[aria-label$='day by day'] li.row-tap:has-text('Harbour Hotel') >> visible=true"
+    },
+    {
+      "wait_for": "[data-slot='sheet']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-slot='sheet']",
+        "text": "Harbour Hotel"
+      }
+    },
+    {
+      "screenshot": "opened-from-time"
+    },
+    {
+      "press": {
+        "selector": "[data-slot='sheet']",
+        "key": "Escape"
+      }
+    },
+    {
+      "wait_for": "ol[aria-label$='day by day'] li.row-tap"
+    },
+    {
+      "hover": "h1"
+    }
+  ]
+}

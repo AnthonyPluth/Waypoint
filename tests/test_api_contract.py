@@ -327,6 +327,7 @@ class Replies(DbCase):
                                                         "end_zone": "Europe/London", "start_local": "2026-06-02T15:00",
                                                         "end_local": "2026-06-08T10:00", "trip_id": made["id"]})
         self.check("POST /api/trips/{id}/split", trips_api.api_trip_split(self.c, {}, {"segment_ids": [other["id"]]}, str(made["id"])))
+        self.check("POST /api/segments/{id}/move", trips_api.api_segment_move(self.c, {}, {"trip_id": made["id"]}, str(other["id"])))
         self.check("DELETE /api/segments/{id}", trips_api.api_segment_remove(self.c, {}, {}, str(other["id"])))
         self.check("DELETE /api/trips/{id}", trips_api.api_trip_remove(self.c, {}, {}, str(made["id"])))
         self.check("GET /api/airports/{id}", trips_api.api_airport(self.c, {}, {}, "AKL"))
@@ -401,7 +402,7 @@ class Generated(unittest.TestCase):
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
-                                     "DELETE /api/segments/{id}", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/offline",
+                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
