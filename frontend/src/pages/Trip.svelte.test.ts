@@ -66,6 +66,49 @@ describe("Trip", () => {
     expect(cards[1].querySelector("img")).toBeNull();
   });
 
+  describe("deleting a trip", () => {
+    it("names the trip and how many bookings go with it, and does nothing until confirmed", async () => {
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveTextContent(/Delete .*\?/);
+      expect(dialog).toHaveTextContent("Its 2 bookings are removed too. This can’t be undone.");
+      await u.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(api).not.toHaveBeenCalledWith("/api/trips/1", expect.objectContaining({ method: "DELETE" }));
+    });
+
+    it("says it in the singular for one booking", async () => {
+      held = trip([flight]);
+      render(TripPage);
+      await userEvent.click(await screen.findByRole("button", { name: "Delete trip" }));
+      expect(await screen.findByRole("dialog")).toHaveTextContent("Its 1 booking is removed too.");
+    });
+
+    it("deletes the trip once confirmed and goes back to Trips", async () => {
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "DELETE" }));
+      await waitFor(() => expect(location.hash).toBe("#trips"));
+    });
+
+    it("keeps the dialog open when the delete fails", async () => {
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips/1" && opts?.method === "DELETE") throw new Error("No such trip");
+        return answer(path, opts) as never;
+      });
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "DELETE" }));
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+  });
+
   describe("moving bookings and merging trips", () => {
     const march = trip([segment({ id: 9, start_local: "2026-03-01T10:00", end_local: "2026-03-01T12:00" })], { id: 7, name: "Spring trip" });
 
