@@ -168,7 +168,6 @@
     const into = await apiCall<"POST /api/segments/{id}/move">(`/api/segments/${s.id}/move`, { method: "POST", body: { trip_id: moveTo === "new" ? null : Number(moveTo) } });
     toast.success("Moved");
     if (onchanged) onchanged(into.id); else location.hash = `#trip/${into.id}`;
-    await load();
   });
 
   const remove = (s: Segment) => act(async () => {
@@ -433,7 +432,7 @@
     <label class="flex flex-col gap-1.5 text-foreground"><span class="font-medium">Move it to</span>
       <select bind:value={moveTo} class={pick}>
         <option value="">Choose a trip</option>
-        <option value="new">A new trip of its own</option>
+        {#if (trip?.segments.length ?? 0) > 1}<option value="new">A new trip of its own</option>{/if}
         {#each others as o (o.id)}<option value={String(o.id)}>{o.name} · {dates(o)}</option>{/each}
       </select></label>
   {/snippet}

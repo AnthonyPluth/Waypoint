@@ -84,7 +84,7 @@ export function problem(d: Draft): string | null {
   if (!LOCAL.test(d.end_local)) return d.kind === "hotel" ? "Enter the check-out date and time" : "Enter when it ends";
   const stay = d.kind === "hotel";
   if (stay && !d.start_zone.trim() && !(d.details.address ?? "").trim()) return "Enter the time zone of the stay (for example America/New_York), or its address to work it out from";
-  if (!flight && !stay && !d.start_zone.trim()) return "Enter the time zone of the place (for example America/New_York)";
+  if (d.kind === "cruise" && !d.start_zone.trim()) return "Enter the time zone of the place (for example America/New_York)";
   for (const zone of [d.start_zone.trim(), stay ? "" : d.end_zone.trim()]) {
     if (zone && !knownZone(zone)) return `The time zone “${zone.slice(0, 40)}” isn’t one Waypoint knows (use a name like America/New_York)`;
   }
@@ -126,7 +126,7 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
     kind: d.kind, status: d.status, provider: text(d.provider), confirmation: text(d.confirmation),
     origin: flight ? d.origin.trim().toUpperCase() : text(d.origin), destination: flight ? d.destination.trim().toUpperCase() : text(d.destination),
     start_local: d.start_local, end_local: d.end_local,
-    ...(flight ? { ...(startZone && { start_zone: startZone }), ...(d.end_zone.trim() && { end_zone: d.end_zone.trim() }) }
+    ...(flight || d.kind === "car" || d.kind === "train" ? { ...(startZone && { start_zone: startZone }), ...(d.end_zone.trim() && { end_zone: d.end_zone.trim() }) }
       : d.kind === "hotel" ? { start_zone: startZone || null }
         : { start_zone: startZone, end_zone: endZone }),
     details, manage_url: text(d.manage_url),

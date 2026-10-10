@@ -192,7 +192,7 @@ export function membershipFor(segment: Segment, traveler: Traveler, loyalty: Loy
   const program = programFor(segment);
   if (!program) return null;
   if (segment.kind === "flight") return traveler.person_id === null ? { state: "unmatched" } : null;
-  const booker = segment.kind !== "hotel" || (traveler.person_id !== null && traveler.person_id === segment.booked_by);
+  const booker = (segment.kind !== "hotel" && segment.kind !== "car") || (traveler.person_id !== null && traveler.person_id === segment.booked_by);
   if (traveler.person_id === null) return booker ? { state: "unmatched" } : null;
   const entry = loyalty.find((m) => m.person_id === traveler.person_id && m.program === program);
   return entry ? { state: "found", entry } : booker ? { state: "none", program } : null;

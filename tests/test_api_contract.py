@@ -327,7 +327,7 @@ class Replies(DbCase):
                                                         "end_zone": "Europe/London", "start_local": "2026-06-02T15:00",
                                                         "end_local": "2026-06-08T10:00", "trip_id": made["id"]})
         self.check("POST /api/trips/{id}/split", trips_api.api_trip_split(self.c, {}, {"segment_ids": [other["id"]]}, str(made["id"])))
-        self.check("POST /api/segments/{id}/move", trips_api.api_segment_move(self.c, {}, {"trip_id": None}, str(other["id"])))
+        self.check("POST /api/segments/{id}/move", trips_api.api_segment_move(self.c, {}, {"trip_id": made["id"]}, str(other["id"])))
         self.check("DELETE /api/segments/{id}", trips_api.api_segment_remove(self.c, {}, {}, str(other["id"])))
         self.check("DELETE /api/trips/{id}", trips_api.api_trip_remove(self.c, {}, {}, str(made["id"])))
         self.check("GET /api/airports/{id}", trips_api.api_airport(self.c, {}, {}, "AKL"))
