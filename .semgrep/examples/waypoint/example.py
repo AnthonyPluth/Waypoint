@@ -102,6 +102,11 @@ BRAND_FILE = "https://commons.wikimedia.org/wiki/Special:FilePath/Example.png"
 # ok: waypoint-wikimedia-hosts
 logos.fetch_due(conn, now)
 
+# ruleid: waypoint-mail-image-fetch
+picture = tls.urlopen(request, 5, public_only=True)
+# ok: waypoint-mail-image-fetch
+kept = extract.keep(raw, mailimages.Fetcher())
+
 # ruleid: waypoint-ai-hosts
 URL = "https://openrouter.ai/api/v1/chat/completions"
 # ruleid: waypoint-ai-hosts

@@ -8,6 +8,7 @@
     { "click": "button:has-text('View email') >> visible=true" },
     { "wait_for": "[data-testid='message-subject']" },
     { "expect_text": { "selector": "main", "text": "Your itinerary: flight EX 410" } },
+    { "wait_for": "iframe[data-testid='preview-html'][aria-busy='false']" },
     { "scroll_to": "[data-testid='message-subject']" },
     { "screenshot": "booking-email" }
   ]

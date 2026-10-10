@@ -66,11 +66,114 @@ describe("Trip", () => {
     expect(cards[1].querySelector("img")).toBeNull();
   });
 
+  describe("deleting a trip", () => {
+    it("names the trip and how many bookings go with it, and does nothing until confirmed", async () => {
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveTextContent(/Delete .*\?/);
+      expect(dialog).toHaveTextContent("Its 2 bookings are removed too. This can’t be undone.");
+      await u.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(api).not.toHaveBeenCalledWith("/api/trips/1", expect.objectContaining({ method: "DELETE" }));
+    });
+
+    it("says it in the singular for one booking", async () => {
+      held = trip([flight]);
+      render(TripPage);
+      await userEvent.click(await screen.findByRole("button", { name: "Delete trip" }));
+      expect(await screen.findByRole("dialog")).toHaveTextContent("Its 1 booking is removed too.");
+    });
+
+    it("deletes the trip once confirmed and goes back to Trips", async () => {
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "DELETE" }));
+      await waitFor(() => expect(location.hash).toBe("#trips"));
+    });
+
+    it("keeps the dialog open when the delete fails", async () => {
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips/1" && opts?.method === "DELETE") throw new Error("No such trip");
+        return answer(path, opts) as never;
+      });
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "DELETE" }));
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+  });
+
+  describe("moving bookings and merging trips", () => {
+    const march = trip([segment({ id: 9, start_local: "2026-03-01T10:00", end_local: "2026-03-01T12:00" })], { id: 7, name: "Spring trip" });
+
+    function withOthers() {
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips" && !opts) return { trips: [held, march] } as never;
+        if (path === "/api/trips/1/merge") return { ...held, segments: [...held.segments, ...march.segments] } as never;
+        if (path.endsWith("/move")) return march as never;
+        return answer(path, opts) as never;
+      });
+    }
+
+    it("merges another trip into this one, listing only the others", async () => {
+      withOthers();
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Merge another trip" }));
+      const dialog = await screen.findByRole("dialog");
+      const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
+      await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(2));
+      expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Merge" })).toBeDisabled();
+      await u.selectOptions(choose, "7");
+      await u.click(within(dialog).getByRole("button", { name: "Merge" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1/merge", { method: "POST", body: { merge: 7 } }));
+    });
+
+    it("offers a new trip of its own only when the trip has other bookings", async () => {
+      held = trip([flight]);
+      withOthers();
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: /^Move / }));
+      const choose = within(await screen.findByRole("dialog")).getByRole("combobox", { name: "Move it to" });
+      await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
+      expect(within(choose).queryByRole("option", { name: "A new trip of its own" })).toBeNull();
+    });
+
+    it("moves a booking into another trip, or into a new one of its own", async () => {
+      withOthers();
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      let dialog = await screen.findByRole("dialog");
+      const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
+      expect(within(dialog).getByRole("button", { name: "Move" })).toBeDisabled();
+      await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
+      await u.selectOptions(choose, "7");
+      await u.click(within(dialog).getByRole("button", { name: "Move" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2/move", { method: "POST", body: { trip_id: 7 } }));
+      expect(location.hash).toBe("#trip/7");
+      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      dialog = await screen.findByRole("dialog");
+      await u.selectOptions(within(dialog).getByRole("combobox", { name: "Move it to" }), "new");
+      await u.click(within(dialog).getByRole("button", { name: "Move" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2/move", { method: "POST", body: { trip_id: null } }));
+    });
+  });
+
   it("opens the email a booking was made from, in place, and closes it again", async () => {
     held = trip([segment({ ...flight, has_email: true }), stay]);
     const answer = vi.mocked(api).getMockImplementation()!;
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1/emails" ? { emails: [
-      { subject: "Your itinerary: EX 410", sender_domain: "example-air.example", received: "2026-10-17", text: "Gate B12", html: "<p>Gate <b>B12</b></p>", truncated: false }] }
+      { subject: "Your itinerary: EX 410", sender_domain: "example-air.example", received: "2026-10-17", text: "Gate B12", html: "<p>Gate <b>B12</b></p>", truncated: false, original: true, images: 0 }] }
       : answer(path, opts)) as never);
     render(TripPage);
     await screen.findByRole("list", { name: "Bookings" });
@@ -79,7 +182,7 @@ describe("Trip", () => {
     const region = await screen.findByRole("region", { name: /The email for/ });
     expect(await within(region).findByTestId("message-subject")).toHaveTextContent("Your itinerary: EX 410");
     expect(region).toHaveTextContent("example-air.example · sent 2026-10-17");
-    expect(within(region).getByTestId("preview-html").querySelector("b")).toHaveTextContent("B12");
+    expect(within(region).getByTestId("preview-html").getAttribute("srcdoc")).toContain("<b>B12</b>");
     expect(vi.mocked(api)).toHaveBeenCalledWith("/api/segments/1/emails");
     await userEvent.click(screen.getByRole("button", { name: /Hide the email for/ }));
     expect(screen.queryByRole("region", { name: /The email for/ })).toBeNull();
@@ -341,7 +444,7 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Hotel name"), "Harbour Hotel");
     await u.type(screen.getByLabelText(/^Check-in/), "2026-11-21T15:00");
     await u.type(screen.getByLabelText(/^Check-out/), "2026-11-27T10:00");
-    await u.type(screen.getByLabelText(/^Time zone/), "Europe/London");
+    await u.selectOptions(screen.getByLabelText(/^Time zone/), "Europe/London");
     await u.click(screen.getByLabelText("Sam Doe"));
     await u.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({
@@ -538,6 +641,44 @@ describe("Trip", () => {
       await u.click(screen.getByRole("button", { name: "Save" }));
       const post = vi.mocked(api).mock.calls.find(([path, o]) => path === "/api/segments/2" && o?.method === "POST")!;
       expect((post[1] as { body: { details: Record<string, string> } }).body.details.address).toBe("7 Mill Lane\nLondon N1 1AA");
+    });
+  });
+
+  describe("View email on the row of action buttons", () => {
+    const emailed = { emails: [{ subject: "Your stay", sender_domain: "example-hotel.example", received: "2026-11-01", text: "Check in at 3", html: null, truncated: false }] };
+
+    it("puts View email in the same row as Directions and Call, after them", async () => {
+      held = trip([{ ...stay, has_email: true }]);
+      render(TripPage);
+      const group = await screen.findByRole("group", { name: /Actions for Harbour Hotel/ });
+      expect(group).toHaveClass("flex", "flex-wrap");
+      expect(Array.from(group.querySelectorAll("a, button"), (el) => el.textContent?.trim())).toEqual(["Directions", "Call", "View email"]);
+      expect(within(group).getByRole("button", { name: "View the email for Harbour Hotel" })).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("renders View email on its own when the booking has no action links", async () => {
+      held = trip([{ ...stay, has_email: true, links: { app: null, directions: null, call: null } }]);
+      render(TripPage);
+      const button = await screen.findByRole("button", { name: "View the email for Harbour Hotel" });
+      expect(button).toHaveTextContent("View email");
+      expect(button).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("link", { name: "Directions" })).toBeNull();
+    });
+
+    it("opens the email below the whole row of buttons, and the buttons stay where they are", async () => {
+      held = trip([{ ...stay, has_email: true }]);
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/2/emails" ? emailed : answer(path, opts)) as never);
+      render(TripPage);
+      const group = await screen.findByRole("group", { name: /Actions for Harbour Hotel/ });
+      await userEvent.click(within(group).getByRole("button", { name: "View the email for Harbour Hotel" }));
+      const region = await screen.findByRole("region", { name: "The email for Harbour Hotel" });
+      expect(group.contains(region)).toBe(false);
+      expect(group.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(region).getByTestId("message-subject")).toHaveTextContent("Your stay");
+      expect(within(group).getByRole("link", { name: "Directions" })).toHaveAttribute("href", stay.links.directions!);
+      expect(within(group).getByRole("link", { name: "Call" })).toHaveAttribute("href", stay.links.call!);
+      expect(within(group).getByRole("button", { name: "Hide the email for Harbour Hotel" })).toHaveAttribute("aria-expanded", "true");
     });
   });
 

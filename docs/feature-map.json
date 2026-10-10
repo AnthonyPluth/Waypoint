@@ -205,6 +205,7 @@
       "handler": "waypoint/server/api/trips.py:api_trips",
       "web": [
         "frontend/src/lib/early.ts",
+        "frontend/src/pages/Trip.svelte",
         "frontend/src/pages/Trips.svelte",
         "frontend/src/pages/Upcoming.svelte"
       ],
@@ -276,7 +277,9 @@
       "method": "DELETE",
       "path": "/api/trips/{id}",
       "handler": "waypoint/server/api/trips.py:api_trip_remove",
-      "web": [],
+      "web": [
+        "frontend/src/pages/Trip.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp.py",
@@ -292,7 +295,9 @@
       "method": "POST",
       "path": "/api/trips/{id}/merge",
       "handler": "waypoint/server/api/trips.py:api_trip_merge",
-      "web": [],
+      "web": [
+        "frontend/src/pages/Trip.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -347,6 +352,7 @@
         "tests/test_logos.py",
         "tests/test_mail_scan.py",
         "tests/test_mcp.py",
+        "tests/test_offline.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -383,6 +389,20 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/segments/{id}/emails/{id}/images/{id}",
+      "handler": "waypoint/server/api/trips.py:api_segment_email_image",
+      "web": [],
+      "tests": [
+        "tests/test_mail_scan.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/segments/{id}",
       "handler": "waypoint/server/api/trips.py:api_segment_edit",
@@ -392,6 +412,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_logos.py",
+        "tests/test_mail_scan.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_offline.py",
@@ -411,8 +432,24 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_logos.py",
+        "tests/test_mail_scan.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/segments/{id}/move",
+      "handler": "waypoint/server/api/trips.py:api_segment_move",
+      "web": [
+        "frontend/src/pages/Trip.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -948,6 +985,19 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/review/{id}/images/{id}",
+      "handler": "waypoint/server/api/review.py:api_review_image",
+      "web": [],
+      "tests": [
+        "tests/test_mail_scan.py",
+        "tests/test_mcp_routes.py"
       ],
       "docs": [
         "start/review"

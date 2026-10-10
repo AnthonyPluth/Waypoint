@@ -292,11 +292,20 @@ def decode_locked(raw: str | None) -> list[str]:
     return [f for f in found if isinstance(f, str)] if isinstance(found, list) else []
 
 
-def _place_zone(conn: db.Connection, kind: str, code: str | None, given: str | None, label: str) -> str:
+AIRPORT_KINDS = ("flight", "car", "train")
+
+
+def _airport(conn: db.Connection, code: str | None) -> airports.Found | None:
+    return airports.lookup(conn, code) if code and IATA.fullmatch(code.strip()) else None
+
+
+def _place_zone(conn: db.Connection, kind: str, code: str | None, given: str | None, label: str, address: str | None = None) -> str:
     if given:
         return _zone(given, label)
-    known = airports.lookup(conn, code) if kind == "flight" and code else None
-    return _zone(known["zone"] if known else None, label)
+    known = _airport(conn, code) if kind in AIRPORT_KINDS else None
+    if known:
+        return _zone(known["zone"], label)
+    return _zone(place_zones.zone_for_address(conn, address) if kind == "car" else None, label)
 
 
 def _stay_zone(conn: db.Connection, fields: SegmentIn) -> str:
@@ -324,8 +333,9 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
     if kind == "hotel":
         start_zone = end_zone = _stay_zone(conn, fields)
     else:
-        start_zone = _place_zone(conn, kind, origin, fields.get("start_zone"), "start")
-        end_zone = _place_zone(conn, kind, destination, fields.get("end_zone"), "end")
+        address = (fields.get("details") or {}).get("address")
+        start_zone = _place_zone(conn, kind, origin, fields.get("start_zone"), "start", address)
+        end_zone = _place_zone(conn, kind, destination, fields.get("end_zone") or (start_zone if kind in ("car", "train") and not _airport(conn, destination) else None), "end")
     start, end = _local(fields.get("start_local"), "start"), _local(fields.get("end_local"), "end")
     if instant(end, end_zone) < instant(start, start_zone):
         raise Invalid("This ends before it starts (times are compared at their own places’ zones)")
@@ -831,6 +841,11 @@ def emails_of(conn: db.Connection, viewer: Viewer, segment_id: int) -> list[stor
     return None if seg is None else stored_mail.for_segment(conn, seg.id)
 
 
+def email_image_of(conn: db.Connection, viewer: Viewer, segment_id: int, email: int, index: int) -> stored_mail.Image | None:
+    seg = visibility.visible_segment(conn, viewer, segment_id)
+    return None if seg is None else stored_mail.image_for_segment(conn, seg.id, email, index)
+
+
 def delete_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> bool:
     seg = visibility.visible_segment(conn, viewer, segment_id)
     if seg is None:
@@ -932,6 +947,47 @@ def split(conn: db.Connection, viewer: Viewer, trip_id: int, segment_ids: Sequen
     refresh(conn, trip)
     refresh(conn, new)
     return _trip_outs(conn, viewer, [new])[0]
+
+
+def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: int | None) -> TripOut | None:
+    seg = visibility.visible_segment(conn, viewer, segment_id)
+    if seg is None:
+        return None
+    if trip_id == seg.trip_id:
+        raise Invalid("It’s already in that trip")
+    source = conn.orm.get(Trip, seg.trip_id)
+    target: Trip | None
+    if trip_id is None:
+        if conn.orm.scalars(select(Segment.id).where(Segment.trip_id == seg.trip_id, Segment.id != seg.id)).first() is None:
+            raise Invalid("It’s already in a trip of its own")
+        place = _headline(conn, {"kind": seg.kind, "origin": seg.origin, "destination": seg.destination})
+        target = Trip(name=_name_for(place, seg.start_local), destination=place, auto=True, booked_by=viewer.person_id)
+        conn.orm.add(target)
+        conn.orm.flush()
+    else:
+        target = visibility.visible_trip(conn, viewer, trip_id)
+        if target is None:
+            return None
+        if not viewer.household:
+            _, who = _involved(conn, [seg.trip_id, target.id])
+            moving = {t.person_id for t in conn.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id)).all()
+                      if t.person_id is not None} | ({seg.booked_by} if seg.booked_by is not None else set())
+            there = who[target.id] | ({target.booked_by} if target.booked_by is not None else set())
+            if moving != there:
+                raise Invalid("That trip involves different people, and moving this there would show it to people who aren’t "
+                              "on it, or show them that trip. Add the missing travellers to the booking first.")
+        target.auto = False
+    conn.execute(update(Segment).where(Segment.id == seg.id).values(trip_id=target.id))
+    conn.orm.flush()
+    conn.orm.expire_all()
+    refresh(conn, target)
+    left = conn.orm.scalars(select(Segment.id).where(Segment.trip_id == source.id)).first() if source else None
+    if source is not None:
+        if left is None:
+            conn.execute(delete(Trip).where(Trip.id == source.id))
+        else:
+            refresh(conn, source)
+    return _trip_outs(conn, viewer, [conn.orm.get(Trip, target.id) or target])[0]
 
 
 def unmatched(conn: db.Connection, viewer: Viewer) -> list[tuple[SegmentTraveler, SegmentOut]]:

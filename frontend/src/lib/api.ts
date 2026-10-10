@@ -60,3 +60,18 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   }
   return data as T;
 }
+
+const NO_PICTURE = "That picture can’t be shown.";
+
+export async function apiImage(path: string): Promise<string> {
+  const res = await fetch(path);
+  if (res.status === 401 || res.status === 403) await denied();
+  if (!res.ok) throw new ApiError(NO_PICTURE, res.status);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new ApiError(NO_PICTURE, 0));
+    reader.readAsDataURL(blob);
+  });
+}

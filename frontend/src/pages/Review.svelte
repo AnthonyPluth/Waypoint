@@ -26,6 +26,7 @@
   import { Button, buttonVariants } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import MessageView from "$lib/components/MessageView.svelte";
+  import ZoneSelect from "$lib/components/ZoneSelect.svelte";
   import { Input } from "$lib/components/ui/input";
   import { Sheet } from "$lib/components/ui/sheet";
   import { viewport } from "$lib/phone.svelte";
@@ -72,14 +73,14 @@
     formError = "";
     void peek(item);
   };
-  type Peek = { state: "loading" } | { state: "ready"; subject: string | null; text: string; html: string | null; truncated: boolean } | { state: "error"; message: string };
+  type Peek = { state: "loading" } | { state: "ready"; subject: string | null; text: string; html: string | null; truncated: boolean; original: boolean; images: number } | { state: "error"; message: string };
   let peeks = $state<Record<number, Peek>>({});
   async function peek(item: ReviewItem) {
     if (peeks[item.id] && peeks[item.id]?.state !== "error") return;
     peeks[item.id] = { state: "loading" };
     try {
       const r = await apiCall<"GET /api/review/{id}/preview">(`/api/review/${item.id}/preview`);
-      peeks[item.id] = { state: "ready", subject: r.subject ?? null, text: r.text, html: r.html ?? null, truncated: r.truncated };
+      peeks[item.id] = { state: "ready", subject: r.subject ?? null, text: r.text, html: r.html ?? null, truncated: r.truncated, original: r.original, images: r.images };
     } catch (err) { peeks[item.id] = { state: "error", message: errMsg(err) }; }
   }
 
@@ -120,7 +121,7 @@
     const flight = d.kind === "flight";
     if (d.kind === "hotel" && !d.startZone.trim() && !d.address.trim()) { formError = "Enter the hotel’s time zone (for example America/New_York), or its address to work it out from"; return; }
     const body = { kind: d.kind as "flight" | "hotel" | "car" | "train" | "cruise", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
-      destination: d.destination, ...(flight ? {} : d.kind === "hotel" ? { start_zone: d.startZone.trim() || null, ...(d.address.trim() && { details: { address: d.address.trim() } }) } : { start_zone: d.startZone, end_zone: d.endZone || d.startZone }) };
+      destination: d.destination, ...(flight ? {} : d.kind === "hotel" ? { start_zone: d.startZone.trim() || null, ...(d.address.trim() && { details: { address: d.address.trim() } }) } : d.kind === "cruise" ? { start_zone: d.startZone, end_zone: d.endZone || d.startZone } : { ...(d.startZone && { start_zone: d.startZone }), ...(d.endZone && { end_zone: d.endZone }) }) };
     let added = false;
     const ok = await act(async () => {
       const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
@@ -206,13 +207,13 @@
         <Input bind:value={d.address} maxlength={300} autocomplete="off" />
         <span class="text-muted-foreground">Waypoint works the time zone out from it when you leave the time zone empty.</span></label>
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>
-        <Input bind:value={d.startZone} maxlength={64} autocomplete="off" spellcheck={false} placeholder="America/New_York" />
+        <ZoneSelect bind:value={d.startZone} blank="Work it out from the address" />
         <span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address above.</span></label>
     {:else if d.kind !== "flight"}
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it starts</span>
-        <Input bind:value={d.startZone} required maxlength={64} autocomplete="off" spellcheck={false} placeholder="America/New_York" /></label>
+        <ZoneSelect bind:value={d.startZone} blank={d.kind === "cruise" ? "Choose a time zone" : "Work it out from the airport"} required={d.kind === "cruise"} /></label>
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it ends</span>
-        <Input bind:value={d.endZone} maxlength={64} autocomplete="off" spellcheck={false} placeholder="Same as where it starts" /></label>
+        <ZoneSelect bind:value={d.endZone} blank="Same as where it starts" /></label>
     {:else}
       <p class="text-sm text-muted-foreground">A flight’s time zones come from its airports.</p>
     {/if}
@@ -230,7 +231,7 @@
     {#if p.state === "loading"}<p class="text-sm text-muted-foreground" role="status">Fetching the message from Gmail…</p>
     {:else if p.state === "error"}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{p.message}</p>
     {:else}
-      <MessageView subject={p.subject} text={p.text} html={p.html} truncated={p.truncated} />
+      <MessageView subject={p.subject} text={p.text} html={p.html} truncated={p.truncated} original={p.original} images={p.images} imagesAt={`/api/review/${item.id}/images/`} />
     {/if}
   </div>
 {/snippet}

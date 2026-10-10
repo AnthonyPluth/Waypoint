@@ -841,6 +841,56 @@
         }
       }
     },
+    "/api/segments/{id}/move": {
+      "post": {
+        "operationId": "api_segment_move",
+        "x-handler": "waypoint/server/api/trips.py:api_segment_move",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trip"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/airports/{id}": {
       "get": {
         "operationId": "api_airport",
@@ -3427,6 +3477,21 @@
         ],
         "additionalProperties": false
       },
+      "MoveBody": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "trip_id"
+        ],
+        "additionalProperties": false
+      },
       "Offline": {
         "type": "object",
         "properties": {
@@ -3647,13 +3712,21 @@
           },
           "truncated": {
             "type": "boolean"
+          },
+          "original": {
+            "type": "boolean"
+          },
+          "images": {
+            "type": "integer"
           }
         },
         "required": [
           "subject",
           "text",
           "html",
-          "truncated"
+          "truncated",
+          "original",
+          "images"
         ],
         "additionalProperties": false
       },
@@ -5292,6 +5365,12 @@
           },
           "truncated": {
             "type": "boolean"
+          },
+          "original": {
+            "type": "boolean"
+          },
+          "images": {
+            "type": "integer"
           }
         },
         "required": [
@@ -5300,7 +5379,9 @@
           "received",
           "text",
           "html",
-          "truncated"
+          "truncated",
+          "original",
+          "images"
         ],
         "additionalProperties": false
       },

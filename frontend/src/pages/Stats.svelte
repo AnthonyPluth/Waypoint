@@ -169,7 +169,7 @@
       <h3 class="eyebrow px-1">{title}</h3>
       <dl class="rows">
         {#each items as r (r.label)}
-            <div class="row flex-nowrap"><dt class="min-w-0 truncate text-muted-foreground" title={r.label}>{r.label}</dt><dd class="max-w-[60%] shrink-0 text-right font-medium">{r.value}{#if r.detail}<span class="block text-sm font-normal text-muted-foreground">{r.detail}</span>{/if}</dd></div>
+            <div class="row flex-nowrap"><dt class="min-w-0 flex-1 truncate text-muted-foreground" title={r.label}>{r.label}</dt><dd class="max-w-[60%] shrink-0 break-words text-right font-medium">{r.value}{#if r.detail}<span class="block text-sm font-normal text-muted-foreground">{r.detail}</span>{/if}</dd></div>
         {/each}
       </dl>
     </div>

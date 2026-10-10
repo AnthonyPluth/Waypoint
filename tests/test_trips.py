@@ -481,6 +481,86 @@ class StayZoneTests(Household):
         self.assertEqual((renamed["start_zone"], renamed["end_zone"]), ("America/Denver", "America/Denver"))
 
 
+LATER = {**OUT, "start_local": "2026-09-10T19:00", "end_local": "2026-09-11T07:10"}
+
+
+class MoveTests(Household):
+    def two(self, later_for=None):
+        a = self.add(self.jane, OUT, None, self.on(self.jane.person_id))
+        b = self.add(self.jane, LATER, None, self.on(*(later_for or [self.jane.person_id])))
+        self.assertNotEqual(a["trip_id"], b["trip_id"])
+        return a, b
+
+    def test_a_booking_moves_into_another_trip_and_both_trips_follow(self):
+        a, b = self.two()
+        moved = trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        self.assertEqual((moved["id"], sorted(s["id"] for s in moved["segments"])), (b["trip_id"], sorted([a["id"], b["id"]])))
+        self.assertEqual((moved["start_date"], moved["end_date"]), ("2026-06-01", "2026-09-11"))
+        self.assertIsNone(trips.get(self.c, self.jane, a["trip_id"]))
+
+    def test_a_booking_moves_out_to_a_new_trip_of_its_own(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jane.person_id))
+        b = self.add(self.jane, BACK, a["trip_id"], self.on(self.jane.person_id))
+        moved = trips.move_segment(self.c, self.jane, b["id"], None)
+        self.assertNotEqual(moved["id"], a["trip_id"])
+        self.assertEqual([s["id"] for s in moved["segments"]], [b["id"]])
+        left = trips.get(self.c, self.jane, a["trip_id"])
+        self.assertEqual([s["id"] for s in left["segments"]], [a["id"]])
+        self.assertEqual((left["start_date"], left["end_date"]), ("2026-06-01", "2026-06-02"))
+
+    def test_a_booking_alone_in_its_trip_can_not_move_to_a_new_trip_of_its_own(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jane.person_id))
+        with self.assertRaisesRegex(trips.Invalid, "already in a trip of its own"):
+            trips.move_segment(self.c, self.jane, a["id"], None)
+        self.assertIsNotNone(trips.get(self.c, self.jane, a["trip_id"]))
+
+    def test_it_can_not_move_into_the_trip_it_is_in_or_one_you_cannot_see(self):
+        a, _ = self.two()
+        with self.assertRaisesRegex(trips.Invalid, "already in that trip"):
+            trips.move_segment(self.c, self.jane, a["id"], a["trip_id"])
+        c = self.add(self.sam, LATER, None, self.on(self.sam.person_id))
+        self.assertIsNone(trips.move_segment(self.c, self.jane, a["id"], c["trip_id"]))
+        self.assertIsNone(trips.move_segment(self.c, self.sam, a["id"], None))
+        self.assertIsNone(trips.move_segment(self.c, self.jane, 9999, None))
+
+    def test_a_member_can_not_move_a_booking_between_trips_of_different_people_but_the_household_can(self):
+        a, b = self.two(later_for=[self.jane.person_id, self.sam.person_id])
+        with self.assertRaisesRegex(trips.Invalid, "different people"):
+            trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        moved = trips.move_segment(self.c, Viewer(None, household=True), a["id"], b["trip_id"])
+        self.assertEqual(len(moved["segments"]), 2)
+
+
+class RentalZoneTests(Household):
+    RENTAL = {"kind": "car", "provider": "Example Rental", "origin": "JFK", "destination": "LHR", "start_local": "2026-06-01T19:00",
+              "end_local": "2026-06-08T07:10", "start_zone": None, "end_zone": None}
+
+    def rent(self, **extra):
+        return self.add(self.jane, {**self.RENTAL, **extra}, None, self.on(self.jane.person_id))
+
+    def test_a_rental_at_airports_takes_each_airports_zone(self):
+        seg = self.rent()
+        self.assertEqual((seg["start_zone"], seg["end_zone"]), ("America/New_York", "Europe/London"))
+
+    def test_a_rental_with_an_address_and_no_drop_off_place_takes_the_addresss_zone_for_both(self):
+        seg = self.rent(origin="Example Rental", destination=None, details={"address": "1 Ocean Ave, Honolulu, HI 96815"})
+        self.assertEqual((seg["start_zone"], seg["end_zone"]), ("Pacific/Honolulu", "Pacific/Honolulu"))
+
+    def test_a_given_zone_wins_over_the_airport_and_the_end_follows_the_start_without_an_airport(self):
+        seg = self.rent(start_zone="America/Denver", destination="Example Rental downtown")
+        self.assertEqual((seg["start_zone"], seg["end_zone"]), ("America/Denver", "America/Denver"))
+
+    def test_a_rental_that_nothing_settles_is_refused_and_says_what_to_do(self):
+        with self.assertRaisesRegex(trips.Invalid, "start time zone"):
+            self.rent(origin="Example Rental", destination=None)
+        with self.assertRaisesRegex(trips.Invalid, "isn’t one"):
+            self.rent(start_zone="Mars/Olympus")
+
+    def test_a_cruise_still_needs_its_zone(self):
+        with self.assertRaisesRegex(trips.Invalid, "start time zone"):
+            self.add(self.jane, {**self.RENTAL, "kind": "cruise", "origin": "JFK"}, None, self.on(self.jane.person_id))
+
+
 class CruiseTests(Household):
     def test_a_cruise_keeps_its_ports_in_order_with_their_own_zones(self):
         seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS})
@@ -821,8 +901,8 @@ class VisibilityRouteTests(RouteCase):
                  ("POST", f"/api/trips/{trip}/split", {"segment_ids": segs[:1]}),
                  ("POST", "/api/segments", {**HOTEL, "trip_id": trip})]
         for s in segs:
-            calls += [("GET", f"/api/segments/{s}", None), ("GET", f"/api/segments/{s}/logo", None), ("GET", f"/api/segments/{s}/emails", None),
-                      ("POST", f"/api/segments/{s}", {"status": "cancelled"}),
+            calls += [("GET", f"/api/segments/{s}", None), ("GET", f"/api/segments/{s}/logo", None), ("GET", f"/api/segments/{s}/emails", None), ("GET", f"/api/segments/{s}/emails/0/images/0", None),
+                      ("POST", f"/api/segments/{s}", {"status": "cancelled"}), ("POST", f"/api/segments/{s}/move", {"trip_id": None}),
                       ("DELETE", f"/api/segments/{s}", None)]
         gone = [(m, p.replace(str(trip), "99999").replace(str(segs[0]), "99998").replace(str(segs[1]), "99997"), b) for m, p, b in calls[:3]]
         for who in ("ben",):
@@ -830,7 +910,7 @@ class VisibilityRouteTests(RouteCase):
                 with self.subTest(who=who, call=f"{method} {path}"):
                     status, got = self.call(who, method, path, body)
                     self.assertEqual((status, got), (404, {"error": got["error"]}))
-                    self.assertIn(got["error"], ("No such trip", "No such segment"))
+                    self.assertIn(got["error"], ("No such trip", "No such segment", "No such image"))
         for method, path, body in gone:
             self.assertEqual(self.call("ben", method, path, body)[0], 404)
         self.assertEqual(self.ok("ben", "GET", "/api/trips")["trips"], [])
@@ -844,7 +924,8 @@ class VisibilityRouteTests(RouteCase):
         covered = {("GET", "/api/trips/{id}"), ("POST", "/api/trips/{id}"), ("DELETE", "/api/trips/{id}"),
                    ("POST", "/api/trips/{id}/merge"), ("POST", "/api/trips/{id}/split"), ("POST", "/api/segments"),
                    ("GET", "/api/segments/{id}"), ("POST", "/api/segments/{id}"), ("DELETE", "/api/segments/{id}"),
-                   ("GET", "/api/segments/{id}/logo"), ("GET", "/api/segments/{id}/emails")}
+                   ("GET", "/api/segments/{id}/logo"), ("GET", "/api/segments/{id}/emails"),
+                   ("GET", "/api/segments/{id}/emails/{id}/images/{id}"), ("POST", "/api/segments/{id}/move")}
         found = {(m, p) for m, p, _ in ROUTES if p.startswith(("/api/trips/", "/api/segments"))}
         self.assertEqual(found, covered, "a new route that takes a trip or segment goes in the stranger's 404 test")
 
@@ -939,6 +1020,19 @@ class SegmentRouteTests(RouteCase):
         named = self.book("ana", HOTEL, trip_id=into["id"])
         grouped = self.book("ana", HOTEL)
         self.assertEqual((named["trip_id"], grouped["trip_id"]), (into["id"], out["trip_id"]))
+
+    def test_a_segment_moves_to_another_trip_or_a_new_one_over_the_api(self):
+        out = self.book("ana")
+        stay = self.book("ana", HOTEL, trip_id=out["trip_id"])
+        alone = self.ok("ana", "POST", f"/api/segments/{stay['id']}/move", {"trip_id": None})
+        self.assertEqual([s["id"] for s in alone["segments"]], [stay["id"]])
+        self.assertNotEqual(alone["id"], out["trip_id"])
+        moved = self.ok("ana", "POST", f"/api/segments/{stay['id']}/move", {"trip_id": out["trip_id"]})
+        self.assertEqual((moved["id"], sorted(s["id"] for s in moved["segments"])), (out["trip_id"], sorted([out["id"], stay["id"]])))
+        for body, status in (({"trip_id": "abc"}, 400), ({"trip_id": 99999}, 404), ({"trip_id": out["trip_id"]}, 400)):
+            with self.subTest(body=body):
+                self.assertEqual(self.call("ana", "POST", f"/api/segments/{stay['id']}/move", body)[0], status)
+        self.assertEqual(self.call("ana", "POST", "/api/segments/99999/move", {"trip_id": None})[0], 404)
 
     def test_what_cannot_be_sent_says_so(self):
         for body, why in [({**OUT, "kind": 5}, "as text"), ({**OUT, "kind": "boat"}, "Choose what"),

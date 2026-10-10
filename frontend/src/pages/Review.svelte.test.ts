@@ -159,7 +159,7 @@ describe("Review", () => {
     await userEvent.type(screen.getByLabelText("Check-out"), "2026-11-27T10:00");
     expect(screen.queryByLabelText("Time zone where it starts")).toBeNull();
     expect(screen.queryByLabelText("Time zone where it ends")).toBeNull();
-    await userEvent.type(screen.getByLabelText(/^Time zone/), "Europe/London");
+    await userEvent.selectOptions(screen.getByLabelText(/^Time zone/), "Europe/London");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({
       kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London" })]));
@@ -412,8 +412,8 @@ describe("Review: the message beside the form", () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     const formatted = await screen.findByTestId("preview-html");
-    expect(formatted.querySelector("b")).toHaveTextContent("B12");
-    expect(formatted.querySelector("td")).toHaveTextContent("Seat");
+    expect(formatted.getAttribute("srcdoc")).toContain("<b>B12</b>");
+    expect(formatted.getAttribute("srcdoc")).toContain("<td>Seat</td>");
     await userEvent.click(screen.getByRole("button", { name: "Show as plain text" }));
     expect(screen.queryByTestId("preview-html")).toBeNull();
     expect(screen.getByTestId("preview")).toHaveTextContent("Gate B12");
@@ -433,7 +433,7 @@ describe("Review: the message beside the form", () => {
     truncated = true;
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
-    expect(await screen.findByText(/Cut short here/)).toBeInTheDocument();
+    expect(await screen.findByText(/cut short/)).toBeInTheDocument();
   });
 
   it("says why it couldn’t be fetched, and tries again when asked again", async () => {

@@ -24,7 +24,10 @@ describe("the segment form's messages", () => {
     expect(problem(flight({ end_local: "" }))).toBe("Enter when it ends");
   });
   it("needs a time zone for anything but a flight, and one that exists", () => {
-    expect(problem(car({ start_zone: "" }))).toBe("Enter the time zone of the place (for example America/New_York)");
+    expect(problem({ ...car({ start_zone: "" }), kind: "cruise" })).toBe("Enter the time zone of the place (for example America/New_York)");
+    expect(problem(car({ start_zone: "" }))).toBeNull();
+    expect(body(car({ start_zone: "", end_zone: "" }))).not.toHaveProperty("start_zone");
+    expect(body(car({ start_zone: "Europe/London" }))).toMatchObject({ start_zone: "Europe/London" });
     expect(problem(hotel({ start_zone: "Mars/Olympus" }))).toBe("The time zone “Mars/Olympus” isn’t one Waypoint knows (use a name like America/New_York)");
     expect(problem(flight({ end_zone: "Nowhere" }))).toMatch(/isn’t one Waypoint knows/);
   });
@@ -56,7 +59,8 @@ describe("the request the form makes", () => {
     expect(body(hotel())).toMatchObject({ start_zone: "Europe/London", origin: "Harbour Hotel" });
     expect(body(hotel())).not.toHaveProperty("end_zone");
     expect(body(hotel({ end_zone: "Europe/Paris" }))).not.toHaveProperty("end_zone");
-    expect(body(car())).toMatchObject({ start_zone: "Europe/London", end_zone: "Europe/London" });
+    expect(body(car())).toMatchObject({ start_zone: "Europe/London" });
+    expect(body(car())).not.toHaveProperty("end_zone");
     expect(body(car({ end_zone: "Europe/Paris" }))).toMatchObject({ end_zone: "Europe/Paris" });
   });
   it("lets a stay leave its zone empty when it has an address to work it out from", () => {

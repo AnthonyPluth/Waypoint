@@ -193,9 +193,18 @@ describe("loyalty on a booking", () => {
   });
   it("finds a car renter's number for the rental brand, or says they have none", () => {
     const hertz = membership({ program: "Hertz Gold Plus Rewards" });
-    const rental = segment({ kind: "car", provider: "Hertz" });
+    const rental = segment({ kind: "car", provider: "Hertz", booked_by: 1 });
     expect(membershipFor(rental, jane, [hertz])).toEqual({ state: "found", entry: hertz });
     expect(membershipFor(rental, jane, [])).toEqual({ state: "none", program: "Hertz Gold Plus Rewards" });
+  });
+  it("asks a car renter's party for a number only of whoever booked, and shows one anyone has", () => {
+    const hertz = membership({ program: "Hertz Gold Plus Rewards" });
+    const rental = segment({ kind: "car", provider: "Hertz", booked_by: 1 });
+    const sam = { id: 2, person_id: 2, name: "Sam Doe", seat: null };
+    expect(membershipFor(rental, sam, [])).toBeNull();
+    expect(membershipFor(rental, { id: 3, person_id: null, name: "DOE/MIA MISS", seat: null }, [])).toBeNull();
+    const hers = membership({ id: 12, person_id: 2, program: "Hertz Gold Plus Rewards" });
+    expect(membershipFor(rental, sam, [hertz, hers])).toEqual({ state: "found", entry: hers });
   });
   it("asks a hotel guest for a number only if they booked the room, and shows one anyone has", () => {
     const sam = { id: 2, person_id: 2, name: "Sam Doe", seat: null };
