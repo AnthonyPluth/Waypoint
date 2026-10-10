@@ -208,6 +208,7 @@ export interface LoyaltyEntry {
   readable: boolean;
   expiry: string | null;
   notes: string | null;
+  logo: string | null;
 }
 
 export interface LoyaltyList {

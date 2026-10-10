@@ -4,13 +4,13 @@ from unittest import mock
 from sqlalchemy import select
 
 from waypoint import oidc
-from waypoint.domain import demo, loyalty, people
+from waypoint.domain import demo, logos, loyalty, people
 from waypoint.server.api import loyalty as api
 from waypoint.server.common import ApiError
 from waypoint.storage import db, secretbox
-from waypoint.storage.models import LoyaltyId
+from waypoint.storage.models import BrandLogo, LoyaltyId
 from tests.privacy import no_leaks
-from tests.shared import DbCase, ServerCase
+from tests.shared import DbCase, ServerCase, fetch
 
 CANARY = "CANARY-AAD-4417029X"
 
@@ -144,6 +144,32 @@ class PrivacyTests(DbCase):
         self.assertNotIn(CANARY, str(replies))
 
 
+PNG = b"\x89PNG\r\n\x1a\n" + b"made-up image bytes"
+
+
+class LogoBrandTests(DbCase):
+    def test_every_airline_program_but_other_maps_to_a_brand(self):
+        for program in loyalty.PROGRAMS["airline"]:
+            with self.subTest(program=program):
+                brand = loyalty.logo_brand("airline", program)
+                self.assertEqual(brand is None, program == loyalty.OTHER)
+        self.assertEqual(set(loyalty.AIRLINE_BRANDS), set(loyalty.PROGRAMS["airline"]) - {loyalty.OTHER})
+
+    def test_only_airline_programs_have_a_brand(self):
+        for kind in ("hotel", "car", "known_traveler", "redress"):
+            for program in loyalty.PROGRAMS[kind]:
+                self.assertIsNone(loyalty.logo_brand(kind, program))
+        self.assertIsNone(loyalty.logo_brand("hotel", "Delta SkyMiles"))
+
+    def test_airline_memberships_queue_their_brands_for_fetching(self):
+        who = guest(self.c)
+        loyalty.add(self.c, membership(who, program="Delta SkyMiles"))
+        loyalty.add(self.c, membership(who, kind="hotel", program="Hilton Honors"))
+        loyalty.add(self.c, membership(who, program=loyalty.OTHER))
+        self.assertEqual(logos.note(self.c), 1)
+        self.assertEqual([k for (k,) in self.c.execute(select(BrandLogo.key)).fetchall()], ["delta air lines"])
+
+
 class RouteTests(ServerCase):
     def setUp(self):
         self.database = os.path.join(os.environ["WAYPOINT_DATA"], "waypoint.db")
@@ -181,6 +207,37 @@ class RouteTests(ServerCase):
         move = {"person_id": self.guest["id"], "kind": "hotel", "program": "Marriott Bonvoy"}
         self.assertEqual(self.req("POST", f"/api/loyalty/{other['id']}", move)[0], 400)
         self.assertEqual(self.req("POST", f"/api/loyalty/{first['id']}", {**move, "notes": "Gold"})[0], 200)
+
+    def keep_logo(self, brand):
+        from waypoint.storage import db as storage
+        with storage.session() as conn:
+            conn.execute(BrandLogo.__table__.insert().values(key=logos.key(brand), name=brand, logo=PNG, logo_type="image/png", checked="2026-10-06T12:00:00"))
+
+    def test_an_airline_membership_with_a_known_logo_links_to_it_and_nothing_else_does(self):
+        self.keep_logo("Delta Air Lines")
+        self.keep_logo("Hilton Honors")
+        _, delta = self.save(kind="airline", program="Delta SkyMiles")
+        _, other = self.save(kind="airline", program=loyalty.OTHER)
+        _, united = self.save(kind="airline", program="United MileagePlus")
+        _, hotel = self.save()
+        self.assertEqual(delta["logo"], f"/api/loyalty/{delta['id']}/logo")
+        self.assertEqual([other["logo"], united["logo"], hotel["logo"]], [None, None, None])
+        ours = {delta["id"], other["id"], united["id"], hotel["id"]}
+        listed = {m["id"]: m["logo"] for m in self.req("GET", "/api/loyalty")[1]["loyalty"] if m["id"] in ours}
+        self.assertEqual(listed, {delta["id"]: delta["logo"], other["id"]: None, united["id"]: None, hotel["id"]: None})
+        status, headers, body = fetch(self.base, "GET", delta["logo"], headers={"X-Waypoint": "1"})
+        self.assertEqual((status, headers["Content-Type"], body), (200, "image/png", PNG))
+        self.assertIn("private", headers["Cache-Control"])
+        edited = self.req("POST", f"/api/loyalty/{delta['id']}", {"person_id": self.guest["id"], "kind": "airline", "program": "Delta SkyMiles"})[1]
+        self.assertEqual(edited["logo"], delta["logo"])
+
+    def test_a_membership_without_a_logo_is_a_404_on_the_logo_route(self):
+        _, united = self.save(kind="airline", program="United MileagePlus")
+        _, hotel = self.save()
+        for who in (united["id"], hotel["id"], 999, "abc"):
+            with self.subTest(who=who):
+                status, reply = self.req("GET", f"/api/loyalty/{who}/logo")
+                self.assertEqual((status, reply["error"]), (404, "No such membership"))
 
     def test_an_id_that_is_not_there_is_a_404(self):
         for who in ("999", "abc"):

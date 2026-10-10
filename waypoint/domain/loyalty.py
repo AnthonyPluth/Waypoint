@@ -18,6 +18,14 @@ PROGRAMS: dict[str, tuple[str, ...]] = {
     "known_traveler": ("Global Entry", "NEXUS", "SENTRI", "TSA PreCheck", OTHER),
     "redress": ("DHS TRIP", OTHER),
 }
+AIRLINE_BRANDS: dict[str, str] = {
+    "Alaska Mileage Plan": "Alaska Airlines",
+    "American AAdvantage": "American Airlines",
+    "Delta SkyMiles": "Delta Air Lines",
+    "JetBlue TrueBlue": "JetBlue Airways",
+    "Southwest Rapid Rewards": "Southwest Airlines",
+    "United MileagePlus": "United Airlines",
+}
 MASK = "••••"
 
 
@@ -57,6 +65,10 @@ class Duplicate(Exception):
 
 class Unreadable(Exception):
     pass
+
+
+def logo_brand(kind: str, program: str) -> str | None:
+    return AIRLINE_BRANDS.get(program) if kind == "airline" else None
 
 
 def mask(number: str) -> str:

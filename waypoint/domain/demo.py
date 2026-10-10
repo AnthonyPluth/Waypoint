@@ -7,9 +7,9 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import func, select
 
 from ..storage import db, secretbox, stored_mail
-from ..storage.models import (FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentMessage, SegmentPort, SegmentTraveler,
+from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentMessage, SegmentPort, SegmentTraveler,
                               StoredMessage, Trip, User)
-from . import loyalty, people, trips
+from . import logos, loyalty, people, trips
 from .mail import review
 from .visibility import Viewer
 
@@ -31,6 +31,20 @@ MEMBERSHIPS = [
     ("Mia Doe", "known_traveler", "TSA PreCheck", "TT0000099999", None, None),
     ("Mia Doe", "redress", "DHS TRIP", "DEMO0001234", None, None),
 ]
+
+
+DEMO_LOGO_COLORS = {"American Airlines": (30, 110, 190), "United Airlines": (20, 60, 160), "Delta Air Lines": (190, 40, 60)}
+
+
+def _png_chunk(kind: bytes, data: bytes) -> bytes:
+    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+
+
+def _square(color: tuple[int, int, int]) -> bytes:
+    size = 48
+    rows = b"".join(b"\x00" + bytes(color) * size for _ in range(size))
+    chunk = _png_chunk
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
 
 
 def _at(today: date, days: int, clock: str) -> str:
@@ -263,10 +277,13 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     for who, kind, program, number, expiry, notes in MEMBERSHIPS:
         loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number,
                            "expiry": expiry, "notes": notes})
+    for brand, color in DEMO_LOGO_COLORS.items():
+        db.upsert(conn, BrandLogo, {"key": logos.key(brand), "name": brand, "logo": _square(color), "logo_type": "image/png",
+                                    "checked": datetime.now(UTC).isoformat(timespec="seconds"), "source": "logodev"}, key=["key"])
     db.upsert(conn, FlightStatus, {**_flight_status(today), "fetched_at": datetime.now(UTC).timestamp()}, key=["flight_number", "date"])
     return _rows(conn) - before
 
 
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
-               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage))
+               for m in (User, Person, LoyaltyId, BrandLogo, Trip, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage))

@@ -23,6 +23,7 @@ A person has one membership in each program: once one is saved, that program is 
 
 - A number is **encrypted** in the database, with the same key as Waypoint’s other secrets (`WAYPOINT_SECRET_KEY`).
 - The People page shows it **masked**, with only its last four characters. Choose **Show** to reveal it and **Copy** to copy it. Revealing is its own request, so loading the page never carries your numbers.
+- An airline program shows the airline’s logo beside its name when [brand logos](/Waypoint/start/logos/) are set up and the airline’s logo has been fetched; otherwise it looks as it always did. Only the airline’s public name is ever asked of the logo service, never anything about you or your number.
 - Numbers are never written to the log, to reports or notifications, and never sent to an AI.
 - Waypoint keeps nothing in your browser: a number you revealed is gone when you leave the page.
 - An [AI assistant you connect](/Waypoint/start/mcp/) can’t reach loyalty or Known Traveler numbers at all, not even their last four characters.

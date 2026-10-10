@@ -13,8 +13,8 @@ from sqlalchemy import insert, select, update
 from ..providers import logodev, wikimedia
 from ..storage import db
 from ..storage import settings_keys as sk
-from ..storage.models import Airline, BrandLogo, Segment
-from . import visibility
+from ..storage.models import Airline, BrandLogo, LoyaltyId, Segment
+from . import loyalty, visibility
 from .visibility import Viewer
 
 PER_ROUND = 20
@@ -189,6 +189,17 @@ def segment_logo(conn: db.Connection, viewer: Viewer, segment_id: int) -> tuple[
     return logo(conn, brand_names(conn, [seg], [{"flight_number": _flight_number(seg.details) or ""}])[0])
 
 
+def membership_logo(conn: db.Connection, loyalty_id: int) -> tuple[bytes, str] | None:
+    row = conn.execute(select(LoyaltyId.kind, LoyaltyId.program).where(LoyaltyId.id == loyalty_id)).fetchone()
+    return logo(conn, loyalty.logo_brand(row[0], row[1])) if row else None
+
+
+def with_logo(conn: db.Connection, kind_programs: Iterable[tuple[str, str]]) -> set[tuple[str, str]]:
+    pairs = {(k, p): loyalty.logo_brand(k, p) for k, p in kind_programs}
+    kept = have(conn, pairs.values())
+    return {pair for pair, brand in pairs.items() if brand and key(brand) in kept}
+
+
 def logo(conn: db.Connection, brand: str | None) -> tuple[bytes, str] | None:
     if not brand:
         return None
@@ -241,6 +252,9 @@ def note(conn: db.Connection) -> int:
     for r, n in zip(rows, numbers, strict=True):
         for brand in _candidates(r[0], r[1], n, r[3], airlines):
             found.setdefault(key(brand), brand)
+    for (program,) in conn.execute(select(LoyaltyId.program).where(LoyaltyId.kind == "airline").distinct()).fetchall():
+        if airline := loyalty.logo_brand("airline", program):
+            found.setdefault(key(airline), airline)
     if not found:
         return 0
     known = {k for (k,) in conn.execute(select(BrandLogo.key).where(BrandLogo.key.in_(sorted(found)))).fetchall()}
