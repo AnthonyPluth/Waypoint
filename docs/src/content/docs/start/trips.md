@@ -79,3 +79,12 @@ With a Logo.dev key saved in Settings, each booking also shows its airline’s, 
 ## In a backup
 
 Trips, segments and their travellers are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list isn’t: every Waypoint has it already.
+
+## Open in app, or the vendor's website
+
+A booking whose email carried no manage link still gets a button on a phone for the vendor it is with: **Open in app** where the vendor's app claims a neutral page of its site (its trips list, or its home page), and **Open website** where it doesn't, so the button never promises an app it can't open. A manage link from the email always wins, and a computer shows no button. The links are ordinary `https` web addresses the phone hands to the installed app (universal links), so nothing is sent about whether the app is installed, no custom `app://` address is used and the link carries nothing about the booking.
+
+- Opens the app: Delta, United, American, Marriott, Hyatt, Hertz, Enterprise, Booking.com, Expedia and Airbnb.
+- Opens the website: every other vendor Waypoint knows, because its app claims only account, check-in or parameter-driven pages, or none could be read. Southwest, JetBlue, Alaska, Hilton, IHG, Avis, Budget, Amtrak, Carnival and Royal Caribbean were read and found to claim nothing suitable.
+
+Your phone decides in the end. A universal link doesn't open the app when it's typed into Safari's address bar or tapped on a page of the same site, and the phone remembers a choice of "Open in Safari" for a site. On Android a vendor's app can open the browser instead where it doesn't list that site. The table is `waypoint/domain/app_links.py`, with the date each vendor was checked and the claimed page its link comes from; `python3 tools/app_link_check.py delta.com united.com` fetches those vendors' public `apple-app-site-association` files and prints the production apps and the pages they claim, so the table can be checked again.

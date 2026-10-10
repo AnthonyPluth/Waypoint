@@ -63,6 +63,10 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ download: "x" }] })).toEqual(["step 1: download takes a object"]);
   });
 
+  it("takes phone_agent as true or false", () => {
+    expect(flowProblems({ ...ok, phone_agent: true })).toEqual([]);
+    expect(flowProblems({ ...ok, phone_agent: "yes" })).toEqual(["phone_agent is true or false"]);
+  });
   it("rejects a viewport it doesn't know", () => expect(flowProblems({ ...ok, viewports: ["watch"] })).toEqual(["unknown viewport watch"]));
 
   it("rejects a page the app doesn't have, so a typo can't pass for a clean run", () => {

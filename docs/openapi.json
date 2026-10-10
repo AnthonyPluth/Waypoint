@@ -4525,6 +4525,19 @@
               "null"
             ]
           },
+          "open": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "open_kind": {
+            "enum": [
+              "app",
+              "website",
+              null
+            ]
+          },
           "directions": {
             "type": [
               "string",
@@ -4540,6 +4553,8 @@
         },
         "required": [
           "app",
+          "open",
+          "open_kind",
           "directions",
           "call"
         ],

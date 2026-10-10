@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when } from "./trips";
+import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -411,5 +411,19 @@ describe("seatsInOrder", () => {
   });
   it("orders the seats in a flight's subline", () => {
     expect(subline(segment({ kind: "flight", provider: "Example Air", details: { flight_number: "EA 1", seat: "12B, 12A" } }), true)).toContain("Seat 12A, 12B");
+  });
+});
+
+describe("vendorLink", () => {
+  const withOpen = (open: string | null, open_kind: "app" | "website" | null, app: string | null = null) =>
+    segment({ links: { app, open, open_kind, directions: null, call: null } });
+  it("is Open in app for an app link and Open website for a website one, on a phone", () => {
+    expect(vendorLink(withOpen("https://www.marriott.com/", "app"), true)).toEqual({ href: "https://www.marriott.com/", label: "Open in app" });
+    expect(vendorLink(withOpen("https://www.avis.com/", "website"), true)).toEqual({ href: "https://www.avis.com/", label: "Open website" });
+  });
+  it("is nothing on a computer, for a vendor with no link, or when the booking has its own link", () => {
+    expect(vendorLink(withOpen("https://www.marriott.com/", "app"), false)).toBeNull();
+    expect(vendorLink(withOpen(null, null), true)).toBeNull();
+    expect(vendorLink(withOpen("https://www.marriott.com/", "app", "https://example.com/manage"), true)).toBeNull();
   });
 });

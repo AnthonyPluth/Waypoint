@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from typing import TypedDict
+from typing import Literal, TypedDict
 from urllib.parse import quote, urlsplit
 
+from . import app_links
+
 UNITED = ("www.united.com", "/en/us/manageres/mytrips")
-DELTA = ("www.delta.com", "/mytrips/")
+DELTA = ("www.delta.com", "/my-trips/search")
 ALASKA = ("www.alaskaair.com", "/booking/reservation-lookup")
 AMERICAN = ("www.aa.com", "/reservation/view/find-your-reservation")
 SOUTHWEST = ("www.southwest.com", "/air/check-in/")
@@ -24,6 +26,8 @@ DIGITS = re.compile(r"\d")
 
 class Links(TypedDict):
     app: str | None
+    open: str | None
+    open_kind: Literal["app", "website"] | None
     directions: str | None
     call: str | None
 
@@ -73,6 +77,9 @@ def segment_links(kind: str, provider: str | None, confirmation: str | None, las
                   details: dict[str, str], origin: str | None) -> Links:
     stay = kind in ("hotel", "car", "cruise")
     airline_page = manage_link(provider, confirmation, last_name) if kind == "flight" else None
-    return {"app": https_only(manage_url) or airline_page,
+    mine = https_only(manage_url) or airline_page
+    vendor = None if mine else app_links.vendor_for(kind, provider, origin if kind == "hotel" else None)
+    opening = https_only(vendor["url"]) if vendor else None
+    return {"app": mine, "open": opening, "open_kind": vendor["kind"] if opening and vendor else None,
             "directions": directions_link(details.get("address") or origin) if stay else None,
             "call": call_link(details.get("phone"))}

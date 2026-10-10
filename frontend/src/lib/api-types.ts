@@ -490,6 +490,8 @@ export interface SegmentEmails {
 
 export interface SegmentLinks {
   app: string | null;
+  open: string | null;
+  open_kind: "app" | "website" | null;
   directions: string | null;
   call: string | null;
 }

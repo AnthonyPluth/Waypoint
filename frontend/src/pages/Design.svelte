@@ -12,12 +12,12 @@
     start_local: "2026-11-20T07:05", start_zone: "America/Chicago", end_local: "2026-11-20T09:20", end_zone: "America/Los_Angeles",
     origin: "MSP", destination: "LAX", details: { flight_number: "EA 214", terminal: "1", cabin: "Economy" }, manage_url: "https://example.com/manage",
     source: "manual", booked_by: null, locked_fields: [], check_times: false, travelers: [{ id: 1, person_id: null, name: "Jane Doe", seat: "14C" }],
-    itinerary: [], days: [], logo: null, logo_label: null, hotel_brand: null, has_email: false, links: { app: "https://example.com/manage", directions: null, call: null },
+    itinerary: [], days: [], logo: null, logo_label: null, hotel_brand: null, has_email: false, links: { app: "https://example.com/manage", open: null, open_kind: null, directions: null, call: null },
   };
   const stay: Segment = {
     ...flight, id: 2, kind: "hotel", confirmation: "HT5521", provider: "Example Hotels", origin: "Harbour Hotel", destination: null,
     start_local: "2026-11-20T15:00", start_zone: "America/Los_Angeles", end_local: "2026-11-24T11:00", end_zone: "America/Los_Angeles",
-    details: { address: "1 Quay Street, Los Angeles", room: "412" }, manage_url: null, links: { app: null, directions: null, call: null }, travelers: [],
+    details: { address: "1 Quay Street, Los Angeles", room: "412" }, manage_url: null, links: { app: null, open: null, open_kind: null, directions: null, call: null }, travelers: [],
   };
   const flightNow = instant("2026-11-20T07:05", "America/Chicago") - 3 * 3_600_000;
   const underWayNow = instant("2026-11-20T07:05", "America/Chicago") + 90 * 60_000;

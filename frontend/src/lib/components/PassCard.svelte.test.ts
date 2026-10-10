@@ -63,12 +63,29 @@ describe("a flight pass", () => {
   it("has the code as the first focusable control and copies it on tap", async () => {
     const user = userEvent.setup();
     const writeText = vi.spyOn(navigator.clipboard, "writeText");
-    render(PassCard, { ...goes({ links: { app: "https://example.com/manage", directions: null, call: null } }) });
+    render(PassCard, { ...goes({ links: { app: "https://example.com/manage", open: null, open_kind: null, directions: null, call: null } }) });
     await user.tab();
     expect(screen.getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toHaveFocus();
     await user.keyboard("{Enter}");
     expect(writeText).toHaveBeenCalledWith("KQ7M2X");
     expect(toast.success).toHaveBeenCalledWith("Copied");
+  });
+  it("offers a phone the vendor's app, or its website, without opening a new tab, and a computer nothing", () => {
+    const vendor = (open_kind: "app" | "website") => ({ links: { app: null, open: "https://www.example-vendor.example/", open_kind, directions: null, call: null } });
+    const ua = vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)");
+    const first = render(PassCard, { ...goes(vendor("app")), now: dep - 25 * HOUR });
+    const app = screen.getByRole("link", { name: "Open in app" });
+    expect(app).toHaveAttribute("href", "https://www.example-vendor.example/");
+    expect(app).not.toHaveAttribute("target");
+    first.unmount();
+    render(PassCard, { ...goes(vendor("website")), now: dep - 25 * HOUR });
+    expect(screen.getByRole("link", { name: "Open website" })).not.toHaveAttribute("target");
+    ua.mockReturnValue("Mozilla/5.0 (X11; Linux x86_64)");
+  });
+  it("offers a computer no vendor button", () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (X11; Linux x86_64)");
+    render(PassCard, { ...goes({ links: { app: null, open: "https://www.example-vendor.example/", open_kind: "app", directions: null, call: null } }), now: dep - 25 * HOUR });
+    expect(screen.queryByRole("link", { name: /Open in app|Open website|Manage booking/ })).toBeNull();
   });
   it("offers the booking’s link", () => {
     render(PassCard, { ...goes({ manage_url: "https://example.com/manage" }), now: dep - 25 * HOUR });

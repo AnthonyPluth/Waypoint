@@ -278,6 +278,8 @@ class Traveler(TypedDict):
 
 class SegmentLinks(TypedDict):
     app: str | None
+    open: str | None
+    open_kind: Literal["app", "website"] | None
     directions: str | None
     call: str | None
 
