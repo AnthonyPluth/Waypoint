@@ -3,7 +3,7 @@
 [![Backend coverage](https://codecov.io/gh/AnthonyPluth/Waypoint/branch/main/graph/badge.svg?flag=backend)](https://app.codecov.io/gh/AnthonyPluth/Waypoint?flags%5B0%5D=backend)
 [![Frontend coverage](https://codecov.io/gh/AnthonyPluth/Waypoint/branch/main/graph/badge.svg?flag=frontend)](https://app.codecov.io/gh/AnthonyPluth/Waypoint?flags%5B0%5D=frontend)
 
-A self-hosted travel app for a household. Waypoint shows everyone the trips they’re on (flights, hotels, rental cars and their confirmation numbers) and keeps the family’s frequent-flyer, hotel-loyalty and TSA PreCheck numbers in one place, so anyone can book for anyone. Bookings are meant to arrive by scanning Gmail privately: read-only, searched on your server, and a message kept, encrypted, only while a review item or a booking needs it.
+A self-hosted travel app for a household. Waypoint shows everyone the trips they’re on (flights, hotels, rental cars and their confirmation numbers) and keeps the family’s frequent-flyer, hotel-loyalty and TSA PreCheck numbers in one place, so anyone can book for anyone. Bookings are meant to arrive by scanning Gmail privately: read-only, searched on your server, and a message kept, with its images and layout, encrypted, only while a review item or a booking needs it.
 
 **Status: early, Phase 0.** Today Waypoint offers OIDC sign-in (Authentik, Keycloak, Google, …), settings, and backups you can download and restore. The travel features come in later phases: people and loyalty IDs, trips and manual entry, Gmail scanning, vendor parsers, deep links and reminders, and optional AI suggestions.
 
