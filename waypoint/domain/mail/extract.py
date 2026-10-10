@@ -7,16 +7,17 @@ import email.policy
 import email.utils
 import json
 import re
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from typing import Any, Literal
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ... import monitoring
-from ...storage.stored_mail import Content
+from ...providers import mailimages
+from ...storage.stored_mail import Content, Image
 from .. import seatmaps
 from . import parsers, safe_html, seats
 from .booking import Booking as Booking
@@ -545,12 +546,21 @@ def _visible(htmls: list[str], texts: list[str]) -> str:
     return "\n".join([*texts, "".join(scanner.parts)])
 
 
-def _bodies(message: Mapping[str, Any]) -> tuple[list[str], list[str]] | None:
+def _parsed(message: Mapping[str, Any]) -> Any | None:
     data = _decode(message.get("raw"))
     if data is None:
         return None
     try:
-        parsed = email.message_from_bytes(data, policy=email.policy.default)
+        return email.message_from_bytes(data, policy=email.policy.default)
+    except (ValueError, LookupError, TypeError):
+        return None
+
+
+Bodies = tuple[list[str], list[str]]
+
+
+def _split(parsed: Any) -> Bodies | None:
+    try:
         plain: list[str] = []
         html: list[str] = []
         for part in parsed.walk():
@@ -566,13 +576,59 @@ def _bodies(message: Mapping[str, Any]) -> tuple[list[str], list[str]] | None:
     return plain, html
 
 
-def safe_markup(message: Mapping[str, Any], limit: int = MAX_PART) -> tuple[str, bool] | None:
-    bodies = _bodies(message)
+def _bodies(message: Mapping[str, Any]) -> Bodies | None:
+    parsed = _parsed(message)
+    return None if parsed is None else _split(parsed)
+
+
+Fetch = Callable[[str], tuple[str, bytes] | None]
+
+
+class _Pictures:
+    def __init__(self, parsed: Any, fetch: Fetch | None) -> None:
+        self.fetch = fetch
+        self.found: list[Image] = []
+        self.index: dict[str, int] = {}
+        self.total = 0
+        self.parts: dict[str, Any] = {}
+        try:
+            for part in parsed.walk() if parsed is not None else ():
+                cid = str(part.get("Content-ID") or "").strip().strip("<>").strip()
+                if cid and part.get_content_maintype() == "image":
+                    self.parts.setdefault(cid, part)
+        except (ValueError, LookupError, TypeError):
+            pass
+
+    def _inline(self, name: str) -> tuple[str, bytes] | None:
+        part = self.parts.get(unquote(name).strip().strip("<>").strip())
+        if part is None:
+            return None
+        try:
+            data = part.get_payload(decode=True)
+        except (ValueError, LookupError, TypeError):
+            return None
+        kind = mailimages.sniff(data) if isinstance(data, bytes) and len(data) <= mailimages.MAX_IMAGE_BYTES else None
+        return (kind, data) if kind else None
+
+    def resolve(self, source: str) -> int | None:
+        if source in self.index:
+            return self.index[source]
+        lowered = source.lower()
+        picture = self._inline(source[4:]) if lowered.startswith("cid:") else self.fetch(source) if self.fetch and lowered.startswith("https://") else None
+        if picture is None or len(self.found) >= mailimages.MAX_ATTEMPTS or self.total + len(picture[1]) > mailimages.MAX_TOTAL_BYTES:
+            return None
+        self.total += len(picture[1])
+        self.index[source] = len(self.found)
+        self.found.append({"type": picture[0], "data": picture[1]})
+        return self.index[source]
+
+
+def _markup(bodies: Bodies | None, limit: int, resolve: safe_html.Resolve | None = None) -> tuple[str, bool] | None:
     if bodies is None or not bodies[1]:
         return None
     shown: list[str] = []
     for i, part in enumerate(bodies[1]):
-        markup, cut, size = safe_html.clean_counted(part, limit)
+        markup, cut, size = safe_html.clean_counted(part, limit, resolve)
         shown.append(markup)
         limit -= size
         if cut or (limit <= 0 and i + 1 < len(bodies[1])):
@@ -580,8 +636,11 @@ def safe_markup(message: Mapping[str, Any], limit: int = MAX_PART) -> tuple[str,
     return "<hr>".join(shown), False
 
 
-def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
-    bodies = _bodies(message)
+def safe_markup(message: Mapping[str, Any], limit: int = MAX_PART) -> tuple[str, bool] | None:
+    return _markup(_bodies(message), limit)
+
+
+def _plain(bodies: Bodies | None, limit: int) -> str:
     if bodies is None:
         return ""
     plain, html = bodies
@@ -597,23 +656,30 @@ def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
     return re.sub(r"\n\s*\n+", "\n", "".join(scanner.parts))[:limit]
 
 
+def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
+    return _plain(_bodies(message), limit)
+
+
 SUBJECT_LIMIT = 300
-KEPT_LIMIT = 30_000
+KEPT_LIMIT = 300_000
 
 
-def keep(message: Mapping[str, Any]) -> Content:
-    data = _decode(message.get("raw"))
+def keep(message: Mapping[str, Any], fetch: Fetch | None = None) -> tuple[Content, list[Image]]:
+    parsed = _parsed(message)
     subject: str | None = None
     sender: str | None = None
     received: str | None = None
-    if data is not None:
+    if parsed is not None:
         try:
-            parsed = email.message_from_bytes(data, policy=email.policy.default)
             subject = " ".join(str(parsed.get("Subject") or "").split())[:SUBJECT_LIMIT] or None
             sender, received = _domain(parsed.get("From")), _day(parsed.get("Date"))
         except (ValueError, LookupError, TypeError):
             subject = None
-    text = plain_text(message, KEPT_LIMIT + 1)
-    shown = safe_markup(message, KEPT_LIMIT)
-    return {"subject": subject, "sender_domain": sender, "received": received, "text": text[:KEPT_LIMIT],
-            "html": shown[0] if shown else None, "truncated": len(text) > KEPT_LIMIT or bool(shown and shown[1])}
+    bodies = None if parsed is None else _split(parsed)
+    pictures = _Pictures(parsed, fetch)
+    text = _plain(bodies, KEPT_LIMIT + 1)
+    shown = _markup(bodies, KEPT_LIMIT, pictures.resolve)
+    content: Content = {"subject": subject, "sender_domain": sender, "received": received, "text": text[:KEPT_LIMIT],
+                        "html": shown[0] if shown else None, "truncated": len(text) > KEPT_LIMIT or bool(shown and shown[1]),
+                        "original": True, "images": len(pictures.found)}
+    return content, pictures.found

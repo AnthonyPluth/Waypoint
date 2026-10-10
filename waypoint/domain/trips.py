@@ -841,6 +841,11 @@ def emails_of(conn: db.Connection, viewer: Viewer, segment_id: int) -> list[stor
     return None if seg is None else stored_mail.for_segment(conn, seg.id)
 
 
+def email_image_of(conn: db.Connection, viewer: Viewer, segment_id: int, email: int, index: int) -> stored_mail.Image | None:
+    seg = visibility.visible_segment(conn, viewer, segment_id)
+    return None if seg is None else stored_mail.image_for_segment(conn, seg.id, email, index)
+
+
 def delete_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> bool:
     seg = visibility.visible_segment(conn, viewer, segment_id)
     if seg is None:

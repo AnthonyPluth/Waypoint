@@ -10,7 +10,7 @@ from .common import ApiError, server_error
 
 from .api.ai import api_ai, api_ai_save
 from .api.backups import api_backup, api_backup_inspect, api_restore
-from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_edit, api_segment_emails, api_segment_remove, api_trip,
+from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_edit, api_segment_email_image, api_segment_emails, api_segment_remove, api_trip,
                         api_trip_add, api_trip_edit, api_trip_merge, api_trip_remove, api_trip_split, api_trips)
 from .api.flight_import import api_import, api_import_preview
 from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
@@ -22,7 +22,7 @@ from .api.logos import api_logodev, api_logodev_fetch, api_logodev_save, api_seg
 from .api.mailboxes import api_mailbox_backfill, api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_reread, api_mailbox_scan, api_mailbox_share, api_mailboxes
 from .api.reminders import (api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
                             api_reminders_set)
-from .api.review import (api_review, api_review_dismiss, api_review_ignore, api_review_match, api_review_preview,
+from .api.review import (api_review, api_review_dismiss, api_review_ignore, api_review_image, api_review_match, api_review_preview,
                          api_review_suggest, api_review_who)
 from .api.offline import api_offline
 from .api.state import api_state
@@ -53,6 +53,7 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/segments/{id}", api_segment),
     ("GET", "/api/segments/{id}/logo", api_segment_logo),
     ("GET", "/api/segments/{id}/emails", api_segment_emails),
+    ("GET", "/api/segments/{id}/emails/{id}/images/{id}", api_segment_email_image),
     ("POST", "/api/segments/{id}", api_segment_edit),
     ("DELETE", "/api/segments/{id}", api_segment_remove),
     ("GET", "/api/airports/{id}", api_airport),
@@ -90,6 +91,7 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/review/{id}/ignore", api_review_ignore),
     ("POST", "/api/review/{id}/match", api_review_match),
     ("GET", "/api/review/{id}/preview", api_review_preview),
+    ("GET", "/api/review/{id}/images/{id}", api_review_image),
     ("POST", "/api/review/{id}/suggest", api_review_suggest),
     ("DELETE", "/api/review/{id}", api_review_dismiss),
     ("GET", "/api/mcp-settings", api_mcp_settings),

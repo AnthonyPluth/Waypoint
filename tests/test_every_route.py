@@ -15,6 +15,8 @@ NOT_JSON = {
     "GET /api/backup": "a .json.gz file to keep",
     "GET /api/mailboxes/callback": "a redirect back to Settings, where Google sends the browser",
     "GET /api/segments/{id}/logo": "a brand's logo, an image",
+    "GET /api/segments/{id}/emails/{id}/images/{id}": "an image kept with an email",
+    "GET /api/review/{id}/images/{id}": "an image kept with an email",
 }
 
 

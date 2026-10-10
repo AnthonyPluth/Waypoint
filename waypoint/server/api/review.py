@@ -10,7 +10,7 @@ import time
 from ...domain.mail import ai, review, scan
 from ...providers import gmail
 from ...storage import db
-from ..common import ApiError, own_session, row_id
+from ..common import NO_IMAGE, ApiError, Response, image_response, own_session, position, row_id
 from ..contract import Matched, MatchBody, Ok, Preview, Review, ReviewItem, ReviewMatch, WhoBody
 from .mailboxes import owner
 from .trips import viewer
@@ -99,6 +99,11 @@ GONE = "That message is no longer in Gmail."
 NOT_KEPT = "This message wasn’t kept. Its owner can open it in Gmail."
 
 
+def _preview(kept: Mapping[str, Any]) -> Preview:
+    return {"subject": kept["subject"], "text": kept["text"], "html": kept["html"], "truncated": kept["truncated"],
+            "original": kept["original"], "images": kept["images"]}
+
+
 @own_session
 def api_review_preview(_conn, _q, _b, item_id: str) -> Preview:
     item = row_id(item_id, NO_ITEM)
@@ -107,19 +112,23 @@ def api_review_preview(_conn, _q, _b, item_id: str) -> Preview:
     if not visible:
         raise ApiError(NO_ITEM, 404)
     if kept is not None:
-        return {"subject": kept["subject"], "text": kept["text"], "html": kept["html"], "truncated": kept["truncated"]}
+        return _preview(kept)
     try:
-        text, html, truncated = scan.preview(owner(), item)
+        shown = scan.preview(owner(), item)
     except KeyError:
         raise ApiError(NOT_KEPT, 404) from None
     except gmail.MessageGone:
         raise ApiError(GONE, 404) from None
     except gmail.GmailError as e:
         raise ApiError(str(e), 502) from e
-    with db.session() as conn:
-        again = review.stored_email(conn, owner(), item)[1]
-    subject = again["subject"] if again is not None else None
-    return {"subject": subject, "text": text, "html": html, "truncated": truncated}
+    return _preview(shown)
+
+
+def api_review_image(conn, _q, _b, item_id: str, index: str) -> Response:
+    found = review.stored_image(conn, owner(), row_id(item_id, NO_IMAGE), position(index))
+    if found is None:
+        raise ApiError(NO_IMAGE, 404)
+    return image_response(found)
 
 
 @own_session

@@ -851,7 +851,7 @@ class VisibilityRouteTests(RouteCase):
                  ("POST", f"/api/trips/{trip}/split", {"segment_ids": segs[:1]}),
                  ("POST", "/api/segments", {**HOTEL, "trip_id": trip})]
         for s in segs:
-            calls += [("GET", f"/api/segments/{s}", None), ("GET", f"/api/segments/{s}/logo", None), ("GET", f"/api/segments/{s}/emails", None),
+            calls += [("GET", f"/api/segments/{s}", None), ("GET", f"/api/segments/{s}/logo", None), ("GET", f"/api/segments/{s}/emails", None), ("GET", f"/api/segments/{s}/emails/0/images/0", None),
                       ("POST", f"/api/segments/{s}", {"status": "cancelled"}),
                       ("DELETE", f"/api/segments/{s}", None)]
         gone = [(m, p.replace(str(trip), "99999").replace(str(segs[0]), "99998").replace(str(segs[1]), "99997"), b) for m, p, b in calls[:3]]
@@ -860,7 +860,7 @@ class VisibilityRouteTests(RouteCase):
                 with self.subTest(who=who, call=f"{method} {path}"):
                     status, got = self.call(who, method, path, body)
                     self.assertEqual((status, got), (404, {"error": got["error"]}))
-                    self.assertIn(got["error"], ("No such trip", "No such segment"))
+                    self.assertIn(got["error"], ("No such trip", "No such segment", "No such image"))
         for method, path, body in gone:
             self.assertEqual(self.call("ben", method, path, body)[0], 404)
         self.assertEqual(self.ok("ben", "GET", "/api/trips")["trips"], [])
@@ -874,7 +874,8 @@ class VisibilityRouteTests(RouteCase):
         covered = {("GET", "/api/trips/{id}"), ("POST", "/api/trips/{id}"), ("DELETE", "/api/trips/{id}"),
                    ("POST", "/api/trips/{id}/merge"), ("POST", "/api/trips/{id}/split"), ("POST", "/api/segments"),
                    ("GET", "/api/segments/{id}"), ("POST", "/api/segments/{id}"), ("DELETE", "/api/segments/{id}"),
-                   ("GET", "/api/segments/{id}/logo"), ("GET", "/api/segments/{id}/emails")}
+                   ("GET", "/api/segments/{id}/logo"), ("GET", "/api/segments/{id}/emails"),
+                   ("GET", "/api/segments/{id}/emails/{id}/images/{id}")}
         found = {(m, p) for m, p, _ in ROUTES if p.startswith(("/api/trips/", "/api/segments"))}
         self.assertEqual(found, covered, "a new route that takes a trip or segment goes in the stranger's 404 test")
 

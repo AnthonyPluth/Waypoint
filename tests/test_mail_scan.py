@@ -1,4 +1,7 @@
 import base64
+import email
+import email.message
+import email.policy
 import json
 import os
 import threading
@@ -12,7 +15,7 @@ from unittest import mock
 from sqlalchemy import delete, insert, select, update
 
 from tests.privacy import no_leaks
-from tests.shared import TODAY, DbCase
+from tests.shared import TODAY, DbCase, fetch
 from tests.test_gmail import CLIENT_ID, CLIENT_SECRET, FakeGoogle, Google, GoogleCase
 from waypoint import oidc
 from waypoint.domain import loyalty, people, trips
@@ -40,6 +43,27 @@ def eml(name: str) -> bytes:
 
 def b64(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode().rstrip("=")
+
+
+ATTACHED = b"\x89PNG\r\n\x1a\n" + b"CANARY-IMAGE-BYTES-3Z6V" + bytes(24)
+REMOTE = b"GIF89a" + b"CANARY-REMOTE-BYTES-5K1W" + bytes(8)
+REMOTE_URL = "https://images.example/hero.gif?t=CANARY-IMAGE-URL-8D4Q"
+PICTURE_CANARIES = ("CANARY-IMAGE-BYTES-3Z6V", "CANARY-REMOTE-BYTES-5K1W", "CANARY-IMAGE-URL-8D4Q")
+
+
+def with_pictures(name: str) -> bytes:
+    base = email.message_from_bytes(eml(name), policy=email.policy.default)
+    pictures = f'<img src="cid:logo@example.example" alt="Logo"><img src="{REMOTE_URL}" alt="Hero">'
+    msg = email.message.EmailMessage()
+    for header in ("From", "To", "Subject", "Date", "Message-ID"):
+        msg[header] = base[header]
+    msg.set_content(str(base.get_body(("html",)).get_content()).replace("</body>", f"{pictures}</body>"), subtype="html")
+    msg.add_related(ATTACHED, "image", "png", cid="<logo@example.example>")
+    return msg.as_bytes()
+
+
+def remote_pictures(found=("image/gif", REMOTE)):
+    return mock.patch.object(scan.mailimages, "Fetcher", return_value=lambda url: found)
 
 
 class FakeGmail(FakeGoogle):
@@ -488,13 +512,14 @@ class ReviewTests(ScanCase):
         self.scan()
         [item] = self.items()
         with no_leaks(self, "CANARY-BODY-NOMARKUP-6H9C", database=self.path):
-            text, html, cut = scan.preview("u-jane", item["id"])
-        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", text)
-        self.assertNotIn("<", text)
-        assert html is not None
-        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", html)
-        self.assertTrue(html.startswith("<p>"))
-        self.assertFalse(cut)
+            shown = scan.preview("u-jane", item["id"])
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", shown["text"])
+        self.assertNotIn("<", shown["text"])
+        assert shown["html"] is not None
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", shown["html"])
+        self.assertTrue(shown["html"].startswith("<p>"))
+        self.assertFalse(shown["truncated"])
+        self.assertTrue(shown["original"])
         with self.assertRaises(KeyError):
             scan.preview("u-sam", item["id"])
         with self.assertRaises(KeyError):
@@ -505,8 +530,8 @@ class ReviewTests(ScanCase):
         self.scan()
         [item] = self.items()
         with mock.patch.object(extract, "KEPT_LIMIT", 20):
-            text, _html, cut = scan.preview("u-jane", item["id"])
-        self.assertEqual((len(text), cut), (20, True))
+            shown = scan.preview("u-jane", item["id"])
+        self.assertEqual((len(shown["text"]), shown["truncated"]), (20, True))
         del self.google.mail["msg-no_markup"]
         with self.assertRaises(gmail.MessageGone):
             scan.preview("u-jane", item["id"])
@@ -1302,6 +1327,92 @@ class KeptMessageTests(ScanCase):
         self.assertEqual(self.items()[0]["has_email"], True)
 
 
+class KeptPictureTests(ScanCase):
+
+    def kept_pictures(self, message_id="msg-pics"):
+        return self.read(lambda conn: [stored_mail.image_of(conn, self.mailbox, message_id, i) for i in range(3)])
+
+    def scan_pictures(self, name="no_markup"):
+        self.add_mail("msg-pics", with_pictures(name))
+        with remote_pictures(), no_leaks(self, *PICTURE_CANARIES, "CANARY-BODY-NOMARKUP-6H9C", "CANARY-BODY-FLIGHT-JSONLD-7Q2X", database=self.path):
+            self.scan()
+
+    def test_the_pictures_of_a_kept_message_are_kept_with_it_encrypted_and_nothing_else_sees_them(self):
+        self.scan_pictures()
+        kept = self.read(lambda conn: stored_mail.get(conn, self.mailbox, "msg-pics"))
+        assert kept and kept["html"]
+        self.assertEqual((kept["images"], kept["original"]), (2, True))
+        self.assertEqual(self.kept_pictures(), [{"type": "image/png", "data": ATTACHED}, {"type": "image/gif", "data": REMOTE}, None])
+        for banned in ("images.example", "CANARY-IMAGE-URL-8D4Q", "cid:", "src="):
+            self.assertNotIn(banned, kept["html"])
+        sealed = self.read(lambda conn: conn.execute(select(StoredMessage.content)).scalar())
+        self.assertTrue(secretbox.is_encrypted(sealed))
+        self.assertEqual(self.read(lambda conn: stored_mail.image_of(conn, self.mailbox, "msg-pics", -1)), None)
+
+    def test_pictures_go_when_the_item_is_dismissed(self):
+        self.scan_pictures()
+        [item] = self.items()
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"])))
+        self.assertEqual(self.kept_pictures(), [None, None, None])
+        self.assertEqual(self.read(lambda conn: conn.execute(select(StoredMessage.id)).fetchall()), [])
+
+    def test_pictures_go_when_the_last_booking_made_from_the_message_is_removed(self):
+        self.scan_pictures("flight_jsonld")
+        [seg] = self.segments()
+        self.assertEqual(self.kept_pictures()[0]["data"], ATTACHED)
+        self.assertEqual(self.read(lambda conn: stored_mail.image_for_segment(conn, seg["id"], 0, 1))["data"], REMOTE)
+        self.assertIsNone(self.read(lambda conn: stored_mail.image_for_segment(conn, seg["id"], 1, 0)))
+        self.assertIsNone(self.read(lambda conn: stored_mail.image_for_segment(conn, seg["id"], 0, 2)))
+        self.assertIsNone(self.read(lambda conn: stored_mail.image_for_segment(conn, 99999, 0, 0)))
+        self.assertTrue(self.read(lambda conn: trips.delete_segment(conn, self.jane, seg["id"])))
+        self.assertEqual(self.kept_pictures(), [None, None, None])
+
+    def test_pictures_go_when_the_mailbox_is_disconnected(self):
+        self.scan_pictures()
+        self.assertIsNotNone(self.kept_pictures()[0])
+        with mock.patch.object(gmail, "_post", return_value={}):
+            self.read(lambda conn: gmail.disconnect(conn, self.mailbox, "u-jane"))
+        self.assertEqual(self.kept_pictures(), [None, None, None])
+        self.assertEqual(self.read(lambda conn: conn.execute(select(StoredMessage.id)).fetchall()), [])
+
+    def test_a_picture_that_cannot_be_fetched_is_left_out_and_the_message_still_opens(self):
+        self.add_mail("msg-pics", with_pictures("no_markup"))
+        with mock.patch.object(scan.mailimages, "Fetcher", return_value=lambda url: None):
+            self.scan()
+        kept = self.read(lambda conn: stored_mail.get(conn, self.mailbox, "msg-pics"))
+        assert kept and kept["html"]
+        self.assertEqual((kept["images"], kept["original"]), (1, True))
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", kept["html"])
+        self.assertIn("Hero", kept["html"])
+        self.assertEqual(len(self.items()), 1)
+
+    def test_a_message_that_cannot_be_kept_does_not_undo_its_booking(self):
+        self.put("flight_jsonld")
+        with mock.patch.object(scan, "keep_message", side_effect=RuntimeError("CANARY-KEEP-DETAILS-6W2B")), \
+                no_leaks(self, "CANARY-KEEP-DETAILS-6W2B", database=self.path):
+            result = self.scan()
+        self.assertEqual((result.state, result.bookings), ("done", 1))
+        self.assertEqual(len(self.segments()), 1)
+        self.assertEqual(self.scanned(), {"msg-flight_jsonld": "booking"})
+
+    def test_a_busy_database_while_keeping_stops_the_scan_to_be_retried(self):
+        self.put("flight_jsonld")
+        with mock.patch.object(scan, "keep_message", side_effect=RuntimeError("busy")), mock.patch.object(db, "is_busy", return_value=True):
+            self.assertEqual(self.scan().state, "failed")
+
+    def test_the_ai_fallback_still_gets_text_alone(self):
+        self.add_mail("msg-pics", with_pictures("no_markup"))
+        asked = []
+        config = scan.ai.Config("local", "llama3", url="http://ollama.example:1234")
+        with remote_pictures(), mock.patch.object(scan.ai, "config", return_value=config), \
+                mock.patch.object(scan.ai, "suggest", side_effect=lambda cfg, text, known: asked.append(text) or None):
+            self.scan()
+        self.assertTrue(asked)
+        for text in asked:
+            for banned in ("<", "images.example", "cid:"):
+                self.assertNotIn(banned, text)
+
+
 class PrivacyTests(ScanCase):
     def test_email_stays_on_the_server(self):
         self.put("flight_jsonld", "flight_microdata", "hotel_jsonld", "car_jsonld", "train_jsonld", "no_markup", "incomplete", *UTC_FIXTURES)
@@ -1588,7 +1699,7 @@ class MailScanApiTests(GoogleCase):
         status, body = self.call("ana", "GET", f"/api/segments/{seg['id']}/emails")
         self.assertEqual(status, 200)
         [email] = body["emails"]
-        self.assertEqual(set(email), {"subject", "sender_domain", "received", "text", "html", "truncated"})
+        self.assertEqual(set(email), {"subject", "sender_domain", "received", "text", "html", "truncated", "original", "images"})
         self.assertEqual(email["sender_domain"], "example-air.example")
         self.assertEqual(self.call("ben", "GET", f"/api/segments/{seg['id']}/emails"), (404, {"error": "No such segment"}))
         self.assertEqual(self.call("ana", "GET", "/api/segments/99999/emails"), (404, {"error": "No such segment"}))
@@ -1693,6 +1804,58 @@ class MailScanApiTests(GoogleCase):
         del self.google.mail["m-no_markup"]
         self.assertEqual(self.call("ana", "GET", f"/api/review/{item['id']}/preview")[0], 200)
         self.assertEqual(len(self.google.fetched), fetched)
+
+    def pictures_mail(self, name):
+        self.google.mail[f"m-{name}"] = with_pictures(name)
+        self.google.matches.append(f"m-{name}")
+
+    def image(self, who, path):
+        return fetch(self.base, "GET", path, None, self.who[who] if who else {})
+
+    def test_the_pictures_of_an_item_are_served_to_whoever_can_see_the_item_alone(self):
+        self.pictures_mail("no_markup")
+        with remote_pictures():
+            self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        status, body = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
+        self.assertEqual((status, body["images"], body["original"]), (200, 2, True))
+        self.assertNotIn("src=", body["html"])
+        self.assertNotIn("images.example", body["html"])
+        status, headers, raw = self.image("ana", f"/api/review/{item['id']}/images/0")
+        self.assertEqual((status, raw, headers["Content-Type"], headers["X-Content-Type-Options"]), (200, ATTACHED, "image/png", "nosniff"))
+        self.assertIn("default-src 'none'; sandbox", headers.get_all("Content-Security-Policy"))
+        self.assertEqual(headers["Cache-Control"], "no-store")
+        status, headers, raw = self.image("ana", f"/api/review/{item['id']}/images/1")
+        self.assertEqual((status, raw, headers["Content-Type"]), (200, REMOTE, "image/gif"))
+        for path in (f"/api/review/{item['id']}/images/2", f"/api/review/{item['id']}/images/x", f"/api/review/{item['id']}/images/-1",
+                     f"/api/review/{item['id']}/images/99999999999", "/api/review/9999/images/0", "/api/review/x/images/0"):
+            status, _, raw = self.image("ana", path)
+            self.assertEqual((status, json.loads(raw)), (404, {"error": "No such image"}), path)
+        self.assertEqual(self.image("ben", f"/api/review/{item['id']}/images/0")[0], 404)
+        self.assertEqual(self.image(None, f"/api/review/{item['id']}/images/0")[0], 401)
+        self.share()
+        self.assertEqual(self.image("ben", f"/api/review/{item['id']}/images/0")[1:], (mock.ANY, ATTACHED))
+        self.share(on=False)
+        self.assertEqual(self.image("ben", f"/api/review/{item['id']}/images/0")[0], 404)
+
+    def test_the_pictures_of_a_booking_email_are_served_to_whoever_can_see_the_booking_alone(self):
+        self.pictures_mail("flight_jsonld")
+        with remote_pictures():
+            self.scan_now()
+        [trip] = self.call("ana", "GET", "/api/trips")[1]["trips"]
+        [seg] = trip["segments"]
+        status, body = self.call("ana", "GET", f"/api/segments/{seg['id']}/emails")
+        [shown] = body["emails"]
+        self.assertEqual((status, shown["images"], shown["original"]), (200, 2, True))
+        self.assertNotIn("src=", shown["html"])
+        status, headers, raw = self.image("ana", f"/api/segments/{seg['id']}/emails/0/images/1")
+        self.assertEqual((status, raw, headers["Content-Type"]), (200, REMOTE, "image/gif"))
+        for path in (f"/api/segments/{seg['id']}/emails/1/images/0", f"/api/segments/{seg['id']}/emails/0/images/2",
+                     f"/api/segments/{seg['id']}/emails/x/images/0", "/api/segments/9999/emails/0/images/0"):
+            status, _, raw = self.image("ana", path)
+            self.assertEqual((status, json.loads(raw)), (404, {"error": "No such image"}), path)
+        self.assertEqual(self.image("ben", f"/api/segments/{seg['id']}/emails/0/images/0")[0], 404)
+        self.assertEqual(self.image(None, f"/api/segments/{seg['id']}/emails/0/images/0")[0], 401)
 
     def test_an_item_from_before_messages_were_kept_is_fetched_for_its_owner_alone_and_kept_from_then_on(self):
         self.put("no_markup")

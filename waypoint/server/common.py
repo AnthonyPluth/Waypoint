@@ -6,8 +6,9 @@ import re
 import secrets
 import threading
 import urllib.parse
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass, field
+from typing import Any
 
 from .. import monitoring, validate
 
@@ -77,6 +78,19 @@ def row_id(value, missing: str = "Not found", status: int = 404) -> int:
     if not isinstance(value, str) or not _ID.fullmatch(value):
         raise ApiError(missing, status)
     return int(value)
+
+
+NO_IMAGE = "No such image"
+
+
+def position(value: str) -> int:
+    if not isinstance(value, str) or not value.isascii() or not value.isdigit() or len(value) > 6:
+        raise ApiError(NO_IMAGE, 404)
+    return int(value)
+
+
+def image_response(image: Mapping[str, Any]) -> Response:
+    return Response(image["data"], image["type"], csp="default-src 'none'; sandbox")
 
 
 def clamped_int(v, label: str, default: int, low: int, high: int) -> int:
