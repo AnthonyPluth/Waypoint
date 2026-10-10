@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, newPage } from "./api";
+import { api, apiImage, ApiError, newPage, onDenied } from "./api";
 
 const reply = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -132,5 +132,26 @@ describe("api", () => {
     fail(new TypeError("Failed to fetch"));
     await new Promise((r) => setTimeout(r, 10));
     expect(settled).not.toHaveBeenCalled();
+  });
+});
+
+describe("apiImage", () => {
+  it("gives a picture as a data address, with no CSRF header", async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 200, blob: async () => new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" }) });
+    expect(await apiImage("/api/review/1/images/0")).toBe("data:image/png;base64,AQID");
+    expect(fetchMock).toHaveBeenCalledWith("/api/review/1/images/0");
+  });
+
+  it("refuses a picture the server doesn’t give", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 404 }));
+    await expect(apiImage("/api/review/1/images/9")).rejects.toMatchObject({ status: 404, message: "That picture can’t be shown." });
+  });
+
+  it("tells whoever is listening when it is denied", async () => {
+    const denied = vi.fn(async () => {});
+    onDenied(denied);
+    fetchMock.mockResolvedValue(new Response("{}", { status: 403 }));
+    await expect(apiImage("/api/review/1/images/0")).rejects.toBeInstanceOf(ApiError);
+    expect(denied).toHaveBeenCalled();
   });
 });

@@ -48,6 +48,7 @@
   let askOffline = $state(false);
   let lockedCopy = $state(false);
   let savedCopy = $state<Trip | null>(null);
+  let deleting = $state(false);
   let others = $state<Trip[]>([]);
   let merging = $state(false);
   let mergeWith = $state("");
@@ -151,6 +152,13 @@
     await load();
   }
 
+  const deleteTrip = () => act(async () => {
+    if (!trip) return;
+    await apiCall<"DELETE /api/trips/{id}">(`/api/trips/${trip.id}`, { method: "DELETE" });
+    toast.success("Trip deleted");
+    if (onchanged) onchanged(); else location.hash = "#trips";
+  });
+
   const loadOthers = () => act(async () => {
     others = (await apiCall<"GET /api/trips">("/api/trips")).trips.filter((o) => o.id !== (trip?.id ?? -1));
   });
@@ -234,6 +242,7 @@
     {#if !form}
       <div class="flex flex-wrap gap-2">
         <Button onclick={() => { focus = ""; form = blank(t.id); }}><Plus /> Add a booking</Button>
+        <Button variant="outline" onclick={() => { deleting = true; }}>Delete trip</Button>
         <Button variant="outline" onclick={() => { mergeWith = ""; merging = true; void loadOthers(); }}>Merge another trip</Button>
       </div>
     {/if}
@@ -355,7 +364,7 @@
           {#each mail.emails as e, i (i)}
             <div>
               {#if e.received || e.sender_domain}<p class="mb-1 text-sm text-muted-foreground">{[e.sender_domain, e.received && `sent ${e.received}`].filter(Boolean).join(" · ")}</p>{/if}
-              <MessageView subject={e.subject} text={e.text} html={e.html} truncated={e.truncated} />
+              <MessageView subject={e.subject} text={e.text} html={e.html} truncated={e.truncated} original={e.original} images={e.images} imagesAt={`/api/segments/${s.id}/emails/${i}/images/`} />
             </div>
           {/each}
         {/if}
@@ -414,6 +423,10 @@
     <Button variant="outline" size="sm" aria-label={`Remove ${name}`} onclick={() => { removing = s; asking = true; }}>Remove</Button>
   </div>
 {/snippet}
+
+<ConfirmDialog bind:open={deleting} title={`Delete ${trip?.name ?? "this trip"}?`} confirmLabel="Delete trip" busyLabel="Deleting…" destructive
+  description={trip ? `${trip.segments.length === 0 ? "It has no bookings." : trip.segments.length === 1 ? "Its 1 booking is removed too." : `Its ${trip.segments.length} bookings are removed too.`} This can’t be undone.` : ""}
+  onconfirm={async () => await deleteTrip()} />
 
 <ConfirmDialog bind:open={merging} title="Merge another trip into this one" confirmLabel="Merge" busyLabel="Merging…" disabled={!mergeWith}
   onconfirm={async () => await merge()}>

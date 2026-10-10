@@ -1,0 +1,12 @@
+{
+  "name": "trip-delete",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/'] >> visible=true" },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "click": "button:has-text('Delete trip') >> visible=true" },
+    { "wait_for": "[role='dialog']" },
+    { "screenshot": "delete-trip" }
+  ]
+}

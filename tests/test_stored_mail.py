@@ -1,3 +1,4 @@
+import base64
 import json
 from unittest import mock
 
@@ -8,7 +9,9 @@ from waypoint.storage import backup, db, schema, secretbox, stored_mail
 from waypoint.storage.models import Mailbox, ReviewItem, Segment, StoredMessage, Trip
 
 CONTENT: stored_mail.Content = {"subject": "Your itinerary: CANARY-KEPT-SUBJECT-5T2K", "sender_domain": "example-air.example", "received": "2026-10-17",
-                                "text": "Hello CANARY-KEPT-BODY-8W3M.", "html": "<p>Hello CANARY-KEPT-BODY-8W3M.</p>", "truncated": False}
+                                "text": "Hello CANARY-KEPT-BODY-8W3M.", "html": "<p>Hello CANARY-KEPT-BODY-8W3M.</p>", "truncated": False, "original": False, "images": 0}
+
+PICTURE = b"\x89PNG\r\n\x1a\n" + b"CANARY-PICTURE-BYTES-2R8T" + bytes(40)
 
 
 class KeptMessageTests(DbCase):
@@ -50,7 +53,7 @@ class KeptMessageTests(DbCase):
             self.assertIsNone(stored_mail.get(conn, self.box, "m1"))
             conn.execute(StoredMessage.__table__.update().values(content=secretbox.encrypt(json.dumps({"subject": 5, "text": None, "html": 7}))))
             self.assertEqual(stored_mail.get(conn, self.box, "m1"), {"subject": None, "sender_domain": None, "received": None, "text": "",
-                                                                      "html": None, "truncated": False})
+                                                                      "html": None, "truncated": False, "original": False, "images": 0})
 
     def test_subjects_come_without_opening_the_messages_and_are_encrypted_on_their_own(self):
         with db.session() as conn:
@@ -119,6 +122,74 @@ class KeptMessageTests(DbCase):
             self.assertEqual(len(exported["tables"]["segment_messages"]["rows"]), 1)
             self.assertNotIn(b"CANARY-KEPT", backup.dump(conn))
             self.assertNotIn(b"CANARY-KEPT", __import__("gzip").decompress(backup.dump(conn)))
+
+    def test_pictures_are_kept_in_the_same_encrypted_value_and_come_back_exact(self):
+        pictures: list[stored_mail.Image] = [{"type": "image/png", "data": PICTURE}, {"type": "image/gif", "data": bytes(range(256))}]
+        with db.session() as conn:
+            stored_mail.put(conn, self.box, "m1", {**CONTENT, "images": 2, "original": True}, 5.0, pictures)
+            raw = conn.execute(select(StoredMessage.content)).scalar()
+            self.assertTrue(secretbox.is_encrypted(raw))
+            self.assertNotIn("CANARY-PICTURE", raw)
+            opened = stored_mail.get(conn, self.box, "m1")
+            assert opened
+            self.assertEqual((opened["images"], opened["original"]), (2, True))
+            self.assertNotIn("data", opened)
+            self.assertEqual([stored_mail.image_of(conn, self.box, "m1", i) for i in (0, 1)], pictures)
+            for index in (-1, 2, 99):
+                self.assertIsNone(stored_mail.image_of(conn, self.box, "m1", index))
+            self.assertIsNone(stored_mail.image_of(conn, self.box, "other", 0))
+            stored_mail.put(conn, self.box, "m1", CONTENT, 6.0)
+            self.assertIsNone(stored_mail.image_of(conn, self.box, "m1", 0))
+
+    def test_a_message_kept_before_pictures_shows_as_not_original_with_none(self):
+        with db.session() as conn:
+            stored_mail.put(conn, self.box, "m1", CONTENT, 5.0)
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.encrypt(json.dumps(
+                {"subject": "S", "text": "T", "html": "<p>T</p>", "truncated": False}))))
+            opened = stored_mail.get(conn, self.box, "m1")
+            assert opened
+            self.assertEqual((opened["original"], opened["images"]), (False, 0))
+            self.assertIsNone(stored_mail.image_of(conn, self.box, "m1", 0))
+
+    def test_a_picture_that_cannot_be_read_is_not_served(self):
+        with db.session() as conn:
+            stored_mail.put(conn, self.box, "m1", CONTENT, 5.0)
+            damaged = {**CONTENT, "images": [{"type": "image/png", "data": "!!not base64!!"}, {"type": "image/png"}, "x", {"type": "image/png", "data": ""}]}
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.encrypt(json.dumps(damaged))))
+            self.assertEqual([stored_mail.image_of(conn, self.box, "m1", i) for i in range(4)], [None] * 4)
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.PREFIX + "bad"))
+            self.assertIsNone(stored_mail.image_of(conn, self.box, "m1", 0))
+
+    def test_the_pictures_of_the_bookings_messages_follow_the_same_order_as_the_messages(self):
+        with db.session() as conn:
+            stored_mail.put(conn, self.box, "old", {**CONTENT, "images": 1}, 1.0, [{"type": "image/png", "data": b"OLD-PICTURE"}])
+            stored_mail.put(conn, self.box, "new", {**CONTENT, "images": 1}, 2.0, [{"type": "image/png", "data": b"NEW-PICTURE"}])
+            stored_mail.put(conn, self.box, "unreadable", CONTENT, 3.0)
+            conn.execute(StoredMessage.__table__.update().where(StoredMessage.message_id == "unreadable").values(content=secretbox.PREFIX + "bad"))
+            for mid in ("old", "new", "unreadable"):
+                stored_mail.link(conn, 1, self.box, mid)
+            self.assertEqual(len(stored_mail.for_segment(conn, 1)), 2)
+            self.assertEqual([(stored_mail.image_for_segment(conn, 1, i, 0) or {})["data"] for i in (0, 1)], [b"NEW-PICTURE", b"OLD-PICTURE"])
+            self.assertIsNone(stored_mail.image_for_segment(conn, 1, 2, 0))
+            self.assertIsNone(stored_mail.image_for_segment(conn, 1, -1, 0))
+            self.assertIsNone(stored_mail.image_for_segment(conn, 2, 0, 0))
+
+    def test_a_backup_carries_the_pictures_encrypted_and_they_come_back_exact(self):
+        with db.session() as conn:
+            stored_mail.put(conn, self.box, "m1", {**CONTENT, "images": 1, "original": True}, 1.0, [{"type": "image/png", "data": PICTURE}])
+            stored_mail.link(conn, 1, self.box, "m1")
+            conn.commit()
+            dumped = backup.dump(conn)
+            self.assertNotIn(b"CANARY-PICTURE", dumped)
+            self.assertNotIn(b"CANARY-PICTURE", __import__("gzip").decompress(dumped))
+            self.assertNotIn(base64.b64encode(PICTURE), __import__("gzip").decompress(dumped))
+            data = backup.load(dumped)
+            columns = data["tables"]["stored_messages"]["columns"]
+            [row] = data["tables"]["stored_messages"]["rows"]
+            sealed = row[columns.index("content")]
+            self.assertTrue(secretbox.is_encrypted(sealed))
+            conn.execute(StoredMessage.__table__.update().values(content=sealed))
+            self.assertEqual(stored_mail.image_of(conn, self.box, "m1", 0), {"type": "image/png", "data": PICTURE})
 
     def test_a_message_kept_before_encryption_is_encrypted_at_start(self):
         with db.session() as conn:

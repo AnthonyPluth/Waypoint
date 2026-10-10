@@ -44,5 +44,5 @@ def projection(conn: db.Connection, viewer: Viewer, today: date) -> Saved:
     for segment in trip["segments"]:
         emails = trips.emails_of(conn, viewer, segment["id"]) if segment["has_email"] else None
         if emails:
-            messages.append({"segment_id": segment["id"], "emails": emails})
+            messages.append({"segment_id": segment["id"], "emails": [{**e, "images": 0} for e in emails]})
     return {"trip": trip, "messages": messages}

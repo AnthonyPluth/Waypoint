@@ -176,6 +176,19 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/wikimedia.py"]
 
+  - id: waypoint-mail-image-fetch
+    message: >-
+      Only waypoint/providers/mailimages.py downloads the images of a kept email, once, when the message is kept, with
+      the limits it enforces (https only, public addresses only, size and time caps, PNG, JPEG, GIF and WebP only, no
+      cookies) so the browser never contacts the sender (AGENTS.md, "Email stays on the server"): call it rather than
+      opening a public address yourself.
+    severity: ERROR
+    languages: [python]
+    pattern-regex: \bpublic_only\b
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/providers/mailimages.py", "/waypoint/tls.py"]
+
   - id: waypoint-ai-hosts
     message: >-
       Only waypoint/domain/mail/ai.py may send anything to an AI service, and only when the household turned the AI

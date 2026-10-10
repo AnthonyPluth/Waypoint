@@ -24,7 +24,7 @@ const hotel = segment({ id: 2, kind: "hotel", confirmation: "H77231", provider: 
 
 const copyOf = (savedAt: number): SavedCopy => ({
   savedAt, trip: { ...trip([flight, hotel]), name: "Trip to London" },
-  messages: [{ segment_id: 1, emails: [{ subject: "Your itinerary", sender_domain: "air.example", received: "2026-11-01", text: CANARY, html: `<p>${CANARY}</p>`, truncated: false }] }],
+  messages: [{ segment_id: 1, emails: [{ subject: "Your itinerary", sender_domain: "air.example", received: "2026-11-01", text: CANARY, html: `<p>${CANARY}</p>`, truncated: false, original: true, images: 0 }] }],
 });
 
 const go = async (hash: string) => { location.hash = hash; window.dispatchEvent(new HashChangeEvent("hashchange")); await Promise.resolve(); };
@@ -79,7 +79,8 @@ describe("opening the app with no connection", () => {
     const region = screen.getByRole("region", { name: /The email for/ });
     expect(within(region).getByText("Your itinerary")).toBeInTheDocument();
     expect(region).toHaveTextContent("air.example");
-    expect(region).toHaveTextContent(CANARY);
+    expect(within(region).getByTestId("preview-html").getAttribute("srcdoc")).toContain(CANARY);
+    expect(within(region).getByTestId("preview-html")).toHaveAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
   });
 
   it("keeps the check-in countdown and the route line going from the booked times and the device clock", async () => {

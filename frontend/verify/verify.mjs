@@ -23,7 +23,14 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
+
+export function lengthenNames(value, suffix) {
+  if (Array.isArray(value)) return value.map((v) => lengthenNames(v, suffix));
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, LONG_NAME_KEYS.has(k) && typeof v === "string" ? v + suffix : lengthenNames(v, suffix)]));
+}
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const unknownPages = (names) => names.filter((n) => !PAGES.includes(n));
 
@@ -89,6 +96,11 @@ async function runStep(page, step, shot, saveDownload) {
     await page.context().setOffline(step.offline);
   } else if ("reload" in step) {
     await page.reload({ waitUntil: "domcontentloaded", timeout });
+  } else if ("long_names" in step) {
+    await page.route("**/api/stats**", async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: lengthenNames(await response.json(), step.long_names) });
+    });
   } else if ("goto" in step) {
     await page.goto(step.goto.startsWith("#") ? `${page.url().split("#")[0]}${step.goto}` : step.goto);
   } else if ("click" in step) {

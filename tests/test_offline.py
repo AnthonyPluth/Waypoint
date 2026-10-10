@@ -13,7 +13,7 @@ from waypoint.server import ROUTES
 from waypoint.storage import db, secretbox, stored_mail
 from waypoint.storage.models import AuthSession, Mailbox, Person, Trip, User
 from tests.privacy import no_leaks
-from tests.shared import DbCase, ServerCase
+from tests.shared import DbCase, ServerCase, fetch
 
 MESSAGE_CANARY = "message-canary-7c41e9"
 AIRLINE_CANARY = "AIRLINE-CANARY-82913746"
@@ -106,12 +106,12 @@ class OfflineRouteTests(ServerCase):
         self.assertEqual(status, 200, got)
         return got
 
-    def keep_message(self, segment_id: int, text: str) -> None:
+    def keep_message(self, segment_id: int, text: str, pictures=()) -> None:
         with db.session() as conn:
             box = conn.execute(insert(Mailbox).values(owner_sub="sub-ana", address=f"ana{segment_id}@gmail.example", token=secretbox.encrypt("t"),
                                                       status="connected", created=1.0)).lastrowid
             stored_mail.put(conn, box, f"m{segment_id}", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-10-01",
-                                                          "text": text, "html": f"<p>{text}</p>", "truncated": False}, 1.0)   # type: ignore[arg-type]
+                                                          "text": text, "html": f"<p>{text}</p>", "truncated": False}, 1.0, pictures)   # type: ignore[arg-type]
             stored_mail.link(conn, segment_id, box, f"m{segment_id}")   # type: ignore[arg-type]
 
     def test_the_route_needs_sign_in(self):
@@ -149,6 +149,17 @@ class OfflineRouteTests(ServerCase):
         self.assertNotIn(AIRLINE_CANARY, text)
         self.assertNotIn(TRAVELER_CANARY, text)
         self.assertEqual(sorted(t["name"] for t in body["trip"]["segments"][0]["travelers"]), ["Ana", "DOE/GUEST MR"])
+
+    def test_the_pictures_of_a_stored_message_are_never_part_of_the_device_copy(self):
+        seg = self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
+        self.keep_message(seg["id"], MESSAGE_CANARY, [{"type": "image/png", "data": b"\x89PNG\r\n\x1a\nCANARY-PICTURE-BYTES-7N4D"}])
+        got = self.ok("ana")
+        [email] = got["messages"][0]["emails"]
+        self.assertEqual(email["images"], 0)
+        self.assertNotIn("CANARY-PICTURE-BYTES-7N4D", json.dumps(got))
+        self.assertNotIn("Q0FOQVJZLVBJQ1RVUkU", json.dumps(got))
+        status, _headers, raw = fetch(self.base, "GET", f"/api/segments/{seg['id']}/emails/0/images/0", None, self.who["ana"])
+        self.assertEqual((status, raw), (200, b"\x89PNG\r\n\x1a\nCANARY-PICTURE-BYTES-7N4D"))
 
     def test_the_stored_message_is_in_the_reply_only_for_someone_who_can_see_the_booking(self):
         seg = self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])

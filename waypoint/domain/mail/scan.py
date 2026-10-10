@@ -3,7 +3,6 @@ from __future__ import annotations
 import threading
 import time
 from collections import Counter
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
@@ -11,7 +10,7 @@ from typing import Any, Literal
 from sqlalchemy import delete, select, update
 
 from ... import dates, monitoring
-from ...providers import gmail
+from ...providers import gmail, mailimages
 from ...storage import db, stored_mail
 from ...storage.models import Mailbox, ScannedMessage
 from ...storage.stored_mail import Content
@@ -99,19 +98,33 @@ def _record(conn: db.Connection, mailbox_id: int, message_id: str, outcome: str,
                                             "scanned": now}, key=["mailbox_id", "message_id"])
 
 
-def _keeper(raw: dict[str, Any]) -> Callable[[], Content]:
-    return lambda: extract.keep(raw)
+def keep_message(mailbox_id: int, message_id: str, raw: dict[str, Any], segments: list[int], now: float) -> Content:
+    content, images = extract.keep(raw, mailimages.Fetcher())
+    with db.session() as conn:
+        stored_mail.put(conn, mailbox_id, message_id, content, now, images)
+        for segment_id in segments:
+            stored_mail.link(conn, segment_id, mailbox_id, message_id)
+    return content
+
+
+def _keep_quietly(mailbox_id: int, message_id: str, raw: dict[str, Any], segments: list[int], now: float) -> None:
+    try:
+        keep_message(mailbox_id, message_id, raw, segments, now)
+    except Exception as e:
+        if db.is_busy(e):
+            raise
+        monitoring.report(e, values=False)
 
 
 def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str, message: extract.Message,
           ignored: list[str], now: float, why: Counter[str] | None = None, again: bool = False,
-          keep: Callable[[], Content] | None = None, backfill: bool = False) -> tuple[int, int]:
+          backfill: bool = False) -> tuple[int, int, list[int] | None, str | None]:
     why = Counter() if why is None else why
     if again:
         conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id))
     if _ignores(ignored, message.sender_domain):
         _record(conn, mailbox_id, message_id, IGNORED, now)
-        return 0, 0
+        return 0, 0, None, None
     made, failed = 0, 0
     touched: list[int] = []
     held: list[ingest.Held] = []
@@ -134,12 +147,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     elif held:
         review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "match", now, held)
         queued = 1
-    if keep is not None and (queued or touched):
-        stored_mail.put(conn, mailbox_id, message_id, keep(), now)
-        for segment_id in dict.fromkeys(touched):
-            stored_mail.link(conn, segment_id, mailbox_id, message_id)
-    _record(conn, mailbox_id, message_id, BOOKING if usable else UNREADABLE, now)
-    return made, queued
+    return made, queued, list(dict.fromkeys(touched)) if queued or touched else None, BOOKING if usable else UNREADABLE
 
 
 SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
@@ -166,12 +174,9 @@ def _again(owner: str, item_id: int) -> tuple[int, str, dict[str, Any]]:
     return found[0], found[1], gmail.fetch(token, found[1])
 
 
-def preview(owner: str, item_id: int) -> tuple[str, str | None, bool]:
+def preview(owner: str, item_id: int) -> Content:
     mailbox_id, message_id, raw = _again(owner, item_id)
-    kept = extract.keep(raw)
-    with db.session() as conn:
-        stored_mail.put(conn, mailbox_id, message_id, kept, time.time())
-    return kept["text"], kept["html"], kept["truncated"]
+    return keep_message(mailbox_id, message_id, raw, [], time.time())
 
 
 def suggest_now(owner: str, item_id: int, now: float) -> None:
@@ -266,16 +271,19 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 continue
             try:
                 with _filing, db.session() as conn:
-                    a, b = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, _keeper(raw), backfill)
+                    a, b, wanted, outcome = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, backfill)
             except Exception as e:
                 if db.is_busy(e):
                     raise
                 monitoring.report(e, values=False)
                 with db.session() as conn:
                     review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "incomplete", now)
-                    stored_mail.put(conn, mailbox_id, message_id, extract.keep(raw), now)
-                    _record(conn, mailbox_id, message_id, UNREADABLE, now)
-                a, b = 0, 1
+                a, b, wanted, outcome = 0, 1, [], UNREADABLE
+            if wanted is not None:
+                _keep_quietly(mailbox_id, message_id, raw, wanted, now)
+            if outcome is not None:
+                with db.session() as conn:
+                    _record(conn, mailbox_id, message_id, outcome, now)
             if b:
                 _suggest(mailbox_id, message_id, raw, now)
             read, made, queued = read + 1, made + a, queued + b

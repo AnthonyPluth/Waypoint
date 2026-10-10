@@ -169,7 +169,7 @@
       <h3 class="eyebrow px-1">{title}</h3>
       <dl class="rows">
         {#each items as r (r.label)}
-            <div class="row flex-nowrap"><dt class="min-w-0 flex-1 truncate text-muted-foreground" title={r.label}>{r.label}</dt><dd class="max-w-[60%] break-words text-right font-medium">{r.value}{#if r.detail}<span class="block text-sm font-normal text-muted-foreground">{r.detail}</span>{/if}</dd></div>
+            <div class="row flex-nowrap"><dt class="min-w-0 flex-1 truncate text-muted-foreground" title={r.label}>{r.label}</dt><dd class="max-w-[60%] shrink-0 break-words text-right font-medium">{r.value}{#if r.detail}<span class="block text-sm font-normal text-muted-foreground">{r.detail}</span>{/if}</dd></div>
         {/each}
       </dl>
     </div>
@@ -237,7 +237,7 @@
       {#if cabinTotal || seatTotal}
         <section aria-labelledby="seats-title" class="space-y-3">
           <h3 id="seats-title" class="eyebrow px-1">Seats</h3>
-          <div class="rows"><div class="row flex-col items-stretch gap-5 py-4">
+          <div class="rows"><div class="row flex-col flex-nowrap items-stretch gap-5 py-4">
             {#if cabinTotal}{@render bars("Cabin", f.cabins.map((c) => [c.name, c.count]), cabinTotal)}{/if}
             {#if seatTotal}{@render bars("Where you sit", seatBars, seatTotal)}{/if}
             {#if f.top_seat}<p class="text-sm"><span class="text-muted-foreground">Top seat</span> <span class="font-medium">{f.top_seat}</span></p>{/if}

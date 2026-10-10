@@ -326,6 +326,8 @@ export interface Preview {
   text: string;
   html: string | null;
   truncated: boolean;
+  original: boolean;
+  images: number;
 }
 
 export interface ReminderDevice {
@@ -676,6 +678,8 @@ export interface StoredEmail {
   text: string;
   html: string | null;
   truncated: boolean;
+  original: boolean;
+  images: number;
 }
 
 export interface Traveler {

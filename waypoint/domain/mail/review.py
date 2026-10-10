@@ -90,12 +90,20 @@ def locate(conn: db.Connection, owner: str, item_id: int) -> tuple[int, str] | N
     return (int(row["mailbox_id"]), str(row["message_id"])) if row is not None else None
 
 
-def stored_email(conn: db.Connection, owner: str, item_id: int) -> tuple[bool, stored_mail.Content | None]:
+def _seen_message(conn: db.Connection, owner: str, item_id: int) -> tuple[int, str] | None:
     row = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id).join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                        .where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
-    if row is None:
-        return False, None
-    return True, stored_mail.get(conn, int(row["mailbox_id"]), str(row["message_id"]))
+    return None if row is None else (int(row["mailbox_id"]), str(row["message_id"]))
+
+
+def stored_email(conn: db.Connection, owner: str, item_id: int) -> tuple[bool, stored_mail.Content | None]:
+    found = _seen_message(conn, owner, item_id)
+    return (False, None) if found is None else (True, stored_mail.get(conn, *found))
+
+
+def stored_image(conn: db.Connection, owner: str, item_id: int, index: int) -> stored_mail.Image | None:
+    found = _seen_message(conn, owner, item_id)
+    return None if found is None else stored_mail.image_of(conn, *found, index)
 
 
 def dismiss(conn: db.Connection, owner: str, item_id: int, booking: tuple[Viewer, int] | None = None) -> bool:
