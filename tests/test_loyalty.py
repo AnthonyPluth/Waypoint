@@ -1,7 +1,7 @@
 import os
 from unittest import mock
 
-from sqlalchemy import insert, select
+from sqlalchemy import delete, insert, select
 
 from waypoint import oidc
 from waypoint.domain import demo, logos, loyalty, people
@@ -212,6 +212,7 @@ class RouteTests(ServerCase):
         self.addCleanup(conn.close)
         conn.execute(insert(BrandLogo).values(key=logos.key("Delta Air Lines"), name="Delta Air Lines", logo=PNG, logo_type="image/png", source="logodev"))
         conn.commit()
+        self.addCleanup(lambda: (conn.execute(delete(BrandLogo).where(BrandLogo.key == logos.key("Delta Air Lines"))), conn.commit()))
         status, headers, body = fetch(self.base, "GET", path, None, {"X-Waypoint": "1"}, 20)
         self.assertEqual((status, body, headers.get("Content-Type")), (200, PNG, "image/png"))
         listed = {m["id"]: m["logo"] for m in self.req("GET", "/api/loyalty")[1]["loyalty"]}

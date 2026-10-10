@@ -15,6 +15,8 @@ A membership has a **kind**, a **program**, a **number**, and optionally notes. 
 - **Known Traveler**: TSA PreCheck, Global Entry, NEXUS or SENTRI.
 - **Redress**: a DHS TRIP number.
 
+On the People page an airline program shows that airline’s logo before its name, once [Brand logos](/Waypoint/start/logos/) has fetched it; with no logo (or no Logo.dev key) the row shows just the name. Hotel, car and other programs have none.
+
 Each kind has a fixed list of programs. Choose **Other** for one that isn’t listed, and say which in the notes.
 
 A person has one membership in each program: once one is saved, that program is no longer offered for them under **+ ID**, and Waypoint refuses a second one (edit the first instead). **Other** can be used more than once, since it can stand for any program. A person who ended up with two numbers for one program by claiming a guest keeps both, flagged on the People page, and can still edit either.

@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-Waypoint can show the logo of each booking’s brand (an airline, a hotel chain, a rental company, a cruise line) beside it on the trip’s cards, on Upcoming and in a trip’s day-by-day list. The logos come from [Logo.dev](https://www.logo.dev), and a hotel’s own brand (Hyatt Place, Courtyard) from [Wikidata](https://www.wikidata.org) and [Wikimedia Commons](https://commons.wikimedia.org). It is off until you save a key in **Settings**, and a booking whose brand has no logo looks as it always did.
+Waypoint can show the logo of each booking’s brand (an airline, a hotel chain, a rental company, a cruise line) beside it on the trip’s cards, on Upcoming and in a trip’s day-by-day list. An airline loyalty program on the [People](/Waypoint/start/loyalty/) page shows the same airline logo beside its name. The logos come from [Logo.dev](https://www.logo.dev), and a hotel’s own brand (Hyatt Place, Courtyard) from [Wikidata](https://www.wikidata.org) and [Wikimedia Commons](https://commons.wikimedia.org). It is off until you save a key in **Settings**, and a booking whose brand has no logo looks as it always did.
 
 ## Set it up
 
