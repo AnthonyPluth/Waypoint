@@ -481,6 +481,36 @@ class StayZoneTests(Household):
         self.assertEqual((renamed["start_zone"], renamed["end_zone"]), ("America/Denver", "America/Denver"))
 
 
+class RentalZoneTests(Household):
+    RENTAL = {"kind": "car", "provider": "Example Rental", "origin": "JFK", "destination": "LHR", "start_local": "2026-06-01T19:00",
+              "end_local": "2026-06-08T07:10", "start_zone": None, "end_zone": None}
+
+    def rent(self, **extra):
+        return self.add(self.jane, {**self.RENTAL, **extra}, None, self.on(self.jane.person_id))
+
+    def test_a_rental_at_airports_takes_each_airports_zone(self):
+        seg = self.rent()
+        self.assertEqual((seg["start_zone"], seg["end_zone"]), ("America/New_York", "Europe/London"))
+
+    def test_a_rental_with_an_address_and_no_drop_off_place_takes_the_addresss_zone_for_both(self):
+        seg = self.rent(origin="Example Rental", destination=None, details={"address": "1 Ocean Ave, Honolulu, HI 96815"})
+        self.assertEqual((seg["start_zone"], seg["end_zone"]), ("Pacific/Honolulu", "Pacific/Honolulu"))
+
+    def test_a_given_zone_wins_over_the_airport_and_the_end_follows_the_start_without_an_airport(self):
+        seg = self.rent(start_zone="America/Denver", destination="Example Rental downtown")
+        self.assertEqual((seg["start_zone"], seg["end_zone"]), ("America/Denver", "America/Denver"))
+
+    def test_a_rental_that_nothing_settles_is_refused_and_says_what_to_do(self):
+        with self.assertRaisesRegex(trips.Invalid, "start time zone"):
+            self.rent(origin="Example Rental", destination=None)
+        with self.assertRaisesRegex(trips.Invalid, "isn’t one"):
+            self.rent(start_zone="Mars/Olympus")
+
+    def test_a_cruise_still_needs_its_zone(self):
+        with self.assertRaisesRegex(trips.Invalid, "start time zone"):
+            self.add(self.jane, {**self.RENTAL, "kind": "cruise", "origin": "JFK"}, None, self.on(self.jane.person_id))
+
+
 class CruiseTests(Household):
     def test_a_cruise_keeps_its_ports_in_order_with_their_own_zones(self):
         seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS})
