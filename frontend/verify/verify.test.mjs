@@ -8,11 +8,16 @@ describe("flowProblems", () => {
 
   it("names what is wrong, step by step", () => {
     expect(flowProblems({ steps: [] })).toEqual(["needs a name of letters, digits, - or _", "needs a list of steps"]);
-    const bad = flowProblems({ ...ok, steps: [{ click: "a", goto: "#b" }, { fill: "text" }, { hover: "x" }] });
+    const bad = flowProblems({ ...ok, steps: [{ click: "a", goto: "#b" }, { fill: "text" }, { drag: "x" }] });
     expect(bad).toHaveLength(3);
     expect(bad[0]).toMatch(/step 1 must have exactly one of/);
     expect(bad[1]).toBe("step 2: fill takes a object");
     expect(bad[2]).toMatch(/step 3 must have exactly one of/);
+  });
+
+  it("takes a selector to hover", () => {
+    expect(flowProblems({ ...ok, steps: [{ hover: "li.row" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ hover: true }] })).toEqual(["step 1: hover takes a string"]);
   });
 
   it("needs a selector and a file name for a download", () => {

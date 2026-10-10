@@ -5,6 +5,7 @@
   import type { Person, Segment } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
+  import ZoneSelect from "$lib/components/ZoneSelect.svelte";
   import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, SEAT_LIMIT, SEATED, seatKey, type Draft } from "$lib/segment-form";
 
   let { initial, people, onsaved, oncancel, focus = "", titled = true }: { initial: Draft; people: Person[]; onsaved: (s: Segment) => void; oncancel: () => void; focus?: string; titled?: boolean } = $props();
@@ -23,7 +24,7 @@
 
   const flight = $derived(d.kind === "flight");
   const editing = $derived(d.id !== null);
-  const zones = (() => { try { return Intl.supportedValuesOf("timeZone"); } catch { return []; } })();
+  const startBlank = $derived(flight ? "Work it out from the airport" : d.kind === "hotel" ? "Work it out from the address" : d.kind === "cruise" ? "Choose a time zone" : "Work it out from the airport or address");
 
   async function save(e: SubmitEvent) {
     e.preventDefault();
@@ -80,13 +81,12 @@
         <Input type="datetime-local" bind:value={d.end_local} autocomplete="off" />
         <span class="text-muted-foreground">The local time at the place it ends.</span></label>
       <label class={label}><span class="font-medium">{flight ? "Departure time zone (only if the airport isn’t known)" : "Time zone"}</span>
-        <Input bind:value={d.start_zone} list="segment-zones" autocomplete="off" spellcheck={false} placeholder="America/New_York" />
+        <ZoneSelect bind:value={d.start_zone} blank={startBlank} />
         {#if d.kind === "hotel"}<span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address.</span>{/if}</label>
       {#if d.kind !== "hotel"}
         <label class={label}><span class="font-medium">{flight ? "Arrival time zone (only if the airport isn’t known)" : "Time zone at the end (if different)"}</span>
-          <Input bind:value={d.end_zone} list="segment-zones" autocomplete="off" spellcheck={false} /></label>
+          <ZoneSelect bind:value={d.end_zone} blank={flight ? "Work it out from the airport" : d.kind === "cruise" ? "Same as where it starts" : "Same as where it starts, or work it out from the airport"} /></label>
       {/if}
-      <datalist id="segment-zones">{#each zones as zone (zone)}<option value={zone}></option>{/each}</datalist>
       {#each DETAILS[d.kind] as [key, name] (key)}
         <label class={label}><span class="font-medium">{name}</span>
           {#if key === "address"}
@@ -105,7 +105,7 @@
               <label class={label}><span class="font-medium">Port {i + 1}</span>
                 <Input bind:value={port.name} maxlength={100} autocomplete="off" aria-label={`Port ${i + 1} name`} /></label>
               <label class={label}><span class="font-medium">Time zone</span>
-                <Input bind:value={port.zone} list="segment-zones" autocomplete="off" spellcheck={false} placeholder="America/Nassau" aria-label={`Port ${i + 1} time zone`} /></label>
+                <ZoneSelect bind:value={port.zone} blank="Choose a time zone" label={`Port ${i + 1} time zone`} /></label>
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label class={label}><span class="font-medium">Arrives</span>
                   <Input type="datetime-local" bind:value={port.arrive} autocomplete="off" aria-label={`Port ${i + 1} arrival`} /></label>

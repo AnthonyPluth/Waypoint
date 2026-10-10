@@ -121,11 +121,11 @@
           <ul class="rows">
             {#each day.items as item (`${item.segment.id}-${item.role}`)}
               {@const seg = item.segment}
-              <li class="row items-start" class:opacity-60={seg.status === "cancelled"}>
+              <li class="row row-tap items-start" class:opacity-60={seg.status === "cancelled"}>
                 <BrandLogo src={seg.logo} label={seg.logo_label} size={32} class="mt-0.5" />
                 <div class="min-w-0 flex-1">
                   <p class="break-words text-body font-medium" class:line-through={seg.status === "cancelled"}>
-                    <a class="underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}
+                    <a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}
                     title={upcomingTitle(seg) === headline(seg) ? undefined : headline(seg)} onclick={(e) => openDetail(e, seg, item.bookings)}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${upcomingTitle(seg)}` : upcomingTitle(seg)}</a></p>
                   {#if item.role === "start" && subline(seg, true)}<p class="break-words text-caption text-muted-foreground">{subline(seg, true)}</p>{/if}
                   {#if item.role === "start" && item.bookings.length > 1}<p class="text-caption text-muted-foreground">{item.bookings.length} bookings{timesDiffer(item.bookings) ? " · times differ between bookings" : ""}</p>{/if}
