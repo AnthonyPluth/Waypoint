@@ -48,6 +48,7 @@
   let askOffline = $state(false);
   let lockedCopy = $state(false);
   let savedCopy = $state<Trip | null>(null);
+  let deleting = $state(false);
 
   const isTrip = (v: unknown): v is Trip => !!v && typeof v === "object" && Array.isArray((v as Trip).segments) && typeof (v as Trip).name === "string";
   $effect(() => onLock(() => { savedCopy = null; }));
@@ -144,6 +145,13 @@
     await load();
   }
 
+  const deleteTrip = () => act(async () => {
+    if (!trip) return;
+    await apiCall<"DELETE /api/trips/{id}">(`/api/trips/${trip.id}`, { method: "DELETE" });
+    toast.success("Trip deleted");
+    if (onchanged) onchanged(); else location.hash = "#trips";
+  });
+
   const remove = (s: Segment) => act(async () => {
     await apiCall<"DELETE /api/segments/{id}">(`/api/segments/${s.id}`, { method: "DELETE" });
     toast.success("Removed");
@@ -205,7 +213,12 @@
       <p class="text-muted-foreground">{dates(t)}{t.destination ? ` · ${t.destination}` : ""}</p>
       {#if t.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
     </div>
-    {#if !form}<Button onclick={() => { focus = ""; form = blank(t.id); }}><Plus /> Add a booking</Button>{/if}
+    {#if !form}
+      <div class="flex flex-wrap gap-2">
+        <Button onclick={() => { focus = ""; form = blank(t.id); }}><Plus /> Add a booking</Button>
+        <Button variant="outline" onclick={() => { deleting = true; }}>Delete trip</Button>
+      </div>
+    {/if}
   </div>
 
   {#if form && form.id === null}
@@ -381,6 +394,10 @@
     <Button variant="outline" size="sm" aria-label={`Remove ${name}`} onclick={() => { removing = s; asking = true; }}>Remove</Button>
   </div>
 {/snippet}
+
+<ConfirmDialog bind:open={deleting} title={`Delete ${trip?.name ?? "this trip"}?`} confirmLabel="Delete trip" busyLabel="Deleting…" destructive
+  description={trip ? `${trip.segments.length === 0 ? "It has no bookings." : trip.segments.length === 1 ? "Its 1 booking is removed too." : `Its ${trip.segments.length} bookings are removed too.`} This can’t be undone.` : ""}
+  onconfirm={async () => await deleteTrip()} />
 
 <ConfirmDialog bind:open={asking} title={`Remove ${removing ? headline(removing) : "this booking"}?`} confirmLabel="Remove" busyLabel="Removing…" destructive
   description="It’s deleted from the trip. This can’t be undone."

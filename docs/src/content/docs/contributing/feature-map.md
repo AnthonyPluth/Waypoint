@@ -29,7 +29,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/trips` | `trips.py:api_trip_add` | - | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/trips/{id}` | `trips.py:api_trip` | `pages/Trip.svelte` | `test_api_contract.py`, `test_logos.py`, `test_mcp.py`, `test_monitoring.py`, `test_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}` | `trips.py:api_trip_edit` | `pages/Trip.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_monitoring.py`, `test_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
-| `DELETE /api/trips/{id}` | `trips.py:api_trip_remove` | - | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_monitoring.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `DELETE /api/trips/{id}` | `trips.py:api_trip_remove` | `pages/Trip.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_monitoring.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/merge` | `trips.py:api_trip_merge` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/split` | `trips.py:api_trip_split` | - | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/segments` | `trips.py:api_segment_add` | `lib/components/SegmentForm.svelte`, `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py`, `test_mcp_routes.py`, `test_offline.py`, `test_reminders.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
