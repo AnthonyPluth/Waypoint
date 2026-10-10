@@ -260,8 +260,8 @@
                       {#if itemDetails(m)}<p class="break-words text-muted-foreground">{itemDetails(m)}</p>{/if}
                     </div>
                     <div class="-mt-1 -mr-2 flex shrink-0 gap-1 phone:gap-0">
-                      <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:size-7 phone:min-h-7 phone:min-w-7" aria-label={`Edit ${p.display_name}’s ${m.program}`} title="Edit" onclick={() => startEditId(m)}><Pencil class="size-4" /></Button>
-                      <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:size-7 phone:min-h-7 phone:min-w-7" aria-label={`Remove ${p.display_name}’s ${m.program}`} title="Remove" onclick={() => { idRemoving = m; idAsking = true; }}><Trash class="size-4" /></Button>
+                      <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:justify-end phone:pr-1" aria-label={`Edit ${p.display_name}’s ${m.program}`} title="Edit" onclick={() => startEditId(m)}><Pencil class="size-4" /></Button>
+                      <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:justify-start phone:pl-1" aria-label={`Remove ${p.display_name}’s ${m.program}`} title="Remove" onclick={() => { idRemoving = m; idAsking = true; }}><Trash class="size-4" /></Button>
                     </div>
                   </li>
                 {/each}
