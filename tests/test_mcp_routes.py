@@ -14,7 +14,7 @@ WRITE_READS = ["GET /api/people/claim-suggestions"]
 CHANGES = [
     "DELETE /api/people/{id}", "DELETE /api/segments/{id}", "DELETE /api/trips/{id}",
     "POST /api/distance-unit", "POST /api/people", "POST /api/people/claim-suggestions/dismiss", "POST /api/people/{id}",
-    "POST /api/people/{id}/claim", "POST /api/segments", "POST /api/segments/{id}", "POST /api/trips", "POST /api/trips/{id}",
+    "POST /api/people/{id}/claim", "POST /api/segments", "POST /api/segments/{id}", "POST /api/segments/{id}/move", "POST /api/trips", "POST /api/trips/{id}",
     "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
 ]
 BLOCKED = [

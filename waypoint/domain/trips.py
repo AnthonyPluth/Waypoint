@@ -949,6 +949,47 @@ def split(conn: db.Connection, viewer: Viewer, trip_id: int, segment_ids: Sequen
     return _trip_outs(conn, viewer, [new])[0]
 
 
+def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: int | None) -> TripOut | None:
+    seg = visibility.visible_segment(conn, viewer, segment_id)
+    if seg is None:
+        return None
+    if trip_id == seg.trip_id:
+        raise Invalid("It’s already in that trip")
+    source = conn.orm.get(Trip, seg.trip_id)
+    target: Trip | None
+    if trip_id is None:
+        if conn.orm.scalars(select(Segment.id).where(Segment.trip_id == seg.trip_id, Segment.id != seg.id)).first() is None:
+            raise Invalid("It’s already in a trip of its own")
+        place = _headline(conn, {"kind": seg.kind, "origin": seg.origin, "destination": seg.destination})
+        target = Trip(name=_name_for(place, seg.start_local), destination=place, auto=True, booked_by=viewer.person_id)
+        conn.orm.add(target)
+        conn.orm.flush()
+    else:
+        target = visibility.visible_trip(conn, viewer, trip_id)
+        if target is None:
+            return None
+        if not viewer.household:
+            _, who = _involved(conn, [seg.trip_id, target.id])
+            moving = {t.person_id for t in conn.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id)).all()
+                      if t.person_id is not None} | ({seg.booked_by} if seg.booked_by is not None else set())
+            there = who[target.id] | ({target.booked_by} if target.booked_by is not None else set())
+            if moving != there:
+                raise Invalid("That trip involves different people, and moving this there would show it to people who aren’t "
+                              "on it, or show them that trip. Add the missing travellers to the booking first.")
+        target.auto = False
+    conn.execute(update(Segment).where(Segment.id == seg.id).values(trip_id=target.id))
+    conn.orm.flush()
+    conn.orm.expire_all()
+    refresh(conn, target)
+    left = conn.orm.scalars(select(Segment.id).where(Segment.trip_id == source.id)).first() if source else None
+    if source is not None:
+        if left is None:
+            conn.execute(delete(Trip).where(Trip.id == source.id))
+        else:
+            refresh(conn, source)
+    return _trip_outs(conn, viewer, [conn.orm.get(Trip, target.id) or target])[0]
+
+
 def unmatched(conn: db.Connection, viewer: Viewer) -> list[tuple[SegmentTraveler, SegmentOut]]:
     found = visibility.visible_unmatched(conn, viewer)
     segs = {s.id: s for s in visibility.visible_segments(conn, viewer, None) if s.id in {t.segment_id for t in found}}

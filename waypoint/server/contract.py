@@ -361,6 +361,10 @@ class MergeBody(TypedDict):
     merge: int
 
 
+class MoveBody(TypedDict):
+    trip_id: int | None
+
+
 class SplitBody(TypedDict):
     segment_ids: list[int]
 

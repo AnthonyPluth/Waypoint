@@ -48,7 +48,15 @@
   let askOffline = $state(false);
   let lockedCopy = $state(false);
   let savedCopy = $state<Trip | null>(null);
+  let deleting = $state(false);
+  let others = $state<Trip[]>([]);
+  let merging = $state(false);
+  let mergeWith = $state("");
+  let moveOpen = $state(false);
+  let moving = $state<Segment | null>(null);
+  let moveTo = $state("");
 
+  const pick = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
   const isTrip = (v: unknown): v is Trip => !!v && typeof v === "object" && Array.isArray((v as Trip).segments) && typeof (v as Trip).name === "string";
   $effect(() => onLock(() => { savedCopy = null; }));
 
@@ -144,6 +152,32 @@
     await load();
   }
 
+  const deleteTrip = () => act(async () => {
+    if (!trip) return;
+    await apiCall<"DELETE /api/trips/{id}">(`/api/trips/${trip.id}`, { method: "DELETE" });
+    toast.success("Trip deleted");
+    if (onchanged) onchanged(); else location.hash = "#trips";
+  });
+
+  const loadOthers = () => act(async () => {
+    others = (await apiCall<"GET /api/trips">("/api/trips")).trips.filter((o) => o.id !== (trip?.id ?? -1));
+  });
+
+  const merge = () => act(async () => {
+    if (!trip || !mergeWith) return;
+    trip = await apiCall<"POST /api/trips/{id}/merge">(`/api/trips/${trip.id}/merge`, { method: "POST", body: { merge: Number(mergeWith) } });
+    toast.success("Merged");
+    onchanged?.();
+  });
+
+  const move = () => act(async () => {
+    const s = moving;
+    if (!s || !moveTo) return;
+    const into = await apiCall<"POST /api/segments/{id}/move">(`/api/segments/${s.id}/move`, { method: "POST", body: { trip_id: moveTo === "new" ? null : Number(moveTo) } });
+    toast.success("Moved");
+    if (onchanged) onchanged(into.id); else location.hash = `#trip/${into.id}`;
+  });
+
   const remove = (s: Segment) => act(async () => {
     await apiCall<"DELETE /api/segments/{id}">(`/api/segments/${s.id}`, { method: "DELETE" });
     toast.success("Removed");
@@ -205,7 +239,13 @@
       <p class="text-muted-foreground">{dates(t)}{t.destination ? ` · ${t.destination}` : ""}</p>
       {#if t.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
     </div>
-    {#if !form}<Button onclick={() => { focus = ""; form = blank(t.id); }}><Plus /> Add a booking</Button>{/if}
+    {#if !form}
+      <div class="flex flex-wrap gap-2">
+        <Button onclick={() => { focus = ""; form = blank(t.id); }}><Plus /> Add a booking</Button>
+        <Button variant="outline" onclick={() => { deleting = true; }}>Delete trip</Button>
+        <Button variant="outline" onclick={() => { mergeWith = ""; merging = true; void loadOthers(); }}>Merge another trip</Button>
+      </div>
+    {/if}
   </div>
 
   {#if form && form.id === null}
@@ -302,18 +342,19 @@
         aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
     {/if}
   {/if}
-  {#if s.links.app || (s.status !== "cancelled" && (s.links.directions || s.links.call))}
+  {#if s.links.app || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email}
     <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
       {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>{/if}
       {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
       {#if s.status !== "cancelled" && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
+      {#if s.has_email}
+        {@const mail = mails[s.id]}
+        <Button variant="outline" size="sm" aria-expanded={!!mail} aria-label={`${mail ? "Hide" : "View"} the email for ${headline(s)}`} onclick={() => toggleMail(s)}>{mail ? "Hide email" : "View email"}</Button>
+      {/if}
     </div>
   {/if}
   {#if s.has_email}
     {@const mail = mails[s.id]}
-    <div class="mt-2">
-      <Button variant="outline" size="sm" aria-expanded={!!mail} aria-label={`${mail ? "Hide" : "View"} the email for ${headline(s)}`} onclick={() => toggleMail(s)}>{mail ? "Hide email" : "View email"}</Button>
-    </div>
     {#if mail}
       <div class="mt-2 space-y-4" role="region" aria-label={`The email for ${headline(s)}`}>
         {#if mail.state === "loading"}<p class="text-sm text-muted-foreground" role="status">Opening the email…</p>
@@ -378,9 +419,38 @@
 {#snippet buttons(s: Segment, name: string)}
   <div class="flex flex-wrap gap-2">
     <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => edit(s)}>Edit</Button>
+    <Button variant="outline" size="sm" aria-label={`Move ${name}`} onclick={() => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); }}>Move</Button>
     <Button variant="outline" size="sm" aria-label={`Remove ${name}`} onclick={() => { removing = s; asking = true; }}>Remove</Button>
   </div>
 {/snippet}
+
+<ConfirmDialog bind:open={deleting} title={`Delete ${trip?.name ?? "this trip"}?`} confirmLabel="Delete trip" busyLabel="Deleting…" destructive
+  description={trip ? `${trip.segments.length === 0 ? "It has no bookings." : trip.segments.length === 1 ? "Its 1 booking is removed too." : `Its ${trip.segments.length} bookings are removed too.`} This can’t be undone.` : ""}
+  onconfirm={async () => await deleteTrip()} />
+
+<ConfirmDialog bind:open={merging} title="Merge another trip into this one" confirmLabel="Merge" busyLabel="Merging…" disabled={!mergeWith}
+  onconfirm={async () => await merge()}>
+  {#snippet description()}
+    <p>Its bookings move here and that trip goes away.</p>
+    <label class="flex flex-col gap-1.5 text-foreground"><span class="font-medium">Trip to merge in</span>
+      <select bind:value={mergeWith} class={pick}>
+        <option value="">Choose a trip</option>
+        {#each others as o (o.id)}<option value={String(o.id)}>{o.name} · {dates(o)}</option>{/each}
+      </select></label>
+  {/snippet}
+</ConfirmDialog>
+
+<ConfirmDialog bind:open={moveOpen} title={`Move ${moving ? headline(moving) : "this booking"}`} confirmLabel="Move" busyLabel="Moving…" disabled={!moveTo}
+  onconfirm={async () => await move()}>
+  {#snippet description()}
+    <label class="flex flex-col gap-1.5 text-foreground"><span class="font-medium">Move it to</span>
+      <select bind:value={moveTo} class={pick}>
+        <option value="">Choose a trip</option>
+        {#if (trip?.segments.length ?? 0) > 1}<option value="new">A new trip of its own</option>{/if}
+        {#each others as o (o.id)}<option value={String(o.id)}>{o.name} · {dates(o)}</option>{/each}
+      </select></label>
+  {/snippet}
+</ConfirmDialog>
 
 <ConfirmDialog bind:open={asking} title={`Remove ${removing ? headline(removing) : "this booking"}?`} confirmLabel="Remove" busyLabel="Removing…" destructive
   description="It’s deleted from the trip. This can’t be undone."

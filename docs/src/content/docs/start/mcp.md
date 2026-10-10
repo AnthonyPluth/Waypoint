@@ -33,7 +33,7 @@ The tools are `upcoming`, `list_trips`, `get_trip`, `list_people`, `get_stats` a
 
 ## Letting it change trips (optional)
 
-An assistant can also ask for **Change trips**: everything the app changes, as the approver. That’s trips (add, rename, merge, split, remove), segments (add, edit, remove), travellers, people and guests, and the distance unit; deletes are included, and marked as destructive. A change needs both:
+An assistant can also ask for **Change trips**: everything the app changes, as the approver. That’s trips (add, rename, merge, split, remove), segments (add, edit, move to another trip, remove), travellers, people and guests, and the distance unit; deletes are included, and marked as destructive. A change needs both:
 
 - **Change trips** ticked on the approval page (offered only when the assistant asks for it, and never ticked for you), and
 - **Let assistants change trips** switched on in the card. It’s off until you turn it on, and checked on every change.
