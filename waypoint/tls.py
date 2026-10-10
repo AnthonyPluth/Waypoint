@@ -13,6 +13,7 @@ import urllib.request
 @functools.cache
 def ssl_context() -> ssl.SSLContext:
     ctx = ssl.create_default_context()
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     try:
         import certifi
 
