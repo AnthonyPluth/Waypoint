@@ -31,10 +31,11 @@ def _known(domain: str | None, domains: tuple[str, ...]) -> bool:
 def decide(head: Head) -> Decision:
     text = f"{head.subject} {head.snippet}"
     changes = bool(CHANGES.search(head.subject))
-    if not changes and (CODE.search(text) or AUTO_REPLY.search(text) or REPLY.match(head.subject) or MAILING.search(head.subject)):
+    known = _known(head.sender_domain, query.SENDERS)
+    if not changes and (CODE.search(text) or AUTO_REPLY.search(text) or (not known and (REPLY.match(head.subject) or (MAILING.search(head.subject) and not BOOKING.search(head.subject))))):
         return "skip"
     if _known(head.sender_domain, query.BANK_SENDERS):
         return "read" if any(w in head.subject.lower() for w in query.BANK_SUBJECT_WORDS) else "skip"
-    if _known(head.sender_domain, query.SENDERS) or head.labels & CATEGORY_SIGNALS or BOOKING.search(text):
+    if known or head.labels & CATEGORY_SIGNALS or BOOKING.search(text):
         return "read"
     return "skip"

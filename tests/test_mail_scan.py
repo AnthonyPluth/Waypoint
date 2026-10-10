@@ -358,6 +358,23 @@ class TriageScanTests(ScanCase):
         self.assertEqual(scan.decode(self.row()["scan_summary"]), scan.summary(self.mailbox))
         self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "found", "read", "review", "skipped"])
 
+    def test_a_reply_or_an_offer_looking_subject_from_a_travel_sender_is_still_read(self):
+        for subject in ("Re: Your reservation", "Autumn sale: your booking is confirmed", "Your deal is booked: reservation H77"):
+            self.assertEqual(triage.decide(triage.Head(subject, "delta.com", "", frozenset())), "read", subject)
+            self.assertEqual(triage.decide(triage.Head(subject, "stranger.example", "", frozenset())), "skip" if subject.startswith("Re:") else "read", subject)
+        self.assertEqual(triage.decide(triage.Head("Your verification code", "delta.com", "Your code is 123456", frozenset())), "skip")
+
+    def test_a_look_back_or_a_re_read_leaves_the_last_scans_summary_alone(self):
+        self.put("hotel_jsonld")
+        self.scan()
+        before = self.row()["scan_summary"]
+        self.assertTrue(before)
+        self.add_mail("later", plain_mail(UNLISTED[0], "Your reservation is confirmed", "Everything is arranged."))
+        self.scan(backfill=True)
+        self.assertEqual(self.row()["scan_summary"], before)
+        self.scan(again=True)
+        self.assertEqual(self.row()["scan_summary"], before)
+
     def test_a_stored_summary_that_is_not_counts_is_read_as_none(self):
         for text in (None, "", "x", "[]", '{"found":1}', '{"found":true,"read":1,"bookings":1,"review":1,"skipped":1,"capped":false}',
                      '{"found":1,"read":1,"bookings":1,"review":1,"skipped":1,"capped":"no"}'):

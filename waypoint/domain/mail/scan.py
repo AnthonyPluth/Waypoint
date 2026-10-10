@@ -356,7 +356,8 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
     except Exception as e:
         monitoring.report(e, values=False)
         return _fail(mailbox_id, FAILED_GENERALLY, (read, made, queued))
-    remember(mailbox_id, Summary(len(pending), read, made, queued, skipped, capped))
+    if not again and not backfill:
+        remember(mailbox_id, Summary(len(pending), read, made, queued, skipped, capped))
     monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {len(pending)} message(s) found, "
                    f"{read} read, {made} booking(s) added or changed, {queued} to review, {skipped} skipped{', more waiting' if capped else ''}.")
     if why:
