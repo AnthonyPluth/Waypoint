@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { viewerZone, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeTime, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when } from "./trips";
+import { describe, expect, it } from "vitest";
+import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, programFor, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -16,24 +16,9 @@ describe("instant", () => {
 });
 
 describe("local times across zones", () => {
-  it("shows the place's own time, and yours in brackets only when your offset then differs", () => {
-    expect(placeTime("2026-11-20T19:00", NY, LA)).toEqual({ text: "7:00 PM", yours: "4:00 PM PST" });
-    expect(placeTime("2026-11-20T19:00", NY, NY)).toEqual({ text: "7:00 PM", yours: null });
-    expect(placeTime("2026-11-20T19:00", NY, "America/Toronto").yours).toBeNull();
-  });
-  it("says which day it is for you when that isn't the place's day", () => {
-    expect(placeTime("2026-11-21T07:10", LON, LA)).toEqual({ text: "7:10 AM", yours: "Nov 20, 11:10 PM PST" });
-  });
   it("never converts the place's time to the viewer's or the server's", () => {
-    for (const mine of [NY, LON, AKL, LA, "UTC"]) expect(placeTime("2026-11-20T19:00", NY, mine).text).toBe("7:00 PM");
+    expect(clock("2026-11-20T19:00")).toBe("7:00 PM");
     expect(clock("2026-03-01T22:15")).toBe("10:15 PM");
-  });
-  it("brackets the time in the zone the device is in, so on the east coast it reads EDT", () => {
-    const device = vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ timeZone: NY } as Intl.ResolvedDateTimeFormatOptions);
-    expect(viewerZone()).toBe(NY);
-    expect(placeTime("2026-07-20T19:00", "America/Chicago")).toEqual({ text: "7:00 PM", yours: "8:00 PM EDT" });
-    expect(placeTime("2026-07-20T19:00", NY)).toEqual({ text: "7:00 PM", yours: null });
-    device.mockRestore();
   });
   it("tells the day in a zone", () => { expect(dayIn(Date.UTC(2026, 10, 21, 3, 0), NY)).toBe("2026-11-20"); });
 });

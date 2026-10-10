@@ -216,12 +216,13 @@ describe("Upcoming", () => {
     expect(screen.getByRole("link", { name: "Open Trip to London" })).toHaveAttribute("href", "#trip/1?segment=1");
   });
 
-  it("shows a time at its place and, in brackets, yours when your zone differs", async () => {
+  it("shows a time at its place and never a second time in your zone", async () => {
     at("2026-11-20T09:00:00-05:00");
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(within(card).getByText("7:10 AM")).toBeInTheDocument();
+    expect(card).not.toHaveTextContent("[");
   });
 
   it("says nothing is coming up when every trip is over", async () => {

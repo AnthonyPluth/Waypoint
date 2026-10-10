@@ -132,8 +132,8 @@
                 </div>
                 <p class="text-body font-medium">
                   {#if untimed(seg)}<span class="text-muted-foreground">time not recorded</span>
-                  {:else if item.role === "end"}<PlaceTime local={seg.end_local} zone={seg.end_zone} />
-                  {:else}<PlaceTime local={seg.start_local} zone={seg.start_zone} />{/if}
+                  {:else if item.role === "end"}<PlaceTime local={seg.end_local} />
+                  {:else}<PlaceTime local={seg.start_local} />{/if}
                 </p>
               </li>
             {/each}

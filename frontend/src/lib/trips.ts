@@ -40,15 +40,6 @@ export const clock = (local: string): string => asUtc(local).toLocaleTimeString(
 export const dayLabel = (local: string): string => asUtc(local).toLocaleDateString(locale(), { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
 export const dateLabel = (day: string): string => asUtc(`${day}T00:00`).toLocaleDateString(locale(), { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
 
-export function placeTime(local: string, zone: string, mine: string = viewerZone()): { text: string; yours: string | null } {
-  const text = clock(local);
-  const at = instant(local, zone);
-  if (Number.isNaN(at) || offsetAt(at, zone) === offsetAt(at, mine)) return { text, yours: null };
-  const yours = new Intl.DateTimeFormat(locale(), { timeZone: mine, hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(at));
-  const sameDay = dayIn(at, mine) === local.slice(0, 10);
-  return { text, yours: sameDay ? yours : `${new Intl.DateTimeFormat(locale(), { timeZone: mine, month: "short", day: "numeric" }).format(new Date(at))}, ${yours}` };
-}
-
 export function until(ms: number): string {
   const mins = Math.round(ms / 60000);
   if (mins < 1) return "now";

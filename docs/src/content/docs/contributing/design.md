@@ -46,7 +46,7 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 
 - The headline comes from `passHeadline(segment, now)` in `frontend/src/lib/trips.ts` and uses the booked times only. A flight reads "Check-in opens in …" until `CHECK_IN_WINDOW_HOURS` before departure, then "Check-in is open, departs in …", then "Under way, arrives in …", then "Landed". Live status never changes it. A cancelled segment reads "Cancelled".
 - The plane comes from `routeProgress(segment, now)`: `(now − departure) ÷ (arrival − departure)` on the segment's instants, clamped to 0–1, and 0 for a segment with no times. It never uses live status.
-- Times are the wall-clock times at each place, as stored, with the bracketed "your time" reading when your zone differs.
+- Times are the wall-clock times at each place, as stored, and are never shown in the viewer's own zone.
 - The card does not read the API for gate or city: a gate shows only from live flight status, and the airport name is not shown.
 
 ## Navigation

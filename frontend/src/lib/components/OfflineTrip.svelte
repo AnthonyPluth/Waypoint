@@ -55,8 +55,8 @@
                 <li class="flex flex-wrap items-baseline justify-between gap-x-3">
                   <span class="break-words font-medium">{p.name}</span>
                   <span class="text-muted-foreground">
-                    {#if p.arrive_local}{dayLabel(p.arrive_local)}, arrives <PlaceTime local={p.arrive_local} zone={p.zone} />{#if p.depart_local}, leaves <PlaceTime local={p.depart_local} zone={p.zone} />{/if}
-                    {:else if p.depart_local}{dayLabel(p.depart_local)}, leaves <PlaceTime local={p.depart_local} zone={p.zone} />
+                    {#if p.arrive_local}{dayLabel(p.arrive_local)}, arrives <PlaceTime local={p.arrive_local} />{#if p.depart_local}, leaves <PlaceTime local={p.depart_local} />{/if}
+                    {:else if p.depart_local}{dayLabel(p.depart_local)}, leaves <PlaceTime local={p.depart_local} />
                     {:else}Time not recorded{/if}
                   </span>
                 </li>
