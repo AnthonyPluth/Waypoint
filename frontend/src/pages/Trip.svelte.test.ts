@@ -66,6 +66,55 @@ describe("Trip", () => {
     expect(cards[1].querySelector("img")).toBeNull();
   });
 
+  describe("moving bookings and merging trips", () => {
+    const march = trip([segment({ id: 9, start_local: "2026-03-01T10:00", end_local: "2026-03-01T12:00" })], { id: 7, name: "Spring trip" });
+
+    function withOthers() {
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips" && !opts) return { trips: [held, march] } as never;
+        if (path === "/api/trips/1/merge") return { ...held, segments: [...held.segments, ...march.segments] } as never;
+        if (path.endsWith("/move")) return march as never;
+        return answer(path, opts) as never;
+      });
+    }
+
+    it("merges another trip into this one, listing only the others", async () => {
+      withOthers();
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Merge another trip" }));
+      const dialog = await screen.findByRole("dialog");
+      const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
+      await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(2));
+      expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Merge" })).toBeDisabled();
+      await u.selectOptions(choose, "7");
+      await u.click(within(dialog).getByRole("button", { name: "Merge" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1/merge", { method: "POST", body: { merge: 7 } }));
+    });
+
+    it("moves a booking into another trip, or into a new one of its own", async () => {
+      withOthers();
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      let dialog = await screen.findByRole("dialog");
+      const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
+      expect(within(dialog).getByRole("button", { name: "Move" })).toBeDisabled();
+      await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
+      await u.selectOptions(choose, "7");
+      await u.click(within(dialog).getByRole("button", { name: "Move" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2/move", { method: "POST", body: { trip_id: 7 } }));
+      expect(location.hash).toBe("#trip/7");
+      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      dialog = await screen.findByRole("dialog");
+      await u.selectOptions(within(dialog).getByRole("combobox", { name: "Move it to" }), "new");
+      await u.click(within(dialog).getByRole("button", { name: "Move" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2/move", { method: "POST", body: { trip_id: null } }));
+    });
+  });
+
   it("opens the email a booking was made from, in place, and closes it again", async () => {
     held = trip([segment({ ...flight, has_email: true }), stay]);
     const answer = vi.mocked(api).getMockImplementation()!;

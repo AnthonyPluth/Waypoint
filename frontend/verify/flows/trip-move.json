@@ -1,0 +1,12 @@
+{
+  "name": "trip-move",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/'] >> visible=true" },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "click": "ul[aria-label='Bookings'] button[aria-label^='Move '] >> nth=-1" },
+    { "wait_for": "[role='dialog'] select" },
+    { "screenshot": "move-booking" }
+  ]
+}
