@@ -94,6 +94,20 @@ describe("MessageView", () => {
     expect(screen.getByTestId("email-frame")).toBeInTheDocument();
   });
 
+  it("rings the frame while the keyboard is inside it, which the browser doesn't do for a frame", async () => {
+    render(MessageView, { text: "Gate B12", layout: LAYOUT, images: 0 });
+    const box = frame();
+    expect(box.className).not.toContain("ring-[3px]");
+    box.tabIndex = 0;
+    box.focus();
+    window.dispatchEvent(new Event("blur"));
+    await waitFor(() => expect(box.className).toContain("ring-[3px]"));
+    const other = document.createElement("button");
+    document.body.append(other);
+    other.focus();
+    await waitFor(() => expect(box.className).not.toContain("ring-[3px]"));
+  });
+
   it("shows a message kept before the full message was kept as it was, with a line saying the original can't be shown", () => {
     render(MessageView, { text: "Gate B12", html: "<p>Gate <b>B12</b></p>", full: false, layout: null, images: 0 });
     expect(screen.getByTestId("original-unavailable")).toHaveTextContent("The original can’t be shown for this email");

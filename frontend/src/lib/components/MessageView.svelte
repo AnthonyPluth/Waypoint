@@ -16,6 +16,9 @@
   };
   let { subject = null, text, html = null, truncated = false, full = true, layout = null, images = 0, loadImages, offline = false }: Props = $props();
   let plain = $state(false);
+  let frame = $state<HTMLIFrameElement>();
+  let inFrame = $state(false);
+  const syncFocus = () => (inFrame = Boolean(frame) && document.activeElement === frame);
   let pictures = $state<{ state: "loading" } | { state: "ready"; list: Picture[] } | { state: "failed"; message: string }>({ state: "loading" });
 
   $effect(() => {
@@ -33,12 +36,15 @@
   const formatted = $derived(Boolean(layout || html));
 </script>
 
+<svelte:window onblur={syncFocus} onfocus={syncFocus} />
+<svelte:document onfocusin={syncFocus} />
+
 <div class="space-y-2">
   {#if subject}<p class="break-words font-medium" data-testid="message-subject">{subject}</p>{/if}
   {#if layout && !plain}
     {#if shown}
-      <iframe title={subject ? `The email: ${subject}` : "The email"} srcdoc={shown} sandbox={FRAME_SANDBOX} referrerpolicy="no-referrer" loading="lazy"
-        class="block h-[32rem] max-h-[75vh] w-full rounded-lg border border-border bg-white" data-testid="email-frame"></iframe>
+      <iframe title={subject ? `The email: ${subject}` : "The email"} srcdoc={shown} sandbox={FRAME_SANDBOX} referrerpolicy="no-referrer" loading="lazy" bind:this={frame}
+        class={["block h-[32rem] max-h-[75vh] w-full rounded-lg border bg-white outline-none", inFrame ? "border-ring ring-[3px] ring-ring/50" : "border-border"]} data-testid="email-frame"></iframe>
       {#if pictures.state === "failed"}<p class="text-sm text-muted-foreground" role="alert">The pictures couldn’t be loaded: {pictures.message}</p>{/if}
     {:else}<p class="text-sm text-muted-foreground" role="status">Opening the email…</p>{/if}
   {:else if html && !plain}

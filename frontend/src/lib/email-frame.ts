@@ -9,7 +9,7 @@ const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 const SHEET = `
   :root { color-scheme: light; }
   html, body { margin: 0; }
-  body { padding: 12px; background: #ffffff; color: #1a1a1a; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; overflow-wrap: anywhere; }
+  body { padding: 12px; background: #ffffff; color: #1a1a1a; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; overflow-wrap: break-word; }
   img { max-width: 100%; height: auto; }
   table { max-width: 100%; }
   a { color: #0b57d0; }
