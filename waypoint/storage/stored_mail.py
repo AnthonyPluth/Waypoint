@@ -10,6 +10,11 @@ from . import db, secretbox
 from .models import ReviewItem, SegmentMessage, StoredMessage
 
 
+class Image(TypedDict):
+    type: str
+    data: str
+
+
 class Content(TypedDict):
     subject: str | None
     sender_domain: str | None
@@ -17,6 +22,23 @@ class Content(TypedDict):
     text: str
     html: str | None
     truncated: bool
+    full: bool
+    layout: str | None
+    images: list[Image]
+
+
+class Stored(Content):
+    id: int
+
+
+IMAGE_TYPES = ("image/png", "image/jpeg", "image/gif", "image/webp")
+
+
+def _images(found: Any) -> list[Image]:
+    if not isinstance(found, list):
+        return []
+    return [{"type": i["type"], "data": i["data"]} for i in found
+            if isinstance(i, dict) and i.get("type") in IMAGE_TYPES and isinstance(i.get("data"), str)]
 
 
 def _open(value: str) -> Content | None:
@@ -31,7 +53,8 @@ def _open(value: str) -> Content | None:
             "sender_domain": found.get("sender_domain") if isinstance(found.get("sender_domain"), str) else None,
             "received": found.get("received") if isinstance(found.get("received"), str) else None,
             "text": str(found.get("text") or ""), "html": html if isinstance(html, str) else None,
-            "truncated": bool(found.get("truncated"))}
+            "truncated": bool(found.get("truncated")), "full": found.get("full") is True,
+            "layout": found.get("layout") if isinstance(found.get("layout"), str) else None, "images": _images(found.get("images"))}
 
 
 def put(conn: db.Connection, mailbox_id: int, message_id: str, content: Mapping[str, Any], now: float) -> int:
@@ -73,10 +96,18 @@ def link(conn: db.Connection, segment_id: int, mailbox_id: int, message_id: str)
     return True
 
 
-def for_segment(conn: db.Connection, segment_id: int) -> list[Content]:
-    rows = conn.execute(select(StoredMessage.content).join(SegmentMessage, SegmentMessage.stored_message_id == StoredMessage.id)
-                        .where(SegmentMessage.segment_id == segment_id).order_by(StoredMessage.created.desc(), StoredMessage.id.desc())).scalars()
-    return [c for c in (_open(v) for v in rows) if c is not None]
+def for_segment(conn: db.Connection, segment_id: int) -> list[Stored]:
+    rows = conn.execute(select(StoredMessage.id, StoredMessage.content).join(SegmentMessage, SegmentMessage.stored_message_id == StoredMessage.id)
+                        .where(SegmentMessage.segment_id == segment_id).order_by(StoredMessage.created.desc(), StoredMessage.id.desc())).fetchall()
+    opened = [(int(r["id"]), _open(r["content"])) for r in rows]
+    return [{**c, "id": i} for i, c in opened if c is not None]
+
+
+def images_for_segment(conn: db.Connection, segment_id: int, stored_id: int) -> list[Image] | None:
+    value = conn.execute(select(StoredMessage.content).join(SegmentMessage, SegmentMessage.stored_message_id == StoredMessage.id)
+                         .where(SegmentMessage.segment_id == segment_id, StoredMessage.id == stored_id)).scalar()
+    found = _open(value) if value else None
+    return None if found is None else found["images"]
 
 
 def with_messages(conn: db.Connection, segment_ids: Iterable[int]) -> set[int]:

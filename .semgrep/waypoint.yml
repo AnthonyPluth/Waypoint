@@ -176,6 +176,33 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/wikimedia.py"]
 
+  - id: waypoint-image-fetch
+    message: >-
+      Only waypoint/providers/images.py downloads the images of an email (AGENTS.md, "Email stays on the server"): it
+      refuses private, loopback and link-local addresses (also after redirects and in DNS answers), anything but https,
+      oversized, slow or non-image answers, and sends no cookies or identifying headers. Call it rather than opening a
+      connection to an address a message named.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: tls.public_handlers(...)
+      - pattern: tls.public_address(...)
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/providers/images.py", "/waypoint/tls.py"]
+
+  - id: waypoint-image-callers
+    message: >-
+      Only the mail scan (waypoint/domain/mail/scan.py) calls waypoint/providers/images.py, once, when a message is kept,
+      so a sender can learn nothing from someone opening an email (AGENTS.md, "Email stays on the server"). Show the
+      images the scan kept (stored_mail) instead of fetching them again.
+    severity: ERROR
+    languages: [python]
+    pattern-regex: \bfrom\s+[.\w]*providers\.images\s+import\b|\bfrom\s+[.\w]*providers\s+import\b[^\n]*\bimages\b|\bimport\s+[.\w]*providers\.images\b
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/providers/images.py", "/waypoint/domain/mail/scan.py"]
+
   - id: waypoint-ai-hosts
     message: >-
       Only waypoint/domain/mail/ai.py may send anything to an AI service, and only when the household turned the AI

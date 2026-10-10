@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import base64
+import struct
+import zlib
 from datetime import UTC, date, datetime, timedelta
+from email.message import EmailMessage
 
 from sqlalchemy import func, select
 
@@ -8,7 +12,7 @@ from ..storage import db, secretbox, stored_mail
 from ..storage.models import (FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentMessage, SegmentPort, SegmentTraveler,
                               StoredMessage, Trip, User)
 from . import loyalty, people, trips
-from .mail import review
+from .mail import extract, review
 from .visibility import Viewer
 
 MEMBERS = [("demo-jane", "jane.doe@example.com", "Jane Doe", "Jane"),
@@ -162,7 +166,45 @@ def _held_stay(today: date) -> trips.SegmentIn:
 
 def _message(domain: str, days_ago: int, today: date, subject: str, lines: tuple[str, ...]) -> stored_mail.Content:
     return {"subject": subject, "sender_domain": domain, "received": (today - timedelta(days=days_ago)).isoformat(), "text": "\n".join(lines),
-            "html": "".join(f"<p>{line}</p>" for line in lines), "truncated": False}
+            "html": "".join(f"<p>{line}</p>" for line in lines), "truncated": False, "full": False, "layout": None, "images": []}
+
+
+def _png(width: int, height: int, top: tuple[int, int, int], bottom: tuple[int, int, int]) -> bytes:
+    rows = b"".join(b"\x00" + bytes(c for x in range(width) for c in tuple(t + (b - t) * y // (height - 1) for t, b in zip(top, bottom, strict=True)))
+                    for y in range(height))
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
+
+
+RICH_ITINERARY = """<html><body style="margin:0; background-color:#eef2f7" bgcolor="#eef2f7">
+<table width="600" align="center" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border:1px solid #d5dbe5; width:100%; max-width:600px">
+<tr><td><img src="cid:banner" alt="Example Air" width="600" style="display:block; width:100%"></td></tr>
+<tr><td style="padding:24px; font-family:Georgia, serif; color:#1f2937">
+<h1 style="font-size:22px; margin:0 0 12px; color:#0b3d91">Your itinerary</h1>
+<p style="font-size:15px; line-height:1.5; margin:0 0 16px">Hello, your flight <b>EX 410</b> leaves New York (JFK) at 7:00 am. Check in opens 24 hours before.</p>
+<table width="100%" cellpadding="8" cellspacing="0" style="border:1px solid #d5dbe5; font-size:14px">
+<tr style="background-color:#f3f6fb"><td><b>Confirmation</b></td><td align="right">CH3K5P</td></tr>
+<tr><td><b>Flight</b></td><td align="right">EX 410, JFK to ORD</td></tr>
+<tr style="background-color:#f3f6fb"><td><b>Seat</b></td><td align="right">14C</td></tr></table>
+<p style="margin:16px 0 0"><a href="https://example-air.example/manage" style="color:#0b3d91; font-weight:bold">Manage your booking</a></p>
+<p style="font-size:12px; color:#6b7280; margin:20px 0 0">Made-up message for the demo. <img src="https://images.example-air.example/pixel.gif" width="1" height="1" alt=""></p>
+</td></tr></table></body></html>"""
+
+
+def _rich_message(domain: str, days_ago: int, today: date, subject: str) -> stored_mail.Content:
+    mail = EmailMessage()
+    mail["Subject"] = subject
+    mail["From"] = f"Example Air <bookings@{domain}>"
+    mail["Date"] = (datetime.combine(today - timedelta(days=days_ago), datetime.min.time(), UTC)).strftime("%a, %d %b %Y %H:%M:%S +0000")
+    mail.set_content("Hello,\nYour flight EX 410 leaves New York (JFK) at 7:00 am.\nConfirmation: CH3K5P")
+    mail.add_alternative(RICH_ITINERARY, subtype="html")
+    body = mail.get_body(("html",))
+    assert isinstance(body, EmailMessage)
+    body.add_related(_png(600, 120, (11, 61, 145), (59, 130, 246)), "image", "png", cid="<banner>")
+    return extract.keep({"raw": base64.urlsafe_b64encode(mail.as_bytes()).decode("ascii")})
 
 
 SUBJECTS = {"example-air.example": "Your itinerary", "example-stays.example": "Your reservation", "example-cruises.example": "Your cruise booking"}
@@ -220,8 +262,7 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     stored_mail.put(conn, box.id, "demo-held-stay", _message("example-stays.example", 4, today, "Your stay: Quay Street Lodge",
                                                              ("Hello Jane,", "Your stay at Quay Street Lodge is booked.", "Confirmation: DEMO77")), 0.0)
     if from_email:
-        stored_mail.put(conn, box.id, "demo-read-from-email", _message("example-air.example", 60, today, "Your itinerary: flight EX 410",
-                                                                       ("Hello,", "Your flight EX 410 leaves New York (JFK) at 7:00 am.", "Confirmation: CH3K5P")), 0.0)
+        stored_mail.put(conn, box.id, "demo-read-from-email", _rich_message("example-air.example", 60, today, "Your itinerary: flight EX 410"), 0.0)
         stored_mail.link(conn, from_email["id"], box.id, "demo-read-from-email")
     shared = Mailbox(owner_sub="demo-sam", address=DEMO_SHARED_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
                      status="connected", created=0.0, last_scan=None, share_review=True)

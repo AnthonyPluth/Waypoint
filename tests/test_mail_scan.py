@@ -11,6 +11,7 @@ from unittest import mock
 
 from sqlalchemy import delete, insert, select, update
 
+from tests.fakenet import IMAGE_CANARIES, JPEG, PNG, SENDER_HOSTS, SENDER_PAGES, internet
 from tests.privacy import no_leaks
 from tests.shared import TODAY, DbCase
 from tests.test_gmail import CLIENT_ID, CLIENT_SECRET, FakeGoogle, Google, GoogleCase
@@ -19,7 +20,7 @@ from waypoint.domain import loyalty, people, trips
 from waypoint.domain.mail import extract, ingest, query, review, scan
 from waypoint.domain.visibility import Viewer
 from waypoint.providers import gmail
-from waypoint.server import jobs
+from waypoint.server import jobs, mcp_access, mcp_http
 from waypoint.storage import db, secretbox, stored_mail
 from waypoint.storage.models import IgnoredSender, Mailbox, ReviewItem, ScannedMessage, Segment, SegmentMessage, SegmentTraveler, StoredMessage
 
@@ -488,7 +489,8 @@ class ReviewTests(ScanCase):
         self.scan()
         [item] = self.items()
         with no_leaks(self, "CANARY-BODY-NOMARKUP-6H9C", database=self.path):
-            text, html, cut = scan.preview("u-jane", item["id"])
+            kept = scan.preview("u-jane", item["id"])
+        text, html, cut = kept["text"], kept["html"], kept["truncated"]
         self.assertIn("CANARY-BODY-NOMARKUP-6H9C", text)
         self.assertNotIn("<", text)
         assert html is not None
@@ -505,8 +507,8 @@ class ReviewTests(ScanCase):
         self.scan()
         [item] = self.items()
         with mock.patch.object(extract, "KEPT_LIMIT", 20):
-            text, _html, cut = scan.preview("u-jane", item["id"])
-        self.assertEqual((len(text), cut), (20, True))
+            kept = scan.preview("u-jane", item["id"])
+        self.assertEqual((len(kept["text"]), kept["truncated"]), (20, True))
         del self.google.mail["msg-no_markup"]
         with self.assertRaises(gmail.MessageGone):
             scan.preview("u-jane", item["id"])
@@ -1588,7 +1590,7 @@ class MailScanApiTests(GoogleCase):
         status, body = self.call("ana", "GET", f"/api/segments/{seg['id']}/emails")
         self.assertEqual(status, 200)
         [email] = body["emails"]
-        self.assertEqual(set(email), {"subject", "sender_domain", "received", "text", "html", "truncated"})
+        self.assertEqual(set(email), {"id", "subject", "sender_domain", "received", "text", "html", "truncated", "full", "layout", "images"})
         self.assertEqual(email["sender_domain"], "example-air.example")
         self.assertEqual(self.call("ben", "GET", f"/api/segments/{seg['id']}/emails"), (404, {"error": "No such segment"}))
         self.assertEqual(self.call("ana", "GET", "/api/segments/99999/emails"), (404, {"error": "No such segment"}))
@@ -1733,6 +1735,84 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual((status, body["matched"]), (200, 1))
         names = [p["display_name"] for p in self.call("ana", "GET", "/api/people")[1]["people"]]
         self.assertIn("Mia Rose Doe", names)
+
+    def rich_scan(self, *names):
+        self.put(*names)
+        with internet(SENDER_HOSTS, SENDER_PAGES):
+            return self.scan_now()
+
+    def test_the_images_of_a_booking_come_back_only_for_whoever_can_see_the_booking(self):
+        with no_leaks(self, *IMAGE_CANARIES, sent_ok=True):
+            self.rich_scan("rich_flight")
+            [trip] = self.call("ana", "GET", "/api/trips")[1]["trips"]
+            [seg] = trip["segments"]
+            status, listed = self.call("ana", "GET", f"/api/segments/{seg['id']}/emails")
+            [email] = listed["emails"]
+            self.assertEqual((status, email["full"], email["images"]), (200, True, 2))
+            self.assertIn('data-image="1"', email["layout"])
+            self.assertNotIn("data", json.dumps(email["images"]))
+            path = f"/api/segments/{seg['id']}/emails/{email['id']}/images"
+            status, body = self.call("ana", "GET", path)
+        self.assertEqual(status, 200)
+        self.assertEqual([i["type"] for i in body["images"]], ["image/png", "image/jpeg"])
+        self.assertEqual([base64.b64decode(i["data"]) for i in body["images"]], [PNG, JPEG])
+        self.assertEqual(self.call("ben", "GET", path), (404, {"error": "No such segment"}))
+        self.assertEqual(self.call("ana", "GET", f"/api/segments/{seg['id']}/emails/{email['id'] + 99}/images"), (404, {"error": "No such segment"}))
+        self.assertEqual(self.call("ana", "GET", f"/api/segments/99999/emails/{email['id']}/images"), (404, {"error": "No such segment"}))
+        self.assertEqual(self.call("ana", "GET", f"/api/segments/{seg['id']}/emails/x/images"), (404, {"error": "No such segment"}))
+        self.assertEqual(self.call("ben", "GET", f"/api/segments/{seg['id']}/emails")[0], 404)
+
+    def test_a_message_of_one_booking_is_not_reachable_through_another(self):
+        self.rich_scan("rich_flight")
+        [trip] = self.call("ana", "GET", "/api/trips")[1]["trips"]
+        [seg] = trip["segments"]
+        [email] = self.call("ana", "GET", f"/api/segments/{seg['id']}/emails")[1]["emails"]
+        other = self.call("ana", "POST", "/api/segments", {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": "2026-12-08T08:00",
+                                                           "end_local": "2026-12-08T11:20"})[1]
+        self.assertEqual(self.call("ana", "GET", f"/api/segments/{other['id']}/emails/{email['id']}/images"), (404, {"error": "No such segment"}))
+
+    def test_the_images_of_a_review_item_come_back_for_its_owner_and_for_the_household_only_while_it_is_shared(self):
+        self.rich_scan("rich_note")
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        path = f"/api/review/{item['id']}/images"
+        with no_leaks(self, *IMAGE_CANARIES, sent_ok=True):
+            status, preview = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
+            self.assertEqual((status, preview["full"], preview["images"]), (200, True, 2))
+            self.assertIn("CANARY-BODY-RICH-NOTE-8K1Q", preview["layout"])
+            status, body = self.call("ana", "GET", path)
+        self.assertEqual(status, 200)
+        self.assertEqual([base64.b64decode(i["data"]) for i in body["images"]], [PNG, JPEG])
+        self.assertEqual(self.call("ben", "GET", path)[0], 404)
+        self.share()
+        self.assertEqual(self.call("ben", "GET", path), (200, body))
+        self.share(on=False)
+        self.assertEqual(self.call("ben", "GET", path), (404, {"error": "No such item"}))
+        self.assertEqual(self.call("ana", "GET", "/api/review/99999/images"), (404, {"error": "No such item"}))
+        self.assertEqual(self.call("ana", "GET", "/api/review/x/images"), (404, {"error": "No such item"}))
+
+    def test_an_item_whose_message_was_not_kept_has_no_images_to_serve(self):
+        self.rich_scan("rich_note")
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        with db.session() as conn:
+            conn.execute(StoredMessage.__table__.delete())
+        self.assertEqual(self.call("ana", "GET", f"/api/review/{item['id']}/images"), (404, {"error": "No such item"}))
+
+    def test_a_message_kept_before_images_were_kept_says_so_and_has_none(self):
+        self.put("no_markup")
+        self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        old = {"subject": "Old", "sender_domain": "x.example", "received": None, "text": "Old text", "html": "<p>Old</p>", "truncated": False}
+        with db.session() as conn:
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.encrypt(json.dumps(old))))
+        status, preview = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
+        self.assertEqual((status, preview["full"], preview["layout"], preview["images"], preview["html"]), (200, False, None, 0, "<p>Old</p>"))
+        self.assertEqual(self.call("ana", "GET", f"/api/review/{item['id']}/images"), (200, {"images": []}))
+
+    def test_assistants_cannot_reach_a_message_or_its_images(self):
+        for path in ("/api/review/{id}/images", "/api/review/{id}/preview", "/api/segments/{id}/emails", "/api/segments/{id}/emails/{id}/images"):
+            with self.subTest(path=path):
+                self.assertTrue(mcp_access.blocked(path))
+                self.assertIsNone(mcp_http.needs("GET", path))
 
 
 if __name__ == "__main__":

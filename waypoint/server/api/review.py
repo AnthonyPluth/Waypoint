@@ -11,7 +11,8 @@ from ...domain.mail import ai, review, scan
 from ...providers import gmail
 from ...storage import db
 from ..common import ApiError, own_session, row_id
-from ..contract import Matched, MatchBody, Ok, Preview, Review, ReviewItem, ReviewMatch, WhoBody
+from ...storage.stored_mail import Content
+from ..contract import Matched, MatchBody, MessageImage, MessageImages, Ok, Preview, Review, ReviewItem, ReviewMatch, WhoBody
 from .mailboxes import owner
 from .trips import viewer
 
@@ -99,6 +100,11 @@ GONE = "That message is no longer in Gmail."
 NOT_KEPT = "This message wasn’t kept. Its owner can open it in Gmail."
 
 
+def _preview(kept: Content) -> Preview:
+    return {"subject": kept["subject"], "text": kept["text"], "html": kept["html"], "truncated": kept["truncated"], "full": kept["full"],
+            "layout": kept["layout"], "images": len(kept["images"])}
+
+
 @own_session
 def api_review_preview(_conn, _q, _b, item_id: str) -> Preview:
     item = row_id(item_id, NO_ITEM)
@@ -107,19 +113,25 @@ def api_review_preview(_conn, _q, _b, item_id: str) -> Preview:
     if not visible:
         raise ApiError(NO_ITEM, 404)
     if kept is not None:
-        return {"subject": kept["subject"], "text": kept["text"], "html": kept["html"], "truncated": kept["truncated"]}
+        return _preview(kept)
     try:
-        text, html, truncated = scan.preview(owner(), item)
+        fetched = scan.preview(owner(), item)
     except KeyError:
         raise ApiError(NOT_KEPT, 404) from None
     except gmail.MessageGone:
         raise ApiError(GONE, 404) from None
     except gmail.GmailError as e:
         raise ApiError(str(e), 502) from e
+    return _preview(fetched)
+
+
+@own_session
+def api_review_images(_conn, _q, _b, item_id: str) -> MessageImages:
     with db.session() as conn:
-        again = review.stored_email(conn, owner(), item)[1]
-    subject = again["subject"] if again is not None else None
-    return {"subject": subject, "text": text, "html": html, "truncated": truncated}
+        visible, kept = review.stored_email(conn, owner(), row_id(item_id, NO_ITEM))
+    if not visible or kept is None:
+        raise ApiError(NO_ITEM, 404)
+    return {"images": [MessageImage(type=i["type"], data=i["data"]) for i in kept["images"]]}
 
 
 @own_session

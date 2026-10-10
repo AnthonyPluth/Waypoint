@@ -33,3 +33,7 @@ text = part.get_payload(decode=True)
 found = extract.read(message)
 # ok: waypoint-message-body
 sender = found.sender_domain
+
+# The scan is the one caller of the image provider, and it calls it when a message is kept.
+# ok: waypoint-image-callers
+from ...providers import gmail, images

@@ -826,9 +826,14 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
     return "updated" if changed else "unchanged"
 
 
-def emails_of(conn: db.Connection, viewer: Viewer, segment_id: int) -> list[stored_mail.Content] | None:
+def emails_of(conn: db.Connection, viewer: Viewer, segment_id: int) -> list[stored_mail.Stored] | None:
     seg = visibility.visible_segment(conn, viewer, segment_id)
     return None if seg is None else stored_mail.for_segment(conn, seg.id)
+
+
+def email_images(conn: db.Connection, viewer: Viewer, segment_id: int, message_id: int) -> list[stored_mail.Image] | None:
+    seg = visibility.visible_segment(conn, viewer, segment_id)
+    return None if seg is None else stored_mail.images_for_segment(conn, seg.id, message_id)
 
 
 def delete_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> bool:

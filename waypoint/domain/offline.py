@@ -13,7 +13,7 @@ LOOKAHEAD_DAYS = 7
 
 class SegmentMessages(TypedDict):
     segment_id: int
-    emails: list[stored_mail.Content]
+    emails: list[stored_mail.Stored]
 
 
 class Saved(TypedDict):

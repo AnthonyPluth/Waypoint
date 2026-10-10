@@ -7,8 +7,9 @@ from urllib.parse import urlsplit
 from ... import validate
 from ...domain import airports, people, trips
 from ...domain.visibility import Viewer
+from ...storage.stored_mail import Stored
 from ..common import ApiError, _current, row_id
-from ..contract import (Airport, MergeBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
+from ..contract import (Airport, MergeBody, Ok, Segment, SegmentBody, SegmentEdit, MessageImage, MessageImages, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
                         TripList)
 
 NAME_LIMIT = 100
@@ -185,11 +186,24 @@ def api_segment(conn, _q, _b, segment_id) -> Segment:
     return Segment(**_run(lambda: trips.get_segment(conn, who, row_id(segment_id, NO_SEGMENT)), NO_SEGMENT))
 
 
+def email_out(e: Stored, offline: bool = False) -> StoredEmail:
+    return {"id": e["id"], "subject": e["subject"], "sender_domain": e["sender_domain"], "received": e["received"], "text": e["text"],
+            "html": e["html"], "truncated": e["truncated"], "full": e["full"] and not offline,
+            "layout": None if offline else e["layout"], "images": 0 if offline else len(e["images"])}
+
+
 def api_segment_emails(conn, _q, _b, segment_id) -> SegmentEmails:
     found = trips.emails_of(conn, viewer(conn), row_id(segment_id, NO_SEGMENT))
     if found is None:
         raise ApiError(NO_SEGMENT, 404)
-    return {"emails": [StoredEmail(**e) for e in found]}
+    return {"emails": [email_out(e) for e in found]}
+
+
+def api_segment_email_images(conn, _q, _b, segment_id, message_id) -> MessageImages:
+    found = trips.email_images(conn, viewer(conn), row_id(segment_id, NO_SEGMENT), row_id(message_id, NO_SEGMENT))
+    if found is None:
+        raise ApiError(NO_SEGMENT, 404)
+    return {"images": [MessageImage(type=i["type"], data=i["data"]) for i in found]}
 
 
 def api_segment_edit(conn, _q, body: SegmentEdit, segment_id) -> Segment:

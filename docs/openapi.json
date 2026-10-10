@@ -841,6 +841,45 @@
         }
       }
     },
+    "/api/segments/{id}/emails/{id2}/images": {
+      "get": {
+        "operationId": "api_segment_email_images",
+        "x-handler": "waypoint/server/api/trips.py:api_segment_email_images",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id2",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageImages"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/airports/{id}": {
       "get": {
         "operationId": "api_airport",
@@ -2021,6 +2060,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/review/{id}/images": {
+      "get": {
+        "operationId": "api_review_images",
+        "x-handler": "waypoint/server/api/review.py:api_review_images",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageImages"
                 }
               }
             }
@@ -3427,6 +3497,37 @@
         ],
         "additionalProperties": false
       },
+      "MessageImage": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "data": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "MessageImages": {
+        "type": "object",
+        "properties": {
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageImage"
+            }
+          }
+        },
+        "required": [
+          "images"
+        ],
+        "additionalProperties": false
+      },
       "Offline": {
         "type": "object",
         "properties": {
@@ -3647,13 +3748,28 @@
           },
           "truncated": {
             "type": "boolean"
+          },
+          "full": {
+            "type": "boolean"
+          },
+          "layout": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "images": {
+            "type": "integer"
           }
         },
         "required": [
           "subject",
           "text",
           "html",
-          "truncated"
+          "truncated",
+          "full",
+          "layout",
+          "images"
         ],
         "additionalProperties": false
       },
@@ -5263,6 +5379,9 @@
       "StoredEmail": {
         "type": "object",
         "properties": {
+          "id": {
+            "type": "integer"
+          },
           "subject": {
             "type": [
               "string",
@@ -5292,15 +5411,31 @@
           },
           "truncated": {
             "type": "boolean"
+          },
+          "full": {
+            "type": "boolean"
+          },
+          "layout": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "images": {
+            "type": "integer"
           }
         },
         "required": [
+          "id",
           "subject",
           "sender_domain",
           "received",
           "text",
           "html",
-          "truncated"
+          "truncated",
+          "full",
+          "layout",
+          "images"
         ],
         "additionalProperties": false
       },

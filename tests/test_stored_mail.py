@@ -8,7 +8,8 @@ from waypoint.storage import backup, db, schema, secretbox, stored_mail
 from waypoint.storage.models import Mailbox, ReviewItem, Segment, StoredMessage, Trip
 
 CONTENT: stored_mail.Content = {"subject": "Your itinerary: CANARY-KEPT-SUBJECT-5T2K", "sender_domain": "example-air.example", "received": "2026-10-17",
-                                "text": "Hello CANARY-KEPT-BODY-8W3M.", "html": "<p>Hello CANARY-KEPT-BODY-8W3M.</p>", "truncated": False}
+                                "text": "Hello CANARY-KEPT-BODY-8W3M.", "html": "<p>Hello CANARY-KEPT-BODY-8W3M.</p>", "truncated": False,
+                                "full": True, "layout": "<p>Hello CANARY-KEPT-BODY-8W3M.</p>", "images": []}
 
 
 class KeptMessageTests(DbCase):
@@ -50,7 +51,7 @@ class KeptMessageTests(DbCase):
             self.assertIsNone(stored_mail.get(conn, self.box, "m1"))
             conn.execute(StoredMessage.__table__.update().values(content=secretbox.encrypt(json.dumps({"subject": 5, "text": None, "html": 7}))))
             self.assertEqual(stored_mail.get(conn, self.box, "m1"), {"subject": None, "sender_domain": None, "received": None, "text": "",
-                                                                      "html": None, "truncated": False})
+                                                                      "html": None, "truncated": False, "full": False, "layout": None, "images": []})
 
     def test_subjects_come_without_opening_the_messages_and_are_encrypted_on_their_own(self):
         with db.session() as conn:
@@ -79,6 +80,33 @@ class KeptMessageTests(DbCase):
             self.assertEqual(stored_mail.for_segment(conn, 2), [])
             self.assertEqual(stored_mail.with_messages(conn, [1, 2]), {1})
             self.assertEqual(stored_mail.with_messages(conn, []), set())
+
+    def test_images_are_kept_with_the_message_and_only_the_four_types_come_back(self):
+        pixels = {"type": "image/png", "data": "iVBORw0KGgo="}
+        with db.session() as conn:
+            stored_mail.put(conn, self.box, "m1", {**CONTENT, "images": [pixels]}, 5.0)
+            raw = conn.execute(select(StoredMessage.content)).scalar()
+            self.assertNotIn("iVBORw0KGgo", raw)
+            self.assertEqual(stored_mail.get(conn, self.box, "m1")["images"], [pixels])
+            hostile = [pixels, {"type": "image/svg+xml", "data": "PHN2Zz4="}, {"type": "text/html", "data": "PGI+"}, {"type": "image/png"}, "x", None,
+                       {"type": "image/gif", "data": 5}, {"type": "image/webp", "data": "UklGRg=="}]
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.encrypt(json.dumps({**CONTENT, "images": hostile}))))
+            self.assertEqual([i["type"] for i in stored_mail.get(conn, self.box, "m1")["images"]], ["image/png", "image/webp"])
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.encrypt(json.dumps({**CONTENT, "images": "nope", "layout": 5, "full": "yes"}))))
+            found = stored_mail.get(conn, self.box, "m1")
+            self.assertEqual((found["images"], found["layout"], found["full"]), ([], None, False))
+
+    def test_a_booking_reads_the_images_of_its_own_messages_alone(self):
+        pixels = {"type": "image/png", "data": "iVBORw0KGgo="}
+        with db.session() as conn:
+            stored_mail.put(conn, self.box, "m1", {**CONTENT, "images": [pixels]}, 5.0)
+            stored_mail.link(conn, 1, self.box, "m1")
+            [email] = stored_mail.for_segment(conn, 1)
+            self.assertEqual(stored_mail.images_for_segment(conn, 1, email["id"]), [pixels])
+            self.assertIsNone(stored_mail.images_for_segment(conn, 2, email["id"]))
+            self.assertIsNone(stored_mail.images_for_segment(conn, 1, email["id"] + 1))
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.PREFIX + "bad"))
+            self.assertIsNone(stored_mail.images_for_segment(conn, 1, email["id"]))
 
     def test_a_message_goes_when_neither_an_item_nor_a_booking_holds_it(self):
         with db.session() as conn:

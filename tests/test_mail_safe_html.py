@@ -110,6 +110,150 @@ class Limits(unittest.TestCase):
         clean("<<>><a href=><td colspan=\"<b>\">&#xZZ; <!-- <p> -->")
 
 
+def rich(html: str, images: dict[str, int] | None = None, limit: int = 10_000, markup_limit: int | None = None) -> str:
+    wanted = images or {}
+    return safe_html.clean_rich(html, limit, lambda source: wanted.get(source), markup_limit)[0]
+
+
+LOGO = "https://img.example-air.example/logo.png"
+
+
+class LayoutKept(unittest.TestCase):
+    def test_layout_tables_widths_colours_and_fonts_survive(self):
+        html = ('<body bgcolor="#eef2f7" style="margin:0"><table width="600" align="center" cellpadding="0" cellspacing="0" border="0" '
+                'style="background-color:#ffffff; border:1px solid #d5dbe5; max-width:600px"><tr><td colspan="2" align="center" valign="top" '
+                'width="50%" bgcolor="#f3f6fb" style="padding:24px 12px; font-family:Georgia, \'Times New Roman\', serif; font-size:15px; '
+                'color:#1f2937; text-align:center; line-height:1.5">Hello <font color="#0b3d91" size="4" face="Arial">Jane</font></td></tr></table></body>')
+        out = rich(html)
+        for part in ('<div style="background-color: #eef2f7; margin: 0">', '<table width="600" border="0" cellpadding="0" cellspacing="0" align="center"',
+                     "background-color: #ffffff", "border: 1px solid #d5dbe5", "max-width: 600px", 'colspan="2"', 'align="center" valign="top"',
+                     'width="50%"', "background-color: #f3f6fb", "padding: 24px 12px", "font-family: Georgia, &#x27;Times New Roman&#x27;, serif",
+                     "font-size: 15px", "color: #1f2937", "text-align: center", "line-height: 1.5",
+                     '<font style="color: #0b3d91; font-family: Arial; font-size: large">Jane</font>'):
+            self.assertIn(part, out)
+        self.assertEqual(out.count("<div"), out.count("</div>"))
+
+    def test_the_allowed_inline_styles_each_survive_and_values_are_kept_as_written(self):
+        for style in ("color: red", "color: rgb(10, 20, 30)", "color: rgba(10,20,30,0.5)", "background-color: hsl(10, 20%, 30%)",
+                      "background: #fff", "font-weight: bold", "font-weight: 600", "font-style: italic", "text-decoration: underline",
+                      "text-transform: uppercase", "letter-spacing: 0.5px", "white-space: nowrap", "vertical-align: middle",
+                      "margin: 0 auto", "padding-left: 4px", "border-top: 2px dashed #ccc", "border-radius: 4px", "border-collapse: collapse",
+                      "width: 100%", "height: 40px", "min-width: 200px", "display: none", "display: inline-block", "opacity: 0.5",
+                      "list-style-type: disc", "text-indent: 1em"):
+            with self.subTest(style=style):
+                self.assertEqual(rich(f'<p style="{style}">x</p>'), f'<p style="{style}">x</p>')
+
+    def test_links_open_in_a_new_tab_without_a_referrer_and_say_where_they_go(self):
+        out = rich('<a href="https://example-air.example/manage?id=1&amp;x=2" style="color:#0b3d91;font-weight:bold">Manage</a>')
+        self.assertEqual(out, '<a href="https://example-air.example/manage?id=1&amp;x=2" title="https://example-air.example/manage?id=1&amp;x=2" '
+                              'style="color: #0b3d91; font-weight: bold" target="_blank" rel="noopener noreferrer">Manage</a>')
+        self.assertEqual(rich('<a href="mailto:help@example-air.example">Write</a>').count('rel="noopener noreferrer"'), 1)
+
+    def test_an_image_that_was_kept_is_named_by_number_and_never_by_address(self):
+        out = rich(f'<img src="{LOGO}" alt="Example Air" width="600" height="80" style="display:block; width:100%; position:fixed">', {LOGO: 3})
+        self.assertEqual(out, '<img data-image="3" alt="Example Air" width="600" height="80" style="display: block; width: 100%">')
+        self.assertNotIn("example-air.example", out)
+        self.assertNotIn(" src", out)
+
+    def test_an_image_that_was_not_kept_is_its_alt_text(self):
+        self.assertEqual(rich(f'<p><img src="{LOGO}" alt="Example Air logo"> hi</p>'), "<p>Example Air logo  hi</p>")
+        self.assertEqual(rich('<p><img src="cid:gone" alt="Seat map">x</p>', {"cid:other": 1}), "<p>Seat map x</p>")
+
+    def test_a_tracking_pixel_is_never_asked_for(self):
+        asked: list[str] = []
+
+        def ask(source: str) -> int:
+            asked.append(source)
+            return 0
+
+        out = safe_html.clean_rich(f'<img src="{LOGO}?pixel=1" width="1" height="1"><img src="{LOGO}?p=2" width=2><img src="{LOGO}?p=3" height="0px">'
+                                   f'<img src="{LOGO}?real=1" width="200">', 1000, ask)[0]
+        self.assertEqual(asked, [f"{LOGO}?real=1"])
+        self.assertEqual(out.count("<img"), 1)
+
+    def test_a_page_with_a_head_and_a_body_shows_the_body_alone(self):
+        self.assertEqual(rich("<html><head><title>T</title><style>p{color:red}</style></head><body><p>Gate B12</p></body></html>"), "<div><p>Gate B12</p></div>")
+
+    def test_the_text_is_cut_at_the_limit_and_the_markup_at_its_own(self):
+        out, cut, size = safe_html.clean_rich("<p>" + "x" * 100 + "</p><p>more</p>", 20, lambda s: None)
+        self.assertEqual((out, cut, size), ("<p>" + "x" * 20 + "</p>", True, 20))
+        out = rich("<p>one</p>" * 100, markup_limit=100)
+        self.assertLess(len(out), 200)
+        self.assertEqual(out.count("<p>"), out.count("</p>"))
+        self.assertEqual(safe_html.clean_rich("<p>one</p>" * 100, 10_000, lambda s: None, 100)[1], True)
+
+
+HOSTILE_STYLES = (
+    "width: expression(alert(1))", "background: url(https://t.example/p.gif)", "background-image: url('https://t.example/p.gif')",
+    "background: red url(https://t.example/p.gif)", "@import url(https://t.example/x.css)", "position: fixed; top: 0; left: 0; width: 100%; height: 100%",
+    "position: absolute", "color: red; position: fixed", "behavior: url(x.htc)", "-moz-binding: url(https://t.example/x.xml#b)",
+    "width: calc(100% - 10px)", "color: \\72 ed", "background: u\\72 l(https://t.example/p.gif)", "background: u/**/rl(https://t.example/p.gif)",
+    "font-family: x; } body { display: none", "font-family: 'a'; background: url(x)", "content: url(https://t.example/p.gif)",
+    "list-style-image: url(https://t.example/p.gif)", "color: var(--x)", "z-index: 99999", "cursor: url(https://t.example/c.cur), auto",
+    "filter: url(#x)", "color: red\\9", "color: red <script>alert(1)</script>", "background: image-set(url(x) 1x)",
+    "transform: scale(100)", "overflow: visible", "float: left", "left: 0", "display: flex", "color: javascript:alert(1)",
+)
+
+
+class LayoutDropped(unittest.TestCase):
+    def test_hostile_styles_are_dropped_and_nothing_of_them_is_left(self):
+        for style in HOSTILE_STYLES:
+            with self.subTest(style=style):
+                out = rich(f'<div style="{style}">x</div><a href="https://example-air.example/" style="{style}">y</a>')
+                self.assertNotRegex(out.replace("https://example-air.example/", ""),
+                                    r"(?i)expression|url|@import|position|behavior|binding|image|calc|var\(|z-index|cursor|filter|javascript|script|\\|/\*|99999|transform|overflow|float|left:|flex")
+
+    def test_a_style_cannot_close_its_attribute_or_add_one(self):
+        out = rich('<p style="color: red&quot; onmouseover=&quot;alert(1)">x</p><p style=\'font-family: &quot;a&quot; onload=&quot;x&quot;\'>y</p>')
+        self.assertNotIn("onmouseover", out)
+        self.assertNotIn("onload", out)
+        self.assertNotIn("alert", out)
+
+    def test_scripts_handlers_style_blocks_forms_and_frames_go(self):
+        html = ('<p onclick="evil()" onmouseover="e()" onload="e()">a</p><script>evil()</script><style>body{display:none}</style>'
+                '<form action="https://t.example/steal" method="post"><input name=x value=1><select><option>EVIL</option></select><button>Go</button>'
+                '<textarea>EVIL</textarea></form><iframe src="https://t.example"></iframe><object data="https://t.example/x"></object>'
+                '<embed src="https://t.example/x"><svg onload="evil()"><script>1</script></svg><math><mi>EVIL</mi></math>'
+                '<link rel="stylesheet" href="https://t.example/x.css"><base href="https://t.example/"><meta http-equiv="refresh" content="0;url=https://t.example/">'
+                '<video src="https://t.example/v.mp4"></video><audio src="https://t.example/a.mp3"></audio><canvas></canvas><template><p>EVIL</p></template>'
+                '<noscript><img src="https://t.example/p.gif"></noscript><p>b</p>')
+        out = rich(html, {"https://t.example/p.gif": 0})
+        self.assertEqual(out, "<p>a</p><p>b</p>")
+
+    def test_no_attribute_that_loads_or_runs_survives_on_any_tag(self):
+        html = ('<div class="x" id="y" onclick="e()" background="https://t.example/b.gif" data-x="1" srcset="https://t.example/s.gif 2x" '
+                'src="https://t.example/p.gif" href="https://t.example/" action="https://t.example/" formaction="https://t.example/" '
+                'poster="https://t.example/p.gif" ping="https://t.example/p" xlink:href="https://t.example/" style="color: red">'
+                '<table background="https://t.example/b.gif" bgcolor="url(https://t.example/b.gif)"><tr><td background="https://t.example/b.gif" '
+                'bgcolor="javascript:1" width="expression(1)" align="javascript:1">x</td></tr></table></div>')
+        out = rich(html)
+        self.assertEqual(out, '<div style="color: red"><table><tr><td>x</td></tr></table></div>')
+
+    def test_links_with_a_script_or_data_address_are_no_links(self):
+        for href in ("javascript:alert(1)", "  JaVa\tScRiPt:alert(1)", "data:text/html,<script>1</script>", "vbscript:x", "http://example.com",
+                     "//example.com", "/relative", "file:///etc/passwd", "ftp://example.com", "blob:https://example.com/1", "https:", ""):
+            with self.subTest(href=href):
+                out = rich(f'<a href="{href}" style="color:red">go</a>')
+                self.assertEqual(out, "<a>go</a>")
+
+    def test_an_image_address_is_never_written_to_the_markup_whatever_it_is(self):
+        sources = (LOGO, "http://t.example/p.gif", "javascript:alert(1)", "data:image/svg+xml;base64,PHN2Zz4=", "data:image/png;base64,AAAA", "//t.example/p.gif",
+                   "cid:logo", "file:///etc/passwd", "blob:https://t.example/1", "", " ")
+        for source in sources:
+            with self.subTest(source=source):
+                for known in ({}, {source: 5}):
+                    out = rich(f'<img src="{source}" alt="x" onerror="evil()" srcset="{LOGO} 2x" lowsrc="{LOGO}" dynsrc="{LOGO}">', known)
+                    self.assertNotRegex(out, r"(?i)\bsrc|srcset|lowsrc|dynsrc|onerror|http|javascript|data:|file:|blob:")
+
+    def test_text_that_looks_like_markup_or_styles_stays_text(self):
+        out = rich("<p>a &lt;img src=&quot;https://t.example/p.gif&quot; onerror=&quot;e()&quot;&gt; &lt;style&gt;x&lt;/style&gt;</p>")
+        self.assertEqual(out, "<p>a &lt;img src=\"https://t.example/p.gif\" onerror=\"e()\"&gt; &lt;style&gt;x&lt;/style&gt;</p>")
+
+    def test_the_original_cleaner_still_drops_every_style_and_image(self):
+        out = clean(f'<div style="color:red" bgcolor="red"><img src="{LOGO}" alt="Logo"><a href="https://example-air.example/" style="color:red">x</a></div>')
+        self.assertEqual(out, '<div>Logo <a href="https://example-air.example/" target="_blank" rel="noopener noreferrer">x</a></div>')
+
+
 class FromAMessage(unittest.TestCase):
     def test_a_message_is_read_in_memory_alone(self):
         html = '<html><body><p>CANARY-BODY-PREVIEW-8M3Q</p></body></html>'

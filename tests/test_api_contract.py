@@ -134,7 +134,7 @@ class Replies(DbCase):
         box = self.c.execute(insert(Mailbox).values(owner_sub="u8", address="joan@gmail.example", token=secretbox.encrypt("t"), status="connected",
                                                     created=1.0)).lastrowid
         stored_mail.put(self.c, box, "m8", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-02-20", "text": "Hello.",
-                                            "html": None, "truncated": False}, 1.0)   # type: ignore[arg-type]
+                                            "html": None, "truncated": False, "full": True, "layout": None, "images": []}, 1.0)
         stored_mail.link(self.c, seg["id"], box, "m8")   # type: ignore[arg-type]
         found = offline_api.api_offline(self.c, {}, {})
         self.assertEqual([m["segment_id"] for m in found["messages"]], [seg["id"]])
@@ -200,10 +200,14 @@ class Replies(DbCase):
         self.check("POST /api/review/{id}/ignore", review_api.api_review_ignore(self.c, {}, {}, str(listed["items"][0]["id"])))
         self.c.commit()
         stored_mail.put(self.c, box, "m1", {"subject": "Your itinerary", "sender_domain": "air1.example", "received": "2026-10-17", "text": "Hello.",
-                                            "html": "<p>Hello.</p>", "truncated": False}, 1.0)
+                                            "html": "<p>Hello.</p>", "truncated": False, "full": True, "layout": '<p><img data-image="0" alt="Logo">Hello.</p>',
+                                            "images": [{"type": "image/png", "data": "iVBORw0KGgo="}]}, 1.0)
         self.c.commit()
         self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][1]["id"])))
-        with mock.patch.object(scan, "preview", return_value=("Hello.", "<p>Hello.</p>", False)):
+        self.check("GET /api/review/{id}/images", review_api.api_review_images(None, {}, {}, str(listed["items"][1]["id"])))
+        kept = {"subject": None, "sender_domain": "air1.example", "received": None, "text": "Hello.", "html": "<p>Hello.</p>", "truncated": False,
+                "full": False, "layout": None, "images": []}
+        with mock.patch.object(scan, "preview", return_value=kept):
             self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][2]["id"])))
         with mock.patch.object(scan, "suggest_now"):
             self.check("POST /api/review/{id}/suggest", review_api.api_review_suggest(None, {}, {}, str(listed["items"][1]["id"])))
@@ -315,9 +319,12 @@ class Replies(DbCase):
         box = self.c.execute(insert(Mailbox).values(owner_sub="u9", address="jane@gmail.example", token=secretbox.encrypt("t"), status="connected",
                                                     created=1.0)).lastrowid
         stored_mail.put(self.c, box, "m9", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-02-20", "text": "Hello.",
-                                            "html": None, "truncated": False}, 1.0)   # type: ignore[arg-type]
+                                            "html": None, "truncated": False, "full": True, "layout": '<p><img data-image="0" alt="">Hello.</p>',
+                                            "images": [{"type": "image/png", "data": "iVBORw0KGgo="}]}, 1.0)
         stored_mail.link(self.c, seg["id"], box, "m9")   # type: ignore[arg-type]
-        self.check("GET /api/segments/{id}/emails", trips_api.api_segment_emails(self.c, {}, {}, str(seg["id"])))
+        sent = trips_api.api_segment_emails(self.c, {}, {}, str(seg["id"]))
+        self.check("GET /api/segments/{id}/emails", sent)
+        self.check("GET /api/segments/{id}/emails/{id}/images", trips_api.api_segment_email_images(self.c, {}, {}, str(seg["id"]), str(sent["emails"][0]["id"])))
         self.check("POST /api/segments/{id}", trips_api.api_segment_edit(self.c, {}, {"status": "changed"}, str(seg["id"])))
         self.check("GET /api/trips", trips_api.api_trips(self.c, {}, {}))
         self.check("GET /api/trips/{id}", trips_api.api_trip(self.c, {}, {}, str(seg["trip_id"])))
@@ -394,14 +401,14 @@ class Generated(unittest.TestCase):
                                      "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/share",
                                      "GET /api/ai", "POST /api/ai", "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "DELETE /api/review/{id}",
-                                     "GET /api/review/{id}/preview", "POST /api/review/{id}/suggest",
+                                     "GET /api/review/{id}/preview", "GET /api/review/{id}/images", "POST /api/review/{id}/suggest",
                                      "GET /api/people", "POST /api/people",
                                      "POST /api/people/{id}", "DELETE /api/people/{id}", "POST /api/people/{id}/claim",
                                      "GET /api/people/claim-suggestions", "POST /api/people/claim-suggestions/dismiss",
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
-                                     "DELETE /api/segments/{id}", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/offline",
+                                     "DELETE /api/segments/{id}", "GET /api/segments/{id}/emails", "GET /api/segments/{id}/emails/{id}/images", "GET /api/airports/{id}", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",

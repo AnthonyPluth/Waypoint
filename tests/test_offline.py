@@ -1,3 +1,4 @@
+import base64
 import json
 import secrets
 import time
@@ -16,6 +17,8 @@ from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
 
 MESSAGE_CANARY = "message-canary-7c41e9"
+LAYOUT_CANARY = "layout-canary-5d83a2"
+IMAGE_CANARY = "image-canary-b94f06"
 AIRLINE_CANARY = "AIRLINE-CANARY-82913746"
 TRAVELER_CANARY = "TRAVELER-CANARY-55120987"
 TODAY = date.today()
@@ -106,12 +109,13 @@ class OfflineRouteTests(ServerCase):
         self.assertEqual(status, 200, got)
         return got
 
-    def keep_message(self, segment_id: int, text: str) -> None:
+    def keep_message(self, segment_id: int, text: str, layout: str | None = None, images: list | None = None) -> None:
         with db.session() as conn:
             box = conn.execute(insert(Mailbox).values(owner_sub="sub-ana", address=f"ana{segment_id}@gmail.example", token=secretbox.encrypt("t"),
                                                       status="connected", created=1.0)).lastrowid
             stored_mail.put(conn, box, f"m{segment_id}", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-10-01",
-                                                          "text": text, "html": f"<p>{text}</p>", "truncated": False}, 1.0)   # type: ignore[arg-type]
+                                                          "text": text, "html": f"<p>{text}</p>", "truncated": False, "full": layout is not None,
+                                                          "layout": layout, "images": images or []}, 1.0)
             stored_mail.link(conn, segment_id, box, f"m{segment_id}")   # type: ignore[arg-type]
 
     def test_the_route_needs_sign_in(self):
@@ -159,6 +163,20 @@ class OfflineRouteTests(ServerCase):
         self.assertIn(f"<p>{MESSAGE_CANARY}</p>", got["messages"][0]["emails"][0]["html"])
         self.assertNotIn(MESSAGE_CANARY, json.dumps(self.ok("ben")))
         self.assertNotIn(MESSAGE_CANARY, json.dumps(self.ok("cy")))
+
+    def test_the_copy_for_the_device_holds_the_text_and_cleaned_markup_but_never_the_layout_or_the_images(self):
+        seg = self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
+        pixels = base64.b64encode(b"\x89PNG\r\n\x1a\n" + IMAGE_CANARY.encode()).decode()
+        self.keep_message(seg["id"], MESSAGE_CANARY, f"<p style=\"color: red\">{LAYOUT_CANARY}<img data-image=\"0\" alt=\"\"></p>",
+                          [{"type": "image/png", "data": pixels}])
+        online = self.call("ana", "GET", f"/api/segments/{seg['id']}/emails")[1]["emails"][0]
+        self.assertEqual((online["full"], online["images"]), (True, 1))
+        self.assertIn(LAYOUT_CANARY, online["layout"])
+        [email] = self.ok("ana")["messages"][0]["emails"]
+        self.assertEqual((email["full"], email["layout"], email["images"]), (False, None, 0))
+        self.assertEqual(email["text"], MESSAGE_CANARY)
+        for canary in (LAYOUT_CANARY, IMAGE_CANARY, pixels[12:40]):
+            self.assertNotIn(canary, json.dumps(self.ok("ana")))
 
     def test_a_booking_with_no_stored_message_has_no_entry(self):
         self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])

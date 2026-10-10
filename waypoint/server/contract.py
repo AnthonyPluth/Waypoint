@@ -163,15 +163,31 @@ class Preview(TypedDict):
     text: str
     html: str | None
     truncated: bool
+    full: bool
+    layout: str | None
+    images: int
 
 
 class StoredEmail(TypedDict):
+    id: int
     subject: str | None
     sender_domain: str | None
     received: str | None
     text: str
     html: str | None
     truncated: bool
+    full: bool
+    layout: str | None
+    images: int
+
+
+class MessageImage(TypedDict):
+    type: str
+    data: str
+
+
+class MessageImages(TypedDict):
+    images: list[MessageImage]
 
 
 class SegmentEmails(TypedDict):

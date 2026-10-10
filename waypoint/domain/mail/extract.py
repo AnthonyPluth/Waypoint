@@ -12,10 +12,11 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from typing import Any, Literal
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from ... import monitoring
+from ... import imagetype, monitoring
+from ...storage import stored_mail
 from ...storage.stored_mail import Content
 from .. import seatmaps
 from . import parsers, safe_html, seats
@@ -598,10 +599,89 @@ def plain_text(message: Mapping[str, Any], limit: int = MAX_PART) -> str:
 
 
 SUBJECT_LIMIT = 300
-KEPT_LIMIT = 30_000
+KEPT_LIMIT = 500_000
+MARKUP_LIMIT = 2_000_000
 
 
-def keep(message: Mapping[str, Any]) -> Content:
+def _inline_images(message: Mapping[str, Any]) -> dict[str, imagetype.Fetched]:
+    data = _decode(message.get("raw"))
+    found: dict[str, imagetype.Fetched] = {}
+    if data is None:
+        return found
+    try:
+        parsed = email.message_from_bytes(data, policy=email.policy.default)
+        for part in parsed.walk():
+            cid = str(part.get("Content-ID") or "").strip().strip("<>").strip()
+            if not cid or part.get_content_maintype() != "image" or cid in found:
+                continue
+            body = part.get_payload(decode=True)
+            kind = imagetype.sniff(body) if isinstance(body, bytes) and len(body) <= imagetype.MAX_IMAGE else None
+            if kind and isinstance(body, bytes):
+                found[cid] = (kind, body)
+    except (ValueError, LookupError, TypeError, KeyError):
+        return found
+    return found
+
+
+def _reference(source: str, inline: Mapping[str, imagetype.Fetched]) -> str | None:
+    if source[:4].lower() == "cid:":
+        cid = unquote(source[4:]).strip().strip("<>").strip()
+        return f"cid:{cid}" if cid in inline else None
+    return source if source.startswith("https://") else None
+
+
+def _layout_markup(parts: list[str], resolve: safe_html.Resolve) -> tuple[str, bool]:
+    limit, room = KEPT_LIMIT, MARKUP_LIMIT
+    shown: list[str] = []
+    for i, part in enumerate(parts):
+        markup, cut, size = safe_html.clean_rich(part, limit, resolve, room)
+        shown.append(markup)
+        limit -= size
+        room -= len(markup)
+        if cut or ((limit <= 0 or room <= 0) and i + 1 < len(parts)):
+            return "<hr>".join(shown), True
+    return "<hr>".join(shown), False
+
+
+def layout_of(message: Mapping[str, Any], fetch: imagetype.Fetch | None = None) -> tuple[str, bool, list[imagetype.Fetched]] | None:
+    bodies = _bodies(message)
+    if bodies is None or not bodies[1]:
+        return None
+    inline = _inline_images(message)
+    wanted: dict[str, None] = {}
+
+    def note(source: str) -> int | None:
+        ref = _reference(source, inline)
+        if ref is None:
+            return None
+        wanted[ref] = None
+        return 0
+
+    _layout_markup(bodies[1], note)
+    chosen: dict[str, imagetype.Fetched] = {}
+    budget = imagetype.MAX_TOTAL
+    for ref in wanted:
+        if ref.startswith("cid:") and len(chosen) < imagetype.MAX_COUNT and len(inline[ref[4:]][1]) <= budget:
+            chosen[ref] = inline[ref[4:]]
+            budget -= len(chosen[ref][1])
+    remote = [ref for ref in wanted if ref.startswith("https://")]
+    if fetch is not None and remote and len(chosen) < imagetype.MAX_COUNT:
+        got = fetch(remote, budget)
+        for ref in remote:
+            if ref in got and len(chosen) < imagetype.MAX_COUNT and len(got[ref][1]) <= budget and got[ref][0] in imagetype.TYPES:
+                chosen[ref] = got[ref]
+                budget -= len(got[ref][1])
+    order = list(chosen)
+
+    def place(source: str) -> int | None:
+        ref = _reference(source, inline)
+        return order.index(ref) if ref in chosen and ref is not None else None
+
+    markup, cut = _layout_markup(bodies[1], place)
+    return markup, cut, [chosen[ref] for ref in order]
+
+
+def keep(message: Mapping[str, Any], fetch: imagetype.Fetch | None = None) -> Content:
     data = _decode(message.get("raw"))
     subject: str | None = None
     sender: str | None = None
@@ -615,5 +695,9 @@ def keep(message: Mapping[str, Any]) -> Content:
             subject = None
     text = plain_text(message, KEPT_LIMIT + 1)
     shown = safe_markup(message, KEPT_LIMIT)
+    rich = layout_of(message, fetch)
+    images: list[stored_mail.Image] = [{"type": kind, "data": base64.b64encode(blob).decode("ascii")} for kind, blob in (rich[2] if rich else [])]
     return {"subject": subject, "sender_domain": sender, "received": received, "text": text[:KEPT_LIMIT],
-            "html": shown[0] if shown else None, "truncated": len(text) > KEPT_LIMIT or bool(shown and shown[1])}
+            "html": shown[0] if shown else None,
+            "truncated": len(text) > KEPT_LIMIT or bool(shown and shown[1]) or bool(rich and rich[1]),
+            "full": True, "layout": rich[0] if rich else None, "images": images}

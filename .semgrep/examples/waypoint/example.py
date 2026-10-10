@@ -68,6 +68,23 @@ print(f"scanned {message_id}")
 # ok: waypoint-print
 monitoring.log("Scanned the mailbox.")
 
+# ruleid: waypoint-image-fetch
+handlers = tls.public_handlers()
+# ruleid: waypoint-image-fetch
+reachable = tls.public_address(host)
+# ok: waypoint-image-fetch
+found = stored_mail.images_for_segment(conn, segment_id, stored_id)
+# ruleid: waypoint-image-callers
+from waypoint.providers import images
+# ruleid: waypoint-image-callers
+from ...providers import gmail, images
+# ruleid: waypoint-image-callers
+from waypoint.providers.images import fetch_many
+# ruleid: waypoint-image-callers
+import waypoint.providers.images
+# ok: waypoint-image-callers
+from waypoint.providers import gmail
+
 # ruleid: waypoint-google-hosts
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 # ruleid: waypoint-google-hosts
