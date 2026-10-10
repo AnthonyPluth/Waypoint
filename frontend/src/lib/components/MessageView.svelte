@@ -6,6 +6,7 @@
   let { subject = null, text, html = null, truncated = false, original = true, images = 0, imagesAt = null }: Props = $props();
   let plain = $state(false);
   let pictures = $state<Record<number, string>>({});
+  let fetching = $state(false);
 
   const POLICY = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
   const SHEET = "html{color-scheme:light}body{margin:0;padding:12px;background:#ffffff;color:#1f2937;font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto;border:0}a{color:#1d4ed8}";
@@ -23,11 +24,13 @@
     const count = images;
     if (!base || !count) return;
     let current = true;
+    fetching = true;
     void Promise.allSettled(Array.from({ length: count }, (_, i) => apiImage(`${base}${i}`))).then((done) => {
       if (!current) return;
       const found: Record<number, string> = {};
       done.forEach((r, i) => { if (r.status === "fulfilled") found[i] = r.value; });
       pictures = found;
+      fetching = false;
     });
     return () => { current = false; };
   });
@@ -36,7 +39,7 @@
 <div class="space-y-2">
   {#if subject}<p class="break-words font-medium" data-testid="message-subject">{subject}</p>{/if}
   {#if html && !plain}
-    <iframe title={subject ? `The email: ${subject}` : "The email"} sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc={page}
+    <iframe title={subject ? `The email: ${subject}` : "The email"} sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc={page} aria-busy={fetching}
       class="h-[30rem] w-full rounded-lg border-0 bg-muted" data-testid="preview-html"></iframe>
   {:else}
     <pre class="max-h-96 overflow-auto rounded-lg bg-muted p-3 font-sans text-sm leading-relaxed break-words whitespace-pre-wrap">{text || "(This message has no text.)"}</pre>
