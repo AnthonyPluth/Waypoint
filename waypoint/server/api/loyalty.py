@@ -4,7 +4,8 @@ from collections.abc import Mapping
 from typing import Any
 
 from ... import validate
-from ...domain import loyalty
+from ...domain import logos, loyalty
+from ...storage import db
 from ..common import ApiError, row_id
 from ..contract import LoyaltyBody, LoyaltyConflict, LoyaltyEntry, LoyaltyList, Ok, Revealed
 
@@ -38,15 +39,20 @@ def fields(body: Mapping[str, Any], *, need_number: bool) -> loyalty.Fields:
             "notes": _v.text(body.get("notes"), "notes", NOTES_LIMIT)}
 
 
+def entries(conn: db.Connection, found: list[loyalty.Listed]) -> list[LoyaltyEntry]:
+    shown = logos.with_logo(conn, {(e["kind"], e["program"]) for e in found})
+    return [LoyaltyEntry(**e, logo=f"/api/loyalty/{e['id']}/logo" if (e["kind"], e["program"]) in shown else None) for e in found]
+
+
 def api_loyalty(conn, _q, _b) -> LoyaltyList:
-    return {"loyalty": [LoyaltyEntry(**e) for e in loyalty.everyone(conn)],
+    return {"loyalty": entries(conn, loyalty.everyone(conn)),
             "conflicts": [LoyaltyConflict(**c) for c in loyalty.conflicts(conn)],
             "programs": {k: list(p) for k, p in loyalty.PROGRAMS.items()}}
 
 
 def api_loyalty_add(conn, _q, body: LoyaltyBody) -> LoyaltyEntry:
     try:
-        return LoyaltyEntry(**loyalty.add(conn, fields(body, need_number=True)))
+        return entries(conn, [loyalty.add(conn, fields(body, need_number=True))])[0]
     except loyalty.NoSuchPerson:
         raise ApiError("No such person", 404) from None
     except loyalty.Duplicate:
@@ -62,7 +68,7 @@ def api_loyalty_edit(conn, _q, body: LoyaltyBody, loyalty_id) -> LoyaltyEntry:
         raise ApiError(DUPLICATE) from None
     if found is None:
         raise ApiError(NO_SUCH, 404)
-    return LoyaltyEntry(**found)
+    return entries(conn, [found])[0]
 
 
 def api_loyalty_remove(conn, _q, _b, loyalty_id) -> Ok:

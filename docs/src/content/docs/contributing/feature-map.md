@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-67 routes; 0 have no test yet.
+68 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -46,6 +46,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/distance-unit` | `stats.py:api_distance_unit_save` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `GET /api/flight-status` | `flightstatus.py:api_flight_statuses` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py`, `test_mcp_routes.py` | [start/flight-status](/Waypoint/start/flight-status/) |
 | `POST /api/flight-status/{id}` | `flightstatus.py:api_flight_status_refresh` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py`, `test_mcp.py` | [start/flight-status](/Waypoint/start/flight-status/) |
+| `GET /api/loyalty/{id}/logo` | `logos.py:api_loyalty_logo` | - | `test_loyalty.py` | [start/loyalty](/Waypoint/start/loyalty/) |
 | `GET /api/logodev` | `logos.py:api_logodev` | `lib/components/settings/LogosSection.svelte` | `test_api_contract.py`, `test_logos.py` | [start/logos](/Waypoint/start/logos/) |
 | `POST /api/logodev` | `logos.py:api_logodev_save` | `lib/components/settings/LogosSection.svelte` | `test_api_contract.py`, `test_logos.py` | [start/logos](/Waypoint/start/logos/) |
 | `POST /api/logodev/fetch` | `logos.py:api_logodev_fetch` | `lib/components/settings/LogosSection.svelte` | `test_api_contract.py`, `test_logos.py` | [start/logos](/Waypoint/start/logos/) |

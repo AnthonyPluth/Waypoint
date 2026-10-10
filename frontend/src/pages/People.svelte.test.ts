@@ -17,8 +17,8 @@ const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", lega
 const mia: Person = { id: 2, display_name: "Mia Doe", first_name: "Mia", legal_name: "Mia Rose Doe", aliases: ["DOE/MIA MISS"], member: false, links: [] };
 
 const PROGRAMS = { airline: ["American AAdvantage", "Other"], hotel: ["Marriott Bonvoy", "Other"], car: ["Other"], known_traveler: ["TSA PreCheck", "Other"], redress: ["DHS TRIP", "Other"] };
-const aa: LoyaltyEntry = { id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, expiry: null, notes: null };
-const tsa: LoyaltyEntry = { id: 12, person_id: 1, kind: "known_traveler", program: "TSA PreCheck", masked: "••••2345", readable: true, expiry: "2029-03-31", notes: null };
+const aa: LoyaltyEntry = { id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, expiry: null, notes: null, logo: null };
+const tsa: LoyaltyEntry = { id: 12, person_id: 1, kind: "known_traveler", program: "TSA PreCheck", masked: "••••2345", readable: true, expiry: "2029-03-31", notes: null, logo: null };
 
 let held: Person[];
 let ids: LoyaltyEntry[];
@@ -32,7 +32,7 @@ function serve() {
       if (opts?.method === "DELETE") { ids = ids.filter((m) => m.id !== id); return { ok: true }; }
       const b = opts?.body as { person_id: number; kind: string; program: string; number?: string; expiry: string; notes: string };
       const next: LoyaltyEntry = { id: id || 20, person_id: b.person_id, kind: b.kind, program: b.program, masked: b.number ? `••••${b.number.slice(-4)}` : ids.find((m) => m.id === id)?.masked ?? "••••",
-        readable: true, expiry: b.expiry || null, notes: b.notes || null };
+        readable: true, expiry: b.expiry || null, notes: b.notes || null, logo: null };
       ids = id ? ids.map((m) => (m.id === id ? next : m)) : [...ids, next];
       return next;
     }
@@ -63,6 +63,37 @@ describe("People", () => {
     expect(within(list).getByText("Member")).toBeInTheDocument();
     expect(within(list).getByText("Guest")).toBeInTheDocument();
     expect(within(list).getByText(/Legal name Mia Rose Doe · Printed as DOE\/MIA MISS/)).toBeInTheDocument();
+  });
+
+  it("shows an airline membership's logo beside its program, decoratively, and none for any other kind or a missing one", async () => {
+    const delta: LoyaltyEntry = { ...aa, id: 13, program: "Delta SkyMiles", logo: "/api/loyalty/13/logo" };
+    const other: LoyaltyEntry = { ...aa, id: 14, program: "Other" };
+    const hotel: LoyaltyEntry = { ...aa, id: 15, kind: "hotel", program: "Marriott Bonvoy" };
+    ids = [{ ...aa, logo: "/api/loyalty/11/logo" }, delta, other, hotel, tsa];
+    const { container } = render(People);
+    await screen.findByRole("list", { name: "People" });
+    const rows = (name: string) => screen.getByText(name).closest("li") as HTMLElement;
+    for (const name of ["American AAdvantage", "Delta SkyMiles"]) {
+      const img = rows(name).querySelector("img");
+      expect(img).toHaveAttribute("src", name === "Delta SkyMiles" ? "/api/loyalty/13/logo" : "/api/loyalty/11/logo");
+      expect(img).toHaveAttribute("alt", "");
+    }
+    for (const name of ["Marriott Bonvoy", "TSA PreCheck"]) expect(rows(name).querySelector("img")).toBeNull();
+    expect(screen.getAllByText("Other").map((e) => e.closest("li")?.querySelector("img")).filter(Boolean)).toHaveLength(0);
+    expect(container.querySelectorAll("img")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Edit Jane Doe’s Delta SkyMiles" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove Jane Doe’s Delta SkyMiles" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show and copy Delta SkyMiles number" })).toBeInTheDocument();
+  });
+
+  it("falls back to the plain program name when the logo can't load", async () => {
+    ids = [{ ...aa, logo: "/api/loyalty/11/logo" }];
+    const { container } = render(People);
+    await screen.findByRole("list", { name: "People" });
+    const img = container.querySelector("img")!;
+    img.dispatchEvent(new Event("error"));
+    await waitFor(() => expect(container.querySelector("img")).toBeNull());
+    expect(screen.getByText("American AAdvantage")).toBeInTheDocument();
   });
 
   it("offers Remove for a guest but never for a member", async () => {
