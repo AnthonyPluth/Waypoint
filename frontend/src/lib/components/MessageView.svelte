@@ -1,18 +1,53 @@
 <script lang="ts">
+  import { apiImage } from "$lib/api";
   import { Button } from "$lib/components/ui/button";
 
-  let { subject = null, text, html = null, truncated = false }: { subject?: string | null; text: string; html?: string | null; truncated?: boolean } = $props();
+  type Props = { subject?: string | null; text: string; html?: string | null; truncated?: boolean; original?: boolean; images?: number; imagesAt?: string | null };
+  let { subject = null, text, html = null, truncated = false, original = true, images = 0, imagesAt = null }: Props = $props();
   let plain = $state(false);
+  let pictures = $state<Record<number, string>>({});
+  let fetching = $state(false);
+
+  const POLICY = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
+  const SHEET = "html{color-scheme:light}body{margin:0;padding:12px;background:#ffffff;color:#1f2937;font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto;border:0}a{color:#1d4ed8}";
+  const PLAIN_SHEET = "body{margin:0;padding:12px;background:#1a1e29;color:#f3f5f9;font:14px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif;overflow-wrap:anywhere}a{color:#4f9dff}blockquote{border-left:2px solid #9aa4b8;margin:8px 0;padding-left:12px}td,th{padding:4px;vertical-align:top}p{margin:8px 0}";
+
+  function pageOf(markup: string, found: Record<number, string>, designed: boolean): string {
+    const body = markup.replace(/ data-i="(\d+)"/g, (_all, n: string) => (found[Number(n)] ? ` src="${found[Number(n)]}"` : ""));
+    return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${POLICY}"><style>${designed ? SHEET : PLAIN_SHEET}</style></head><body>${body}</body></html>`;
+  }
+
+  const page = $derived(html ? pageOf(html, pictures, original) : "");
+
+  $effect(() => {
+    const base = imagesAt;
+    const count = images;
+    if (!base || !count) return;
+    let current = true;
+    fetching = true;
+    void (async () => {
+      const found: Record<number, string> = {};
+      for (let i = 0; i < count && current; i++) {
+        try { found[i] = await apiImage(`${base}${i}`); }
+        catch (err) { if (err && typeof err === "object" && "status" in err && (err.status === 401 || err.status === 403)) break; }
+      }
+      if (!current) return;
+      pictures = found;
+      fetching = false;
+    })();
+    return () => { current = false; };
+  });
 </script>
 
 <div class="space-y-2">
   {#if subject}<p class="break-words font-medium" data-testid="message-subject">{subject}</p>{/if}
   {#if html && !plain}
-    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-    <div class="max-h-96 overflow-auto rounded-lg bg-muted p-3 text-sm leading-relaxed break-words [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_table]:max-w-full [&_td]:p-1 [&_td]:align-top [&_th]:p-1 [&_th]:text-left [&_ul]:list-disc" data-testid="preview-html">{@html html}</div>
+    <iframe title={subject ? `The email: ${subject}` : "The email"} sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc={page} aria-busy={fetching}
+      class="h-[30rem] w-full rounded-lg border-0 bg-muted" data-testid="preview-html"></iframe>
   {:else}
     <pre class="max-h-96 overflow-auto rounded-lg bg-muted p-3 font-sans text-sm leading-relaxed break-words whitespace-pre-wrap">{text || "(This message has no text.)"}</pre>
   {/if}
   {#if html}<Button variant="outline" size="sm" onclick={() => (plain = !plain)}>{plain ? "Show as formatted" : "Show as plain text"}</Button>{/if}
-  {#if truncated}<p class="text-sm text-muted-foreground">Cut short here.</p>{/if}
+  {#if !original}<p class="text-sm text-muted-foreground" data-testid="message-old">This email was kept before Waypoint could show the original, so its layout and pictures can’t be shown.</p>{/if}
+  {#if truncated}<p class="text-sm text-muted-foreground">This email was cut short.</p>{/if}
 </div>

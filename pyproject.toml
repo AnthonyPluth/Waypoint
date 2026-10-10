@@ -117,6 +117,12 @@ type = "independence"
 modules = ["waypoint.providers.logodev", "waypoint.providers.wikimedia", "waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
 
 [[tool.importlinter.contracts]]
+id = "mailimages-alone"
+name = "The mail image fetcher imports no other provider, and none imports it"
+type = "independence"
+modules = ["waypoint.providers.mailimages", "waypoint.providers.logodev", "waypoint.providers.wikimedia", "waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
+
+[[tool.importlinter.contracts]]
 id = "storage-at-the-bottom"
 name = "Storage imports nothing from the domain, the providers or the server"
 type = "forbidden"

@@ -15,7 +15,7 @@ Saved:
 
 - the trip’s bookings: kind, provider, confirmation codes, flight numbers, times with their time zones, places, terminal, gate, seat, cabin, room, car class, addresses, phone numbers and manage links;
 - the travellers’ display names;
-- the confirmation message Waypoint keeps for each of the trip’s bookings, as **View email** shows it today: subject, the sender’s domain and day, its text and its cleaned-up formatting.
+- the confirmation message Waypoint keeps for each of the trip’s bookings, as **View email** shows it, except for its images: subject, the sender’s domain and day, its text and its formatting. The images stay on the server, so offline an email shows its text and layout, with each image’s description in place of the picture.
 
 Not saved: loyalty and Known Traveler numbers (they need a connection, as always), any other trip, and People, Settings, the review queue, mailboxes, AI settings and sign-in data. Live flight status is not kept either.
 

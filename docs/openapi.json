@@ -3712,13 +3712,21 @@
           },
           "truncated": {
             "type": "boolean"
+          },
+          "original": {
+            "type": "boolean"
+          },
+          "images": {
+            "type": "integer"
           }
         },
         "required": [
           "subject",
           "text",
           "html",
-          "truncated"
+          "truncated",
+          "original",
+          "images"
         ],
         "additionalProperties": false
       },
@@ -5357,6 +5365,12 @@
           },
           "truncated": {
             "type": "boolean"
+          },
+          "original": {
+            "type": "boolean"
+          },
+          "images": {
+            "type": "integer"
           }
         },
         "required": [
@@ -5365,7 +5379,9 @@
           "received",
           "text",
           "html",
-          "truncated"
+          "truncated",
+          "original",
+          "images"
         ],
         "additionalProperties": false
       },

@@ -173,7 +173,7 @@ describe("Trip", () => {
     held = trip([segment({ ...flight, has_email: true }), stay]);
     const answer = vi.mocked(api).getMockImplementation()!;
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1/emails" ? { emails: [
-      { subject: "Your itinerary: EX 410", sender_domain: "example-air.example", received: "2026-10-17", text: "Gate B12", html: "<p>Gate <b>B12</b></p>", truncated: false }] }
+      { subject: "Your itinerary: EX 410", sender_domain: "example-air.example", received: "2026-10-17", text: "Gate B12", html: "<p>Gate <b>B12</b></p>", truncated: false, original: true, images: 0 }] }
       : answer(path, opts)) as never);
     render(TripPage);
     await screen.findByRole("list", { name: "Bookings" });
@@ -182,7 +182,7 @@ describe("Trip", () => {
     const region = await screen.findByRole("region", { name: /The email for/ });
     expect(await within(region).findByTestId("message-subject")).toHaveTextContent("Your itinerary: EX 410");
     expect(region).toHaveTextContent("example-air.example · sent 2026-10-17");
-    expect(within(region).getByTestId("preview-html").querySelector("b")).toHaveTextContent("B12");
+    expect(within(region).getByTestId("preview-html").getAttribute("srcdoc")).toContain("<b>B12</b>");
     expect(vi.mocked(api)).toHaveBeenCalledWith("/api/segments/1/emails");
     await userEvent.click(screen.getByRole("button", { name: /Hide the email for/ }));
     expect(screen.queryByRole("region", { name: /The email for/ })).toBeNull();

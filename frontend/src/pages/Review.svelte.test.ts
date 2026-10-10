@@ -412,8 +412,8 @@ describe("Review: the message beside the form", () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     const formatted = await screen.findByTestId("preview-html");
-    expect(formatted.querySelector("b")).toHaveTextContent("B12");
-    expect(formatted.querySelector("td")).toHaveTextContent("Seat");
+    expect(formatted.getAttribute("srcdoc")).toContain("<b>B12</b>");
+    expect(formatted.getAttribute("srcdoc")).toContain("<td>Seat</td>");
     await userEvent.click(screen.getByRole("button", { name: "Show as plain text" }));
     expect(screen.queryByTestId("preview-html")).toBeNull();
     expect(screen.getByTestId("preview")).toHaveTextContent("Gate B12");
@@ -433,7 +433,7 @@ describe("Review: the message beside the form", () => {
     truncated = true;
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
-    expect(await screen.findByText(/Cut short here/)).toBeInTheDocument();
+    expect(await screen.findByText(/cut short/)).toBeInTheDocument();
   });
 
   it("says why it couldn’t be fetched, and tries again when asked again", async () => {

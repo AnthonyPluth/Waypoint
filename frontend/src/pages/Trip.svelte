@@ -364,7 +364,7 @@
           {#each mail.emails as e, i (i)}
             <div>
               {#if e.received || e.sender_domain}<p class="mb-1 text-sm text-muted-foreground">{[e.sender_domain, e.received && `sent ${e.received}`].filter(Boolean).join(" · ")}</p>{/if}
-              <MessageView subject={e.subject} text={e.text} html={e.html} truncated={e.truncated} />
+              <MessageView subject={e.subject} text={e.text} html={e.html} truncated={e.truncated} original={e.original} images={e.images} imagesAt={`/api/segments/${s.id}/emails/${i}/images/`} />
             </div>
           {/each}
         {/if}

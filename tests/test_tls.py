@@ -20,6 +20,9 @@ class TlsTests(unittest.TestCase):
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
         self.assertTrue(ctx.check_hostname)
 
+    def test_the_context_refuses_anything_older_than_tls_1_2(self):
+        self.assertEqual(tls.ssl_context().minimum_version, ssl.TLSVersion.TLSv1_2)
+
     def test_only_web_addresses_are_opened_before_anything_is_sent(self):
         opened = mock.Mock(side_effect=AssertionError("nothing may be opened"))
         refused = ["file:///etc/passwd", "ftp://example.com/x", "data:text/plain,hi", "http://example.com/", "gopher://x/",

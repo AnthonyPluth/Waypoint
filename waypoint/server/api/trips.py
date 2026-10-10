@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 from ... import validate
 from ...domain import airports, people, trips
 from ...domain.visibility import Viewer
-from ..common import ApiError, _current, row_id
+from ..common import NO_IMAGE, ApiError, Response, _current, image_response, position, row_id
 from ..contract import (Airport, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
                         TripList)
 
@@ -190,6 +190,13 @@ def api_segment_emails(conn, _q, _b, segment_id) -> SegmentEmails:
     if found is None:
         raise ApiError(NO_SEGMENT, 404)
     return {"emails": [StoredEmail(**e) for e in found]}
+
+
+def api_segment_email_image(conn, _q, _b, segment_id, email, index) -> Response:
+    found = trips.email_image_of(conn, viewer(conn), row_id(segment_id, NO_IMAGE), position(email), position(index))
+    if found is None:
+        raise ApiError(NO_IMAGE, 404)
+    return image_response(found)
 
 
 def api_segment_edit(conn, _q, body: SegmentEdit, segment_id) -> Segment:
