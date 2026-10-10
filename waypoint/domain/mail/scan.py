@@ -118,13 +118,13 @@ def _keep_quietly(mailbox_id: int, message_id: str, raw: dict[str, Any], segment
 
 def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str, message: extract.Message,
           ignored: list[str], now: float, why: Counter[str] | None = None, again: bool = False,
-          backfill: bool = False) -> tuple[int, int, list[int] | None]:
+          backfill: bool = False) -> tuple[int, int, list[int] | None, str | None]:
     why = Counter() if why is None else why
     if again:
         conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id))
     if _ignores(ignored, message.sender_domain):
         _record(conn, mailbox_id, message_id, IGNORED, now)
-        return 0, 0, None
+        return 0, 0, None, None
     made, failed = 0, 0
     touched: list[int] = []
     held: list[ingest.Held] = []
@@ -147,8 +147,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     elif held:
         review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "match", now, held)
         queued = 1
-    _record(conn, mailbox_id, message_id, BOOKING if usable else UNREADABLE, now)
-    return made, queued, list(dict.fromkeys(touched)) if queued or touched else None
+    return made, queued, list(dict.fromkeys(touched)) if queued or touched else None, BOOKING if usable else UNREADABLE
 
 
 SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
@@ -272,17 +271,19 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 continue
             try:
                 with _filing, db.session() as conn:
-                    a, b, wanted = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, backfill)
+                    a, b, wanted, outcome = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, backfill)
             except Exception as e:
                 if db.is_busy(e):
                     raise
                 monitoring.report(e, values=False)
                 with db.session() as conn:
                     review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "incomplete", now)
-                    _record(conn, mailbox_id, message_id, UNREADABLE, now)
-                a, b, wanted = 0, 1, []
+                a, b, wanted, outcome = 0, 1, [], UNREADABLE
             if wanted is not None:
                 _keep_quietly(mailbox_id, message_id, raw, wanted, now)
+            if outcome is not None:
+                with db.session() as conn:
+                    _record(conn, mailbox_id, message_id, outcome, now)
             if b:
                 _suggest(mailbox_id, message_id, raw, now)
             read, made, queued = read + 1, made + a, queued + b

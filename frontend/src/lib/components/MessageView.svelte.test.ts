@@ -65,6 +65,14 @@ describe("MessageView", () => {
     expect(pageOf()).toContain("<p>Hi</p>");
   });
 
+  it("stops asking for pictures at the first refusal to sign in, so the sign-out handlers run once", async () => {
+    vi.mocked(apiImage).mockRejectedValue(Object.assign(new Error("denied"), { status: 403 }));
+    render(MessageView, { text: "Hi", html: '<p>Hi</p><img data-i="0" alt="A"><img data-i="1" alt="B"><img data-i="2" alt="C">', images: 3, imagesAt: "/api/review/7/images/" });
+    await waitFor(() => expect(frameOf().getAttribute("aria-busy")).toBe("false"));
+    expect(apiImage).toHaveBeenCalledTimes(1);
+    expect(pageOf()).toContain("<p>Hi</p>");
+  });
+
   it("asks for no pictures when it has none, or no place to ask", () => {
     render(MessageView, { text: "Hi", html: '<img data-i="0" alt="A">', images: 1 });
     render(MessageView, { text: "Hi", html: "<p>Hi</p>", images: 0, imagesAt: "/api/review/7/images/" });

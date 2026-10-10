@@ -25,13 +25,16 @@
     if (!base || !count) return;
     let current = true;
     fetching = true;
-    void Promise.allSettled(Array.from({ length: count }, (_, i) => apiImage(`${base}${i}`))).then((done) => {
-      if (!current) return;
+    void (async () => {
       const found: Record<number, string> = {};
-      done.forEach((r, i) => { if (r.status === "fulfilled") found[i] = r.value; });
+      for (let i = 0; i < count && current; i++) {
+        try { found[i] = await apiImage(`${base}${i}`); }
+        catch (err) { if (err && typeof err === "object" && "status" in err && (err.status === 401 || err.status === 403)) break; }
+      }
+      if (!current) return;
       pictures = found;
       fetching = false;
-    });
+    })();
     return () => { current = false; };
   });
 </script>

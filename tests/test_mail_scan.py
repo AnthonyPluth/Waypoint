@@ -1396,9 +1396,18 @@ class KeptPictureTests(ScanCase):
         self.assertEqual(self.scanned(), {"msg-flight_jsonld": "booking"})
 
     def test_a_busy_database_while_keeping_stops_the_scan_to_be_retried(self):
-        self.put("flight_jsonld")
+        self.put("no_markup")
         with mock.patch.object(scan, "keep_message", side_effect=RuntimeError("busy")), mock.patch.object(db, "is_busy", return_value=True):
             self.assertEqual(self.scan().state, "failed")
+        self.assertEqual(self.scanned(), {})
+        self.assertEqual(self.kept_pictures_rows(), [])
+        self.assertEqual(self.scan(now=NOW + 60).state, "done")
+        self.assertEqual(self.scanned(), {"msg-no_markup": "unreadable"})
+        self.assertEqual(self.kept_pictures_rows(), ["msg-no_markup"])
+        self.assertEqual(len(self.items()), 1)
+
+    def kept_pictures_rows(self):
+        return self.read(lambda conn: [m for (m,) in conn.execute(select(StoredMessage.message_id))])
 
     def test_the_ai_fallback_still_gets_text_alone(self):
         self.add_mail("msg-pics", with_pictures("no_markup"))
