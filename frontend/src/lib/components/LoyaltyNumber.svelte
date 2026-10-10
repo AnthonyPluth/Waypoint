@@ -19,7 +19,7 @@
 </script>
 
 {#if entry.readable}
-  <button type="button" class="rounded-md px-1.5 py-0.5 phone:min-h-11 font-mono underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+  <button type="button" class="rounded-md px-1.5 py-0.5 phone:min-h-11 phone:-my-3 font-mono underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
     aria-label={shown !== null ? `Hide ${entry.program} number` : `Show and copy ${entry.program} number`} onclick={toggle}>{shown ?? entry.masked}</button>
 {:else}
   <span class="text-muted-foreground">Can’t be read with this key: enter it again in <a class="underline" href="#people">People</a></span>
