@@ -1,0 +1,27 @@
+{
+  "name": "stats-long-names",
+  "page": "stats",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Stats" } },
+    { "wait_for": "[data-visited]" },
+    { "long_names": ", Santa Cruz / Monterey Bay KOA Holiday Resort, Cape Hatteras / Outer Banks" },
+    { "reload": true },
+    { "wait_for": "#top-hotels-stayed-at" },
+    { "scroll_to": "#places-title" },
+    { "screenshot": "places" },
+    { "scroll_to": "#top-airlines" },
+    { "screenshot": "airlines" },
+    { "scroll_to": "text=Flight records" },
+    { "screenshot": "flight-records" },
+    { "scroll_to": "#seats-title" },
+    { "screenshot": "seats" },
+    { "scroll_to": "#hotels-title" },
+    { "screenshot": "hotels" },
+    { "scroll_to": "text=Hotel records" },
+    { "screenshot": "hotel-records" },
+    { "scroll_to": "#top-rental-companies" },
+    { "screenshot": "cars" },
+    { "scroll_to": "#top-cruise-lines" },
+    { "screenshot": "cruises" }
+  ]
+}
