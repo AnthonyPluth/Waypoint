@@ -1,0 +1,13 @@
+{
+  "name": "open-in-app",
+  "page": "trips",
+  "viewports": ["phone"],
+  "phone_agent": true,
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/'] >> visible=true" },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "wait_for": "a:has-text('Open in app')" },
+    { "screenshot": "vendor-links" }
+  ]
+}

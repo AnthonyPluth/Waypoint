@@ -27,6 +27,7 @@ Each `*.json` file here is a flow that `make verify` runs after visiting the pag
   - `{"wait_for": selector}` waits for it to appear; `{"expect_text": {"selector": …, "text": …}}` fails unless it contains the text within the timeout (it keeps looking while the page settles).
   - `{"screenshot": "name"}` saves `flow-<flow name>-<name>-<viewport>.png` (full page) and `…-<viewport>-top.png` (the top of the page, the size of the viewport).
 - `host` (default the server's own address, 127.0.0.1) opens the flow on another name for the same server: passkeys need a host name such as `localhost`, not an IP address.
+- `phone_agent` (true) makes the phone-width visit look like an iPhone to the page, for features that only show on a phone (the app's own `isMobile()` reads the user agent); tablet and desktop visits are unchanged.
 - `allow_console` (a list of texts) names console errors a flow expects, such as the browser's own "net::ERR_INTERNET_DISCONNECTED" while it is offline on purpose.
 - A flow also ends with a screenshot, and fails the run on a failed step, a console error or a 5xx response.
 

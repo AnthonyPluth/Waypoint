@@ -9,7 +9,7 @@ export const segment = (extra: Partial<Segment> = {}): Segment => ({
   id: 1, trip_id: 1, kind: "flight", status: "confirmed", confirmation: "KQ7M2X", provider: "American Airlines",
   start_local: "2026-11-20T19:00", start_zone: "America/New_York", end_local: "2026-11-21T07:10", end_zone: "Europe/London",
   origin: "JFK", destination: "LHR", details: { flight_number: "AA 101", terminal: "8" }, manage_url: null, source: "email", booked_by: 1,
-  locked_fields: [], check_times: false, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }], itinerary: [], days: [], logo: null, logo_label: null, hotel_brand: null, has_email: false, links: { app: null, directions: null, call: null }, ...extra,
+  locked_fields: [], check_times: false, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }], itinerary: [], days: [], logo: null, logo_label: null, hotel_brand: null, has_email: false, links: { app: null, open: null, open_kind: null, directions: null, call: null }, ...extra,
 });
 
 export const trip = (segments: Segment[], extra: Partial<Trip> = {}): Trip => ({

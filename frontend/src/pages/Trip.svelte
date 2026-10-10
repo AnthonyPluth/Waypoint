@@ -25,7 +25,7 @@
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { appWord, bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, untimed } from "$lib/trips";
+  import { appWord, bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, untimed, vendorLink } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
@@ -342,9 +342,11 @@
         aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
     {/if}
   {/if}
-  {#if s.links.app || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email}
+  {@const vendor = vendorLink(s, isMobile())}
+  {#if s.links.app || vendor || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email}
     <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
-      {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>{/if}
+      {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>
+      {:else if vendor}<Button variant="outline" size="sm" href={vendor.href}>{vendor.label}</Button>{/if}
       {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
       {#if s.status !== "cancelled" && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
       {#if s.has_email}

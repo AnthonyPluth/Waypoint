@@ -247,6 +247,11 @@ export function appWord(s: Segment, now: number, mobile: boolean): string {
   return mobile ? "Open in app" : "Manage booking";
 }
 
+export function vendorLink(s: Segment, mobile: boolean): { href: string; label: string } | null {
+  if (!mobile || s.links.app || !s.links.open) return null;
+  return { href: s.links.open, label: s.links.open_kind === "website" ? "Open website" : "Open in app" };
+}
+
 const PAST_WORD: Record<Segment["kind"], string> = { flight: "Landed", hotel: "Checked out", car: "Dropped off", train: "Arrived", cruise: "Disembarked" };
 
 export function routeProgress(s: Segment, now: number): number {

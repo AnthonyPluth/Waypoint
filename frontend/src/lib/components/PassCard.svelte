@@ -12,7 +12,7 @@
   import { flightStatus, statusFor } from "$lib/flightstatus.svelte";
   import { isMobile } from "$lib/platform";
   import { segmentChips } from "$lib/status";
-  import { appWord, dayLabel, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed } from "$lib/trips";
+  import { appWord, dayLabel, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
 
   type Props = {
     segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
@@ -34,6 +34,7 @@
   const number = $derived(s.details.flight_number ?? "");
   const app = $derived(s.links.app ?? s.manage_url);
   const appLabel = $derived(appWord(s, now, isMobile()));
+  const vendor = $derived(vendorLink(s, isMobile()));
   const asOf = (t: string) => new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t));
   const where = $derived([status?.dep_gate && `Gate ${status.dep_gate}`].filter(Boolean).join(" · "));
   const quiet = $derived(status ? [status.delay_minutes ? `${status.delay_minutes} min late` : "", where, `as of ${asOf(status.fetched_at)}`].filter(Boolean).join(" · ") : "");
@@ -76,6 +77,8 @@
 
     {#if app && showApp}
       <div><Button variant="outline" href={app} target="_blank" rel="noopener noreferrer">{appLabel}</Button></div>
+    {:else if vendor && showApp}
+      <div><Button variant="outline" href={vendor.href}>{vendor.label}</Button></div>
     {/if}
 
     {#if flight}

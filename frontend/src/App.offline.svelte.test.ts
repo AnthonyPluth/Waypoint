@@ -20,7 +20,7 @@ let device: Device;
 
 const flight = segment({ id: 1, confirmation: "QX7R2M", has_email: true, start_local: "2026-11-20T19:00", end_local: "2026-11-21T07:10", details: { flight_number: "AA 101", seat: "14C" } });
 const hotel = segment({ id: 2, kind: "hotel", confirmation: "H77231", provider: "Harbour Hotel", origin: "Harbour Hotel", destination: null, start_local: "2026-11-21T15:00", end_local: "2026-11-24T11:00",
-  start_zone: "Europe/London", end_zone: "Europe/London", details: { address: "1 Quay Street, London", room: "King" }, links: { app: null, directions: "https://maps.example/q", call: "tel:+442079460000" } });
+  start_zone: "Europe/London", end_zone: "Europe/London", details: { address: "1 Quay Street, London", room: "King" }, links: { app: null, open: null, open_kind: null, directions: "https://maps.example/q", call: "tel:+442079460000" } });
 
 const copyOf = (savedAt: number): SavedCopy => ({
   savedAt, trip: { ...trip([flight, hotel]), name: "Trip to London" },

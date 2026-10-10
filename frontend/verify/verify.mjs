@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { animationsRunning, auditPage } from "./a11y.mjs";
 
+export const PHONE_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 } };
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];
 const OWN_PAGES = ["oauth-approve"];
@@ -48,6 +49,7 @@ export function flowProblems(flow) {
   for (const v of flow?.viewports ?? []) if (!(v in VIEWPORTS)) out.push(`unknown viewport ${v}`);
   if (flow?.host !== undefined && !/^[\w.-]+$/.test(flow.host)) out.push("host is a host name such as localhost");
   if (flow?.allow_console !== undefined && !(Array.isArray(flow.allow_console) && flow.allow_console.every((t) => typeof t === "string"))) out.push("allow_console is a list of texts");
+  if (flow?.phone_agent !== undefined && typeof flow.phone_agent !== "boolean") out.push("phone_agent is true or false");
   if (flow?.scheme !== undefined) out.push("scheme is not an option: the app is dark only");
   return out;
 }
@@ -168,8 +170,8 @@ async function main() {
   try { approveUrl = await seedAssistants(browser, base); }
   catch (e) { problems.push(`seeding the demo assistants: ${String(e.message).split("\n")[0]}`, { cause: e }); }
 
-  async function visit(label, viewport, work, { audit = true, reducedMotion = "no-preference", allowConsole = [] } = {}) {
-    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark", reducedMotion });
+  async function visit(label, viewport, work, { audit = true, reducedMotion = "no-preference", allowConsole = [], phoneAgent = false } = {}) {
+    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark", reducedMotion, ...(phoneAgent && viewport === "phone" ? { userAgent: PHONE_AGENT } : {}) });
     const page = await ctx.newPage();
     const where = `${label} @ ${viewport}`;
     const consoleErrors = [];
@@ -225,7 +227,7 @@ async function main() {
           catch (e) { throw new Error(`step ${i + 1} (${JSON.stringify(step).slice(0, 80)}): ${String(e.message).split("\n")[0]}`, { cause: e }); }
         }
         await shot(`flow-${flow.name}`);
-      }, { allowConsole: flow.allow_console });
+      }, { allowConsole: flow.allow_console, phoneAgent: flow.phone_agent === true });
     }
   }
   if (!args.length) for (const name of pages.filter((n) => !OWN_PAGES.includes(n))) {
