@@ -302,18 +302,19 @@
         aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
     {/if}
   {/if}
-  {#if s.links.app || (s.status !== "cancelled" && (s.links.directions || s.links.call))}
+  {#if s.links.app || s.has_email || (s.status !== "cancelled" && (s.links.directions || s.links.call))}
     <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
       {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>{/if}
       {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
       {#if s.status !== "cancelled" && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
+      {#if s.has_email}
+        {@const mail = mails[s.id]}
+        <Button variant="outline" size="sm" aria-expanded={!!mail} aria-label={`${mail ? "Hide" : "View"} the email for ${headline(s)}`} onclick={() => toggleMail(s)}>{mail ? "Hide email" : "View email"}</Button>
+      {/if}
     </div>
   {/if}
   {#if s.has_email}
     {@const mail = mails[s.id]}
-    <div class="mt-2">
-      <Button variant="outline" size="sm" aria-expanded={!!mail} aria-label={`${mail ? "Hide" : "View"} the email for ${headline(s)}`} onclick={() => toggleMail(s)}>{mail ? "Hide email" : "View email"}</Button>
-    </div>
     {#if mail}
       <div class="mt-2 space-y-4" role="region" aria-label={`The email for ${headline(s)}`}>
         {#if mail.state === "loading"}<p class="text-sm text-muted-foreground" role="status">Opening the email…</p>

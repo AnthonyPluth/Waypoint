@@ -541,6 +541,50 @@ describe("Trip", () => {
     });
   });
 
+  describe("View email on the row of actions", () => {
+    const hotelMail = { emails: [{ subject: "Your stay", sender_domain: "example-hotel.example", received: "2026-10-17", text: "Check-in from 3 pm", html: "<p>Check-in <b>3 pm</b></p>", truncated: false }] };
+
+    beforeEach(() => {
+      held = trip([segment({ ...stay, has_email: true })]);
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/2/emails" ? hotelMail : answer(path, opts)) as never);
+    });
+
+    it("puts View email on the same row as Directions and Call", async () => {
+      render(TripPage);
+      const row = within(await screen.findByRole("group", { name: /Actions for Harbour Hotel/ }));
+      expect(row.getByRole("link", { name: "Directions" })).toBeInTheDocument();
+      expect(row.getByRole("link", { name: "Call" })).toBeInTheDocument();
+      expect(row.getByRole("button", { name: "View the email for Harbour Hotel" })).toBeInTheDocument();
+    });
+
+    it("lists the actions in order, with View email last", async () => {
+      render(TripPage);
+      const row = await screen.findByRole("group", { name: /Actions for Harbour Hotel/ });
+      expect(Array.from(row.querySelectorAll("a, button")).map((el) => el.textContent?.trim())).toEqual(["Directions", "Call", "View email"]);
+    });
+
+    it("shows View email alone when the booking has no links", async () => {
+      held = trip([segment({ ...stay, has_email: true, links: { app: null, directions: null, call: null } })]);
+      render(TripPage);
+      const row = within(await screen.findByRole("group", { name: /Actions for Harbour Hotel/ }));
+      expect(row.queryByRole("link")).toBeNull();
+      expect(row.getByRole("button", { name: "View the email for Harbour Hotel" })).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("opens the email below the whole row, not inside it, and keeps the buttons where they are", async () => {
+      render(TripPage);
+      const row = await screen.findByRole("group", { name: /Actions for Harbour Hotel/ });
+      await userEvent.click(within(row).getByRole("button", { name: "View the email for Harbour Hotel" }));
+      const region = await screen.findByRole("region", { name: "The email for Harbour Hotel" });
+      expect(await within(region).findByTestId("message-subject")).toHaveTextContent("Your stay");
+      expect(row.contains(region)).toBe(false);
+      expect(row.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(row).getByRole("link", { name: "Directions" })).toBeInTheDocument();
+      expect(within(row).getByRole("button", { name: "Hide the email for Harbour Hotel" })).toHaveAttribute("aria-expanded", "true");
+    });
+  });
+
   describe("a cruise", () => {
     const ship = segment({ id: 5, kind: "cruise", provider: "Example Cruise Line", origin: "Miami", destination: "Miami", start_zone: "America/New_York", end_zone: "America/New_York",
       start_local: "2026-03-01T16:30", end_local: "2026-03-08T07:00", confirmation: "CR48210", details: { ship: "Example Voyager", room: "9214", address: "1 Port Boulevard\nMiami" },
