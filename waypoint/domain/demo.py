@@ -248,10 +248,10 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     from_email = trips.add_segment(conn, jane, {**_read_from_email(today), "travelers": [{"person_id": None, "name": "RIVERA/ALEX MR"}]}, source="email")
     held_ids = [added["id"] for added in (trips.add_segment(conn, jane, {**_held_stay(today), "travelers": _on(jane.person_id)}) for _ in range(2)) if added]
     box = Mailbox(owner_sub="local", address=DEMO_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
-                  status="connected", created=0.0, last_scan=datetime.now(UTC).timestamp() - 3600)
+                  status="connected", created=0.0, last_scan=datetime.now(UTC).timestamp() - 3600,
+                  scan_summary=scan.encode(scan.Summary(found=24, read=6, bookings=3, review=2, skipped=15, capped=False)))
     conn.orm.add(box)
     conn.orm.flush()
-    scan.remember(box.id, scan.Summary(found=24, read=6, bookings=3, review=2, skipped=15, capped=False))
     for domain, ago, reason in UNREAD:
         review.add(conn, box.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
         stored_mail.put(conn, box.id, f"demo-{domain}", _message(domain, ago, today, f"{SUBJECTS[domain]}: made-up details",

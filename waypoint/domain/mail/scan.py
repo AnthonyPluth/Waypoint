@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import threading
 import time
 from collections import Counter
@@ -55,7 +56,6 @@ _running: set[int] = set()
 _lock = threading.Lock()
 _filing = threading.Lock()
 _notices: dict[int, str] = {}
-_summaries: dict[int, Summary] = {}
 
 
 def running(mailbox_id: int) -> bool:
@@ -86,20 +86,36 @@ def scan(mailbox_id: int, now: float, today: date, again: bool = False, backfill
     return result
 
 
+def encode(found: Summary) -> str:
+    return json.dumps({"found": found.found, "read": found.read, "bookings": found.bookings, "review": found.review,
+                       "skipped": found.skipped, "capped": found.capped}, separators=(",", ":"))
+
+
+def decode(text: str | None) -> Summary | None:
+    try:
+        raw = json.loads(text) if text else None
+    except ValueError:
+        return None
+    counts = ("found", "read", "bookings", "review", "skipped")
+    if not isinstance(raw, dict) or not all(isinstance(raw.get(k), int) and not isinstance(raw.get(k), bool) for k in counts) \
+            or not isinstance(raw.get("capped"), bool):
+        return None
+    return Summary(raw["found"], raw["read"], raw["bookings"], raw["review"], raw["skipped"], raw["capped"])
+
+
 def summary(mailbox_id: int) -> Summary | None:
-    with _lock:
-        return _summaries.get(mailbox_id)
+    with db.session() as conn:
+        return decode(conn.execute(select(Mailbox.scan_summary).where(Mailbox.id == mailbox_id)).scalar())
 
 
 def remember(mailbox_id: int, found: Summary) -> None:
-    with _lock:
-        _summaries[mailbox_id] = found
+    with db.session() as conn:
+        conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(scan_summary=encode(found)))
 
 
 def forget(mailbox_id: int) -> None:
     with _lock:
         _notices.pop(mailbox_id, None)
-        _summaries.pop(mailbox_id, None)
 
 
 def _viewer(owner: str, conn: db.Connection) -> Viewer | None:

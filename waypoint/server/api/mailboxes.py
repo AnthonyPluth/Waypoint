@@ -33,8 +33,8 @@ def _when(t: float | None) -> str | None:
     return datetime.fromtimestamp(t, UTC).isoformat(timespec="seconds") if t else None
 
 
-def _summary(mailbox_id: int) -> ScanSummary | None:
-    found = scan.summary(mailbox_id)
+def _summary(text: str | None) -> ScanSummary | None:
+    found = scan.decode(text)
     return None if found is None else {"found": found.found, "read": found.read, "bookings": found.bookings, "review": found.review,
                                       "skipped": found.skipped, "capped": found.capped}
 
@@ -44,7 +44,7 @@ def api_mailboxes(conn, _q, _b) -> MailboxList:
     return {"configured": gmail.configured(),
             "mailboxes": [{"id": m["id"], "address": m["address"], "status": m["status"], "last_error": m["last_error"],
                            "last_scan": _when(m["last_scan"]), "scan_error": m["scan_error"], "scanning": scan.running(m["id"]),
-                           "scan_notice": scan.notice(m["id"]), "scan_summary": _summary(m["id"]), "share_review": bool(m["share_review"])}
+                           "scan_notice": scan.notice(m["id"]), "scan_summary": _summary(m["scan_summary"]), "share_review": bool(m["share_review"])}
                           for m in gmail.listing(conn, owner())]}
 
 

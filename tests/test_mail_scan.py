@@ -355,8 +355,15 @@ class TriageScanTests(ScanCase):
         self.add_mail("odd", plain_mail(UNLISTED[1], "Your reservation is confirmed", "Everything is arranged."))
         self.scan()
         self.assertEqual(scan.summary(self.mailbox), scan.Summary(3, 2, 1, 1, 1, False))
-        scan.forget(self.mailbox)
-        self.assertIsNone(scan.summary(self.mailbox))
+        self.assertEqual(scan.decode(self.row()["scan_summary"]), scan.summary(self.mailbox))
+        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "found", "read", "review", "skipped"])
+
+    def test_a_stored_summary_that_is_not_counts_is_read_as_none(self):
+        for text in (None, "", "x", "[]", '{"found":1}', '{"found":true,"read":1,"bookings":1,"review":1,"skipped":1,"capped":false}',
+                     '{"found":1,"read":1,"bookings":1,"review":1,"skipped":1,"capped":"no"}'):
+            self.assertIsNone(scan.decode(text), text)
+        good = scan.Summary(4, 3, 2, 1, 0, True)
+        self.assertEqual(scan.decode(scan.encode(good)), good)
 
     def test_nothing_in_a_subject_sender_or_body_reaches_the_summary_the_log_or_anywhere_else(self):
         canaries = ("CANARY-SUBJECT-TRIAGE-4X7K", "CANARY-SENDER-TRIAGE-9M2Q", "CANARY-BODY-TRIAGE-6T3W")

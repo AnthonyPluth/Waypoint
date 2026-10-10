@@ -167,8 +167,11 @@ class Replies(DbCase):
         for status in ("connected", "reconnect", "error"):
             self.c.execute(insert(Mailbox).values(owner_sub="u1", address=f"{status}@gmail.example", token=secretbox.encrypt("t"),
                                                   status=status, last_error=None if status == "connected" else "Said so.",
-                                                  last_scan=1790000000.0, created=1.0))
+                                                  last_scan=1790000000.0, created=1.0,
+                                                  scan_summary='{"found":3,"read":2,"bookings":1,"review":1,"skipped":1,"capped":false}' if status == "connected" else None))
         reply = mailboxes.api_mailboxes(self.c, {}, {})
+        self.assertEqual(reply["mailboxes"][0]["scan_summary"], {"found": 3, "read": 2, "bookings": 1, "review": 1, "skipped": 1, "capped": False})
+        self.assertIsNone(reply["mailboxes"][1]["scan_summary"])
         self.assertEqual([m["status"] for m in reply["mailboxes"]], ["connected", "reconnect", "error"])
         self.check("GET /api/mailboxes", reply)
         with mock.patch.object(jobs, "scan_now", return_value=True):

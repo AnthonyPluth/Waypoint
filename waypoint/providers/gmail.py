@@ -189,7 +189,7 @@ def _revoke_quietly(token: str) -> None:
 
 def listing(conn: db.Connection, owner: str) -> list[dict[str, Any]]:
     return db.rows(conn.execute(select(Mailbox.id, Mailbox.address, Mailbox.status, Mailbox.last_error, Mailbox.last_scan,
-                                       Mailbox.scan_error, Mailbox.share_review).where(Mailbox.owner_sub == owner).order_by(Mailbox.id)))
+                                       Mailbox.scan_error, Mailbox.scan_summary, Mailbox.share_review).where(Mailbox.owner_sub == owner).order_by(Mailbox.id)))
 
 
 def set_share_review(conn: db.Connection, mailbox_id: int, owner: str, share: bool) -> bool:
