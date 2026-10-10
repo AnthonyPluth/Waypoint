@@ -320,4 +320,25 @@ describe("Stats", () => {
     expect(statsCalls()).toEqual(["/api/stats?person=all&year=all"]);
     expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("all");
   });
+
+  it("keeps a record's value and a bar's figure on their row when a detail or a name is long", async () => {
+    const longAirport = "Ted Stevens Anchorage International Airport and Cargo Terminal Complex";
+    const longCabin = "Premium economy with a very long cabin name that goes on and on";
+    serve(() => ({
+      ...full,
+      flights: { ...full.flights, airports: [{ ...airports[0], name: longAirport }, ...airports.slice(1)], cabins: [{ name: longCabin, count: 8 }, { name: "Business", count: 2 }] },
+    }));
+    render(Stats_);
+    const records = (await screen.findByRole("heading", { name: "Flight records" })).closest("div")!;
+    const airportRow = within(records).getByText("Most-visited airport").closest("div")!;
+    expect(airportRow.className).toContain("flex-nowrap");
+    expect(within(airportRow).getByText("Most-visited airport").className).toContain("truncate");
+    expect(within(airportRow).getByText(longAirport).closest("dd")!.className).toContain("break-words");
+    const seats = screen.getByRole("heading", { name: "Seats" }).closest("section")!;
+    const cabin = within(seats).getByText(longCabin);
+    expect(cabin.className).toContain("truncate");
+    expect(cabin.getAttribute("title")).toBe(longCabin);
+    expect(cabin.nextElementSibling!.className).toContain("whitespace-nowrap");
+    expect(cabin.nextElementSibling).toHaveTextContent("80% · 8");
+  });
 });
