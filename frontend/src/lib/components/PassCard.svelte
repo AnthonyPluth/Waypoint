@@ -66,7 +66,7 @@
         {#if flight}
           <p class="break-words font-medium" class:line-through={cancelled}>{[s.provider, number].filter(Boolean).join(" ")}</p>
           <p class="text-sm text-muted-foreground">
-            {#if !timesArea}{dayLabel(s.start_local)}{#if unknown}, time not recorded{:else if !differ}, <PlaceTime local={s.start_local} zone={s.start_zone} />{/if}{/if}
+            {#if !timesArea}{dayLabel(s.start_local)}{#if unknown}, time not recorded{:else if !differ}, <PlaceTime local={s.start_local} />{/if}{/if}
           </p>
         {:else}
           <svelte:element this={`h${level}`} class="break-words text-title font-semibold" class:line-through={cancelled}>{headline(s)}</svelte:element>
@@ -89,13 +89,13 @@
           <div class="col-span-3 mt-2 flex flex-col gap-1 text-sm">
             <span><Badge variant="secondary">Times differ between bookings</Badge></span>
             {#each bookings as b (b.id)}
-              <span>{b.confirmation ? `${b.confirmation}: ` : ""}{START_WORD[b.kind].toLowerCase()} {dayLabel(b.start_local)}, <PlaceTime local={b.start_local} zone={b.start_zone} />, {END_WORD[b.kind].toLowerCase()} {dayLabel(b.end_local)}, <PlaceTime local={b.end_local} zone={b.end_zone} /></span>
+              <span>{b.confirmation ? `${b.confirmation}: ` : ""}{START_WORD[b.kind].toLowerCase()} {dayLabel(b.start_local)}, <PlaceTime local={b.start_local} />, {END_WORD[b.kind].toLowerCase()} {dayLabel(b.end_local)}, <PlaceTime local={b.end_local} /></span>
             {/each}
           </div>
         {:else}
         <div class="col-span-3 flex flex-wrap justify-between gap-x-4 text-sm">
-          <p>{#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} zone={s.start_zone} />{/if}</p>
-          <p class="text-right">{#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</p>
+          <p>{#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} />{/if}</p>
+          <p class="text-right">{#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.end_local} />{/if}</p>
         </div>
         {/if}
       </div>
@@ -105,9 +105,9 @@
     {:else}
       <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
         <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
-          <dd class="mt-1 font-medium">{dayLabel(s.start_local)}, {#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} zone={s.start_zone} />{/if}</dd></div>
+          <dd class="mt-1 font-medium">{dayLabel(s.start_local)}, {#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} />{/if}</dd></div>
         <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
-          <dd class="mt-1 font-medium">{dayLabel(s.end_local)}, {#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.end_local} zone={s.end_zone} />{/if}</dd></div>
+          <dd class="mt-1 font-medium">{dayLabel(s.end_local)}, {#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.end_local} />{/if}</dd></div>
       </dl>
     {/if}
     {#if details}{@render details()}{/if}

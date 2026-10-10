@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { placeTime } from "$lib/trips";
+  import { clock } from "$lib/trips";
 
-  let { local, zone, mine }: { local: string; zone: string; mine?: string } = $props();
-  const shown = $derived(placeTime(local, zone, mine));
+  let { local }: { local: string } = $props();
 </script>
 
-<time datetime={local}>{shown.text}</time>{#if shown.yours}{" "}<span class="text-xs text-muted-foreground" title="The same moment in your time zone">[{shown.yours}]</span>{/if}
+<time datetime={local}>{clock(local)}</time>
