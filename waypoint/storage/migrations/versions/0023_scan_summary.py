@@ -8,10 +8,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    with op.batch_alter_table('mailboxes') as batch:
-        batch.add_column(sa.Column('scan_summary', sa.Text()))
+    op.add_column('mailboxes', sa.Column('scan_summary', sa.Text()))
 
 
 def downgrade() -> None:
-    with op.batch_alter_table('mailboxes') as batch:
-        batch.drop_column('scan_summary')
+    op.drop_column('mailboxes', 'scan_summary')
