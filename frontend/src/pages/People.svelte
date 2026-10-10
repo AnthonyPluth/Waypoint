@@ -5,6 +5,7 @@
   import type { LoyaltyEntry, LoyaltyList, Person } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
+  import BrandLogo from "$lib/components/BrandLogo.svelte";
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Input } from "$lib/components/ui/input";
@@ -247,7 +248,7 @@
                 {#each group.items as m (m.id)}
                   <li class="flex items-start justify-between gap-x-3 text-sm">
                     <div class="min-w-0 flex-1">
-                      <p class="break-words"><span class="font-medium">{m.program}</span>
+                      <p class="break-words"><BrandLogo src={m.logo} size={20} class="mr-1.5 align-middle" /><span class="font-medium">{m.program}</span>
                         {#if m.readable}
                           <button type="button" class="ml-2 rounded-md px-1.5 py-0.5 phone:min-h-11 font-mono underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
                             aria-label={revealed[m.id] !== undefined ? `Hide ${m.program} number` : `Show and copy ${m.program} number`} onclick={() => toggle(m)}>{revealed[m.id] ?? m.masked}</button>
@@ -256,7 +257,7 @@
                         {/if}</p>
                       {#if itemDetails(m)}<p class="break-words text-muted-foreground">{itemDetails(m)}</p>{/if}
                     </div>
-                    <div class="-mt-1 -mr-2 flex shrink-0 gap-1">
+                    <div class="-mt-1 -mr-2 flex shrink-0 gap-1 phone:gap-0.5">
                       <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Edit ${p.display_name}’s ${m.program}`} title="Edit" onclick={() => startEditId(m)}><Pencil class="size-4" /></Button>
                       <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Remove ${p.display_name}’s ${m.program}`} title="Remove" onclick={() => { idRemoving = m; idAsking = true; }}><Trash class="size-4" /></Button>
                     </div>

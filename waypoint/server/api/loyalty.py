@@ -5,7 +5,7 @@ from typing import Any
 
 from ... import validate
 from ...domain import loyalty
-from ..common import ApiError, row_id
+from ..common import ApiError, Response, row_id
 from ..contract import LoyaltyBody, LoyaltyConflict, LoyaltyEntry, LoyaltyList, Ok, Revealed
 
 NUMBER_LIMIT = 64
@@ -63,6 +63,14 @@ def api_loyalty_edit(conn, _q, body: LoyaltyBody, loyalty_id) -> LoyaltyEntry:
     if found is None:
         raise ApiError(NO_SUCH, 404)
     return LoyaltyEntry(**found)
+
+
+def api_loyalty_logo(conn, _q, _b, loyalty_id) -> Response:
+    found = loyalty.logo(conn, row_id(loyalty_id, NO_SUCH))
+    if found is None:
+        raise ApiError(NO_SUCH, 404)
+    data, content_type = found
+    return Response(data, content_type, cache="private, max-age=86400")
 
 
 def api_loyalty_remove(conn, _q, _b, loyalty_id) -> Ok:

@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-67 routes; 0 have no test yet.
+68 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -54,6 +54,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/loyalty/{id}` | `loyalty.py:api_loyalty_edit` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp.py` | [start/loyalty](/Waypoint/start/loyalty/) |
 | `DELETE /api/loyalty/{id}` | `loyalty.py:api_loyalty_remove` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp.py` | [start/loyalty](/Waypoint/start/loyalty/) |
 | `POST /api/loyalty/{id}/reveal` | `loyalty.py:api_loyalty_reveal` | `lib/components/LoyaltyNumber.svelte`, `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp.py`, `test_mcp_routes.py` | [start/loyalty](/Waypoint/start/loyalty/) |
+| `GET /api/loyalty/{id}/logo` | `loyalty.py:api_loyalty_logo` | - | `test_loyalty.py` | [start/loyalty](/Waypoint/start/loyalty/) |
 | `GET /api/mailboxes` | `mailboxes.py:api_mailboxes` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `POST /api/mailboxes/connect` | `mailboxes.py:api_mailbox_connect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `GET /api/mailboxes/callback` | `mailboxes.py:api_mailbox_callback` | - | `test_gmail.py` | [start/gmail](/Waypoint/start/gmail/) |

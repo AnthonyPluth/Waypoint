@@ -499,6 +499,7 @@ class LoyaltyEntry(TypedDict):
     readable: bool
     expiry: str | None
     notes: str | None
+    logo: str | None
 
 
 class LoyaltyConflict(TypedDict):

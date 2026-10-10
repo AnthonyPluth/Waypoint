@@ -1,16 +1,16 @@
 import os
 from unittest import mock
 
-from sqlalchemy import select
+from sqlalchemy import insert, select
 
 from waypoint import oidc
-from waypoint.domain import demo, loyalty, people
+from waypoint.domain import demo, logos, loyalty, people
 from waypoint.server.api import loyalty as api
 from waypoint.server.common import ApiError
 from waypoint.storage import db, secretbox
-from waypoint.storage.models import LoyaltyId
+from waypoint.storage.models import BrandLogo, LoyaltyId
 from tests.privacy import no_leaks
-from tests.shared import DbCase, ServerCase
+from tests.shared import DbCase, ServerCase, fetch
 
 CANARY = "CANARY-AAD-4417029X"
 
@@ -22,6 +22,41 @@ def membership(person_id, **kw):
 
 def guest(c, name="Mia Doe"):
     return people.add_guest(c, {"display_name": name, "first_name": None, "legal_name": None, "aliases": []})["id"]
+
+
+PNG = b"\x89PNG\r\n\x1a\nmade-up"
+
+
+class LogoTests(DbCase):
+    def test_every_airline_program_but_other_maps_to_a_brand(self):
+        for program in loyalty.PROGRAMS["airline"]:
+            with self.subTest(program=program):
+                self.assertEqual(loyalty.brand_of("airline", program) is None, program == loyalty.OTHER)
+        self.assertEqual(set(loyalty.AIRLINE_BRANDS), set(loyalty.PROGRAMS["airline"]) - {loyalty.OTHER})
+
+    def test_only_airline_programs_have_a_brand(self):
+        for kind in ("hotel", "car", "known_traveler", "redress"):
+            for program in loyalty.PROGRAMS[kind]:
+                self.assertIsNone(loyalty.brand_of(kind, program), program)
+        self.assertIsNone(loyalty.brand_of("hotel", "Delta SkyMiles"))
+
+    def test_a_stored_logo_is_offered_only_for_the_membership_it_belongs_to(self):
+        who = guest(self.c)
+        delta = loyalty.add(self.c, membership(who, program="Delta SkyMiles"))
+        other = loyalty.add(self.c, membership(who, program=loyalty.OTHER))
+        hotel = loyalty.add(self.c, membership(who, kind="hotel", program="Hilton Honors"))
+        self.assertEqual([e["logo"] for e in loyalty.everyone(self.c)], [None, None, None])
+        self.c.execute(insert(BrandLogo).values(key=logos.key("Delta Air Lines"), name="Delta Air Lines", logo=PNG, logo_type="image/png", source="logodev"))
+        offered = {e["id"]: e["logo"] for e in loyalty.everyone(self.c)}
+        self.assertEqual(offered, {delta["id"]: f"/api/loyalty/{delta['id']}/logo", other["id"]: None, hotel["id"]: None})
+        self.assertEqual(loyalty.logo(self.c, delta["id"]), (PNG, "image/png"))
+        self.assertIsNone(loyalty.logo(self.c, other["id"]))
+        self.assertIsNone(loyalty.logo(self.c, hotel["id"]))
+        self.assertIsNone(loyalty.logo(self.c, 9999))
+        self.assertEqual(api.api_loyalty_logo(self.c, {}, {}, str(delta["id"])).body, PNG)
+        with self.assertRaises(ApiError) as caught:
+            api.api_loyalty_logo(self.c, {}, {}, str(other["id"]))
+        self.assertEqual(caught.exception.status, 404)
 
 
 class StorageTests(DbCase):
@@ -168,6 +203,19 @@ class RouteTests(ServerCase):
         self.assertEqual((status, edited["program"], edited["masked"]), (200, "Hilton Honors", "••••1234"))
         self.assertEqual(self.req("DELETE", f"/api/loyalty/{added['id']}"), (200, {"ok": True}))
         self.assertNotIn(added["id"], [m["id"] for m in self.req("GET", "/api/loyalty")[1]["loyalty"]])
+
+    def test_the_logo_route_serves_the_stored_image_and_is_a_404_without_one(self):
+        _, delta = self.save(kind="airline", program="Delta SkyMiles")
+        path = f"/api/loyalty/{delta['id']}/logo"
+        self.assertEqual(self.req("GET", path), (404, {"error": "No such membership"}))
+        conn = db.connect(self.database)
+        self.addCleanup(conn.close)
+        conn.execute(insert(BrandLogo).values(key=logos.key("Delta Air Lines"), name="Delta Air Lines", logo=PNG, logo_type="image/png", source="logodev"))
+        conn.commit()
+        status, headers, body = fetch(self.base, "GET", path, None, {"X-Waypoint": "1"}, 20)
+        self.assertEqual((status, body, headers.get("Content-Type")), (200, PNG, "image/png"))
+        listed = {m["id"]: m["logo"] for m in self.req("GET", "/api/loyalty")[1]["loyalty"]}
+        self.assertEqual(listed[delta["id"]], path)
 
     def test_a_second_membership_in_a_program_is_a_400_for_a_save_and_a_move_but_not_an_edit_in_place(self):
         status, first = self.save()

@@ -3159,6 +3159,12 @@
               "string",
               "null"
             ]
+          },
+          "logo": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -3169,7 +3175,8 @@
           "masked",
           "readable",
           "expiry",
-          "notes"
+          "notes",
+          "logo"
         ],
         "additionalProperties": false
       },

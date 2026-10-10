@@ -17,8 +17,8 @@ const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", lega
 const mia: Person = { id: 2, display_name: "Mia Doe", first_name: "Mia", legal_name: "Mia Rose Doe", aliases: ["DOE/MIA MISS"], member: false, links: [] };
 
 const PROGRAMS = { airline: ["American AAdvantage", "Other"], hotel: ["Marriott Bonvoy", "Other"], car: ["Other"], known_traveler: ["TSA PreCheck", "Other"], redress: ["DHS TRIP", "Other"] };
-const aa: LoyaltyEntry = { id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, expiry: null, notes: null };
-const tsa: LoyaltyEntry = { id: 12, person_id: 1, kind: "known_traveler", program: "TSA PreCheck", masked: "••••2345", readable: true, expiry: "2029-03-31", notes: null };
+const aa: LoyaltyEntry = { id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, expiry: null, notes: null, logo: "/api/loyalty/11/logo" };
+const tsa: LoyaltyEntry = { id: 12, person_id: 1, kind: "known_traveler", program: "TSA PreCheck", masked: "••••2345", readable: true, expiry: "2029-03-31", notes: null, logo: null };
 
 let held: Person[];
 let ids: LoyaltyEntry[];
@@ -32,7 +32,7 @@ function serve() {
       if (opts?.method === "DELETE") { ids = ids.filter((m) => m.id !== id); return { ok: true }; }
       const b = opts?.body as { person_id: number; kind: string; program: string; number?: string; expiry: string; notes: string };
       const next: LoyaltyEntry = { id: id || 20, person_id: b.person_id, kind: b.kind, program: b.program, masked: b.number ? `••••${b.number.slice(-4)}` : ids.find((m) => m.id === id)?.masked ?? "••••",
-        readable: true, expiry: b.expiry || null, notes: b.notes || null };
+        readable: true, expiry: b.expiry || null, notes: b.notes || null, logo: null };
       ids = id ? ids.map((m) => (m.id === id ? next : m)) : [...ids, next];
       return next;
     }
@@ -57,6 +57,29 @@ function serve() {
 beforeEach(() => { vi.mocked(api).mockReset(); held = [jane, mia]; ids = [aa, tsa]; conflicts = []; app.state = state(); serve(); });
 
 describe("People", () => {
+  it("shows an airline's logo beside its program without changing the row's button names", async () => {
+    ids = [aa, { ...aa, id: 13, program: "Other", logo: null }, { ...aa, id: 14, program: "Delta SkyMiles", logo: null }, tsa,
+      { ...tsa, id: 15, kind: "hotel", program: "Marriott Bonvoy", logo: null }, { ...tsa, id: 16, kind: "car", program: "Hertz Gold Plus Rewards", logo: null }];
+    render(People);
+    const section = await screen.findByRole("region", { name: "Jane Doe’s Airline memberships" });
+    const logos = section.querySelectorAll("img");
+    expect(logos).toHaveLength(1);
+    expect(logos[0]).toHaveAttribute("src", "/api/loyalty/11/logo");
+    expect(logos[0]).toHaveAttribute("alt", "");
+    expect(within(section).getByText("American AAdvantage")).toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: "Show and copy American AAdvantage number" })).toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: "Edit Jane Doe’s American AAdvantage" })).toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: "Remove Jane Doe’s American AAdvantage" })).toBeInTheDocument();
+    expect(document.querySelectorAll("img")).toHaveLength(1);
+  });
+
+  it("draws no image for a program whose logo is missing", async () => {
+    ids = [{ ...aa, logo: null }, tsa];
+    render(People);
+    await screen.findByRole("region", { name: "Jane Doe’s Airline memberships" });
+    expect(document.querySelector("img")).toBeNull();
+  });
+
   it("lists members and guests, with the names an airline matches", async () => {
     render(People);
     const list = await screen.findByRole("list", { name: "People" });

@@ -18,7 +18,7 @@ CHANGES = [
     "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
 ]
 BLOCKED = [
-    "DELETE /api/loyalty/{id}", "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "POST /api/loyalty/{id}/reveal",
+    "DELETE /api/loyalty/{id}", "GET /api/loyalty", "GET /api/loyalty/{id}/logo", "POST /api/loyalty", "POST /api/loyalty/{id}", "POST /api/loyalty/{id}/reveal",
     "DELETE /api/feed", "DELETE /api/mailboxes/{id}", "DELETE /api/mcp-settings/connections/{id}", "DELETE /api/reminders/devices/{id}",
     "DELETE /api/review/{id}", "GET /api/ai", "GET /api/backup", "GET /api/mailboxes", "GET /api/mailboxes/callback", "GET /api/offline",
     "GET /api/mcp-settings", "GET /api/reminders", "GET /api/review", "GET /api/review/{id}/preview", "GET /api/state",

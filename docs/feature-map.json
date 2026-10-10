@@ -673,6 +673,18 @@
     },
     {
       "method": "GET",
+      "path": "/api/loyalty/{id}/logo",
+      "handler": "waypoint/server/api/loyalty.py:api_loyalty_logo",
+      "web": [],
+      "tests": [
+        "tests/test_loyalty.py"
+      ],
+      "docs": [
+        "start/loyalty"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/mailboxes",
       "handler": "waypoint/server/api/mailboxes.py:api_mailboxes",
       "web": [

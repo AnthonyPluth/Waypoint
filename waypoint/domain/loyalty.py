@@ -5,6 +5,7 @@ from typing import TypedDict
 from sqlalchemy import delete, select, update
 
 from ..storage import db, secretbox
+from . import logos
 from ..storage.models import LoyaltyId, Person
 
 KINDS = ("airline", "hotel", "car", "known_traveler", "redress")
@@ -17,6 +18,14 @@ PROGRAMS: dict[str, tuple[str, ...]] = {
     "car": ("Avis Preferred", "Enterprise Plus", "Hertz Gold Plus Rewards", "National Emerald Club", OTHER),
     "known_traveler": ("Global Entry", "NEXUS", "SENTRI", "TSA PreCheck", OTHER),
     "redress": ("DHS TRIP", OTHER),
+}
+AIRLINE_BRANDS: dict[str, str] = {
+    "Alaska Mileage Plan": "Alaska Airlines",
+    "American AAdvantage": "American Airlines",
+    "Delta SkyMiles": "Delta Air Lines",
+    "JetBlue TrueBlue": "JetBlue",
+    "Southwest Rapid Rewards": "Southwest Airlines",
+    "United MileagePlus": "United Airlines",
 }
 MASK = "••••"
 
@@ -39,6 +48,7 @@ class Listed(TypedDict):
     readable: bool
     expiry: str | None
     notes: str | None
+    logo: str | None
 
 
 class Conflict(TypedDict):
@@ -63,19 +73,29 @@ def mask(number: str) -> str:
     return MASK + number[-4:] if len(number) > 4 else MASK
 
 
-def listed(row: LoyaltyId) -> Listed:
+def brand_of(kind: str, program: str) -> str | None:
+    return AIRLINE_BRANDS.get(program) if kind == "airline" else None
+
+
+def _with_logo(conn: db.Connection, rows: list[LoyaltyId]) -> set[str]:
+    return logos.have(conn, [brand_of(r.kind, r.program) for r in rows])
+
+
+def listed(row: LoyaltyId, with_logo: set[str]) -> Listed:
     try:
         masked, readable = mask(secretbox.decrypt(row.number) or ""), True
     except secretbox.SecretError:
         masked, readable = MASK, False
     return {"id": row.id, "person_id": row.person_id, "kind": row.kind, "program": row.program, "masked": masked,
-            "readable": readable, "expiry": row.expiry, "notes": row.notes}
+            "readable": readable, "expiry": row.expiry, "notes": row.notes,
+            "logo": f"/api/loyalty/{row.id}/logo" if (brand := brand_of(row.kind, row.program)) and logos.key(brand) in with_logo else None}
 
 
 def everyone(conn: db.Connection) -> list[Listed]:
     rows = conn.orm.scalars(select(LoyaltyId)).all()
     order = {k: i for i, k in enumerate(KINDS)}
-    return [listed(r) for r in sorted(rows, key=lambda r: (r.person_id, order.get(r.kind, len(order)), r.program.casefold(), r.id))]
+    with_logo = _with_logo(conn, list(rows))
+    return [listed(r, with_logo) for r in sorted(rows, key=lambda r: (r.person_id, order.get(r.kind, len(order)), r.program.casefold(), r.id))]
 
 
 def conflicts(conn: db.Connection) -> list[Conflict]:
@@ -115,7 +135,7 @@ def add(conn: db.Connection, fields: Fields) -> Listed:
                     notes=fields["notes"])
     conn.orm.add(row)
     conn.orm.flush()
-    return listed(row)
+    return listed(row, _with_logo(conn, [row]))
 
 
 def edit(conn: db.Connection, loyalty_id: int, fields: Fields) -> Listed | None:
@@ -133,7 +153,12 @@ def edit(conn: db.Connection, loyalty_id: int, fields: Fields) -> Listed | None:
         return None
     conn.orm.expire_all()
     row = conn.orm.get(LoyaltyId, loyalty_id)
-    return listed(row) if row else None
+    return listed(row, _with_logo(conn, [row])) if row else None
+
+
+def logo(conn: db.Connection, loyalty_id: int) -> tuple[bytes, str] | None:
+    row = conn.orm.get(LoyaltyId, loyalty_id)
+    return logos.logo(conn, brand_of(row.kind, row.program)) if row else None
 
 
 def remove(conn: db.Connection, loyalty_id: int) -> bool:
