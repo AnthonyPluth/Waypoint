@@ -32,6 +32,18 @@ _static_files: dict[str, dict] = {}
 _static_lock = threading.Lock()
 
 
+WEEK = "public, max-age=604800"
+STABLE_FILES = {"logo.svg", "logo-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"}
+
+
+def cache_control(full: str) -> str:
+    if full.startswith(APP_DIR + os.sep + "assets" + os.sep):
+        return "public, max-age=31536000, immutable"
+    if full.startswith(os.path.join(STATIC, "fonts") + os.sep) or full in {os.path.join(STATIC, name) for name in STABLE_FILES}:
+        return WEEK
+    return "no-cache"
+
+
 def serve(h: Handler, path: str) -> None:
     if path == "/next" or path.startswith("/next/"):
         return h._redirect("/")
@@ -54,14 +66,14 @@ def serve(h: Handler, path: str) -> None:
             data = f.read().replace(b"<script ", f'<script nonce="{nonce}" '.encode())
         return send_file(h, data, ctype, "no-store", None, gz_ok, nonce)
     entry = _static_entry(full)
+    cache = cache_control(full)
     if h.headers.get("If-None-Match") == entry["etag"]:
         h.send_response(304)
         h.send_header("ETag", entry["etag"])
-        h.send_header("Cache-Control", "no-cache")
+        h.send_header("Cache-Control", cache)
         h._security_headers()
         h.end_headers()
         return None
-    cache = "public, max-age=31536000, immutable" if full.startswith(APP_DIR + os.sep + "assets" + os.sep) else "no-cache"
     return send_file(h, entry["data"], ctype, cache, entry["etag"], gz_ok, None, entry.get("gz"))
 
 

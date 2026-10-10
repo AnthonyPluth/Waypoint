@@ -2,6 +2,7 @@
   import { errMsg } from "$lib/act";
   import { route, setQuery } from "$lib/app.svelte";
   import { apiCall } from "$lib/contract";
+  import { takeEarlyTrips } from "$lib/early";
   import type { Person, Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
@@ -23,7 +24,7 @@
     const mine = ++latest;
     loadError = "";
     try {
-      const [t, p] = await Promise.all([apiCall<"GET /api/trips">("/api/trips"), apiCall<"GET /api/people">("/api/people")]);
+      const [t, p] = await Promise.all([takeEarlyTrips("trips") ?? apiCall<"GET /api/trips">("/api/trips"), apiCall<"GET /api/people">("/api/people")]);
       if (mine !== latest) return;
       trips = t.trips; people = p.people;
     } catch (err) { if (mine !== latest) return; trips = null; loadError = errMsg(err); }

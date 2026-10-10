@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./api", () => ({ api: vi.fn(), newPage: vi.fn() }));
 vi.mock("./offline.svelte", () => ({ syncSavedTrip: vi.fn() }));
+vi.mock("./early", () => ({ startEarly: vi.fn(), dropEarly: vi.fn() }));
 
 import { api, newPage } from "./api";
 import * as offlineModule from "./offline.svelte";
@@ -155,5 +156,52 @@ describe("checking in", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     checkIn();
     expect(api).not.toHaveBeenCalled();
+  });
+});
+
+describe("starting early", () => {
+  const fresh = async () => {
+    vi.resetModules();
+    const [apiModule, earlyModule, appModule] = await Promise.all([import("./api"), import("./early"), import("./app.svelte")]);
+    vi.mocked(apiModule.api).mockReset();
+    return { api: vi.mocked(apiModule.api), startEarly: vi.mocked(earlyModule.startEarly), dropEarly: vi.mocked(earlyModule.dropEarly), ...appModule };
+  };
+  const goto = (hash: string) => { location.hash = hash; window.dispatchEvent(new HashChangeEvent("hashchange")); };
+
+  it("starts the first page's reads before the state has come back", async () => {
+    const m = await fresh();
+    const order: string[] = [];
+    m.startEarly.mockImplementation(() => { order.push("early"); });
+    m.api.mockImplementation((async () => { order.push("state"); return state(); }) as never);
+    goto("#upcoming");
+    await m.boot();
+    expect(m.startEarly).toHaveBeenCalledWith("upcoming");
+    expect(order).toEqual(["early", "state"]);
+  });
+
+  it("drops the early reads when the page changes", async () => {
+    const m = await fresh();
+    goto("#upcoming");
+    m.dropEarly.mockClear();
+    goto("#settings");
+    expect(m.dropEarly).toHaveBeenCalled();
+  });
+
+  it("starts over on every try until the first one works, so a failed early read is never kept", async () => {
+    const m = await fresh();
+    const order: string[] = [];
+    m.dropEarly.mockImplementation(() => { order.push("drop"); });
+    m.startEarly.mockImplementation(() => { order.push("start"); });
+    m.api.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(state() as never);
+    goto("#upcoming");
+    order.length = 0;
+    await m.boot();
+    expect(m.app.bootError).toBe("offline");
+    await m.boot();
+    expect(order).toEqual(["drop", "start", "drop", "start"]);
+    expect(m.app.state).not.toBeNull();
+    order.length = 0;
+    await m.boot();
+    expect(order).toEqual([]);
   });
 });

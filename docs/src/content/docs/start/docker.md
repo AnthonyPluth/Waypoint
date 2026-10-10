@@ -68,6 +68,12 @@ waypoint.example.com {
 
 Already sign in through a proxy (Authelia forward-auth, Cloudflare Access, oauth2-proxy)? Leave `OIDC_ISSUER` empty and set `WAYPOINT_ALLOW_NO_AUTH=1` instead, and don’t expose port 8765 except through that proxy.
 
+## Caching behind Cloudflare or another CDN
+
+Waypoint sets its own cache headers, so a CDN needs no rules of its own: the web app's files under `/assets/` are cached for a year (their names change with their content), and the fonts and icons for a week. Leave the CDN on its default of respecting the origin's headers, and turn on Brotli and HTTP/3 if it offers them.
+
+Never cache the rest. The page at `/` carries a fresh security nonce on every request, and `/api/`, `/auth/`, `/oauth/` and `/mcp` answer with one person's private data, so a "cache everything" rule would break the first and leak the others. Keep Cloudflare's Rocket Loader off: it rewrites scripts that Waypoint's security policy only allows by their nonce.
+
 ## Putting Waypoint on the internet
 
 Waypoint is built to be reachable from anywhere, as long as it’s set up like this:

@@ -7,6 +7,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
+import { dropEarly, startEarly } from "$lib/early";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { segment, trip } from "../test/fixtures";
@@ -24,7 +25,7 @@ const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: 
   arr_actual: null, arr_zone: "Europe/London", arr_terminal: null, arr_gate: null, delay_minutes: 50, fetched_at: "2026-11-20T14:05:00+00:00" }] };
 
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] }); vi.mocked(api).mockReset(); });
-afterEach(() => { vi.useRealTimers(); flightStatus.list = null; });
+afterEach(() => { vi.useRealTimers(); flightStatus.list = null; dropEarly(); });
 
 const serve = (trips: unknown[], guests: unknown[] = []) =>
   vi.mocked(api).mockImplementation(async (path) => (path === "/api/people/claim-suggestions" ? { guests } : { trips }));
@@ -308,5 +309,25 @@ describe("Upcoming booking detail", () => {
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).keyboard("{Control>}");
     link.dispatchEvent(new MouseEvent("click", { ctrlKey: true, bubbles: true, cancelable: true }));
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("the reads started before the page opened", () => {
+  it("uses them instead of asking again", async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? delayed : { trips: [london] }) as never);
+    startEarly("upcoming");
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: /London/ })).toBeInTheDocument();
+    await waitFor(() => expect(flightStatus.list?.enabled).toBe(true));
+    expect(vi.mocked(api).mock.calls.filter(([path]) => path === "/api/trips")).toHaveLength(1);
+    expect(vi.mocked(api).mock.calls.filter(([path]) => path === "/api/flight-status")).toHaveLength(1);
+  });
+
+  it("shows the failure of an early read like any other", async () => {
+    vi.mocked(api).mockRejectedValue(new Error("Request failed (500)"));
+    startEarly("upcoming");
+    render(Upcoming);
+    expect(await screen.findByText("Request failed (500)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 });

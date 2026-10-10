@@ -204,6 +204,7 @@
       "path": "/api/trips",
       "handler": "waypoint/server/api/trips.py:api_trips",
       "web": [
+        "frontend/src/lib/early.ts",
         "frontend/src/pages/Trips.svelte",
         "frontend/src/pages/Upcoming.svelte"
       ],
