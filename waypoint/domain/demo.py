@@ -10,7 +10,7 @@ from ..storage import db, secretbox, stored_mail
 from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentMessage, SegmentPort, SegmentTraveler,
                               StoredMessage, Trip, User)
 from . import logos, loyalty, people, trips
-from .mail import review
+from .mail import review, scan
 from .visibility import Viewer
 
 MEMBERS = [("demo-jane", "jane.doe@example.com", "Jane Doe", "Jane"),
@@ -248,9 +248,10 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     from_email = trips.add_segment(conn, jane, {**_read_from_email(today), "travelers": [{"person_id": None, "name": "RIVERA/ALEX MR"}]}, source="email")
     held_ids = [added["id"] for added in (trips.add_segment(conn, jane, {**_held_stay(today), "travelers": _on(jane.person_id)}) for _ in range(2)) if added]
     box = Mailbox(owner_sub="local", address=DEMO_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
-                  status="connected", created=0.0, last_scan=None)
+                  status="connected", created=0.0, last_scan=datetime.now(UTC).timestamp() - 3600)
     conn.orm.add(box)
     conn.orm.flush()
+    scan.remember(box.id, scan.Summary(found=24, read=6, bookings=3, review=2, skipped=15, capped=False))
     for domain, ago, reason in UNREAD:
         review.add(conn, box.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
         stored_mail.put(conn, box.id, f"demo-{domain}", _message(domain, ago, today, f"{SUBJECTS[domain]}: made-up details",

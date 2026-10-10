@@ -19,7 +19,7 @@ from ... import monitoring
 from ...providers import mailimages
 from ...storage.stored_mail import Content, Image
 from .. import seatmaps
-from . import parsers, safe_html, seats
+from . import parsers, safe_html, seats, triage
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger
@@ -451,6 +451,15 @@ def _day(header: Any) -> str | None:
     except (TypeError, ValueError, IndexError):
         return None
     return sent.date().isoformat()
+
+
+def head(found: Mapping[str, Any]) -> triage.Head:
+    headers = {str(h.get("name", "")).lower(): str(h.get("value", "")) for h in found.get("payload", {}).get("headers", []) if isinstance(h, dict)} \
+        if isinstance(found.get("payload"), dict) else {}
+    labels = found.get("labelIds")
+    return triage.Head(" ".join(headers.get("subject", "").split())[:300], _domain(headers.get("from")),
+                       " ".join(str(found.get("snippet") or "").split())[:300],
+                       frozenset(str(label) for label in labels) if isinstance(labels, list) else frozenset())
 
 
 def read(message: Mapping[str, Any]) -> Message:

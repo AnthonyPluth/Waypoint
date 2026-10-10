@@ -93,6 +93,9 @@
     });
   }
 
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const summary = (c: NonNullable<Mailbox["scan_summary"]>) =>
+    `${plural(c.found, "new message", "new messages")} found, ${c.read} read, ${plural(c.bookings, "booking", "bookings")} added or changed, ${c.review} couldn’t be read, ${c.skipped} skipped.${c.capped ? " More are waiting; the next scan carries on." : ""}`;
   const scanned = (m: Mailbox) => (m.last_scan ? new Date(m.last_scan).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : null);
 
   const label = (m: Mailbox) => (m.status === "connected" ? "Connected" : m.status === "reconnect" ? "Reconnect" : "Couldn’t reach Google");
@@ -122,6 +125,7 @@
               <p class="text-sm text-muted-foreground" role="status">Scanning for bookings…</p>
             {:else if m.status !== "reconnect"}
               <p class="text-sm text-muted-foreground">{scanned(m) ? `Last scanned ${scanned(m)}.` : "Not scanned yet."}</p>
+              {#if m.scan_summary}<p class="text-sm text-muted-foreground" data-testid="scan-summary">{summary(m.scan_summary)}</p>{/if}
             {/if}
             <label class="mt-2 flex items-start gap-2 text-sm">
               <input type="checkbox" class="mt-0.5 size-4 shrink-0" checked={m.share_review} onchange={(e) => share(m, e.currentTarget)} />
