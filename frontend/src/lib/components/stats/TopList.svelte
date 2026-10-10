@@ -13,12 +13,12 @@
     <h3 {id} class="eyebrow px-1">{title}</h3>
     <ol class="rows">
       {#each shown as r, i (r.key)}
-        <li class="row">
-          <div class="flex min-w-0 items-baseline gap-3">
+        <li class="row flex-nowrap">
+          <div class="flex min-w-0 flex-1 items-baseline gap-3">
             <span class="w-5 shrink-0 text-sm tabular-nums text-muted-foreground">{i + 1}</span>
-            <div class="min-w-0"><p class="truncate font-medium">{r.name}</p>{#if r.sub}<p class="truncate text-sm text-muted-foreground">{r.sub}</p>{/if}</div>
+            <div class="min-w-0 flex-1"><p class="truncate font-medium" title={r.name}>{r.name}</p>{#if r.sub}<p class="truncate text-sm text-muted-foreground" title={r.sub}>{r.sub}</p>{/if}</div>
           </div>
-          <span class="text-sm tabular-nums text-muted-foreground">{r.value}</span>
+          <span class="shrink-0 whitespace-nowrap text-sm tabular-nums text-muted-foreground">{r.value}</span>
         </li>
       {/each}
     </ol>
