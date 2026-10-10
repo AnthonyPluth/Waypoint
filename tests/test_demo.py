@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy import MetaData, func, select
 
-from waypoint.domain import demo, stats, trips
+from waypoint.domain import demo, loyalty, stats, trips
 from waypoint.domain.visibility import Viewer
 from tests.shared import DbCase
 
@@ -18,6 +18,13 @@ class DemoTests(DbCase):
         before = self.rows()
         added = demo.seed(self.c)
         self.assertEqual(self.rows() - before, added)
+
+    def test_the_airline_memberships_have_made_up_logos_and_the_others_none(self):
+        demo.seed(self.c)
+        found = {(m["kind"], m["program"]): m["logo"] for m in loyalty.everyone(self.c)}
+        self.assertTrue(found[("airline", "American AAdvantage")].endswith("/logo"))
+        self.assertTrue(found[("airline", "Delta SkyMiles")].endswith("/logo"))
+        self.assertTrue(all(logo is None for (kind, _), logo in found.items() if kind != "airline"))
 
     def check_dates(self, today: date) -> None:
         demo.seed(self.c, today)

@@ -5,9 +5,9 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import func, select
 
 from ..storage import db, secretbox, stored_mail
-from ..storage.models import (FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentMessage, SegmentPort, SegmentTraveler,
+from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentMessage, SegmentPort, SegmentTraveler,
                               StoredMessage, Trip, User)
-from . import loyalty, people, trips
+from . import logos, loyalty, people, trips
 from .mail import review
 from .visibility import Viewer
 
@@ -235,10 +235,20 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     for who, kind, program, number, expiry, notes in MEMBERSHIPS:
         loyalty.add(conn, {"person_id": by_name[who], "kind": kind, "program": program, "number": number,
                            "expiry": expiry, "notes": notes})
+    for brand, mark in DEMO_LOGOS:
+        db.upsert(conn, BrandLogo, {"key": logos.key(brand), "name": brand, "logo": _monogram(mark), "logo_type": "image/svg+xml", "source": "demo"}, key=["key"])
     db.upsert(conn, FlightStatus, {**_flight_status(today), "fetched_at": datetime.now(UTC).timestamp()}, key=["flight_number", "date"])
     return _rows(conn) - before
 
 
+DEMO_LOGOS = (("American Airlines", "AA"), ("Delta Air Lines", "DL"), ("United Airlines", "UA"))
+
+
+def _monogram(letters: str) -> bytes:
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#64748b"/>'
+            f'<text x="32" y="41" font-family="sans-serif" font-size="26" font-weight="700" text-anchor="middle" fill="#ffffff">{letters}</text></svg>').encode()
+
+
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
-               for m in (User, Person, LoyaltyId, Trip, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage))
+               for m in (User, Person, LoyaltyId, BrandLogo, Trip, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage))
