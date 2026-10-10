@@ -601,6 +601,44 @@ describe("Trip", () => {
     });
   });
 
+  describe("View email on the row of action buttons", () => {
+    const emailed = { emails: [{ subject: "Your stay", sender_domain: "example-hotel.example", received: "2026-11-01", text: "Check in at 3", html: null, truncated: false }] };
+
+    it("puts View email in the same row as Directions and Call, after them", async () => {
+      held = trip([{ ...stay, has_email: true }]);
+      render(TripPage);
+      const group = await screen.findByRole("group", { name: /Actions for Harbour Hotel/ });
+      expect(group).toHaveClass("flex", "flex-wrap");
+      expect(Array.from(group.querySelectorAll("a, button"), (el) => el.textContent?.trim())).toEqual(["Directions", "Call", "View email"]);
+      expect(within(group).getByRole("button", { name: "View the email for Harbour Hotel" })).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("renders View email on its own when the booking has no action links", async () => {
+      held = trip([{ ...stay, has_email: true, links: { app: null, directions: null, call: null } }]);
+      render(TripPage);
+      const button = await screen.findByRole("button", { name: "View the email for Harbour Hotel" });
+      expect(button).toHaveTextContent("View email");
+      expect(button).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("link", { name: "Directions" })).toBeNull();
+    });
+
+    it("opens the email below the whole row of buttons, and the buttons stay where they are", async () => {
+      held = trip([{ ...stay, has_email: true }]);
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/2/emails" ? emailed : answer(path, opts)) as never);
+      render(TripPage);
+      const group = await screen.findByRole("group", { name: /Actions for Harbour Hotel/ });
+      await userEvent.click(within(group).getByRole("button", { name: "View the email for Harbour Hotel" }));
+      const region = await screen.findByRole("region", { name: "The email for Harbour Hotel" });
+      expect(group.contains(region)).toBe(false);
+      expect(group.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(region).getByTestId("message-subject")).toHaveTextContent("Your stay");
+      expect(within(group).getByRole("link", { name: "Directions" })).toHaveAttribute("href", stay.links.directions!);
+      expect(within(group).getByRole("link", { name: "Call" })).toHaveAttribute("href", stay.links.call!);
+      expect(within(group).getByRole("button", { name: "Hide the email for Harbour Hotel" })).toHaveAttribute("aria-expanded", "true");
+    });
+  });
+
   describe("a cruise", () => {
     const ship = segment({ id: 5, kind: "cruise", provider: "Example Cruise Line", origin: "Miami", destination: "Miami", start_zone: "America/New_York", end_zone: "America/New_York",
       start_local: "2026-03-01T16:30", end_local: "2026-03-08T07:00", confirmation: "CR48210", details: { ship: "Example Voyager", room: "9214", address: "1 Port Boulevard\nMiami" },
