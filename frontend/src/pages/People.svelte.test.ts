@@ -86,6 +86,16 @@ describe("People", () => {
     expect(screen.getByRole("button", { name: "Show and copy Delta SkyMiles number" })).toBeInTheDocument();
   });
 
+  it("keeps a membership's logo, program name and number together on one line", async () => {
+    ids = [{ ...aa, logo: "/api/loyalty/11/logo" }];
+    render(People);
+    const number = await screen.findByRole("button", { name: "Show and copy American AAdvantage number" });
+    const line = number.parentElement!;
+    expect(line.className).toContain("flex");
+    expect(line.querySelector("img")).not.toBeNull();
+    expect(within(line).getByText("American AAdvantage")).toBeInTheDocument();
+  });
+
   it("falls back to the plain program name when the logo can't load", async () => {
     ids = [{ ...aa, logo: "/api/loyalty/11/logo" }];
     const { container } = render(People);
