@@ -214,6 +214,38 @@ describe("Stats", () => {
     expect(screen.getByRole("region", { name: "Rental companies" })).toHaveTextContent("Hertz");
   });
 
+  it("keeps a record's long value in its row, to the right of the label, and the label truncates", async () => {
+    const longHotel = "Santa Cruz / Monterey Bay KOA Holiday Resort and Campground";
+    serve(() => ({ ...full, stays: { ...full.stays, longest: { ...full.stays.longest!, hotel: longHotel } } }));
+    render(Stats_);
+    const records = (await screen.findByRole("heading", { name: "Hotel records" })).closest("div")!;
+    const label = within(records).getByText("Longest stay");
+    const row = label.closest("div")!;
+    const value = row.querySelector("dd")!;
+    expect(row).toHaveTextContent(`Longest stay${longHotel}, London4 nights`);
+    expect(row.className).toContain("flex-nowrap");
+    expect(label.className).toContain("truncate");
+    expect(label.className).toContain("min-w-0");
+    expect(value.className).toContain("max-w-[60%]");
+    expect(value.className).toContain("shrink-0");
+    expect(label.nextElementSibling).toBe(value);
+  });
+
+  it("truncates a long bar name and keeps its figure on one line on the right", async () => {
+    const longCabin = "Premium Economy Extra Legroom Exit Row Seats on the Wing";
+    serve(() => ({ ...full, flights: { ...full.flights, cabins: [{ name: longCabin, count: 8 }, { name: "Business", count: 2 }] } }));
+    render(Stats_);
+    const seats = (await screen.findByRole("heading", { name: "Seats" })).closest("section")!;
+    const name = within(seats).getByText(longCabin);
+    const figure = within(seats).getByText("80% · 8");
+    expect(name.className).toContain("truncate");
+    expect(name).toHaveAttribute("title", longCabin);
+    expect(figure.className).toContain("shrink-0");
+    expect(figure.className).toContain("whitespace-nowrap");
+    expect(name.parentElement).toContainElement(figure);
+    expect(seats.querySelector(".row")!.className).toContain("flex-nowrap");
+  });
+
   it("shows the records and the seats", async () => {
     serve(() => full);
     render(Stats_);

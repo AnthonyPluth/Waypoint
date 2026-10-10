@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { findChromium, flowProblems, PAGES, screenshotFiles, unknownPages } from "./verify.mjs";
+import { findChromium, flowProblems, lengthenNames, PAGES, screenshotFiles, unknownPages } from "./verify.mjs";
+
+describe("lengthenNames", () => {
+  it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
+    const reply = { year: null, flights: { airlines: [{ code: "DL", name: "Delta", flights: 7 }] }, stays: { hotels: [{ name: "Quay", stays: 1 }],
+      longest: { hotel: "Harbour", city: "London", nights: 4, start_local: "2026-06-02T15:00" } }, places: { countries: [{ name: "US", visits: 3 }] } };
+    expect(lengthenNames(reply, " (long)")).toEqual({ year: null, flights: { airlines: [{ code: "DL", name: "Delta (long)", flights: 7 }] },
+      stays: { hotels: [{ name: "Quay (long)", stays: 1 }], longest: { hotel: "Harbour (long)", city: "London (long)", nights: 4, start_local: "2026-06-02T15:00" } },
+      places: { countries: [{ name: "US (long)", visits: 3 }] } });
+  });
+
+  it("leaves codes, numbers and nulls alone", () => {
+    expect(lengthenNames({ code: "JFK", longest: null, count: 2 }, "!")).toEqual({ code: "JFK", longest: null, count: 2 });
+    expect(lengthenNames([], "!")).toEqual([]);
+  });
+});
 
 describe("flowProblems", () => {
   const ok = { name: "open-settings", page: "upcoming", steps: [{ goto: "#settings" }, { click: "text=Settings", timeout: 500 }] };
@@ -31,6 +46,11 @@ describe("flowProblems", () => {
     const steps = [{ upload: { selector: "input[type=file]", file: "tests/fixtures/flight_import/flighty.csv" } }, { scroll_to: "#import-title" }];
     expect(flowProblems({ ...ok, steps })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ upload: "x" }] })).toEqual(["step 1: upload takes a object"]);
+  });
+
+  it("takes a suffix for the names of a list, to check a long one's layout", () => {
+    expect(flowProblems({ ...ok, steps: [{ long_names: ", a long name" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ long_names: 3 }] })).toEqual(["step 1: long_names takes a string"]);
   });
 
   it("takes a download to click and save, named", () => {
