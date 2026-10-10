@@ -395,6 +395,29 @@ describe("Review: the message beside the form", () => {
     expect(calls).toContainEqual(["/api/review/1/preview", undefined, undefined]);
   });
 
+  it("shows a kept message as it was sent, in a sandboxed frame, with pictures from the server's own route", async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview")
+      ? { subject: "Your itinerary", text: "Gate B12", html: null, truncated: false, full: true, layout: '<p><img data-image="0" alt="Logo">Gate <b>B12</b></p>', images: 1 }
+      : path.endsWith("/images") ? { images: [{ type: "image/jpeg", data: "/9j/4AAQ" }] }
+      : path === "/api/people" ? { people: [] } : held) as never);
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
+    const frame = (await screen.findByTestId("email-frame")) as HTMLIFrameElement;
+    expect(frame.getAttribute("sandbox")).not.toMatch(/allow-scripts|allow-same-origin/);
+    expect(frame.getAttribute("srcdoc")).toContain('src="data:image/jpeg;base64,/9j/4AAQ"');
+    expect(vi.mocked(api)).toHaveBeenCalledWith("/api/review/1/images");
+  });
+
+  it("says the original can’t be shown for a message kept before the full message was kept", async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview")
+      ? { subject: "Your itinerary", text: "Gate B12", html: "<p>Gate B12</p>", truncated: false, full: false, layout: null, images: 0 }
+      : path === "/api/people" ? { people: [] } : held) as never);
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
+    expect(await screen.findByTestId("original-unavailable")).toHaveTextContent("The original can’t be shown");
+    expect(screen.queryByTestId("email-frame")).toBeNull();
+  });
+
   it("shows the message as text, never as markup", async () => {
     const hostile = "<img src=x onerror=alert(1)><script>alert(2)</script> Hello";
     vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview") ? { text: hostile, truncated: false } : path === "/api/people" ? { people: [] } : held) as never);
@@ -433,7 +456,7 @@ describe("Review: the message beside the form", () => {
     truncated = true;
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
-    expect(await screen.findByText(/Cut short here/)).toBeInTheDocument();
+    expect(await screen.findByText(/This email was cut short/)).toBeInTheDocument();
   });
 
   it("says why it couldn’t be fetched, and tries again when asked again", async () => {

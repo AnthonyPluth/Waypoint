@@ -62,6 +62,8 @@
     lockedCopy = navigator.onLine === false && (await hasSavedTrip().catch(() => false));
   }
 
+  const pictures = (segmentId: number, messageId: number) => async () =>
+    (await apiCall<"GET /api/segments/{id}/emails/{id}/images">(`/api/segments/${segmentId}/emails/${messageId}/images`)).images;
   type Mail = { state: "loading" } | { state: "ready"; emails: StoredEmail[] } | { state: "error"; message: string };
   let mails = $state<Record<number, Mail | undefined>>({});
   async function toggleMail(s: Segment) {
@@ -323,7 +325,7 @@
           {#each mail.emails as e, i (i)}
             <div>
               {#if e.received || e.sender_domain}<p class="mb-1 text-sm text-muted-foreground">{[e.sender_domain, e.received && `sent ${e.received}`].filter(Boolean).join(" · ")}</p>{/if}
-              <MessageView subject={e.subject} text={e.text} html={e.html} truncated={e.truncated} />
+              <MessageView subject={e.subject} text={e.text} html={e.html} truncated={e.truncated} full={e.full} layout={e.layout} images={e.images} loadImages={pictures(s.id, e.id)} />
             </div>
           {/each}
         {/if}

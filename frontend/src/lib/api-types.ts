@@ -268,6 +268,15 @@ export interface MergeBody {
   merge: number;
 }
 
+export interface MessageImage {
+  type: string;
+  data: string;
+}
+
+export interface MessageImages {
+  images: MessageImage[];
+}
+
 export interface Offline {
   trip: Trip | null;
   messages: OfflineMessages[];
@@ -321,6 +330,9 @@ export interface Preview {
   text: string;
   html: string | null;
   truncated: boolean;
+  full: boolean;
+  layout: string | null;
+  images: number;
 }
 
 export interface ReminderDevice {
@@ -665,12 +677,16 @@ export interface StatsStays {
 }
 
 export interface StoredEmail {
+  id: number;
   subject: string | null;
   sender_domain: string | null;
   received: string | null;
   text: string;
   html: string | null;
   truncated: boolean;
+  full: boolean;
+  layout: string | null;
+  images: number;
 }
 
 export interface Traveler {
@@ -752,6 +768,7 @@ export interface Endpoints {
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };
   "DELETE /api/segments/{id}": { body: never; reply: Ok };
   "GET /api/segments/{id}/emails": { body: never; reply: SegmentEmails };
+  "GET /api/segments/{id}/emails/{id}/images": { body: never; reply: MessageImages };
   "GET /api/airports/{id}": { body: never; reply: Airport };
   "POST /api/import/preview": { body: never; reply: ImportPreview };
   "POST /api/import": { body: ImportBody; reply: Imported };
@@ -786,6 +803,7 @@ export interface Endpoints {
   "POST /api/review/{id}/ignore": { body: never; reply: Ok };
   "POST /api/review/{id}/match": { body: MatchBody; reply: Ok };
   "GET /api/review/{id}/preview": { body: never; reply: Preview };
+  "GET /api/review/{id}/images": { body: never; reply: MessageImages };
   "POST /api/review/{id}/suggest": { body: never; reply: Ok };
   "DELETE /api/review/{id}": { body: never; reply: Ok };
   "GET /api/mcp-settings": { body: never; reply: McpSettings };

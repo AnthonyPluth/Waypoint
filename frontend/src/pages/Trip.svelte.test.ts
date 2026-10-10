@@ -85,6 +85,40 @@ describe("Trip", () => {
     expect(screen.queryByRole("region", { name: /The email for/ })).toBeNull();
   });
 
+  it("opens a kept email as it was sent, in a sandboxed frame with its pictures fetched from the server and none from the sender", async () => {
+    held = trip([segment({ ...flight, has_email: true }), stay]);
+    const answer = vi.mocked(api).getMockImplementation()!;
+    const kept = { id: 7, subject: "Your itinerary: EX 410", sender_domain: "example-air.example", received: "2026-10-17", text: "Gate B12", html: "<p>Gate B12</p>", truncated: false,
+      full: true, layout: '<table><tr><td style="color: #0b3d91"><img data-image="0" alt="Example Air" width="200">Gate <b>B12</b></td></tr></table>', images: 1 };
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1/emails" ? { emails: [kept] }
+      : path === "/api/segments/1/emails/7/images" ? { images: [{ type: "image/png", data: "iVBORw0KGgo=" }] } : answer(path, opts)) as never);
+    render(TripPage);
+    await userEvent.click(await screen.findByRole("button", { name: /View the email for/ }));
+    const region = await screen.findByRole("region", { name: /The email for/ });
+    const frame = (await within(region).findByTestId("email-frame")) as HTMLIFrameElement;
+    expect(frame.getAttribute("sandbox")).toBe("allow-popups allow-popups-to-escape-sandbox");
+    expect(frame.getAttribute("srcdoc")).toContain('src="data:image/png;base64,iVBORw0KGgo="');
+    expect(frame.getAttribute("srcdoc")).toContain("Content-Security-Policy");
+    expect(frame.getAttribute("srcdoc")).not.toMatch(/<script|src="https?:/);
+    expect(vi.mocked(api)).toHaveBeenCalledWith("/api/segments/1/emails/7/images");
+    expect(within(region).queryByTestId("original-unavailable")).toBeNull();
+  });
+
+  it("shows an email kept before the full message was kept as it was, and says the original can’t be shown", async () => {
+    held = trip([segment({ ...flight, has_email: true }), stay]);
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1/emails" ? { emails: [
+      { id: 3, subject: "Your itinerary", sender_domain: "example-air.example", received: "2026-10-17", text: "Gate B12", html: "<p>Gate <b>B12</b></p>", truncated: false,
+        full: false, layout: null, images: 0 }] } : answer(path, opts)) as never);
+    render(TripPage);
+    await userEvent.click(await screen.findByRole("button", { name: /View the email for/ }));
+    const region = await screen.findByRole("region", { name: /The email for/ });
+    expect(await within(region).findByTestId("original-unavailable")).toHaveTextContent("The original can’t be shown");
+    expect(within(region).queryByTestId("email-frame")).toBeNull();
+    expect(within(region).getByTestId("preview-html").querySelector("b")).toHaveTextContent("B12");
+    expect(vi.mocked(api)).not.toHaveBeenCalledWith(expect.stringContaining("/images"));
+  });
+
   it("says why an email couldn’t be opened, and when it is no longer kept", async () => {
     held = trip([segment({ ...flight, has_email: true }), stay]);
     const answer = vi.mocked(api).getMockImplementation()!;

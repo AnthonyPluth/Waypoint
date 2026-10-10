@@ -7,6 +7,8 @@
     { "wait_for": "button:has-text('View email')" },
     { "click": "button:has-text('View email') >> visible=true" },
     { "wait_for": "[data-testid='message-subject']" },
+    { "wait_for": "[data-testid='email-frame'] >> internal:control=enter-frame >> img" },
+    { "expect_text": { "selector": "[data-testid='email-frame'] >> internal:control=enter-frame >> body", "text": "Manage your booking" } },
     { "expect_text": { "selector": "main", "text": "Your itinerary: flight EX 410" } },
     { "scroll_to": "[data-testid='message-subject']" },
     { "screenshot": "booking-email" }

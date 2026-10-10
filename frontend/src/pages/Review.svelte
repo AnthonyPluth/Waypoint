@@ -72,14 +72,14 @@
     formError = "";
     void peek(item);
   };
-  type Peek = { state: "loading" } | { state: "ready"; subject: string | null; text: string; html: string | null; truncated: boolean } | { state: "error"; message: string };
+  type Peek = { state: "loading" } | { state: "ready"; subject: string | null; text: string; html: string | null; truncated: boolean; full: boolean; layout: string | null; images: number } | { state: "error"; message: string };
   let peeks = $state<Record<number, Peek>>({});
   async function peek(item: ReviewItem) {
     if (peeks[item.id] && peeks[item.id]?.state !== "error") return;
     peeks[item.id] = { state: "loading" };
     try {
       const r = await apiCall<"GET /api/review/{id}/preview">(`/api/review/${item.id}/preview`);
-      peeks[item.id] = { state: "ready", subject: r.subject ?? null, text: r.text, html: r.html ?? null, truncated: r.truncated };
+      peeks[item.id] = { state: "ready", subject: r.subject ?? null, text: r.text, html: r.html ?? null, truncated: r.truncated, full: r.full, layout: r.layout ?? null, images: r.images };
     } catch (err) { peeks[item.id] = { state: "error", message: errMsg(err) }; }
   }
 
@@ -230,7 +230,8 @@
     {#if p.state === "loading"}<p class="text-sm text-muted-foreground" role="status">Fetching the message from Gmail…</p>
     {:else if p.state === "error"}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{p.message}</p>
     {:else}
-      <MessageView subject={p.subject} text={p.text} html={p.html} truncated={p.truncated} />
+      <MessageView subject={p.subject} text={p.text} html={p.html} truncated={p.truncated} full={p.full} layout={p.layout} images={p.images}
+        loadImages={async () => (await apiCall<"GET /api/review/{id}/images">(`/api/review/${item.id}/images`)).images} />
     {/if}
   </div>
 {/snippet}
