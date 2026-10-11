@@ -62,13 +62,13 @@
 
   const SHOWN: Record<string, string[]> = { flight: ["flight_number", "cabin"], hotel: ["address", "phone"], car: ["address", "phone"], train: ["address"], parking: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
   const detailLabel = (kind: string, key: string) => DETAILS[kind as Kind].find(([k]) => k === key)?.[1] ?? key;
-  type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string> };
+  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string> };
   const detailsOf = (s: ReviewItem["suggestions"][number]): Record<string, string> => ({ address: s.address ?? "", phone: s.phone ?? "", room: s.room ?? "", ship: s.ship ?? "", deck: s.deck ?? "", flight_number: s.flight_number ?? "", cabin: s.cabin ?? "" });
-  const suggestedDraft = (item: ReviewItem, s: ReviewItem["suggestions"][number]): Draft => ({
-    item, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
+  const suggestedDraft = (item: ReviewItem, s: ReviewItem["suggestions"][number], pick: number): Draft => ({
+    item, pick, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
     destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", details: detailsOf(s),
     read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), sources: s.sources ?? {} });
-  const handDraft = (item: ReviewItem): Draft => ({ item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {} });
+  const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {} });
   let drafts = $state<Draft[]>([]);
   const draft = $derived(drafts[0] ?? null);
   let formError = $state("");
@@ -76,6 +76,7 @@
   let emailOpen = $state(true);
   let baseline = "";
   let addedIds: number[] = [];
+  let addedPicks: number[] = [];
   const fingerprint = (d: Draft) => JSON.stringify([d.kind, d.provider, d.confirmation, d.origin, d.destination, d.start, d.end, d.startZone, d.endZone,
     Object.entries(d.details).filter(([, v]) => v.trim()).sort(([a], [b]) => a.localeCompare(b))]);
   const fingerprints = () => JSON.stringify(drafts.map(fingerprint));
@@ -84,7 +85,8 @@
     if (draft && draft.item.id !== item.id) delete peeks[draft.item.id];
     emailOpen = true;
     addedIds = [];
-    drafts = use && item.suggestions.length ? item.suggestions.map((s) => suggestedDraft(item, s)) : [handDraft(item)];
+    addedPicks = [];
+    drafts = use && item.suggestions.length ? item.suggestions.map((s, n) => suggestedDraft(item, s, n + 1)) : [handDraft(item)];
     baseline = fingerprints();
     formError = "";
     void peek(item);
@@ -129,8 +131,15 @@
   const placeLabels = (kind: string) => kind === "flight" ? ["From (airport code)", "To (airport code)"] : kind === "hotel" ? ["Hotel", ""] : kind === "parking" ? ["Lot", ""] : kind === "car" ? ["Pick-up", "Drop-off"] : kind === "cruise" ? ["Embarkation port", "Disembarkation port"] : ["From (station)", "To (station)"];
 
   const closeForm = () => {
-    if (draft) delete peeks[draft.item.id];
+    const open = draft;
+    const picks = addedPicks;
+    addedPicks = [];
+    if (open) delete peeks[open.item.id];
     drafts = [];
+    if (open && picks.length) void act(async () => {
+      await apiCall<"DELETE /api/review/{id}">(`/api/review/${open.item.id}?${picks.map((n) => `suggestion=${n}`).join("&")}`, { method: "DELETE" });
+      await settle();
+    });
   };
   let discarding = $state(false);
   const requestClose = () => {
@@ -172,12 +181,18 @@
       for (const [n, body] of bodies.entries()) {
         const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
         added.push(made.id);
-        drafts = drafts.filter((d) => d !== legs[n]);
+        const leg = legs[n];
+        if (leg?.pick) addedPicks.push(leg.pick);
+        if (n < bodies.length - 1) drafts = drafts.filter((d) => d !== leg);
       }
       listed = true;
       await apiCall<"DELETE /api/review/{id}">(`/api/review/${first.item.id}?${added.map((id) => `segment=${id}`).join("&")}`, { method: "DELETE" });
-    }, { busy: (on) => (saving = on), onError: (m) => (formError = listed ? `Added, but couldn’t take it off this list: ${m}` : added.length ? `Added ${added.length} of ${before + bodies.length}, but couldn’t add the rest: ${m}` : m) });
+    }, { busy: (on) => (saving = on), onError: (m) => {
+      if (listed) toast.error(`Added, but couldn’t take it off this list: ${m}`);
+      else formError = added.length ? `Added ${added.length} of ${before + bodies.length}, but couldn’t add the rest: ${m}` : m;
+    } });
     if (!ok) { if (listed) { closeForm(); await settle(); } else if (added.length) await settle(); return; }
+    addedPicks = [];
     closeForm();
     toast.success(added.length > 1 ? `Added ${plural(added.length, legs)} to your trips` : "Added to your trips");
     await settle();

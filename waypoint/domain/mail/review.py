@@ -149,6 +149,17 @@ def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewe
     return True
 
 
+def drop_suggestions(conn: db.Connection, owner: str, item_id: int, picks: list[int]) -> bool:
+    row = visible(conn, owner, item_id)
+    if row is None:
+        return False
+    stored = suggestions_of(row["suggestion"])
+    if not all(1 <= n <= len(stored) for n in picks):
+        return False
+    set_suggestions(conn, int(row["mailbox_id"]), str(row["message_id"]), [x for n, x in enumerate(stored, 1) if n not in picks], row["suggestion_error"])
+    return True
+
+
 def ignore_sender(conn: db.Connection, owner: str, item_id: int) -> int | None:
     row = _mine(conn, owner, item_id)
     if row is None or row["sender_domain"] == UNKNOWN_SENDER:
