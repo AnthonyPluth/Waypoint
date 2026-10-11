@@ -1,0 +1,21 @@
+From: Example Stays <reservations@example-stays.example>
+To: traveller@gmail.example
+Subject: Your stay is booked
+Date: Sun, 18 Oct 2026 09:10:00 -0400
+Message-ID: <stay-address@example-stays.example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Hello Jane, your stay is confirmed. CANARY-BODY-STAY-7K3M
+
+Booker
+Jane Doe
+CANARY-BOOKER-ADDR-2R6F Elm Street, Springfield 12345
+Phone: 555 010 0199 CANARY-BOOKER-PHONE-4T8N
+
+Hotel: Harbour Hotel
+Address: 1 Quay Road,
+Bristol BS1 4AA, UK
+Phone: +44 117 555 0100
+Confirmation code: QW4R7T
+Check-in 2026-12-02 15:00, check-out 2026-12-05 11:00 (London time).

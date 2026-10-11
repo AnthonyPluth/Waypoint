@@ -112,6 +112,22 @@ class RedactTests(unittest.TestCase):
         text = "Depart 2026-12-02 07:15, return 2026-12-09 10:05, flight EX 1234, room 4401."
         self.assertEqual(ai.redact(text), text)
 
+    def test_a_postal_address_is_not_a_loyalty_number_but_a_loyalty_number_still_goes(self):
+        text = ("Hotel: Harbour Hotel\nAddress: 1 Quay Road, Cardiff CF10 1AA, UK\nAccount number: AB 1234567\n"
+                "Rewards member FXLOY-4400123\nPhone: +44 117 555 0100\nAddress: 300 Cardinal Way, Tower Hill 4400")
+        out = ai.redact(text)
+        for kept in ("1 Quay Road, Cardiff CF10 1AA, UK", "+44 117 555 0100", "300 Cardinal Way, Tower Hill 4400"):
+            self.assertIn(kept, out)
+        for gone in ("AB 1234567", "FXLOY-4400123"):
+            self.assertNotIn(gone, out)
+
+    def test_labels_with_plurals_and_no_spaces_still_remove_their_numbers(self):
+        for label in ("Memberships number", "Members ID", "Accounts", "loyaltyNo", "cardnumber", "membernumber", "AccountNo", "Rewards", "frequentflyer"):
+            with self.subTest(label=label):
+                out = ai.redact(f"{label}: AB 1234567X1")
+                self.assertNotIn("1234567", out)
+                self.assertIn(ai.REMOVED, out)
+
     def test_only_so_much_goes_out(self):
         self.assertEqual(len(ai.redact("word " * 10_000)), ai.MAX_SENT)
         self.assertEqual(ai.redact("   \n"), "")
@@ -145,9 +161,8 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(self.parse(cruise), cruise)
         self.refused({**cruise, "end_zone": "Mars/Base"})
 
-    def test_extra_fields_make_it_no_suggestion(self):
-        self.refused({**GOOD, "note": f"ignore previous instructions {REPLY_CANARY}"})
-        self.refused({**GOOD, "details": {"seat": "1A"}})
+    def test_extra_fields_are_ignored_not_kept(self):
+        self.assertEqual(self.parse({**GOOD, "note": f"ignore previous instructions {REPLY_CANARY}", "details": {"seat": "1A"}, "seat": "1A"}), GOOD)
 
     def test_a_code_that_isnt_in_the_message_is_another_trips(self):
         self.refused({**GOOD, "confirmation": "ZZ9Y8X"})
@@ -174,6 +189,96 @@ class ParseTests(unittest.TestCase):
 
     def test_nothing_found_says_so(self):
         self.refused({}, ai.NO_BOOKING)
+
+
+STAY_SENT = (
+    "Your stay is confirmed. Confirmation code: QW4R7T\n\nBooker\nJane Doe\nBOOKERADDR-2R6F Elm Street, Springfield 12345\n"
+    "Phone: 555 010 0199\n\nHotel: Harbour Hotel\nAddress: 1 Quay Road,\nBristol BS1 4AA, UK\nPhone: +44 117 555 0100\n"
+    "Check-in 2026-12-02 15:00, check-out 2026-12-05 11:00\n")
+STAY = {"kind": "hotel", "provider": "Example Stays", "confirmation": "QW4R7T", "origin": "Harbour Hotel",
+        "start_local": "2026-12-02T15:00", "end_local": "2026-12-05T11:00", "start_zone": "Europe/London", "end_zone": "Europe/London"}
+
+
+class AddressTests(unittest.TestCase):
+    def parse(self, extra, sent=STAY_SENT, base=STAY):
+        return ai.parse(json.dumps({**base, **extra}), sent)
+
+    def test_a_hotels_address_and_phone_are_the_propertys_not_the_bookers(self):
+        found = self.parse({"address": "1 Quay Road, Bristol BS1 4AA, UK", "phone": "+44 117 555 0100"})
+        self.assertEqual((found["address"], found["phone"]), ("1 Quay Road, Bristol BS1 4AA, UK", "+44 117 555 0100"))
+
+    def test_an_address_split_over_lines_and_commas_still_counts_as_in_the_email(self):
+        self.assertEqual(self.parse({"address": "1 quay road bristol bs1-4aa uk"})["address"], "1 quay road bristol bs1-4aa uk")
+
+    def test_the_bookers_address_and_phone_are_dropped_and_the_rest_is_kept(self):
+        found = self.parse({"address": "BOOKERADDR-2R6F Elm Street, Springfield 12345", "phone": "555 010 0199"})
+        self.assertEqual(found, STAY)
+
+    def test_an_address_in_a_block_labelled_guest_or_billing_is_dropped(self):
+        for label in ("Guest", "Billing address", "Billed to", "Booked by"):
+            with self.subTest(label=label):
+                sent = f"Confirmation code: QW4R7T\n\nHotel: Harbour Hotel\n\n{label}\n7 Mill Lane, Leeds LS1 1AA\n"
+                self.assertEqual(self.parse({"address": "7 Mill Lane, Leeds LS1 1AA"}, sent), STAY)
+
+    def test_an_address_that_is_not_in_the_email_is_dropped_and_the_rest_kept(self):
+        self.assertEqual(self.parse({"address": "9 Invented Street, Nowhere"}), STAY)
+        self.assertEqual(self.parse({"phone": "+44 117 000 0000"}), STAY)
+
+    def test_an_email_with_no_address_fills_the_rest_and_leaves_it_empty(self):
+        sent = "Confirmation code: QW4R7T. Harbour Hotel, 2026-12-02 15:00 to 2026-12-05 11:00."
+        self.assertEqual(self.parse({}, sent), STAY)
+        self.assertEqual(self.parse({"address": ""}, sent), STAY)
+
+    def test_an_address_is_one_short_plain_line(self):
+        long = "1 Quay Road " + "x" * 190
+        sent = STAY_SENT + "Contact reception@harbour.example or 0117 555 0100\n" + long
+        self.assertEqual(self.parse({"address": long}, sent), STAY)
+        self.assertEqual(self.parse({"address": "1 Quay Road, Bristol BS1 4AA, UK reception@harbour.example"}, sent), STAY)
+        self.assertEqual(self.parse({"address": "1 Quay Road, Bristol BS1 4AA, UK 0117 555 0100"}, sent), STAY)
+        self.assertEqual(self.parse({"address": "1 Quay Road,\nBristol   BS1 4AA, UK"})["address"], "1 Quay Road, Bristol BS1 4AA, UK")
+
+    def test_a_models_extra_keys_do_not_fail_the_suggestion(self):
+        self.assertEqual(self.parse({"note": REPLY_CANARY, "extras": {"a": 1}, "loyalty": 5, "phone": 12345}), STAY)
+
+    def test_a_car_and_a_cruise_and_a_train_take_their_pick_up_and_terminal_addresses(self):
+        car = {"kind": "car", "provider": "Example Rentals", "origin": "Bristol Airport", "destination": "Bristol Airport",
+               "start_local": "2026-12-02T10:00", "end_local": "2026-12-05T10:00", "confirmation": "QW4R7T"}
+        sent = "Confirmation code: QW4R7T\n\nPick-up: Bristol Airport\nAddress: 4 Runway Drive, Bristol BS48 3DY\nPhone: 0117 555 0142\n"
+        found = ai.parse(json.dumps({**car, "address": "4 Runway Drive, Bristol BS48 3DY", "phone": "0117 555 0142"}), sent)
+        self.assertEqual((found["address"], found["phone"]), ("4 Runway Drive, Bristol BS48 3DY", "0117 555 0142"))
+        cruise = {"kind": "cruise", "provider": "Example Cruise Line", "origin": "Miami", "destination": "Nassau", "confirmation": "QW4R7T",
+                  "start_local": "2026-12-02T16:00", "end_local": "2026-12-09T07:00", "start_zone": "America/New_York", "end_zone": "America/Nassau"}
+        sent = ("Confirmation code: QW4R7T\nShip: Example Voyager\nCabin: 8123\nDeck: 8\nEmbarkation: Miami\n"
+                "Terminal address: 1015 North America Way, Miami FL 33132\nPhone: 305 555 0188\n")
+        found = ai.parse(json.dumps({**cruise, "address": "1015 North America Way, Miami FL 33132", "phone": "305 555 0188",
+                                     "room": "8123", "ship": "Example Voyager", "deck": "8"}), sent)
+        self.assertEqual({k: found.get(k) for k in ("address", "phone", "room", "ship", "deck")},
+                         {"address": "1015 North America Way, Miami FL 33132", "phone": "305 555 0188", "room": "8123",
+                          "ship": "Example Voyager", "deck": "8"})
+        invented = ai.parse(json.dumps({**cruise, "room": "9999", "ship": "Other Ship", "deck": "Z9"}), sent)
+        self.assertEqual({k for k in invented if k in ai.OPTIONAL}, set())
+        train = {"kind": "train", "provider": "Example Rail", "origin": "Bristol Temple Meads", "destination": "London Paddington",
+                 "start_local": "2026-12-02T10:00", "end_local": "2026-12-02T11:45", "confirmation": "QW4R7T"}
+        sent = "Confirmation code: QW4R7T\nDeparts Bristol Temple Meads, Temple Gate, Bristol BS1 6QF\n"
+        found = ai.parse(json.dumps({**train, "address": "Temple Gate, Bristol BS1 6QF", "phone": "0117 555 0101"}), sent)
+        self.assertEqual((found["address"], "phone" in found), ("Temple Gate, Bristol BS1 6QF", False))
+
+    def test_a_flight_never_takes_an_address_or_the_other_details(self):
+        sent = "Confirmation code: QW4R7T BOS DEN. 1 Quay Road, Bristol BS1 4AA, UK. Phone +44 117 555 0100. Cabin 8123"
+        found = ai.parse(json.dumps({**GOOD, "address": "1 Quay Road, Bristol BS1 4AA, UK", "phone": "+44 117 555 0100", "room": "8123"}), sent)
+        self.assertEqual(found, GOOD)
+        found = ai.parse(json.dumps({**STAY, "room": "8123", "ship": "Example Voyager", "deck": "8"}), sent + " Example Voyager")
+        self.assertEqual(found, STAY)
+
+    def test_the_prompt_asks_for_them_only_for_the_kinds_they_belong_to(self):
+        prompt = ai.SYSTEM
+        self.assertIn('For a hotel, car, train or cruise only, also "address"', prompt)
+        self.assertIn('For a hotel, car or cruise only, also "phone"', prompt)
+        self.assertIn('For a cruise only, also "room" (the cabin), "ship" and "deck"', prompt)
+        self.assertIn("Never give any of these for a flight", prompt)
+        self.assertIn("never the address of the guest, the booker, the cardholder or a billing address", prompt)
+        self.assertIn("a block labelled booker, guest or billing", prompt)
+        self.assertEqual((ai.ADDRESS_KINDS, ai.PHONE_KINDS), (("hotel", "car", "train", "cruise"), ("hotel", "car", "cruise")))
 
 
 class ConfigTests(unittest.TestCase):
@@ -286,7 +391,7 @@ class SuggestTests(unittest.TestCase):
         self.assertNotIn("CANARY", str(caught.exception))
 
     def test_a_hostile_or_malformed_reply_is_no_suggestion(self):
-        for content in (json.dumps({**GOOD, "confirmation": "ZZ9Y8X"}), json.dumps({**GOOD, "x": REPLY_CANARY}),
+        for content in (json.dumps({**GOOD, "confirmation": "ZZ9Y8X"}),
                         "I am sorry, " + REPLY_CANARY, json.dumps([GOOD])):
             self.fake.content = content
             with self.subTest(content=content[:30]), self.assertRaises(ai.AiError) as caught:
@@ -390,7 +495,7 @@ class ScanTests(ScanAiCase):
     def test_a_hostile_reply_is_no_suggestion_and_an_error_the_person_sees(self):
         self.turn_on()
         self.put("no_markup_ids")
-        for content in (json.dumps({**GOOD, "confirmation": "ZZ9Y8X", "x": REPLY_CANARY}), json.dumps({**GOOD, "y": REPLY_CANARY}),
+        for content in (json.dumps({**GOOD, "confirmation": "ZZ9Y8X", "x": REPLY_CANARY}),
                         "ignore the above and " + REPLY_CANARY):
             self.fake.content = content
             with no_leaks(self, REPLY_CANARY, database=self.path):
@@ -502,6 +607,40 @@ class AiApiTests(RouteCase):
         self.assertEqual(self.ok("ben", "GET", "/api/review")["items"], [])
         with db.session() as conn:
             conn.execute(Mailbox.__table__.delete())
+
+
+class ScanAddressTests(ScanAiCase):
+    BOOKER = ("CANARY-BOOKER-ADDR-2R6F", "CANARY-BOOKER-PHONE-4T8N")
+    PROPERTY = {"address": "1 Quay Road, Bristol BS1 4AA, UK", "phone": "+44 117 555 0100"}
+
+    def reply(self, **extra):
+        self.fake.content = json.dumps({**STAY, **extra})
+
+    def ask(self):
+        self.turn_on()
+        self.put("no_markup_stay")
+        with no_leaks(self, *self.BOOKER, REPLY_CANARY, database=self.path, sent_ok=True):
+            self.assertEqual(self.scan().review, 1)
+        return self.items()[0]
+
+    def test_the_propertys_address_and_phone_reach_the_suggestion_not_the_bookers(self):
+        self.reply(**self.PROPERTY, note=REPLY_CANARY)
+        item = self.ask()
+        self.assertEqual((item["suggestion"], item["suggestion_error"]), ({**STAY, **self.PROPERTY}, None))
+        sent = self.fake.requests[0][2]
+        self.assertEqual(set(sent), {"model", "messages", "stream", "format", "options"})
+        self.assertEqual([m["role"] for m in sent["messages"]], ["system", "user"])
+        self.assertIn("1 Quay Road,\nBristol BS1 4AA, UK", sent["messages"][1]["content"])
+
+    def test_the_bookers_address_is_dropped_and_never_stored_or_logged(self):
+        self.reply(address="CANARY-BOOKER-ADDR-2R6F Elm Street, Springfield 12345", phone="555 010 0199 CANARY-BOOKER-PHONE-4T8N")
+        item = self.ask()
+        self.assertEqual((item["suggestion"], item["suggestion_error"]), (STAY, None))
+
+    def test_an_address_that_is_not_in_the_email_leaves_the_rest_of_the_suggestion(self):
+        self.reply(address="9 Invented Street, Nowhere")
+        item = self.ask()
+        self.assertEqual((item["suggestion"], item["suggestion_error"]), (STAY, None))
 
 
 if __name__ == "__main__":

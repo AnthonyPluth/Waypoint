@@ -26,9 +26,24 @@
   let leaving = $state<Mailbox | null>(null);
   let asking = $state(false);
   let starting = $state<number | null>(null);
+  let ignored = $state<Record<number, string[] | null>>({});
+  let unignoring = $state<{ box: Mailbox; domain: string } | null>(null);
+  let askingToStop = $state(false);
+
+  async function loadIgnored(boxes: Mailbox[]) {
+    const found = await Promise.all(boxes.map(async (m) => {
+      try { return [m.id, (await apiCall<"GET /api/mailboxes/{id}/ignored">(`/api/mailboxes/${m.id}/ignored`)).domains] as const; }
+      catch { return [m.id, null] as const; }
+    }));
+    ignored = Object.fromEntries(found);
+  }
 
   async function load() {
-    try { list = await apiCall<"GET /api/mailboxes">("/api/mailboxes"); problem = ""; }
+    try {
+      list = await apiCall<"GET /api/mailboxes">("/api/mailboxes");
+      problem = "";
+      await loadIgnored(list.mailboxes);
+    }
     catch (err) { problem = errMsg(err); }
   }
 
@@ -74,6 +89,19 @@
     watchUntil = Date.now() + 2 * POLL_MS + 500;
     watching = true;
   }, { busy: (on) => (starting = on ? m.id : null) });
+
+  async function stopIgnoring() {
+    const target = unignoring;
+    if (!target) return false;
+    return act(async () => {
+      const r = await apiCall<"POST /api/mailboxes/{id}/unignore">(`/api/mailboxes/${target.box.id}/unignore`, { method: "POST", body: { domain: target.domain }, failed: "Couldn’t stop ignoring it" });
+      if (r.started) toast.success(`Reading again what was skipped from ${target.domain}`);
+      else toast("Waypoint will read this sender again. A scan of this mailbox is already running, so choose Look back 18 months when it finishes.");
+      await load();
+      watchUntil = Date.now() + 2 * POLL_MS + 500;
+      watching = true;
+    });
+  }
 
   const share = (m: Mailbox, box: HTMLInputElement) => act(async () => {
     try {
@@ -148,7 +176,7 @@
               {#if m.status === "connected"}Waypoint can read this mailbox, read-only.{:else}{m.last_error ?? "Waypoint can’t read this mailbox right now."}{/if}
             </p>
             {#if m.scanning}
-              <p class="text-sm text-muted-foreground" role="status">Scanning for bookings…</p>
+              <p class="text-sm text-muted-foreground" role="status">{m.reading_again ? `Reading again what was skipped from ${m.reading_again}…` : "Scanning for bookings…"}</p>
             {:else if m.status !== "reconnect"}
               <p class="text-sm text-muted-foreground">{scanned(m) ? `Last scanned ${scanned(m)}.` : "Not scanned yet."}</p>
               {#if m.scan_summary}<p class="text-sm text-muted-foreground" data-testid="scan-summary">{summary(m.scan_summary)}</p>{/if}
@@ -179,6 +207,28 @@
                   {/if}
                 </div>
               {/if}
+            {/if}
+            {#if m.status === "connected"}
+              <div class="mt-2" data-testid="ignored-senders">
+                {#if ignored[m.id] === null}
+                  <h3 class="text-sm font-medium">Ignored senders</h3>
+                  <p class="text-sm text-muted-foreground">Couldn’t load the list.</p>
+                {:else if ignored[m.id]}
+                  <h3 class="text-sm font-medium">Ignored senders ({ignored[m.id]!.length})</h3>
+                  {#if !ignored[m.id]!.length}
+                    <p class="text-sm text-muted-foreground">None</p>
+                  {:else}
+                    <ul class="mt-1 space-y-1">
+                      {#each ignored[m.id]! as domain (domain)}
+                        <li class="flex items-center justify-between gap-2 text-sm">
+                          <span class="min-w-0 truncate">{domain}</span>
+                          <Button variant="outline" size="sm" aria-label={`Stop ignoring ${domain}`} onclick={() => { unignoring = { box: m, domain }; askingToStop = true; }}>Stop ignoring</Button>
+                        </li>
+                      {/each}
+                    </ul>
+                  {/if}
+                {/if}
+              </div>
             {/if}
             {#if m.scan_notice && !m.scanning && m.status !== "reconnect"}<p class="text-sm text-muted-foreground" role="status">The scan couldn’t start: {m.scan_notice}</p>{/if}
             {#if m.scan_error}<p class="text-sm text-signal-ink" role="status">The last scan stopped: {m.scan_error} What it had read is kept, and the next scan carries on.</p>{/if}
@@ -215,6 +265,13 @@
     {/if}
   </div>
 </section>
+
+<ConfirmDialog bind:open={askingToStop} title={`Stop ignoring ${unignoring?.domain ?? "this sender"}?`} confirmLabel="Stop ignoring" busyLabel="Stopping…"
+  onconfirm={stopIgnoring}>
+  {#snippet description()}
+    <p>Waypoint will read mail from this sender again and look back through what it skipped.</p>
+  {/snippet}
+</ConfirmDialog>
 
 <ConfirmDialog bind:open={asking} title={`Disconnect ${leaving?.address ?? "this Gmail"}?`} confirmLabel="Disconnect" busyLabel="Disconnecting…" destructive
   onconfirm={disconnect}>

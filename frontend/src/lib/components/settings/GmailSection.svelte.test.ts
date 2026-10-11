@@ -11,13 +11,100 @@ import type { Mailbox, MailboxList } from "$lib/api-types";
 import { toast } from "svelte-sonner";
 import GmailSection from "./GmailSection.svelte";
 
-const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, scan_notice: null, scan_summary: null, share_review: false, labels_picked: 0, ...extra });
+const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, scan_notice: null, scan_summary: null, reading_again: null, share_review: false, labels_picked: 0, ...extra });
 const list = (mailboxes: Mailbox[] = [], configured = true): MailboxList => ({ configured, mailboxes });
-const serve = (reply: MailboxList, others: (path: string) => unknown = () => ({})) =>
-  vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/mailboxes" ? reply : others(path)) as never);
+const serve = (reply: MailboxList, others: (path: string) => unknown = () => ({}), ignored: Record<number, string[]> = {}) =>
+  vi.mocked(api).mockImplementation(async (path: string) => {
+    if (path === "/api/mailboxes") return reply as never;
+    const listed = /^\/api\/mailboxes\/(\d+)\/ignored$/.exec(path);
+    if (listed) return { domains: ignored[Number(listed[1])] ?? [] } as never;
+    return others(path) as never;
+  });
 
 beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.warning).mockReset(); });
 afterEach(() => { vi.unstubAllGlobals(); history.replaceState(null, "", "/"); });
+
+describe("Settings → Gmail → Ignored senders", () => {
+  it("lists the domains a mailbox ignores, with a count in the heading", async () => {
+    serve(list([box()]), undefined, { 1: ["example-air.example", "mail.seaside-stays.example"] });
+    render(GmailSection);
+    const section = await screen.findByTestId("ignored-senders");
+    expect(await within(section).findByRole("heading", { name: "Ignored senders (2)" })).toBeInTheDocument();
+    expect(within(section).getByText("example-air.example")).toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: "Stop ignoring example-air.example" })).toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: "Stop ignoring mail.seaside-stays.example" })).toBeInTheDocument();
+  });
+
+  it("says None when a mailbox ignores nobody", async () => {
+    serve(list([box()]));
+    render(GmailSection);
+    const section = await screen.findByTestId("ignored-senders");
+    expect(await within(section).findByRole("heading", { name: "Ignored senders (0)" })).toBeInTheDocument();
+    expect(within(section).getByText("None")).toBeInTheDocument();
+    expect(within(section).queryByRole("button")).toBeNull();
+  });
+
+  it("lists each mailbox’s own ignored senders", async () => {
+    serve(list([box(), box({ id: 2, address: "work@gmail.example" })]), undefined, { 1: ["example-air.example"], 2: [] });
+    render(GmailSection);
+    const sections = await screen.findAllByTestId("ignored-senders");
+    await waitFor(() => expect(within(sections[0]).getByText("example-air.example")).toBeInTheDocument());
+    expect(within(sections[1]).getByText("None")).toBeInTheDocument();
+    expect(api).toHaveBeenCalledWith("/api/mailboxes/2/ignored");
+  });
+
+  it("says when the list couldn’t be loaded", async () => {
+    vi.mocked(api).mockImplementation((async (path: string) => {
+      if (path === "/api/mailboxes") return list([box()]);
+      throw new Error("Nope.");
+    }) as never);
+    render(GmailSection);
+    expect(await screen.findByText("Couldn’t load the list.")).toBeInTheDocument();
+  });
+
+  it("asks before it stops ignoring, then removes the row and shows the scan starting", async () => {
+    let gone = false;
+    vi.mocked(api).mockImplementation((async (path: string) => {
+      if (path === "/api/mailboxes") return list([box({ scanning: gone, reading_again: gone ? "example-air.example" : null })]);
+      if (path === "/api/mailboxes/1/ignored") return { domains: gone ? [] : ["example-air.example"] };
+      if (path === "/api/mailboxes/1/unignore") { gone = true; return { started: true }; }
+      return {};
+    }) as never);
+    render(GmailSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Stop ignoring example-air.example" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Stop ignoring example-air.example?")).toBeInTheDocument();
+    expect(within(dialog).getByText("Waypoint will read mail from this sender again and look back through what it skipped.")).toBeInTheDocument();
+    expect(api).not.toHaveBeenCalledWith("/api/mailboxes/1/unignore", expect.anything());
+    await userEvent.click(dialog.querySelector("button[type=submit]")!);
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/mailboxes/1/unignore", { method: "POST", body: { domain: "example-air.example" }, failed: "Couldn’t stop ignoring it" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Reading again what was skipped from example-air.example"));
+    expect(await screen.findByText("Reading again what was skipped from example-air.example…")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("None")).toBeInTheDocument());
+  });
+
+  it("leaves the row alone when the confirm is cancelled", async () => {
+    serve(list([box()]), undefined, { 1: ["example-air.example"] });
+    render(GmailSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Stop ignoring example-air.example" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    expect(api).not.toHaveBeenCalledWith("/api/mailboxes/1/unignore", expect.anything());
+    expect(screen.getByText("example-air.example")).toBeInTheDocument();
+  });
+
+  it("says a running scan will need a look-back when one is already going", async () => {
+    vi.mocked(api).mockImplementation((async (path: string) => {
+      if (path === "/api/mailboxes") return list([box()]);
+      if (path === "/api/mailboxes/1/ignored") return { domains: ["example-air.example"] };
+      if (path === "/api/mailboxes/1/unignore") return { started: false };
+      return {};
+    }) as never);
+    render(GmailSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Stop ignoring example-air.example" }));
+    await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("Look back 18 months")));
+  });
+});
 
 describe("Settings → Gmail", () => {
   it("says in one line what the last scan found, read, filed, couldn't read and skipped, and nothing else", async () => {

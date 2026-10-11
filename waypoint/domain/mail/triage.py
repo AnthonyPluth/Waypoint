@@ -43,7 +43,7 @@ class Head:
     sender_name: str = ""
 
 
-def _known(domain: str | None, domains: tuple[str, ...]) -> bool:
+def sender_in(domain: str | None, domains: tuple[str, ...]) -> bool:
     return bool(domain) and any(domain == d or (domain or "").endswith("." + d) for d in domains)
 
 
@@ -57,13 +57,13 @@ def _named(head: Head) -> bool:
 
 
 def strong(head: Head) -> bool:
-    return _known(head.sender_domain, query.SENDERS) or travel_words(f"{head.subject} {head.snippet}") >= 2
+    return sender_in(head.sender_domain, query.SENDERS) or travel_words(f"{head.subject} {head.snippet}") >= 2
 
 
 def shopping(head: Head) -> bool:
-    if _known(head.sender_domain, query.SENDERS) or _known(head.sender_domain, query.BANK_SENDERS):
+    if sender_in(head.sender_domain, query.SENDERS) or sender_in(head.sender_domain, query.BANK_SENDERS):
         return False
-    if _known(head.sender_domain, query.RETAIL_SENDERS):
+    if sender_in(head.sender_domain, query.RETAIL_SENDERS):
         return True
     text = f"{head.subject} {head.snippet}"
     return bool(RETAIL.search(text)) and not travel_words(text) and not _named(head)
@@ -72,15 +72,15 @@ def shopping(head: Head) -> bool:
 def decide(head: Head) -> Decision:
     text = f"{head.subject} {head.snippet}"
     changes = bool(CHANGES.search(head.subject))
-    known = _known(head.sender_domain, query.SENDERS)
+    known = sender_in(head.sender_domain, query.SENDERS)
     words = travel_words(text)
     if not changes and (CODE.search(text) or AUTO_REPLY.search(text) or (not known and (REPLY.match(head.subject) or (MAILING.search(head.subject) and not (travel_words(head.subject) or GENERIC.search(head.subject)))))):
         return "skip"
-    if _known(head.sender_domain, query.BANK_SENDERS):
+    if sender_in(head.sender_domain, query.BANK_SENDERS):
         return "read" if any(w in head.subject.lower() for w in query.BANK_SUBJECT_WORDS) else "skip"
     if known:
         return "read"
-    if _known(head.sender_domain, query.RETAIL_SENDERS):
+    if sender_in(head.sender_domain, query.RETAIL_SENDERS):
         return "skip"
     if words or (_named(head) and (GENERIC.search(text) or RETAIL.search(text))) or (changes and GENERIC.search(text) and not RETAIL.search(text)):
         return "read"

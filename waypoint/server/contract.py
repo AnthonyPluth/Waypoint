@@ -63,6 +63,7 @@ class Mailbox(TypedDict):
     scanning: bool
     scan_notice: str | None
     scan_summary: ScanSummary | None
+    reading_again: str | None
     labels_picked: int
     share_review: bool
 
@@ -85,6 +86,20 @@ class MailboxLabels(TypedDict):
 
 class LabelsBody(TypedDict):
     labels: list[str]
+
+
+class IgnoredSenders(TypedDict):
+    domains: list[str]
+
+
+class UnignoreBody(TypedDict):
+    domain: str
+
+
+class Ignoring(TypedDict):
+    ok: bool
+    mailbox_id: int
+    domain: str
 
 
 class ShareBody(TypedDict):
@@ -115,6 +130,10 @@ class AiSuggestion(TypedDict):
     start_zone: NotRequired[str]
     end_zone: NotRequired[str]
     address: NotRequired[str]
+    phone: NotRequired[str]
+    room: NotRequired[str]
+    ship: NotRequired[str]
+    deck: NotRequired[str]
     sources: NotRequired[dict[str, str]]
 
 
@@ -124,6 +143,7 @@ class ReviewItem(TypedDict):
     owner: str
     mine: bool
     sender_domain: str
+    known_sender: bool
     subject: str | None
     has_email: bool
     received: str | None

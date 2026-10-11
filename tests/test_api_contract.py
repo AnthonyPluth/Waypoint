@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 
 from waypoint.storage import backup, db, secretbox, stored_mail
-from waypoint.storage.models import LoyaltyId, Mailbox
+from waypoint.storage.models import IgnoredSender, LoyaltyId, Mailbox
 from waypoint.storage import settings_keys as sk
 from unittest import mock
 
@@ -179,6 +179,11 @@ class Replies(DbCase):
             self.check("POST /api/mailboxes/{id}/reread", mailboxes.api_mailbox_reread(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
             self.check("POST /api/mailboxes/{id}/backfill", mailboxes.api_mailbox_backfill(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
         self.check("POST /api/mailboxes/{id}/share", mailboxes.api_mailbox_share(self.c, {}, {"share": True}, str(reply["mailboxes"][0]["id"])))
+        first = reply["mailboxes"][0]["id"]
+        self.c.execute(insert(IgnoredSender).values(mailbox_id=first, domain="example-air.example"))
+        self.check("GET /api/mailboxes/{id}/ignored", mailboxes.api_mailbox_ignored(self.c, {}, {}, str(first)))
+        with mock.patch.object(jobs, "scan_now", return_value=True):
+            self.check("POST /api/mailboxes/{id}/unignore", mailboxes.api_mailbox_unignore(self.c, {}, {"domain": "example-air.example"}, str(first)))
         live = [{"id": "Label_1", "name": "Japan 2026", "count": 12}]
         with mock.patch.object(gmail, "labels", return_value=live), mock.patch.object(gmail, "access_token", return_value="t"):
             box = str(reply["mailboxes"][0]["id"])
@@ -402,7 +407,7 @@ class Generated(unittest.TestCase):
 
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
-                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels",
+                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels", "GET /api/mailboxes/{id}/ignored", "POST /api/mailboxes/{id}/unignore",
                                      "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/share",
                                      "GET /api/ai", "POST /api/ai", "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "DELETE /api/review/{id}",

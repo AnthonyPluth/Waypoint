@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from ... import oidc, validate
-from ...domain.mail import scan
+from ...domain.mail import review, scan
 from ...providers import gmail
 from .. import jobs
 from ..common import ApiError, Response, _current, row_id
-from ..contract import Disconnected, LabelsBody, MailboxLabels, MailboxList, Ok, ScanStarted, ScanSummary, ShareBody, Started
+from ..contract import Disconnected, IgnoredSenders, LabelsBody, MailboxLabels, MailboxList, Ok, ScanStarted, ScanSummary, ShareBody, Started, UnignoreBody
 
 BACK = {gmail.Declined: "denied", gmail.Refused: "refused", gmail.WrongScope: "scope"}
 
@@ -46,6 +46,7 @@ def api_mailboxes(conn, _q, _b) -> MailboxList:
             "mailboxes": [{"id": m["id"], "address": m["address"], "status": m["status"], "last_error": m["last_error"],
                            "last_scan": _when(m["last_scan"]), "scan_error": m["scan_error"], "scanning": scan.running(m["id"]),
                            "scan_notice": scan.notice(m["id"]), "scan_summary": _summary(m["scan_summary"]),
+                           "reading_again": scan.reading_again(m["id"]),
                            "labels_picked": len(scan.decode_labels(m["scan_labels"])), "share_review": bool(m["share_review"])}
                           for m in gmail.listing(conn, owner())]}
 
@@ -107,6 +108,22 @@ def api_mailbox_backfill(conn, _q, _b, mailbox_id: str) -> ScanStarted:
     if not any(m["id"] == n for m in gmail.listing(conn, owner())):
         raise ApiError("Not found", 404)
     return {"started": jobs.scan_now(n, backfill=True)}
+
+
+def api_mailbox_ignored(conn, _q, _b, mailbox_id: str) -> IgnoredSenders:
+    n = _owned(conn, mailbox_id)
+    return {"domains": [d for d in review.ignored(conn, n) if d != review.UNKNOWN_SENDER]}
+
+
+def api_mailbox_unignore(conn, _q, body: UnignoreBody, mailbox_id: str) -> ScanStarted:
+    n = _owned(conn, mailbox_id)
+    domain = body.get("domain")
+    if not isinstance(domain, str) or not domain or len(domain) > 255:
+        raise ApiError('Send "domain" as the sender’s domain')
+    if not review.stop_ignoring(conn, n, domain):
+        return {"started": False}
+    conn.commit()
+    return {"started": jobs.scan_now(n, backfill=True, sender=domain)}
 
 
 MAX_LABELS = 100

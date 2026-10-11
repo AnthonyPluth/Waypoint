@@ -7,13 +7,14 @@ from sqlalchemy import delete, func, or_, select, update
 
 from ...providers import gmail
 from ...storage import db, stored_mail
-from ...storage.models import IgnoredSender, Mailbox, Person, ReviewItem, TrustedSender
+from ...storage.models import IgnoredSender, Mailbox, Person, ReviewItem, ScannedMessage, TrustedSender
 from .. import trips, visibility
 from ..visibility import Viewer
-from . import ai
+from . import ai, query, triage
 
 Reason = Literal["no_markup", "incomplete", "broken", "match", "generic"]
 UNKNOWN_SENDER = ""
+IGNORED = "ignored"
 
 
 class ItemOut(TypedDict):
@@ -22,6 +23,7 @@ class ItemOut(TypedDict):
     owner: str
     mine: bool
     sender_domain: str
+    known_sender: bool
     subject: str | None
     has_email: bool
     received: str | None
@@ -69,7 +71,7 @@ def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
                         .order_by(ReviewItem.received.is_(None), ReviewItem.received.desc(), ReviewItem.id.desc())).fetchall()
     subjects = stored_mail.subjects(conn, (r["mailbox_id"] for r in rows))
     return [{"id": r["id"], "address": r["address"], "owner": r["display_name"] or r["address"], "mine": r["owner_sub"] == owner,
-             "sender_domain": r["sender_domain"], "subject": subjects.get((r["mailbox_id"], r["message_id"])),
+             "sender_domain": r["sender_domain"], "known_sender": triage.sender_in(r["sender_domain"], query.SENDERS), "subject": subjects.get((r["mailbox_id"], r["message_id"])),
              "has_email": (r["mailbox_id"], r["message_id"]) in subjects,
              "received": r["received"], "reason": r["reason"],
              "gmail_url": gmail.open_url(r["address"], r["message_id"]) if r["owner_sub"] == owner else None,
@@ -132,11 +134,32 @@ def ignore_sender(conn: db.Connection, owner: str, item_id: int) -> int | None:
         return None
     db.insert_ignore(conn, IgnoredSender, {"mailbox_id": row["mailbox_id"], "domain": row["sender_domain"]},
                      key=["mailbox_id", "domain"])
+    waiting = select(ReviewItem.message_id).where(ReviewItem.mailbox_id == row["mailbox_id"], ReviewItem.sender_domain == row["sender_domain"])
+    conn.execute(update(ScannedMessage).where(ScannedMessage.mailbox_id == row["mailbox_id"], ScannedMessage.message_id.in_(waiting))
+                 .values(outcome=IGNORED, sender_domain=row["sender_domain"]))
     left = int(conn.execute(delete(ReviewItem).where(ReviewItem.mailbox_id == row["mailbox_id"],
                                                      ReviewItem.sender_domain == row["sender_domain"],
                                                      ReviewItem.matches.is_(None))).rowcount)
     stored_mail.prune(conn)
     return left
+
+
+def sender_to_ignore(conn: db.Connection, owner: str, item_id: int) -> tuple[int, str] | None:
+    row = _mine(conn, owner, item_id)
+    if row is None or row["sender_domain"] == UNKNOWN_SENDER:
+        return None
+    return int(row["mailbox_id"]), str(row["sender_domain"])
+
+
+def stop_ignoring(conn: db.Connection, mailbox_id: int, domain: str) -> bool:
+    removed = conn.execute(delete(IgnoredSender).where(IgnoredSender.mailbox_id == mailbox_id, IgnoredSender.domain == domain)).rowcount
+    if not removed:
+        return False
+    conn.execute(delete(ScannedMessage).where(
+        ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.outcome == IGNORED,
+        or_(ScannedMessage.sender_domain.is_(None), ScannedMessage.sender_domain == domain,
+            ScannedMessage.sender_domain.endswith("." + domain, autoescape=True))))
+    return True
 
 
 def trusted(conn: db.Connection, mailbox_id: int, domain: str | None) -> bool:
@@ -158,7 +181,7 @@ def add_generic(conn: db.Connection, mailbox_id: int, message_id: str, sender_do
 
 
 def ignored(conn: db.Connection, mailbox_id: int) -> list[str]:
-    return list(conn.execute(select(IgnoredSender.domain).where(IgnoredSender.mailbox_id == mailbox_id)).scalars())
+    return list(conn.execute(select(IgnoredSender.domain).where(IgnoredSender.mailbox_id == mailbox_id).order_by(IgnoredSender.domain)).scalars())
 
 
 class CandidateOut(TypedDict):
