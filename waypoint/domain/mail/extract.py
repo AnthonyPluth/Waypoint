@@ -590,7 +590,7 @@ def read(message: Mapping[str, Any]) -> Message:
         shown = clock_times(_visible(htmls, texts))
         bookings = [replace(b, clock_times=shown) if utc_marked(b.start) or utc_marked(b.end) else b for b in bookings]
     return Message(sender, received, tuple(bookings), unread, markup=seen, gaps=tuple(gaps), other_markup=other, forwarded_by=forwarded_by,
-                   revises=bool(triage.CHANGES.search(subject) or words.CANCEL.search(subject)),
+                   revises=bool(triage.CHANGES.search(subject) or words.CANCEL.search(subject) or references.changes(visible)),
                    found=references.read(subject, visible) if not bookings and not unread else references.Found())
 
 

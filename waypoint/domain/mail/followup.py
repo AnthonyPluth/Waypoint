@@ -12,6 +12,7 @@ from ..visibility import Viewer
 from . import extract, references
 
 MIN_NAME = 4
+GENERIC_NAMES = frozenset({"hotel", "hotels", "stay", "stays", "resort", "resorts", "lodge", "lodging", "travel", "airlines", "airline", "airways", "booking", "bookings", "rental", "rentals", "reservations", "cruise", "cruises", "parking", "trains", "train"})
 
 
 @dataclass(frozen=True)
@@ -28,9 +29,13 @@ def _related(domain: str, other: str) -> bool:
     return domain == other or domain.endswith("." + other) or other.endswith("." + domain)
 
 
+def _labels(domain: str) -> set[str]:
+    return {_squash(label) for label in domain.split(".")[:-1] if label}
+
+
 def _same_sender(conn: db.Connection, segment: Segment, domain: str) -> bool:
     name = _squash(trips.provider_key(segment.provider))
-    if len(name) >= MIN_NAME and name in _squash(domain):
+    if len(name) >= MIN_NAME and name not in GENERIC_NAMES and name in _labels(domain):
         return True
     return any(_related(domain, known) for known in stored_mail.senders_for_segment(conn, segment.id))
 

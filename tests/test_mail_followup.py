@@ -116,6 +116,28 @@ class FollowUpTests(FollowUpCase):
         self.assertEqual(self.read(lambda conn: conn.execute(select(func.count()).select_from(ReviewItem)).scalar()), 2)
         self.assertNotIn("follow-up", self.outcomes().values())
 
+    def test_a_neutral_subject_over_a_body_that_says_it_cancelled_or_changed_is_queued_for_a_person(self):
+        self.by_hand()
+        self.add("m-cancel", follow("Your stay: an update", f"Your hotel reservation {CODE} has been cancelled.", HOTEL))
+        self.add("m-change", follow("Your stay: a note", f"We have rescheduled your hotel booking {CODE}.", HOTEL, "Sat, 17 Oct 2026 09:00:00 +0100"))
+        self.scan()
+        self.assertEqual(self.read(lambda conn: conn.execute(select(func.count()).select_from(ReviewItem)).scalar()), 2)
+        self.assertNotIn("follow-up", self.outcomes().values())
+
+    def test_a_cancellation_policy_in_the_body_does_not_stop_a_follow_up(self):
+        self.by_hand()
+        self.add("m-policy", follow("Your stay: check-in is open", f"Your hotel reservation {CODE}. Free cancellation until 48 hours before.", HOTEL))
+        self.assertEqual(self.scan().review, 0)
+
+    def test_a_generic_provider_name_or_part_of_a_label_is_not_the_same_sender(self):
+        self.by_hand(provider="Stays")
+        self.by_hand(provider="Harbour Hotel", confirmation="K55667", start_local="2026-12-21T15:00", end_local="2026-12-27T10:00")
+        self.add("m-generic", follow("Your stay: check-in is open", f"Your hotel reservation {CODE}.", "stays.example"))
+        self.add("m-part", follow("Your stay: check-in is open", "Your hotel reservation K55667.", "harbourhotel-deals.example"))
+        self.add("m-whole", follow("Your stay: check-in is open", "Your hotel reservation K55667.", "mail.harbourhotel.example"))
+        self.scan()
+        self.assertEqual(self.outcomes(), {"m-generic": "unreadable", "m-part": "unreadable", "m-whole": "follow-up"})
+
     def test_a_code_that_matches_two_bookings_queues_as_before(self):
         self.by_hand()
         self.by_hand(start_local="2026-12-21T15:00", end_local="2026-12-27T10:00")
