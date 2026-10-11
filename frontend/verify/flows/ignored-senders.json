@@ -1,0 +1,22 @@
+{
+  "name": "ignored-senders",
+  "page": "settings",
+  "steps": [
+    { "fake_ignored": "news.example, deals.example" },
+    { "goto": "#settings/mail" },
+    { "wait_for": "[data-testid='ignored-senders'] h3:has-text('Ignored senders (2)')" },
+    { "scroll_to": "[data-testid='ignored-senders']" },
+    { "screenshot": "list" },
+    { "click": "button[aria-label='Stop ignoring news.example']" },
+    { "wait_for": "[role='dialog']" },
+    { "expect_text": { "selector": "[role='dialog']", "text": "look back through what it skipped" } },
+    { "screenshot": "confirm" },
+    { "click": "[role='dialog'] button[type=submit]" },
+    { "wait_for": "[data-testid='ignored-senders'] h3:has-text('Ignored senders (1)')" },
+    { "click": "button[aria-label='Stop ignoring deals.example']" },
+    { "click": "[role='dialog'] button[type=submit]" },
+    { "wait_for": "[data-testid='ignored-senders'] >> text=None" },
+    { "scroll_to": "[data-testid='ignored-senders']" },
+    { "screenshot": "empty" }
+  ]
+}
