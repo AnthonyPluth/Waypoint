@@ -54,13 +54,13 @@
     await refreshState().catch(ignoreFailure);
   };
 
-  const KINDS: [string, string][] = [["flight", "Flight"], ["hotel", "Hotel stay"], ["car", "Car rental"], ["train", "Train"]];
+  const KINDS: [string, string][] = [["flight", "Flight"], ["hotel", "Hotel stay"], ["car", "Car rental"], ["train", "Train"], ["parking", "Parking"]];
   const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
   const sender = (i: ReviewItem) => i.sender_domain || "Unknown sender";
   const subject = (i: ReviewItem) => i.subject || `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
 
-  const SHOWN: Record<string, string[]> = { hotel: ["address", "phone"], car: ["address", "phone"], train: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
+  const SHOWN: Record<string, string[]> = { hotel: ["address", "phone"], car: ["address", "phone"], train: ["address"], parking: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
   const detailLabel = (kind: string, key: string) => DETAILS[kind as Kind].find(([k]) => k === key)?.[1] ?? key;
   type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string> };
   const detailsOf = (s: NonNullable<ReviewItem["suggestion"]>): Record<string, string> => ({ address: s.address ?? "", phone: s.phone ?? "", room: s.room ?? "", ship: s.ship ?? "", deck: s.deck ?? "" });
@@ -113,7 +113,7 @@
     toast.success(`Asked the AI about ${done} ${done === 1 ? "message" : "messages"}`);
   }, { busy: (on) => (asking_all = on) });
 
-  const placeLabels = (kind: string) => kind === "flight" ? ["From (airport code)", "To (airport code)"] : kind === "hotel" ? ["Hotel", ""] : kind === "car" ? ["Pick-up", "Drop-off"] : kind === "cruise" ? ["Embarkation port", "Disembarkation port"] : ["From (station)", "To (station)"];
+  const placeLabels = (kind: string) => kind === "flight" ? ["From (airport code)", "To (airport code)"] : kind === "hotel" ? ["Hotel", ""] : kind === "parking" ? ["Lot", ""] : kind === "car" ? ["Pick-up", "Drop-off"] : kind === "cruise" ? ["Embarkation port", "Disembarkation port"] : ["From (station)", "To (station)"];
 
   const closeForm = () => {
     if (draft) delete peeks[draft.item.id];
@@ -126,9 +126,10 @@
     if (!d) return;
     const flight = d.kind === "flight";
     const details = Object.fromEntries((SHOWN[d.kind] ?? []).map((key) => [key, (d.details[key] ?? "").trim()] as const).filter(([, v]) => v));
-    if (d.kind === "hotel" && !d.startZone.trim() && !details["address"]) { formError = "Enter the hotel’s time zone (for example America/New_York), or its address to work it out from"; return; }
-    const body = { kind: d.kind as "flight" | "hotel" | "car" | "train" | "cruise", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
-      destination: d.destination, ...(Object.keys(details).length && { details }), ...(flight ? {} : d.kind === "hotel" ? { start_zone: d.startZone.trim() || null } : d.kind === "cruise" ? { start_zone: d.startZone, end_zone: d.endZone || d.startZone } : { ...(d.startZone && { start_zone: d.startZone }), ...(d.endZone && { end_zone: d.endZone }) }) };
+    const stay = d.kind === "hotel" || d.kind === "parking";
+    if (stay && !d.startZone.trim() && !details["address"]) { formError = `Enter the ${d.kind === "hotel" ? "hotel" : "lot"}’s time zone (for example America/New_York), or its address to work it out from`; return; }
+    const body = { kind: d.kind as "flight" | "hotel" | "car" | "train" | "cruise" | "parking", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
+      destination: d.destination, ...(Object.keys(details).length && { details }), ...(flight ? {} : stay ? { start_zone: d.startZone.trim() || null } : d.kind === "cruise" ? { start_zone: d.startZone, end_zone: d.endZone || d.startZone } : { ...(d.startZone && { start_zone: d.startZone }), ...(d.endZone && { end_zone: d.endZone }) }) };
     let added = false;
     const ok = await act(async () => {
       const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
@@ -168,7 +169,7 @@
   let chosen = $state<Record<number, string>>({});
   let guestName = $state<Record<number, string>>({});
   let matching = $state<number | null>(null);
-  const what = (w: Pick<WhoIsThis, "kind" | "origin" | "destination" | "start_local" | "provider">) => `${w.kind === "hotel" ? "Stay" : w.kind === "car" ? "Rental" : w.kind === "train" ? "Train" : w.kind === "cruise" ? "Cruise" : "Flight"}${w.origin ? ` ${w.origin}${w.destination ? ` → ${w.destination}` : ""}` : ""} on ${w.start_local.slice(0, 10)}${w.provider ? ` (${w.provider})` : ""}`;
+  const what = (w: Pick<WhoIsThis, "kind" | "origin" | "destination" | "start_local" | "provider">) => `${w.kind === "hotel" ? "Stay" : w.kind === "parking" ? "Parking" : w.kind === "car" ? "Rental" : w.kind === "train" ? "Train" : w.kind === "cruise" ? "Cruise" : "Flight"}${w.origin ? ` ${w.origin}${w.destination ? ` → ${w.destination}` : ""}` : ""} on ${w.start_local.slice(0, 10)}${w.provider ? ` (${w.provider})` : ""}`;
 
   let settling = $state<string | null>(null);
   const matchKey = (m: ReviewMatch) => `${m.item_id}-${m.entry}`;
@@ -223,15 +224,15 @@
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[1]}</span>
         <Input bind:value={d.destination} required={d.kind === "flight"} maxlength={100} autocomplete="off" /></label>
     {/if}
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "car" ? "Pick-up time" : "Departs"} {#if d.sources["start_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["start_local"]}”</span>{/if}</span>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "parking" ? "Entry" : d.kind === "car" ? "Pick-up time" : "Departs"} {#if d.sources["start_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["start_local"]}”</span>{/if}</span>
       <Input type="datetime-local" class={d.sources["start_local"] ? "ring-2 ring-primary" : ""} bind:value={d.start} required /></label>
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off time" : "Arrives"} {#if d.sources["end_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["end_local"]}”</span>{/if}</span>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "parking" ? "Exit" : d.kind === "car" ? "Drop-off time" : "Arrives"} {#if d.sources["end_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["end_local"]}”</span>{/if}</span>
       <Input type="datetime-local" class={d.sources["end_local"] ? "ring-2 ring-primary" : ""} bind:value={d.end} required /></label>
-    {#if d.kind === "hotel"}
+    {#if d.kind === "hotel" || d.kind === "parking"}
       {@render detailField(d, "address", "Waypoint works the time zone out from it when you leave the time zone empty.")}
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>
         <ZoneSelect bind:value={d.startZone} blank="Work it out from the address" />
-        <span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address above.</span></label>
+        <span class="text-muted-foreground">{d.kind === "parking" ? "Entry and exit are both at the lot." : "Check-in and check-out are both at the hotel."} Leave this empty to work it out from the address above.</span></label>
       {@render detailField(d, "phone")}
     {:else if d.kind !== "flight"}
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it starts</span>

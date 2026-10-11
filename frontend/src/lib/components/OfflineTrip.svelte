@@ -22,7 +22,7 @@
   const dates = $derived(trip.start_date && trip.end_date
     ? (trip.start_date === trip.end_date ? dateLabel(trip.start_date) : `${dateLabel(trip.start_date)} – ${dateLabel(trip.end_date)}`) : "No dates yet");
   const emailsOf = (s: Segment) => copy.messages.find((m) => m.segment_id === s.id)?.emails ?? [];
-  const kindName = (s: Segment) => ({ flight: "Flight", hotel: "Hotel", car: "Car", train: "Train", cruise: "Cruise" })[s.kind];
+  const kindName = (s: Segment) => ({ flight: "Flight", hotel: "Hotel", car: "Car", train: "Train", cruise: "Cruise", parking: "Parking" })[s.kind];
 </script>
 
 <div class="mb-4 flex items-start gap-3 rounded-2xl border border-border bg-card p-4 text-sm" role="status" data-testid="offline-banner">

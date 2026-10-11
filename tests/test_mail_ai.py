@@ -272,7 +272,7 @@ class AddressTests(unittest.TestCase):
 
     def test_the_prompt_asks_for_them_only_for_the_kinds_they_belong_to(self):
         prompt = ai.SYSTEM
-        self.assertIn('For a hotel, car, train or cruise only, also "address"', prompt)
+        self.assertIn('For a hotel, car, train, cruise or parking only, also "address"', prompt)
         self.assertIn('For a hotel, car or cruise only, also "phone"', prompt)
         self.assertIn('For a cruise only, also "room" (the cabin), "ship" and "deck"', prompt)
         self.assertIn("Never give any of these for a flight", prompt)

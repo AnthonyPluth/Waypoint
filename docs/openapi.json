@@ -2542,7 +2542,8 @@
               "hotel",
               "car",
               "train",
-              "cruise"
+              "cruise",
+              "parking"
             ]
           },
           "origin": {
@@ -4204,7 +4205,8 @@
               "hotel",
               "car",
               "train",
-              "cruise"
+              "cruise",
+              "parking"
             ]
           },
           "provider": {
@@ -4267,7 +4269,8 @@
               "hotel",
               "car",
               "train",
-              "cruise"
+              "cruise",
+              "parking"
             ]
           },
           "provider": {
@@ -4508,7 +4511,8 @@
               "hotel",
               "car",
               "train",
-              "cruise"
+              "cruise",
+              "parking"
             ]
           },
           "status": {
@@ -4670,7 +4674,8 @@
               "hotel",
               "car",
               "train",
-              "cruise"
+              "cruise",
+              "parking"
             ]
           },
           "start_local": {
@@ -4769,7 +4774,8 @@
               "hotel",
               "car",
               "train",
-              "cruise"
+              "cruise",
+              "parking"
             ]
           },
           "status": {
@@ -5062,6 +5068,9 @@
           "cruises": {
             "$ref": "#/components/schemas/StatsCruises"
           },
+          "parking": {
+            "$ref": "#/components/schemas/StatsParking"
+          },
           "places": {
             "$ref": "#/components/schemas/StatsPlaces"
           }
@@ -5075,6 +5084,7 @@
           "stays",
           "cars",
           "cruises",
+          "parking",
           "places"
         ],
         "additionalProperties": false
@@ -5378,6 +5388,29 @@
         "required": [
           "name",
           "count"
+        ],
+        "additionalProperties": false
+      },
+      "StatsParking": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer"
+          },
+          "bookings": {
+            "type": "integer"
+          },
+          "lots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsNamed"
+            }
+          }
+        },
+        "required": [
+          "days",
+          "bookings",
+          "lots"
         ],
         "additionalProperties": false
       },
@@ -5974,7 +6007,8 @@
               "hotel",
               "car",
               "train",
-              "cruise"
+              "cruise",
+              "parking"
             ]
           },
           "provider": {

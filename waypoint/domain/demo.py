@@ -83,6 +83,9 @@ def _family_last_year(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": _at(today, -400, "07:30"), "end_local": _at(today, -400, "10:55"),
          "confirmation": "TV5N2B", "provider": "United Airlines", "details": {"flight_number": "UA 1205", "cabin": "Premium Economy", "seat": "14A"}},
+        {"kind": "parking", "origin": "Example Airport Economy Lot", "start_local": _at(today, -400, "04:30"), "end_local": _at(today, -396, "23:15"),
+         "start_zone": "America/New_York", "end_zone": "America/New_York", "confirmation": "PK21866", "provider": "Example Parking",
+         "details": {"space_type": "Economy", "address": "1 Terminal Road\nJamaica, NY 11430"}},
         {"kind": "car", "origin": "SFO airport", "destination": "SFO airport", "start_local": _at(today, -400, "12:00"), "end_local": _at(today, -396, "12:00"),
          "start_zone": "America/Los_Angeles", "end_zone": "America/Los_Angeles", "confirmation": "C5521", "provider": "Hertz",
          "details": {"car_class": "SUV"}},
@@ -144,6 +147,10 @@ def _jane_alone(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": _at(today, 20, "08:00"), "end_local": _at(today, 20, "11:20"),
          "confirmation": "PL4N9R", "provider": "United Airlines", "details": {"flight_number": "UA 311", "terminal": "7"}},
+        {"kind": "parking", "origin": "Example Airport Long-Term Lot", "start_local": _at(today, 20, "05:15"), "end_local": _at(today, 23, "03:00"),
+         "start_zone": "America/New_York", "end_zone": "America/New_York", "confirmation": "PK30417", "provider": "Example Parking",
+         "details": {"space_type": "Covered", "vehicle": "Blue hatchback", "address": "1 Terminal Road\nJamaica, NY 11430", "notes": "Shuttle every 15 minutes"},
+         "manage_url": "https://example.com/manage/PK30417"},
         {"kind": "car", "origin": "SFO airport", "destination": "SFO airport", "start_local": _at(today, 20, "12:30"), "end_local": _at(today, 22, "16:00"),
          "start_zone": "America/Los_Angeles", "end_zone": "America/Los_Angeles", "confirmation": "C7710", "provider": "Hertz",
          "details": {"car_class": "Midsize", "address": "1 Rental Way, San Francisco, CA 94103", "phone": "+1 415 555 0100"}},

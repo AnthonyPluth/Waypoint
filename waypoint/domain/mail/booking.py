@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-Kind = Literal["flight", "hotel", "car", "train", "cruise"]
+Kind = Literal["flight", "hotel", "car", "train", "cruise", "parking"]
 Status = Literal["confirmed", "cancelled"]
 
 

@@ -15,15 +15,15 @@ from ..storage.models import Segment, SegmentPort, SegmentTraveler, Trip
 from . import airports, links, logos, people, place_zones, visibility
 from .visibility import Viewer
 
-Kind = Literal["flight", "hotel", "car", "train", "cruise"]
+Kind = Literal["flight", "hotel", "car", "train", "cruise", "parking"]
 Status = Literal["confirmed", "changed", "cancelled"]
-KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train", "cruise")
+KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train", "cruise", "parking")
 STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
 TIME_UNKNOWN = "time_unknown"
 ADDRESS_LIMIT = 300
 MAX_PORTS = 40
 SEAT_LIMIT = 10
-DETAIL_KEYS = ("flight_number", "terminal", "seat", "seat_position", "aircraft", "cabin", "room", "car_class", "address", "phone", "ship", "deck", TIME_UNKNOWN)
+DETAIL_KEYS = ("flight_number", "terminal", "seat", "seat_position", "aircraft", "cabin", "room", "car_class", "address", "phone", "ship", "deck", "space_type", "vehicle", "notes", TIME_UNKNOWN)
 
 
 def untimed(details: Mapping[str, str]) -> bool:
@@ -330,8 +330,10 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
             if not code or not IATA.fullmatch(code):
                 raise Invalid(f"A flight’s {label} is an airport code like JFK")
         origin, destination = (origin or "").upper(), (destination or "").upper()
-    if kind == "hotel":
+    if kind in ("hotel", "parking"):
         start_zone = end_zone = _stay_zone(conn, fields)
+        if kind == "parking" and fields.get("end_zone"):
+            end_zone = _zone(fields["end_zone"], "exit")
     else:
         address = (fields.get("details") or {}).get("address")
         start_zone = _place_zone(conn, kind, origin, fields.get("start_zone"), "start", address)

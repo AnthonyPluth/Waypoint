@@ -326,14 +326,14 @@
     <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} />{/if}</dd></div>
   <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
     <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} />{/if}</dd></div>
-  {#if s.kind === "hotel" && !untimed(s)}
+  {#if (s.kind === "hotel" || s.kind === "parking") && !untimed(s)}
     <div><dt class="eyebrow">Time zone</dt><dd class="mt-1 text-sm text-muted-foreground" data-testid="stay-zone">{s.start_zone.replaceAll("_", " ")}</dd></div>
   {/if}
 {/snippet}
 
 {#snippet links(s: Segment)}
   {#if s.check_times}<p class="text-sm text-signal-ink" role="note">Check the times: the email gave them in UTC and Waypoint couldn’t tell which clock they mean. Edit the booking to correct or confirm them.</p>{/if}
-  {#if s.kind === "hotel" || s.kind === "car" || s.kind === "cruise"}
+  {#if s.kind === "hotel" || s.kind === "car" || s.kind === "cruise" || s.kind === "parking"}
     {#if s.details.address}
       <div class="mt-2 text-sm"><p class="eyebrow">{s.kind === "car" ? "Pick-up address" : s.kind === "cruise" ? "Terminal address" : "Address"}</p>
         <CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" /></div>

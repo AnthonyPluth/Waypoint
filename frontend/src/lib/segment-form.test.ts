@@ -5,6 +5,7 @@ import { segment } from "../test/fixtures";
 const flight = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), origin: "JFK", destination: "LHR", start_local: "2026-11-20T19:00", end_local: "2026-11-21T07:10", people: [1], ...extra });
 const car = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), kind: "car", origin: "Example Rental", start_local: "2026-11-21T15:00", end_local: "2026-11-27T10:00", start_zone: "Europe/London", people: [1], ...extra });
 const hotel = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), kind: "hotel", origin: "Harbour Hotel", start_local: "2026-11-21T15:00", end_local: "2026-11-27T10:00", start_zone: "Europe/London", people: [1], ...extra });
+const parking = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), kind: "parking", origin: "Example Long-Term Lot", start_local: "2026-11-21T08:00", end_local: "2026-11-27T21:00", start_zone: "America/New_York", people: [1], ...extra });
 
 describe("the segment form's messages", () => {
   it("accepts a complete flight and a complete stay", () => {
@@ -120,6 +121,33 @@ describe("a cruise", () => {
   });
 });
 
+describe("a parking booking", () => {
+  it("wants a lot name, an entry and an exit, and a zone or an address to find it from", () => {
+    expect(problem(parking())).toBeNull();
+    expect(problem(parking({ origin: " " }))).toBe("Enter the lot’s name");
+    expect(problem(parking({ start_local: "" }))).toBe("Enter the entry date and time");
+    expect(problem(parking({ end_local: "" }))).toBe("Enter the exit date and time");
+    expect(problem(parking({ start_zone: "" }))).toMatch(/Enter the time zone of the stay/);
+    expect(problem(parking({ start_zone: "", details: { address: "1 Terminal Road" } }))).toBeNull();
+    expect(problem(parking({ end_local: "2026-11-21T07:00" }))).toMatch(/ends before it starts/);
+  });
+  it("sends the lot, its one zone and its details, trimmed", () => {
+    const sent = body(parking({ provider: " Example Parking ", details: { space_type: " Covered ", vehicle: "Blue hatchback", notes: "", address: " 1 Terminal Road " } }));
+    expect(sent).toMatchObject({ kind: "parking", origin: "Example Long-Term Lot", provider: "Example Parking", start_zone: "America/New_York",
+      details: { space_type: "Covered", vehicle: "Blue hatchback", address: "1 Terminal Road" } });
+    expect(sent).not.toHaveProperty("end_zone");
+    expect(sent.details).not.toHaveProperty("notes");
+    expect(sent.travelers).toEqual([{ person_id: 1 }]);
+  });
+  it("opens a saved booking as it was and sends no zone when it is to be worked out", () => {
+    const d = draftOf(segment({ kind: "parking", origin: "Example Long-Term Lot", destination: null, start_zone: "America/New_York", end_zone: "America/New_York",
+      details: { space_type: "Covered", notes: "Shuttle every 15 minutes" }, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }] }));
+    expect(d).toMatchObject({ kind: "parking", origin: "Example Long-Term Lot", details: { space_type: "Covered", notes: "Shuttle every 15 minutes" } });
+    expect(body(d).details).toEqual({ space_type: "Covered", notes: "Shuttle every 15 minutes" });
+    expect(body({ ...d, start_zone: "" })).toMatchObject({ start_zone: null });
+  });
+});
+
 describe("a seat for each traveller", () => {
   const two = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), origin: "JFK", destination: "LHR", start_local: "2026-11-20T19:00", end_local: "2026-11-21T07:10", people: [1, 2], printed: ["DOE/MIA MISS"], ...extra });
   it("sends each traveller's own seat, trimmed, and none for an empty one", () => {
@@ -150,6 +178,7 @@ describe("the fields each kind shows", () => {
     expect(names("car")).toEqual(["Pick-up address", "Car class", "Phone"]);
     expect(names("cruise")).toEqual(["Ship", "Cabin", "Deck", "Terminal address", "Phone"]);
     expect(names("flight")).toEqual(["Flight number", "Terminal", "Cabin"]);
+    expect(names("parking")).toEqual(["Address", "Space type (covered, economy, valet)", "Vehicle (make and colour)", "Notes"]);
   });
 
   it("round-trips an address with its lines, and refuses one over the limit", () => {

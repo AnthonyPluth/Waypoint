@@ -119,7 +119,7 @@ class Disconnected(TypedDict):
 
 
 class AiSuggestion(TypedDict):
-    kind: Literal["flight", "hotel", "car", "train", "cruise"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
     origin: str
     start_local: str
     end_local: str
@@ -157,7 +157,7 @@ class WhoIsThis(TypedDict):
     name: str
     segment_id: int
     trip_id: int
-    kind: Literal["flight", "hotel", "car", "train", "cruise"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
     provider: str | None
     origin: str | None
     destination: str | None
@@ -166,7 +166,7 @@ class WhoIsThis(TypedDict):
 
 
 class ReviewBooking(TypedDict):
-    kind: Literal["flight", "hotel", "car", "train", "cruise"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
     provider: str | None
     confirmation: str | None
     origin: str | None
@@ -179,7 +179,7 @@ class ReviewCandidate(TypedDict):
     segment_id: int
     trip_id: int
     trip_name: str
-    kind: Literal["flight", "hotel", "car", "train", "cruise"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
     provider: str | None
     origin: str | None
     destination: str | None
@@ -362,7 +362,7 @@ class CruiseDay(TypedDict):
 class Segment(TypedDict):
     id: int
     trip_id: int
-    kind: Literal["flight", "hotel", "car", "train", "cruise"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
     status: Literal["confirmed", "changed", "cancelled"]
     confirmation: str | None
     provider: str | None
@@ -431,7 +431,7 @@ class TravelerBody(TypedDict):
 
 
 class SegmentBody(TypedDict):
-    kind: Literal["flight", "hotel", "car", "train", "cruise"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
     start_local: str
     end_local: str
     trip_id: NotRequired[int | None]
@@ -449,7 +449,7 @@ class SegmentBody(TypedDict):
 
 
 class SegmentEdit(TypedDict):
-    kind: NotRequired[Literal["flight", "hotel", "car", "train", "cruise"]]
+    kind: NotRequired[Literal["flight", "hotel", "car", "train", "cruise", "parking"]]
     status: NotRequired[Literal["confirmed", "changed", "cancelled"]]
     confirmation: NotRequired[str | None]
     provider: NotRequired[str | None]
@@ -722,6 +722,12 @@ class StatsCruises(TypedDict):
     lines: list[StatsNamed]
 
 
+class StatsParking(TypedDict):
+    days: int
+    bookings: int
+    lots: list[StatsNamed]
+
+
 class StatsPlaces(TypedDict):
     countries: list[StatsPlace]
     cities: list[StatsPlace]
@@ -744,6 +750,7 @@ class Stats(TypedDict):
     stays: StatsStays
     cars: StatsCars
     cruises: StatsCruises
+    parking: StatsParking
     places: StatsPlaces
 
 

@@ -54,7 +54,7 @@
   const reviewable = $derived(reviewOffered(sel.year, new Date()));
 
   const f = $derived(current?.flights);
-  const empty = $derived(!!current && current.flights.count === 0 && current.stays.nights === 0 && current.cars.days === 0 && current.cruises.count === 0);
+  const empty = $derived(!!current && current.flights.count === 0 && current.stays.nights === 0 && current.cars.days === 0 && current.cruises.count === 0 && current.parking.bookings === 0);
   const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
   type Tile = { label: string; value: string; note?: string[] };
   const flightTiles = $derived<Tile[]>(current && f && f.count ? [
@@ -73,6 +73,10 @@
     ] : []),
   ] : []);
   const carTiles = $derived<Tile[]>(current && current.cars.days ? [{ label: "Rental days", value: count(current.cars.days) }] : []);
+  const parkingTiles = $derived<Tile[]>(current && current.parking.bookings ? [
+    { label: "Parking days", value: count(current.parking.days) },
+    { label: "Parking bookings", value: count(current.parking.bookings) },
+  ] : []);
   const cruiseTiles = $derived<Tile[]>(current && current.cruises.count ? [
     { label: "Cruises taken", value: count(current.cruises.count) },
     { label: "Nights at sea", value: count(current.cruises.nights) },
@@ -101,6 +105,7 @@
     { title: "Hotel chains", rows: named(current.stays.chains, "stay") },
   ] : []);
   const carLists = $derived<{ title: string; rows: Row[] }[]>(current ? [{ title: "Rental companies", rows: named(current.cars.companies, "rental") }] : []);
+  const parkingLists = $derived<{ title: string; rows: Row[] }[]>(current ? [{ title: "Lots", rows: named(current.parking.lots, "stay") }] : []);
   const cruiseLists = $derived<{ title: string; rows: Row[] }[]>(current ? [{ title: "Cruise lines", rows: named(current.cruises.lines, "cruise") }] : []);
 
   const airportName = (code: string) => f?.airports.find((a) => a.code === code);
@@ -205,7 +210,7 @@
   <div class="rows" data-testid="stats-empty">
     <div class="row flex-col items-start gap-3 py-6">
       <p class="font-medium">{whoName === "Everyone" ? "Nothing finished" : `Nothing finished for ${whoName}`}{sel.year ? ` in ${sel.year}` : " yet"}.</p>
-      <p class="text-sm text-muted-foreground">Stats count flights, stays, rentals and cruises once they’re over.</p>
+      <p class="text-sm text-muted-foreground">Stats count flights, stays, rentals, cruises and parking once they’re over.</p>
       <div class="flex flex-wrap gap-2"><Button href="#trips">Add a trip</Button><Button variant="outline" href="#settings/travel">Import past flights</Button></div>
     </div>
   </div>
@@ -261,6 +266,14 @@
         <h2 id="cars-title" class="text-2xl font-bold tracking-tight">Cars</h2>
         {@render tileGrid(carTiles)}
         {#each carLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
+      </section>
+    {/if}
+
+    {#if parkingTiles.length}
+      <section aria-labelledby="parking-title" class="space-y-3">
+        <h2 id="parking-title" class="text-2xl font-bold tracking-tight">Parking</h2>
+        {@render tileGrid(parkingTiles)}
+        {#each parkingLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
       </section>
     {/if}
 

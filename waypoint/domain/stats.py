@@ -172,6 +172,12 @@ class CruiseStats(TypedDict):
     lines: list[Named]
 
 
+class ParkingStats(TypedDict):
+    days: int
+    bookings: int
+    lots: list[Named]
+
+
 class PlaceStats(TypedDict):
     countries: list[Place]
     cities: list[Place]
@@ -183,6 +189,7 @@ class Stats(TypedDict):
     stays: StayStats
     cars: CarStats
     cruises: CruiseStats
+    parking: ParkingStats
     places: PlaceStats
 
 
@@ -439,6 +446,21 @@ def _cars(cars: Sequence[Seg], year: int | None) -> CarStats:
     return {"days": len(days), "companies": _ranked(companies)}
 
 
+def _parking(spots: Sequence[Seg], year: int | None) -> ParkingStats:
+    days: set[date] = set()
+    lots: Counter[str] = Counter()
+    bookings = 0
+    for s in spots:
+        out = {d for d in _days(s) if _in(d, year)}
+        days |= out
+        if not out:
+            continue
+        bookings += 1
+        if (lot := " ".join((s.origin or "").split())):
+            lots[lot] += 1
+    return {"days": len(days), "bookings": bookings, "lots": _ranked(lots)}
+
+
 def _cruises(cruises: Sequence[Seg], year: int | None) -> CruiseStats:
     nights: set[date] = set()
     sea: set[date] = set()
@@ -527,6 +549,8 @@ def _years(live: Sequence[Seg]) -> list[int]:
             found.update(d.year for d in _days(s))
         elif s.kind == "cruise":
             found.update(d.year for d in _nights(s))
+        elif s.kind == "parking":
+            found.update(d.year for d in _days(s))
     return sorted(found, reverse=True)
 
 
@@ -539,10 +563,12 @@ def build(segments: Iterable[Seg], known: Mapping[str, Airport], airlines: Mappi
     stays = [s for s in live if s.kind == "hotel"]
     cars = [s for s in live if s.kind == "car"]
     cruises = [s for s in live if s.kind == "cruise"]
+    spots = [s for s in live if s.kind == "parking"]
     stays_in = [s for s in stays if year is None or any(_in(d, year) for d in _nights(s))]
     return {"years": _years(live), "flights": _flights(flights, known, airlines, trip_names),
             "stays": _stays(stays_in, year, city_countries, city_points, trip_names),
-            "cars": _cars(cars, year), "cruises": _cruises(cruises, year), "places": _places(flights, stays_in, known, city_countries)}
+            "cars": _cars(cars, year), "cruises": _cruises(cruises, year),
+            "parking": _parking(spots, year), "places": _places(flights, stays_in, known, city_countries)}
 
 
 def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: int | None, now: datetime) -> Stats | None:

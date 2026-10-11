@@ -24,7 +24,8 @@
 
   const flight = $derived(d.kind === "flight");
   const editing = $derived(d.id !== null);
-  const startBlank = $derived(flight ? "Work it out from the airport" : d.kind === "hotel" ? "Work it out from the address" : d.kind === "cruise" ? "Choose a time zone" : "Work it out from the airport or address");
+  const stay = $derived(d.kind === "hotel" || d.kind === "parking");
+  const startBlank = $derived(flight ? "Work it out from the airport" : stay ? "Work it out from the address" : d.kind === "cruise" ? "Choose a time zone" : "Work it out from the airport or address");
 
   async function save(e: SubmitEvent) {
     e.preventDefault();
@@ -55,7 +56,7 @@
         <select bind:value={d.status} class={selectClass}>
           <option value="confirmed">Confirmed</option><option value="changed">Changed</option><option value="cancelled">Cancelled</option>
         </select></label>
-      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel chain or booking site" : d.kind === "car" ? "Rental company" : d.kind === "train" ? "Railway" : d.kind === "cruise" ? "Cruise line" : "Airline"}</span>
+      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel chain or booking site" : d.kind === "car" ? "Rental company" : d.kind === "train" ? "Railway" : d.kind === "cruise" ? "Cruise line" : d.kind === "parking" ? "Parking operator" : "Airline"}</span>
         <Input bind:value={d.provider} maxlength={100} autocomplete="off" placeholder={d.kind === "flight" ? "American Airlines" : d.kind === "hotel" ? "Marriott" : ""} /></label>
       <label class={label}><span class="font-medium">Confirmation code</span>
         <Input bind:value={d.confirmation} maxlength={50} autocomplete="off" spellcheck={false} /></label>
@@ -67,23 +68,24 @@
             <Input bind:value={d.destination} maxlength={3} autocomplete="off" spellcheck={false} placeholder="LHR" /></label>
         </div>
       {:else}
-        <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel name" : d.kind === "car" ? "Pick-up place" : d.kind === "cruise" ? "Embark port" : "From"}</span>
+        <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel name" : d.kind === "parking" ? "Lot name" : d.kind === "car" ? "Pick-up place" : d.kind === "cruise" ? "Embark port" : "From"}</span>
           <Input bind:value={d.origin} maxlength={100} autocomplete="off" /></label>
-        {#if d.kind !== "hotel"}
+        {#if !stay}
           <label class={label}><span class="font-medium">{d.kind === "car" ? "Drop-off place" : d.kind === "cruise" ? "Disembark port" : "To"}</span>
             <Input bind:value={d.destination} maxlength={100} autocomplete="off" /></label>
         {/if}
       {/if}
-      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "car" ? "Pick-up" : d.kind === "cruise" ? "Embarks" : "Departs"}</span>
+      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "parking" ? "Entry" : d.kind === "car" ? "Pick-up" : d.kind === "cruise" ? "Embarks" : "Departs"}</span>
         <Input type="datetime-local" bind:value={d.start_local} autocomplete="off" />
         <span class="text-muted-foreground">The local time at the place.</span></label>
-      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off" : d.kind === "cruise" ? "Disembarks" : "Arrives"}</span>
+      <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "parking" ? "Exit" : d.kind === "car" ? "Drop-off" : d.kind === "cruise" ? "Disembarks" : "Arrives"}</span>
         <Input type="datetime-local" bind:value={d.end_local} autocomplete="off" />
         <span class="text-muted-foreground">The local time at the place it ends.</span></label>
       <label class={label}><span class="font-medium">{flight ? "Departure time zone (only if the airport isn’t known)" : "Time zone"}</span>
         <ZoneSelect bind:value={d.start_zone} blank={startBlank} />
-        {#if d.kind === "hotel"}<span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address.</span>{/if}</label>
-      {#if d.kind !== "hotel"}
+        {#if d.kind === "hotel"}<span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address.</span>{/if}
+        {#if d.kind === "parking"}<span class="text-muted-foreground">Entry and exit are both at the lot. Leave this empty to work it out from the address.</span>{/if}</label>
+      {#if !stay}
         <label class={label}><span class="font-medium">{flight ? "Arrival time zone (only if the airport isn’t known)" : "Time zone at the end (if different)"}</span>
           <ZoneSelect bind:value={d.end_zone} blank={flight ? "Work it out from the airport" : d.kind === "cruise" ? "Same as where it starts" : "Same as where it starts, or work it out from the airport"} /></label>
       {/if}

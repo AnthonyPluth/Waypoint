@@ -178,6 +178,11 @@ describe("wording", () => {
     expect(subline(segment({ kind: "train", provider: "Example Rail", details: { seat: "4B" } }), true)).toBe("Example Rail · Seat 4B");
     expect(headline(segment({ kind: "cruise", origin: null, provider: null, details: {} }))).toBe("Cruise");
     expect([START_WORD.cruise, END_WORD.cruise]).toEqual(["Embarks", "Disembarks"]);
+    const lot = segment({ kind: "parking", provider: "Example Parking", origin: "Example Long-Term Lot", details: { space_type: "Covered", address: "1 Terminal Road, Jamaica, NY" } });
+    expect(headline(lot)).toBe("Example Long-Term Lot");
+    expect(subline(lot)).toBe("Covered · 1 Terminal Road, Jamaica, NY");
+    expect(headline(segment({ kind: "parking", origin: null, provider: null }))).toBe("Parking");
+    expect([START_WORD.parking, END_WORD.parking]).toEqual(["Entry", "Exit"]);
   });
 });
 
@@ -305,8 +310,8 @@ describe("untimed", () => {
 
 describe("tripKinds", () => {
   it("lists what a trip holds once each, in a fixed order, and not what was cancelled", () => {
-    const t = trip([segment({ id: 1, kind: "hotel" }), segment({ id: 2, kind: "flight" }), segment({ id: 3, kind: "flight" }), segment({ id: 4, kind: "car", status: "cancelled" }), segment({ id: 5, kind: "cruise" })]);
-    expect(tripKinds(t)).toEqual(["flight", "hotel", "cruise"]);
+    const t = trip([segment({ id: 1, kind: "hotel" }), segment({ id: 2, kind: "flight" }), segment({ id: 3, kind: "flight" }), segment({ id: 4, kind: "car", status: "cancelled" }), segment({ id: 5, kind: "cruise" }), segment({ id: 6, kind: "parking" })]);
+    expect(tripKinds(t)).toEqual(["flight", "hotel", "cruise", "parking"]);
   });
   it("still shows what a trip was when everything on it is cancelled, and nothing for an empty trip", () => {
     expect(tripKinds(trip([segment({ kind: "train", status: "cancelled" })]))).toEqual(["train"]);
@@ -400,6 +405,8 @@ describe("the pass headline", () => {
     expect(passHeadline(segment({ kind: "car" }), dep - HOUR)).toBe("Pick-up in 1 h");
     expect(passHeadline(segment({ kind: "train" }), dep + HOUR)).toBe("Arrives in 6 h 10 min");
     expect(passHeadline(segment({ kind: "cruise" }), arr + HOUR)).toBe("Disembarked");
+    expect(passHeadline(segment({ kind: "parking" }), dep - HOUR)).toBe("Entry in 1 h");
+    expect(passHeadline(segment({ kind: "parking" }), arr + HOUR)).toBe("Exited");
   });
 });
 

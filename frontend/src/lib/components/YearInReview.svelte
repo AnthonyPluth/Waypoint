@@ -40,6 +40,8 @@
     ...(facts.nights ? [{ id: "nights", eyebrow: "Away from home", big: `${count(facts.nights)} ${facts.nights === 1 ? "night" : "nights"}`, lines: ["in hotels and rentals"] }] : []),
     ...(facts.cruises.count ? [{ id: "cruises", eyebrow: "At sea", big: `${count(facts.cruises.count)} ${facts.cruises.count === 1 ? "cruise" : "cruises"}`,
       lines: [`${count(facts.cruises.nights)} ${facts.cruises.nights === 1 ? "night" : "nights"} aboard`, `${count(facts.cruises.seaDays)} ${facts.cruises.seaDays === 1 ? "sea day" : "sea days"}`] }] : []),
+    ...(facts.parking.bookings ? [{ id: "parking", eyebrow: "Parked", big: `${count(facts.parking.days)} ${facts.parking.days === 1 ? "parking day" : "parking days"}`,
+      lines: [`${count(facts.parking.bookings)} ${facts.parking.bookings === 1 ? "parking booking" : "parking bookings"}`] }] : []),
     { id: "map", eyebrow: "Where you went", lines: [] },
     { id: "save", eyebrow: "Save as image", lines: [] },
   ]);
