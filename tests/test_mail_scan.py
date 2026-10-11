@@ -366,6 +366,14 @@ class TriageScanTests(ScanCase):
         self.assertEqual(self.google.fetched, [f"c{n}" for n in range(5)])
         self.assertEqual(self.row()["last_scan"] is not None, True)
 
+    def test_chained_scans_stop_after_the_chain_limit_and_the_next_cycle_goes_on(self):
+        for n in range(6):
+            self.add_mail(f"c{n}", plain_mail(UNLISTED[0], f"Your reservation is confirmed ({n})", "Reservation number HX4471."))
+        with mock.patch.object(scan, "BUDGET", -1), mock.patch.object(scan, "MAX_CHAIN", 2):
+            last = scan.run(self.mailbox, TODAY)
+        self.assertEqual((last.state, last.capped), ("done", True))
+        self.assertEqual(self.google.fetched, ["c0", "c1", "c2"])
+
     def test_the_summary_is_counts_only_and_is_what_the_mailbox_list_carries(self):
         self.add_mail("stay", eml("hotel_jsonld"))
         self.add_mail("l0", plain_mail(*LOOKALIKES[0]))
