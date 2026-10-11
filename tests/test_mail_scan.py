@@ -226,12 +226,13 @@ class ScanCase(DbCase):
 
 
 class SearchTests(ScanCase):
-    def test_the_search_is_for_booking_words_from_any_sender_without_promotions_spam_or_trash_since_18_months_ago(self):
+    def test_the_search_is_for_booking_words_from_any_sender_without_spam_or_trash_since_18_months_ago(self):
         self.assertEqual(self.scan().state, "done")
         [q] = self.google.queries
         self.assertTrue(q.startswith("(confirmation OR itinerary OR reservation OR "), q)
         self.assertNotIn("from:", q)
-        self.assertIn("-category:promotions -in:spam -in:trash", q)
+        self.assertIn("-in:spam -in:trash", q)
+        self.assertNotIn("promotions", q)
         self.assertTrue(q.endswith("after:2025/03/23"), q)
         self.assertLess(len(q), 1500)
 
@@ -253,7 +254,7 @@ class SearchTests(ScanCase):
     def test_the_search_is_one_group_of_words_so_gmail_cant_read_the_or_across_the_rest(self):
         q = query.build(date(2026, 1, 31), ["a.example"])
         words = "(" + query._any((*query.WORDS, *query.LODGING_WORDS, *query.JAPANESE_WORDS)) + ")"
-        self.assertTrue(q.startswith(f"{words} -category:promotions -in:spam -in:trash -from:a.example after:2026/01/31"), q)
+        self.assertTrue(q.startswith(f"{words} -in:spam -in:trash -from:a.example after:2026/01/31"), q)
 
     def test_a_banks_mail_has_to_be_about_travel_to_be_read(self):
         self.assertEqual(triage.decide(triage.Head("Your statement is ready", "chase.com", "reservation", frozenset())), "skip")
