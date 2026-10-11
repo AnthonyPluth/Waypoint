@@ -19,7 +19,7 @@ from ... import monitoring
 from ...providers import mailimages
 from ...storage.stored_mail import Content, Image
 from .. import seatmaps
-from . import flights, lodging, parsers, safe_html, seats, triage
+from . import cars, cruises, flights, lodging, parsers, safe_html, seats, trains, triage
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger
@@ -29,7 +29,7 @@ from .booking import Status
 RESERVATIONS: dict[str, Kind] = {"FlightReservation": "flight", "LodgingReservation": "hotel",
                                  "RentalCarReservation": "car", "TrainReservation": "train"}
 MAX_PART = 2_000_000
-GENERIC_READERS: tuple[Callable[[str, str], tuple[Parsed, str | None]], ...] = (lodging.read, flights.read)
+GENERIC_READERS: tuple[Callable[[str, str], tuple[Parsed, str | None]], ...] = (lodging.read, flights.read, cars.read, trains.read, cruises.read)
 MAX_NODES = 200
 IATA = re.compile(r"[A-Z]{3}")
 CLOCK = re.compile(r"(?<![\d:.])(\d{1,2}):(\d{2})(?::\d{2})?(?!\d)(?:\s*([AaPp])\.?[Mm]\.?)?")

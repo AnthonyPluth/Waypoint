@@ -460,7 +460,9 @@
       "method": "GET",
       "path": "/api/airports/{id}",
       "handler": "waypoint/server/api/trips.py:api_airport",
-      "web": [],
+      "web": [
+        "frontend/src/lib/airport-zones.ts"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_trips.py"
@@ -882,11 +884,27 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/mailboxes/{id}/review-glance",
+      "handler": "waypoint/server/api/mailboxes.py:api_mailbox_review_glance",
+      "web": [
+        "frontend/src/lib/components/settings/ReviewGlance.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mail_scan.py"
+      ],
+      "docs": [
+        "start/gmail"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/mailboxes/{id}/unignore",
       "handler": "waypoint/server/api/mailboxes.py:api_mailbox_unignore",
       "web": [
         "frontend/src/lib/components/settings/GmailSection.svelte",
+        "frontend/src/lib/components/settings/ReviewGlance.svelte",
         "frontend/src/pages/Review.svelte"
       ],
       "tests": [
@@ -1023,6 +1041,7 @@
       "path": "/api/review/{id}/ignore",
       "handler": "waypoint/server/api/review.py:api_review_ignore",
       "web": [
+        "frontend/src/lib/components/settings/ReviewGlance.svelte",
         "frontend/src/pages/Review.svelte"
       ],
       "tests": [
@@ -1146,6 +1165,74 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_protocol.py"
+      ],
+      "docs": [
+        "start/mcp"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/assistant/review",
+      "handler": "waypoint/server/api/assistant.py:api_assistant_review",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_review.py"
+      ],
+      "docs": [
+        "start/mcp"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/assistant/review/{id}",
+      "handler": "waypoint/server/api/assistant.py:api_assistant_review_item",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_review.py"
+      ],
+      "docs": [
+        "start/mcp"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/assistant/review/{id}/match",
+      "handler": "waypoint/server/api/assistant.py:api_assistant_review_match",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_review.py",
+        "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/mcp"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/assistant/review/{id}/create",
+      "handler": "waypoint/server/api/assistant.py:api_assistant_review_create",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_review.py",
+        "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/mcp"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/assistant/review/{id}/dismiss",
+      "handler": "waypoint/server/api/assistant.py:api_assistant_review_dismiss",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_review.py",
+        "tests/test_mcp_routes.py"
       ],
       "docs": [
         "start/mcp"

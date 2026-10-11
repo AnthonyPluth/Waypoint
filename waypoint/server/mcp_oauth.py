@@ -20,8 +20,8 @@ from ..storage.models import OAuthClient, OAuthCode, OAuthConsent, OAuthGrant, O
 SCOPES = ("read", "write")
 CONSENT = {
     "write": ("Change trips",
-              "Add, change and remove trips, bookings, travellers, people and guests, and the distance unit. "
-              "Never mailboxes, the “Couldn’t read” queue, AI settings, backups, loyalty numbers, sign-in or these assistant settings. It's told "
+              "Add, change and remove trips, bookings, travellers, people and guests, settle or dismiss Review items, and the distance unit. "
+              "Never mailboxes, AI settings, backups, loyalty numbers, sign-in or these assistant settings. It's told "
               "to ask you before every change.",
               "Turn on Let assistants change trips in Settings first. Until then this connection can't make changes."),
 }

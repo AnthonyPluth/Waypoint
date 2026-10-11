@@ -5,8 +5,8 @@
   import X from "@lucide/svelte/icons/x";
   import type { Snippet } from "svelte";
 
-  let { open = $bindable(false), title, description, children }: {
-    open?: boolean; title: string; description?: string; children: Snippet;
+  let { open = $bindable(false), title, description, wide = false, onOpenAutoFocus, children }: {
+    open?: boolean; title: string; description?: string; wide?: boolean; onOpenAutoFocus?: (event: Event) => void; children: Snippet;
   } = $props();
 
   const CLOSE_DISTANCE = 96;
@@ -33,7 +33,7 @@
 <Dialog.Root bind:open>
   <Dialog.Portal>
     <Dialog.Overlay data-slot="sheet-overlay" class="sheet-overlay" />
-    <Dialog.Content data-slot="sheet" data-side={side} class="sheet" style={drag ? `--sheet-drag: ${drag}px` : undefined} data-dragging={drag ? "" : undefined}>
+    <Dialog.Content data-slot="sheet" data-side={side} data-wide={wide ? "" : undefined} {onOpenAutoFocus} class="sheet" style={drag ? `--sheet-drag: ${drag}px` : undefined} data-dragging={drag ? "" : undefined}>
       {#if side === "bottom"}
         <div class="sheet-handle" data-sheet-handle onpointerdown={grab} onpointermove={pull} onpointerup={release} onpointercancel={release} role="presentation">
           <span class="sheet-grip" aria-hidden="true"></span>
@@ -41,7 +41,7 @@
       {/if}
       <div class="flex items-start justify-between gap-3 px-5 pb-2 pt-3 md:px-6 md:pt-5">
         <div class="min-w-0">
-          <Dialog.Title class="text-heading font-semibold break-words">{title}</Dialog.Title>
+          <Dialog.Title tabindex={-1} class="text-heading font-semibold break-words outline-none">{title}</Dialog.Title>
           {#if description}<Dialog.Description class="text-caption text-muted-foreground">{description}</Dialog.Description>{/if}
         </div>
         <Dialog.Close>

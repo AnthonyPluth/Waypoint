@@ -36,9 +36,9 @@ def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
         if not review.drop(conn, owner(), row_id(item_id, NO_ITEM), row_id(held, "No such booking", 400)):
             raise ApiError(NO_ITEM, 404)
         return {"ok": True}
-    added = (_q.get("segment") or [""])[0]
-    booking = (viewer(conn), row_id(added, "No such segment", 400)) if added else None
-    if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), booking):
+    added = [a for a in _q.get("segment") or [] if a]
+    bookings = (viewer(conn), [row_id(a, "No such segment", 400) for a in added]) if added else None
+    if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), bookings):
         raise ApiError(NO_ITEM, 404)
     return {"ok": True}
 
@@ -53,7 +53,7 @@ def api_review_match(conn, _q, body: MatchBody, item_id: str) -> Ok:
         settled = review.settle(conn, owner(), viewer(conn), row_id(item_id, NO_ITEM), entry, chosen)
     except trips.Invalid as e:
         raise ApiError(str(e)) from e
-    if not settled:
+    if settled is None:
         raise ApiError(NO_ITEM, 404)
     return {"ok": True}
 
