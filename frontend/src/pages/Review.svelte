@@ -31,6 +31,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Sheet } from "$lib/components/ui/sheet";
   import { viewport } from "$lib/phone.svelte";
+  import { DETAILS, type Kind } from "$lib/segment-form";
   import { apiCall } from "$lib/contract";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import { toast } from "svelte-sonner";
@@ -59,7 +60,10 @@
   const sender = (i: ReviewItem) => i.sender_domain || "Unknown sender";
   const subject = (i: ReviewItem) => i.subject || `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
 
-  type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; address: string; sources: Record<string, string> };
+  const SHOWN: Record<string, string[]> = { hotel: ["address", "phone"], car: ["address", "phone"], train: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
+  const detailLabel = (kind: string, key: string) => DETAILS[kind as Kind].find(([k]) => k === key)?.[1] ?? key;
+  type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string> };
+  const detailsOf = (s: NonNullable<ReviewItem["suggestion"]>): Record<string, string> => ({ address: s.address ?? "", phone: s.phone ?? "", room: s.room ?? "", ship: s.ship ?? "", deck: s.deck ?? "" });
   let draft = $state<Draft | null>(null);
   let formError = $state("");
   let saving = $state(false);
@@ -69,8 +73,9 @@
     const s = use ? item.suggestion : null;
     draft = s
       ? { item, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
-          destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", address: s.address ?? "", sources: s.sources ?? {} }
-      : { item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", address: "", sources: {} };
+          destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", details: detailsOf(s),
+          read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), sources: s.sources ?? {} }
+      : { item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {} };
     formError = "";
     void peek(item);
   };
@@ -120,9 +125,10 @@
     const d = draft;
     if (!d) return;
     const flight = d.kind === "flight";
-    if (d.kind === "hotel" && !d.startZone.trim() && !d.address.trim()) { formError = "Enter the hotel’s time zone (for example America/New_York), or its address to work it out from"; return; }
+    const details = Object.fromEntries((SHOWN[d.kind] ?? []).map((key) => [key, (d.details[key] ?? "").trim()] as const).filter(([, v]) => v));
+    if (d.kind === "hotel" && !d.startZone.trim() && !details["address"]) { formError = "Enter the hotel’s time zone (for example America/New_York), or its address to work it out from"; return; }
     const body = { kind: d.kind as "flight" | "hotel" | "car" | "train" | "cruise", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
-      destination: d.destination, ...(flight ? {} : d.kind === "hotel" ? { start_zone: d.startZone.trim() || null, ...(d.address.trim() && { details: { address: d.address.trim() } }) } : d.kind === "cruise" ? { start_zone: d.startZone, end_zone: d.endZone || d.startZone } : { ...(d.startZone && { start_zone: d.startZone }), ...(d.endZone && { end_zone: d.endZone }) }) };
+      destination: d.destination, ...(Object.keys(details).length && { details }), ...(flight ? {} : d.kind === "hotel" ? { start_zone: d.startZone.trim() || null } : d.kind === "cruise" ? { start_zone: d.startZone, end_zone: d.endZone || d.startZone } : { ...(d.startZone && { start_zone: d.startZone }), ...(d.endZone && { end_zone: d.endZone }) }) };
     let added = false;
     const ok = await act(async () => {
       const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
@@ -181,6 +187,13 @@
 
 <h1 class="mb-6 text-display">Review</h1>
 
+{#snippet detailField(d: Draft, key: string, hint?: string)}
+  {@const outlined = !!d.sources[key] || d.read.includes(key)}
+  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{detailLabel(d.kind, key)} {#if d.sources[key]}<span class="font-normal text-muted-foreground">from “{d.sources[key]}”</span>{/if}</span>
+    <Input class={outlined ? "ring-2 ring-primary" : ""} value={d.details[key] ?? ""} oninput={(e) => (d.details[key] = e.currentTarget.value)} maxlength={key === "address" ? 300 : 200} autocomplete="off" />
+    {#if hint}<span class="text-muted-foreground">{hint}</span>{/if}</label>
+{/snippet}
+
 {#snippet addForm(item: ReviewItem, d: Draft, titled: boolean)}
   {@const labels = placeLabels(d.kind)}
   <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-labelledby={titled ? `add-${item.id}` : undefined} aria-label={titled ? undefined : "Add this booking by hand"}>
@@ -205,17 +218,17 @@
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off time" : "Arrives"} {#if d.sources["end_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["end_local"]}”</span>{/if}</span>
       <Input type="datetime-local" class={d.sources["end_local"] ? "ring-2 ring-primary" : ""} bind:value={d.end} required /></label>
     {#if d.kind === "hotel"}
-      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Address {#if d.sources["address"]}<span class="font-normal text-muted-foreground">from “{d.sources["address"]}”</span>{/if}</span>
-        <Input class={d.sources["address"] ? "ring-2 ring-primary" : ""} bind:value={d.address} maxlength={300} autocomplete="off" />
-        <span class="text-muted-foreground">Waypoint works the time zone out from it when you leave the time zone empty.</span></label>
+      {@render detailField(d, "address", "Waypoint works the time zone out from it when you leave the time zone empty.")}
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>
         <ZoneSelect bind:value={d.startZone} blank="Work it out from the address" />
         <span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address above.</span></label>
+      {@render detailField(d, "phone")}
     {:else if d.kind !== "flight"}
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it starts</span>
         <ZoneSelect bind:value={d.startZone} blank={d.kind === "cruise" ? "Choose a time zone" : "Work it out from the airport"} required={d.kind === "cruise"} /></label>
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it ends</span>
         <ZoneSelect bind:value={d.endZone} blank="Same as where it starts" /></label>
+      {#each SHOWN[d.kind] ?? [] as key (key)}{@render detailField(d, key)}{/each}
     {:else}
       <p class="text-sm text-muted-foreground">A flight’s time zones come from its airports.</p>
     {/if}
