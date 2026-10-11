@@ -198,7 +198,6 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
             made += 1
     if proposed:
         if review.asked(conn, mailbox_id, message.sender_domain):
-            _record(conn, mailbox_id, message_id, SKIPPED, now)
             return made, 0, list(dict.fromkeys(touched)) if touched else None, None
         review.add_generic(conn, mailbox_id, message_id, message.sender_domain, message.received, ingest.suggestion(conn, proposed[0]), now)
         return made, 1, [], UNREADABLE
@@ -343,6 +342,9 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 forced = set(labelled)
                 found = found + [m for m in labelled if m not in set(found)]
             with db.session() as conn:
+                if forced:
+                    conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.outcome == SKIPPED,
+                                                              ScannedMessage.message_id.in_(forced)))
                 seen = set(conn.execute(select(ScannedMessage.message_id).where(
                     ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id.in_(found))).scalars()) if found else set()
         pending = [m for m in found if m not in seen]

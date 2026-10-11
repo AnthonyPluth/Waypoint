@@ -449,6 +449,18 @@ class LabelScanTests(ScanCase):
         self.scan()
         self.assertEqual((self.google.fetched, self.google.label_queries), ([], ["Label_1"]))
 
+    def test_a_message_skipped_before_its_label_was_picked_is_read_once_it_is(self):
+        raw = plain_mail("Pat <pat@family.example>", "Lunch on Sunday?", "See you there.")
+        self.in_label("Label_1", "old", raw)
+        self.google.matches.append("old")
+        self.google.added.append("old")
+        self.scan()
+        self.assertEqual(self.scanned()["old"], "skipped")
+        self.pick("Label_1")
+        self.scan(now=NOW + 60)
+        self.assertEqual(self.scanned()["old"], "unreadable")
+        self.assertIn("old", self.google.fetched)
+
     def test_a_label_deleted_in_gmail_drops_out_with_a_note_and_the_scan_goes_on(self):
         self.pick("Label_1", "Label_Gone")
         self.in_label("Label_1", "j1", eml("hotel_jsonld"))
@@ -568,7 +580,7 @@ class GenericReaderScanTests(ScanCase):
         self.add_mail("second", self.second())
         self.scan()
         self.assertEqual(len(self.items()), 1)
-        self.assertEqual(self.scanned()["second"], "skipped")
+        self.assertNotIn("second", self.scanned())
 
     def test_confirming_trusts_the_sender_and_later_mail_is_filed_directly(self):
         self.put("lodging_en")

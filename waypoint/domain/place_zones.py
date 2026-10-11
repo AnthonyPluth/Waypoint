@@ -152,7 +152,7 @@ def _city_zone(conn: db.Connection, tokens: list[str], country: str | None) -> s
     return None
 
 
-JAPAN = re.compile(r"日本|東京都|北海道|[府県]")
+JAPAN = re.compile(r"日本|東京都|北海道|[\u4e00-\u9fff]{1,4}[府県]")
 
 
 def zone_for_address(conn: db.Connection, address: str | None) -> str | None:
