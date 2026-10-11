@@ -24,6 +24,7 @@ class ItemOut(TypedDict):
     mine: bool
     sender_domain: str
     known_sender: bool
+    holds_bookings: bool
     subject: str | None
     has_email: bool
     received: str | None
@@ -65,13 +66,13 @@ def _seen_by(owner: str) -> Any:
 def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
     rows = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.sender_domain,
                                ReviewItem.received, ReviewItem.reason, Mailbox.address, Mailbox.owner_sub, Person.display_name,
-                               ReviewItem.suggestion, ReviewItem.suggestion_error)
+                               ReviewItem.suggestion, ReviewItem.suggestion_error, ReviewItem.matches)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .outerjoin(Person, Person.user_sub == Mailbox.owner_sub).where(_seen_by(owner), ReviewItem.reason != "match")
                         .order_by(ReviewItem.received.is_(None), ReviewItem.received.desc(), ReviewItem.id.desc())).fetchall()
     subjects = stored_mail.subjects(conn, (r["mailbox_id"] for r in rows))
     return [{"id": r["id"], "address": r["address"], "owner": r["display_name"] or r["address"], "mine": r["owner_sub"] == owner,
-             "sender_domain": r["sender_domain"], "known_sender": triage.sender_in(r["sender_domain"], query.SENDERS), "subject": subjects.get((r["mailbox_id"], r["message_id"])),
+             "sender_domain": r["sender_domain"], "known_sender": triage.sender_in(r["sender_domain"], query.SENDERS), "holds_bookings": r["matches"] is not None, "subject": subjects.get((r["mailbox_id"], r["message_id"])),
              "has_email": (r["mailbox_id"], r["message_id"]) in subjects,
              "received": r["received"], "reason": r["reason"],
              "gmail_url": gmail.open_url(r["address"], r["message_id"]) if r["owner_sub"] == owner else None,
@@ -150,7 +151,8 @@ def ignore_sender(conn: db.Connection, owner: str, item_id: int) -> int | None:
     conn.execute(update(ScannedMessage).where(ScannedMessage.mailbox_id == row["mailbox_id"], ScannedMessage.message_id.in_(waiting))
                  .values(outcome=IGNORED, sender_domain=row["sender_domain"]))
     left = int(conn.execute(delete(ReviewItem).where(ReviewItem.mailbox_id == row["mailbox_id"],
-                                                     ReviewItem.sender_domain == row["sender_domain"])).rowcount)
+                                                     ReviewItem.sender_domain == row["sender_domain"],
+                                                     ReviewItem.matches.is_(None))).rowcount)
     stored_mail.prune(conn)
     return left
 

@@ -572,6 +572,7 @@ export interface ReviewItem {
   mine: boolean;
   sender_domain: string;
   known_sender: boolean;
+  holds_bookings: boolean;
   subject: string | null;
   has_email: boolean;
   received: string | null;
@@ -605,6 +606,7 @@ export interface ScanSummary {
   labels_dropped: number;
   triaged: number;
   total: number;
+  not_travel: number;
 }
 
 export interface Segment {
