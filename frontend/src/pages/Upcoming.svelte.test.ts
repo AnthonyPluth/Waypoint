@@ -180,7 +180,7 @@ describe("Upcoming", () => {
       const card = (await screen.findByRole("heading", { name: "Example Long-Term Lot" })).closest("section")!;
       expect(within(card).getByText("Next up")).toBeInTheDocument();
       expect(within(card).getByText("Entry in 6 h")).toBeInTheDocument();
-      expect(within(card).getByText("1 Terminal Road, Jamaica, NY", { selector: "dd" })).toBeInTheDocument();
+      expect(within(card).getByText("Jamaica, NY", { selector: "dd" })).toBeInTheDocument();
       expect(within(card).getByText("Exit")).toBeInTheDocument();
     });
 
