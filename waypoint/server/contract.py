@@ -92,6 +92,39 @@ class IgnoredSenders(TypedDict):
     domains: list[str]
 
 
+class GlanceReason(TypedDict):
+    reason: Literal["no_markup", "incomplete", "broken", "match", "generic"]
+    waiting: int
+    recent: int
+
+
+class GlanceGap(TypedDict):
+    label: str
+    count: int
+
+
+class GlanceDomain(TypedDict):
+    domain: str
+    count: int
+    reason: Literal["no_markup", "incomplete", "broken", "match", "generic"]
+    item_id: int | None
+    known_sender: bool
+
+
+class GlanceScan(TypedDict):
+    at: str
+    added: int
+
+
+class ReviewGlance(TypedDict):
+    waiting: int
+    days: int
+    reasons: list[GlanceReason]
+    gaps: list[GlanceGap]
+    domains: list[GlanceDomain]
+    scans: list[GlanceScan]
+
+
 class UnignoreBody(TypedDict):
     domain: str
 

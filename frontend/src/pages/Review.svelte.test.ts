@@ -9,6 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 import { api } from "$lib/api";
 import { forgetAirportZones } from "$lib/airport-zones";
 import type { Person, Review, ReviewItem, ReviewMatch, WhoIsThis } from "$lib/api-types";
+import { setQuery } from "$lib/app.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { toast } from "svelte-sonner";
 import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
@@ -63,6 +64,7 @@ function serve(failOn?: string) {
   });
 }
 
+afterEach(() => { setQuery(""); });
 beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
@@ -150,6 +152,29 @@ describe("Review", () => {
     options.action.onClick();
     await waitFor(() => expect(calls).toContainEqual(["/api/mailboxes/5/unignore", "POST", { domain: "example-air.example" }]));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Reading again what was skipped from example-air.example"));
+  });
+
+  it("shows only the mail from the sender in the link from Settings, in that mailbox, and everything again on request", async () => {
+    held = { ...held, items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "seaside-stays.example" }),
+      item({ id: 3, sender_domain: "seaside-stays.example", address: "ben@gmail.example", mine: false })] };
+    setQuery("sender=seaside-stays.example&mailbox=ana%40gmail.example");
+    render(ReviewPage);
+    expect(await screen.findAllByTestId("review-item")).toHaveLength(1);
+    expect(screen.getByTestId("review-filter")).toHaveTextContent("Showing only mail from seaside-stays.example in ana@gmail.example.");
+    await userEvent.click(screen.getByRole("button", { name: "Show everything" }));
+    expect(await screen.findAllByTestId("review-item")).toHaveLength(3);
+    expect(screen.queryByTestId("review-filter")).toBeNull();
+  });
+
+  it("filters by sender alone when no mailbox is named, and says when none is waiting", async () => {
+    held = { ...held, items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "seaside-stays.example" })] };
+    setQuery("sender=seaside-stays.example");
+    render(ReviewPage);
+    expect(await screen.findAllByTestId("review-item")).toHaveLength(1);
+    expect(screen.getByTestId("review-filter")).toHaveTextContent("Showing only mail from seaside-stays.example. Show everything");
+    setQuery("sender=gone.example");
+    await waitFor(() => expect(screen.queryAllByTestId("review-item")).toHaveLength(0));
+    expect(screen.getByTestId("review-filter")).toHaveTextContent("Showing only mail from gone.example, and none is waiting.");
   });
 
   it("says in the ignore dialog where to undo it", async () => {

@@ -21,7 +21,7 @@
   import { SvelteSet } from "svelte/reactivity";
   import { act, errMsg, ignoreFailure } from "$lib/act";
   import type { Person, Review, ReviewMatch, SegmentBody, WhoIsThis } from "$lib/api-types";
-  import { refreshState } from "$lib/app.svelte";
+  import { refreshState, route, setQuery } from "$lib/app.svelte";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button, buttonVariants } from "$lib/components/ui/button";
@@ -56,6 +56,13 @@
 
   const KINDS: [string, string][] = [["flight", "Flight"], ["hotel", "Hotel stay"], ["car", "Car rental"], ["train", "Train"], ["parking", "Parking"]];
   const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
+
+  const only = $derived.by(() => {
+    const q = new URLSearchParams(route.query);
+    const from = q.get("sender");
+    return from ? { sender: from, mailbox: q.get("mailbox") } : null;
+  });
+  const shown = $derived(review ? (only ? review.items.filter((i) => i.sender_domain === only.sender && (!only.mailbox || i.address === only.mailbox)) : review.items) : []);
 
   const sender = (i: ReviewItem) => i.sender_domain || "Unknown sender";
   const subject = (i: ReviewItem) => i.subject || `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
@@ -334,11 +341,14 @@
       <section aria-labelledby="unread-title" class="space-y-2">
         <h2 id="unread-title" class="eyebrow px-1">Couldn’t read</h2>
         <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Mail and AI → Gmail), and then you can add those by hand or dismiss them. Open one in Gmail, or choose Add by hand to read it beside the form. Waypoint keeps each message here, encrypted, so you can read it without Gmail: until the item is dismissed or added, and for as long as a booking you add from it exists.</p>
+        {#if only}
+          <p class="px-1 text-sm" data-testid="review-filter">Showing only mail from {only.sender}{only.mailbox ? ` in ${only.mailbox}` : ""}{shown.length ? "" : ", and none is waiting"}. <button type="button" class="underline underline-offset-2" onclick={() => setQuery("")}>Show everything</button></p>
+        {/if}
         {#if unasked.length > 1}
           <div class="px-1"><Button variant="outline" size="sm" disabled={asking_all} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : `Ask AI about all ${unasked.length}`}</Button></div>
         {/if}
         <ul class="rows" aria-label="Couldn’t read">
-          {#each review.items as item (item.id)}
+          {#each shown as item (item.id)}
             <li class="row items-start" data-testid="review-item">
               <div class="min-w-0 basis-full">
                 <p class="break-words font-medium">{subject(item)}</p>
