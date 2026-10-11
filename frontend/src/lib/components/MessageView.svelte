@@ -8,7 +8,6 @@
 
   type Props = { subject?: string | null; text: string; html?: string | null; truncated?: boolean; original?: boolean; images?: number; imagesAt?: string | null; width?: number | null };
   let { subject = null, text, html = null, truncated = false, original = true, images = 0, imagesAt = null, width = null }: Props = $props();
-  let plain = $state(false);
   let pictures = $state<Record<number, string>>({});
   let fetching = $state(false);
   let larger = $state(false);
@@ -47,18 +46,14 @@
 
 <div class="space-y-2">
   {#if subject}<p class="break-words font-medium" data-testid="message-subject">{subject}</p>{/if}
-  {#snippet toggle()}
-    <Button variant="outline" size="sm" onclick={() => (plain = !plain)}>{plain ? "Show as formatted" : "Show as plain text"}</Button>
-  {/snippet}
   {#snippet enlarge()}
-    {@render toggle()}
     <Dialog.Trigger>
       {#snippet child({ props })}
         <Button {...props} variant="outline" size="sm"><Maximize2 />Larger view</Button>
       {/snippet}
     </Dialog.Trigger>
   {/snippet}
-  {#if html && !plain && original}
+  {#if html && original}
     <Dialog.Root bind:open={larger}>
       <EmailFrame {title} {page} {width} busy={fetching} leading={enlarge} />
       <Dialog.Portal>
@@ -77,13 +72,11 @@
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
-  {:else if html && !plain}
+  {:else if html}
     <iframe {title} sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc={page} aria-busy={fetching}
       class="h-[30rem] w-full rounded-lg border-0 bg-muted" data-testid="preview-html"></iframe>
-    {@render toggle()}
   {:else}
     <pre class="max-h-96 overflow-auto rounded-lg bg-muted p-3 font-sans text-sm leading-relaxed break-words whitespace-pre-wrap">{text || "(This message has no text.)"}</pre>
-    {#if html}{@render toggle()}{/if}
   {/if}
   {#if !original}<p class="text-sm text-muted-foreground" data-testid="message-old">This email was kept before Waypoint could show the original, so its layout and pictures can’t be shown.</p>{/if}
   {#if truncated}<p class="text-sm text-muted-foreground">This email was cut short.</p>{/if}
