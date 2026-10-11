@@ -113,8 +113,8 @@ def clean_url(text: str) -> str | None:
 
 
 LABELLED = re.compile(
-    r"(?i)(?<![a-z])(frequent[- ]?flyer|loyalty|member(?:ship)?|rewards?|skymiles|aadvantage|mileageplus|known[- ]traveler|ktn|passid|"
-    r"pre-?check|global entry|card(?: number)?|account(?: number)?)(?![a-z])([^\n\d]{0,40}?)\b((?-i:[A-Z0-9][A-Z0-9 -]{2,30}\d))\b")
+    r"(?i)(frequent[- ]?flyer|loyalty|member(?:ship)?|rewards?|skymiles|aadvantage|mileageplus|known[- ]traveler|ktn|passid|"
+    r"pre-?check|global entry|card(?: number)?|account(?: number)?)(?:s|no|num|number|id|ids)?(?![a-z])([^\n\d]{0,40}?)\b((?-i:[A-Z0-9][A-Z0-9 -]{2,30}\d))\b")
 CARD = re.compile(r"\b\d{4}[ -]\d{4}[ -]\d{4}[ -]\d{1,4}\b|\b\d{4}[ -]\d{6}[ -]\d{4,5}\b")
 LONG = re.compile(r"\b\d{9,}\b")
 PREFIXED = re.compile(r"\b[A-Z]{1,4}-?\d{7,}\b")

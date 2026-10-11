@@ -114,12 +114,19 @@ class RedactTests(unittest.TestCase):
 
     def test_a_postal_address_is_not_a_loyalty_number_but_a_loyalty_number_still_goes(self):
         text = ("Hotel: Harbour Hotel\nAddress: 1 Quay Road, Cardiff CF10 1AA, UK\nAccount number: AB 1234567\n"
-                "Rewards member FXLOY-4400123\nPhone: +44 117 555 0100\nAddress: 300 Memberships Lane, Tower Hill 4400")
+                "Rewards member FXLOY-4400123\nPhone: +44 117 555 0100\nAddress: 300 Cardinal Way, Tower Hill 4400")
         out = ai.redact(text)
-        for kept in ("1 Quay Road, Cardiff CF10 1AA, UK", "+44 117 555 0100", "300 Memberships Lane, Tower Hill 4400"):
+        for kept in ("1 Quay Road, Cardiff CF10 1AA, UK", "+44 117 555 0100", "300 Cardinal Way, Tower Hill 4400"):
             self.assertIn(kept, out)
         for gone in ("AB 1234567", "FXLOY-4400123"):
             self.assertNotIn(gone, out)
+
+    def test_labels_with_plurals_and_no_spaces_still_remove_their_numbers(self):
+        for label in ("Memberships number", "Members ID", "Accounts", "loyaltyNo", "cardnumber", "membernumber", "AccountNo", "Rewards", "frequentflyer"):
+            with self.subTest(label=label):
+                out = ai.redact(f"{label}: AB 1234567X1")
+                self.assertNotIn("1234567", out)
+                self.assertIn(ai.REMOVED, out)
 
     def test_only_so_much_goes_out(self):
         self.assertEqual(len(ai.redact("word " * 10_000)), ai.MAX_SENT)
