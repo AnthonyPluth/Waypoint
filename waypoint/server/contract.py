@@ -50,6 +50,7 @@ class ScanSummary(TypedDict):
     labels_dropped: int
     triaged: int
     total: int
+    not_travel: int
 
 
 class Mailbox(TypedDict):

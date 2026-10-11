@@ -84,7 +84,7 @@ describe("Review", () => {
     expect(await screen.findByText("Mail from an unknown sender")).toBeInTheDocument();
     expect(screen.getByText("to ana@gmail.example")).toBeInTheDocument();
     expect(screen.getByText(REASONS.broken)).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /Ignore/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /ignore/i })).toHaveLength(1);
   });
 
   it("shows an item shared by another member with whose mailbox it is, and only Add by hand and Dismiss", async () => {
@@ -120,13 +120,30 @@ describe("Review", () => {
   });
 
   it("ignores a sender only after asking", async () => {
+    held = { ...held, items: [item(), item({ id: 2 }), item({ id: 3, sender_domain: "other-air.example" }), item({ id: 4, address: "bo@gmail.example" })] };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Ignore example-air.example" }));
+    await userEvent.click((await screen.findAllByRole("button", { name: "Not travel: ignore example-air.example" }))[0]!);
     expect(await screen.findByText("Ignore example-air.example?")).toBeInTheDocument();
+    expect(await screen.findByText(/2 items from them \(this one included\) leave this list/)).toBeInTheDocument();
     expect(calls.some(([p]) => p.endsWith("/ignore"))).toBe(false);
     await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1/ignore", "POST", undefined]));
     expect(toast.success).toHaveBeenCalledWith("Ignoring example-air.example");
+  });
+
+  it("says one item when it is the only one from that sender", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore example-air.example" }));
+    expect(await screen.findByText(/and this item leaves this list/)).toBeInTheDocument();
+  });
+
+  it("does nothing when the question is cancelled", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore example-air.example" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(calls.some(([p]) => p.endsWith("/ignore"))).toBe(false);
+    expect(screen.getByTestId("review-item")).toBeInTheDocument();
   });
 
   it("adds a booking by hand with the provider filled in, then takes the item off the list", async () => {

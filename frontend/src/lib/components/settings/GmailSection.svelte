@@ -121,7 +121,7 @@
 
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const summary = (c: NonNullable<Mailbox["scan_summary"]>) =>
-    `${plural(c.found, "new message", "new messages")} found, ${c.read} read, ${plural(c.bookings, "booking", "bookings")} added or changed, ${c.review} couldn’t be read, ${c.skipped} skipped.${c.capped ? ` Looked at ${c.triaged} of ${c.total} messages so far; the scan carries on by itself.` : ""}${c.labels_dropped ? ` ${plural(c.labels_dropped, "label you picked was", "labels you picked were")} deleted in Gmail and ${c.labels_dropped === 1 ? "was" : "were"} dropped.` : ""}`;
+    `${plural(c.found, "new message", "new messages")} found, ${c.read} read, ${plural(c.bookings, "booking", "bookings")} added or changed, ${c.review} couldn’t be read, ${c.skipped} skipped${c.not_travel ? ` (${c.not_travel} as not travel)` : ""}.${c.capped ? ` Looked at ${c.triaged} of ${c.total} messages so far; the scan carries on by itself.` : ""}${c.labels_dropped ? ` ${plural(c.labels_dropped, "label you picked was", "labels you picked were")} deleted in Gmail and ${c.labels_dropped === 1 ? "was" : "were"} dropped.` : ""}`;
   const scanned = (m: Mailbox) => (m.last_scan ? new Date(m.last_scan).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : null);
 
   const label = (m: Mailbox) => (m.status === "connected" ? "Connected" : m.status === "reconnect" ? "Reconnect" : "Couldn’t reach Google");

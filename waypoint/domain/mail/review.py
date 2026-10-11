@@ -133,7 +133,8 @@ def ignore_sender(conn: db.Connection, owner: str, item_id: int) -> int | None:
     db.insert_ignore(conn, IgnoredSender, {"mailbox_id": row["mailbox_id"], "domain": row["sender_domain"]},
                      key=["mailbox_id", "domain"])
     left = int(conn.execute(delete(ReviewItem).where(ReviewItem.mailbox_id == row["mailbox_id"],
-                                                     ReviewItem.sender_domain == row["sender_domain"])).rowcount)
+                                                     ReviewItem.sender_domain == row["sender_domain"],
+                                                     ReviewItem.matches.is_(None))).rowcount)
     stored_mail.prune(conn)
     return left
 

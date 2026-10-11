@@ -449,6 +449,7 @@ export interface ScanSummary {
   labels_dropped: number;
   triaged: number;
   total: number;
+  not_travel: number;
 }
 
 export interface Segment {

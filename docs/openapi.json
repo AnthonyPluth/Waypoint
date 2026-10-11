@@ -4332,6 +4332,9 @@
           },
           "total": {
             "type": "integer"
+          },
+          "not_travel": {
+            "type": "integer"
           }
         },
         "required": [
@@ -4343,7 +4346,8 @@
           "capped",
           "labels_dropped",
           "triaged",
-          "total"
+          "total",
+          "not_travel"
         ],
         "additionalProperties": false
       },

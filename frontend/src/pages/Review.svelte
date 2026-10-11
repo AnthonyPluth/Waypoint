@@ -143,6 +143,7 @@
 
   let ignoring = $state<ReviewItem | null>(null);
   let asking = $state(false);
+  const goingCount = $derived(ignoring && review ? review.items.filter((i) => i.address === ignoring?.address && i.sender_domain === ignoring?.sender_domain).length : 0);
   const ignore = (i: ReviewItem) => act(async () => {
     await apiCall<"POST /api/review/{id}/ignore">(`/api/review/${i.id}/ignore`, { method: "POST" });
     toast.success(`Ignoring ${i.sender_domain}`);
@@ -272,7 +273,7 @@
                 {#if review.ai && item.mine && item.reason !== "generic"}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestion ? "Ask again" : "Ask AI"}</Button>{/if}
                 {#if item.suggestion}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>Check suggestion</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
-                {#if item.sender_domain && item.mine}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Ignore ${item.sender_domain}`}>Ignore this sender</Button>{/if}
+                {#if item.sender_domain && item.mine}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Not travel: ignore ${item.sender_domain}`}>Not travel: ignore this sender</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={`Dismiss “${subject(item)}”`}>Dismiss</Button>
               </div>
             </li>
@@ -355,7 +356,7 @@
 {/if}
 
 <ConfirmDialog bind:open={asking} title={`Ignore ${ignoring?.sender_domain ?? "this sender"}?`} confirmLabel="Ignore" busyLabel="Ignoring…" destructive
-  description="Waypoint stops looking at mail from this sender in that mailbox, and their other items leave this list. Other mailboxes aren’t affected."
+  description={`Not travel: Waypoint stops looking at mail from this sender in that mailbox, and ${goingCount === 1 ? "this item leaves" : `${goingCount} items from them (this one included) leave`} this list. Bookings already made from their emails stay. Other mailboxes aren’t affected.`}
   onconfirm={async () => { const i = ignoring; return i ? await ignore(i) : true; }} />
 
 <Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v && !saving) closeForm(); }} title={draft?.suggested ? "Check this suggestion" : "Add this booking by hand"}>
