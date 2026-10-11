@@ -185,13 +185,23 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     made, failed = 0, 0
     touched: list[int] = []
     held: list[ingest.Held] = []
+    proposed: list[extract.Booking] = []
     for booking in message.bookings:
+        if booking.generic and not review.trusted(conn, mailbox_id, message.sender_domain):
+            proposed.append(booking)
+            continue
         filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill, held)
         if filed is None:
             failed += 1
             why[ingest.explain(conn, booking)] += 1
         elif filed not in ("unchanged", "ambiguous"):
             made += 1
+    if proposed:
+        if review.asked(conn, mailbox_id, message.sender_domain):
+            _record(conn, mailbox_id, message_id, SKIPPED, now)
+            return made, 0, list(dict.fromkeys(touched)) if touched else None, None
+        review.add_generic(conn, mailbox_id, message_id, message.sender_domain, message.received, ingest.suggestion(conn, proposed[0]), now)
+        return made, 1, [], UNREADABLE
     usable = len(message.bookings) - failed
     queued = 0
     if failed or message.unread or not usable:
@@ -220,6 +230,7 @@ class NotAskable(Exception):
 
 
 HOLDS_BOOKINGS = "This item holds bookings to settle, not a message to read."
+READ_ALREADY = "Waypoint already read this one: check what it found."
 
 
 def _again(owner: str, item_id: int) -> tuple[int, str, dict[str, Any]]:
@@ -243,6 +254,8 @@ def suggest_now(owner: str, item_id: int, now: float) -> None:
             raise KeyError(item_id)
         if review.is_match(conn, *found):
             raise NotAskable(HOLDS_BOOKINGS)
+        if review.is_generic(conn, *found):
+            raise NotAskable(READ_ALREADY)
         if ai.config(conn) is None:
             raise NoAi(NO_AI)
     mailbox_id, message_id, raw = _again(owner, item_id)
@@ -267,6 +280,11 @@ def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) 
         error = SUGGESTION_FAILED
     with db.session() as conn:
         review.set_suggestion(conn, mailbox_id, message_id, suggestion, error)
+
+
+def _generic(mailbox_id: int, message_id: str) -> bool:
+    with db.session() as conn:
+        return review.is_generic(conn, mailbox_id, message_id)
 
 
 def _fail(mailbox_id: int, text: str, partial: tuple[int, int, int]) -> Result:
@@ -374,7 +392,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             if outcome is not None:
                 with db.session() as conn:
                     _record(conn, mailbox_id, message_id, outcome, now)
-            if b:
+            if b and not _generic(mailbox_id, message_id):
                 _suggest(mailbox_id, message_id, raw, now)
             read, made, queued = read + 1, made + a, queued + b
         if not again and not backfill:

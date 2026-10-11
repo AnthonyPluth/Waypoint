@@ -46,6 +46,7 @@ class Booking:
     start_zone: str | None = None
     end_zone: str | None = None
     ports: tuple[Port, ...] = ()
+    generic: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)

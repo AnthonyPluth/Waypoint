@@ -51,6 +51,8 @@ class Suggestion(TypedDict, total=False):
     end_local: str
     start_zone: str
     end_zone: str
+    address: str
+    sources: dict[str, str]
 
 
 @dataclass(frozen=True)

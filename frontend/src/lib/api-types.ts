@@ -24,6 +24,8 @@ export interface AiSuggestion {
   destination?: string;
   start_zone?: string;
   end_zone?: string;
+  address?: string;
+  sources?: Record<string, string>;
 }
 
 export interface Airport {
@@ -417,7 +419,7 @@ export interface ReviewItem {
   subject: string | null;
   has_email: boolean;
   received: string | null;
-  reason: "no_markup" | "incomplete" | "broken";
+  reason: "no_markup" | "incomplete" | "broken" | "generic";
   gmail_url: string | null;
   suggestion: AiSuggestion | null;
   suggestion_error: string | null;

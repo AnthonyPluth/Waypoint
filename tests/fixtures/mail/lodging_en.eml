@@ -1,0 +1,19 @@
+From: Seaside Stays <bookings@seaside-stays.example>
+To: traveller@gmail.example
+Subject: Your booking is confirmed
+Date: Wed, 14 Oct 2026 12:00:00 +0100
+Message-ID: <fx-lodging-en@seaside-stays.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>CANARY-BODY-LODGING-EN-6V3T Thanks for booking with us.</p>
+<p>Free cancellation until Nov 10, 2026.</p>
+<table>
+<tr><td>Confirmation number</td><td>SS48213</td></tr>
+<tr><td>Property</td><td>: Seaside Inn</td></tr>
+<tr><td>Address</td><td>: 12 Beach Road, Brighton, UK</td></tr>
+<tr><td>Check-in</td><td>Saturday, November 21, 2026 after 3:00 PM</td></tr>
+<tr><td>Check-out</td><td>Wednesday, November 25, 2026 11:00 AM</td></tr>
+</table>
+</body></html>

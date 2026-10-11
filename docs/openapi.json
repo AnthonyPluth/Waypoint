@@ -2487,6 +2487,15 @@
           },
           "end_zone": {
             "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -4194,7 +4203,8 @@
             "enum": [
               "no_markup",
               "incomplete",
-              "broken"
+              "broken",
+              "generic"
             ]
           },
           "gmail_url": {

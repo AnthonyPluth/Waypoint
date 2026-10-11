@@ -111,6 +111,8 @@ class AiSuggestion(TypedDict):
     destination: NotRequired[str]
     start_zone: NotRequired[str]
     end_zone: NotRequired[str]
+    address: NotRequired[str]
+    sources: NotRequired[dict[str, str]]
 
 
 class ReviewItem(TypedDict):
@@ -122,7 +124,7 @@ class ReviewItem(TypedDict):
     subject: str | None
     has_email: bool
     received: str | None
-    reason: Literal["no_markup", "incomplete", "broken"]
+    reason: Literal["no_markup", "incomplete", "broken", "generic"]
     gmail_url: str | None
     suggestion: AiSuggestion | None
     suggestion_error: str | None
