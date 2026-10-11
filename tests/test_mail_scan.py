@@ -104,6 +104,9 @@ class FakeGmail(FakeGoogle):
         if rest.startswith("/messages/"):
             mid = urllib.parse.unquote(rest.removeprefix("/messages/"))
             if q.get("format") == "metadata":
+                if g.rate_limited > 0:
+                    g.rate_limited -= 1
+                    return self.reply({"error": "rateLimitExceeded"}, 429)
                 g.heads.append(mid)
                 if mid not in g.mail:
                     return self.reply({"error": "not_found"}, 404)
@@ -135,6 +138,7 @@ def reset(g) -> None:
     g.grants.clear(); g.live.clear(); g.revoked.clear(); g.calls.clear(); g.owners.clear(); g.emails.clear()
     g.refresh_fails, g.revoke_status = None, 200
     g.mail, g.matches, g.added, g.queries, g.fetched, g.history_calls = {}, [], [], [], [], []
+    g.rate_limited = 0
     g.fail_on, g.history_gone, g.history_id, g.page = None, False, "200", 100
     g.heads, g.snippets, g.labels = [], {}, {}
     g.mailbox_labels, g.label_mail, g.label_queries = [], {}, []
@@ -226,20 +230,10 @@ class ScanCase(DbCase):
 
 
 class SearchTests(ScanCase):
-    def test_the_search_is_for_booking_words_from_any_sender_without_spam_or_trash_since_18_months_ago(self):
+    def test_the_search_is_for_the_whole_mailbox_without_spam_or_trash_since_18_months_ago(self):
         self.assertEqual(self.scan().state, "done")
         [q] = self.google.queries
-        self.assertTrue(q.startswith("(confirmation OR itinerary OR reservation OR "), q)
-        self.assertNotIn("from:", q)
-        self.assertIn("-in:spam -in:trash", q)
-        self.assertNotIn("promotions", q)
-        self.assertTrue(q.endswith("after:2025/03/23"), q)
-        self.assertLess(len(q), 1500)
-
-    def test_the_search_has_the_lodging_and_japanese_words(self):
-        q = query.build(date(2026, 1, 31))
-        for word in ('"check-in"', '"check-out"', '"your stay"', "hotel", '"reservation number"', "宿泊", "予約", "確認"):
-            self.assertIn(word, q)
+        self.assertEqual(q, "-in:spam -in:trash after:2025/03/23")
 
     def test_the_search_covers_booking_agencies_travel_portals_and_cruise_lines(self):
         senders = set(query.SENDERS)
@@ -251,10 +245,9 @@ class SearchTests(ScanCase):
         head = triage.Head("Hello", "familyvacations-disneycruise.com", "", frozenset())
         self.assertEqual(triage.decide(head), "read")
 
-    def test_the_search_is_one_group_of_words_so_gmail_cant_read_the_or_across_the_rest(self):
-        q = query.build(date(2026, 1, 31), ["a.example"])
-        words = "(" + query._any((*query.WORDS, *query.LODGING_WORDS, *query.JAPANESE_WORDS)) + ")"
-        self.assertTrue(q.startswith(f"{words} -in:spam -in:trash -from:a.example after:2026/01/31"), q)
+    def test_an_ignored_sender_is_left_out_of_the_search_once_each(self):
+        q = query.build(date(2026, 1, 31), ["a.example", "a.example"])
+        self.assertEqual(q, "-in:spam -in:trash -from:a.example after:2026/01/31")
 
     def test_a_banks_mail_has_to_be_about_travel_to_be_read(self):
         self.assertEqual(triage.decide(triage.Head("Your statement is ready", "chase.com", "reservation", frozenset())), "skip")
@@ -348,30 +341,39 @@ class TriageScanTests(ScanCase):
         self.assertEqual(self.scan().bookings, 1)
         self.assertEqual([s["kind"] for s in self.segments()], ["hotel"])
 
-    def test_the_fetch_cap_stops_reading_reports_it_takes_the_newest_first_and_the_next_scan_goes_on(self):
+    def test_a_scan_over_its_time_budget_stops_reports_it_and_the_next_scan_goes_on(self):
         for n in range(5):
             self.add_mail(f"c{n}", plain_mail(UNLISTED[0], f"Your reservation is confirmed ({n})", "Reservation number HX4471."))
-        with mock.patch.object(scan, "MAX_READ", 2):
+        with mock.patch.object(scan, "BUDGET", -1):
             first = self.scan()
-        self.assertEqual((first.messages, first.capped, first.found), (2, True, 5))
-        self.assertEqual(self.google.fetched, ["c0", "c1"])
+        self.assertEqual((first.messages, first.capped, first.found), (1, True, 5))
+        self.assertEqual(self.google.fetched, ["c0"])
         self.assertIsNone(self.row()["last_scan"])
-        self.assertEqual(scan.summary(self.mailbox), scan.Summary(5, 2, 0, 2, 0, True))
+        self.assertEqual(scan.summary(self.mailbox), scan.Summary(5, 1, 0, 1, 0, True, 0, 1, 5))
         self.google.fetched.clear()
-        with mock.patch.object(scan, "MAX_READ", 10):
-            second = self.scan(now=NOW + 5000)
-        self.assertEqual((second.messages, second.capped, second.found), (3, False, 3))
-        self.assertEqual(self.google.fetched, ["c2", "c3", "c4"])
+        second = self.scan(now=NOW + 5000)
+        self.assertEqual((second.messages, second.capped, second.found), (4, False, 4))
+        self.assertEqual(self.google.fetched, ["c1", "c2", "c3", "c4"])
         self.assertEqual(self.row()["last_scan"], NOW + 5000)
+
+    def test_a_capped_scan_is_followed_straight_away_until_every_message_is_looked_at(self):
+        for n in range(5):
+            self.add_mail(f"c{n}", plain_mail(UNLISTED[0], f"Your reservation is confirmed ({n})", "Reservation number HX4471."))
+        with mock.patch.object(scan, "BUDGET", -1):
+            last = scan.run(self.mailbox, TODAY)
+        self.assertEqual((last.state, last.capped), ("done", False))
+        self.assertEqual(sorted(self.scanned()), [f"c{n}" for n in range(5)])
+        self.assertEqual(self.google.fetched, [f"c{n}" for n in range(5)])
+        self.assertEqual(self.row()["last_scan"] is not None, True)
 
     def test_the_summary_is_counts_only_and_is_what_the_mailbox_list_carries(self):
         self.add_mail("stay", eml("hotel_jsonld"))
         self.add_mail("l0", plain_mail(*LOOKALIKES[0]))
         self.add_mail("odd", plain_mail(UNLISTED[1], "Your reservation is confirmed", "Everything is arranged."))
         self.scan()
-        self.assertEqual(scan.summary(self.mailbox), scan.Summary(3, 2, 1, 1, 1, False))
+        self.assertEqual(scan.summary(self.mailbox), scan.Summary(3, 2, 1, 1, 1, False, 0, 3, 3))
         self.assertEqual(scan.decode(self.row()["scan_summary"]), scan.summary(self.mailbox))
-        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "found", "labels_dropped", "read", "review", "skipped"])
+        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "found", "labels_dropped", "read", "review", "skipped", "total", "triaged"])
 
     def test_a_reply_or_an_offer_looking_subject_from_a_travel_sender_is_still_read(self):
         for subject in ("Re: Your reservation", "Autumn sale: your booking is confirmed", "Your deal is booked: reservation H77"):
@@ -408,7 +410,7 @@ class TriageScanTests(ScanCase):
                 no_leaks(self, *canaries, database=self.path):
             self.scan()
         summary = scan.summary(self.mailbox)
-        self.assertEqual(summary, scan.Summary(2, 1, 0, 1, 1, False))
+        self.assertEqual(summary, scan.Summary(2, 1, 0, 1, 1, False, 0, 2, 2))
         self.assertFalse([t for t in said for k in canaries if k.lower() in t.lower()])
 
 
@@ -1234,6 +1236,22 @@ class LaterScanTests(ScanCase):
         self.assertEqual((after["provider"], after["manage_url"]), ("Example Air", seg["manage_url"]))
         self.assertEqual((after["details"]["terminal"], after["details"]["seat"]), ("7", "1A"))
         self.assertEqual((after["start_local"], after["status"]), (seg["start_local"], seg["status"]))
+
+    def test_a_rate_limit_is_waited_out_and_retried_and_the_scan_carries_on(self):
+        self.add_mail("stay", eml("hotel_jsonld"))
+        self.google.rate_limited = 3
+        with mock.patch("waypoint.providers.gmail.time.sleep") as slept:
+            result = self.scan()
+        self.assertEqual((result.state, result.bookings), ("done", 1))
+        self.assertEqual([c.args[0] for c in slept.call_args_list], [1, 2, 4])
+
+    def test_a_rate_limit_that_never_lifts_stops_the_scan_and_keeps_what_it_read(self):
+        self.add_mail("stay", eml("hotel_jsonld"))
+        self.google.rate_limited = 100
+        with mock.patch("waypoint.providers.gmail.time.sleep"):
+            result = self.scan()
+        self.assertEqual(result.state, "failed")
+        self.assertIn("slow down", result.error)
 
     def test_a_look_back_that_fails_keeps_the_last_good_state(self):
         self.first()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 import base64
 import contextlib
 import hashlib
@@ -65,6 +65,10 @@ class Reconnect(GmailError):
 
 
 class Lapsed(GmailError):
+    pass
+
+
+class RateLimited(GmailError):
     pass
 
 
@@ -303,9 +307,10 @@ def disconnect(conn: db.Connection, mailbox_id: int, owner: str) -> bool:
     return token is not None
 
 
-SEARCH_PAGE = 100
-MAX_FOUND = 5000
+SEARCH_PAGE = 500
+MAX_FOUND = 100_000
 FETCH_ATTEMPTS = 3
+RATE_ATTEMPTS = 6
 
 
 def _api(path: str, token: str, params: Mapping[str, str | list[str]] | None = None) -> Any:
@@ -316,7 +321,7 @@ def _api(path: str, token: str, params: Mapping[str, str | list[str]] | None = N
         if e.code == 404:
             raise MessageGone("That message is gone.") from e
         if e.code == 429:
-            raise GmailError("Google asked Waypoint to slow down; the scan carries on next time.") from e
+            raise RateLimited("Google asked Waypoint to slow down; the scan carries on next time.") from e
         raise GmailError("Google refused a request while reading the mailbox.") from e
     except (urllib.error.URLError, OSError, ValueError) as e:
         raise GmailError("Couldn’t reach Google while reading the mailbox.") from e
@@ -375,36 +380,34 @@ def added_since(token: str, start: str) -> set[str]:
             return ids
 
 
-def fetch(token: str, message_id: str) -> dict[str, Any]:
-    quoted = urllib.parse.quote(message_id, safe="")
-    for attempt in range(FETCH_ATTEMPTS):
+def _retrying(call: Callable[[], Any]) -> dict[str, Any]:
+    for attempt in range(RATE_ATTEMPTS):
         try:
-            found = _api(f"/messages/{quoted}", token, {"format": "raw"})
+            found = call()
         except MessageGone:
             raise
+        except RateLimited:
+            if attempt == RATE_ATTEMPTS - 1:
+                raise
+            time.sleep(2 ** attempt)
+            continue
         except GmailError:
-            if attempt == FETCH_ATTEMPTS - 1:
+            if attempt >= FETCH_ATTEMPTS - 1:
                 raise
             time.sleep(0.2 * (attempt + 1))
             continue
         return found if isinstance(found, dict) else {}
     raise GmailError("Couldn’t reach Google while reading the mailbox.")
+
+
+def fetch(token: str, message_id: str) -> dict[str, Any]:
+    quoted = urllib.parse.quote(message_id, safe="")
+    return _retrying(lambda: _api(f"/messages/{quoted}", token, {"format": "raw"}))
 
 
 def fetch_head(token: str, message_id: str) -> dict[str, Any]:
     quoted = urllib.parse.quote(message_id, safe="")
-    for attempt in range(FETCH_ATTEMPTS):
-        try:
-            found = _api(f"/messages/{quoted}", token, {"format": "metadata", "metadataHeaders": ["From", "Subject"]})
-        except MessageGone:
-            raise
-        except GmailError:
-            if attempt == FETCH_ATTEMPTS - 1:
-                raise
-            time.sleep(0.2 * (attempt + 1))
-            continue
-        return found if isinstance(found, dict) else {}
-    raise GmailError("Couldn’t reach Google while reading the mailbox.")
+    return _retrying(lambda: _api(f"/messages/{quoted}", token, {"format": "metadata", "metadataHeaders": ["From", "Subject"]}))
 
 
 def open_url(address: str, message_id: str) -> str:
