@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import base64
-import binascii
 import json
 from collections.abc import Callable, Mapping, Sequence
 from datetime import date
@@ -251,15 +249,15 @@ def _key(row: Any) -> tuple[bool, str, int]:
 
 
 def _cursor(key: tuple[bool, str, int]) -> str:
-    return base64.urlsafe_b64encode(json.dumps(list(key), separators=(",", ":")).encode()).decode().rstrip("=")
+    return json.dumps(list(key), separators=(",", ":")).encode().hex()
 
 
 def _after(cursor: str) -> tuple[bool, str, int]:
     try:
-        flag, received, last = json.loads(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
+        flag, received, last = json.loads(bytes.fromhex(cursor))
         if isinstance(flag, bool) and isinstance(received, str) and isinstance(last, int) and not isinstance(last, bool):
             return flag, received, last
-    except (ValueError, binascii.Error, TypeError):
+    except (ValueError, TypeError):
         pass
     raise trips.Invalid("That cursor isn’t one Waypoint gave out. Start again without it.")
 
