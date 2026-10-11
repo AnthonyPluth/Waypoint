@@ -149,7 +149,7 @@
 
   let ignoring = $state<ReviewItem | null>(null);
   let asking = $state(false);
-  const goingCount = $derived(ignoring && review ? review.items.filter((i) => i.address === ignoring?.address && i.sender_domain === ignoring?.sender_domain).length : 0);
+  const goingCount = $derived(ignoring && review ? review.items.filter((i) => i.address === ignoring?.address && i.sender_domain === ignoring?.sender_domain && !i.holds_bookings).length : 0);
   const UNDO_MS = 8000;
   const undoIgnore = (mailboxId: number, domain: string) => act(async () => {
     await apiCall<"POST /api/mailboxes/{id}/unignore">(`/api/mailboxes/${mailboxId}/unignore`, { method: "POST", body: { domain }, failed: "Couldn’t undo that" });

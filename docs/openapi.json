@@ -4322,6 +4322,9 @@
           "known_sender": {
             "type": "boolean"
           },
+          "holds_bookings": {
+            "type": "boolean"
+          },
           "subject": {
             "type": [
               "string",
@@ -4375,6 +4378,7 @@
           "mine",
           "sender_domain",
           "known_sender",
+          "holds_bookings",
           "subject",
           "has_email",
           "received",

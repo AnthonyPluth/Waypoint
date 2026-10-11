@@ -144,6 +144,7 @@ class ReviewItem(TypedDict):
     mine: bool
     sender_domain: str
     known_sender: bool
+    holds_bookings: bool
     subject: str | None
     has_email: bool
     received: str | None
