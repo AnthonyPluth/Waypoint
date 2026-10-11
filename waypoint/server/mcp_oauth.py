@@ -18,10 +18,11 @@ from .. import oidc
 from ..storage.models import OAuthClient, OAuthCode, OAuthConsent, OAuthGrant, OAuthToken
 
 SCOPES = ("read", "write")
+SETTINGS_SCOPES = (*SCOPES, "mail")
 CONSENT = {
     "write": ("Change trips",
-              "Add, change and remove trips, bookings, travellers, people and guests, and the distance unit. "
-              "Never mailboxes, the “Couldn’t read” queue, AI settings, backups, loyalty numbers, sign-in or these assistant settings. It's told "
+              "Add, change and remove trips, bookings, travellers, people and guests, settle or dismiss Review items, and the distance unit. "
+              "Never mailboxes, AI settings, backups, loyalty numbers, sign-in or these assistant settings. It's told "
               "to ask you before every change.",
               "Turn on Let assistants change trips in Settings first. Until then this connection can't make changes."),
 }
@@ -186,7 +187,7 @@ def parse_scope(value: Any, error: str = "invalid_scope") -> frozenset[str]:
 
 
 def scope_text(scopes: frozenset[str] | set[str]) -> str:
-    return " ".join(s for s in SCOPES if s in scopes)
+    return " ".join(s for s in SETTINGS_SCOPES if s in scopes)
 
 
 def check_resource(given: Any, canonical: str, error: type[OAuthError] | None = None, **kw: Any) -> None:
@@ -491,6 +492,15 @@ def revoke_grant(conn, grant_id: int, reason: str, now: float | None = None) -> 
     conn.execute(delete(OAuthCode).where(OAuthCode.grant_id == grant_id))
     conn.execute(delete(OAuthToken).where(OAuthToken.grant_id == grant_id))
     return done
+
+
+def set_scope(conn, grant_id: int, scope: str, on: bool) -> bool:
+    row = conn.execute(select(OAuthGrant.scope).where(OAuthGrant.id == grant_id, OAuthGrant.revoked.is_(None))).fetchone()
+    if row is None:
+        return False
+    have = set(row["scope"].split())
+    conn.execute(update(OAuthGrant).where(OAuthGrant.id == grant_id).values(scope=scope_text((have | {scope}) if on else (have - {scope}))))
+    return True
 
 
 def access_grant(conn, presented: str, canonical: str, now: float | None = None):

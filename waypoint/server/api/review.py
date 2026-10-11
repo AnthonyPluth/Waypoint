@@ -53,7 +53,7 @@ def api_review_match(conn, _q, body: MatchBody, item_id: str) -> Ok:
         settled = review.settle(conn, owner(), viewer(conn), row_id(item_id, NO_ITEM), entry, chosen)
     except trips.Invalid as e:
         raise ApiError(str(e)) from e
-    if not settled:
+    if settled is None:
         raise ApiError(NO_ITEM, 404)
     return {"ok": True}
 

@@ -149,7 +149,7 @@ def consent_page(scope, target, token: str, user: dict, writes_on: bool) -> str:
 <form method="post" action="/oauth/authorize">
 <input type="hidden" name="consent" value="{html.escape(token)}">
 <label class="choice"><input type="checkbox" checked disabled><span><b>Read your travel</b><span class="help">Upcoming
-flights and stays, trips, who is on them, people and guests, stats and live flight status. Never your email, mailboxes, loyalty numbers, backups or settings.</span></span></label>
+flights and stays, trips, who is on them, people and guests, stats, live flight status and the Review queue (what Waypoint read from an email, not the email). Never your mailboxes, loyalty numbers, backups or settings, and never the text of your email unless you turn that on for this assistant afterwards in Settings.
 {boxes}<div class="actions"><button class="btn primary" type="submit" name="decision" value="allow">Allow</button>
 <button class="btn" type="submit" name="decision" value="deny">Deny</button></div>
 </form>"""

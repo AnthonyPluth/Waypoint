@@ -15,6 +15,7 @@
   let asking = $state(false);
   let address = $state<HTMLInputElement | null>(null);
   let saving = $state(false);
+  let savingMail = $state<number | null>(null);
 
   async function load() {
     try { list = await apiCall<"GET /api/mcp-settings">("/api/mcp-settings"); problem = ""; }
@@ -29,6 +30,15 @@
       if (list) list = { ...list, allow_writes: r.allow };
     }, { busy: (on) => (saving = on) });
     if (list) box.checked = list.allow_writes;
+  }
+
+  async function chooseMail(c: McpConnection, e: Event) {
+    const box = e.currentTarget as HTMLInputElement, allow = box.checked;
+    await act(async () => {
+      const r = await apiCall<"POST /api/mcp-settings/connections/{id}/mail">(`/api/mcp-settings/connections/${c.id}/mail`, { method: "POST", body: { allow }, failed: "Couldn’t save that" });
+      if (list) list = { ...list, connections: list.connections.map((x) => (x.id === c.id ? { ...x, scope: [...x.scope.filter((s) => s !== "mail"), ...(r.allow ? ["mail"] : [])] } : x)) };
+    }, { busy: (on) => (savingMail = on ? c.id : null) });
+    box.checked = !!list?.connections.find((x) => x.id === c.id)?.scope.includes("mail");
   }
 
   async function copy() {
@@ -47,7 +57,7 @@
     });
   }
 
-  const SCOPES: Record<string, string> = { read: "Read", write: "Change trips" };
+  const SCOPES: Record<string, string> = { read: "Read", write: "Change trips", mail: "Email text" };
   const access = (scope: string[]) => Object.keys(SCOPES).filter((s) => s === "read" || scope.includes(s)).map((s) => SCOPES[s]);
 
   const at = (t: string) => new Date(t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -96,6 +106,18 @@
               Approved{c.who ? ` by ${c.who}` : ""}{c.created ? ` ${at(c.created)}` : ""}. {c.last_used ? `Last used ${at(c.last_used)}.` : "Not used yet."}
             </p>
             <p class="mt-1 flex flex-wrap gap-1">{#each access(c.scope) as a (a)}<Badge variant="secondary">{a}</Badge>{/each}</p>
+            {#if !c.scope.includes("write")}
+              <p class="mt-1 text-sm text-muted-foreground" data-testid="no-changes">Read only: it can’t make changes. To allow them, disconnect it and connect it again, ticking the box for changes when Waypoint asks.</p>
+            {:else if !list.allow_writes}
+              <p class="mt-1 text-sm text-muted-foreground" data-testid="no-changes">It can’t make changes while “Let assistants change trips” above is off.</p>
+            {/if}
+            <label class="mt-2 flex cursor-pointer items-start gap-2">
+              <input type="checkbox" class="mt-1 size-5 shrink-0" aria-describedby={`mcp-mail-help-${c.id}`} checked={c.scope.includes("mail")} disabled={savingMail === c.id} onchange={(e) => chooseMail(c, e)} />
+              <span class="min-w-0">
+                <span class="block font-medium">Read email text</span>
+                <span id={`mcp-mail-help-${c.id}`} class="block text-sm text-muted-foreground">This sends the email’s text to the assistant you connected: the subject and text of the emails Waypoint keeps for the Review queue and for bookings. Off unless you turn it on. Never mailboxes or other mail.</span>
+              </span>
+            </label>
           </div>
           <Button variant="outline" onclick={() => { leaving = c; asking = true; }}>Disconnect</Button>
         </div>

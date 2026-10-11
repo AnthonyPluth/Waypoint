@@ -136,7 +136,7 @@ class ValueTests(unittest.TestCase):
         self.assertEqual(set(mcp_oauth.CONSENT), {"write"})
         label, note, off = mcp_oauth.CONSENT["write"]
         self.assertEqual(label, "Change trips")
-        for words in ("Add, change and remove trips, bookings, travellers, people and guests, and the distance unit",
+        for words in ("Add, change and remove trips, bookings, travellers, people and guests, settle or dismiss Review items, and the distance unit",
                       "Never mailboxes", "AI settings, backups, loyalty numbers, sign-in or these assistant settings"):
             self.assertIn(words, note)
         self.assertIn("Let assistants change trips", off)

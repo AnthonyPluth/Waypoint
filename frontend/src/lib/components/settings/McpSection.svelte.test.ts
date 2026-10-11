@@ -141,6 +141,53 @@ describe("Settings → AI assistants (MCP)", () => {
     expect(second).not.toHaveTextContent("by ");
   });
 
+  it("says on a read-only connection that it can’t make changes and what to do, and on a writing one why it still can’t while the switch is off", async () => {
+    serve(() => view({ connections: [conn({ scope: ["read"] }), conn({ id: 2, scope: ["read", "write"] })] }));
+    render(McpSection);
+    await screen.findAllByTestId("assistant");
+    const [first, second] = screen.getAllByTestId("assistant");
+    expect(first).toHaveTextContent("Read only: it can’t make changes. To allow them, disconnect it and connect it again");
+    expect(second).toHaveTextContent("It can’t make changes while “Let assistants change trips” above is off.");
+  });
+
+  it("says nothing about changes once the switch is on and the connection may make them", async () => {
+    serve(() => view({ allow_writes: true, connections: [conn({ scope: ["read", "write"] })] }));
+    render(McpSection);
+    await screen.findByTestId("assistant");
+    expect(screen.queryByTestId("no-changes")).toBeNull();
+  });
+
+  it("turns email text on for one connection, with the plain warning, and off again", async () => {
+    let connections = [conn(), conn({ id: 2, client: "Desktop app" })];
+    serve(() => view({ connections }), (path, opts) => {
+      if (path === "/api/mcp-settings/connections/2/mail") return { allow: opts?.body?.allow };
+      return undefined;
+    });
+    render(McpSection);
+    const [first, second] = await screen.findAllByRole("checkbox", { name: /Read email text/ });
+    expect(first).not.toBeChecked();
+    expect(screen.getAllByText(/This sends the email’s text to the assistant you connected/)).toHaveLength(2);
+    await userEvent.click(second);
+    await waitFor(() => expect(posts("/api/mcp-settings/connections/2/mail")).toEqual([{ allow: true }]));
+    await waitFor(() => expect(second).toBeChecked());
+    expect(screen.getAllByTestId("assistant")[1]).toHaveTextContent("Email text");
+    expect(first).not.toBeChecked();
+    expect(screen.getAllByTestId("assistant")[0]).not.toHaveTextContent("Email text");
+    await userEvent.click(second);
+    await waitFor(() => expect(posts("/api/mcp-settings/connections/2/mail")).toEqual([{ allow: true }, { allow: false }]));
+    await waitFor(() => expect(second).not.toBeChecked());
+    connections = [];
+  });
+
+  it("puts the email box back and says why when the server refuses", async () => {
+    serve(() => view({ connections: [conn()] }), (path) => { if (path.endsWith("/mail")) throw new Error("That connection isn’t there any more."); return undefined; });
+    render(McpSection);
+    const box = (await screen.findByRole("checkbox", { name: /Read email text/ })) as HTMLInputElement;
+    await userEvent.click(box);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("That connection isn’t there any more."));
+    await waitFor(() => expect(box.checked).toBe(false));
+  });
+
   it("disconnects after asking, then lists again", async () => {
     let connections = [conn(), conn({ id: 2, client: "Desktop app" })];
     serve(() => view({ connections }), (path, opts) => {

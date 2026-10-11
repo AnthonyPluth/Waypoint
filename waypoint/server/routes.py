@@ -15,7 +15,9 @@ from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_e
 from .api.flight_import import api_import, api_import_preview
 from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
 from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loyalty_remove, api_loyalty_reveal
-from .api.mcp import api_mcp_revoke, api_mcp_settings, api_mcp_writes
+from .api.assistant import (api_assistant_review, api_assistant_review_create, api_assistant_review_dismiss, api_assistant_review_email,
+                            api_assistant_review_item, api_assistant_review_match, api_assistant_segment_emails)
+from .api.mcp import api_mcp_mail, api_mcp_revoke, api_mcp_settings, api_mcp_writes
 from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, api_person_add, api_person_claim,
                           api_person_edit, api_person_remove)
 from .api.logos import api_logodev, api_logodev_fetch, api_logodev_save, api_loyalty_logo, api_segment_logo
@@ -102,7 +104,15 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("DELETE", "/api/review/{id}", api_review_dismiss),
     ("GET", "/api/mcp-settings", api_mcp_settings),
     ("POST", "/api/mcp-settings/writes", api_mcp_writes),
+    ("POST", "/api/mcp-settings/connections/{id}/mail", api_mcp_mail),
     ("DELETE", "/api/mcp-settings/connections/{id}", api_mcp_revoke),
+    ("GET", "/api/assistant/review", api_assistant_review),
+    ("GET", "/api/assistant/review/{id}", api_assistant_review_item),
+    ("GET", "/api/assistant/review/{id}/email", api_assistant_review_email),
+    ("POST", "/api/assistant/review/{id}/match", api_assistant_review_match),
+    ("POST", "/api/assistant/review/{id}/create", api_assistant_review_create),
+    ("POST", "/api/assistant/review/{id}/dismiss", api_assistant_review_dismiss),
+    ("GET", "/api/assistant/segments/{id}/email", api_assistant_segment_emails),
     ("GET", "/api/state", api_state),
     ("GET", "/api/offline", api_offline),
 ]

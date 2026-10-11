@@ -20,8 +20,10 @@ ANYTHING = frozenset(mcp_access.writable_routes(routes.ROUTES))
 WRITES_OFF = "Changes are switched off. Turn on “Let assistants change trips” in Waypoint under Settings."
 READ_ONLY = ("This connection can only read. To let the assistant change trips, reconnect Waypoint in the assistant and "
              "allow “Change trips” when Waypoint asks.")
-REFUSALS = {mcp_access.WRITE: (READ_ONLY, WRITES_OFF)}
-OUT_OF_REACH = ("Not found: assistants can't reach mailboxes, the “Couldn’t read” queue, AI settings, backups, loyalty and Known "
+NO_MAIL = ("This connection can't read email. To allow it, turn on “Read email text” on this assistant's row in Waypoint under "
+           "Settings → AI assistants (MCP).")
+REFUSALS = {mcp_access.WRITE: (READ_ONLY, WRITES_OFF), mcp_access.MAIL: (NO_MAIL, NO_MAIL)}
+OUT_OF_REACH = ("Not found: assistants can't reach mailboxes, the Review queue except through its own tools, AI settings, backups, loyalty and Known "
                 "Traveler numbers, sign-in, the calendar feed, notifications or the assistant settings. Use Waypoint itself for those.")
 METHODS = ("GET", "POST", "DELETE")
 
@@ -44,6 +46,8 @@ def needs(method: str, pattern: str) -> tuple[str, ...] | None:
     if method == "GET":
         if pattern in mcp_access.READABLE:
             return (mcp_access.READ,)
+        if pattern in mcp_access.MAIL_READABLE:
+            return (mcp_access.MAIL,)
         return (mcp_access.WRITE,) if pattern in mcp_access.WRITE_READABLE else None
     if (method, pattern) in ANYTHING:
         return (mcp_access.WRITE,)
@@ -64,6 +68,8 @@ def _why_not(access: mcp_access.Access, scope: str) -> str | None:
         return "Not found"
     if not access.has(scope):
         return REFUSALS[scope][0]
+    if scope not in mcp_access.SWITCHES:
+        return None
     with db.session() as conn:
         if mcp_access.switched_on(conn, scope):
             return None

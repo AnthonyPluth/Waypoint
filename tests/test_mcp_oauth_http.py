@@ -346,7 +346,7 @@ class ConsentTests(OAuthServer):
         page = self.authorize(c, scope="read write")
         body = page.body.decode()
         self.assertIn('<input type="checkbox" name="write" value="1"><span><b>Change trips', body)
-        self.assertIn("Add, change and remove trips, bookings, travellers, people and guests, and the distance unit", body)
+        self.assertIn("Add, change and remove trips, bookings, travellers, people and guests, settle or dismiss Review items, and the distance unit", body)
         self.assertIn("AI settings, backups, loyalty numbers, sign-in or these assistant settings", body)
         self.assertEqual(self.granted(c, page), "read")
         self.assertEqual(self.granted(c, self.authorize(c, scope="read write"), write=True), "read write")
@@ -592,7 +592,7 @@ class McpTests(OAuthServer):
         t = self.tokens(scope="read write", write=True)
         self.assertEqual(t["scope"], "read write")
         token = t["access_token"]
-        offered = {x["name"] for x in mcp_server.ALL_TOOLS}
+        offered = {x["name"] for x in mcp_server.ALL_TOOLS} - {x["name"] for x in mcp_server.MAIL_TOOLS}
         self.assertEqual(self.tool_names(token), offered)
         self.assertIn("create_trip", offered)
         self.assertNotIn("isError", self.call(token, "create_trip", {"fields": self.trip}))

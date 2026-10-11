@@ -40,6 +40,141 @@ export interface Airport {
   zone: string;
 }
 
+export interface AssistantCandidate {
+  segment_id: number;
+  trip_id: number;
+  trip_name: string;
+  kind: string;
+  provider: string | null;
+  origin: string | null;
+  destination: string | null;
+  start_local: string;
+  end_local: string;
+  confidence: "exact" | "likely" | "possible";
+  agreed: string[];
+  differed: string[];
+}
+
+export interface AssistantCreateBody {
+  kind?: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
+  status?: "confirmed" | "changed" | "cancelled";
+  confirmation?: string | null;
+  provider?: string | null;
+  start_local?: string;
+  start_zone?: string | null;
+  end_local?: string;
+  end_zone?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  details?: Record<string, string>;
+  manage_url?: string | null;
+  travelers?: TravelerBody[];
+  itinerary?: Port[];
+  entry?: number | null;
+}
+
+export interface AssistantDismissBody {
+  reason: "not_travel" | "duplicate" | "already_added" | "other";
+  note?: string | null;
+}
+
+export interface AssistantDismissed {
+  ok: boolean;
+  reason: "not_travel" | "duplicate" | "already_added" | "other";
+}
+
+export interface AssistantEmail {
+  subject: string | null;
+  sender_domain: string | null;
+  received: string | null;
+  text: string;
+  truncated: boolean;
+  kept: "original" | "plain text";
+}
+
+export interface AssistantEntry {
+  entry: number;
+  booking: AssistantParsed;
+  candidates: AssistantCandidate[];
+}
+
+export interface AssistantItem {
+  id: number;
+  mailbox_id: number;
+  mine: boolean;
+  sender_domain: string;
+  reason: "no_markup" | "incomplete" | "broken" | "match" | "generic";
+  status: string | null;
+  kind: string | null;
+  received: string | null;
+  has_email: boolean;
+  bookings: number;
+  match: AssistantMatch | null;
+}
+
+export interface AssistantItemDetail {
+  id: number;
+  mailbox_id: number;
+  mine: boolean;
+  sender_domain: string;
+  reason: "no_markup" | "incomplete" | "broken" | "match" | "generic";
+  status: string | null;
+  kind: string | null;
+  received: string | null;
+  has_email: boolean;
+  bookings: number;
+  match: AssistantMatch | null;
+  entries: AssistantEntry[];
+  suggestion: AssistantParsed | null;
+}
+
+export interface AssistantItems {
+  items: AssistantItem[];
+  total: number;
+  not_shown: number;
+  next: string | null;
+}
+
+export interface AssistantMatch {
+  segment_id: number;
+  trip_id: number;
+  confidence: "exact" | "likely" | "possible";
+}
+
+export interface AssistantMatchBody {
+  entry?: number | null;
+  segment_id?: number | null;
+  trip_id?: number | null;
+}
+
+export interface AssistantMatched {
+  ok: boolean;
+  segment_id: number;
+  trip_id: number;
+}
+
+export interface AssistantParsed {
+  kind: string | null;
+  status: string | null;
+  provider: string | null;
+  confirmation: string | null;
+  origin: string | null;
+  destination: string | null;
+  address: string | null;
+  phone: string | null;
+  start_local: string | null;
+  start_zone: string | null;
+  end_local: string | null;
+  end_zone: string | null;
+  details: Record<string, string>;
+  travelers: string[];
+  read: Record<string, string>;
+}
+
+export interface AssistantSegmentEmails {
+  emails: AssistantEmail[];
+}
+
 export interface BackupContents {
   created: string | null;
   source: string | null;
@@ -285,6 +420,10 @@ export interface McpConnection {
   scope: string[];
   created: string | null;
   last_used: string | null;
+}
+
+export interface McpMailBody {
+  allow: boolean;
 }
 
 export interface McpSettings {
@@ -866,7 +1005,15 @@ export interface Endpoints {
   "DELETE /api/review/{id}": { body: never; reply: Ok };
   "GET /api/mcp-settings": { body: never; reply: McpSettings };
   "POST /api/mcp-settings/writes": { body: McpWritesBody; reply: McpWritesBody };
+  "POST /api/mcp-settings/connections/{id}/mail": { body: McpMailBody; reply: McpMailBody };
   "DELETE /api/mcp-settings/connections/{id}": { body: never; reply: Ok };
+  "GET /api/assistant/review": { body: never; reply: AssistantItems };
+  "GET /api/assistant/review/{id}": { body: never; reply: AssistantItemDetail };
+  "GET /api/assistant/review/{id}/email": { body: never; reply: AssistantEmail };
+  "POST /api/assistant/review/{id}/match": { body: AssistantMatchBody; reply: AssistantMatched };
+  "POST /api/assistant/review/{id}/create": { body: AssistantCreateBody; reply: Segment };
+  "POST /api/assistant/review/{id}/dismiss": { body: AssistantDismissBody; reply: AssistantDismissed };
+  "GET /api/assistant/segments/{id}/email": { body: never; reply: AssistantSegmentEmails };
   "GET /api/state": { body: never; reply: State };
   "GET /api/offline": { body: never; reply: Offline };
 }

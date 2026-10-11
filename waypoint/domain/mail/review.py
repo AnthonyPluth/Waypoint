@@ -79,6 +79,18 @@ def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
             for r in rows]
 
 
+def pending(conn: db.Connection, owner: str) -> list[Any]:
+    return list(conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.sender_domain, ReviewItem.received,
+                                    ReviewItem.reason, ReviewItem.suggestion, ReviewItem.matches, Mailbox.owner_sub)
+                             .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(_seen_by(owner))).fetchall())
+
+
+def visible(conn: db.Connection, owner: str, item_id: int) -> Any:
+    return conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.sender_domain, ReviewItem.received,
+                               ReviewItem.reason, ReviewItem.suggestion, ReviewItem.matches, Mailbox.owner_sub)
+                        .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
+
+
 def count(conn: db.Connection, owner: str) -> int:
     return int(conn.execute(select(func.count()).select_from(ReviewItem).join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                             .where(_seen_by(owner))).scalar() or 0)
@@ -264,27 +276,37 @@ def _leave(conn: db.Connection, item_id: int, reason: str, left: list[dict[str, 
     stored_mail.prune(conn)
 
 
-def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_id: int, segment_id: int | None) -> bool:
+def entries_of(row: Any) -> list[dict[str, Any]]:
+    return _entries(row) if row["matches"] else []
+
+
+def finish_entry(conn: db.Connection, row: Any, entry_id: int, segment_id: int) -> None:
+    stored_mail.link(conn, segment_id, int(row["mailbox_id"]), str(row["message_id"]))
+    _leave(conn, int(row["id"]), row["reason"], [e for e in _entries(row) if e["id"] != entry_id])
+
+
+def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_id: int, segment_id: int | None,
+           trip_id: int | None = None, any_visible: bool = False) -> int | None:
     row = _held(conn, owner, item_id)
     if row is None:
-        return False
+        return None
     entries = _entries(row)
     entry = next((e for e in entries if e["id"] == entry_id), None)
     if entry is None:
-        return False
+        return None
     if segment_id is None:
-        added = trips.add_segment(conn, viewer, entry["booking"], source="email")
+        added = trips.add_segment(conn, viewer, entry["booking"], trip_id, source="email")
         if added is None:
             raise trips.Invalid("The booking couldn’t be added")
         target = added["id"]
     else:
-        if segment_id not in entry["candidates"]:
+        if not any_visible and segment_id not in entry["candidates"]:
             raise trips.Invalid("That isn’t one of the bookings it could be")
         trips.merge_email_segment(conn, viewer, entry["booking"], into=segment_id)
         target = segment_id
     stored_mail.link(conn, target, int(row["mailbox_id"]), str(row["message_id"]))
     _leave(conn, item_id, row["reason"], [e for e in entries if e["id"] != entry_id])
-    return True
+    return int(target)
 
 
 def drop(conn: db.Connection, owner: str, item_id: int, entry_id: int) -> bool:

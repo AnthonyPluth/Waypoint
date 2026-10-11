@@ -12,7 +12,7 @@ MAX_TEXT = 200_000
 
 Fetch = Callable[..., Any]
 
-READ, WRITE = mcp_access.READ, mcp_access.WRITE
+READ, WRITE, MAIL = mcp_access.READ, mcp_access.WRITE, mcp_access.MAIL
 
 
 class ToolError(Exception):
@@ -31,6 +31,9 @@ _DAY = {"type": "string", "description": "A day, like 2026-09-30."}
 _TRIP_ID = {**_ID, "description": "A trip's id (from list_trips)."}
 _SEGMENT_ID = {**_ID, "description": "A segment's id (from get_trip or upcoming)."}
 _PERSON_ID = {**_ID, "description": "A person's id (from list_people)."}
+_ITEM_ID = {**_ID, "description": "A review item's id (from list_review_items)."}
+_ENTRY = {**_ID, "description": "Which booking of the item (the entry number from get_review_item); optional when it holds one."}
+_KINDS = ["flight", "hotel", "car", "train", "cruise", "parking"]
 
 
 def _need(a: dict, name: str) -> int:
@@ -95,6 +98,25 @@ def flight_status(fetch: Fetch, a: dict) -> Any:
     return {"enabled": out["enabled"], "paused": out["paused"], "statuses": statuses}
 
 
+def list_review_items(fetch: Fetch, a: dict) -> Any:
+    params = {k: a[k] for k in ("reason", "kind", "mailbox", "since", "limit", "cursor") if a.get(k) not in (None, "")}
+    if isinstance(a.get("has_match"), bool):
+        params["has_match"] = "true" if a["has_match"] else "false"
+    return fetch("assistant/review", params)
+
+
+def get_review_item(fetch: Fetch, a: dict) -> Any:
+    item = _need(a, "item_id")
+    out = fetch(f"assistant/review/{item}", {})
+    if allowed(fetch, (MAIL,)):
+        try:
+            out["email"] = fetch(f"assistant/review/{item}/email", {})
+        except ToolError as e:
+            out["email"] = None
+            out["email_note"] = str(e)
+    return out
+
+
 TOOLS: list[dict[str, Any]] = [
     {"name": "upcoming", "description": "What's coming up: flights, stays, rentals, trains, cruises and parking in the next days (default 60), soonest "
      "first, with their trip, confirmation code and travellers. Times are the wall-clock times at the place, in the zone each carries.",
@@ -118,10 +140,28 @@ TOOLS: list[dict[str, Any]] = [
     {"name": "flight_status", "description": "The live status Waypoint already holds for your flights (delays, gates, landed). It never "
      "looks anything new up for an assistant, so a flight with no status has none held.",
      "inputSchema": _schema({"segment_id": _SEGMENT_ID}), "run": flight_status, "needs": (READ,)},
+    {"name": "list_review_items", "description": "The Review queue: emails Waypoint couldn't file by itself, newest first, a page at a time "
+     "(at most 50; next is the cursor for the following page, not_shown counts the rest). Each item has its sender's domain, why it needs "
+     "review (reason), what was read (kind, status) and its best match among your bookings with a confidence of exact, likely or "
+     "possible. Never the email's subject or text. Use get_review_item for one item in full.",
+     "inputSchema": _schema({"reason": {"type": "string", "enum": ["no_markup", "incomplete", "broken", "match", "generic"],
+                                        "description": "Only items needing review for this reason."},
+                             "kind": {"type": "string", "enum": _KINDS, "description": "Only items read as this kind of booking."},
+                             "mailbox": {**_ID, "description": "Only items from this mailbox (mailbox_id of an item)."},
+                             "has_match": {"type": "boolean", "description": "Only items with (true) or without (false) a possible match."},
+                             "since": {**_DAY, "description": "Only items received on or after this day."},
+                             "limit": {"type": "integer", "minimum": 1, "maximum": 50, "description": "Page size (default 20)."},
+                             "cursor": {"type": "string", "description": "The next value of the previous page."}}),
+     "run": list_review_items, "needs": (READ,)},
+    {"name": "get_review_item", "description": "One Review item in full: what Waypoint read from the email (provider, confirmation code, places, "
+     "address, phone, start and end with zones, travellers, which fields the reader read), and for each booking in it the bookings it could "
+     "be, each with a deterministic confidence (exact, likely or possible) and the fields that agreed and differed. Without email access it "
+     "has no subject or text.",
+     "inputSchema": _schema({"item_id": _ITEM_ID}, ["item_id"]), "run": get_review_item, "needs": (READ,)},
 ]
 
 
-_SWITCHES = {WRITE: "Let assistants change trips"}
+_SWITCHES = {WRITE: "Let assistants change trips", MAIL: "Read email text"}
 WRITE_RULES = (
     "You can change the household's travel: the changing tools, and call_endpoint (list_endpoints) for anything else. Rules: "
     "1) Before every change, say in plain words what you'll change and wait for the person's explicit yes. "
@@ -129,7 +169,11 @@ WRITE_RULES = (
     "destructive) also needs the person to confirm what will be lost, separately from any other yes. Ask for each change on its own, "
     "never under one blanket yes for several. "
     "3) Times are wall-clock times at the place (start_local in start_zone); never convert them. "
-    "Mailboxes, the “Couldn’t read” queue, AI settings, backups, sign-in and these assistant settings are out of reach.")
+    "Mailboxes, AI settings, backups, sign-in and these assistant settings are out of reach.")
+MAIL_RULES = (
+    "This connection may read the text of kept emails (get_segment_email, and the email in get_review_item). That is the household's "
+    "private mail: use it only for what the person asked, quote as little as you can, and never repeat it anywhere else.")
+NO_MAIL_RULES = "Email text is off for this connection: the review tools give what Waypoint read, never an email's subject or text."
 ASK = "Ask the person before calling this."
 DESTRUCTIVE = "Destructive: tell the person exactly what will be removed or merged and get a clear yes first."
 
@@ -162,6 +206,45 @@ def _change(template: str, id_arg: str | None = None, fields: bool = False, extr
     return run
 
 
+SEGMENT_KEYS = ("kind", "status", "confirmation", "provider", "origin", "destination", "start_local", "end_local", "start_zone", "end_zone",
+                "details", "itinerary", "manage_url", "travelers")
+
+
+def _known_fields(a: dict) -> dict:
+    fields = a.get("fields") or {}
+    if not isinstance(fields, dict):
+        raise ToolError("Send fields as an object.")
+    for key in fields:
+        if key not in SEGMENT_KEYS:
+            raise ToolError(f"{key} isn't a field of a segment, so nothing was changed. Fields: {', '.join(SEGMENT_KEYS)}. Address, phone, seat, "
+                            "room, ship, deck and the like go inside details, like {\"details\": {\"address\": \"…\"}}.")
+    return fields
+
+
+def _add_segment(fetch: Fetch, a: dict) -> Any:
+    body = _known_fields(a)
+    if a.get("trip_id") is not None:
+        body = {**body, "trip_id": a["trip_id"]}
+    return fetch("segments", {}, body)
+
+
+def _update_segment(fetch: Fetch, a: dict) -> Any:
+    segment = _need(a, "segment_id")
+    body = dict(_known_fields(a))
+    if isinstance(body.get("details"), dict):
+        current = fetch(f"segments/{segment}", {}).get("details") or {}
+        merged = {**current, **body["details"]}
+        body["details"] = {k: v for k, v in merged.items() if v != ""}
+    return fetch(f"segments/{segment}", {}, body)
+
+
+def _create_from_item(fetch: Fetch, a: dict) -> Any:
+    body = dict(_known_fields(a))
+    if a.get("entry") is not None:
+        body["entry"] = a["entry"]
+    return fetch(f"assistant/review/{_need(a, 'item_id')}/create", {}, body)
+
+
 def _fields(description: str) -> dict:
     return {"type": "object", "description": description}
 
@@ -186,10 +269,11 @@ _PERSON_FIELDS = _fields("display_name, and optionally first_name, legal_name (a
 
 WRITE_TOOLS: list[dict[str, Any]] = [
     _write_tool("add_segment", "Add a flight, stay, rental, train, cruise or parking spot. Without a trip_id it goes into the trip it falls into (one is "
-                "made if none does).", _change("segments", None, True, ("trip_id",)),
+                "made if none does).", _add_segment,
                 {"fields": _SEGMENT_FIELDS, "trip_id": _TRIP_ID}, ["fields"], route=("POST", "/api/segments")),
     _write_tool("update_segment", "Change only the fields sent of a segment (what ends up different is locked, so a later email "
-                "won't put it back). travelers replaces who it's for.", _change("segments/{id}", "segment_id", True),
+                "won't put it back). Inside details only the keys sent change (an address, a seat, a room); send an empty text to clear one. "
+                "travelers replaces who it's for.", _update_segment,
                 {"segment_id": _SEGMENT_ID, "fields": _SEGMENT_FIELDS}, ["segment_id", "fields"], route=("POST", "/api/segments/{id}"),
                 idempotent=True),
     _write_tool("remove_segment", "Remove a segment (a grouped trip left with none goes too).", _change("segments/{id}", "segment_id", method="DELETE"),
@@ -201,6 +285,22 @@ WRITE_TOOLS: list[dict[str, Any]] = [
     _write_tool("merge_trips", "Fold another trip into this one: its segments move here and it goes.", _change("trips/{id}/merge", "trip_id", extra=("merge",)),
                 {"trip_id": {**_TRIP_ID, "description": "The trip that stays."}, "merge": {**_TRIP_ID, "description": "The trip folded into it."}},
                 ["trip_id", "merge"], route=("POST", "/api/trips/{id}/merge")),
+    _write_tool("match_review_item", "Settle a Review item by attaching the booking read from its email to an existing segment (segment_id: it gets "
+                "the item's confirmation code, link and message) or by adding it to an existing trip (trip_id). The item is then removed from the "
+                "queue. Only items with a read booking can be matched.",
+                _change("assistant/review/{id}/match", "item_id", extra=("entry", "segment_id", "trip_id")),
+                {"item_id": _ITEM_ID, "entry": _ENTRY, "segment_id": _SEGMENT_ID, "trip_id": _TRIP_ID}, ["item_id"],
+                route=("POST", "/api/assistant/review/{id}/match")),
+    _write_tool("create_segment_from_review_item", "Add a booking from a Review item as a new segment (and a trip when it falls into none), "
+                "with fields to correct or fill in anything (same rules as adding by hand). The item is then removed and its message is kept "
+                "with the booking.", _create_from_item, {"item_id": _ITEM_ID, "entry": _ENTRY, "fields": _SEGMENT_FIELDS}, ["item_id"],
+                route=("POST", "/api/assistant/review/{id}/create")),
+    _write_tool("dismiss_review_item", "Dismiss a Review item as not a trip. It is removed from the queue and its stored email is deleted "
+                "unless something else keeps it; this cannot be undone. The reason is not kept.",
+                _change("assistant/review/{id}/dismiss", "item_id", extra=("reason", "note")),
+                {"item_id": _ITEM_ID, "reason": {"type": "string", "enum": ["not_travel", "duplicate", "already_added", "other"]},
+                 "note": {"type": "string", "maxLength": 200, "description": "Optional, in your own words; never any of the email's text."}},
+                ["item_id", "reason"], route=("POST", "/api/assistant/review/{id}/dismiss")),
     _write_tool("add_guest", "Add a guest: someone who travels with the household but has no login.", _change("people", None, True),
                 {"fields": _PERSON_FIELDS}, ["fields"], route=("POST", "/api/people")),
     _write_tool("update_person", "Change a person's names (a guest's or a member's).", _change("people/{id}", "person_id", True),
@@ -224,6 +324,13 @@ def _call_endpoint(fetch: Fetch, a: dict) -> Any:
     return fetch(path, query, body) if method == "POST" else fetch(path, query, body, "DELETE")
 
 
+MAIL_TOOLS: list[dict[str, Any]] = [
+    {"name": "get_segment_email", "description": "The emails kept with a booking (newest first, at most 5): subject, sender's domain and the text, "
+     "as Waypoint kept it, never HTML. Only when this connection was allowed to read email text.",
+     "inputSchema": _schema({"segment_id": _SEGMENT_ID}, ["segment_id"]),
+     "run": lambda fetch, a: fetch(f"assistant/segments/{_need(a, 'segment_id')}/email", {}), "needs": (MAIL,)},
+]
+
 ANY_TOOLS: list[dict[str, Any]] = [
     {"name": "list_endpoints", "description": "Every Waypoint endpoint call_endpoint can reach, by area, the destructive ones marked.",
      "inputSchema": _schema(), "run": lambda fetch, _a: fetch("endpoints", {}), "needs": (WRITE,), "reads": True},
@@ -235,7 +342,7 @@ ANY_TOOLS: list[dict[str, Any]] = [
                              "body": {"type": "object"}, "query": {"type": "object"}}, ["method", "path"]),
      "run": _call_endpoint, "needs": (WRITE,), "write": True, "idempotent": False, "destructive": True},
 ]
-ALL_TOOLS = TOOLS + WRITE_TOOLS + ANY_TOOLS
+ALL_TOOLS = TOOLS + MAIL_TOOLS + WRITE_TOOLS + ANY_TOOLS
 BY_NAME = {t["name"]: t for t in ALL_TOOLS}
 
 
@@ -264,11 +371,10 @@ def call_tool(name: str, args: dict, fetch: Fetch) -> str:
 
 def _about(fetch: Fetch) -> str:
     about = ("Access to a Waypoint travel app, as the member who connected you: the trips they are on (flights, stays, rentals, "
-             "trains), the people who travel, stats and "
-             "live flight status. Times are wall-clock times at the place, with its zone.")
-    if allowed(fetch, (WRITE,)):
-        return f"{about} {WRITE_RULES}"
-    return f"{about} Everything is read-only."
+             "trains), the people who travel, stats, live flight status and the Review queue. Times are wall-clock times at the place, "
+             "with its zone.")
+    rules = WRITE_RULES if allowed(fetch, (WRITE,)) else f"Everything is read-only. {_refusal(fetch, (WRITE,))}"
+    return f"{about} {rules} {MAIL_RULES if allowed(fetch, (MAIL,)) else NO_MAIL_RULES}"
 
 
 def handle(msg: Any, fetch: Fetch) -> dict | None:
