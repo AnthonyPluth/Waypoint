@@ -1,0 +1,26 @@
+From: Alpine Rail <tickets@alpine-rail.example>
+To: traveller@gmail.example
+Subject: Your train tickets
+Date: Wed, 14 Oct 2026 12:00:00 +0200
+Message-ID: <fx-train-generic-en@alpine-rail.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>CANARY-BODY-TRAIN-EN-6D4N Your train tickets are ready.</p>
+<p>Booking reference: AR48219</p>
+<p>Operator: Alpine Rail</p>
+<p>Exchanges are free until Nov 15, 2026 12:00.</p>
+<h3>Outbound</h3>
+<p>Train: EC 311</p>
+<p>From: Zurich HB</p>
+<p>Departure: 21.11.2026 09:02</p>
+<p>To: Milan Centrale</p>
+<p>Arrival: 21.11.2026 12:25</p>
+<h3>Return</h3>
+<p>Train: EC 316</p>
+<p>From: Milan Centrale</p>
+<p>Departure: 28.11.2026 15:35</p>
+<p>To: Zurich HB</p>
+<p>Arrival: 28.11.2026 18:58</p>
+</body></html>

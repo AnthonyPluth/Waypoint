@@ -12,6 +12,8 @@ import { viewport } from "$lib/phone.svelte";
 import { toast } from "svelte-sonner";
 import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
 
+const settled = () => waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); expect(document.body.style.pointerEvents).not.toBe("none"); });
+
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
   id: 1, address: "ana@gmail.example", owner: "Ana Doe", mine: true, sender_domain: "example-air.example", known_sender: false, holds_bookings: false, subject: null, has_email: true, received: "2026-10-17",
   reason: "no_markup", gmail_url: "https://mail.google.com/mail/?authuser=ana%40gmail.example#all/abc", suggestion: null, suggestion_error: null, ...extra });
@@ -109,6 +111,7 @@ describe("Review", () => {
     expect(await screen.findByLabelText(/Confirmation/)).toBeInTheDocument();
     expect(calls).toContainEqual(["/api/review/4/preview", undefined, undefined]);
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await settled();
     await userEvent.click(within(row).getByRole("button", { name: /Dismiss/ }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/4", "DELETE", undefined]));
   });
@@ -288,7 +291,8 @@ describe("Review", () => {
     expect(screen.getByLabelText("From (airport code)")).toHaveValue("BOS");
     expect(calls.some(([p, m]) => p.startsWith("/api/review/") && m === "DELETE")).toBe(false);
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("form")).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: "Discard" }));
+    await waitFor(() => expect(screen.queryByRole("form")).toBeNull());
   });
 
   it("says when a booking was added but its item couldn’t be taken off the list", async () => {
@@ -472,6 +476,8 @@ describe("Review: the AI’s suggestion", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
     expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
     expect(screen.getByLabelText(/^Pick-up address/)).toHaveClass("ring-2");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     first.unmount();
     const cruise = { kind: "cruise" as const, origin: "Miami", destination: "Nassau", start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00",
       start_zone: "America/New_York", end_zone: "America/Nassau", address: "1015 North America Way, Miami FL 33132", room: "8123", ship: "Example Voyager", deck: "8" };
@@ -578,6 +584,7 @@ describe("Review: the message beside the form", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("That message is no longer in Gmail.");
     previewFails = "";
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await settled();
     await userEvent.click(screen.getByRole("button", { name: /by hand/ }));
     expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
   });
@@ -668,23 +675,148 @@ describe("Review: Ask AI", () => {
   });
 });
 
-describe("Review on a phone", () => {
-  beforeEach(() => { viewport.phone = true; });
+describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as const)("Review on %s", (_name, phone, side) => {
+  beforeEach(() => { viewport.phone = phone; });
   afterEach(() => { viewport.phone = false; });
 
   it("opens Add by hand in a sheet with the message above the form, and Cancel closes it", async () => {
     render(ReviewPage);
     const u = userEvent.setup();
-    const open = await screen.findByRole("button", { name: /Add .* by hand/ });
-    await u.click(open);
+    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
     const sheet = await screen.findByRole("dialog", { name: "Add this booking by hand" });
-    expect(sheet).toHaveAttribute("data-side", "bottom");
-    expect(await within(sheet).findByText(/Your flight EX 410/)).toBeInTheDocument();
+    expect(sheet).toHaveAttribute("data-side", side);
+    const peek = await within(sheet).findByTestId("preview");
+    expect(peek).toHaveTextContent("Your flight EX 410");
+    const form = within(sheet).getByRole("form", { name: "Add this booking by hand" });
+    expect(peek.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(sheet).getByLabelText("Provider")).toHaveValue("Example Air");
     expect(within(sheet).getAllByRole("heading", { name: "Add this booking by hand" })).toHaveLength(1);
-    expect(screen.queryByTestId("review-item")?.closest("ul")?.querySelector("form")).toBeNull();
+    const list = screen.getByRole("list", { name: "Couldn’t read" });
+    expect(list.querySelector("form")).toBeNull();
+    expect(within(list).queryByTestId("preview")).toBeNull();
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
     await u.click(within(sheet).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("opens Check suggestion in the sheet with the message above the form", async () => {
+    held = { matches: [], items: [item({ suggestion: SUGGESTION })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    const sheet = await screen.findByRole("dialog", { name: "Check this suggestion" });
+    expect(sheet).toHaveAttribute("data-side", side);
+    expect(await within(sheet).findByTestId("preview")).toHaveTextContent("EX 410");
+    expect(within(sheet).getByLabelText("Confirmation code")).toHaveValue("QW4R7T");
+    expect(within(sheet).queryByText(/An AI read the email/)).toBeNull();
+    expect(screen.getByRole("list", { name: "Couldn’t read" }).querySelector("form")).toBeNull();
+  });
+
+  it("closes an untouched form with Escape, the close button, Cancel or an outside click without asking", async () => {
+    render(ReviewPage);
+    const u = userEvent.setup();
+    const open = await screen.findByRole("button", { name: /Add .* by hand/ });
+    const gone = settled;
+    await u.click(open);
+    await screen.findByRole("dialog");
+    await u.keyboard("{Escape}");
+    await gone();
+    await u.click(open);
+    await u.click(await screen.findByRole("button", { name: "Close" }));
+    await gone();
+    await u.click(open);
+    await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    await gone();
+    await u.click(open);
+    await screen.findByRole("dialog");
+    const overlay = document.querySelector("[data-slot='sheet-overlay']") as HTMLElement;
+    overlay.dispatchEvent(new MouseEvent("pointerdown", { clientX: 5, clientY: 5, bubbles: true }));
+    overlay.dispatchEvent(new MouseEvent("pointerup", { clientX: 5, clientY: 5, bubbles: true }));
+    overlay.dispatchEvent(new MouseEvent("click", { clientX: 5, clientY: 5, bubbles: true }));
+    await gone();
+    expect(screen.queryByText("Discard this booking?")).toBeNull();
+  });
+
+  it("asks before discarding a changed form, keeps it on Keep editing and closes it on Discard", async () => {
+    render(ReviewPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    const sheet = await screen.findByRole("dialog", { name: "Add this booking by hand" });
+    await u.type(within(sheet).getByLabelText("From (airport code)"), "JFK");
+    await u.keyboard("{Escape}");
+    const ask = await screen.findByRole("dialog", { name: "Discard this booking?" });
+    await u.click(within(ask).getByRole("button", { name: "Keep editing" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Discard this booking?" })).toBeNull());
+    expect(screen.getByRole("dialog", { name: "Add this booking by hand" })).toBeInTheDocument();
+    expect(within(sheet).getByLabelText("From (airport code)")).toHaveValue("JFK");
+    await u.click(within(sheet).getByRole("button", { name: "Close" }));
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard this booking?" })).getByRole("button", { name: "Discard" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(calls.some(([path]) => path === "/api/segments")).toBe(false);
+  });
+
+  it("treats a field changed back to what it was as untouched", async () => {
+    render(ReviewPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    const sheet = await screen.findByRole("dialog");
+    await u.type(within(sheet).getByLabelText("From (airport code)"), "J");
+    await u.clear(within(sheet).getByLabelText("From (airport code)"));
+    await u.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("moves focus into the form on open and back to the button on close", async () => {
+    render(ReviewPage);
+    const u = userEvent.setup();
+    const open = await screen.findByRole("button", { name: /Add .* by hand/ });
+    await u.click(open);
+    const sheet = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(sheet).getByLabelText("What is it?")).toHaveFocus());
+    await u.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(open).toHaveFocus());
+  });
+
+  it("moves focus to the heading for a suggestion", async () => {
+    held = { matches: [], items: [item({ suggestion: SUGGESTION })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    const sheet = await screen.findByRole("dialog", { name: "Check this suggestion" });
+    await waitFor(() => expect(within(sheet).getByRole("heading", { name: "Check this suggestion" })).toHaveFocus());
+  });
+
+  it("collapses the email to its subject and opens it again", async () => {
+    render(ReviewPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    const sheet = await screen.findByRole("dialog");
+    const toggle = within(sheet).getByRole("button", { name: "Hide the email" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(await within(sheet).findByText(/Your flight EX 410/)).toBeVisible();
+    await u.click(toggle);
+    const closed = within(sheet).getByRole("button", { name: "Show the email" });
+    expect(closed).toHaveAttribute("aria-expanded", "false");
+    expect(within(sheet).getByText(/Your flight EX 410/)).not.toBeVisible();
+    expect(within(sheet).getByText("Mail from example-air.example on 2026-10-17")).toBeVisible();
+    await u.click(closed);
+    expect(within(sheet).getByRole("button", { name: "Hide the email" })).toHaveAttribute("aria-expanded", "true");
+    expect(within(sheet).getByText(/Your flight EX 410/)).toBeVisible();
+  });
+
+  it("replaces the open form when another item’s Add by hand is used", async () => {
+    held = { matches: [], items: [item({ id: 1, subject: "First booking" }), item({ id: 2, subject: "Second booking" })], who: [], ai: false };
+    render(ReviewPage);
+    await screen.findByText("First booking");
+    const first = screen.getByRole("button", { name: "Add “First booking” by hand" });
+    const second = screen.getByRole("button", { name: "Add “Second booking” by hand" });
+    first.click();
+    await screen.findByRole("dialog");
+    await waitFor(() => expect(calls.some(([path]) => path === "/api/review/1/preview")).toBe(true));
+    second.click();
+    await waitFor(() => expect(calls.some(([path]) => path === "/api/review/2/preview")).toBe(true));
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.getAllByTestId("preview")).toHaveLength(1);
+    expect(screen.getAllByRole("form")).toHaveLength(1);
   });
 
   it("adds the booking from the sheet and closes it", async () => {

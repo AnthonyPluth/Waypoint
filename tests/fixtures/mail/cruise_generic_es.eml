@@ -1,0 +1,19 @@
+From: Naviera Ejemplo <reservas@naviera-ejemplo.example>
+To: traveller@gmail.example
+Subject: Su reserva de crucero (cruise booking)
+Date: Wed, 14 Oct 2026 12:00:00 +0100
+Message-ID: <fx-cruise-generic-es@naviera-ejemplo.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>CANARY-BODY-CRUISE-ES-7K3W Gracias por reservar su crucero.</p>
+<p>Cancelación sin cargo hasta el 30 de agosto de 2026.</p>
+<p>Código de reserva: NE553208</p>
+<p>Naviera: Naviera Ejemplo</p>
+<p>Nombre del barco: Estrella del Atlántico</p>
+<p>Puerto de embarque: Lisboa (LIS)</p>
+<p>Fecha de embarque: 21 de noviembre de 2026</p>
+<p>Puerto de desembarque: Lisboa (LIS)</p>
+<p>Fecha de desembarque: 28 de noviembre de 2026</p>
+</body></html>

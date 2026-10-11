@@ -2424,6 +2424,208 @@
         }
       }
     },
+    "/api/assistant/review": {
+      "get": {
+        "operationId": "api_assistant_review",
+        "x-handler": "waypoint/server/api/assistant.py:api_assistant_review",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantItems"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/assistant/review/{id}": {
+      "get": {
+        "operationId": "api_assistant_review_item",
+        "x-handler": "waypoint/server/api/assistant.py:api_assistant_review_item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantItemDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/assistant/review/{id}/match": {
+      "post": {
+        "operationId": "api_assistant_review_match",
+        "x-handler": "waypoint/server/api/assistant.py:api_assistant_review_match",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantMatchBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantMatched"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/assistant/review/{id}/create": {
+      "post": {
+        "operationId": "api_assistant_review_create",
+        "x-handler": "waypoint/server/api/assistant.py:api_assistant_review_create",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/assistant/review/{id}/dismiss": {
+      "post": {
+        "operationId": "api_assistant_review_dismiss",
+        "x-handler": "waypoint/server/api/assistant.py:api_assistant_review_dismiss",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantDismissBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantDismissed"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/state": {
       "get": {
         "operationId": "api_state",
@@ -2625,6 +2827,622 @@
           "city",
           "country",
           "zone"
+        ],
+        "additionalProperties": false
+      },
+      "AssistantCandidate": {
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "integer"
+          },
+          "trip_id": {
+            "type": "integer"
+          },
+          "trip_name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "confidence": {
+            "enum": [
+              "exact",
+              "likely",
+              "possible"
+            ]
+          },
+          "agreed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "differed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "segment_id",
+          "trip_id",
+          "trip_name",
+          "kind",
+          "provider",
+          "origin",
+          "destination",
+          "start_local",
+          "end_local",
+          "confidence",
+          "agreed",
+          "differed"
+        ],
+        "additionalProperties": false
+      },
+      "AssistantCreateBody": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "flight",
+              "hotel",
+              "car",
+              "train",
+              "cruise",
+              "parking"
+            ]
+          },
+          "status": {
+            "enum": [
+              "confirmed",
+              "changed",
+              "cancelled"
+            ]
+          },
+          "confirmation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "start_zone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "end_zone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "manage_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "travelers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TravelerBody"
+            }
+          },
+          "itinerary": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            }
+          },
+          "entry": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "AssistantDismissBody": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "enum": [
+              "not_travel",
+              "duplicate",
+              "already_added",
+              "other"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "AssistantDismissed": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "reason": {
+            "enum": [
+              "not_travel",
+              "duplicate",
+              "already_added",
+              "other"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "AssistantEntry": {
+        "type": "object",
+        "properties": {
+          "entry": {
+            "type": "integer"
+          },
+          "booking": {
+            "$ref": "#/components/schemas/AssistantParsed"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantCandidate"
+            }
+          }
+        },
+        "required": [
+          "entry",
+          "booking",
+          "candidates"
+        ],
+        "additionalProperties": false
+      },
+      "AssistantItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "mailbox_id": {
+            "type": "integer"
+          },
+          "mine": {
+            "type": "boolean"
+          },
+          "sender_domain": {
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "no_markup",
+              "incomplete",
+              "broken",
+              "match",
+              "generic"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "received": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_email": {
+            "type": "boolean"
+          },
+          "bookings": {
+            "type": "integer"
+          },
+          "match": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssistantMatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "mailbox_id",
+          "mine",
+          "sender_domain",
+          "reason",
+          "status",
+          "kind",
+          "received",
+          "has_email",
+          "bookings",
+          "match"
+        ],
+        "additionalProperties": false
+      },
+      "AssistantItemDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "mailbox_id": {
+            "type": "integer"
+          },
+          "mine": {
+            "type": "boolean"
+          },
+          "sender_domain": {
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "no_markup",
+              "incomplete",
+              "broken",
+              "match",
+              "generic"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "received": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_email": {
+            "type": "boolean"
+          },
+          "bookings": {
+            "type": "integer"
+          },
+          "match": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssistantMatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantEntry"
+            }
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssistantParsed"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "mailbox_id",
+          "mine",
+          "sender_domain",
+          "reason",
+          "status",
+          "kind",
+          "received",
+          "has_email",
+          "bookings",
+          "match",
+          "entries",
+          "suggestion"
+        ],
+        "additionalProperties": false
+      },
+      "AssistantItems": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantItem"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "not_shown": {
+            "type": "integer"
+          },
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "not_shown",
+          "next"
+        ],
+        "additionalProperties": false
+      },
+      "AssistantMatch": {
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "integer"
+          },
+          "trip_id": {
+            "type": "integer"
+          },
+          "confidence": {
+            "enum": [
+              "exact",
+              "likely",
+              "possible"
+            ]
+          }
+        },
+        "required": [
+          "segment_id",
+          "trip_id",
+          "confidence"
+        ],
+        "additionalProperties": false
+      },
+      "AssistantMatchBody": {
+        "type": "object",
+        "properties": {
+          "entry": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "segment_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "trip_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "AssistantMatched": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "segment_id": {
+            "type": "integer"
+          },
+          "trip_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "segment_id",
+          "trip_id"
+        ],
+        "additionalProperties": false
+      },
+      "AssistantParsed": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confirmation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_zone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_local": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_zone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "travelers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "read": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "status",
+          "provider",
+          "confirmation",
+          "origin",
+          "destination",
+          "address",
+          "phone",
+          "start_local",
+          "start_zone",
+          "end_local",
+          "end_zone",
+          "details",
+          "travelers",
+          "read"
         ],
         "additionalProperties": false
       },
