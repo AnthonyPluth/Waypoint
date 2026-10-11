@@ -7,7 +7,8 @@ from tests.privacy import no_leaks
 from waypoint.domain.mail import extract, flights, when, words
 
 FIXTURES = Path(__file__).parent / "fixtures" / "mail"
-CANARIES = ("CANARY-BODY-FLIGHT-EN-4J7S", "CANARY-BODY-FLIGHT-DE-8W2L", "CANARY-SENDER-FLIGHT-6P1R", "CANARY-BODY-ORDER-2D9K")
+CANARIES = ("CANARY-BODY-FLIGHT-EN-4J7S", "CANARY-BODY-FLIGHT-DE-8W2L", "CANARY-SENDER-FLIGHT-6P1R", "CANARY-BODY-ORDER-2D9K",
+            "CANARY-BODY-ROUND-TRIP-3H8N")
 
 
 def read(body: str):
@@ -217,3 +218,95 @@ class ReadingOrderTests(unittest.TestCase):
                 raw = (FIXTURES / f"{name}.eml").read_bytes()
                 [b] = extract.read({"id": "m1", "raw": base64.urlsafe_b64encode(raw).decode().rstrip("=")}).bookings
                 self.assertEqual((b.origin, b.destination, b.start, b.end, b.confirmation), expected)
+
+
+def block(title: str, day: str, number: str, left: str, right: str, extra: str = "Economy · 2h 50m · Nonstop") -> str:
+    return (f"<table><tr><td>{title}</td><td>{day}</td></tr><tr><td>{extra}</td></tr><tr><td>{number}</td></tr>"
+            f"<tr><td>{left}</td><td>{right}</td></tr></table>")
+
+
+BANNER = ("<table><tr><td>Rewards Travel</td></tr><tr><td>Your flights are booked. Confirmation code: Q7M2KD</td></tr></table>"
+          "<p>CANARY-BODY-ROUND-TRIP-3H8N</p>")
+OUTBOUND = block("Outbound to Denver", "Sat, Dec 5, 2026", "Delta DL 1204", "Boston BOS 7:15 AM", "Denver DEN 10:05 AM")
+RETURN = block("Return to Boston", "Fri, Dec 11, 2026", "Delta DL 1377", "Denver DEN 4:20 PM", "Boston BOS 9:50 PM", "Economy · 3h 40m · Nonstop")
+
+
+def legs(parsed):
+    return [(b.origin, b.destination, b.start, b.end, dict(b.details)["flight_number"], b.confirmation) for b in parsed.bookings]
+
+
+class RoundTripTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(no_leaks(self, *CANARIES))
+
+    def test_a_round_trip_card_site_email_is_one_flight_per_leg_from_every_reading_path(self):
+        raw = (FIXTURES / "flight_round_trip_card_site.eml").read_bytes()
+        message = {"id": "m1", "raw": base64.urlsafe_b64encode(raw).decode().rstrip("=")}
+        expected = [("BOS", "DEN", "2026-12-05T07:15", "2026-12-05T10:05", "DL 1204", "Q7M2KD"),
+                    ("DEN", "BOS", "2026-12-11T16:20", "2026-12-11T21:50", "DL 1377", "Q7M2KD")]
+        found = extract.read(message)
+        generic, why = flights.read("", extract.plain_text(message))
+        self.assertEqual((legs(found), found.unread, found.gaps), (expected, 0, ()))
+        self.assertEqual((legs(generic), why), (expected, None))
+        self.assertEqual({b.provider for b in found.bookings}, {"Delta Air Lines"})
+        self.assertEqual([(b.start_zone, b.end_zone) for b in found.bookings], [(None, None)] * 2)
+
+    def test_the_fixture_has_no_markup_and_no_vendor_parser_so_the_generic_reader_is_what_reads_it(self):
+        raw = (FIXTURES / "flight_round_trip_card_site.eml").read_bytes()
+        self.assertNotIn(b"ld+json", raw)
+        self.assertNotIn(b"schema.org", raw)
+        self.assertIsNone(extract.parsers.for_sender("rewards-travel.example"))
+
+    def test_the_date_is_the_one_in_each_legs_own_block(self):
+        parsed, why = read(BANNER + OUTBOUND + RETURN)
+        self.assertIsNone(why)
+        self.assertEqual([(b.start[:10], b.end[:10]) for b in parsed.bookings], [("2026-12-05", "2026-12-05"), ("2026-12-11", "2026-12-11")])
+
+    def test_a_one_way_is_one_booking(self):
+        parsed, why = read(BANNER + OUTBOUND)
+        self.assertEqual((legs(parsed), why, parsed.unread), ([("BOS", "DEN", "2026-12-05T07:15", "2026-12-05T10:05", "DL 1204", "Q7M2KD")], None, 0))
+
+    def test_an_airport_in_both_legs_is_not_one_flight(self):
+        parsed, _ = read(BANNER + OUTBOUND + RETURN)
+        self.assertEqual([(b.origin, b.destination) for b in parsed.bookings], [("BOS", "DEN"), ("DEN", "BOS")])
+
+    def test_the_same_flight_number_each_way_is_still_two_flights(self):
+        parsed, _ = read(BANNER + OUTBOUND + RETURN.replace("DL 1377", "DL 1204"))
+        self.assertEqual([(b.origin, b.start[:10]) for b in parsed.bookings], [("BOS", "2026-12-05"), ("DEN", "2026-12-11")])
+
+    def test_a_leg_with_no_time_is_reported_and_the_other_leg_is_still_read(self):
+        no_time = block("Return to Boston", "Fri, Dec 11, 2026", "Delta DL 1377", "Denver DEN", "Boston BOS")
+        parsed, why = read(BANNER + OUTBOUND + no_time)
+        self.assertIsNone(why)
+        self.assertEqual((legs(parsed), parsed.unread), ([("BOS", "DEN", "2026-12-05T07:15", "2026-12-05T10:05", "DL 1204", "Q7M2KD")], 1))
+        parsed, _ = read(BANNER + block("Outbound to Denver", "Sat, Dec 5, 2026", "Delta DL 1204", "Boston BOS", "Denver DEN") + RETURN)
+        self.assertEqual(([b.origin for b in parsed.bookings], parsed.unread), (["DEN"], 1))
+
+    def test_a_duration_is_not_read_as_a_time_of_day(self):
+        self.assertIsNone(when.find_time("Economy 2h 50m Nonstop"))
+        self.assertIsNone(when.find_time("3h 40min"))
+        self.assertEqual(when.find_time("à 15h05").hour, 15)
+
+    def test_an_overnight_flight_lands_the_next_day(self):
+        parsed, _ = read(BANNER + block("Outbound to Denver", "Sat, Dec 5, 2026", "Delta DL 1204", "Boston BOS 10:30 PM", "Denver DEN 12:40 AM", "Economy · 4h 10m · Nonstop"))
+        self.assertEqual(legs(parsed), [("BOS", "DEN", "2026-12-05T22:30", "2026-12-06T00:40", "DL 1204", "Q7M2KD")])
+
+    def test_an_arrival_that_is_not_after_the_departure_is_not_guessed(self):
+        parsed, why = read(BANNER + block("Outbound to Denver", "Sat, Dec 5, 2026", "Delta DL 1204", "Boston BOS 7:15 AM", "Denver DEN 5:15 AM"))
+        self.assertEqual((parsed.bookings, why), ((), "arrival isn't after departure"))
+
+    def test_a_flight_to_itself_is_never_read(self):
+        parsed, why = read(BANNER + block("Outbound to Denver", "Sat, Dec 5, 2026", "Delta DL 1204", "Boston BOS 7:15 AM", "Boston BOS 10:05 AM"))
+        self.assertEqual((parsed.bookings, why), ((), "departure and arrival airport are the same"))
+
+    def test_a_block_flight_longer_than_the_limit_is_rejected(self):
+        zones = {"AAA": "Pacific/Kiritimati", "BBB": "Etc/GMT+12"}
+        with mock.patch.object(flights.reference, "airport_zones", return_value=zones):
+            parsed, why = read(BANNER + block("Outbound", "Sat, Dec 5, 2026", "Delta DL 1204", "Alpha AAA 12:05 AM", "Bravo BBB 11:50 PM"))
+        self.assertEqual((parsed.bookings, why), ((), f"flight is longer than {flights.MAX_HOURS} hours"))
+
+    def test_a_block_without_a_date_of_its_own_is_not_given_one_from_elsewhere(self):
+        undated = "<table><tr><td>Outbound to Denver</td></tr><tr><td>Delta DL 1204</td></tr><tr><td>Boston BOS 7:15 AM</td><td>Denver DEN 10:05 AM</td></tr></table>"
+        parsed, why = read("<p>Trip Dec 5, 2026 - Dec 11, 2026</p>" + BANNER + undated)
+        self.assertEqual(parsed.bookings, ())
+        self.assertTrue(why)

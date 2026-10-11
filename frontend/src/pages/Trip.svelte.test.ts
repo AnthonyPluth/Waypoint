@@ -161,6 +161,7 @@ describe("Trip", () => {
       await u.click(within(dialog).getByRole("button", { name: "Move" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2/move", { method: "POST", body: { trip_id: 7 } }));
       expect(location.hash).toBe("#trip/7");
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
       dialog = await screen.findByRole("dialog");
       await u.selectOptions(within(dialog).getByRole("combobox", { name: "Move it to" }), "new");
@@ -484,7 +485,7 @@ describe("Trip", () => {
     await u.click(await screen.findByRole("button", { name: /Add a booking/ }));
     await u.selectOptions(screen.getByLabelText("What is it"), "Hotel");
     expect(screen.queryByLabelText(/Time zone at the end/)).toBeNull();
-    expect(screen.getByText(/Leave this empty to work it out from the address/)).toBeInTheDocument();
+    expect(screen.queryByText(/Leave this empty to work it out from the address/)).toBeNull();
     await u.selectOptions(screen.getByLabelText("What is it"), "Car rental");
     expect(screen.getByLabelText(/Time zone at the end/)).toBeInTheDocument();
   });
@@ -495,7 +496,7 @@ describe("Trip", () => {
     await u.click(await screen.findByRole("button", { name: /Add a booking/ }));
     await u.selectOptions(screen.getByLabelText("What is it"), "Parking");
     expect(screen.queryByLabelText(/Time zone at the end/)).toBeNull();
-    expect(screen.getByText(/Entry and exit are both at the lot/)).toBeInTheDocument();
+    expect(screen.queryByText(/Entry and exit are both at the lot/)).toBeNull();
     await u.type(screen.getByLabelText("Lot name"), "Example Long-Term Lot");
     await u.type(screen.getByLabelText(/^Entry/), "2026-11-20T16:00");
     await u.type(screen.getByLabelText(/^Exit/), "2026-11-27T21:00");

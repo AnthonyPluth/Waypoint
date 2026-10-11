@@ -15,6 +15,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
+  import ReviewGlance from "./ReviewGlance.svelte";
   import { apiCall } from "$lib/contract";
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
@@ -230,6 +231,7 @@
                 {/if}
               </div>
             {/if}
+            {#if m.status === "connected"}<ReviewGlance mailbox={m} onchange={load} />{/if}
             {#if m.scan_notice && !m.scanning && m.status !== "reconnect"}<p class="text-sm text-muted-foreground" role="status">The scan couldn’t start: {m.scan_notice}</p>{/if}
             {#if m.scan_error}<p class="text-sm text-signal-ink" role="status">The last scan stopped: {m.scan_error} What it had read is kept, and the next scan carries on.</p>{/if}
           </div>

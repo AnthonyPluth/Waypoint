@@ -1,0 +1,33 @@
+{
+  "name": "review-at-a-glance",
+  "page": "settings",
+  "steps": [
+    {
+      "goto": "#settings/mail"
+    },
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Settings"
+      }
+    },
+    {
+      "wait_for": "[data-testid='review-glance'][data-state='data']"
+    },
+    {
+      "scroll_to": "[data-testid='review-glance'][data-state='data']"
+    },
+    {
+      "screenshot": "with-data"
+    },
+    {
+      "wait_for": "[data-testid='review-glance'][data-state='empty']"
+    },
+    {
+      "scroll_to": "[data-testid='review-glance'][data-state='empty']"
+    },
+    {
+      "screenshot": "empty"
+    }
+  ]
+}

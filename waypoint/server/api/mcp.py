@@ -30,3 +30,4 @@ def api_mcp_revoke(conn, _q, _b, grant_id) -> Ok:
     if not mcp_oauth.revoke_grant(conn, row_id(grant_id), "revoked_in_settings"):
         raise ApiError("That connection isn't there any more.", 404)
     return {"ok": True}
+
