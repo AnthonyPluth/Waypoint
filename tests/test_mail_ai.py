@@ -214,6 +214,13 @@ class AddressTests(unittest.TestCase):
         found = self.parse({"address": "BOOKERADDR-2R6F Elm Street, Springfield 12345", "phone": "555 010 0199"})
         self.assertEqual(found, STAY)
 
+    def test_a_parking_suggestion_keeps_a_lot_address_that_is_in_the_email_and_drops_one_that_is_not(self):
+        sent = "Confirmation code: PK1234\nLot: Example Long-Term Lot\nAddress: 1 Terminal Road, Jamaica, NY\nEntry 2026-12-02 08:00, exit 2026-12-05 21:00\n"
+        lot = {"kind": "parking", "provider": "Example Parking", "confirmation": "PK1234", "origin": "Example Long-Term Lot",
+               "start_local": "2026-12-02T08:00", "end_local": "2026-12-05T21:00", "start_zone": "America/New_York", "end_zone": "America/New_York"}
+        self.assertEqual(self.parse({"address": "1 Terminal Road, Jamaica, NY"}, sent, lot)["address"], "1 Terminal Road, Jamaica, NY")
+        self.assertEqual(self.parse({"address": "9 Invented Street, Nowhere"}, sent, lot), lot)
+
     def test_an_address_in_a_block_labelled_guest_or_billing_is_dropped(self):
         for label in ("Guest", "Billing address", "Billed to", "Booked by"):
             with self.subTest(label=label):
@@ -278,7 +285,7 @@ class AddressTests(unittest.TestCase):
         self.assertIn("Never give any of these for a flight", prompt)
         self.assertIn("never the address of the guest, the booker, the cardholder or a billing address", prompt)
         self.assertIn("a block labelled booker, guest or billing", prompt)
-        self.assertEqual((ai.ADDRESS_KINDS, ai.PHONE_KINDS), (("hotel", "car", "train", "cruise"), ("hotel", "car", "cruise")))
+        self.assertEqual((ai.ADDRESS_KINDS, ai.PHONE_KINDS), (("hotel", "car", "train", "cruise", "parking"), ("hotel", "car", "cruise")))
 
 
 class ConfigTests(unittest.TestCase):
