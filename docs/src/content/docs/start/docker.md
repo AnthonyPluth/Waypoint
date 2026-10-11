@@ -7,10 +7,6 @@ sidebar:
 
 Waypoint signs you in through your OpenID Connect provider (Authentik, Authelia, Keycloak, Pocket ID, Google, Microsoft Entra, …). The image holds Python, Waypoint’s dependencies and Waypoint itself. It uses SQLite in `/data`, or Postgres if you set `DATABASE_URL`.
 
-:::note
-Waypoint is in an early phase: today it offers sign-in, settings and backups. Installing it now gets you the foundation the travel features will be added to.
-:::
-
 ## 1. Register Waypoint with your provider
 
 Create an OIDC / OAuth2 application (a “confidential” client, authorization code flow):

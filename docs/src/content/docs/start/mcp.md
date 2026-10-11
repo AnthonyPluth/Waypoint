@@ -5,7 +5,7 @@ sidebar:
   order: 7
 ---
 
-Waypoint serves a [Model Context Protocol](https://modelcontextprotocol.io) endpoint, so an assistant like Claude can answer questions about your travel (what’s coming up, who is on a trip, your stats) and, if you allow it, change it. It never sees your email, mailboxes, loyalty or Known Traveler numbers, backups or settings.
+Waypoint serves a [Model Context Protocol](https://modelcontextprotocol.io) endpoint, so an assistant like Claude can answer questions about your travel (what’s coming up, who is on a trip, your stats) and, if you allow it, change it. It never sees the text of your email, your mailboxes, loyalty or Known Traveler numbers, backups or settings.
 
 **The assistant is the member who approved it.** It sees exactly what that member sees in the app: the trips they’re on, and nothing of a trip only someone else is on. A trip it can’t see is “No such trip”, the same as one that doesn’t exist.
 
@@ -31,6 +31,15 @@ An app that registers but is never approved is forgotten after a day (and at mos
 An assistant always gets **read**: upcoming flights, stays, rentals, trains, cruises and parking, trips and a trip’s segments with who is travelling, people and guests, [stats](/Waypoint/start/stats/), and the live [flight status](/Waypoint/start/flight-status/) Waypoint already holds (an assistant never makes Waypoint look anything up). Times are the wall-clock times at the place, with its zone, as in the app.
 The tools are `upcoming`, `list_trips`, `get_trip`, `list_people`, `get_stats` and `flight_status`.
 
+### The Review queue
+
+An assistant can also work the [Review](/Waypoint/start/review/) queue of the mailboxes whose items you can see (your own, and those a household member shared). It sees each item as the fields Waypoint already read from it, the same kind of data `get_trip` returns for a booking: the kind, provider, confirmation code, places, address, phone, start and end with their zones, travellers (as the email printed them), which fields the reader marked as read, the sender’s domain, why the item needs review and the bookings it could be. **It does not see the email’s subject, text, snippet or images**. An item that isn’t yours is “No such item”, like one that doesn’t exist.
+
+- `list_review_items`: your pending items, newest first, with filters (`reason`, `kind`, `mailbox`, `has_match`, `since`) and pages of at most 50 with a `cursor`; it says how many it didn’t show.
+- `get_review_item`: one item in full, with each booking in it and the bookings it could be. Every candidate carries a `confidence` of `exact`, `likely` or `possible` and the fields that agreed and differed (confirmation code, provider, kind, places, dates). It is worked out by fixed rules, the same every time, with no AI: `exact` when the confirmation codes agree and nothing else disagrees, `likely` when they agree but something else differs, or there is no code to compare and the dates, provider and places all agree, and `possible` otherwise.
+
+Settling an item changes your trips, so these three need **Change trips** and the **Let assistants change trips** switch like any other change, and the assistant is told to ask first: `match_review_item` (attach the booking to a segment you can see, which gets the item’s confirmation code and link, or add it to a trip you can see), `create_segment_from_review_item` (add a booking from the item, correcting any field, with the same checks as adding by hand) and `dismiss_review_item` (not a trip). **Dismissing is destructive**: it removes the item and deletes its stored message unless a booking was made from it, as the Review page’s dismiss does, so the assistant must get a separate yes. The reason it is given (not travel, duplicate, already added or other, and a short note) is not kept. No tool removes a segment through the queue, and none touches a mailbox.
+
 ## Letting it change trips (optional)
 
 An assistant can also ask for **Change trips**: everything the app changes, as the approver. That’s trips (add, rename, merge, split, remove), segments (add, edit, move to another trip, remove), travellers, people and guests, and the distance unit; deletes are included, and marked as destructive. A change needs both:
@@ -42,7 +51,7 @@ Waypoint tells the assistant to describe every change and wait for your yes, and
 
 ## What it can never reach
 
-Whatever it was allowed and whatever the switch says, an assistant can never reach: loyalty and Known Traveler numbers (an assistant has no need of one, so not even their last four characters, nor the list of memberships), Gmail mailboxes and scanning, the “Couldn’t read” queue, the AI settings, backup and restore, sign-in and who’s signed in, the calendar feed and notification devices, the copy of your current trip saved for offline use, the flight-status refresh (it spends the monthly budget and uses the key), the Logo.dev settings, importing past flights from a file, and these assistant settings themselves. **Nothing from your email is reachable**: no body, subject or review item. A flight read from an email is a segment like any other, which is the household’s own data. The list is `BLOCKED` in `waypoint/server/mcp_access.py`, and a test lists every route as reachable or blocked, so a new route has to be decided on.
+Whatever it was allowed and whatever the switch says, an assistant can never reach: loyalty and Known Traveler numbers (an assistant has no need of one, so not even their last four characters, nor the list of memberships), Gmail mailboxes and scanning, the “Couldn’t read” queue, the AI settings, backup and restore, sign-in and who’s signed in, the calendar feed and notification devices, the copy of your current trip saved for offline use, the flight-status refresh (it spends the monthly budget and uses the key), the Logo.dev settings, importing past flights from a file, and these assistant settings themselves. **Nothing of your email’s own text is reachable**: no body, subject, snippet or image. An assistant sees a review item only as the fields Waypoint parsed from it (confirmation code, places, address, phone, dates and traveller names, which a plain **read** connection can therefore see), and the Review and booking-email routes stay closed to it. A flight read from an email is a segment like any other, which is the household’s own data. The list is `BLOCKED` in `waypoint/server/mcp_access.py`, and a test lists every route as reachable or blocked, so a new route has to be decided on.
 
 ## Endpoints
 

@@ -5,6 +5,7 @@
   import type { Person, Segment } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
+  import FlightLength from "$lib/components/FlightLength.svelte";
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
   import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, SEAT_LIMIT, SEATED, seatKey, type Draft } from "$lib/segment-form";
 
@@ -81,10 +82,9 @@
       <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "parking" ? "Exit" : d.kind === "car" ? "Drop-off" : d.kind === "cruise" ? "Disembarks" : "Arrives"}</span>
         <Input type="datetime-local" bind:value={d.end_local} autocomplete="off" />
         <span class="text-muted-foreground">The local time at the place it ends.</span></label>
+      {#if flight}<FlightLength origin={d.origin} destination={d.destination} start={d.start_local} end={d.end_local} />{/if}
       <label class={label}><span class="font-medium">{flight ? "Departure time zone (only if the airport isn’t known)" : "Time zone"}</span>
-        <ZoneSelect bind:value={d.start_zone} blank={startBlank} />
-        {#if d.kind === "hotel"}<span class="text-muted-foreground">Check-in and check-out are both at the hotel. Leave this empty to work it out from the address.</span>{/if}
-        {#if d.kind === "parking"}<span class="text-muted-foreground">Entry and exit are both at the lot. Leave this empty to work it out from the address.</span>{/if}</label>
+        <ZoneSelect bind:value={d.start_zone} blank={startBlank} /></label>
       {#if !stay}
         <label class={label}><span class="font-medium">{flight ? "Arrival time zone (only if the airport isn’t known)" : "Time zone at the end (if different)"}</span>
           <ZoneSelect bind:value={d.end_zone} blank={flight ? "Work it out from the airport" : d.kind === "cruise" ? "Same as where it starts" : "Same as where it starts, or work it out from the airport"} /></label>

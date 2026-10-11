@@ -33,6 +33,8 @@ The AI is told to give the property’s address, never the guest’s or the book
 
 A suggestion is a draft. **Check suggestion** opens the same form as **Add by hand**, filled in, with the address and the other details the AI read outlined so you check them first; you change what’s off and add it. Nothing is saved as a booking until you do.
 
+Several flights in one email become several suggestions. The model replies with a list of bookings, one for each flight (a round trip is an outbound and a return, each with its own airports, date, times and flight number), and each is checked on its own: a flight that leaves from and arrives at the same airport, or that lasts longer than 30 hours, is left out with a reason, and the others are kept. In Review the item shows one editable suggestion for each flight, in order, with **Dismiss** for a flight you don’t want and a single **Add 2 flights** (the count of flights) that adds them together; they land in the same trip when their dates fit one. The form also warns, without stopping you, when a flight is longer than 30 hours (“This flight is 6 days long. Check the times.”). Items made before this keep their one suggestion; **Ask again** gets the new reading.
+
 ## Turning it off
 
 Choosing **Off** stops the sending at once, including a scan that’s under way: the setting is read again before each message.

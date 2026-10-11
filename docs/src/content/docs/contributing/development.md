@@ -123,7 +123,7 @@ Waypoint applies it on its next start. Queries, in the app and in the tests, are
 |---|---|
 | `run.py` | Starts the server; `backup`, `restore`, `demo` and `verify` commands |
 | `waypoint/server/` | Web server: `handler.py` (who may reach what, security headers, request limits, reading bodies and sending answers, `serve()`), `routes.py` (the API’s route table: finding a request’s route and answering it), `api/` (the API, one module per area), `common.py` (shared handler helpers) and `contract.py` (the API contract’s types) |
-| `waypoint/domain/` | What Waypoint works out from your data. It doesn’t import the server. Nearly empty in Phase 0 (`demo.py`, the sample data); the travel logic goes here |
+| `waypoint/domain/` | What Waypoint works out from your data. It doesn’t import the server. The trips, the mail parsers (`mail/`) and `demo.py`, the sample data |
 | `waypoint/providers/` | Each outside service Waypoint reads from or sends to. Providers don’t import each other; what two of them share sits in a module of its own |
 | `waypoint/storage/` | The database, at the bottom: it imports nothing from the domain, the providers or the server, and only it imports the database drivers and Alembic |
 | `waypoint/storage/db.py`, `schema.py`, `models.py`, `settings_keys.py`, `secretbox.py`, `backup.py` | Database connections (SQLite or Postgres), the schema and its ORM models, the settings’ names, secrets encrypted at rest, backups |

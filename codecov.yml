@@ -10,4 +10,10 @@ coverage:
     patch:
       default:
         informational: true
+flag_management:
+  individual_flags:
+    - name: backend
+      carryforward: true    # a commit whose upload is missing (a cancelled run, a failed test step) keeps the last report instead of a grey badge
+    - name: frontend
+      carryforward: true
 comment: false                # the status checks carry the numbers; no bot comment on every pull request

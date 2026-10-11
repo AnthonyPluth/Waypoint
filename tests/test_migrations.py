@@ -599,6 +599,21 @@ class MigrationTests(unittest.TestCase):
             self.assertIsNone(c.execute(select(schema.scanned_messages.c.sender_domain)).scalar())
         self.assertEqual(drift(self.path), [])
 
+    def test_0026_adds_the_gap_to_the_review_items_and_takes_it_away_leaving_the_rows(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            self.assertIn("gap", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
+            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected"))
+            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m1", sender_domain="seaside-stays.example",
+                                                         reason="incomplete", created=1.0, gap="no place"))
+            command.downgrade(db.alembic_config(c), "0025")
+            self.assertNotIn("gap", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
+            self.assertEqual(c.execute(select(schema.review_items.c.reason)).scalars().all(), ["incomplete"])
+            command.upgrade(db.alembic_config(c), "head")
+            self.assertIsNone(c.execute(select(schema.review_items.c.gap)).scalar())
+        self.assertEqual(drift(self.path), [])
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:

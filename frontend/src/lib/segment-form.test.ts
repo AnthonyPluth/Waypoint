@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blank, body, DETAILS, draftOf, problem, type Draft, type Kind } from "./segment-form";
+import { blank, body, DETAILS, draftOf, longFlightWarning, problem, type Draft, type Kind } from "./segment-form";
 import { segment } from "../test/fixtures";
 
 const flight = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), origin: "JFK", destination: "LHR", start_local: "2026-11-20T19:00", end_local: "2026-11-21T07:10", people: [1], ...extra });
@@ -187,5 +187,25 @@ describe("the fields each kind shows", () => {
     expect(body({ ...d, details: { ...d.details, address: "  3 Mill Lane\nLondon  " } }).details?.address).toBe("3 Mill Lane\nLondon");
     expect(problem(d)).toBeNull();
     expect(problem({ ...d, details: { address: "x".repeat(301) } })).toMatch(/at most 300/);
+  });
+});
+
+describe("the long flight warning", () => {
+  const BOS = "America/New_York", DEN = "America/Denver";
+
+  it("says how long a flight is when it is longer than any flight", () => {
+    expect(longFlightWarning("2026-12-05T07:15", "2026-12-11T21:50", BOS, DEN)).toBe("This flight is 6 days long. Check the times.");
+    expect(longFlightWarning("2026-12-05T07:15", "2026-12-06T21:50", BOS, DEN)).toBe("This flight is 40 hours long. Check the times.");
+  });
+
+  it("counts the airports’ zones, not the clock alone", () => {
+    expect(longFlightWarning("2026-12-05T10:00", "2026-12-05T06:00", "Australia/Sydney", "America/Los_Angeles")).toBeNull();
+    expect(longFlightWarning("2026-12-05T07:15", "2026-12-06T08:00", BOS, DEN)).toBeNull();
+  });
+
+  it("is quiet while a time or a zone is missing", () => {
+    expect(longFlightWarning("", "2026-12-11T21:50", BOS, DEN)).toBeNull();
+    expect(longFlightWarning("2026-12-05T07:15", "2026-12-11T21:50", null, DEN)).toBeNull();
+    expect(longFlightWarning("2026-12-05T07:15", "2026-12-04T21:50", BOS, DEN)).toBeNull();
   });
 });

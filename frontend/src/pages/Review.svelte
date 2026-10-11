@@ -20,17 +20,17 @@
 <script lang="ts">
   import { SvelteSet } from "svelte/reactivity";
   import { act, errMsg, ignoreFailure } from "$lib/act";
-  import type { Person, Review, ReviewMatch, WhoIsThis } from "$lib/api-types";
-  import { refreshState } from "$lib/app.svelte";
+  import type { Person, Review, ReviewMatch, SegmentBody, WhoIsThis } from "$lib/api-types";
+  import { refreshState, route, setQuery } from "$lib/app.svelte";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button, buttonVariants } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import MessageView from "$lib/components/MessageView.svelte";
+  import FlightLength from "$lib/components/FlightLength.svelte";
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
   import { Input } from "$lib/components/ui/input";
   import { Sheet } from "$lib/components/ui/sheet";
-  import { viewport } from "$lib/phone.svelte";
   import { DETAILS, type Kind } from "$lib/segment-form";
   import { apiCall } from "$lib/contract";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
@@ -57,28 +57,48 @@
   const KINDS: [string, string][] = [["flight", "Flight"], ["hotel", "Hotel stay"], ["car", "Car rental"], ["train", "Train"], ["parking", "Parking"]];
   const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
+  const only = $derived.by(() => {
+    const q = new URLSearchParams(route.query);
+    const from = q.get("sender");
+    return from ? { sender: from, mailbox: q.get("mailbox") } : null;
+  });
+  const shown = $derived(review ? (only ? review.items.filter((i) => i.sender_domain === only.sender && (!only.mailbox || i.address === only.mailbox)) : review.items) : []);
+
   const sender = (i: ReviewItem) => i.sender_domain || "Unknown sender";
   const subject = (i: ReviewItem) => i.subject || `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
 
-  const SHOWN: Record<string, string[]> = { hotel: ["address", "phone"], car: ["address", "phone"], train: ["address"], parking: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
+  const SHOWN: Record<string, string[]> = { flight: ["flight_number", "cabin"], hotel: ["address", "phone"], car: ["address", "phone"], train: ["address"], parking: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
   const detailLabel = (kind: string, key: string) => DETAILS[kind as Kind].find(([k]) => k === key)?.[1] ?? key;
   type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string> };
-  const detailsOf = (s: NonNullable<ReviewItem["suggestion"]>): Record<string, string> => ({ address: s.address ?? "", phone: s.phone ?? "", room: s.room ?? "", ship: s.ship ?? "", deck: s.deck ?? "" });
-  let draft = $state<Draft | null>(null);
+  const detailsOf = (s: ReviewItem["suggestions"][number]): Record<string, string> => ({ address: s.address ?? "", phone: s.phone ?? "", room: s.room ?? "", ship: s.ship ?? "", deck: s.deck ?? "", flight_number: s.flight_number ?? "", cabin: s.cabin ?? "" });
+  const suggestedDraft = (item: ReviewItem, s: ReviewItem["suggestions"][number]): Draft => ({
+    item, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
+    destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", details: detailsOf(s),
+    read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), sources: s.sources ?? {} });
+  const handDraft = (item: ReviewItem): Draft => ({ item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {} });
+  let drafts = $state<Draft[]>([]);
+  const draft = $derived(drafts[0] ?? null);
   let formError = $state("");
   let saving = $state(false);
-  let inSheet = $state(false);
+  let emailOpen = $state(true);
+  let baseline = "";
+  let addedIds: number[] = [];
+  const fingerprint = (d: Draft) => JSON.stringify([d.kind, d.provider, d.confirmation, d.origin, d.destination, d.start, d.end, d.startZone, d.endZone,
+    Object.entries(d.details).filter(([, v]) => v.trim()).sort(([a], [b]) => a.localeCompare(b))]);
+  const fingerprints = () => JSON.stringify(drafts.map(fingerprint));
+  const dirty = $derived(drafts.length > 0 && fingerprints() !== baseline);
   const startAdd = (item: ReviewItem, use = false) => {
-    inSheet = viewport.phone;
-    const s = use ? item.suggestion : null;
-    draft = s
-      ? { item, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
-          destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", details: detailsOf(s),
-          read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), sources: s.sources ?? {} }
-      : { item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {} };
+    if (draft && draft.item.id !== item.id) delete peeks[draft.item.id];
+    emailOpen = true;
+    addedIds = [];
+    drafts = use && item.suggestions.length ? item.suggestions.map((s) => suggestedDraft(item, s)) : [handDraft(item)];
+    baseline = fingerprints();
     formError = "";
     void peek(item);
   };
+  const dropLeg = (leg: Draft) => { drafts = drafts.filter((d) => d !== leg); };
+  const plural = (n: number, ds: Draft[]) => (ds.every((d) => d.kind === "flight") ? `${n} flights` : `${n} bookings`);
+  const legTitle = (leg: Draft, n: number) => `${leg.kind === "flight" ? "Flight" : "Booking"} ${n + 1} of ${drafts.length}${leg.origin && leg.destination ? `: ${leg.origin.toUpperCase()} → ${leg.destination.toUpperCase()}` : ""}`;
   type Peek = { state: "loading" } | { state: "ready"; subject: string | null; text: string; html: string | null; truncated: boolean; original: boolean; images: number; width: number | null } | { state: "error"; message: string };
   let peeks = $state<Record<number, Peek>>({});
   async function peek(item: ReviewItem) {
@@ -97,7 +117,7 @@
   }, { busy: (on) => (on ? asking_ai.add(item.id) : asking_ai.delete(item.id)) });
 
   let asking_all = $state(false);
-  const unasked = $derived(review?.ai ? review.items.filter((i) => i.mine && !i.suggestion && !asking_ai.has(i.id)) : []);
+  const unasked = $derived(review?.ai ? review.items.filter((i) => i.mine && !i.suggestions.length && !asking_ai.has(i.id)) : []);
   const askAll = (items: ReviewItem[]) => act(async () => {
     let done = 0;
     try {
@@ -117,28 +137,56 @@
 
   const closeForm = () => {
     if (draft) delete peeks[draft.item.id];
-    draft = null;
+    drafts = [];
+  };
+  let discarding = $state(false);
+  const requestClose = () => {
+    if (saving) return;
+    if (dirty) discarding = true;
+    else closeForm();
+  };
+  const focusSheet = (e: Event) => {
+    e.preventDefault();
+    const sheet = document.querySelector<HTMLElement>("[data-slot='sheet']");
+    const target = draft?.suggested ? "[data-dialog-title]" : "form[data-editor] select";
+    sheet?.querySelector<HTMLElement>(target)?.focus({ preventScroll: true });
   };
 
-  async function add(e: SubmitEvent) {
-    e.preventDefault();
-    const d = draft;
-    if (!d) return;
+  function bodyOf(d: Draft): SegmentBody | string {
     const flight = d.kind === "flight";
     const details = Object.fromEntries((SHOWN[d.kind] ?? []).map((key) => [key, (d.details[key] ?? "").trim()] as const).filter(([, v]) => v));
     const stay = d.kind === "hotel" || d.kind === "parking";
-    if (stay && !d.startZone.trim() && !details["address"]) { formError = `Enter the ${d.kind === "hotel" ? "hotel" : "lot"}’s time zone (for example America/New_York), or its address to work it out from`; return; }
-    const body = { kind: d.kind as "flight" | "hotel" | "car" | "train" | "cruise" | "parking", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
+    if (stay && !d.startZone.trim() && !details["address"]) return `Enter the ${d.kind === "hotel" ? "hotel" : "lot"}’s time zone (for example America/New_York), or its address to work it out from`;
+    return { kind: d.kind as "flight" | "hotel" | "car" | "train" | "cruise" | "parking", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
       destination: d.destination, ...(Object.keys(details).length && { details }), ...(flight ? {} : stay ? { start_zone: d.startZone.trim() || null } : d.kind === "cruise" ? { start_zone: d.startZone, end_zone: d.endZone || d.startZone } : { ...(d.startZone && { start_zone: d.startZone }), ...(d.endZone && { end_zone: d.endZone }) }) };
-    let added = false;
+  }
+
+  async function add(e: SubmitEvent) {
+    e.preventDefault();
+    const legs = [...drafts];
+    const first = legs[0];
+    if (!first) return;
+    const bodies: SegmentBody[] = [];
+    for (const leg of legs) {
+      const built = bodyOf(leg);
+      if (typeof built === "string") { formError = built; return; }
+      bodies.push(built);
+    }
+    const added = addedIds;
+    const before = added.length;
+    let listed = false;
     const ok = await act(async () => {
-      const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
-      added = true;
-      await apiCall<"DELETE /api/review/{id}">(`/api/review/${d.item.id}?segment=${made.id}`, { method: "DELETE" });
-    }, { busy: (on) => (saving = on), onError: (m) => (formError = added ? `Added, but couldn’t take it off this list: ${m}` : m) });
-    if (!ok) { if (added) { closeForm(); await settle(); } return; }
+      for (const [n, body] of bodies.entries()) {
+        const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
+        added.push(made.id);
+        drafts = drafts.filter((d) => d !== legs[n]);
+      }
+      listed = true;
+      await apiCall<"DELETE /api/review/{id}">(`/api/review/${first.item.id}?${added.map((id) => `segment=${id}`).join("&")}`, { method: "DELETE" });
+    }, { busy: (on) => (saving = on), onError: (m) => (formError = listed ? `Added, but couldn’t take it off this list: ${m}` : added.length ? `Added ${added.length} of ${before + bodies.length}, but couldn’t add the rest: ${m}` : m) });
+    if (!ok) { if (listed) { closeForm(); await settle(); } else if (added.length) await settle(); return; }
     closeForm();
-    toast.success("Added to your trips");
+    toast.success(added.length > 1 ? `Added ${plural(added.length, legs)} to your trips` : "Added to your trips");
     await settle();
   }
 
@@ -199,55 +247,68 @@
 
 <h1 class="mb-6 text-display">Review</h1>
 
-{#snippet detailField(d: Draft, key: string, hint?: string)}
+{#snippet detailField(d: Draft, key: string)}
   {@const outlined = !!d.sources[key] || d.read.includes(key)}
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{detailLabel(d.kind, key)} {#if d.sources[key]}<span class="font-normal text-muted-foreground">from “{d.sources[key]}”</span>{/if}</span>
-    <Input class={outlined ? "ring-2 ring-primary" : ""} value={d.details[key] ?? ""} oninput={(e) => (d.details[key] = e.currentTarget.value)} maxlength={key === "address" ? 300 : 200} autocomplete="off" />
-    {#if hint}<span class="text-muted-foreground">{hint}</span>{/if}</label>
+    <Input class={outlined ? "ring-2 ring-primary" : ""} value={d.details[key] ?? ""} oninput={(e) => (d.details[key] = e.currentTarget.value)} maxlength={key === "address" ? 300 : 200} autocomplete="off" /></label>
 {/snippet}
 
-{#snippet addForm(item: ReviewItem, d: Draft, titled: boolean)}
+{#snippet legFields(d: Draft)}
   {@const labels = placeLabels(d.kind)}
-  <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-labelledby={titled ? `add-${item.id}` : undefined} aria-label={titled ? undefined : "Add this booking by hand"}>
-    {#if titled}<h3 id={`add-${item.id}`} class="font-medium">{d.suggested ? "Check this suggestion" : "Add this booking by hand"}</h3>{/if}
-    {#if d.suggested && item.reason === "generic"}<p class="text-sm text-muted-foreground">Waypoint read this from labelled lines in the email, not from the vendor’s own booking data. The fields it found are outlined: check each against the booking, change what’s off, then add it. Adding it also trusts {sender(item)}, so later mail from there is added without asking.</p>
-    {:else if d.suggested}<p class="text-sm text-muted-foreground">An AI read the email and suggested this. It can be wrong: check each field against the booking, change what’s off, then add it.</p>{/if}
-    {#if item.received}<p class="text-sm text-muted-foreground">The email was sent {item.received}. Enter the times as they read on the booking, at the place they happen.</p>{/if}
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">What is it?</span>
-      <select bind:value={d.kind} class={selectClass}>{#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}</select></label>
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Provider</span>
-      <Input bind:value={d.provider} maxlength={100} autocomplete="off" /></label>
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Confirmation code {#if d.sources["confirmation"]}<span class="font-normal text-muted-foreground">from “{d.sources["confirmation"]}”</span>{/if}</span>
-      <Input class={d.sources["confirmation"] ? "ring-2 ring-primary" : ""} bind:value={d.confirmation} maxlength={50} autocomplete="off" spellcheck={false} /></label>
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[0]} {#if d.sources["origin"]}<span class="font-normal text-muted-foreground">from “{d.sources["origin"]}”</span>{/if}</span>
-      <Input class={d.sources["origin"] ? "ring-2 ring-primary" : ""} bind:value={d.origin} required maxlength={100} autocomplete="off" /></label>
-    {#if labels[1]}
-      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[1]}</span>
-        <Input bind:value={d.destination} required={d.kind === "flight"} maxlength={100} autocomplete="off" /></label>
+  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">What is it?</span>
+    <select bind:value={d.kind} class={selectClass}>{#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}</select></label>
+  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Provider</span>
+    <Input bind:value={d.provider} maxlength={100} autocomplete="off" /></label>
+  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Confirmation code {#if d.sources["confirmation"]}<span class="font-normal text-muted-foreground">from “{d.sources["confirmation"]}”</span>{/if}</span>
+    <Input class={d.sources["confirmation"] ? "ring-2 ring-primary" : ""} bind:value={d.confirmation} maxlength={50} autocomplete="off" spellcheck={false} /></label>
+  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[0]} {#if d.sources["origin"]}<span class="font-normal text-muted-foreground">from “{d.sources["origin"]}”</span>{/if}</span>
+    <Input class={d.sources["origin"] ? "ring-2 ring-primary" : ""} bind:value={d.origin} required maxlength={100} autocomplete="off" /></label>
+  {#if labels[1]}
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[1]}</span>
+      <Input bind:value={d.destination} required={d.kind === "flight"} maxlength={100} autocomplete="off" /></label>
+  {/if}
+  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "parking" ? "Entry" : d.kind === "car" ? "Pick-up time" : "Departs"} {#if d.sources["start_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["start_local"]}”</span>{/if}</span>
+    <Input type="datetime-local" class={d.sources["start_local"] ? "ring-2 ring-primary" : ""} bind:value={d.start} required /></label>
+  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "parking" ? "Exit" : d.kind === "car" ? "Drop-off time" : "Arrives"} {#if d.sources["end_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["end_local"]}”</span>{/if}</span>
+    <Input type="datetime-local" class={d.sources["end_local"] ? "ring-2 ring-primary" : ""} bind:value={d.end} required /></label>
+  {#if d.kind === "flight"}<FlightLength origin={d.origin} destination={d.destination} start={d.start} end={d.end} />{/if}
+  {#if d.kind === "hotel" || d.kind === "parking"}
+    {@render detailField(d, "address")}
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>
+      <ZoneSelect bind:value={d.startZone} blank="Work it out from the address" /></label>
+    {@render detailField(d, "phone")}
+  {:else if d.kind !== "flight"}
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it starts</span>
+      <ZoneSelect bind:value={d.startZone} blank={d.kind === "cruise" ? "Choose a time zone" : "Work it out from the airport"} required={d.kind === "cruise"} /></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it ends</span>
+      <ZoneSelect bind:value={d.endZone} blank="Same as where it starts" /></label>
+    {#each SHOWN[d.kind] ?? [] as key (key)}{@render detailField(d, key)}{/each}
+  {:else}
+    {#each SHOWN.flight as key (key)}{#if d.read.includes(key)}{@render detailField(d, key)}{/if}{/each}
+  {/if}
+{/snippet}
+
+{#snippet addForm(item: ReviewItem)}
+  {@const lead = drafts[0]}
+  {@const many = drafts.length > 1}
+  <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-label={lead?.suggested ? (many ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"}>
+    {#if lead?.suggested && item.reason === "generic"}<p class="text-sm text-muted-foreground">Waypoint read this from labelled lines in the email, not from the vendor’s own booking data. The fields it found are outlined: check each against the booking, change what’s off, then add it. Adding it also trusts {sender(item)}, so later mail from there is added without asking.</p>
     {/if}
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "parking" ? "Entry" : d.kind === "car" ? "Pick-up time" : "Departs"} {#if d.sources["start_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["start_local"]}”</span>{/if}</span>
-      <Input type="datetime-local" class={d.sources["start_local"] ? "ring-2 ring-primary" : ""} bind:value={d.start} required /></label>
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "parking" ? "Exit" : d.kind === "car" ? "Drop-off time" : "Arrives"} {#if d.sources["end_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["end_local"]}”</span>{/if}</span>
-      <Input type="datetime-local" class={d.sources["end_local"] ? "ring-2 ring-primary" : ""} bind:value={d.end} required /></label>
-    {#if d.kind === "hotel" || d.kind === "parking"}
-      {@render detailField(d, "address", "Waypoint works the time zone out from it when you leave the time zone empty.")}
-      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>
-        <ZoneSelect bind:value={d.startZone} blank="Work it out from the address" />
-        <span class="text-muted-foreground">{d.kind === "parking" ? "Entry and exit are both at the lot." : "Check-in and check-out are both at the hotel."} Leave this empty to work it out from the address above.</span></label>
-      {@render detailField(d, "phone")}
-    {:else if d.kind !== "flight"}
-      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it starts</span>
-        <ZoneSelect bind:value={d.startZone} blank={d.kind === "cruise" ? "Choose a time zone" : "Work it out from the airport"} required={d.kind === "cruise"} /></label>
-      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it ends</span>
-        <ZoneSelect bind:value={d.endZone} blank="Same as where it starts" /></label>
-      {#each SHOWN[d.kind] ?? [] as key (key)}{@render detailField(d, key)}{/each}
-    {:else}
-      <p class="text-sm text-muted-foreground">A flight’s time zones come from its airports.</p>
+    {#if many}
+      {#each drafts as leg, n (leg)}
+        <fieldset class="flex min-w-0 flex-col gap-4 rounded-xl border border-border p-3" data-testid="leg">
+          <legend class="px-1 text-sm font-medium">{legTitle(leg, n)}</legend>
+          {@render legFields(leg)}
+          <div><Button type="button" variant="outline" size="sm" disabled={saving} onclick={() => dropLeg(leg)} aria-label={`Dismiss ${legTitle(leg, n)}`}>Dismiss this {leg.kind === "flight" ? "flight" : "booking"}</Button></div>
+        </fieldset>
+      {/each}
+    {:else if lead}
+      {@render legFields(lead)}
     {/if}
     {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
     <div class="flex flex-wrap gap-2">
-      <Button type="submit" disabled={saving}>{saving ? "Adding…" : "Add to my trips"}</Button>
-      <Button type="button" variant="outline" disabled={saving} onclick={closeForm}>Cancel</Button>
+      <Button type="submit" disabled={saving}>{saving ? "Adding…" : many ? `Add ${plural(drafts.length, drafts)}` : "Add to my trips"}</Button>
+      <Button type="button" variant="outline" disabled={saving} onclick={requestClose}>Cancel</Button>
     </div>
   </form>
 {/snippet}
@@ -280,33 +341,30 @@
       <section aria-labelledby="unread-title" class="space-y-2">
         <h2 id="unread-title" class="eyebrow px-1">Couldn’t read</h2>
         <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Mail and AI → Gmail), and then you can add those by hand or dismiss them. Open one in Gmail, or choose Add by hand to read it beside the form. Waypoint keeps each message here, encrypted, so you can read it without Gmail: until the item is dismissed or added, and for as long as a booking you add from it exists.</p>
+        {#if only}
+          <p class="px-1 text-sm" data-testid="review-filter">Showing only mail from {only.sender}{only.mailbox ? ` in ${only.mailbox}` : ""}{shown.length ? "" : ", and none is waiting"}. <button type="button" class="underline underline-offset-2" onclick={() => setQuery("")}>Show everything</button></p>
+        {/if}
         {#if unasked.length > 1}
           <div class="px-1"><Button variant="outline" size="sm" disabled={asking_all} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : `Ask AI about all ${unasked.length}`}</Button></div>
         {/if}
         <ul class="rows" aria-label="Couldn’t read">
-          {#each review.items as item (item.id)}
+          {#each shown as item (item.id)}
             <li class="row items-start" data-testid="review-item">
               <div class="min-w-0 basis-full">
                 <p class="break-words font-medium">{subject(item)}</p>
                 <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, item.mine ? `to ${item.address}` : `in ${item.owner}’s mailbox, shared with the household`].filter(Boolean).join(" · ")}</p>
-                <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestion && item.reason !== "generic"} <Badge variant="outline">AI suggestion</Badge>{/if}</p>
+                <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">AI suggestion</Badge>{/if}</p>
                 {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
               </div>
               <div class="flex basis-full flex-wrap gap-2">
                 {#if item.gmail_url}<a class={buttonVariants({ variant: "outline", size: "sm" })} href={item.gmail_url} target="_blank" rel="noopener noreferrer" aria-label={`Open “${subject(item)}” in Gmail`}>Open in Gmail</a>{/if}
-                {#if review.ai && item.mine && item.reason !== "generic"}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestion ? "Ask again" : "Ask AI"}</Button>{/if}
-                {#if item.suggestion}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>Check suggestion</Button>{/if}
+                {#if review.ai && item.mine && item.reason !== "generic"}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestions.length ? "Ask again" : "Ask AI"}</Button>{/if}
+                {#if item.suggestions.length}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : item.suggestions.length > 1 ? `Check the AI’s ${item.suggestions.length} suggestions for “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>{item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
                 {#if item.sender_domain && item.mine}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Not travel: ignore ${item.sender_domain}`}>Not travel: ignore this sender</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={`Dismiss “${subject(item)}”`}>Dismiss</Button>
               </div>
             </li>
-            {#if peeks[item.id] && draft?.item.id === item.id && !inSheet}
-              <li class="row items-stretch" data-testid="preview">{@render messagePeek(item)}</li>
-            {/if}
-            {#if draft && draft.item.id === item.id && !inSheet}
-              <li class="row items-stretch">{@render addForm(item, draft, true)}</li>
-            {/if}
           {/each}
         </ul>
       </section>
@@ -388,11 +446,20 @@
   {/snippet}
 </ConfirmDialog>
 
-<Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v && !saving) closeForm(); }} title={draft?.suggested ? "Check this suggestion" : "Add this booking by hand"}>
+<Sheet bind:open={() => draft !== null, (v) => { if (!v) requestClose(); }} title={draft?.suggested ? (drafts.length > 1 ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"} wide onOpenAutoFocus={focusSheet}>
   {#if draft}
     <div class="flex flex-col gap-4">
-      {#if peeks[draft.item.id]}<div data-testid="preview">{@render messagePeek(draft.item)}</div>{/if}
-      {@render addForm(draft.item, draft, false)}
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        {#if !emailOpen}<p class="min-w-0 break-words text-sm font-medium">{subject(draft.item)}</p>{/if}
+        <Button type="button" variant="outline" size="sm" class="ml-auto" aria-expanded={emailOpen} aria-controls="review-email" onclick={() => (emailOpen = !emailOpen)}>{emailOpen ? "Hide the email" : "Show the email"}</Button>
+      </div>
+      <div id="review-email" hidden={!emailOpen}>
+        {#if peeks[draft.item.id]}<div data-testid="preview">{@render messagePeek(draft.item)}</div>{/if}
+      </div>
+      {@render addForm(draft.item)}
     </div>
   {/if}
 </Sheet>
+
+<ConfirmDialog bind:open={discarding} title="Discard this booking?" description="What you typed here won’t be saved." confirmLabel="Discard" cancelLabel="Keep editing" destructive
+  onconfirm={() => { closeForm(); return true; }} />

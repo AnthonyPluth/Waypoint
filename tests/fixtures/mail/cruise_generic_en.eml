@@ -1,0 +1,22 @@
+From: Blue Horizon Cruises <bookings@blue-horizon.example>
+To: traveller@gmail.example
+Subject: Your cruise is booked
+Date: Wed, 14 Oct 2026 12:00:00 -0500
+Message-ID: <fx-cruise-generic-en@blue-horizon.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>CANARY-BODY-CRUISE-EN-2V8S Welcome aboard, we look forward to sailing with you.</p>
+<p>Cancellations made after Aug 30, 2026 are charged in full.</p>
+<table>
+<tr><td>Booking number</td><td>BH772013</td></tr>
+<tr><td>Cruise line</td><td>Blue Horizon Cruises</td></tr>
+<tr><td>Ship</td><td>Blue Horizon Voyager</td></tr>
+<tr><td>Embarkation port</td><td>Galveston, TX</td></tr>
+<tr><td>Embarkation date</td><td>Saturday, November 21, 2026, 4:00 PM</td></tr>
+<tr><td>Disembarkation port</td><td>Galveston, TX</td></tr>
+<tr><td>Disembarkation date</td><td>Saturday, November 28, 2026, 8:00 AM</td></tr>
+</table>
+<p>Day 3: Cozumel, Mexico, arrive 8:00 AM</p>
+</body></html>
