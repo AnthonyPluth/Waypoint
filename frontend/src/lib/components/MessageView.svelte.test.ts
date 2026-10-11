@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/svelte";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/api", () => ({ apiImage: vi.fn() }));
