@@ -69,7 +69,7 @@
   }
 </script>
 
-<div class="mt-2" data-testid="review-glance">
+<div class="mt-2" data-testid="review-glance" data-state={glance ? (glance.waiting ? "data" : "empty") : failed ? "failed" : "loading"}>
   <h3 class="text-sm font-medium">Review at a glance</h3>
   {#if failed}
     <p class="text-sm text-muted-foreground">Couldn’t load it.</p>
