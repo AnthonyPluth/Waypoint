@@ -479,6 +479,7 @@ describe("Review: the AI’s suggestion", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     first.unmount();
+    await waitFor(() => expect(document.body.style.pointerEvents).not.toBe("none"));
     const cruise = { kind: "cruise" as const, origin: "Miami", destination: "Nassau", start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00",
       start_zone: "America/New_York", end_zone: "America/Nassau", address: "1015 North America Way, Miami FL 33132", room: "8123", ship: "Example Voyager", deck: "8" };
     held = { matches: [], items: [item({ suggestion: cruise })], who: [], ai: false };
