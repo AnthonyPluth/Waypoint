@@ -103,10 +103,15 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     ap.add_argument("pr", type=int, help="the pull request's number")
     ap.add_argument("files", nargs="*", help="screenshots to publish (default: every *-top.png in artifacts/verify/)")
     ap.add_argument("--trailer", action="append", default=[], help="a commit trailer, 'Key: value' (repeatable)")
+    ap.add_argument("--git-config", action="append", default=[], metavar="KEY=VALUE",
+                    help="git configuration for the screenshots commit only, passed as git -c KEY=VALUE (repeatable)")
     ap.add_argument("--remote", default="origin", help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     if args.pr < 1:
         ap.error("the pull request number must be positive")
+    for setting in args.git_config:
+        if "=" not in setting or setting.startswith("="):
+            ap.error(f"--git-config takes KEY=VALUE, not {setting!r}")
     return args
 
 
@@ -121,7 +126,7 @@ def inside(path: Path, root: Path = ROOT) -> bool:
     return path.resolve() == root or root in path.resolve().parents
 
 
-def _attempt(repo: Path, pr: int, files: Sequence[Path], remote: str, message: str, tmp: Path) -> bool:
+def _attempt(repo: Path, pr: int, files: Sequence[Path], remote: str, message: str, tmp: Path, git_config: Sequence[str] = ()) -> bool:
     work = tmp / "wt"
     local = f"pr-screenshots-tmp-{os.getpid()}"
     exists = git(repo, "ls-remote", "--exit-code", "--heads", remote, BRANCH, ok=(0, EXIT_REF_MISSING)).returncode == 0
@@ -143,7 +148,7 @@ def _attempt(repo: Path, pr: int, files: Sequence[Path], remote: str, message: s
         git(work, "add", "-A", "--", ".")
         if not git(work, "status", "--porcelain").stdout.strip():
             return False
-        git(work, "commit", "--quiet", "-m", message)
+        git(work, *[arg for setting in git_config for arg in ("-c", setting)], "commit", "--quiet", "-m", message)
         git(work, "push", remote, f"HEAD:refs/heads/{BRANCH}")
         return True
     finally:
@@ -153,19 +158,20 @@ def _attempt(repo: Path, pr: int, files: Sequence[Path], remote: str, message: s
 
 
 def publish(repo: Path, pr: int, files: Sequence[Path], remote: str = "origin", trailers: Sequence[str] = (),
-            sleep: Callable[[float], None] = time.sleep, log: Callable[[str], None] = lambda m: print(m, file=sys.stderr)) -> bool:
+            sleep: Callable[[float], None] = time.sleep, log: Callable[[str], None] = lambda m: print(m, file=sys.stderr),
+            git_config: Sequence[str] = ()) -> bool:
     check_trailers(trailers)
     message = commit_message(pr, trailers)
     for attempt in range(1, PUSH_ATTEMPTS):
         with tempfile.TemporaryDirectory(prefix="pr-screenshots-") as tmp:
             try:
-                return _attempt(repo, pr, files, remote, message, Path(tmp))
+                return _attempt(repo, pr, files, remote, message, Path(tmp), git_config)
             except ScreenshotError as e:
                 wait = 2 ** attempt
                 log(f"pr_screenshots: attempt {attempt} failed ({e}); retrying in {wait}s")
                 sleep(wait)
     with tempfile.TemporaryDirectory(prefix="pr-screenshots-") as tmp:
-        return _attempt(repo, pr, files, remote, message, Path(tmp))
+        return _attempt(repo, pr, files, remote, message, Path(tmp), git_config)
 
 
 def main(argv: Sequence[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> int:
@@ -176,7 +182,8 @@ def main(argv: Sequence[str], cwd: Path | None = None, env: dict[str, str] | Non
         return 2
     try:
         files = select_files(args.files)
-        pushed = publish(ROOT, args.pr, files, args.remote, trailers_from(env if env is not None else dict(os.environ), args.trailer))
+        pushed = publish(ROOT, args.pr, files, args.remote, trailers_from(env if env is not None else dict(os.environ), args.trailer),
+                         git_config=args.git_config)
     except ScreenshotError as e:
         print(f"pr_screenshots: {e}", file=sys.stderr)
         return 1
