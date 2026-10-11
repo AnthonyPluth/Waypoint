@@ -134,7 +134,7 @@
     e.preventDefault();
     const sheet = document.querySelector<HTMLElement>("[data-slot='sheet']");
     const target = draft?.suggested ? "[data-dialog-title]" : "form[data-editor] select";
-    sheet?.querySelector<HTMLElement>(target)?.focus();
+    sheet?.querySelector<HTMLElement>(target)?.focus({ preventScroll: true });
   };
 
   async function add(e: SubmitEvent) {
