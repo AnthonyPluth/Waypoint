@@ -540,7 +540,7 @@ describe("Review: the message beside the form", () => {
     expect(region.querySelector("img, script")).toBeNull();
   });
 
-  it("shows a message's HTML as formatted text, with a switch to its plain text and back", async () => {
+  it("shows a message's HTML as formatted text, with no switch to plain text", async () => {
     vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview")
       ? { text: "Gate B12", html: "<p>Gate <b>B12</b></p><table><tr><td>Seat</td><td>12A</td></tr></table>", truncated: false }
       : path === "/api/people" ? { people: [] } : held) as never);
@@ -549,11 +549,7 @@ describe("Review: the message beside the form", () => {
     const formatted = await screen.findByTestId("preview-html");
     expect(formatted.getAttribute("srcdoc")).toContain("<b>B12</b>");
     expect(formatted.getAttribute("srcdoc")).toContain("<td>Seat</td>");
-    await userEvent.click(screen.getByRole("button", { name: "Show as plain text" }));
-    expect(screen.queryByTestId("preview-html")).toBeNull();
-    expect(screen.getByTestId("preview")).toHaveTextContent("Gate B12");
-    await userEvent.click(screen.getByRole("button", { name: "Show as formatted" }));
-    expect(await screen.findByTestId("preview-html")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show as/ })).toBeNull();
   });
 
   it("offers no switch for a message with no HTML part", async () => {
