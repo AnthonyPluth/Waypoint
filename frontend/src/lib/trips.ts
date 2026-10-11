@@ -234,7 +234,7 @@ export function subline(s: Segment, condensed = false): string {
   const d = s.details;
   const parts = s.kind === "flight" ? [[s.provider, d.flight_number].filter(Boolean).join(" "), d.aircraft, d.terminal && `Terminal ${d.terminal}`, d.seat && `Seat ${seatsInOrder(d.seat)}`, condensed ? null : d.cabin]
     : s.kind === "hotel" ? [condensed ? placeOf(d.address) : d.address, d.room]
-      : s.kind === "car" ? [d.car_class, condensed ? placeOf(d.address) : d.address] :s.kind === "cruise" ? [s.details.ship ? s.provider : null, d.room && `Cabin ${d.room}`, d.deck && `Deck ${d.deck}`] : [s.provider, d.seat && `Seat ${seatsInOrder(d.seat)}`, d.cabin];
+      : s.kind === "car" ? [d.car_class, condensed ? placeOf(d.address) : d.address] : s.kind === "cruise" ? [s.details.ship ? s.provider : null, d.room && `Cabin ${d.room}`, d.deck && `Deck ${d.deck}`] : [s.provider, d.seat && `Seat ${seatsInOrder(d.seat)}`, d.cabin];
   return parts.filter(Boolean).join(" · ");
 }
 
