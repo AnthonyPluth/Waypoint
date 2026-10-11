@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from "@testing-library/svelte";
+import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,7 +11,7 @@ import type { Mailbox, MailboxList } from "$lib/api-types";
 import { toast } from "svelte-sonner";
 import GmailSection from "./GmailSection.svelte";
 
-const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, scan_notice: null, scan_summary: null, share_review: false, ...extra });
+const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, scan_notice: null, scan_summary: null, share_review: false, labels_picked: 0, ...extra });
 const list = (mailboxes: Mailbox[] = [], configured = true): MailboxList => ({ configured, mailboxes });
 const serve = (reply: MailboxList, others: (path: string) => unknown = () => ({})) =>
   vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/mailboxes" ? reply : others(path)) as never);
@@ -21,13 +21,13 @@ afterEach(() => { vi.unstubAllGlobals(); history.replaceState(null, "", "/"); })
 
 describe("Settings → Gmail", () => {
   it("says in one line what the last scan found, read, filed, couldn't read and skipped, and nothing else", async () => {
-    serve(list([box({ last_scan: "2026-10-05T10:00:00+00:00", scan_summary: { found: 24, read: 6, bookings: 3, review: 2, skipped: 15, capped: false } })]));
+    serve(list([box({ last_scan: "2026-10-05T10:00:00+00:00", scan_summary: { found: 24, read: 6, bookings: 3, review: 2, skipped: 15, capped: false, labels_dropped: 0 } })]));
     render(GmailSection);
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("24 new messages found, 6 read, 3 bookings added or changed, 2 couldn’t be read, 15 skipped.");
   });
 
   it("says when more messages are waiting after the cap", async () => {
-    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: true } })]));
+    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: true, labels_dropped: 0 } })]));
     render(GmailSection);
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("1 new message found, 1 read, 1 booking added or changed, 0 couldn’t be read, 0 skipped. More are waiting; the next scan carries on.");
   });
@@ -297,5 +297,39 @@ describe("Settings → Gmail", () => {
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("ana@gmail.example")).toBeInTheDocument();
     expect(screen.queryByText("Waypoint is restarting or unreachable.")).toBeNull();
+  });
+
+  describe("labels to read in full", () => {
+    const labels = [{ id: "Label_1", name: "Japan 2026", count: 12, picked: false }, { id: "Label_2", name: "Taxes", count: 3, picked: false }];
+    const serveLabels = (picked = 0) => serve(list([box({ labels_picked: picked })]), (path) => (path === "/api/mailboxes/1/labels" ? { labels } : {}));
+
+    it("picks none by default and lists only the user's own labels, with counts", async () => {
+      serveLabels();
+      render(GmailSection);
+      expect(await screen.findByText(/pick your own labels to read in full/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Choose labels" }));
+      const group = await screen.findByRole("group", { name: /Labels to read in full/ });
+      expect(within(group).getAllByRole("checkbox").map((c) => (c as HTMLInputElement).checked)).toEqual([false, false]);
+      expect(within(group).getByText(/Japan 2026/)).toBeInTheDocument();
+      expect(within(group).getByText(/12 messages/)).toBeInTheDocument();
+      expect(within(group).queryByText(/INBOX|CATEGORY/)).toBeNull();
+    });
+
+    it("saves exactly the labels ticked", async () => {
+      serveLabels();
+      render(GmailSection);
+      await userEvent.click(await screen.findByRole("button", { name: "Choose labels" }));
+      await userEvent.click(await screen.findByRole("checkbox", { name: /Japan 2026/ }));
+      await userEvent.click(screen.getByRole("button", { name: "Save labels" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/mailboxes/1/labels", expect.objectContaining({ method: "POST", body: { labels: ["Label_1"] } })));
+      expect(toast.success).toHaveBeenCalledWith("Labels saved. The next scan reads everything in them.");
+    });
+
+    it("says how many are picked and notes labels deleted in Gmail", async () => {
+      serve(list([box({ labels_picked: 2, scan_summary: { found: 1, read: 1, bookings: 0, review: 0, skipped: 0, capped: false, labels_dropped: 1 } })]));
+      render(GmailSection);
+      expect(await screen.findByText(/Reading everything in 2 labels you picked/)).toBeInTheDocument();
+      expect(screen.getByTestId("scan-summary")).toHaveTextContent("1 label you picked was deleted in Gmail and was dropped.");
+    });
   });
 });

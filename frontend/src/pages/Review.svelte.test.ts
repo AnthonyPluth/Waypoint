@@ -588,4 +588,24 @@ describe("Review on a phone", () => {
     expect(await within(sheet).findByRole("alert")).toHaveTextContent("Couldn’t add it");
     expect(within(sheet).getByLabelText("From (airport code)")).toHaveValue("JFK");
   });
+
+  it("shows a booking Waypoint read itself with its source fields outlined, and not as an AI suggestion", async () => {
+    const read = { kind: "hotel" as const, provider: "Seaside Inn", confirmation: "SS48213", origin: "Seaside Inn", address: "12 Beach Road, Brighton, UK",
+      start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London",
+      sources: { origin: "property", start_local: "check-in", end_local: "check-out", confirmation: "confirmation number", address: "address" } };
+    held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestion: read })], who: [], ai: true };
+    render(ReviewPage);
+    expect(await screen.findByText("Read from the email")).toBeInTheDocument();
+    expect(screen.queryByText("AI suggestion")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ask AI/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Check what Waypoint read/ }));
+    expect(screen.getByText(/Adding it also trusts seaside-stays.example/)).toBeInTheDocument();
+    const checkin = screen.getByLabelText(/^Check-in/);
+    expect(checkin).toHaveValue("2026-11-21T15:00");
+    expect(checkin).toHaveClass("ring-2");
+    expect(screen.getByText("from “check-in”")).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Address/)).toHaveValue("12 Beach Road, Brighton, UK");
+    expect(screen.getByLabelText(/^Address/)).toHaveClass("ring-2");
+    expect(screen.getByLabelText(/^Hotel/)).toHaveClass("ring-2");
+  });
 });
