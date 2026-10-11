@@ -48,6 +48,8 @@ class ScanSummary(TypedDict):
     skipped: int
     capped: bool
     labels_dropped: int
+    triaged: int
+    total: int
 
 
 class Mailbox(TypedDict):

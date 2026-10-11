@@ -1,0 +1,11 @@
+{
+  "name": "scan-progress",
+  "page": "settings",
+  "steps": [
+    { "goto": "#settings/mail" },
+    { "wait_for": "[data-testid='scan-summary']" },
+    { "expect_text": { "selector": "[data-testid='scan-summary']", "text": "Looked at 1260 of 3400 messages so far" } },
+    { "scroll_to": "[data-testid='scan-summary']" },
+    { "screenshot": "progress-line" }
+  ]
+}

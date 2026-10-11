@@ -21,15 +21,15 @@ afterEach(() => { vi.unstubAllGlobals(); history.replaceState(null, "", "/"); })
 
 describe("Settings → Gmail", () => {
   it("says in one line what the last scan found, read, filed, couldn't read and skipped, and nothing else", async () => {
-    serve(list([box({ last_scan: "2026-10-05T10:00:00+00:00", scan_summary: { found: 24, read: 6, bookings: 3, review: 2, skipped: 15, capped: false, labels_dropped: 0 } })]));
+    serve(list([box({ last_scan: "2026-10-05T10:00:00+00:00", scan_summary: { found: 24, read: 6, bookings: 3, review: 2, skipped: 15, capped: false, labels_dropped: 0, triaged: 0, total: 0 } })]));
     render(GmailSection);
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("24 new messages found, 6 read, 3 bookings added or changed, 2 couldn’t be read, 15 skipped.");
   });
 
   it("says when more messages are waiting after the cap", async () => {
-    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: true, labels_dropped: 0 } })]));
+    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: true, labels_dropped: 0, triaged: 40, total: 900 } })]));
     render(GmailSection);
-    expect(await screen.findByTestId("scan-summary")).toHaveTextContent("1 new message found, 1 read, 1 booking added or changed, 0 couldn’t be read, 0 skipped. More are waiting; the next scan carries on.");
+    expect(await screen.findByTestId("scan-summary")).toHaveTextContent("1 new message found, 1 read, 1 booking added or changed, 0 couldn’t be read, 0 skipped. Looked at 40 of 900 messages so far; the scan carries on by itself.");
   });
 
   it("shows no summary when there hasn't been a scan", async () => {
@@ -326,7 +326,7 @@ describe("Settings → Gmail", () => {
     });
 
     it("says how many are picked and notes labels deleted in Gmail", async () => {
-      serve(list([box({ labels_picked: 2, scan_summary: { found: 1, read: 1, bookings: 0, review: 0, skipped: 0, capped: false, labels_dropped: 1 } })]));
+      serve(list([box({ labels_picked: 2, scan_summary: { found: 1, read: 1, bookings: 0, review: 0, skipped: 0, capped: false, labels_dropped: 1, triaged: 0, total: 0 } })]));
       render(GmailSection);
       expect(await screen.findByText(/Reading everything in 2 labels you picked/)).toBeInTheDocument();
       expect(screen.getByTestId("scan-summary")).toHaveTextContent("1 label you picked was deleted in Gmail and was dropped.");

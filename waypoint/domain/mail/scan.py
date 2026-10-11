@@ -21,7 +21,9 @@ from . import ai, extract, ingest, query, review, triage
 
 State = Literal["done", "failed", "not_started", "busy"]
 BOOKING, UNREADABLE, IGNORED, SKIPPED = "booking", "unreadable", "ignored", "skipped"
-MAX_READ = 150
+BUDGET = 1200
+_clock = time.monotonic
+MAX_CHAIN = 12
 LOCAL = "local"
 OVERLAP_DAYS = 2
 TOKEN_LIFE = 2400
@@ -51,6 +53,8 @@ class Summary:
     skipped: int
     capped: bool
     labels_dropped: int = 0
+    triaged: int = 0
+    total: int = 0
 
 
 _running: set[int] = set()
@@ -89,7 +93,8 @@ def scan(mailbox_id: int, now: float, today: date, again: bool = False, backfill
 
 def encode(found: Summary) -> str:
     return json.dumps({"found": found.found, "read": found.read, "bookings": found.bookings, "review": found.review,
-                       "skipped": found.skipped, "capped": found.capped, "labels_dropped": found.labels_dropped}, separators=(",", ":"))
+                       "skipped": found.skipped, "capped": found.capped, "labels_dropped": found.labels_dropped,
+                       "triaged": found.triaged, "total": found.total}, separators=(",", ":"))
 
 
 def decode(text: str | None) -> Summary | None:
@@ -101,9 +106,9 @@ def decode(text: str | None) -> Summary | None:
     if not isinstance(raw, dict) or not all(isinstance(raw.get(k), int) and not isinstance(raw.get(k), bool) for k in counts) \
             or not isinstance(raw.get("capped"), bool):
         return None
-    dropped = raw.get("labels_dropped", 0)
+    extra = [raw.get(k, 0) for k in ("labels_dropped", "triaged", "total")]
     return Summary(raw["found"], raw["read"], raw["bookings"], raw["review"], raw["skipped"], raw["capped"],
-                   dropped if isinstance(dropped, int) and not isinstance(dropped, bool) else 0)
+                   *(n if isinstance(n, int) and not isinstance(n, bool) else 0 for n in extra))
 
 
 def decode_labels(text: str | None) -> list[str]:
@@ -307,7 +312,8 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             return Result("not_started", str(e))
         ignored = review.ignored(conn, mailbox_id)
     history, last_scan = row["history_id"], row["last_scan"]
-    read = made = queued = skipped = dropped = 0
+    read = made = queued = skipped = dropped = handled = total = 0
+    started = _clock()
     forced: set[str] = set()
     pending: list[str] = []
     capped = False
@@ -348,7 +354,11 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 seen = set(conn.execute(select(ScannedMessage.message_id).where(
                     ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id.in_(found))).scalars()) if found else set()
         pending = [m for m in found if m not in seen]
+        total = len(found)
         for message_id in pending:
+            if handled and _clock() - started > BUDGET:
+                capped = True
+                break
             if time.monotonic() - issued > TOKEN_LIFE:
                 with db.session() as conn:
                     token = gmail.access_token(conn, mailbox_id, time.time())
@@ -364,13 +374,8 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                     with db.session() as conn:
                         _record(conn, mailbox_id, message_id, SKIPPED, now)
                     skipped += 1
+                    handled += 1
                     continue
-                if read >= MAX_READ:
-                    capped = True
-                    break
-            elif not again and read >= MAX_READ:
-                capped = True
-                break
             try:
                 raw = gmail.fetch(token, message_id)
                 message = extract.read(raw)
@@ -396,7 +401,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                     _record(conn, mailbox_id, message_id, outcome, now)
             if b and not _generic(mailbox_id, message_id):
                 _suggest(mailbox_id, message_id, raw, now)
-            read, made, queued = read + 1, made + a, queued + b
+            read, made, queued, handled = read + 1, made + a, queued + b, handled + 1
         if not again and not backfill:
             with db.session() as conn:
                 conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(
@@ -407,7 +412,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
         monitoring.report(e, values=False)
         return _fail(mailbox_id, FAILED_GENERALLY, (read, made, queued))
     if not again and not backfill:
-        remember(mailbox_id, Summary(len(pending), read, made, queued, skipped, capped, dropped))
+        remember(mailbox_id, Summary(len(pending), read, made, queued, skipped, capped, dropped, total - len(pending) + handled, total))
     monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {len(pending)} message(s) found, "
                    f"{read} read, {made} booking(s) added or changed, {queued} to review, {skipped} skipped{', more waiting' if capped else ''}.")
     if why:
@@ -415,7 +420,16 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
     return Result("done", None, read, made, queued, len(pending), skipped, capped)
 
 
-def scan_all(now: float, today: date) -> list[Result]:
+def run(mailbox_id: int, today: date, again: bool = False, backfill: bool = False) -> Result:
+    result = scan(mailbox_id, time.time(), today, again, backfill)
+    chained = 0
+    while result.state == "done" and result.capped and not again and chained < MAX_CHAIN:
+        chained += 1
+        result = scan(mailbox_id, time.time(), today, False, backfill)
+    return result
+
+
+def scan_all(today: date) -> list[Result]:
     with db.session() as conn:
         ids = list(conn.execute(select(Mailbox.id).where(Mailbox.status != gmail.RECONNECT).order_by(Mailbox.id)).scalars())
-    return [scan(i, now, today) for i in ids]
+    return [run(i, today) for i in ids]
