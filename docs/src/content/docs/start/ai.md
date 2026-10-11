@@ -23,9 +23,15 @@ Only the message’s plain text, and only for an item in “Couldn’t read” (
 
 ## What comes back
 
-The reply must be JSON with exactly the fields of a booking (kind, provider, confirmation code, origin, destination, start and end times, and zones for hotels, cars, trains and cruises). Anything else (an extra field, a time that isn’t a date and time, a confirmation code that isn’t in the email, a reply that isn’t JSON) is thrown away, and the item shows a short note saying so. Waypoint keeps the suggestion’s fields with the review item, never the email or the AI’s reply.
+The reply must be JSON with the fields of a booking: kind, provider, confirmation code, origin, destination, start and end times, and zones for hotels, cars, trains and cruises. For a hotel, car, train or cruise it may also hold the **address** (the hotel’s, the rental’s pick-up place’s, the station’s or the cruise terminal’s); for a hotel, car or cruise the **phone number** the email prints for the property or company (so **Call** works); and for a cruise the **cabin**, **ship** and **deck**. Nothing is asked for a flight beyond its airports. These are the only details it reads: Waypoint doesn’t read a seat from an email this way.
 
-A suggestion is a draft. **Check suggestion** opens the same form as **Add by hand**, filled in; you change what’s off and add it. Nothing is saved as a booking until you do.
+Anything the booking needs that is wrong throws the whole reply away, and the item shows a short note saying so: a time that isn’t a date and time, an unknown kind, a missing place, a confirmation code that isn’t in the email, a reply that isn’t JSON. A field the AI adds that Waypoint didn’t ask for is ignored.
+
+The address, phone, cabin, ship and deck are held to a stricter rule that costs only the field: each must appear in the email text that was sent (ignoring spaces, case, hyphens, commas and line breaks), and an address must be one plain line of at most 200 characters with no phone number or email address in it. One that fails is left empty and the rest of the suggestion is kept, so a made-up address never reaches the form.
+
+The AI is told to give the property’s address, never the guest’s or the booker’s, and Waypoint checks it as well: an address or phone number is dropped when it is printed in a block that is labelled booker, booked by, guest, billing, cardholder or customer (the heading or label on the lines just above it, within the same paragraph). Waypoint doesn’t keep anyone’s home address, so that label is how the booker’s own address is told apart; an address printed without such a label can’t be told apart, which is why you check it. Redaction leaves postal addresses alone (an address isn’t a loyalty number). Waypoint keeps the suggestion’s fields with the review item, never the email or the AI’s reply.
+
+A suggestion is a draft. **Check suggestion** opens the same form as **Add by hand**, filled in, with the address and the other details the AI read outlined so you check them first; you change what’s off and add it. Nothing is saved as a booking until you do.
 
 ## Turning it off
 
