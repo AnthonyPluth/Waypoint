@@ -10,7 +10,7 @@ from ..storage import db, secretbox, stored_mail
 from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentMessage, SegmentPort, SegmentTraveler,
                               StoredMessage, Trip, User)
 from . import logos, loyalty, people, trips
-from .mail import review, scan
+from .mail import ai, review, scan
 from .visibility import Viewer
 
 MEMBERS = [("demo-jane", "jane.doe@example.com", "Jane Doe", "Jane"),
@@ -223,6 +223,14 @@ SHARED_UNREAD: list[tuple[str, int, review.Reason]] = [("example-cruises.example
 FAMILY_SEATS = {"DL 1412": ("22A", "22B", "22C"), "AA 101": ("31A", "31B", "31C")}
 
 
+def _round_trip(today: date) -> list[ai.Suggestion]:
+    out, back = today + timedelta(days=30), today + timedelta(days=36)
+    return [{"kind": "flight", "provider": "Example Air", "confirmation": "DEMO99", "origin": "BOS", "destination": "DEN", "flight_number": "EX 204",
+             "cabin": "Economy", "start_local": f"{out:%Y-%m-%d}T07:15", "end_local": f"{out:%Y-%m-%d}T10:05"},
+            {"kind": "flight", "provider": "Example Air", "confirmation": "DEMO99", "origin": "DEN", "destination": "BOS", "flight_number": "EX 205",
+             "cabin": "Economy", "start_local": f"{back:%Y-%m-%d}T16:20", "end_local": f"{back:%Y-%m-%d}T21:50"}]
+
+
 def _on(*ids: int | None, seats: tuple[str, ...] = ()) -> list[trips.TravelerIn]:
     out: list[trips.TravelerIn] = [{"person_id": i, "name": None} for i in ids]
     for traveler, seat in zip(out, seats, strict=False):
@@ -268,14 +276,19 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     stay, stay_images = _styled_message("example-stays.example", 4, today, "Your stay: Quay Street Lodge",
                                         ("Hello Jane,", "Your stay at Quay Street Lodge is booked.", "Confirmation: DEMO77"))
     stored_mail.put(conn, box.id, "demo-held-stay", stay, 0.0, stay_images)
-    review.add_generic(conn, box.id, "demo-read-lodging", "seaside-stays.example", (today - timedelta(days=2)).isoformat(), {
+    review.add_generic(conn, box.id, "demo-read-lodging", "seaside-stays.example", (today - timedelta(days=2)).isoformat(), [{
         "kind": "hotel", "provider": "Seaside Inn", "confirmation": "DEMO88", "origin": "Seaside Inn", "address": "12 Beach Road, Brighton, UK",
         "start_local": f"{today + timedelta(days=40):%Y-%m-%d}T15:00", "end_local": f"{today + timedelta(days=44):%Y-%m-%d}T11:00",
         "start_zone": "Europe/London", "sources": {"origin": "property", "start_local": "check-in", "end_local": "check-out",
-                                                     "confirmation": "confirmation number", "address": "address"}}, 0.0)
+                                                     "confirmation": "confirmation number", "address": "address"}}], 0.0)
     stored_mail.put(conn, box.id, "demo-read-lodging", _message("seaside-stays.example", 2, today, "Your booking is confirmed",
                                                                ("Confirmation number: DEMO88", "Property: Seaside Inn", "Address: 12 Beach Road, Brighton, UK",
                                                                 "Check-in: made-up date after 3:00 PM", "Check-out: made-up date 11:00 AM")), 0.0)
+    review.add(conn, box.id, "demo-round-trip", "example-card-travel.example", (today - timedelta(days=3)).isoformat(), "no_markup", 0.0)
+    review.set_suggestions(conn, box.id, "demo-round-trip", _round_trip(today), None)
+    stored_mail.put(conn, box.id, "demo-round-trip", _message("example-card-travel.example", 3, today, "Your flights are booked: made-up details",
+                                                             ("Hello Jane,", "Outbound to Denver: Example Air EX 204, Boston BOS to Denver DEN.",
+                                                              "Return to Boston: Example Air EX 205, Denver DEN to Boston BOS.", "Confirmation: DEMO99")), 0.0)
     if from_email:
         itinerary, itinerary_images = _styled_message("example-air.example", 60, today, "Your itinerary: flight EX 410",
                                                       ("Hello,", "Your flight EX 410 leaves New York (JFK) at 7:00 am.", "Confirmation: CH3K5P"))

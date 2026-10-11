@@ -202,11 +202,13 @@ class Replies(DbCase):
                                                     status="connected", created=1.0)).lastrowid
         for n, reason in enumerate(("no_markup", "incomplete", "broken", "generic")):
             review.add(self.c, box, f"m{n}", f"air{n}.example", "2026-10-17" if reason != "generic" else "2026-01-01", reason, 1.0)   # type: ignore[arg-type]
-        review.set_suggestion(self.c, box, "m0", {"kind": "flight", "origin": "BOS", "destination": "DEN", "start_local": "2026-12-02T07:15",
-                                                  "end_local": "2026-12-02T10:05"}, None)
-        review.set_suggestion(self.c, box, "m3", {"kind": "hotel", "origin": "Seaside Inn", "start_local": "2026-11-21T15:00", "end_local": "2026-11-25T11:00",
-                                                  "address": "12 Beach Road, Brighton, UK", "sources": {"origin": "property", "start_local": "check-in"}}, None)
-        review.set_suggestion(self.c, box, "m1", None, "The AI didn’t find a booking in this message.")
+        review.set_suggestions(self.c, box, "m0", [{"kind": "flight", "origin": "BOS", "destination": "DEN", "start_local": "2026-12-02T07:15",
+                                                   "end_local": "2026-12-02T10:05", "flight_number": "EX 204", "cabin": "Economy"},
+                                                  {"kind": "flight", "origin": "DEN", "destination": "BOS", "start_local": "2026-12-08T16:20",
+                                                   "end_local": "2026-12-08T21:50", "flight_number": "EX 205"}], None)
+        review.set_suggestions(self.c, box, "m3", [{"kind": "hotel", "origin": "Seaside Inn", "start_local": "2026-11-21T15:00", "end_local": "2026-11-25T11:00",
+                                                   "address": "12 Beach Road, Brighton, UK", "sources": {"origin": "property", "start_local": "check-in"}}], None)
+        review.set_suggestions(self.c, box, "m1", [], "The AI didn’t find a booking in this message.")
         me = Viewer(people_domain.person_for_sub(self.c, "u1"))
         trips.add_segment(self.c, me, {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": "2026-12-08T08:00",
                                        "end_local": "2026-12-08T11:20", "travelers": [{"person_id": None, "name": "DOE/MIA MISS"}]}, source="email")
@@ -332,8 +334,8 @@ class Replies(DbCase):
         assert seg is not None
         review.add(self.c, box, "a1", "hotel.example", "2026-10-18", "match", 1.0, [({**stay, "confirmation": "H88231", "provider": "Example Hotels"}, [seg["id"]])])
         review.add(self.c, box, "a2", "inn.example", "2026-10-17", "generic", 1.0)
-        review.set_suggestion(self.c, box, "a2", {"kind": "hotel", "origin": "Seaside Inn", "start_local": "2026-12-21T15:00", "end_local": "2026-12-25T11:00",
-                                                  "start_zone": "America/New_York", "address": "12 Beach Road", "sources": {"origin": "property"}}, None)
+        review.set_suggestions(self.c, box, "a2", [{"kind": "hotel", "origin": "Seaside Inn", "start_local": "2026-12-21T15:00", "end_local": "2026-12-25T11:00",
+                                                  "start_zone": "America/New_York", "address": "12 Beach Road", "sources": {"origin": "property"}}], None)
         review.add(self.c, box, "a3", "air.example", "2026-10-16", "broken", 1.0)
         review.add(self.c, box, "a4", "tour.example", "2026-10-15", "broken", 1.0)
         for message in ("a1", "a2", "a3"):

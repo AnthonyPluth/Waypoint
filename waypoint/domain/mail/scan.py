@@ -215,7 +215,8 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     if proposed:
         if review.asked(conn, mailbox_id, message.sender_domain):
             return made, 0, list(dict.fromkeys(touched)) if touched else None, None
-        review.add_generic(conn, mailbox_id, message_id, message.sender_domain, message.received, ingest.suggestion(conn, proposed[0]), now)
+        review.add_generic(conn, mailbox_id, message_id, message.sender_domain, message.received,
+                           [ingest.suggestion(conn, b) for b in proposed], now, UNREAD_WITH_SUGGESTION if message.unread else None)
         return made, 1, [], UNREADABLE
     usable = len(message.bookings) - failed
     queued = 0
@@ -234,6 +235,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     return made, queued, list(dict.fromkeys(touched)) if queued or touched else None, BOOKING if usable else UNREADABLE
 
 
+UNREAD_WITH_SUGGESTION = "Something else in this email couldn’t be read. Add it by hand if you need it."
 SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
 NO_AI = "Turn on AI suggestions in Settings first."
 
@@ -286,17 +288,18 @@ def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) 
         asking = not review.is_match(conn, mailbox_id, message_id)
     if cfg is None or not asking:
         return
-    suggestion: ai.Suggestion | None = None
+    suggestions: list[ai.Suggestion] = []
     error: str | None = None
     try:
-        suggestion = ai.suggest(cfg, extract.plain_text(raw), known)
+        reading = ai.suggest(cfg, extract.plain_text(raw), known)
+        suggestions, error = reading.bookings, reading.error
     except ai.AiError as e:
         error = str(e)
     except Exception as e:
         monitoring.report(e, values=False)
         error = SUGGESTION_FAILED
     with db.session() as conn:
-        review.set_suggestion(conn, mailbox_id, message_id, suggestion, error)
+        review.set_suggestions(conn, mailbox_id, message_id, suggestions, error)
 
 
 def _generic(mailbox_id: int, message_id: str) -> bool:
