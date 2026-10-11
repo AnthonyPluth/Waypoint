@@ -20,7 +20,7 @@ CHANGES = [
 BLOCKED = [
     "DELETE /api/loyalty/{id}", "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "POST /api/loyalty/{id}/reveal",
     "DELETE /api/feed", "DELETE /api/mailboxes/{id}", "DELETE /api/mcp-settings/connections/{id}", "DELETE /api/reminders/devices/{id}",
-    "DELETE /api/review/{id}", "GET /api/ai", "GET /api/backup", "GET /api/mailboxes", "GET /api/mailboxes/callback", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels", "GET /api/offline",
+    "DELETE /api/review/{id}", "GET /api/ai", "GET /api/backup", "GET /api/mailboxes", "GET /api/mailboxes/callback", "GET /api/mailboxes/{id}/ignored", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/unignore", "GET /api/offline",
     "GET /api/mcp-settings", "GET /api/reminders", "GET /api/review", "GET /api/review/{id}/preview", "GET /api/review/{id}/images/{id}", "GET /api/segments/{id}/emails/{id}/images/{id}", "GET /api/state",
     "POST /api/ai", "POST /api/backup/inspect", "POST /api/feed", "POST /api/flight-status/{id}", "POST /api/import",
     "POST /api/import/preview", "POST /api/mailboxes/connect", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/scan", "POST /api/mailboxes/{id}/share",

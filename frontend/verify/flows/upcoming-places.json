@@ -1,0 +1,9 @@
+{
+  "name": "upcoming-places",
+  "page": "upcoming",
+  "steps": [
+    { "wait_for": "text=Camden, London" },
+    { "scroll_to": "text=Camden, London" },
+    { "screenshot": "city-and-state" }
+  ]
+}

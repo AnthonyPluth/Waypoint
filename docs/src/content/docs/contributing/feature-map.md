@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-73 routes; 0 have no test yet.
+75 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -67,6 +67,8 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/mailboxes/{id}/labels` | `mailboxes.py:api_mailbox_labels_save` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/reread` | `mailboxes.py:api_mailbox_reread` | - | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/backfill` | `mailboxes.py:api_mailbox_backfill` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
+| `GET /api/mailboxes/{id}/ignored` | `mailboxes.py:api_mailbox_ignored` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
+| `POST /api/mailboxes/{id}/unignore` | `mailboxes.py:api_mailbox_unignore` | `lib/components/settings/GmailSection.svelte`, `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `GET /api/reminders` | `reminders.py:api_reminders` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |
 | `POST /api/reminders` | `reminders.py:api_reminders_set` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |
 | `POST /api/reminders/devices` | `reminders.py:api_device_add` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |
