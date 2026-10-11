@@ -35,11 +35,11 @@ class ItemOut(TypedDict):
 
 
 def add(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: str | None, received: str | None,
-        reason: Reason, now: float, held: list[tuple[trips.SegmentIn, list[int]]] | None = None) -> None:
+        reason: Reason, now: float, held: list[tuple[trips.SegmentIn, list[int]]] | None = None, gap: str | None = None) -> None:
     matches = json.dumps([{"id": n, "booking": b, "candidates": c} for n, (b, c) in enumerate(held, 1)], separators=(",", ":")) if held else None
     db.insert_ignore(conn, ReviewItem, {"mailbox_id": mailbox_id, "message_id": message_id,
                                         "sender_domain": sender_domain or UNKNOWN_SENDER,
-                                        "received": received, "reason": reason, "created": now, "matches": matches},
+                                        "received": received, "reason": reason, "created": now, "matches": matches, "gap": gap},
                      key=["mailbox_id", "message_id"])
 
 

@@ -9,6 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 import { api } from "$lib/api";
 import { forgetAirportZones } from "$lib/airport-zones";
 import type { Person, Review, ReviewItem, ReviewMatch, WhoIsThis } from "$lib/api-types";
+import { setQuery } from "$lib/app.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { toast } from "svelte-sonner";
 import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
@@ -67,6 +68,7 @@ function serve(failOn?: string) {
   });
 }
 
+afterEach(() => { setQuery(""); });
 beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
@@ -154,6 +156,29 @@ describe("Review", () => {
     options.action.onClick();
     await waitFor(() => expect(calls).toContainEqual(["/api/mailboxes/5/unignore", "POST", { domain: "example-air.example" }]));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Reading again what was skipped from example-air.example"));
+  });
+
+  it("shows only the mail from the sender in the link from Settings, in that mailbox, and everything again on request", async () => {
+    held = { ...held, items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "seaside-stays.example" }),
+      item({ id: 3, sender_domain: "seaside-stays.example", address: "ben@gmail.example", mine: false })] };
+    setQuery("sender=seaside-stays.example&mailbox=ana%40gmail.example");
+    render(ReviewPage);
+    expect(await screen.findAllByTestId("review-item")).toHaveLength(1);
+    expect(screen.getByTestId("review-filter")).toHaveTextContent("Showing only mail from seaside-stays.example in ana@gmail.example.");
+    await userEvent.click(screen.getByRole("button", { name: "Show everything" }));
+    expect(await screen.findAllByTestId("review-item")).toHaveLength(3);
+    expect(screen.queryByTestId("review-filter")).toBeNull();
+  });
+
+  it("filters by sender alone when no mailbox is named, and says when none is waiting", async () => {
+    held = { ...held, items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "seaside-stays.example" })] };
+    setQuery("sender=seaside-stays.example");
+    render(ReviewPage);
+    expect(await screen.findAllByTestId("review-item")).toHaveLength(1);
+    expect(screen.getByTestId("review-filter")).toHaveTextContent("Showing only mail from seaside-stays.example. Show everything");
+    setQuery("sender=gone.example");
+    await waitFor(() => expect(screen.queryAllByTestId("review-item")).toHaveLength(0));
+    expect(screen.getByTestId("review-filter")).toHaveTextContent("Showing only mail from gone.example, and none is waiting.");
   });
 
   it("says in the ignore dialog where to undo it", async () => {
@@ -556,7 +581,7 @@ describe("Review: the message beside the form", () => {
     expect(region.querySelector("img, script")).toBeNull();
   });
 
-  it("shows a message's HTML as formatted text, with a switch to its plain text and back", async () => {
+  it("shows a message's HTML as formatted text, with no switch to plain text", async () => {
     vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview")
       ? { text: "Gate B12", html: "<p>Gate <b>B12</b></p><table><tr><td>Seat</td><td>12A</td></tr></table>", truncated: false }
       : path === "/api/people" ? { people: [] } : held) as never);
@@ -565,11 +590,7 @@ describe("Review: the message beside the form", () => {
     const formatted = await screen.findByTestId("preview-html");
     expect(formatted.getAttribute("srcdoc")).toContain("<b>B12</b>");
     expect(formatted.getAttribute("srcdoc")).toContain("<td>Seat</td>");
-    await userEvent.click(screen.getByRole("button", { name: "Show as plain text" }));
-    expect(screen.queryByTestId("preview-html")).toBeNull();
-    expect(screen.getByTestId("preview")).toHaveTextContent("Gate B12");
-    await userEvent.click(screen.getByRole("button", { name: "Show as formatted" }));
-    expect(await screen.findByTestId("preview-html")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show as/ })).toBeNull();
   });
 
   it("offers no switch for a message with no HTML part", async () => {

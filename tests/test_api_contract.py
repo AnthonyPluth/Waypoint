@@ -184,6 +184,8 @@ class Replies(DbCase):
         first = reply["mailboxes"][0]["id"]
         self.c.execute(insert(IgnoredSender).values(mailbox_id=first, domain="example-air.example"))
         self.check("GET /api/mailboxes/{id}/ignored", mailboxes.api_mailbox_ignored(self.c, {}, {}, str(first)))
+        review.add(self.c, first, "m1", "example-air.example", "2026-10-01", "incomplete", 1.0, None, "no place")
+        self.check("GET /api/mailboxes/{id}/review-glance", mailboxes.api_mailbox_review_glance(self.c, {}, {}, str(first)))
         with mock.patch.object(jobs, "scan_now", return_value=True):
             self.check("POST /api/mailboxes/{id}/unignore", mailboxes.api_mailbox_unignore(self.c, {}, {"domain": "example-air.example"}, str(first)))
         live = [{"id": "Label_1", "name": "Japan 2026", "count": 12}]
@@ -443,7 +445,7 @@ class Generated(unittest.TestCase):
 
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
-                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels", "GET /api/mailboxes/{id}/ignored", "POST /api/mailboxes/{id}/unignore",
+                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels", "GET /api/mailboxes/{id}/ignored", "GET /api/mailboxes/{id}/review-glance", "POST /api/mailboxes/{id}/unignore",
                                      "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/share",
                                      "GET /api/ai", "POST /api/ai", "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "DELETE /api/review/{id}",
