@@ -7,14 +7,12 @@ from ..storage import db
 from ..storage import settings_keys as sk
 from . import mcp_oauth
 
-READ, WRITE, MAIL = "read", "write", "mail"
+READ, WRITE = "read", "write"
 
 READABLE = frozenset({
     "/api/trips", "/api/trips/{id}", "/api/segments/{id}", "/api/airports/{id}", "/api/people", "/api/stats",
     "/api/distance-unit", "/api/flight-status", "/api/assistant/review", "/api/assistant/review/{id}",
 })
-
-MAIL_READABLE = frozenset({"/api/assistant/review/{id}/email", "/api/assistant/segments/{id}/email"})
 
 SWITCHES = {WRITE: sk.MCP_ALLOW_WRITES}
 

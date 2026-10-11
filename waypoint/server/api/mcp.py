@@ -5,7 +5,7 @@ from datetime import datetime
 from ... import validate
 from .. import mcp_access, mcp_oauth
 from ..common import ApiError, _current, row_id
-from ..contract import McpConnection, McpMailBody, McpSettings, McpWritesBody, Ok
+from ..contract import McpConnection, McpSettings, McpWritesBody, Ok
 
 
 def _when(t: float | None) -> str | None:
@@ -31,9 +31,3 @@ def api_mcp_revoke(conn, _q, _b, grant_id) -> Ok:
         raise ApiError("That connection isn't there any more.", 404)
     return {"ok": True}
 
-
-def api_mcp_mail(conn, _q, body: McpMailBody, grant_id) -> McpMailBody:
-    allow = validate.on(body.get("allow"))
-    if not mcp_oauth.set_scope(conn, row_id(grant_id), mcp_access.MAIL, allow):
-        raise ApiError("That connection isn't there any more.", 404)
-    return {"allow": allow}

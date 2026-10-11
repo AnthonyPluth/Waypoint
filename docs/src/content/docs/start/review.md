@@ -50,7 +50,7 @@ Each such name is listed here with the segment it’s on. Choose the person it i
 
 ## Letting an AI assistant help
 
-An assistant you connected over [MCP](/Waypoint/start/mcp/#the-review-queue) can list these items, compare each with your trips (with a confidence of exact, likely or possible, and the fields that agreed), and, if you allowed changes, match, add or dismiss them for you. It sees only what Waypoint read from each email, not the email, unless you switched on **Read email text** for that connection in Settings.
+An assistant you connected over [MCP](/Waypoint/start/mcp/#the-review-queue) can list these items, compare each with your trips (with a confidence of exact, likely or possible, and the fields that agreed), and, if you allowed changes, match, add or dismiss them for you. It sees only what Waypoint read from each email, never the email itself.
 
 ## When a scan has a problem
 

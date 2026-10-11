@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, cast
 
-from ... import monitoring, validate
+from ... import validate
 from ...domain import trips, visibility
 from ...domain.mail import assist, review
 from ..common import ApiError, row_id
-from ..contract import (AssistantCreateBody, AssistantDismissBody, AssistantDismissed, AssistantEmail, AssistantItemDetail,
-                        AssistantItems, AssistantMatchBody, AssistantMatched, AssistantSegmentEmails, Segment)
+from ..contract import (AssistantCreateBody, AssistantDismissBody, AssistantDismissed, AssistantItemDetail,
+                        AssistantItems, AssistantMatchBody, AssistantMatched, Segment)
 from .mailboxes import owner
 from .trips import NO_SEGMENT, NO_TRIP, segment_fields, viewer
 
@@ -50,25 +50,6 @@ def api_assistant_review_item(conn, _q, _b, item_id: str) -> AssistantItemDetail
     if found is None:
         raise ApiError(NO_ITEM, 404)
     return cast(AssistantItemDetail, found)
-
-
-def api_assistant_review_email(conn, _q, _b, item_id: str) -> AssistantEmail:
-    try:
-        found = assist.email_of_item(conn, owner(), row_id(item_id, NO_ITEM))
-    except trips.Invalid as e:
-        raise ApiError(str(e), 404) from None
-    if found is None:
-        raise ApiError(NO_ITEM, 404)
-    monitoring.log("assistant read email: get_review_item, 1 message")
-    return found
-
-
-def api_assistant_segment_emails(conn, _q, _b, segment_id: str) -> AssistantSegmentEmails:
-    found = assist.emails_of_segment(conn, viewer(conn), row_id(segment_id, NO_SEGMENT))
-    if found is None:
-        raise ApiError(NO_SEGMENT, 404)
-    monitoring.log(f"assistant read email: get_segment_email, {len(found)} messages")
-    return cast(AssistantSegmentEmails, {"emails": found})
 
 
 def _whole(body: Mapping[str, Any], key: str, missing: str) -> int | None:
