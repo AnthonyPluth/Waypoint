@@ -25,6 +25,10 @@ export interface AiSuggestion {
   start_zone?: string;
   end_zone?: string;
   address?: string;
+  phone?: string;
+  room?: string;
+  ship?: string;
+  deck?: string;
   sources?: Record<string, string>;
 }
 
@@ -119,6 +123,16 @@ export interface FlightStatusList {
 export interface FlightStatusPause {
   until: string;
   reason: "limit" | "rate" | "key";
+}
+
+export interface IgnoredSenders {
+  domains: string[];
+}
+
+export interface Ignoring {
+  ok: boolean;
+  mailbox_id: number;
+  domain: string;
 }
 
 export interface ImportBody {
@@ -233,6 +247,7 @@ export interface Mailbox {
   scanning: boolean;
   scan_notice: string | null;
   scan_summary: ScanSummary | null;
+  reading_again: string | null;
   labels_picked: number;
   share_review: boolean;
 }
@@ -416,6 +431,7 @@ export interface ReviewItem {
   owner: string;
   mine: boolean;
   sender_domain: string;
+  known_sender: boolean;
   subject: string | null;
   has_email: boolean;
   received: string | null;
@@ -759,6 +775,10 @@ export interface TripList {
   trips: Trip[];
 }
 
+export interface UnignoreBody {
+  domain: string;
+}
+
 export interface WhoBody {
   person_id?: number;
   new_guest?: string;
@@ -827,6 +847,8 @@ export interface Endpoints {
   "POST /api/mailboxes/{id}/labels": { body: LabelsBody; reply: Ok };
   "POST /api/mailboxes/{id}/reread": { body: never; reply: ScanStarted };
   "POST /api/mailboxes/{id}/backfill": { body: never; reply: ScanStarted };
+  "GET /api/mailboxes/{id}/ignored": { body: never; reply: IgnoredSenders };
+  "POST /api/mailboxes/{id}/unignore": { body: UnignoreBody; reply: ScanStarted };
   "GET /api/reminders": { body: never; reply: Reminders };
   "POST /api/reminders": { body: RemindersBody; reply: Reminders };
   "POST /api/reminders/devices": { body: DeviceBody; reply: ReminderDevice };
@@ -835,7 +857,7 @@ export interface Endpoints {
   "DELETE /api/feed": { body: never; reply: Ok };
   "GET /api/review": { body: never; reply: Review };
   "POST /api/review/who/{id}": { body: WhoBody; reply: Matched };
-  "POST /api/review/{id}/ignore": { body: never; reply: Ok };
+  "POST /api/review/{id}/ignore": { body: never; reply: Ignoring };
   "POST /api/review/{id}/match": { body: MatchBody; reply: Ok };
   "GET /api/review/{id}/preview": { body: never; reply: Preview };
   "POST /api/review/{id}/suggest": { body: never; reply: Ok };

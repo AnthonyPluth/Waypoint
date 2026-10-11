@@ -11,7 +11,7 @@ from ...domain.mail import ai, review, scan
 from ...providers import gmail
 from ...storage import db
 from ..common import NO_IMAGE, ApiError, Response, image_response, own_session, position, row_id
-from ..contract import Matched, MatchBody, Ok, Preview, Review, ReviewItem, ReviewMatch, WhoBody
+from ..contract import Ignoring, Matched, MatchBody, Ok, Preview, Review, ReviewItem, ReviewMatch, WhoBody
 from .mailboxes import owner
 from .trips import viewer
 
@@ -58,10 +58,12 @@ def api_review_match(conn, _q, body: MatchBody, item_id: str) -> Ok:
     return {"ok": True}
 
 
-def api_review_ignore(conn, _q, _b, item_id: str) -> Ok:
-    if review.ignore_sender(conn, owner(), row_id(item_id, NO_ITEM)) is None:
+def api_review_ignore(conn, _q, _b, item_id: str) -> Ignoring:
+    item = row_id(item_id, NO_ITEM)
+    sender = review.sender_to_ignore(conn, owner(), item)
+    if sender is None or review.ignore_sender(conn, owner(), item) is None:
         raise ApiError(NO_ITEM, 404)
-    return {"ok": True}
+    return {"ok": True, "mailbox_id": sender[0], "domain": sender[1]}
 
 
 def _who(body: Mapping[str, Any]) -> tuple[int | None, str | None]:

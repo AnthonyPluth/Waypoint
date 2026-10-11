@@ -1763,6 +1763,87 @@
         }
       }
     },
+    "/api/mailboxes/{id}/ignored": {
+      "get": {
+        "operationId": "api_mailbox_ignored",
+        "x-handler": "waypoint/server/api/mailboxes.py:api_mailbox_ignored",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IgnoredSenders"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/mailboxes/{id}/unignore": {
+      "post": {
+        "operationId": "api_mailbox_unignore",
+        "x-handler": "waypoint/server/api/mailboxes.py:api_mailbox_unignore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnignoreBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanStarted"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/reminders": {
       "get": {
         "operationId": "api_reminders",
@@ -2068,7 +2149,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "$ref": "#/components/schemas/Ignoring"
                 }
               }
             }
@@ -2490,6 +2571,18 @@
             "type": "string"
           },
           "address": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "room": {
+            "type": "string"
+          },
+          "ship": {
+            "type": "string"
+          },
+          "deck": {
             "type": "string"
           },
           "sources": {
@@ -2917,6 +3010,41 @@
         "required": [
           "until",
           "reason"
+        ],
+        "additionalProperties": false
+      },
+      "IgnoredSenders": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "domains"
+        ],
+        "additionalProperties": false
+      },
+      "Ignoring": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "mailbox_id": {
+            "type": "integer"
+          },
+          "domain": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "mailbox_id",
+          "domain"
         ],
         "additionalProperties": false
       },
@@ -3419,6 +3547,12 @@
               }
             ]
           },
+          "reading_again": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "labels_picked": {
             "type": "integer"
           },
@@ -3436,6 +3570,7 @@
           "scanning",
           "scan_notice",
           "scan_summary",
+          "reading_again",
           "labels_picked",
           "share_review"
         ],
@@ -4187,6 +4322,9 @@
           "sender_domain": {
             "type": "string"
           },
+          "known_sender": {
+            "type": "boolean"
+          },
           "subject": {
             "type": [
               "string",
@@ -4239,6 +4377,7 @@
           "owner",
           "mine",
           "sender_domain",
+          "known_sender",
           "subject",
           "has_email",
           "received",
@@ -5805,6 +5944,18 @@
         },
         "required": [
           "trips"
+        ],
+        "additionalProperties": false
+      },
+      "UnignoreBody": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain"
         ],
         "additionalProperties": false
       },

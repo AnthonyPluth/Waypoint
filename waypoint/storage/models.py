@@ -216,6 +216,7 @@ class ScannedMessage(Base):
     message_id: Mapped[str]
     outcome: Mapped[str]
     scanned: Mapped[float]
+    sender_domain: Mapped[str | None]
 
 
 class ReviewItem(Base):

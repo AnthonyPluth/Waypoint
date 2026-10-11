@@ -13,7 +13,7 @@ import { toast } from "svelte-sonner";
 import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
 
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
-  id: 1, address: "ana@gmail.example", owner: "Ana Doe", mine: true, sender_domain: "example-air.example", subject: null, has_email: true, received: "2026-10-17",
+  id: 1, address: "ana@gmail.example", owner: "Ana Doe", mine: true, sender_domain: "example-air.example", known_sender: false, subject: null, has_email: true, received: "2026-10-17",
   reason: "no_markup", gmail_url: "https://mail.google.com/mail/?authuser=ana%40gmail.example#all/abc", suggestion: null, suggestion_error: null, ...extra });
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
@@ -47,7 +47,9 @@ function serve(failOn?: string) {
     if (path === "/api/segments") return { id: 42 } as never;
     if (path.endsWith("/preview")) { if (previewFails) throw new Error(previewFails); return { text: PREVIEW, html: null, truncated } as never; }
     if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestion: SUGGESTION })) }; return { ok: true } as never; }
-    if (opts?.method === "DELETE" || path.endsWith("/ignore")) { const id = Number(path.split("/")[3]?.split("?")[0]); held = { ...held, items: held.items.filter((i) => i.id !== id), matches: held.matches.filter((m) => m.item_id !== id) }; return { ok: true } as never; }
+    if (path.endsWith("/unignore")) return { started: true } as never;
+    if (path.endsWith("/ignore")) { const id = Number(path.split("/")[3]); const domain = held.items.find((i) => i.id === id)?.sender_domain ?? ""; held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true, mailbox_id: 5, domain } as never; }
+    if (opts?.method === "DELETE") { const id = Number(path.split("/")[3]?.split("?")[0]); held = { ...held, items: held.items.filter((i) => i.id !== id), matches: held.matches.filter((m) => m.item_id !== id) }; return { ok: true } as never; }
     if (path.endsWith("/match")) { const id = Number(path.split("/")[3]); held = { ...held, matches: held.matches.filter((m) => m.item_id !== id) }; return { ok: true } as never; }
     if (path.startsWith("/api/review/who/")) { const id = Number(path.split("/")[4]); held = { ...held, who: held.who.filter((w) => w.id !== id) }; return { ok: true, matched: 2 } as never; }
     throw new Error(`unexpected ${path}`);
@@ -126,7 +128,36 @@ describe("Review", () => {
     expect(calls.some(([p]) => p.endsWith("/ignore"))).toBe(false);
     await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1/ignore", "POST", undefined]));
-    expect(toast.success).toHaveBeenCalledWith("Ignoring example-air.example");
+    expect(toast.success).toHaveBeenCalledWith("Ignoring example-air.example", expect.objectContaining({ description: "You can undo this in Settings → Mail and AI → Gmail", action: expect.objectContaining({ label: "Undo" }) }));
+  });
+
+  it("offers Undo on the toast, and Undo stops ignoring that sender and says the mail is read again", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ignore example-air.example" }));
+    await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Ignoring example-air.example", expect.anything()));
+    const options = vi.mocked(toast.success).mock.calls.find(([text]) => text === "Ignoring example-air.example")![1] as unknown as { action: { onClick: () => void } };
+    options.action.onClick();
+    await waitFor(() => expect(calls).toContainEqual(["/api/mailboxes/5/unignore", "POST", { domain: "example-air.example" }]));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Reading again what was skipped from example-air.example"));
+  });
+
+  it("says in the ignore dialog where to undo it", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ignore example-air.example" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("You can undo this in Settings → Mail and AI → Gmail.")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("known-sender-warning")).toBeNull();
+  });
+
+  it("warns in the ignore dialog when the sender is a travel company Waypoint knows, and still allows it", async () => {
+    held = { ...held, items: [item({ sender_domain: "delta.example", known_sender: true })] };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ignore delta.example" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByTestId("known-sender-warning")).toHaveTextContent("This sender is a travel company Waypoint knows. Ignoring it means its bookings won’t be added.");
+    await userEvent.click(dialog.querySelector("button[type=submit]")!);
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1/ignore", "POST", undefined]));
   });
 
   it("adds a booking by hand with the provider filled in, then takes the item off the list", async () => {
@@ -378,6 +409,57 @@ describe("Review: the AI’s suggestion", () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
     const [, , body] = calls.find(([p]) => p === "/api/segments")!;
     expect(body).toMatchObject({ kind: "flight", confirmation: "QW4R7U", origin: "BOS", destination: "DEN", start_local: "2026-12-02T07:15" });
+  });
+
+  it("shows the AI’s address and phone outlined, and sends them when added", async () => {
+    const stay = { kind: "hotel" as const, provider: "Example Stays", confirmation: "QW4R7T", origin: "Harbour Hotel", start_local: "2026-12-02T15:00",
+      end_local: "2026-12-05T11:00", start_zone: "Europe/London", address: "1 Quay Road, Bristol BS1 4AA, UK", phone: "+44 117 555 0100" };
+    held = { matches: [], items: [item({ suggestion: stay })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByText(/An AI read the email and suggested this. It can be wrong/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Address/)).toHaveValue("1 Quay Road, Bristol BS1 4AA, UK");
+    expect(screen.getByLabelText(/^Address/)).toHaveClass("ring-2");
+    expect(screen.getByLabelText(/^Phone/)).toHaveValue("+44 117 555 0100");
+    expect(screen.getByLabelText(/^Phone/)).toHaveClass("ring-2");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    const [, , body] = calls.find(([p]) => p === "/api/segments")!;
+    expect(body).toMatchObject({ kind: "hotel", details: { address: "1 Quay Road, Bristol BS1 4AA, UK", phone: "+44 117 555 0100" } });
+  });
+
+  it("leaves the address empty and unoutlined when the AI found none", async () => {
+    const stay = { kind: "hotel" as const, origin: "Harbour Hotel", start_local: "2026-12-02T15:00", end_local: "2026-12-05T11:00", start_zone: "Europe/London" };
+    held = { matches: [], items: [item({ suggestion: stay })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText(/^Address/)).toHaveValue("");
+    expect(screen.getByLabelText(/^Address/)).not.toHaveClass("ring-2");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.find(([p]) => p === "/api/segments")?.[2]).not.toHaveProperty("details");
+  });
+
+  it("takes a rental’s pick-up address and a cruise’s terminal, cabin, ship and deck", async () => {
+    const car = { kind: "car" as const, origin: "Bristol Airport", destination: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00",
+      address: "4 Runway Drive, Bristol BS48 3DY" };
+    held = { matches: [], items: [item({ suggestion: car })], who: [], ai: false };
+    const first = render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
+    expect(screen.getByLabelText(/^Pick-up address/)).toHaveClass("ring-2");
+    first.unmount();
+    const cruise = { kind: "cruise" as const, origin: "Miami", destination: "Nassau", start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00",
+      start_zone: "America/New_York", end_zone: "America/Nassau", address: "1015 North America Way, Miami FL 33132", room: "8123", ship: "Example Voyager", deck: "8" };
+    held = { matches: [], items: [item({ suggestion: cruise })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText(/^Terminal address/)).toHaveValue("1015 North America Way, Miami FL 33132");
+    expect(screen.getByLabelText(/^Cabin/)).toHaveValue("8123");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    const [, , body] = calls.find(([p]) => p === "/api/segments")!;
+    expect(body).toMatchObject({ kind: "cruise", details: { address: "1015 North America Way, Miami FL 33132", room: "8123", ship: "Example Voyager", deck: "8" } });
   });
 
   it("opens a cruise suggestion with its port labels and saves its ports and zones", async () => {
