@@ -19,7 +19,7 @@ from ... import monitoring
 from ...providers import mailimages
 from ...storage.stored_mail import Content, Image
 from .. import seatmaps
-from . import lodging, parsers, safe_html, seats, triage
+from . import flights, lodging, parsers, safe_html, seats, triage
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger
@@ -29,6 +29,7 @@ from .booking import Status
 RESERVATIONS: dict[str, Kind] = {"FlightReservation": "flight", "LodgingReservation": "hotel",
                                  "RentalCarReservation": "car", "TrainReservation": "train"}
 MAX_PART = 2_000_000
+GENERIC_READERS: tuple[Callable[[str, str], tuple[Parsed, str | None]], ...] = (lodging.read, flights.read)
 MAX_NODES = 200
 IATA = re.compile(r"[A-Z]{3}")
 CLOCK = re.compile(r"(?<![\d:.])(\d{1,2}):(\d{2})(?::\d{2})?(?!\d)(?:\s*([AaPp])\.?[Mm]\.?)?")
@@ -560,15 +561,26 @@ def read(message: Mapping[str, Any]) -> Message:
             bookings = [x for x in bookings if x.kind != "flight"] + text_flights
             unread += found.unread
     if not bookings and not unread and not seen:
-        try:
-            lodged, why = lodging.read("\n".join(htmls), "\n".join(texts))
-        except Exception as e:
-            monitoring.report(e, values=False)
-            lodged, why = Parsed(), None
-        if lodged.bookings:
-            bookings, seen = list(lodged.bookings), True
-        elif why:
-            gaps.append(f"generic reader: {why}")
+        for position, generic in enumerate(GENERIC_READERS):
+            try:
+                generic_found, why = generic("\n".join(htmls), "\n".join(texts))
+            except Exception as e:
+                monitoring.report(e, values=False)
+                generic_found, why = Parsed(), None
+            if generic_found.bookings:
+                bookings, unread, seen = list(generic_found.bookings), generic_found.unread, True
+                for later in GENERIC_READERS[position + 1:]:
+                    try:
+                        left = later("\n".join(htmls), "\n".join(texts))[0]
+                    except Exception as e:
+                        monitoring.report(e, values=False)
+                        continue
+                    if left.bookings or left.unread:
+                        unread += len(left.bookings) + left.unread
+                        gaps.append("generic reader: another kind of booking in the message wasn't filed")
+                break
+            if why:
+                gaps.append(f"generic reader: {why}")
     if any(utc_marked(t) for b in bookings for t in (b.start, b.end)):
         shown = clock_times(_visible(htmls, texts))
         bookings = [replace(b, clock_times=shown) if utc_marked(b.start) or utc_marked(b.end) else b for b in bookings]

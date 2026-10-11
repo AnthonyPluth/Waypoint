@@ -1,0 +1,18 @@
+From: Nordlicht Flug <buchung@nordlicht-flug.example>
+To: traveller@gmail.example
+Subject: Buchungsbestaetigung: your booking is confirmed
+Date: Wed, 14 Oct 2026 12:00:00 +0100
+Message-ID: <fx-flight-generic-de@nordlicht-flug.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>CANARY-BODY-FLIGHT-DE-8W2L Vielen Dank für Ihre Buchung.</p>
+<p>Stornierung bis 20.10.2026 18:00 Uhr kostenlos.</p>
+<p>Buchungscode: NL3X8Q</p>
+<p>Flug LH 9001</p>
+<table>
+<tr><th>Abflug</th><th>Ankunft</th></tr>
+<tr><td>FRA 21. November 2026 15:05 Uhr</td><td>JFK 21. November 2026 18:20 Uhr</td></tr>
+</table>
+</body></html>

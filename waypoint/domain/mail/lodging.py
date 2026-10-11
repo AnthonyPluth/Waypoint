@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, time, timedelta
+from datetime import date, time, timedelta
 
+from . import when
 from .booking import Booking, Parsed, Passenger
 from .parsers._text import lines
 
@@ -21,13 +22,6 @@ LABELS: dict[str, tuple[str, ...]] = {
     "guest": ("guest name", "guest", "宿泊者名", "宿泊者", "ご利用者名"),
 }
 CANCEL = re.compile(r"cancel|refund|penalt|no[- ]show|キャンセル|払い戻し|取消", re.IGNORECASE)
-MONTHS = {m: i for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
-ISO = re.compile(r"(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})")
-JAPANESE = re.compile(r"(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日")
-MONTH_FIRST = re.compile(r"([A-Za-z]{3})[A-Za-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})")
-DAY_FIRST = re.compile(r"(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})[A-Za-z]*\.?,?\s+(\d{4})")
-CLOCK = re.compile(r"(?<![\d:])(\d{1,2}):(\d{2})\s*([AaPp])?\.?[Mm]?\.?(?!\d)")
-JP_CLOCK = re.compile(r"(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?")
 NIGHTS = re.compile(r"(\d{1,3})\s*(?:nights?|泊)", re.IGNORECASE)
 CODE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{3,24}")
 Sources = tuple[tuple[str, str], ...]
@@ -63,41 +57,6 @@ def _find(rows: list[str], key: str) -> tuple[str, str] | None:
     return None
 
 
-def _date(text: str) -> date | None:
-    try:
-        if m := ISO.search(text):
-            return date(int(m[1]), int(m[2]), int(m[3]))
-        if m := JAPANESE.search(text):
-            return date(int(m[1]), int(m[2]), int(m[3]))
-        if (m := MONTH_FIRST.search(text)) and m[1].lower() in MONTHS:
-            return date(int(m[3]), MONTHS[m[1].lower()], int(m[2]))
-        if (m := DAY_FIRST.search(text)) and m[2].lower() in MONTHS:
-            return date(int(m[3]), MONTHS[m[2].lower()], int(m[1]))
-    except ValueError:
-        return None
-    return None
-
-
-def _time(text: str) -> time | None:
-    try:
-        if m := CLOCK.search(text):
-            hour, minute = int(m[1]), int(m[2])
-            if m[3]:
-                if not 1 <= hour <= 12:
-                    return None
-                hour = hour % 12 + (12 if m[3].lower() == "p" else 0)
-            return time(hour, minute)
-        if m := JP_CLOCK.search(text):
-            return time(int(m[1]), int(m[2] or 0))
-    except ValueError:
-        return None
-    return None
-
-
-def _stamp(day: date, at: time | None, fallback: time) -> str:
-    return datetime.combine(day, at or fallback).strftime("%Y-%m-%dT%H:%M")
-
-
 def read(html: str, text: str) -> tuple[Parsed, str | None]:
     rows = lines(html, text)
     try:
@@ -117,16 +76,16 @@ def _booking(rows: list[str]) -> Booking:
     if "property" not in found:
         raise Unreadable("no hotel name found")
     name = found["property"][1][:100]
-    first = _date(found["checkin"][1])
+    first = when.find_date(found["checkin"][1])
     if first is None:
         raise Unreadable("check-in isn't a date")
     sources: dict[str, str] = {"origin": found["property"][0], "start_local": found["checkin"][0]}
-    at_in = _time(found["checkin"][1])
+    at_in = when.find_time(found["checkin"][1])
     last: date | None = None
     at_out: time | None = None
     if "checkout" in found:
-        last = _date(found["checkout"][1])
-        at_out = _time(found["checkout"][1])
+        last = when.find_date(found["checkout"][1])
+        at_out = when.find_time(found["checkout"][1])
         if last is None:
             raise Unreadable("check-out isn't a date")
         sources["end_local"] = found["checkout"][0]
@@ -153,5 +112,5 @@ def _booking(rows: list[str]) -> Booking:
         sources["address"] = found["address"][0]
     guest = found["guest"][1][:80] if "guest" in found else None
     details = tuple((k, v) for k, v in (("address", address), ("time_unknown", "yes" if at_in is None or at_out is None else None)) if v)
-    return Booking("hotel", "confirmed", code, name, _stamp(first, at_in, CHECK_IN), _stamp(last, at_out, CHECK_OUT), name, None, details=details,
+    return Booking("hotel", "confirmed", code, name, when.stamp(first, at_in, CHECK_IN), when.stamp(last, at_out, CHECK_OUT), name, None, details=details,
                    passengers=(Passenger(guest),) if guest else (), generic=tuple(sources.items()))
