@@ -40,6 +40,15 @@ class Restored(TypedDict):
     unreadable_secrets: list[str]
 
 
+class ScanSummary(TypedDict):
+    found: int
+    read: int
+    bookings: int
+    review: int
+    skipped: int
+    capped: bool
+
+
 class Mailbox(TypedDict):
     id: int
     address: str
@@ -49,6 +58,7 @@ class Mailbox(TypedDict):
     scan_error: str | None
     scanning: bool
     scan_notice: str | None
+    scan_summary: ScanSummary | None
     share_review: bool
 
 

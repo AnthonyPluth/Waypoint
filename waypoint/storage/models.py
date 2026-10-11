@@ -196,6 +196,7 @@ class Mailbox(Base):
     last_error: Mapped[str | None]
     created: Mapped[float | None]
     scan_error: Mapped[str | None]
+    scan_summary: Mapped[str | None]
     share_review: Mapped[bool]
 
 

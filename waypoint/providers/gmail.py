@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import base64
 import contextlib
 import hashlib
@@ -188,7 +189,7 @@ def _revoke_quietly(token: str) -> None:
 
 def listing(conn: db.Connection, owner: str) -> list[dict[str, Any]]:
     return db.rows(conn.execute(select(Mailbox.id, Mailbox.address, Mailbox.status, Mailbox.last_error, Mailbox.last_scan,
-                                       Mailbox.scan_error, Mailbox.share_review).where(Mailbox.owner_sub == owner).order_by(Mailbox.id)))
+                                       Mailbox.scan_error, Mailbox.scan_summary, Mailbox.share_review).where(Mailbox.owner_sub == owner).order_by(Mailbox.id)))
 
 
 def set_share_review(conn: db.Connection, mailbox_id: int, owner: str, share: bool) -> bool:
@@ -298,8 +299,8 @@ MAX_FOUND = 5000
 FETCH_ATTEMPTS = 3
 
 
-def _api(path: str, token: str, params: dict[str, str] | None = None) -> Any:
-    url = HOSTS.api + path + ("?" + urllib.parse.urlencode(params) if params else "")
+def _api(path: str, token: str, params: Mapping[str, str | list[str]] | None = None) -> Any:
+    url = HOSTS.api + path + ("?" + urllib.parse.urlencode(params, doseq=True) if params else "")
     try:
         return _get(url, token)
     except urllib.error.HTTPError as e:
@@ -357,6 +358,22 @@ def fetch(token: str, message_id: str) -> dict[str, Any]:
     for attempt in range(FETCH_ATTEMPTS):
         try:
             found = _api(f"/messages/{quoted}", token, {"format": "raw"})
+        except MessageGone:
+            raise
+        except GmailError:
+            if attempt == FETCH_ATTEMPTS - 1:
+                raise
+            time.sleep(0.2 * (attempt + 1))
+            continue
+        return found if isinstance(found, dict) else {}
+    raise GmailError("Couldn’t reach Google while reading the mailbox.")
+
+
+def fetch_head(token: str, message_id: str) -> dict[str, Any]:
+    quoted = urllib.parse.quote(message_id, safe="")
+    for attempt in range(FETCH_ATTEMPTS):
+        try:
+            found = _api(f"/messages/{quoted}", token, {"format": "metadata", "metadataHeaders": ["From", "Subject"]})
         except MessageGone:
             raise
         except GmailError:

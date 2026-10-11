@@ -3305,6 +3305,16 @@
               "null"
             ]
           },
+          "scan_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScanSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "share_review": {
             "type": "boolean"
           }
@@ -3318,6 +3328,7 @@
           "scan_error",
           "scanning",
           "scan_notice",
+          "scan_summary",
           "share_review"
         ],
         "additionalProperties": false
@@ -4142,6 +4153,38 @@
         },
         "required": [
           "started"
+        ],
+        "additionalProperties": false
+      },
+      "ScanSummary": {
+        "type": "object",
+        "properties": {
+          "found": {
+            "type": "integer"
+          },
+          "read": {
+            "type": "integer"
+          },
+          "bookings": {
+            "type": "integer"
+          },
+          "review": {
+            "type": "integer"
+          },
+          "skipped": {
+            "type": "integer"
+          },
+          "capped": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "found",
+          "read",
+          "bookings",
+          "review",
+          "skipped",
+          "capped"
         ],
         "additionalProperties": false
       },

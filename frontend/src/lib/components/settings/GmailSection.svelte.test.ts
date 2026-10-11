@@ -11,7 +11,7 @@ import type { Mailbox, MailboxList } from "$lib/api-types";
 import { toast } from "svelte-sonner";
 import GmailSection from "./GmailSection.svelte";
 
-const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, scan_notice: null, share_review: false, ...extra });
+const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, scan_notice: null, scan_summary: null, share_review: false, ...extra });
 const list = (mailboxes: Mailbox[] = [], configured = true): MailboxList => ({ configured, mailboxes });
 const serve = (reply: MailboxList, others: (path: string) => unknown = () => ({})) =>
   vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/mailboxes" ? reply : others(path)) as never);
@@ -20,6 +20,25 @@ beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockRese
 afterEach(() => { vi.unstubAllGlobals(); history.replaceState(null, "", "/"); });
 
 describe("Settings → Gmail", () => {
+  it("says in one line what the last scan found, read, filed, couldn't read and skipped, and nothing else", async () => {
+    serve(list([box({ last_scan: "2026-10-05T10:00:00+00:00", scan_summary: { found: 24, read: 6, bookings: 3, review: 2, skipped: 15, capped: false } })]));
+    render(GmailSection);
+    expect(await screen.findByTestId("scan-summary")).toHaveTextContent("24 new messages found, 6 read, 3 bookings added or changed, 2 couldn’t be read, 15 skipped.");
+  });
+
+  it("says when more messages are waiting after the cap", async () => {
+    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: true } })]));
+    render(GmailSection);
+    expect(await screen.findByTestId("scan-summary")).toHaveTextContent("1 new message found, 1 read, 1 booking added or changed, 0 couldn’t be read, 0 skipped. More are waiting; the next scan carries on.");
+  });
+
+  it("shows no summary when there hasn't been a scan", async () => {
+    serve(list([box()]));
+    render(GmailSection);
+    await screen.findByText("Not scanned yet.");
+    expect(screen.queryByTestId("scan-summary")).toBeNull();
+  });
+
   it("says Gmail isn’t set up, and offers no Connect, until the server has Google’s client", async () => {
     serve(list([], false));
     render(GmailSection);

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import threading
 import time
 from collections import Counter
@@ -16,10 +17,11 @@ from ...storage.models import Mailbox, ScannedMessage
 from ...storage.stored_mail import Content
 from .. import loyalty, people
 from ..visibility import Viewer
-from . import ai, extract, ingest, query, review
+from . import ai, extract, ingest, query, review, triage
 
 State = Literal["done", "failed", "not_started", "busy"]
-BOOKING, UNREADABLE, IGNORED = "booking", "unreadable", "ignored"
+BOOKING, UNREADABLE, IGNORED, SKIPPED = "booking", "unreadable", "ignored", "skipped"
+MAX_READ = 150
 LOCAL = "local"
 OVERLAP_DAYS = 2
 TOKEN_LIFE = 2400
@@ -35,6 +37,19 @@ class Result:
     messages: int = 0
     bookings: int = 0
     review: int = 0
+    found: int = 0
+    skipped: int = 0
+    capped: bool = False
+
+
+@dataclass(frozen=True)
+class Summary:
+    found: int
+    read: int
+    bookings: int
+    review: int
+    skipped: int
+    capped: bool
 
 
 _running: set[int] = set()
@@ -69,6 +84,33 @@ def scan(mailbox_id: int, now: float, today: date, again: bool = False, backfill
         elif result.state != "busy":
             _notices.pop(mailbox_id, None)
     return result
+
+
+def encode(found: Summary) -> str:
+    return json.dumps({"found": found.found, "read": found.read, "bookings": found.bookings, "review": found.review,
+                       "skipped": found.skipped, "capped": found.capped}, separators=(",", ":"))
+
+
+def decode(text: str | None) -> Summary | None:
+    try:
+        raw = json.loads(text) if text else None
+    except ValueError:
+        return None
+    counts = ("found", "read", "bookings", "review", "skipped")
+    if not isinstance(raw, dict) or not all(isinstance(raw.get(k), int) and not isinstance(raw.get(k), bool) for k in counts) \
+            or not isinstance(raw.get("capped"), bool):
+        return None
+    return Summary(raw["found"], raw["read"], raw["bookings"], raw["review"], raw["skipped"], raw["capped"])
+
+
+def summary(mailbox_id: int) -> Summary | None:
+    with db.session() as conn:
+        return decode(conn.execute(select(Mailbox.scan_summary).where(Mailbox.id == mailbox_id)).scalar())
+
+
+def remember(mailbox_id: int, found: Summary) -> None:
+    with db.session() as conn:
+        conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(scan_summary=encode(found)))
 
 
 def forget(mailbox_id: int) -> None:
@@ -233,7 +275,9 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             return Result("not_started", str(e))
         ignored = review.ignored(conn, mailbox_id)
     history, last_scan = row["history_id"], row["last_scan"]
-    read = made = queued = 0
+    read = made = queued = skipped = 0
+    pending: list[str] = []
+    capped = False
     why: Counter[str] = Counter()
     issued = time.monotonic()
     try:
@@ -256,11 +300,27 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             with db.session() as conn:
                 seen = set(conn.execute(select(ScannedMessage.message_id).where(
                     ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id.in_(found))).scalars()) if found else set()
-        for message_id in (m for m in found if m not in seen):
+        pending = [m for m in found if m not in seen]
+        for message_id in pending:
             if time.monotonic() - issued > TOKEN_LIFE:
                 with db.session() as conn:
                     token = gmail.access_token(conn, mailbox_id, time.time())
                 issued = time.monotonic()
+            if not again:
+                try:
+                    verdict = triage.decide(extract.head(gmail.fetch_head(token, message_id)))
+                except gmail.MessageGone:
+                    with db.session() as conn:
+                        _record(conn, mailbox_id, message_id, IGNORED, now)
+                    continue
+                if verdict == "skip":
+                    with db.session() as conn:
+                        _record(conn, mailbox_id, message_id, SKIPPED, now)
+                    skipped += 1
+                    continue
+                if read >= MAX_READ:
+                    capped = True
+                    break
             try:
                 raw = gmail.fetch(token, message_id)
                 message = extract.read(raw)
@@ -290,17 +350,19 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
         if not again and not backfill:
             with db.session() as conn:
                 conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(
-                    last_scan=now, scan_error=None, **({"history_id": arrived} if arrived else {})))
+                    scan_error=None, **({} if capped else {"last_scan": now, **({"history_id": arrived} if arrived else {})})))
     except gmail.GmailError as e:
         return _fail(mailbox_id, str(e), (read, made, queued))
     except Exception as e:
         monitoring.report(e, values=False)
         return _fail(mailbox_id, FAILED_GENERALLY, (read, made, queued))
-    monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {read} message(s) read, "
-                   f"{made} booking(s) added or changed, {queued} to review.")
+    if not again and not backfill:
+        remember(mailbox_id, Summary(len(pending), read, made, queued, skipped, capped))
+    monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {len(pending)} message(s) found, "
+                   f"{read} read, {made} booking(s) added or changed, {queued} to review, {skipped} skipped{', more waiting' if capped else ''}.")
     if why:
         monitoring.log("What stopped messages being read: " + "; ".join(f"{n} × {what}" for what, n in sorted(why.items())) + ".")
-    return Result("done", None, read, made, queued)
+    return Result("done", None, read, made, queued, len(pending), skipped, capped)
 
 
 def scan_all(now: float, today: date) -> list[Result]:

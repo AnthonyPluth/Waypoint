@@ -226,6 +226,7 @@ export interface Mailbox {
   scan_error: string | null;
   scanning: boolean;
   scan_notice: string | null;
+  scan_summary: ScanSummary | null;
   share_review: boolean;
 }
 
@@ -418,6 +419,15 @@ export interface ReviewMatch {
 
 export interface ScanStarted {
   started: boolean;
+}
+
+export interface ScanSummary {
+  found: number;
+  read: number;
+  bookings: number;
+  review: number;
+  skipped: number;
+  capped: boolean;
 }
 
 export interface Segment {
