@@ -1,6 +1,6 @@
 import unittest
 
-from waypoint.domain.mail.parsers import lodging
+from waypoint.domain.mail import lodging
 
 
 def read(body: str):

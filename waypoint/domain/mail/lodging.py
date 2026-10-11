@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, time, timedelta
 
-from ..booking import Booking, Parsed, Passenger
-from ._text import lines
+from .booking import Booking, Parsed, Passenger
+from .parsers._text import lines
 
 MAX_NIGHTS = 60
 CHECK_IN = time(15, 0)

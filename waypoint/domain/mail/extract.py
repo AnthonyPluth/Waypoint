@@ -19,8 +19,7 @@ from ... import monitoring
 from ...providers import mailimages
 from ...storage.stored_mail import Content, Image
 from .. import seatmaps
-from . import parsers, safe_html, seats, triage
-from .parsers import lodging
+from . import lodging, parsers, safe_html, seats, triage
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger

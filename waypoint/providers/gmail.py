@@ -197,7 +197,8 @@ def set_share_review(conn: db.Connection, mailbox_id: int, owner: str, share: bo
 
 
 def stored_labels(conn: db.Connection, mailbox_id: int, owner: str) -> str | None:
-    return conn.execute(select(Mailbox.scan_labels).where(Mailbox.id == mailbox_id, Mailbox.owner_sub == owner)).scalar()
+    found = conn.execute(select(Mailbox.scan_labels).where(Mailbox.id == mailbox_id, Mailbox.owner_sub == owner)).scalar()
+    return str(found) if found is not None else None
 
 
 def set_labels(conn: db.Connection, mailbox_id: int, owner: str, encoded: str | None) -> bool:
