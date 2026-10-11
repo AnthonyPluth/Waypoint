@@ -1,0 +1,18 @@
+From: Beispiel Mietwagen <buchung@beispiel-mietwagen.example>
+To: traveller@gmail.example
+Subject: Ihre Mietwagen-Buchung (car rental confirmation)
+Date: Wed, 14 Oct 2026 12:00:00 +0200
+Message-ID: <fx-car-generic-de@beispiel-mietwagen.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>CANARY-BODY-CAR-DE-8H2Q Vielen Dank für Ihre Mietwagen-Buchung.</p>
+<p>Stornierung bis 28.11.2026 kostenlos.</p>
+<p>Buchungsnummer: MW90417</p>
+<p>Autovermietung: Beispiel Mietwagen</p>
+<table>
+<tr><th>Abholung / Pick-up</th><th>Rückgabe / Drop-off</th></tr>
+<tr><td>Flughafen München (MUC), 05.12.2026 10:30 Uhr</td><td>Flughafen München (MUC), 09.12.2026 16:00 Uhr</td></tr>
+</table>
+</body></html>

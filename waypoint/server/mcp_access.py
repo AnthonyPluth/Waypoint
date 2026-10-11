@@ -11,7 +11,7 @@ READ, WRITE = "read", "write"
 
 READABLE = frozenset({
     "/api/trips", "/api/trips/{id}", "/api/segments/{id}", "/api/airports/{id}", "/api/people", "/api/stats",
-    "/api/distance-unit", "/api/flight-status",
+    "/api/distance-unit", "/api/flight-status", "/api/assistant/review", "/api/assistant/review/{id}",
 })
 
 SWITCHES = {WRITE: sk.MCP_ALLOW_WRITES}
@@ -24,7 +24,7 @@ BLOCKED = (
 
 WRITE_READABLE = ("/api/people/claim-suggestions",)
 
-MANY = frozenset({"/api/trips/{id}/merge", "/api/trips/{id}/split", "/api/people/{id}/claim"})
+MANY = frozenset({"/api/trips/{id}/merge", "/api/trips/{id}/split", "/api/people/{id}/claim", "/api/assistant/review/{id}/dismiss"})
 
 
 def blocked(template: str) -> bool:

@@ -1,0 +1,20 @@
+From: Roadside Rentals <reservations@roadside-rentals.example>
+To: traveller@gmail.example
+Subject: Your rental car reservation is confirmed
+Date: Wed, 14 Oct 2026 12:00:00 -0600
+Message-ID: <fx-car-generic-en@roadside-rentals.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>CANARY-BODY-CAR-EN-3K7M Thanks for choosing Roadside Rentals.</p>
+<p>Free cancellation until Dec 1, 2026 6:00 PM.</p>
+<p>Confirmation number: RR55821</p>
+<p>Rental company: Roadside Rentals</p>
+<p>Car type: Compact</p>
+<p>Pick-up location: Denver International Airport (DEN)</p>
+<p>Pick-up date and time: Saturday, December 5, 2026 10:30 AM</p>
+<p>Drop-off location: Seattle-Tacoma International Airport (SEA)</p>
+<p>Drop-off date and time: Wednesday, December 9, 2026 4:00 PM</p>
+<p>Late return fees apply from Dec 9, 2026 4:15 PM.</p>
+</body></html>

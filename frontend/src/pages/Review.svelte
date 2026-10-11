@@ -31,7 +31,6 @@
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
   import { Input } from "$lib/components/ui/input";
   import { Sheet } from "$lib/components/ui/sheet";
-  import { viewport } from "$lib/phone.svelte";
   import { DETAILS, type Kind } from "$lib/segment-form";
   import { apiCall } from "$lib/contract";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
@@ -74,10 +73,17 @@
   const draft = $derived(drafts[0] ?? null);
   let formError = $state("");
   let saving = $state(false);
-  let inSheet = $state(false);
+  let emailOpen = $state(true);
+  let baseline = "";
+  const fingerprint = (d: Draft) => JSON.stringify([d.kind, d.provider, d.confirmation, d.origin, d.destination, d.start, d.end, d.startZone, d.endZone,
+    Object.entries(d.details).filter(([, v]) => v.trim()).sort(([a], [b]) => a.localeCompare(b))]);
+  const fingerprints = () => JSON.stringify(drafts.map(fingerprint));
+  const dirty = $derived(drafts.length > 0 && fingerprints() !== baseline);
   const startAdd = (item: ReviewItem, use = false) => {
-    inSheet = viewport.phone;
+    if (draft && draft.item.id !== item.id) delete peeks[draft.item.id];
+    emailOpen = true;
     drafts = use && item.suggestions.length ? item.suggestions.map((s) => suggestedDraft(item, s)) : [handDraft(item)];
+    baseline = fingerprints();
     formError = "";
     void peek(item);
   };
@@ -123,6 +129,18 @@
   const closeForm = () => {
     if (draft) delete peeks[draft.item.id];
     drafts = [];
+  };
+  let discarding = $state(false);
+  const requestClose = () => {
+    if (saving) return;
+    if (dirty) discarding = true;
+    else closeForm();
+  };
+  const focusSheet = (e: Event) => {
+    e.preventDefault();
+    const sheet = document.querySelector<HTMLElement>("[data-slot='sheet']");
+    const target = draft?.suggested ? "[data-dialog-title]" : "form[data-editor] select";
+    sheet?.querySelector<HTMLElement>(target)?.focus({ preventScroll: true });
   };
 
   function bodyOf(d: Draft): SegmentBody | string {
@@ -263,11 +281,10 @@
   {/if}
 {/snippet}
 
-{#snippet addForm(item: ReviewItem, titled: boolean)}
+{#snippet addForm(item: ReviewItem)}
   {@const lead = drafts[0]}
   {@const many = drafts.length > 1}
-  <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-labelledby={titled ? `add-${item.id}` : undefined} aria-label={titled ? undefined : "Add this booking by hand"}>
-    {#if titled}<h3 id={`add-${item.id}`} class="font-medium">{lead?.suggested ? (many ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"}</h3>{/if}
+  <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-label={lead?.suggested ? (many ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"}>
     {#if lead?.suggested && item.reason === "generic"}<p class="text-sm text-muted-foreground">Waypoint read this from labelled lines in the email, not from the vendor’s own booking data. The fields it found are outlined: check each against the booking, change what’s off, then add it. Adding it also trusts {sender(item)}, so later mail from there is added without asking.</p>
     {:else if lead?.suggested}<p class="text-sm text-muted-foreground">An AI read the email and suggested this. It can be wrong: check each field against the booking, change what’s off, then add it.</p>{/if}
     {#if item.received}<p class="text-sm text-muted-foreground">The email was sent {item.received}. Enter the times as they read on the booking, at the place they happen.</p>{/if}
@@ -285,7 +302,7 @@
     {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
     <div class="flex flex-wrap gap-2">
       <Button type="submit" disabled={saving}>{saving ? "Adding…" : many ? `Add ${plural(drafts.length, drafts)}` : "Add to my trips"}</Button>
-      <Button type="button" variant="outline" disabled={saving} onclick={closeForm}>Cancel</Button>
+      <Button type="button" variant="outline" disabled={saving} onclick={requestClose}>Cancel</Button>
     </div>
   </form>
 {/snippet}
@@ -339,12 +356,6 @@
                 <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={`Dismiss “${subject(item)}”`}>Dismiss</Button>
               </div>
             </li>
-            {#if peeks[item.id] && draft?.item.id === item.id && !inSheet}
-              <li class="row items-stretch" data-testid="preview">{@render messagePeek(item)}</li>
-            {/if}
-            {#if draft && draft.item.id === item.id && !inSheet}
-              <li class="row items-stretch">{@render addForm(item, true)}</li>
-            {/if}
           {/each}
         </ul>
       </section>
@@ -426,11 +437,20 @@
   {/snippet}
 </ConfirmDialog>
 
-<Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v && !saving) closeForm(); }} title={draft?.suggested ? (drafts.length > 1 ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"}>
+<Sheet bind:open={() => draft !== null, (v) => { if (!v) requestClose(); }} title={draft?.suggested ? (drafts.length > 1 ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"} wide onOpenAutoFocus={focusSheet}>
   {#if draft}
     <div class="flex flex-col gap-4">
-      {#if peeks[draft.item.id]}<div data-testid="preview">{@render messagePeek(draft.item)}</div>{/if}
-      {@render addForm(draft.item, false)}
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        {#if !emailOpen}<p class="min-w-0 break-words text-sm font-medium">{subject(draft.item)}</p>{/if}
+        <Button type="button" variant="outline" size="sm" class="ml-auto" aria-expanded={emailOpen} aria-controls="review-email" onclick={() => (emailOpen = !emailOpen)}>{emailOpen ? "Hide the email" : "Show the email"}</Button>
+      </div>
+      <div id="review-email" hidden={!emailOpen}>
+        {#if peeks[draft.item.id]}<div data-testid="preview">{@render messagePeek(draft.item)}</div>{/if}
+      </div>
+      {@render addForm(draft.item)}
     </div>
   {/if}
 </Sheet>
+
+<ConfirmDialog bind:open={discarding} title="Discard this booking?" description="What you typed here won’t be saved." confirmLabel="Discard" cancelLabel="Keep editing" destructive
+  onconfirm={() => { closeForm(); return true; }} />
