@@ -47,6 +47,7 @@ class ScanSummary(TypedDict):
     review: int
     skipped: int
     capped: bool
+    labels_dropped: int
 
 
 class Mailbox(TypedDict):
@@ -59,12 +60,28 @@ class Mailbox(TypedDict):
     scanning: bool
     scan_notice: str | None
     scan_summary: ScanSummary | None
+    labels_picked: int
     share_review: bool
 
 
 class MailboxList(TypedDict):
     configured: bool
     mailboxes: list[Mailbox]
+
+
+class MailboxLabel(TypedDict):
+    id: str
+    name: str
+    count: int
+    picked: bool
+
+
+class MailboxLabels(TypedDict):
+    labels: list[MailboxLabel]
+
+
+class LabelsBody(TypedDict):
+    labels: list[str]
 
 
 class ShareBody(TypedDict):
