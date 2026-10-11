@@ -205,7 +205,7 @@ def _styled_message(domain: str, days_ago: int, today: date, subject: str, lines
             f'<tr><td style="padding:24px"><h1 style="margin:0 0 16px;font-size:22px;color:#111827">{subject}</h1>{paragraphs}'
             '<table width="100%" cellpadding="8" cellspacing="0" style="border:1px solid #d1d5db"><tr>'
             '<td style="background-color:#f3f4f6;font-weight:bold">Check in</td><td>Opens 24 hours before departure</td></tr></table></td></tr>'
-            '<tr><td style="background-color:#f3f4f6;padding:12px 24px;font-size:12px;color:#6b7280">Made-up message for the demo.</td></tr></table>')
+            '<tr><td style="background-color:#f3f4f6;padding:12px 24px;font-size:12px;color:#4b5563">Made-up message for the demo.</td></tr></table>')
     content: stored_mail.Content = {"subject": subject, "sender_domain": domain, "received": (today - timedelta(days=days_ago)).isoformat(),
                                     "text": "\n".join(lines), "html": html, "truncated": False, "original": True, "images": 2}
     return content, [{"type": "image/png", "data": _png(64, 64, (253, 186, 116), (234, 88, 12))},
