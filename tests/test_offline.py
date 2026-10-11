@@ -171,6 +171,19 @@ class OfflineRouteTests(ServerCase):
         self.assertNotIn(MESSAGE_CANARY, json.dumps(self.ok("ben")))
         self.assertNotIn(MESSAGE_CANARY, json.dumps(self.ok("cy")))
 
+    def test_a_kept_message_carries_its_design_width_only_when_the_original_was_kept(self):
+        seg = self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
+        with db.session() as conn:
+            box = conn.execute(insert(Mailbox).values(owner_sub="sub-ana", address="ana-w@gmail.example", token=secretbox.encrypt("t"),
+                                                      status="connected", created=1.0)).lastrowid
+            for name, original in (("new", True), ("old", False)):
+                stored_mail.put(conn, box, name, {"subject": name, "sender_domain": "air.example", "received": "2026-10-01", "text": "Hi",
+                                                  "html": '<table width="600"><tr><td>Hi</td></tr></table>', "truncated": False, "original": original},
+                                1.0 if original else 0.0)   # type: ignore[arg-type]
+                stored_mail.link(conn, seg["id"], box, name)   # type: ignore[arg-type]
+        got = self.ok("ana")
+        self.assertEqual({e["subject"]: e["width"] for e in got["messages"][0]["emails"]}, {"new": 600, "old": None})
+
     def test_a_booking_with_no_stored_message_has_no_entry(self):
         self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
         self.assertEqual(self.ok("ana")["messages"], [])

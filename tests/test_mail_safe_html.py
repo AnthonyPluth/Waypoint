@@ -288,5 +288,62 @@ class KeptWithPictures(unittest.TestCase):
             extract.keep(with_images(html, ("logo1", PNG, "png")), lambda url: ("image/gif", GIF))
 
 
+class DesignWidth(unittest.TestCase):
+    def test_a_fixed_width_table_gives_its_width(self):
+        self.assertEqual(safe_html.design_width('<table width="600"><tr><td>Seat 12A</td></tr></table>'), 600)
+
+    def test_nested_tables_give_the_widest(self):
+        html = '<table width="600"><tr><td width="300"><table width="540"><tr><td>x</td></tr></table></td></tr></table>'
+        self.assertEqual(safe_html.design_width(html), 600)
+        self.assertEqual(safe_html.design_width('<table width="320"><tr><td><table width="680"><tr><td>x</td></tr></table></td></tr></table>'), 680)
+
+    def test_images_columns_and_cells_count_too(self):
+        self.assertEqual(safe_html.design_width('<p>x</p><img data-i="0" alt="" width="640">'), 640)
+        self.assertEqual(safe_html.design_width('<table><colgroup><col width="700"></colgroup><tr><td>x</td></tr></table>'), 700)
+        self.assertEqual(safe_html.design_width('<table><tr><td width="650">x</td></tr></table>'), 650)
+
+    def test_a_percentage_or_no_width_gives_none(self):
+        for html in ('<table width="100%"><tr><td width="50%">x</td></tr></table>', "<table><tr><td>x</td></tr></table>", "<p>Hello</p>",
+                     '<div style="width:100%;max-width:600px">x</div>', "", None):
+            with self.subTest(html=html):
+                self.assertIsNone(safe_html.design_width(html))
+
+    def test_width_and_min_width_in_an_allowed_style_count(self):
+        self.assertEqual(safe_html.design_width('<div style="width:620px">x</div>'), 620)
+        self.assertEqual(safe_html.design_width('<div style="color:#111111;min-width:580px">x</div>'), 580)
+        self.assertEqual(safe_html.design_width('<div style="width:450pt">x</div>'), 600)
+        self.assertEqual(safe_html.design_width('<table width="500"><tr><td style="min-width:640px">x</td></tr></table>'), 640)
+
+    def test_other_units_and_other_properties_are_not_widths(self):
+        for style in ("width:40em", "width:90%", "max-width:600px", "border-width:700px", "line-height:700px", "width:600"):
+            with self.subTest(style=style):
+                self.assertIsNone(safe_html.design_width(f'<div style="{style}">x</div>'))
+
+    def test_a_huge_declared_width_is_capped(self):
+        self.assertEqual(safe_html.design_width('<table width="9999"><tr><td>x</td></tr></table>'), safe_html.MAX_DESIGN_WIDTH)
+        self.assertEqual(safe_html.design_width('<div style="min-width:5000px">x</div>'), safe_html.MAX_DESIGN_WIDTH)
+
+    def test_hostile_or_malformed_widths_give_none(self):
+        for value in ("-600", "abc", "600abc", "6e2", "0", "99999999999999999999", "1" * 5000, "NaN", "600 600", "", "0x258", "60.5"):
+            with self.subTest(value=value):
+                self.assertIsNone(safe_html.design_width(f'<table width="{value}"><tr><td>x</td></tr></table>'))
+        for value in ("-600px", "abc", "600px600px", "0px", "99999999999px", "1e3px", "nanpx", "px"):
+            with self.subTest(style=value):
+                self.assertIsNone(safe_html.design_width(f'<div style="width:{value}">x</div>'))
+
+    def test_a_broken_document_gives_none_or_what_it_declares(self):
+        self.assertIsNone(safe_html.design_width("<table width=\"600"))
+        self.assertIsNone(safe_html.design_width("<<<>>><table"))
+
+    def test_the_width_is_a_number_never_markup(self):
+        found = safe_html.design_width('<table width="600"><tr><td>CANARY-BODY</td></tr></table>')
+        self.assertIsInstance(found, int)
+        self.assertNotIn("CANARY", repr(found))
+
+    def test_it_reads_what_the_cleaner_kept(self):
+        kept, _cut = safe_html.clean('<table width="600" onclick="x()"><tr><td style="width:300px;background:url(http://t.example/p)">x</td></tr></table>', 1000)
+        self.assertEqual(safe_html.design_width(kept), 600)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -24,7 +24,7 @@ const hotel = segment({ id: 2, kind: "hotel", confirmation: "H77231", provider: 
 
 const copyOf = (savedAt: number): SavedCopy => ({
   savedAt, trip: { ...trip([flight, hotel]), name: "Trip to London" },
-  messages: [{ segment_id: 1, emails: [{ subject: "Your itinerary", sender_domain: "air.example", received: "2026-11-01", text: CANARY, html: `<p>${CANARY}</p>`, truncated: false, original: true, images: 0 }] }],
+  messages: [{ segment_id: 1, emails: [{ subject: "Your itinerary", sender_domain: "air.example", received: "2026-11-01", text: CANARY, html: `<p>${CANARY}</p>`, truncated: false, original: true, images: 0, width: null }] }],
 });
 
 const go = async (hash: string) => { location.hash = hash; window.dispatchEvent(new HashChangeEvent("hashchange")); await Promise.resolve(); };
