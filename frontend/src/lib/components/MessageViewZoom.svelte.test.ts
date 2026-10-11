@@ -19,19 +19,22 @@ class FakeResizeObserver {
   disconnect() { this.watcher.target = null; }
 }
 
-async function resizeTo(width: number, height = 480, which = "first") {
-  const live = watchers.filter((w) => w.target);
+async function measure(testid: string, width: number, height: number, which: "first" | "last" = "first") {
+  const live = watchers.filter((w) => w.target?.getAttribute("data-testid") === testid);
   const chosen = which === "first" ? live[0] : live[live.length - 1];
   chosen.callback([{ contentRect: { width, height } } as ResizeObserverEntry], {} as ResizeObserver);
   await tick();
 }
 
-const frameOf = () => screen.getByTestId("preview-html") as HTMLIFrameElement;
-const pageOf = () => frameOf().getAttribute("srcdoc") ?? "";
+async function lay(box: number, layout: number, height = 400, which: "first" | "last" = "first") {
+  await measure("preview-viewport", box, 480, which);
+  await measure("preview-html", layout, height, which);
+}
+
+const hostOf = () => screen.getByTestId("preview-html");
 const level = () => screen.getByTestId("zoom-level").textContent;
 const sizerOf = () => screen.getByTestId("preview-sizer") as HTMLElement;
 const FIXED = '<table width="600"><tr><td>Gate B12</td></tr></table>';
-const SANDBOX = ["allow-popups", "allow-popups-to-escape-sandbox"];
 
 beforeEach(() => {
   watchers.length = 0;
@@ -40,34 +43,43 @@ beforeEach(() => {
 
 describe("fitting and zooming the email", () => {
   it("scales a layout wider than its box down to fit, with no sideways scroll", async () => {
-    render(MessageView, { text: "Hi", html: FIXED, width: 600 });
-    await resizeTo(300);
+    render(MessageView, { text: "Hi", html: FIXED });
+    await lay(300, 600);
     expect(level()).toBe("50%");
-    expect(frameOf().style.width).toBe("600px");
-    expect(frameOf().style.transform).toBe("scale(0.5)");
+    expect(hostOf().style.transform).toBe("scale(0.5)");
     expect(sizerOf().style.width).toBe("300px");
-    expect(sizerOf().style.height).toBe("480px");
-    expect(frameOf().style.height).toBe("960px");
+    expect(sizerOf().style.height).toBe("200px");
   });
 
-  it("keeps a narrower layout, a flexible one and a missing width at 100%", async () => {
-    const { unmount } = render(MessageView, { text: "Hi", html: FIXED, width: 600 });
-    await resizeTo(900);
+  it("fits at phone, tablet and desktop widths", async () => {
+    const seen: Record<string, string | null> = {};
+    for (const [name, box] of [["phone", 375], ["tablet", 768], ["desktop", 1280]] as const) {
+      watchers.length = 0;
+      const view = render(MessageView, { text: "Hi", html: FIXED });
+      await lay(box, Math.max(600, box));
+      seen[name] = level();
+      expect(sizerOf().style.width, name).toBe(`${Math.min(box, Math.max(600, box)) * 1}px`);
+      view.unmount();
+    }
+    expect(seen).toEqual({ phone: "63%", tablet: "100%", desktop: "100%" });
+  });
+
+  it("keeps a narrower layout and a flexible one at 100%", async () => {
+    const { unmount } = render(MessageView, { text: "Hi", html: FIXED });
+    await lay(900, 900);
     expect(level()).toBe("100%");
-    expect(frameOf().style.transform).toBe("scale(1)");
-    expect(frameOf().style.width).toBe("900px");
+    expect(hostOf().style.transform).toBe("scale(1)");
     unmount();
     watchers.length = 0;
-    render(MessageView, { text: "Hi", html: "<p>Hi</p>", width: null });
-    await resizeTo(320);
+    render(MessageView, { text: "Hi", html: "<p>Hi</p>" });
+    await lay(320, 320);
     expect(level()).toBe("100%");
-    expect(frameOf().style.width).toBe("320px");
     expect(sizerOf().style.width).toBe("320px");
   });
 
   it("zooms in and out in steps of 25% between fit and 300%, and Fit restores the default", async () => {
-    render(MessageView, { text: "Hi", html: FIXED, width: 600 });
-    await resizeTo(420);
+    render(MessageView, { text: "Hi", html: FIXED });
+    await lay(420, 600);
     expect(level()).toBe("70%");
     const zoomIn = screen.getByRole("button", { name: "Zoom in" });
     const zoomOut = screen.getByRole("button", { name: "Zoom out" });
@@ -92,20 +104,19 @@ describe("fitting and zooming the email", () => {
 
   it("zooms a flexible layout from 100% as well", async () => {
     render(MessageView, { text: "Hi", html: "<p>Hi</p>" });
-    await resizeTo(400);
+    await lay(400, 400);
     await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
     expect(level()).toBe("125%");
-    expect(frameOf().style.width).toBe("400px");
     expect(sizerOf().style.width).toBe("500px");
+    expect(hostOf().style.transform).toBe("scale(1.25)");
   });
 
   it("has real buttons that work from the keyboard and announces the new zoom politely", async () => {
-    render(MessageView, { text: "Hi", html: FIXED, width: 600 });
-    await resizeTo(300);
+    render(MessageView, { text: "Hi", html: FIXED });
+    await lay(300, 600);
     const live = screen.getByTestId("zoom-level");
     expect(live.getAttribute("aria-live")).toBe("polite");
-    const zoomIn = screen.getByRole("button", { name: "Zoom in" });
-    zoomIn.focus();
+    screen.getByRole("button", { name: "Zoom in" }).focus();
     await userEvent.keyboard("{Enter}");
     expect(live).toHaveTextContent("75%");
     await userEvent.keyboard(" ");
@@ -119,17 +130,17 @@ describe("fitting and zooming the email", () => {
   });
 
   it("refits when its container is resized and keeps a zoom that is still above the fit", async () => {
-    render(MessageView, { text: "Hi", html: FIXED, width: 600 });
-    await resizeTo(300);
+    render(MessageView, { text: "Hi", html: FIXED });
+    await lay(300, 600);
     expect(level()).toBe("50%");
-    await resizeTo(450);
+    await lay(450, 600);
     expect(level()).toBe("75%");
     await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
     await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
     expect(level()).toBe("125%");
-    await resizeTo(200);
+    await lay(200, 600);
     expect(level()).toBe("125%");
-    await resizeTo(1000);
+    await lay(1000, 1000);
     expect(level()).toBe("125%");
     expect(sizerOf().style.width).toBe("1250px");
   });
@@ -140,7 +151,7 @@ describe("fitting and zooming the email", () => {
     expect(screen.queryByRole("button", { name: /Larger view/ })).toBeNull();
     expect(screen.getByTestId("message-old")).toBeInTheDocument();
     old.unmount();
-    render(MessageView, { text: "Gate B12", html: FIXED, width: 600 });
+    render(MessageView, { text: "Gate B12", html: FIXED });
     await userEvent.click(screen.getByRole("button", { name: "Show as plain text" }));
     expect(screen.queryByRole("button", { name: "Zoom in" })).toBeNull();
     expect(screen.queryByTestId("zoom-level")).toBeNull();
@@ -149,25 +160,25 @@ describe("fitting and zooming the email", () => {
 
   it("starts every preview at fit and writes nothing to the browser’s storage", async () => {
     const setItem = vi.spyOn(Storage.prototype, "setItem");
-    const first = render(MessageView, { text: "Hi", html: FIXED, width: 600 });
-    await resizeTo(300);
+    const first = render(MessageView, { text: "Hi", html: FIXED });
+    await lay(300, 600);
     await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
     expect(level()).toBe("75%");
     first.unmount();
     watchers.length = 0;
-    render(MessageView, { text: "Hi", html: FIXED, width: 600 });
-    await resizeTo(300);
+    render(MessageView, { text: "Hi", html: FIXED });
+    await lay(300, 600);
     expect(level()).toBe("50%");
     expect(setItem).not.toHaveBeenCalled();
     setItem.mockRestore();
   });
 
-  it("keeps the frame’s sandbox and policy as they were, however it is scaled, and puts none of the email in the page", async () => {
-    render(MessageView, { text: "Hi", html: FIXED, width: 600 });
-    await resizeTo(300);
+  it("puts the email in a shadow root with no frame, and none of it in the page", async () => {
+    render(MessageView, { text: "Hi", html: FIXED });
+    await lay(300, 600);
     await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    expect((frameOf().getAttribute("sandbox") ?? "").split(" ").sort()).toEqual(SANDBOX);
-    expect(pageOf()).toContain("default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");
+    expect(document.querySelector("iframe")).toBeNull();
+    expect(hostOf().shadowRoot?.querySelector("table")).not.toBeNull();
     expect(document.querySelector("table")).toBeNull();
     expect(document.body.textContent).not.toContain("Gate B12");
   });
@@ -175,14 +186,14 @@ describe("fitting and zooming the email", () => {
 
 describe("the larger view", () => {
   it("opens at fit with the same controls, and closes with its button, returning focus", async () => {
-    render(MessageView, { subject: "Your itinerary", text: "Hi", html: FIXED, width: 600 });
-    await resizeTo(300);
+    render(MessageView, { subject: "Your itinerary", text: "Hi", html: FIXED });
+    await lay(300, 600);
     await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
     const opener = screen.getByRole("button", { name: "Larger view" });
     await userEvent.click(opener);
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("The email: Your itinerary")).toBeInTheDocument();
-    await resizeTo(560, 700, "last");
+    await lay(560, 600, 400, "last");
     expect(within(dialog).getByTestId("zoom-level")).toHaveTextContent("93%");
     expect(within(dialog).getByRole("button", { name: "Zoom out" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Fit" })).toBeInTheDocument();
@@ -195,12 +206,12 @@ describe("the larger view", () => {
   });
 
   it("closes with Escape, returns focus to its button and opens at fit again", async () => {
-    render(MessageView, { text: "Hi", html: FIXED, width: 600 });
-    await resizeTo(300);
+    render(MessageView, { text: "Hi", html: FIXED });
+    await lay(300, 600);
     const opener = screen.getByRole("button", { name: "Larger view" });
     await userEvent.click(opener);
     let dialog = await screen.findByRole("dialog");
-    await resizeTo(560, 700, "last");
+    await lay(560, 600, 400, "last");
     await userEvent.click(within(dialog).getByRole("button", { name: "Zoom in" }));
     await userEvent.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -208,17 +219,18 @@ describe("the larger view", () => {
     await waitFor(() => expect(document.body.style.pointerEvents).not.toBe("none"));
     await userEvent.click(opener);
     dialog = await screen.findByRole("dialog");
-    await resizeTo(560, 700, "last");
+    await lay(560, 600, 400, "last");
     expect(within(dialog).getByTestId("zoom-level")).toHaveTextContent("93%");
   });
 
-  it("shows the same page in the same sandbox", async () => {
-    render(MessageView, { text: "Hi", html: FIXED, width: 600 });
-    const outside = pageOf();
+  it("shows the same email in its own shadow root, with the same markup", async () => {
+    render(MessageView, { text: "Hi", html: FIXED });
+    const outside = hostOf().shadowRoot?.innerHTML;
     await userEvent.click(screen.getByRole("button", { name: "Larger view" }));
     const dialog = await screen.findByRole("dialog");
     const inside = within(dialog).getByTestId("preview-html");
-    expect((inside.getAttribute("sandbox") ?? "").split(" ").sort()).toEqual(SANDBOX);
-    expect(inside.getAttribute("srcdoc")).toBe(outside);
+    expect(inside).not.toBe(screen.getAllByTestId("preview-html")[0]);
+    expect(inside.shadowRoot?.innerHTML).toBe(outside);
+    expect(dialog.querySelector("iframe")).toBeNull();
   });
 });

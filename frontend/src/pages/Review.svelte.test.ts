@@ -553,8 +553,8 @@ describe("Review: the message beside the form", () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     const formatted = await screen.findByTestId("preview-html");
-    expect(formatted.getAttribute("srcdoc")).toContain("<b>B12</b>");
-    expect(formatted.getAttribute("srcdoc")).toContain("<td>Seat</td>");
+    expect(formatted.shadowRoot?.innerHTML).toContain("<b>B12</b>");
+    expect(formatted.shadowRoot?.innerHTML).toContain("<td>Seat</td>");
     await userEvent.click(screen.getByRole("button", { name: "Show as plain text" }));
     expect(screen.queryByTestId("preview-html")).toBeNull();
     expect(screen.getByTestId("preview")).toHaveTextContent("Gate B12");

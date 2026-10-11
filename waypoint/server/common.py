@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .. import monitoring, validate
-from ..domain.mail import safe_html
 
 
 class ApiError(Exception):
@@ -140,7 +139,3 @@ def host_allowed(host_header: str) -> bool:
     except ValueError:
         pass
     return host.endswith(SAFE_SUFFIXES) or "." not in host
-
-
-def design_width_of(kept: Mapping[str, Any]) -> int | None:
-    return safe_html.design_width(kept["html"]) if kept["original"] else None

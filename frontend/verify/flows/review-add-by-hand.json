@@ -6,7 +6,7 @@
     { "wait_for": "[data-testid='review-item']" },
     { "click": "button:has-text('Add by hand') >> nth=0" },
     { "wait_for": "[data-testid='message-subject']" },
-    { "wait_for": "[role='dialog'] iframe[data-testid='preview-html'][aria-busy='false']" },
+    { "wait_for": "[role='dialog'] [data-testid='preview-html'][aria-busy='false']" },
     { "screenshot": "message-with-form" },
     { "fill": { "selector": "[role='dialog'] label:has-text('Provider') input", "text": "Seaside Stays Ltd" } },
     { "press": { "selector": "[role='dialog'] label:has-text('Provider') input", "key": "Escape" } },
