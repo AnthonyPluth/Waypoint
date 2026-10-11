@@ -240,11 +240,10 @@
 
 <h1 class="mb-6 text-display">Review</h1>
 
-{#snippet detailField(d: Draft, key: string, hint?: string)}
+{#snippet detailField(d: Draft, key: string)}
   {@const outlined = !!d.sources[key] || d.read.includes(key)}
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{detailLabel(d.kind, key)} {#if d.sources[key]}<span class="font-normal text-muted-foreground">from “{d.sources[key]}”</span>{/if}</span>
-    <Input class={outlined ? "ring-2 ring-primary" : ""} value={d.details[key] ?? ""} oninput={(e) => (d.details[key] = e.currentTarget.value)} maxlength={key === "address" ? 300 : 200} autocomplete="off" />
-    {#if hint}<span class="text-muted-foreground">{hint}</span>{/if}</label>
+    <Input class={outlined ? "ring-2 ring-primary" : ""} value={d.details[key] ?? ""} oninput={(e) => (d.details[key] = e.currentTarget.value)} maxlength={key === "address" ? 300 : 200} autocomplete="off" /></label>
 {/snippet}
 
 {#snippet legFields(d: Draft)}
@@ -267,10 +266,9 @@
     <Input type="datetime-local" class={d.sources["end_local"] ? "ring-2 ring-primary" : ""} bind:value={d.end} required /></label>
   {#if d.kind === "flight"}<FlightLength origin={d.origin} destination={d.destination} start={d.start} end={d.end} />{/if}
   {#if d.kind === "hotel" || d.kind === "parking"}
-    {@render detailField(d, "address", "Waypoint works the time zone out from it when you leave the time zone empty.")}
+    {@render detailField(d, "address")}
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>
-      <ZoneSelect bind:value={d.startZone} blank="Work it out from the address" />
-      <span class="text-muted-foreground">{d.kind === "parking" ? "Entry and exit are both at the lot." : "Check-in and check-out are both at the hotel."} Leave this empty to work it out from the address above.</span></label>
+      <ZoneSelect bind:value={d.startZone} blank="Work it out from the address" /></label>
     {@render detailField(d, "phone")}
   {:else if d.kind !== "flight"}
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it starts</span>
@@ -280,7 +278,6 @@
     {#each SHOWN[d.kind] ?? [] as key (key)}{@render detailField(d, key)}{/each}
   {:else}
     {#each SHOWN.flight as key (key)}{#if d.read.includes(key)}{@render detailField(d, key)}{/if}{/each}
-    <p class="text-sm text-muted-foreground">A flight’s time zones come from its airports.</p>
   {/if}
 {/snippet}
 
@@ -289,8 +286,7 @@
   {@const many = drafts.length > 1}
   <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-label={lead?.suggested ? (many ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"}>
     {#if lead?.suggested && item.reason === "generic"}<p class="text-sm text-muted-foreground">Waypoint read this from labelled lines in the email, not from the vendor’s own booking data. The fields it found are outlined: check each against the booking, change what’s off, then add it. Adding it also trusts {sender(item)}, so later mail from there is added without asking.</p>
-    {:else if lead?.suggested}<p class="text-sm text-muted-foreground">An AI read the email and suggested this. It can be wrong: check each field against the booking, change what’s off, then add it.</p>{/if}
-    {#if item.received}<p class="text-sm text-muted-foreground">The email was sent {item.received}. Enter the times as they read on the booking, at the place they happen.</p>{/if}
+    {/if}
     {#if many}
       {#each drafts as leg, n (leg)}
         <fieldset class="flex min-w-0 flex-col gap-4 rounded-xl border border-border p-3" data-testid="leg">
