@@ -1,0 +1,12 @@
+{
+  "name": "parking-stats",
+  "page": "stats",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Stats" } },
+    { "select": { "selector": "label:has-text('When') select", "index": 0 } },
+    { "wait_for": "#parking-title" },
+    { "expect_text": { "selector": "main", "text": "Example Airport Economy Lot" } },
+    { "scroll_to": "#parking-title" },
+    { "screenshot": "parking" }
+  ]
+}

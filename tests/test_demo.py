@@ -52,3 +52,14 @@ class DemoTests(DbCase):
         self.assertTrue(f["top_seat"] and f["longest"] and f["shortest"] and f["busiest_month"])
         self.assertTrue(f["seat_positions"]["window"] and f["seat_positions"]["aisle"])
         self.assertTrue(got["stays"]["chains"] and got["stays"]["nights"] and got["cars"]["companies"] and got["cars"]["days"])
+        self.assertTrue(got["parking"]["lots"] and got["parking"]["days"] and got["parking"]["bookings"])
+
+    def test_has_parking_on_a_trip_with_flights_and_one_still_to_come(self):
+        demo.seed(self.c, date(2026, 10, 5))
+        found = trips.listing(self.c, Viewer(None, household=True))
+        with_parking = [t for t in found if any(s["kind"] == "parking" for s in t["segments"])]
+        self.assertEqual(len(with_parking), 2)
+        for t in with_parking:
+            self.assertTrue(any(s["kind"] == "flight" for s in t["segments"]))
+        lot = next(s for t in with_parking for s in t["segments"] if s["kind"] == "parking" and s["start_local"][:10] > "2026-10-05")
+        self.assertEqual((lot["start_zone"], lot["details"]["space_type"]), ("America/New_York", "Covered"))

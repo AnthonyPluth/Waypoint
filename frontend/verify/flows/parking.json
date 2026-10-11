@@ -1,0 +1,18 @@
+{
+  "name": "parking",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has([aria-label*='parking']) >> visible=true >> nth=0" },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "expect_text": { "selector": "main", "text": "Example Airport Long-Term Lot" } },
+    { "expect_text": { "selector": "main", "text": "Entry" } },
+    { "scroll_to": "[data-kind='parking']" },
+    { "screenshot": "trip" },
+    { "click": "button[aria-label='Edit Example Airport Long-Term Lot']" },
+    { "wait_for": "form[data-editor]" },
+    { "expect_text": { "selector": "form[data-editor]", "text": "Space type" } },
+    { "scroll_to": "form[data-editor]" },
+    { "screenshot": "form" }
+  ]
+}
