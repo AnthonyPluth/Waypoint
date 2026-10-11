@@ -52,6 +52,10 @@ class Suggestion(TypedDict, total=False):
     start_zone: str
     end_zone: str
     address: str
+    phone: str
+    room: str
+    ship: str
+    deck: str
     sources: dict[str, str]
 
 
@@ -110,7 +114,7 @@ def clean_url(text: str) -> str | None:
 
 LABELLED = re.compile(
     r"(?i)(frequent[- ]?flyer|loyalty|member(?:ship)?|rewards?|skymiles|aadvantage|mileageplus|known[- ]traveler|ktn|passid|"
-    r"pre-?check|global entry|card(?: number)?|account(?: number)?)([^\n\d]{0,40}?)\b((?-i:[A-Z0-9][A-Z0-9 -]{2,30}\d))\b")
+    r"pre-?check|global entry|card(?: number)?|account(?: number)?)(?:s|no|num|number|id|ids)?(?![a-z])([^\n\d]{0,40}?)\b((?-i:[A-Z0-9][A-Z0-9 -]{2,30}\d))\b")
 CARD = re.compile(r"\b\d{4}[ -]\d{4}[ -]\d{4}[ -]\d{1,4}\b|\b\d{4}[ -]\d{6}[ -]\d{4,5}\b")
 LONG = re.compile(r"\b\d{9,}\b")
 PREFIXED = re.compile(r"\b[A-Z]{1,4}-?\d{7,}\b")
@@ -144,7 +148,12 @@ SYSTEM = (
     'arrival station; a cruise\'s disembarkation port; leave it out for a hotel), "start_local" and "end_local" (when it starts and ends, as the email writes '
     'them at the place, as YYYY-MM-DDTHH:MM with no offset: a flight\'s departure and arrival, a hotel\'s check-in and '
     'check-out, a car\'s pick-up and drop-off, a cruise\'s embarkation and disembarkation), and, for a hotel, car, train or cruise only, "start_zone" and "end_zone" (IANA time '
-    'zones such as Europe/Paris). Leave out a key you can\'t find; never guess. If the email holds no booking, reply {}.')
+    'zones such as Europe/Paris). For a hotel, car, train or cruise only, also "address" (on one line: the street address of the hotel, '
+    'of the place the car is picked up, of the station or of the cruise terminal, only when the email prints it; it is the address of the '
+    'property or pick-up place, never the address of the guest, the booker, the cardholder or a billing address, so never copy one from '
+    'a block labelled booker, guest or billing). For a hotel, car or cruise only, also "phone" (the property\'s or company\'s phone number as '
+    'printed, never the booker\'s). For a cruise only, also "room" (the cabin), "ship" and "deck". Never give any of these for a flight. '
+    'Leave out a key you can\'t find; never guess. If the email holds no booking, reply {}.')
 
 
 def request(cfg: Config, text: str) -> tuple[str, dict[str, str], dict[str, Any], bool]:
@@ -170,6 +179,15 @@ TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?")
 FIELDS = ("kind", "provider", "confirmation", "origin", "destination", "start_local", "end_local", "start_zone", "end_zone")
 LIMITS = {"provider": 100, "confirmation": 50, "origin": 100, "destination": 100, "start_zone": 64, "end_zone": 64}
 IATA = re.compile(r"[A-Z]{3}")
+ADDRESS_LIMIT = 200
+ADDRESS_KINDS = ("hotel", "car", "train", "cruise")
+PHONE_KINDS = ("hotel", "car", "cruise")
+CRUISE_DETAILS = {"room": 50, "ship": 100, "deck": 50}
+OPTIONAL = ("address", "phone", "room", "ship", "deck")
+PHONE_RUN = re.compile(r"\+?\(?\d[\d ().-]{5,28}\d")
+PHONE_SHAPE = re.compile(r"\+?[\d\s().-]{7,30}")
+HOLDER = re.compile(r"(?i)\b(?:booker|booked by|booking party|guest|billing|bill(?:ed)? to|card ?holder|customer|payer|sold to|invoice to|"
+                    r"home address|your (?:home )?address|mailing|residen\w*)\b")
 
 
 def _squash(s: str) -> str:
@@ -178,6 +196,64 @@ def _squash(s: str) -> str:
 
 def _in(text: str, value: str) -> bool:
     return _squash(value) in _squash(text)
+
+
+def _plain(text: str) -> tuple[str, list[int]]:
+    letters: list[str] = []
+    at: list[int] = []
+    for i, c in enumerate(text):
+        if c.isspace() or c in ",-":
+            continue
+        for part in c.casefold():
+            letters.append(part)
+            at.append(i)
+    return "".join(letters), at
+
+
+def _held_by_a_person(sent: str, pos: int) -> bool:
+    before = sent[:pos]
+    lines = [ln for ln in before.rsplit("\n\n", 1)[-1].splitlines() if ln.strip()]
+    if not lines:
+        lines = [ln for ln in before.splitlines() if ln.strip()]
+    return bool(HOLDER.search("\n".join(lines[-6:])))
+
+
+def _address(value: str, sent: str) -> str | None:
+    one = " ".join(value.split())
+    if not one or len(one) > ADDRESS_LIMIT or "@" in one \
+            or any(sum(c.isdigit() for c in run.group()) >= 8 for run in PHONE_RUN.finditer(one)):
+        return None
+    plain, at = _plain(sent)
+    needle = _plain(one)[0]
+    starts = [at[m.start()] for m in re.finditer(re.escape(needle), plain)] if needle else []
+    return one if starts and not any(_held_by_a_person(sent, pos) for pos in starts) else None
+
+
+def _phone(value: str, sent: str) -> str | None:
+    one = " ".join(value.split())
+    digits = re.sub(r"\D", "", one)
+    if not PHONE_SHAPE.fullmatch(one) or not 7 <= len(digits) <= 15:
+        return None
+    starts = [m.start() for m in PHONE_RUN.finditer(sent) if re.sub(r"\D", "", m.group()) == digits]
+    return one if starts and not any(_held_by_a_person(sent, pos) for pos in starts) else None
+
+
+def _detail(value: str, limit: int, sent: str) -> str | None:
+    one = " ".join(value.split())
+    return one if one and len(one) <= limit and _in(sent, one) else None
+
+
+def _details(kind: str, values: dict[str, str], sent: str) -> Suggestion:
+    out: Suggestion = {}
+    if kind in ADDRESS_KINDS and "address" in values and (address := _address(values["address"], sent)):
+        out["address"] = address
+    if kind in PHONE_KINDS and "phone" in values and (phone := _phone(values["phone"], sent)):
+        out["phone"] = phone
+    if kind == "cruise":
+        for name, limit in CRUISE_DETAILS.items():
+            if name in values and (found := _detail(values[name], limit, sent)):
+                out[name] = found   # type: ignore[literal-required]
+    return out
 
 
 def _time(value: Any) -> str:
@@ -202,10 +278,10 @@ def parse(content: Any, sent: str) -> Suggestion:
         raise AiError(BAD_REPLY)
     if not found:
         raise AiError(NO_BOOKING)
-    if any(k not in FIELDS for k in found) or any(not isinstance(v, str) for v in found.values()):
+    if any(k in FIELDS and not isinstance(v, str) for k, v in found.items()):
         raise AiError(BAD_REPLY)
     out: Suggestion = {}
-    values = {k: v.strip() for k, v in found.items() if v.strip()}
+    values = {k: v.strip() for k, v in found.items() if k in FIELDS + OPTIONAL and isinstance(v, str) and v.strip()}
     kind = values.get("kind")
     if kind not in KINDS or not values.get("origin"):
         raise AiError(BAD_REPLY)
@@ -231,6 +307,7 @@ def parse(content: Any, sent: str) -> Suggestion:
     for name in FIELDS:
         if name in values and not (kind == "flight" and name in ("start_zone", "end_zone")):
             out[name] = values[name]   # type: ignore[literal-required]
+    out.update(_details(kind, values, sent))
     return out
 
 

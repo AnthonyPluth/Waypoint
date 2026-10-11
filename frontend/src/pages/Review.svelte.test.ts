@@ -351,6 +351,57 @@ describe("Review: the AI’s suggestion", () => {
     expect(body).toMatchObject({ kind: "flight", confirmation: "QW4R7U", origin: "BOS", destination: "DEN", start_local: "2026-12-02T07:15" });
   });
 
+  it("shows the AI’s address and phone outlined, and sends them when added", async () => {
+    const stay = { kind: "hotel" as const, provider: "Example Stays", confirmation: "QW4R7T", origin: "Harbour Hotel", start_local: "2026-12-02T15:00",
+      end_local: "2026-12-05T11:00", start_zone: "Europe/London", address: "1 Quay Road, Bristol BS1 4AA, UK", phone: "+44 117 555 0100" };
+    held = { matches: [], items: [item({ suggestion: stay })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByText(/An AI read the email and suggested this. It can be wrong/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Address/)).toHaveValue("1 Quay Road, Bristol BS1 4AA, UK");
+    expect(screen.getByLabelText(/^Address/)).toHaveClass("ring-2");
+    expect(screen.getByLabelText(/^Phone/)).toHaveValue("+44 117 555 0100");
+    expect(screen.getByLabelText(/^Phone/)).toHaveClass("ring-2");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    const [, , body] = calls.find(([p]) => p === "/api/segments")!;
+    expect(body).toMatchObject({ kind: "hotel", details: { address: "1 Quay Road, Bristol BS1 4AA, UK", phone: "+44 117 555 0100" } });
+  });
+
+  it("leaves the address empty and unoutlined when the AI found none", async () => {
+    const stay = { kind: "hotel" as const, origin: "Harbour Hotel", start_local: "2026-12-02T15:00", end_local: "2026-12-05T11:00", start_zone: "Europe/London" };
+    held = { matches: [], items: [item({ suggestion: stay })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText(/^Address/)).toHaveValue("");
+    expect(screen.getByLabelText(/^Address/)).not.toHaveClass("ring-2");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.find(([p]) => p === "/api/segments")?.[2]).not.toHaveProperty("details");
+  });
+
+  it("takes a rental’s pick-up address and a cruise’s terminal, cabin, ship and deck", async () => {
+    const car = { kind: "car" as const, origin: "Bristol Airport", destination: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00",
+      address: "4 Runway Drive, Bristol BS48 3DY" };
+    held = { matches: [], items: [item({ suggestion: car })], who: [], ai: false };
+    const first = render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
+    expect(screen.getByLabelText(/^Pick-up address/)).toHaveClass("ring-2");
+    first.unmount();
+    const cruise = { kind: "cruise" as const, origin: "Miami", destination: "Nassau", start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00",
+      start_zone: "America/New_York", end_zone: "America/Nassau", address: "1015 North America Way, Miami FL 33132", room: "8123", ship: "Example Voyager", deck: "8" };
+    held = { matches: [], items: [item({ suggestion: cruise })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText(/^Terminal address/)).toHaveValue("1015 North America Way, Miami FL 33132");
+    expect(screen.getByLabelText(/^Cabin/)).toHaveValue("8123");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    const [, , body] = calls.find(([p]) => p === "/api/segments")!;
+    expect(body).toMatchObject({ kind: "cruise", details: { address: "1015 North America Way, Miami FL 33132", room: "8123", ship: "Example Voyager", deck: "8" } });
+  });
+
   it("opens a cruise suggestion with its port labels and saves its ports and zones", async () => {
     const cruise = { kind: "cruise" as const, provider: "Example Cruise Line", confirmation: "QW4R7T", origin: "Miami", destination: "Nassau",
       start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00", start_zone: "America/New_York", end_zone: "America/Nassau" };

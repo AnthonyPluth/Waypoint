@@ -12,7 +12,7 @@ export const DETAILS: Record<Kind, [string, string][]> = {
   flight: [["flight_number", "Flight number"], ["terminal", "Terminal"], ["cabin", "Cabin"]],
   hotel: [["address", "Address"], ["room", "Room"], ["phone", "Phone"]],
   car: [["address", "Pick-up address"], ["car_class", "Car class"], ["phone", "Phone"]],
-  train: [["cabin", "Class"]],
+  train: [["cabin", "Class"], ["address", "Station address"]],
   cruise: [["ship", "Ship"], ["room", "Cabin"], ["deck", "Deck"], ["address", "Terminal address"], ["phone", "Phone"]],
 };
 
