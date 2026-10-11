@@ -98,6 +98,7 @@ class EntryOut(TypedDict):
 class DetailOut(ItemOut):
     entries: list[EntryOut]
     suggestion: ParsedOut | None
+    suggestions: list[ParsedOut]
 
 
 def _same_code(a: str, b: str) -> bool:
@@ -188,11 +189,14 @@ class _Loaded(TypedDict):
     row: Any
     entries: list[dict[str, Any]]
     suggestion: dict[str, Any] | None
+    suggested: int
+    suggestion_list: list[dict[str, Any]]
 
 
 def _load(row: Any) -> _Loaded:
-    suggestion = json.loads(row["suggestion"]) if row["suggestion"] else None
-    return {"row": row, "entries": review.entries_of(row), "suggestion": suggestion if isinstance(suggestion, dict) else None}
+    found = [x for x in review.suggestions_of(row["suggestion"]) if isinstance(x, dict)]
+    return {"row": row, "entries": review.entries_of(row), "suggestion": dict(found[0]) if found else None, "suggested": len(found),
+            "suggestion_list": [dict(x) for x in found]}
 
 
 def _rank(entries: Sequence[EntryOut]) -> MatchOut | None:
@@ -228,7 +232,7 @@ def _summary(item: _Loaded, entries: Sequence[EntryOut], owner: str, has_email: 
     kind = first["kind"] if first else (_clip(item["suggestion"].get("kind")) if item["suggestion"] else None)
     return {"id": int(row["id"]), "mailbox_id": int(row["mailbox_id"]), "mine": row["owner_sub"] == owner,
             "sender_domain": str(row["sender_domain"])[:MAX_FIELD], "reason": str(row["reason"]), "status": first["status"] if first else None,
-            "kind": kind, "received": row["received"], "has_email": has_email, "bookings": len(entries) or (1 if item["suggestion"] else 0),
+            "kind": kind, "received": row["received"], "has_email": has_email, "bookings": len(entries) or item["suggested"],
             "match": _rank(entries)}
 
 
@@ -280,11 +284,8 @@ def detail(conn: db.Connection, owner: str, viewer: Viewer, item_id: int) -> Det
     item = _load(row)
     entries = _entries(conn, viewer, [item]).get(item_id, [])
     kept = (row["mailbox_id"], row["message_id"]) in stored_mail.held(conn, [row["mailbox_id"]])
-    suggestion = None
-    if item["suggestion"] is not None:
-        sources = item["suggestion"].get("sources")
-        suggestion = parsed(item["suggestion"], {}, sources if isinstance(sources, dict) else None)
-    return {**_summary(item, entries, owner, kept), "entries": entries, "suggestion": suggestion}
+    shown = [parsed(x, {}, x["sources"] if isinstance(x.get("sources"), dict) else None) for x in item["suggestion_list"]]
+    return {**_summary(item, entries, owner, kept), "entries": entries, "suggestion": shown[0] if shown else None, "suggestions": shown}
 
 
 def _from_suggestion(suggestion: Mapping[str, Any]) -> trips.SegmentIn:
@@ -292,7 +293,7 @@ def _from_suggestion(suggestion: Mapping[str, Any]) -> trips.SegmentIn:
     for key in ("kind", "provider", "confirmation", "origin", "destination", "start_local", "end_local", "start_zone", "end_zone"):
         if suggestion.get(key):
             out[key] = suggestion[key]
-    details = {k: suggestion[k] for k in ("address", "phone", "room", "ship", "deck") if suggestion.get(k)}
+    details = {k: suggestion[k] for k in ("address", "phone", "room", "ship", "deck", "flight_number", "cabin") if suggestion.get(k)}
     if details:
         out["details"] = details
     return out
@@ -303,6 +304,8 @@ def create(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_
     if row is None:
         return None
     entries = review.entries_of(row)
+    suggestions = _load(row)["suggestion_list"]
+    pick = 0
     base: trips.SegmentIn = {}
     entry: dict[str, Any] | None = None
     if entries:
@@ -312,9 +315,13 @@ def create(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_
         if entry is None:
             raise trips.Invalid("That isn’t one of the bookings in this message")
         base = entry["booking"]
-    elif row["suggestion"]:
-        suggestion = json.loads(row["suggestion"])
-        base = _from_suggestion(suggestion) if isinstance(suggestion, dict) else {}
+    elif suggestions:
+        if entry_id is None and len(suggestions) > 1:
+            raise trips.Invalid(f"This message holds {len(suggestions)} suggested bookings: say which one with entry (1 to {len(suggestions)})")
+        pick = entry_id or 1
+        if not 1 <= pick <= len(suggestions):
+            raise trips.Invalid("That isn’t one of the bookings in this message")
+        base = _from_suggestion(suggestions[pick - 1])
     fields: trips.SegmentIn = {**base, **overrides}
     if "details" in overrides:
         fields["details"] = {**(base.get("details") or {}), **overrides["details"]}
@@ -323,6 +330,10 @@ def create(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_
         raise trips.Invalid("The booking couldn’t be added")
     if entry is not None:
         review.finish_entry(conn, row, int(entry["id"]), added["id"])
+    elif pick and len(suggestions) > 1:
+        stored_mail.link(conn, added["id"], int(row["mailbox_id"]), str(row["message_id"]))
+        left = [x for n, x in enumerate(suggestions, 1) if n != pick]
+        review.set_suggestions(conn, int(row["mailbox_id"]), str(row["message_id"]), left, row["suggestion_error"])  # type: ignore[arg-type]
     else:
-        review.dismiss(conn, owner, item_id, (viewer, added["id"]))
+        review.dismiss(conn, owner, item_id, (viewer, [added["id"]]))
     return trips.get_segment(conn, viewer, added["id"]) or added

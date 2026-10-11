@@ -1,0 +1,15 @@
+{
+  "name": "review-round-trip",
+  "page": "review",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Review" } },
+    { "wait_for": "[data-testid='review-item']" },
+    { "click": "button:has-text('Check 2 suggestions')" },
+    { "wait_for": "[data-testid='leg']" },
+    { "expect_text": { "selector": "body", "text": "Flight 2 of 2: DEN → BOS" } },
+    { "scroll_to": "[data-testid='leg'] >> nth=0" },
+    { "screenshot": "two-flights" },
+    { "scroll_to": "button:has-text('Add 2 flights')" },
+    { "screenshot": "add-two-flights" }
+  ]
+}

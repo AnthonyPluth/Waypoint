@@ -60,7 +60,7 @@ class ReviewTools(test_mcp.Assistants):
             self.two_item = self.item(conn, self.jane_box, "m-two", "match", "2026-10-16",
                                       [(FLIGHT, [self.jane_trip["segment"]]), ({**STAY, "confirmation": "ZZ9999"}, [])])
             self.generic_item = self.item(conn, self.jane_box, "m-generic", "generic", "2026-10-15")
-            review.set_suggestion(conn, self.jane_box, "m-generic", SUGGESTED, None)
+            review.set_suggestions(conn, self.jane_box, "m-generic", [SUGGESTED], None)
             self.unread_item = self.item(conn, self.jane_box, "m-unread", "no_markup", None)
             self.sams_item = self.item(conn, self.sam_box, "m-sams", "broken", "2026-10-18")
             for mailbox, message in ((self.jane_box, "m-flight"), (self.jane_box, "m-two"), (self.jane_box, "m-generic"),
@@ -348,6 +348,30 @@ class CreateTests(ReviewTools):
         got = self.tool(WRITE, "create_segment_from_review_item", {"item_id": self.two_item, "entry": 2})
         self.assertEqual((got["kind"], got["confirmation"]), ("hotel", "ZZ9999"))
         self.assertEqual([e["entry"] for e in self.tool(READ, "get_review_item", {"item_id": self.two_item})["entries"]], [1])
+
+    def test_an_item_with_two_suggested_flights_asks_which_and_keeps_the_item_until_both_are_added(self):
+        legs = [{"kind": "flight", "provider": "Example Air", "confirmation": "Q7M2KD", "origin": "BOS", "destination": "DEN", "flight_number": "EX 204",
+                 "cabin": "Economy", "start_local": "2031-03-02T07:15", "end_local": "2031-03-02T10:05"},
+                {"kind": "flight", "provider": "Example Air", "confirmation": "Q7M2KD", "origin": "DEN", "destination": "BOS", "flight_number": "EX 205",
+                 "start_local": "2031-03-08T16:20", "end_local": "2031-03-08T21:50"}]
+        with db.session() as conn:
+            review.set_suggestions(conn, self.jane_box, "m-unread", legs, None)  # type: ignore[arg-type]
+        shown = self.tool(READ, "get_review_item", {"item_id": self.unread_item})
+        self.assertEqual([s["origin"] for s in shown["suggestions"]], ["BOS", "DEN"])
+        self.assertEqual((shown["bookings"], shown["suggestion"]["origin"]), (2, "BOS"))
+        self.assertIn("say which one", self.refused(WRITE, "create_segment_from_review_item", {"item_id": self.unread_item}))
+        self.assertIn("isn’t one of the bookings", self.refused(WRITE, "create_segment_from_review_item", {"item_id": self.unread_item, "entry": 3}))
+        self.assertIn(self.unread_item, self.left())
+        back = self.tool(WRITE, "create_segment_from_review_item", {"item_id": self.unread_item, "entry": 2})
+        self.assertEqual((back["origin"], back["details"]), ("DEN", {"flight_number": "EX 205"}))
+        self.assertIn(self.unread_item, self.left())
+        self.assertTrue(back["has_email"])
+        left = self.tool(READ, "get_review_item", {"item_id": self.unread_item})
+        self.assertEqual([s["origin"] for s in left["suggestions"]], ["BOS"])
+        out = self.tool(WRITE, "create_segment_from_review_item", {"item_id": self.unread_item})
+        self.assertEqual((out["origin"], out["details"]), ("BOS", {"flight_number": "EX 204", "cabin": "Economy"}))
+        self.assertNotIn(self.unread_item, self.left())
+        self.assertTrue(out["has_email"])
 
     def test_an_item_with_nothing_read_is_filled_in_by_hand(self):
         fields = {"kind": "car", "provider": "Hertz", "origin": "Denver Airport", "destination": "Denver Airport",

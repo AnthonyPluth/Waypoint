@@ -29,6 +29,8 @@ export interface AiSuggestion {
   room?: string;
   ship?: string;
   deck?: string;
+  flight_number?: string;
+  cabin?: string;
   sources?: Record<string, string>;
 }
 
@@ -117,6 +119,7 @@ export interface AssistantItemDetail {
   match: AssistantMatch | null;
   entries: AssistantEntry[];
   suggestion: AssistantParsed | null;
+  suggestions: AssistantParsed[];
 }
 
 export interface AssistantItems {
@@ -560,7 +563,7 @@ export interface ReviewItem {
   received: string | null;
   reason: "no_markup" | "incomplete" | "broken" | "generic";
   gmail_url: string | null;
-  suggestion: AiSuggestion | null;
+  suggestions: AiSuggestion[];
   suggestion_error: string | null;
 }
 

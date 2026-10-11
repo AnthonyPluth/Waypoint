@@ -30,7 +30,7 @@ class ItemOut(TypedDict):
     received: str | None
     reason: Reason
     gmail_url: str | None
-    suggestion: ai.Suggestion | None
+    suggestions: list[ai.Suggestion]
     suggestion_error: str | None
 
 
@@ -53,10 +53,17 @@ def is_generic(conn: db.Connection, mailbox_id: int, message_id: str) -> bool:
     return bool(reason == "generic")
 
 
-def set_suggestion(conn: db.Connection, mailbox_id: int, message_id: str, suggestion: ai.Suggestion | None,
-                   error: str | None) -> None:
+def set_suggestions(conn: db.Connection, mailbox_id: int, message_id: str, suggestions: list[ai.Suggestion],
+                    error: str | None) -> None:
     conn.execute(update(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)
-                 .values(suggestion=json.dumps(suggestion) if suggestion else None, suggestion_error=error))
+                 .values(suggestion=json.dumps(suggestions) if suggestions else None, suggestion_error=error))
+
+
+def suggestions_of(stored: str | None) -> list[ai.Suggestion]:
+    if not stored:
+        return []
+    found = json.loads(stored)
+    return found if isinstance(found, list) else [found]
 
 
 def _seen_by(owner: str) -> Any:
@@ -76,7 +83,7 @@ def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
              "has_email": (r["mailbox_id"], r["message_id"]) in subjects,
              "received": r["received"], "reason": r["reason"],
              "gmail_url": gmail.open_url(r["address"], r["message_id"]) if r["owner_sub"] == owner else None,
-             "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None, "suggestion_error": r["suggestion_error"]}
+             "suggestions": suggestions_of(r["suggestion"]), "suggestion_error": r["suggestion_error"]}
             for r in rows]
 
 
@@ -88,7 +95,7 @@ def pending(conn: db.Connection, owner: str) -> list[Any]:
 
 def visible(conn: db.Connection, owner: str, item_id: int) -> Any:
     return conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.sender_domain, ReviewItem.received,
-                               ReviewItem.reason, ReviewItem.suggestion, ReviewItem.matches, Mailbox.owner_sub)
+                               ReviewItem.reason, ReviewItem.suggestion, ReviewItem.suggestion_error, ReviewItem.matches, Mailbox.owner_sub)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
 
 
@@ -126,16 +133,17 @@ def stored_image(conn: db.Connection, owner: str, item_id: int, index: int) -> s
     return None if found is None else stored_mail.image_of(conn, *found, index)
 
 
-def dismiss(conn: db.Connection, owner: str, item_id: int, booking: tuple[Viewer, int] | None = None) -> bool:
+def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewer, list[int]] | None = None) -> bool:
     seen = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.sender_domain)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
     if seen is None:
         return False
-    if booking is not None and visibility.visible_segment(conn, booking[0], booking[1]) is not None:
-        stored_mail.link(conn, booking[1], int(seen["mailbox_id"]), str(seen["message_id"]))
-        if seen["reason"] == "generic" and seen["sender_domain"] != UNKNOWN_SENDER:
-            db.insert_ignore(conn, TrustedSender, {"mailbox_id": seen["mailbox_id"], "domain": seen["sender_domain"]}, key=["mailbox_id", "domain"])
+    made = [n for n in bookings[1] if visibility.visible_segment(conn, bookings[0], n) is not None] if bookings is not None else []
+    for n in made:
+        stored_mail.link(conn, n, int(seen["mailbox_id"]), str(seen["message_id"]))
+    if made and seen["reason"] == "generic" and seen["sender_domain"] != UNKNOWN_SENDER:
+        db.insert_ignore(conn, TrustedSender, {"mailbox_id": seen["mailbox_id"], "domain": seen["sender_domain"]}, key=["mailbox_id", "domain"])
     conn.execute(delete(ReviewItem).where(ReviewItem.id == item_id))
     stored_mail.prune(conn)
     return True
@@ -188,9 +196,9 @@ def asked(conn: db.Connection, mailbox_id: int, domain: str | None) -> bool:
 
 
 def add_generic(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: str | None, received: str | None,
-                suggestion: ai.Suggestion, now: float) -> None:
+                suggestions: list[ai.Suggestion], now: float, error: str | None = None) -> None:
     add(conn, mailbox_id, message_id, sender_domain, received, "generic", now)
-    set_suggestion(conn, mailbox_id, message_id, suggestion, None)
+    set_suggestions(conn, mailbox_id, message_id, suggestions, error)
 
 
 def ignored(conn: db.Connection, mailbox_id: int) -> list[str]:
