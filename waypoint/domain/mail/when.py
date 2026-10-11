@@ -14,7 +14,7 @@ WORD = r"[^\W\d_]{3,}"
 MONTH_FIRST = re.compile(rf"(?<![^\W\d_])({WORD})\.?\s+(\d{{1,2}})(?:st|nd|rd|th)?,?\s+(\d{{4}})")
 DAY_FIRST = re.compile(rf"(?<!\d)(\d{{1,2}})(?:st|nd|rd|th|er|\.)?\s+(?:de\s+)?({WORD})\.?,?\s+(?:de\s+)?(\d{{4}})")
 CLOCK = re.compile(r"(?<![\d:])(\d{1,2}):(\d{2})\s*([AaPp])?\.?[Mm]?\.?(?!\d)")
-FRENCH_CLOCK = re.compile(r"(?<![\d:])(\d{1,2})\s?h\s?(\d{2})(?!\d)")
+FRENCH_CLOCK = re.compile(r"(?<![\d:])(\d{1,2})\s?h\s?(\d{2})(?!\d)(?!\s?m(?:in)?\b)")
 JP_CLOCK = re.compile(r"(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?")
 
 

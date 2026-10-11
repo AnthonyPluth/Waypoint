@@ -25,6 +25,9 @@ class Unreadable(Exception):
     pass
 
 
+PAIR_DAYS_ABOVE = 4
+
+
 @dataclass(frozen=True)
 class _Stamp:
     day: date
@@ -59,12 +62,13 @@ def _label(row: str, key: Literal["dep", "arr"]) -> str:
     return found[0].lower() if found else ("departure" if key == "dep" else "arrival")
 
 
-def _legs(rows: list[str]) -> list[tuple[str, str, int, int]]:
+def _legs(rows: list[str], known: dict[str, str]) -> list[tuple[str, str, int, int]]:
     starts = [(n, hit) for n, row in enumerate(rows) if _usable(row) and not _labelled_code(row) and (hit := _number(row))]
     legs: list[tuple[str, str, int, int]] = []
     for at, (n, (code, digits)) in enumerate(starts):
         end = starts[at + 1][0] if at + 1 < len(starts) else len(rows)
-        if legs and legs[-1][:2] == (code, digits) and sum(1 for r in rows[legs[-1][2]:n] if when.date_spans(r)) < 2:
+        if legs and legs[-1][:2] == (code, digits) and sum(1 for r in rows[legs[-1][2]:n] if when.date_spans(r)) < 2 \
+                and _pair_row(rows, known, legs[-1][2], n) is None:
             legs[-1] = (code, digits, legs[-1][2], end)
         else:
             legs.append((code, digits, n, end))
@@ -155,6 +159,58 @@ def _instant(day: date, at: time, zone: str) -> datetime:
     return datetime.combine(day, at, tzinfo=ZoneInfo(zone))
 
 
+def _times_in(row: str) -> list[time]:
+    found: list[time] = []
+    for pattern in (when.CLOCK, when.FRENCH_CLOCK, when.JP_CLOCK):
+        for m in pattern.finditer(row):
+            if (at := when.find_time(m[0])) is not None:
+                found.append(at)
+        if found:
+            break
+    return found
+
+
+def _pair_row(rows: list[str], known: dict[str, str], first: int, last: int) -> int | None:
+    for n in range(first, last):
+        row = rows[n]
+        ports = [m[0] for m in AIRPORT.finditer(row) if m[0] in known]
+        if _usable(row) and len(ports) == 2 and len(_times_in(row)) == 2 and not when.date_spans(row):
+            return n
+    return None
+
+
+def _title_day(rows: list[str], pair: int, floor: int) -> date | None:
+    for n in range(pair - 1, max(floor, pair - PAIR_DAYS_ABOVE) - 1, -1):
+        row = rows[n]
+        if not _usable(row):
+            continue
+        spans = when.date_spans(row)
+        if len(spans) == 1:
+            return spans[0][2]
+        if spans:
+            return None
+    return None
+
+
+def _block_leg(code: str, digits: str, row: str, day: date, known: dict[str, str]) -> tuple[Booking, dict[str, str]]:
+    origin, destination = [m[0] for m in AIRPORT.finditer(row) if m[0] in known]
+    leaves, arrives = _times_in(row)
+    if origin == destination:
+        raise Unreadable("departure and arrival airport are the same")
+    departure = _instant(day, leaves, known[origin])
+    arrival = _instant(day, arrives, known[destination])
+    if arrival < departure:
+        arrival = _instant(day + timedelta(days=1), arrives, known[destination])
+    if arrival <= departure:
+        raise Unreadable("arrival isn't after departure")
+    if arrival - departure > timedelta(hours=MAX_HOURS):
+        raise Unreadable(f"flight is longer than {MAX_HOURS} hours")
+    sources = {"origin": "airport code", "destination": "airport code", "start_local": "departure", "end_local": "arrival"}
+    booking = Booking("flight", "confirmed", None, reference.airline_names().get(code), departure.strftime("%Y-%m-%dT%H:%M"),
+                      arrival.strftime("%Y-%m-%dT%H:%M"), origin, destination, details=(("flight_number", f"{code} {digits}"),))
+    return booking, sources
+
+
 def _leg(code: str, digits: str, rows: list[str], known: dict[str, str]) -> tuple[Booking, dict[str, str]]:
     ports = _airports(rows, known)
     if len(ports) < 2:
@@ -179,15 +235,28 @@ def _leg(code: str, digits: str, rows: list[str], known: dict[str, str]) -> tupl
 
 def read(html: str, text: str) -> tuple[Parsed, str | None]:
     rows = lines(html, text)
-    legs = _legs(rows)
+    known = reference.airport_zones()
+    legs = _legs(rows, known)
     if not legs:
         return Parsed(), ""
-    known = reference.airport_zones()
     made: list[Booking] = []
     kept: list[tuple[str, str, int, int]] = []
     failed: list[str] = []
+    floor = 0
     for at, (code, digits, start, end) in enumerate(legs):
         body = rows[start:end]
+        pair = _pair_row(rows, known, start, end)
+        day = _title_day(rows, pair, floor) if pair is not None else None
+        if pair is not None and day is not None:
+            floor = pair + 1
+            try:
+                booking, sources = _block_leg(code, digits, rows[pair], day, known)
+            except Unreadable as e:
+                failed.append(str(e))
+                continue
+            made.append(replace(booking, generic=tuple(sources.items())))
+            kept.append((code, digits, start, end))
+            continue
         try:
             try:
                 booking, sources = _leg(code, digits, body, known)

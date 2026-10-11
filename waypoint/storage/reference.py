@@ -20,3 +20,8 @@ def airport_zones() -> dict[str, str]:
 @cache
 def airline_names() -> dict[str, str]:
     return {row[0]: row[2] for row in _rows("airlines.tsv.gz") if len(row) >= 3 and row[0] and row[2]}
+
+
+@cache
+def airport_places() -> tuple[tuple[str, str, str], ...]:
+    return tuple((row[2], row[3], row[4]) for row in _rows("airports.tsv.gz") if len(row) >= 5 and row[2] and row[4])

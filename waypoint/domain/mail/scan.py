@@ -17,7 +17,7 @@ from ...storage.models import Mailbox, ScannedMessage
 from ...storage.stored_mail import Content
 from .. import loyalty, people
 from ..visibility import Viewer
-from . import ai, extract, ingest, query, review, triage
+from . import ai, extract, glance, ingest, query, review, triage
 
 State = Literal["done", "failed", "not_started", "busy"]
 BOOKING, UNREADABLE, SKIPPED = "booking", "unreadable", "skipped"
@@ -201,6 +201,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     made, failed = 0, 0
     touched: list[int] = []
     held: list[ingest.Held] = []
+    lacks: list[str] = []
     proposed: list[extract.Booking] = []
     for booking in message.bookings:
         if booking.generic and not review.trusted(conn, mailbox_id, message.sender_domain):
@@ -209,13 +210,15 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
         filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill, held)
         if filed is None:
             failed += 1
-            why[ingest.explain(conn, booking)] += 1
+            lacks.append(ingest.explain(conn, booking))
+            why[lacks[-1]] += 1
         elif filed not in ("unchanged", "ambiguous"):
             made += 1
     if proposed:
         if review.asked(conn, mailbox_id, message.sender_domain):
             return made, 0, list(dict.fromkeys(touched)) if touched else None, None
-        review.add_generic(conn, mailbox_id, message_id, message.sender_domain, message.received, ingest.suggestion(conn, proposed[0]), now)
+        review.add_generic(conn, mailbox_id, message_id, message.sender_domain, message.received,
+                           [ingest.suggestion(conn, b) for b in proposed], now, UNREAD_WITH_SUGGESTION if message.unread else None)
         return made, 1, [], UNREADABLE
     usable = len(message.bookings) - failed
     queued = 0
@@ -226,7 +229,8 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
         if not message.bookings and not message.unread:
             why["no structured booking data" if not message.other_markup else "structured data, but no reservation"] += 1
         reason: review.Reason = "broken" if message.broken else "incomplete" if message.markup or message.bookings else "no_markup"
-        review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, reason, now, held)
+        review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, reason, now, held,
+                   glance.gap_of(lacks + list(message.gaps)) if reason == "incomplete" else None)
         queued = 1
     elif held:
         review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "match", now, held)
@@ -234,6 +238,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     return made, queued, list(dict.fromkeys(touched)) if queued or touched else None, BOOKING if usable else UNREADABLE
 
 
+UNREAD_WITH_SUGGESTION = "Something else in this email couldn’t be read. Add it by hand if you need it."
 SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
 NO_AI = "Turn on AI suggestions in Settings first."
 
@@ -286,17 +291,18 @@ def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) 
         asking = not review.is_match(conn, mailbox_id, message_id)
     if cfg is None or not asking:
         return
-    suggestion: ai.Suggestion | None = None
+    suggestions: list[ai.Suggestion] = []
     error: str | None = None
     try:
-        suggestion = ai.suggest(cfg, extract.plain_text(raw), known)
+        reading = ai.suggest(cfg, extract.plain_text(raw), known)
+        suggestions, error = reading.bookings, reading.error
     except ai.AiError as e:
         error = str(e)
     except Exception as e:
         monitoring.report(e, values=False)
         error = SUGGESTION_FAILED
     with db.session() as conn:
-        review.set_suggestion(conn, mailbox_id, message_id, suggestion, error)
+        review.set_suggestions(conn, mailbox_id, message_id, suggestions, error)
 
 
 def _generic(mailbox_id: int, message_id: str) -> bool:

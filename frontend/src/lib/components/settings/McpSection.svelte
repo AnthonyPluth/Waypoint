@@ -96,6 +96,11 @@
               Approved{c.who ? ` by ${c.who}` : ""}{c.created ? ` ${at(c.created)}` : ""}. {c.last_used ? `Last used ${at(c.last_used)}.` : "Not used yet."}
             </p>
             <p class="mt-1 flex flex-wrap gap-1">{#each access(c.scope) as a (a)}<Badge variant="secondary">{a}</Badge>{/each}</p>
+            {#if !c.scope.includes("write")}
+              <p class="mt-1 text-sm text-muted-foreground" data-testid="no-changes">Read only: it can’t make changes. To allow them, disconnect it and connect it again, ticking the box for changes when Waypoint asks.</p>
+            {:else if !list.allow_writes}
+              <p class="mt-1 text-sm text-muted-foreground" data-testid="no-changes">It can’t make changes while “Let assistants change trips” above is off.</p>
+            {/if}
           </div>
           <Button variant="outline" onclick={() => { leaving = c; asking = true; }}>Disconnect</Button>
         </div>

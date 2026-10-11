@@ -409,6 +409,3 @@ def fetch_head(token: str, message_id: str) -> dict[str, Any]:
     quoted = urllib.parse.quote(message_id, safe="")
     return _retrying(lambda: _api(f"/messages/{quoted}", token, {"format": "metadata", "metadataHeaders": ["From", "Subject"]}))
 
-
-def open_url(address: str, message_id: str) -> str:
-    return "https://mail.google.com/mail/?" + urllib.parse.urlencode({"authuser": address}) + "#all/" + urllib.parse.quote(message_id, safe="")

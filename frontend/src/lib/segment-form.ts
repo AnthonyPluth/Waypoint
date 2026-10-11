@@ -69,6 +69,16 @@ export const draftOf = (s: Segment): Draft => ({
 const AIRPORT = /^[A-Za-z]{3}$/;
 const LOCAL = /^\d{4}-\d\d-\d\dT\d\d:\d\d/;
 
+export const MAX_FLIGHT_HOURS = 30;
+
+export function longFlightWarning(start: string, end: string, startZone: string | null, endZone: string | null): string | null {
+  if (!startZone || !endZone || !LOCAL.test(start) || !LOCAL.test(end)) return null;
+  const hours = (instant(end, endZone) - instant(start, startZone)) / 3_600_000;
+  if (!(hours > MAX_FLIGHT_HOURS)) return null;
+  const length = hours >= 48 ? `${Math.floor(hours / 24)} days` : `${Math.floor(hours)} hours`;
+  return `This flight is ${length} long. Check the times.`;
+}
+
 function knownZone(zone: string): boolean {
   try { new Intl.DateTimeFormat("en-US", { timeZone: zone }); return true; } catch { return false; }
 }
