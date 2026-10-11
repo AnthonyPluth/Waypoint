@@ -347,6 +347,7 @@ export interface Preview {
   truncated: boolean;
   original: boolean;
   images: number;
+  width: number | null;
 }
 
 export interface ReminderDevice {
@@ -713,6 +714,7 @@ export interface StoredEmail {
   truncated: boolean;
   original: boolean;
   images: number;
+  width: number | null;
 }
 
 export interface Traveler {
