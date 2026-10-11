@@ -4358,12 +4358,6 @@
               "generic"
             ]
           },
-          "gmail_url": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "suggestion": {
             "anyOf": [
               {
@@ -4393,7 +4387,6 @@
           "has_email",
           "received",
           "reason",
-          "gmail_url",
           "suggestion",
           "suggestion_error"
         ],

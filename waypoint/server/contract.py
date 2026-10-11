@@ -149,7 +149,6 @@ class ReviewItem(TypedDict):
     has_email: bool
     received: str | None
     reason: Literal["no_markup", "incomplete", "broken", "generic"]
-    gmail_url: str | None
     suggestion: AiSuggestion | None
     suggestion_error: str | None
 
