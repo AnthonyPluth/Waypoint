@@ -2818,6 +2818,12 @@
           "deck": {
             "type": "string"
           },
+          "flight_number": {
+            "type": "string"
+          },
+          "cabin": {
+            "type": "string"
+          },
           "sources": {
             "type": "object",
             "additionalProperties": {
@@ -3246,6 +3252,12 @@
                 "type": "null"
               }
             ]
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantParsed"
+            }
           }
         },
         "required": [
@@ -3261,7 +3273,8 @@
           "bookings",
           "match",
           "entries",
-          "suggestion"
+          "suggestion",
+          "suggestions"
         ],
         "additionalProperties": false
       },
@@ -5352,15 +5365,11 @@
               "null"
             ]
           },
-          "suggestion": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AiSuggestion"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiSuggestion"
+            }
           },
           "suggestion_error": {
             "type": [
@@ -5382,7 +5391,7 @@
           "received",
           "reason",
           "gmail_url",
-          "suggestion",
+          "suggestions",
           "suggestion_error"
         ],
         "additionalProperties": false

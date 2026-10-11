@@ -460,7 +460,9 @@
       "method": "GET",
       "path": "/api/airports/{id}",
       "handler": "waypoint/server/api/trips.py:api_airport",
-      "web": [],
+      "web": [
+        "frontend/src/lib/airport-zones.ts"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_trips.py"

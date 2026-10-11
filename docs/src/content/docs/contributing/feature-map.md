@@ -40,7 +40,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/segments/{id}` | `trips.py:api_segment_edit` | `lib/components/SegmentForm.svelte` | `test_api_contract.py`, `test_logos.py`, `test_mail_scan.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_offline.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `DELETE /api/segments/{id}` | `trips.py:api_segment_remove` | `pages/Trip.svelte` | `test_api_contract.py`, `test_logos.py`, `test_mail_scan.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/segments/{id}/move` | `trips.py:api_segment_move` | `pages/Trip.svelte` | `test_api_contract.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
-| `GET /api/airports/{id}` | `trips.py:api_airport` | - | `test_api_contract.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `GET /api/airports/{id}` | `trips.py:api_airport` | `lib/airport-zones.ts` | `test_api_contract.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/import/preview` | `flight_import.py:api_import_preview` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/Waypoint/start/import/) |
 | `POST /api/import` | `flight_import.py:api_import` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/Waypoint/start/import/) |
 | `GET /api/stats` | `stats.py:api_stats` | `lib/components/YearInReview.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |

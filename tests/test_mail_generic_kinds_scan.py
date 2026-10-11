@@ -12,7 +12,7 @@ class GenericKindCase(ScanCase):
 
     def confirm(self, item, **fields):
         seg = self.read(lambda conn: trips.add_segment(conn, self.jane, {"status": "confirmed", "manage_url": None, "details": {}, **fields}))
-        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, seg["id"]))))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, [seg["id"]]))))
         self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, self.DOMAIN)))
         return seg
 
@@ -40,7 +40,7 @@ class GenericCarScanTests(GenericKindCase):
                 .replace(b"December 9, 2026", b"December 16, 2026"))
 
     def test_a_rental_from_a_new_sender_is_a_suggestion_with_its_read_fields_outlined(self):
-        s = self.suggestion(self.first())["suggestion"]
+        s = self.suggestion(self.first())["suggestions"][0]
         self.assertEqual((s["kind"], s["provider"], s["confirmation"], s["origin"], s["destination"], s["start_local"], s["end_local"]),
                          ("car", "Roadside Rentals", "RR55821", "Denver International Airport (DEN)", "Seattle-Tacoma International Airport (SEA)",
                           "2026-12-05T10:30", "2026-12-09T16:00"))
@@ -73,7 +73,7 @@ class GenericCarScanTests(GenericKindCase):
         with no_leaks(self, *self.CANARIES, database=self.path):
             self.scan()
         [item] = self.items()
-        s = item["suggestion"]
+        s = item["suggestions"][0]
         self.assertEqual((s["origin"], s["start_local"], s["end_local"], s["start_zone"], s["confirmation"]),
                          ("Flughafen München (MUC)", "2026-12-05T10:30", "2026-12-09T16:00", "Europe/Berlin", "MW90417"))
         self.assertNotIn("end_zone", s)
@@ -87,7 +87,7 @@ class GenericTrainScanTests(GenericKindCase):
         return eml("train_generic_fr").replace(b"Rail Exemple <", b"CANARY-SENDER-TRAIN-8Z2P Rail <")
 
     def test_a_train_from_a_new_sender_is_a_suggestion_with_its_read_fields_outlined(self):
-        s = self.suggestion(self.first())["suggestion"]
+        s = self.suggestion(self.first())["suggestions"][0]
         self.assertEqual((s["kind"], s["provider"], s["confirmation"], s["origin"], s["destination"], s["start_local"], s["end_local"], s["start_zone"]),
                          ("train", "Rail Exemple", "RX90412", "Paris Gare de Lyon", "Lyon Part-Dieu", "2026-11-21T09:12", "2026-11-21T11:14", "Europe/Paris"))
         self.assertNotIn("end_zone", s)
@@ -113,7 +113,7 @@ class GenericTrainScanTests(GenericKindCase):
         self.add_mail("first", raw)
         self.scan()
         [item] = self.items()
-        self.assertEqual((item["suggestion"]["start_zone"], item["suggestion"]["end_zone"]), ("Europe/Zurich", "Europe/Rome"))
+        self.assertEqual((item["suggestions"][0]["start_zone"], item["suggestions"][0]["end_zone"]), ("Europe/Zurich", "Europe/Rome"))
 
 
 class GenericCruiseScanTests(GenericKindCase):
@@ -128,7 +128,7 @@ class GenericCruiseScanTests(GenericKindCase):
                 .replace(b"November 28, 2026", b"December 12, 2026"))
 
     def test_a_cruise_from_a_new_sender_is_a_suggestion_with_its_read_fields_outlined(self):
-        s = self.suggestion(self.first())["suggestion"]
+        s = self.suggestion(self.first())["suggestions"][0]
         self.assertEqual((s["kind"], s["provider"], s["confirmation"], s["origin"], s["destination"], s["ship"], s["start_local"], s["end_local"], s["start_zone"]),
                          ("cruise", "Blue Horizon Cruises", "BH772013", "Galveston, TX", "Galveston, TX", "Blue Horizon Voyager",
                           "2026-11-21T16:00", "2026-11-28T08:00", "America/Chicago"))
@@ -152,5 +152,5 @@ class GenericCruiseScanTests(GenericKindCase):
         with no_leaks(self, *self.CANARIES, database=self.path):
             self.scan()
         [item] = self.items()
-        s = item["suggestion"]
+        s = item["suggestions"][0]
         self.assertEqual((s["origin"], s["start_zone"], s["ship"], s["confirmation"]), ("Lisboa (LIS)", "Europe/Lisbon", "Estrella del Atlántico", "NE553208"))
