@@ -2252,7 +2252,7 @@ class MailScanApiTests(GoogleCase):
         status, body = self.call("ana", "GET", f"/api/segments/{seg['id']}/emails")
         self.assertEqual(status, 200)
         [email] = body["emails"]
-        self.assertEqual(set(email), {"subject", "sender_domain", "received", "text", "html", "truncated", "original", "images"})
+        self.assertEqual(set(email), {"subject", "sender_domain", "received", "text", "html", "truncated", "original", "images", "width"})
         self.assertEqual(email["sender_domain"], "example-air.example")
         self.assertEqual(self.call("ben", "GET", f"/api/segments/{seg['id']}/emails"), (404, {"error": "No such segment"}))
         self.assertEqual(self.call("ana", "GET", "/api/segments/99999/emails"), (404, {"error": "No such segment"}))

@@ -58,6 +58,12 @@ BORDERS = {"border", *(f"border-{side}" for side in SIDES)}
 ALIGN = {"left", "right", "center", "justify"}
 VALIGN = {"top", "middle", "bottom", "baseline"}
 Resolve = Callable[[str], int | None]
+MAX_DESIGN_WIDTH = 1000
+WIDTH_TAGS = {"table", "td", "th", "col", "colgroup", "img"}
+WIDTH_ATTRIBUTE = re.compile(r"\d{1,4}")
+WIDTH_STYLE = re.compile(r"(\d{1,4}(?:\.\d{1,3})?)(px|pt)")
+WIDTH_PROPERTIES = {"width", "min-width"}
+POINTS_TO_PIXELS = 4 / 3
 
 
 def safe_declaration(name: str, value: str) -> str | None:
@@ -269,3 +275,37 @@ def clean_counted(html: str, limit: int, resolve: Resolve | None = None, markup_
 def clean(html: str, limit: int) -> tuple[str, bool]:
     markup, cut, _size = clean_counted(html, limit)
     return markup, cut
+
+
+class _Widths(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.widest = 0.0
+
+    def handle_starttag(self, tag: str, attrs: Any) -> None:
+        found = dict(attrs)
+        if tag in WIDTH_TAGS:
+            value = (found.get("width") or "").strip()
+            if WIDTH_ATTRIBUTE.fullmatch(value):
+                self.widest = max(self.widest, float(value))
+        for declaration in (found.get("style") or "")[:4000].split(";"):
+            name, colon, text = declaration.partition(":")
+            length = WIDTH_STYLE.fullmatch(text.strip().lower()) if colon and name.strip().lower() in WIDTH_PROPERTIES else None
+            if length:
+                self.widest = max(self.widest, float(length[1]) * (POINTS_TO_PIXELS if length[2] == "pt" else 1))
+
+    def handle_startendtag(self, tag: str, attrs: Any) -> None:
+        self.handle_starttag(tag, attrs)
+
+
+def design_width(markup: str | None) -> int | None:
+    if not markup:
+        return None
+    parser = _Widths()
+    try:
+        parser.feed(markup)
+        parser.close()
+    except (ValueError, RecursionError, AssertionError):
+        return None
+    widest = min(round(parser.widest), MAX_DESIGN_WIDTH)
+    return widest if widest > 0 else None

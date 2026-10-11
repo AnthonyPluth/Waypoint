@@ -1,0 +1,22 @@
+{
+  "name": "email-zoom",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Chicago') >> visible=true" },
+    { "wait_for": "button:has-text('View email')" },
+    { "click": "button:has-text('View email') >> visible=true" },
+    { "wait_for": "iframe[data-testid='preview-html'][aria-busy='false']" },
+    { "expect_text": { "selector": "[data-testid='zoom-level']", "text": "%" } },
+    { "scroll_to": "[data-testid='message-subject']" },
+    { "screenshot": "email-fit" },
+    { "click": "button[aria-label='Zoom in'] >> visible=true" },
+    { "click": "button[aria-label='Zoom in'] >> visible=true" },
+    { "click": "button[aria-label='Zoom in'] >> visible=true" },
+    { "scroll_to": "[data-testid='message-subject']" },
+    { "screenshot": "email-zoomed" },
+    { "click": "button:has-text('Larger view') >> visible=true" },
+    { "wait_for": "[role='dialog'] iframe[data-testid='preview-html']" },
+    { "screenshot": "email-larger" }
+  ]
+}

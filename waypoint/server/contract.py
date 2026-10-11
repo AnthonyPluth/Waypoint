@@ -216,6 +216,7 @@ class Preview(TypedDict):
     truncated: bool
     original: bool
     images: int
+    width: int | None
 
 
 class StoredEmail(TypedDict):
@@ -227,6 +228,7 @@ class StoredEmail(TypedDict):
     truncated: bool
     original: bool
     images: int
+    width: int | None
 
 
 class SegmentEmails(TypedDict):
