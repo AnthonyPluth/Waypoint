@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest import mock
 
 from tests.privacy import no_leaks
-from waypoint.domain.mail import extract, flights, when
+from waypoint.domain.mail import extract, flights, when, words
 
 FIXTURES = Path(__file__).parent / "fixtures" / "mail"
 CANARIES = ("CANARY-BODY-FLIGHT-EN-4J7S", "CANARY-BODY-FLIGHT-DE-8W2L", "CANARY-SENDER-FLIGHT-6P1R", "CANARY-BODY-ORDER-2D9K")
@@ -72,6 +72,19 @@ class FlightReaderTests(unittest.TestCase):
         parsed, why = read("<p>Booking reference: ZK0000</p>" + LABELLED.replace("Booking reference: ZK4R9T", ""))
         self.assertEqual(([dict(b.details)["flight_number"] for b in parsed.bookings], parsed.unread, why, parsed.bookings[0].confirmation),
                          (["BA 9871"], 0, None, "ZK0000"))
+
+    def test_each_leg_keeps_its_own_confirmation_code_and_others_share_the_messages(self):
+        parsed, _ = read("<p>Booking reference: SHARED1</p>"
+                         "<p>BA 9871</p><p>Booking reference: AAAA11</p><p>From: JFK</p><p>Departs: 2026-11-21 19:00</p><p>To: LHR</p><p>Arrives: 2026-11-22 07:10</p>"
+                         "<p>BA 9872</p><p>Booking reference: BBBB22</p><p>From: LHR</p><p>Departs: 2026-11-28 10:00</p><p>To: JFK</p><p>Arrives: 2026-11-28 13:00</p>"
+                         "<p>BA 9873</p><p>From: JFK</p><p>Departs: 2026-12-05 10:00</p><p>To: LHR</p><p>Arrives: 2026-12-05 22:00</p>")
+        self.assertEqual([b.confirmation for b in parsed.bookings], ["AAAA11", "BBBB22", "SHARED1"])
+
+    def test_words_that_only_contain_a_departure_or_arrival_word_are_not_labels(self):
+        for row in ("Sale price", "Department of travel", "Salida", "Arrivals board"):
+            with self.subTest(row):
+                self.assertEqual(bool(words.DEPARTURE.search(row) or words.ARRIVAL.search(row)), row == "Salida")
+        self.assertTrue(words.ARRIVAL.search("Arrival: LHR") and words.DEPARTURE.search("出発: HND") and words.DEPARTURE.search("Départ"))
 
     def test_the_same_leg_listed_twice_is_one_booking(self):
         parsed, _ = read(LABELLED + "<p>Summary: BA 9871</p>" + LABELLED)
@@ -171,6 +184,12 @@ class ReadingOrderTests(unittest.TestCase):
         stay = "<p>Hotel: Harbour Inn</p><p>Check-in: 2026-11-21 15:00</p><p>Check-out: 2026-11-24 11:00</p>"
         m = extract.read(mail(stay + LABELLED))
         self.assertEqual([b.kind for b in m.bookings], ["hotel"])
+
+    def test_flights_left_out_because_a_stay_won_are_counted_as_unread(self):
+        stay = "<p>Hotel: Harbour Inn</p><p>Check-in: 2026-11-21 15:00</p><p>Check-out: 2026-11-24 11:00</p>"
+        m = extract.read(mail(stay + LABELLED))
+        self.assertEqual(([b.kind for b in m.bookings], m.unread), (["hotel"], 1))
+        self.assertEqual(extract.read(mail(stay)).unread, 0)
 
     def test_the_flight_reader_is_used_when_no_stay_is_found(self):
         m = extract.read(mail(LABELLED))

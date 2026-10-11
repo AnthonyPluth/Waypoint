@@ -561,7 +561,7 @@ def read(message: Mapping[str, Any]) -> Message:
             bookings = [x for x in bookings if x.kind != "flight"] + text_flights
             unread += found.unread
     if not bookings and not unread and not seen:
-        for generic in GENERIC_READERS:
+        for position, generic in enumerate(GENERIC_READERS):
             try:
                 generic_found, why = generic("\n".join(htmls), "\n".join(texts))
             except Exception as e:
@@ -569,6 +569,15 @@ def read(message: Mapping[str, Any]) -> Message:
                 generic_found, why = Parsed(), None
             if generic_found.bookings:
                 bookings, unread, seen = list(generic_found.bookings), generic_found.unread, True
+                for other in GENERIC_READERS[position + 1:]:
+                    try:
+                        left = other("\n".join(htmls), "\n".join(texts))[0]
+                    except Exception as e:
+                        monitoring.report(e, values=False)
+                        continue
+                    if left.bookings or left.unread:
+                        unread += len(left.bookings) + left.unread
+                        gaps.append("generic reader: another kind of booking in the message wasn't filed")
                 break
             if why:
                 gaps.append(f"generic reader: {why}")

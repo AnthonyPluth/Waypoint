@@ -184,6 +184,7 @@ def read(html: str, text: str) -> tuple[Parsed, str | None]:
         return Parsed(), ""
     known = reference.airport_zones()
     made: list[Booking] = []
+    kept: list[tuple[str, str, int, int]] = []
     failed: list[str] = []
     for at, (code, digits, start, end) in enumerate(legs):
         body = rows[start:end]
@@ -198,11 +199,13 @@ def read(html: str, text: str) -> tuple[Parsed, str | None]:
             failed.append(str(e))
             continue
         made.append(replace(booking, generic=tuple(sources.items())))
+        kept.append((code, digits, start, end))
     if not made:
         return Parsed(), failed[0] if failed else ""
-    found = _confirmation(rows)
+    shared = _confirmation(rows)
     unique: dict[tuple[str, str, str], Booking] = {}
-    for b in made:
+    for b, (_, _, begin, finish) in zip(made, kept, strict=True):
+        found = _confirmation(rows[begin:finish]) or shared
         if found:
             b = replace(b, confirmation=found[1], generic=(*b.generic, ("confirmation", found[0])))
         unique.setdefault((dict(b.details)["flight_number"], b.origin or "", b.start), b)

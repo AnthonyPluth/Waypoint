@@ -59,7 +59,7 @@ SPANISH = Language(
     "Spanish",
     (("enero", "ene"), ("febrero", "feb"), ("marzo", "mar"), ("abril", "abr"), ("mayo", "may"), ("junio", "jun"), ("julio", "jul"),
      ("agosto", "ago"), ("septiembre", "setiembre", "sept", "sep"), ("octubre", "oct"), ("noviembre", "nov"), ("diciembre", "dic")),
-    ("salida", "sale"),
+    ("salida",),
     ("llegada", "llega"),
     ("desde", "origen"),
     ("hasta", "destino"),
@@ -90,8 +90,16 @@ def _pattern(words: tuple[str, ...]) -> re.Pattern[str]:
     return re.compile("|".join(re.escape(w) for w in sorted(words, key=len, reverse=True)), re.IGNORECASE)
 
 
-DEPARTURE = _pattern(_joined("departure"))
-ARRIVAL = _pattern(_joined("arrival"))
+def _whole(words_: tuple[str, ...]) -> re.Pattern[str]:
+    latin = [re.escape(w) for w in sorted(words_, key=len, reverse=True) if w[0].isascii() or w[0].isalpha() and ord(w[0]) < 0x250]
+    other = [re.escape(w) for w in sorted(words_, key=len, reverse=True) if re.escape(w) not in latin]
+    parts = [rf"(?<![^\W\d_])(?:{'|'.join(latin)})(?![^\W\d_])"] if latin else []
+    parts += other
+    return re.compile("|".join(parts), re.IGNORECASE)
+
+
+DEPARTURE = _whole(_joined("departure"))
+ARRIVAL = _whole(_joined("arrival"))
 BOOKED = _pattern(_joined("booked"))
 CANCEL = _pattern(_joined("cancel"))
 CONFIRMATION = _joined("confirmation")
