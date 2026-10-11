@@ -77,7 +77,7 @@ def _family_now(today: date) -> list[trips.SegmentIn]:
          "details": {"address": "1 Quay Street\nLondon E1 0AA", "room": "Family room", "phone": "+44 20 7946 0000"},
          "manage_url": "https://example.com/manage/H88231"},
         {"kind": "hotel", "origin": "Camden Guesthouse", "start_local": _at(today, 2, "15:00"), "end_local": _at(today, 4, "10:00"),
-         "start_zone": "Europe/London", "end_zone": "Europe/London", "confirmation": "G20417", "provider": "Example Stays"},
+         "start_zone": "Europe/London", "end_zone": "Europe/London", "confirmation": "G20417", "provider": "Example Stays", "details": {"address": "9 Parkway, Camden, London NW1 7AA"}},
         {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": _at(today, 4, "11:30"), "end_local": _at(today, 4, "14:35"),
          "confirmation": "KQ7M2X", "provider": "American Airlines", "details": {"flight_number": "AA 102", "terminal": "3"}},
     ]
@@ -153,7 +153,7 @@ def _jane_alone(today: date) -> list[trips.SegmentIn]:
          "confirmation": "PL4N9R", "provider": "United Airlines", "details": {"flight_number": "UA 311", "terminal": "7"}},
         {"kind": "car", "origin": "SFO airport", "destination": "SFO airport", "start_local": _at(today, 20, "12:30"), "end_local": _at(today, 22, "16:00"),
          "start_zone": "America/Los_Angeles", "end_zone": "America/Los_Angeles", "confirmation": "C7710", "provider": "Hertz",
-         "details": {"car_class": "Midsize", "address": "1 Rental Way, San Francisco", "phone": "+1 415 555 0100"}},
+         "details": {"car_class": "Midsize", "address": "1 Rental Way, San Francisco, CA 94103", "phone": "+1 415 555 0100"}},
         {"kind": "flight", "origin": "SFO", "destination": "JFK", "start_local": _at(today, 22, "17:00"), "end_local": _at(today, 23, "01:35"),
          "confirmation": "PL4N9R", "provider": "United Airlines", "details": {"flight_number": "UA 318"}},
     ]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when } from "./trips";
+import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -119,6 +119,28 @@ describe("hotel brand and place", () => {
     expect(cityState(undefined)).toBe("");
   });
 
+  it("gives City, State when the address has no street, with or without a postal code", () => {
+    expect(cityState("Minneapolis, MN 55401")).toBe("Minneapolis, MN");
+    expect(cityState("Minneapolis, MN, 55401")).toBe("Minneapolis, MN");
+    expect(cityState("Minneapolis, Minnesota")).toBe("Minneapolis, Minnesota");
+    expect(cityState("Fort Lauderdale, FL 33301, USA")).toBe("Fort Lauderdale, FL");
+    expect(cityState("100 Example Ave, Minneapolis, Minnesota 55401")).toBe("Minneapolis, Minnesota");
+    expect(cityState("100 Example Ave, Minneapolis, MN, 55401, USA")).toBe("Minneapolis, MN");
+  });
+
+  it("reads a newline-separated address, and a UK postcode", () => {
+    expect(cityState("2001 Terminal Way\nSeattle, WA 98100")).toBe("Seattle, WA");
+    expect(cityState("1 Quay Street\nLondon E1 0AA")).toBe("London");
+    expect(cityState("12 Beach Road, Brighton, UK")).toBe("Brighton, UK");
+  });
+
+  it("falls back to the address as written when no city and state can be read", () => {
+    expect(placeOf("Somewhere")).toBe("Somewhere");
+    expect(placeOf("100 Example Blvd, USA")).toBe("100 Example Blvd, USA");
+    expect(placeOf("1 Quay Street, London")).toBe("London");
+    expect(placeOf(undefined)).toBe("");
+  });
+
   it("shows the brand with its city, and the full name when there is no brand", () => {
     const place = segment({ kind: "hotel", origin: "Hyatt Place Example Beach Convention Center", hotel_brand: "Hyatt Place", details: { address: "100 Example Blvd, Fort Lauderdale, FL 33301, USA", room: "412" } });
     expect(upcomingTitle(place)).toBe("Hyatt Place");
@@ -127,7 +149,7 @@ describe("hotel brand and place", () => {
     expect(subline(place)).toBe("100 Example Blvd, Fort Lauderdale, FL 33301, USA · 412");
     const plain = segment({ kind: "hotel", origin: "Harbour Hotel", details: { address: "1 Quay Street, London" } });
     expect(upcomingTitle(plain)).toBe("Harbour Hotel");
-    expect(subline(plain, true)).toBe("");
+    expect(subline(plain, true)).toBe("London");
     expect(upcomingTitle(segment({ origin: "JFK", destination: "LHR", hotel_brand: "Hyatt Place" }))).toBe("JFK → LHR");
   });
 });
@@ -142,14 +164,18 @@ describe("wording", () => {
     expect(subline({ ...out, details: { ...out.details, seat: "12A", cabin: "Economy" } })).toBe("American Airlines AA 101 · Terminal 8 · Seat 12A · Economy");
     expect(subline({ ...out, details: { ...out.details, seat: "12A", cabin: "Economy" } }, true)).toBe("American Airlines AA 101 · Terminal 8 · Seat 12A");
     expect(subline({ ...stay, details: { address: "1 Quay Street, London", room: "412" } })).toBe("1 Quay Street, London · 412");
-    expect(subline({ ...stay, details: { address: "1 Quay Street, London", room: "412" } }, true)).toBe("412");
-    expect(subline(stay, true)).toBe("");
+    expect(subline({ ...stay, details: { address: "1 Quay Street, London", room: "412" } }, true)).toBe("London · 412");
+    expect(subline(stay, true)).toBe("London");
     expect(headline(segment({ kind: "car", provider: "Hertz", origin: "SFO airport" }))).toBe("Hertz · SFO airport");
     expect(headline(segment({ kind: "train", origin: "NYP", destination: "BOS" }))).toBe("NYP → BOS");
     expect(headline(segment({ kind: "hotel", origin: null, provider: null }))).toBe("Hotel stay");
     const ship = segment({ kind: "cruise", provider: "Example Cruise Line", origin: "Miami", details: { ship: "Example Voyager", room: "9214", deck: "9" } });
     expect(headline(ship)).toBe("Example Voyager · Miami");
     expect(subline(ship)).toBe("Example Cruise Line · Cabin 9214 · Deck 9");
+    const rental = segment({ kind: "car", provider: "Example Rent", origin: "SFO airport", details: { car_class: "Midsize", address: "1 Rental Way, San Francisco, CA 94103" } });
+    expect(subline(rental, true)).toBe("Midsize · San Francisco, CA");
+    expect(subline(rental)).toBe("Midsize · 1 Rental Way, San Francisco, CA 94103");
+    expect(subline(segment({ kind: "train", provider: "Example Rail", details: { seat: "4B" } }), true)).toBe("Example Rail · Seat 4B");
     expect(headline(segment({ kind: "cruise", origin: null, provider: null, details: {} }))).toBe("Cruise");
     expect([START_WORD.cruise, END_WORD.cruise]).toEqual(["Embarks", "Disembarks"]);
     const lot = segment({ kind: "parking", provider: "Example Parking", origin: "Example Long-Term Lot", details: { space_type: "Covered", address: "1 Terminal Road, Jamaica, NY" } });
