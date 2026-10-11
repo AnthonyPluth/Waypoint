@@ -11,6 +11,9 @@ from . import ai, extract
 def _zone(conn: db.Connection, b: extract.Booking, code: str | None, place: extract.Place) -> str | None:
     if b.kind == "cruise":
         return b.start_zone if code == b.origin else b.end_zone
+    declared = b.start_zone if code == b.origin else b.end_zone
+    if declared and b.kind in ("car", "train"):
+        return declared
     if b.kind == "flight":
         known = airports.lookup(conn, code) if code else None
         return known["zone"] if known else None
@@ -99,8 +102,12 @@ def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:
         out["destination"] = b.destination
     if address := dict(b.details).get("address"):
         out["address"] = address
+    if ship := dict(b.details).get("ship"):
+        out["ship"] = ship
     if zone := _zone(conn, b, b.origin, b.start_place):
         out["start_zone"] = zone
+    if b.kind in ("car", "train", "cruise") and (end_zone := _zone(conn, b, b.destination, b.end_place)) and end_zone != out.get("start_zone"):
+        out["end_zone"] = end_zone
     return out
 
 
