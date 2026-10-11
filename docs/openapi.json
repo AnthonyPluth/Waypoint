@@ -1794,6 +1794,37 @@
         }
       }
     },
+    "/api/mailboxes/{id}/review-glance": {
+      "get": {
+        "operationId": "api_mailbox_review_glance",
+        "x-handler": "waypoint/server/api/mailboxes.py:api_mailbox_review_glance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewGlance"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/mailboxes/{id}/unignore": {
       "post": {
         "operationId": "api_mailbox_unignore",
@@ -3844,6 +3875,101 @@
         ],
         "additionalProperties": false
       },
+      "GlanceDomain": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "reason": {
+            "enum": [
+              "no_markup",
+              "incomplete",
+              "broken",
+              "match",
+              "generic"
+            ]
+          },
+          "item_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "known_sender": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "domain",
+          "count",
+          "reason",
+          "item_id",
+          "known_sender"
+        ],
+        "additionalProperties": false
+      },
+      "GlanceGap": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "GlanceReason": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "enum": [
+              "no_markup",
+              "incomplete",
+              "broken",
+              "match",
+              "generic"
+            ]
+          },
+          "waiting": {
+            "type": "integer"
+          },
+          "recent": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reason",
+          "waiting",
+          "recent"
+        ],
+        "additionalProperties": false
+      },
+      "GlanceScan": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "added": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "added"
+        ],
+        "additionalProperties": false
+      },
       "IgnoredSenders": {
         "type": "object",
         "properties": {
@@ -5139,6 +5265,50 @@
           "destination",
           "start_local",
           "end_local"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewGlance": {
+        "type": "object",
+        "properties": {
+          "waiting": {
+            "type": "integer"
+          },
+          "days": {
+            "type": "integer"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlanceReason"
+            }
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlanceGap"
+            }
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlanceDomain"
+            }
+          },
+          "scans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlanceScan"
+            }
+          }
+        },
+        "required": [
+          "waiting",
+          "days",
+          "reasons",
+          "gaps",
+          "domains",
+          "scans"
         ],
         "additionalProperties": false
       },

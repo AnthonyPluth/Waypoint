@@ -1112,7 +1112,7 @@ class ReviewTests(ScanCase):
         with no_leaks(self, "CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-NOMARKUP-6H9C", database=self.path):
             self.scan()
         stored = self.read(lambda conn: dict(conn.execute(select(ReviewItem)).fetchone()))
-        self.assertEqual(sorted(stored), ["created", "id", "mailbox_id", "matches", "message_id", "reason", "received", "sender_domain", "suggestion", "suggestion_error"])
+        self.assertEqual(sorted(stored), ["created", "gap", "id", "mailbox_id", "matches", "message_id", "reason", "received", "sender_domain", "suggestion", "suggestion_error"])
         self.assertEqual((stored["sender_domain"], stored["received"]), ("example-air.example", "2026-10-17"))
         sealed = self.read(lambda conn: conn.execute(select(StoredMessage.content)).scalar())
         self.assertTrue(secretbox.is_encrypted(sealed))
@@ -2273,6 +2273,25 @@ class MailScanApiTests(GoogleCase):
         with db.session() as conn:
             conn.execute(insert(IgnoredSender).values(mailbox_id=self.ana_box, domain=""))
         self.assertEqual(self.call("ana", "GET", f"/api/mailboxes/{self.ana_box}/ignored")[1], {"domains": ["example-air.example"]})
+
+    def test_review_at_a_glance_is_counts_and_domains_for_the_mailboxs_owner_alone(self):
+        self.put("no_markup", "incomplete")
+        self.scan_now()
+        with no_leaks(self, *CANARIES):
+            status, body = self.call("ana", "GET", f"/api/mailboxes/{self.ana_box}/review-glance")
+            self.assertEqual(status, 200, body)
+            self.assertEqual(self.call("ben", "GET", f"/api/mailboxes/{self.ana_box}/review-glance"), (404, {"error": "Not found"}))
+            self.assertEqual(self.call("ana", "GET", "/api/mailboxes/abc/review-glance")[0], 404)
+            self.assertEqual(self.call("ana", "GET", "/api/mailboxes/9999/review-glance")[0], 404)
+        self.assertEqual((body["waiting"], body["days"]), (2, 30))
+        self.assertEqual({r["reason"]: r["waiting"] for r in body["reasons"]}, {"no_markup": 1, "incomplete": 1})
+        self.assertEqual(body["gaps"], [{"label": "no place", "count": 1}])
+        [domain] = body["domains"]
+        self.assertEqual((domain["domain"], domain["count"], domain["known_sender"]), ("example-air.example", 2, False))
+        self.assertEqual([s["added"] for s in body["scans"]], [2])
+        self.assertNotIn("CANARY", json.dumps(body))
+        self.assertEqual(self.call("ana", "POST", f"/api/review/{domain['item_id']}/ignore", {})[0], 200)
+        self.assertEqual(self.call("ana", "GET", f"/api/mailboxes/{self.ana_box}/review-glance")[1]["domains"], [])
 
     def test_stopping_an_ignored_sender_starts_a_scan_that_reads_its_mail_again(self):
         self.put("no_markup", "incomplete")
