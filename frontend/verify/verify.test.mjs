@@ -58,6 +58,9 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ long_names: 3 }] })).toEqual(["step 1: long_names takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_labels: "Japan 2026, Taxes" }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_labels: 3 }] })).toEqual(["step 1: fake_labels takes a string"]);
+    expect(flowProblems({ ...ok, steps: [{ fake_ignored: "news.example, deals.example" }, { fake_ignore: "news.example" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ fake_ignored: 3 }] })).toEqual(["step 1: fake_ignored takes a string"]);
+    expect(flowProblems({ ...ok, steps: [{ fake_ignore: true }] })).toEqual(["step 1: fake_ignore takes a string"]);
   });
 
   it("takes a download to click and save, named", () => {

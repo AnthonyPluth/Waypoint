@@ -77,13 +77,13 @@ def scan_mailboxes() -> None:
         monitoring.report(e, values=False)
 
 
-def scan_now(mailbox_id: int, again: bool = False, backfill: bool = False) -> bool:
+def scan_now(mailbox_id: int, again: bool = False, backfill: bool = False, sender: str | None = None) -> bool:
     if scan.running(mailbox_id):
         return False
 
     def run() -> None:
         try:
-            scan.run(mailbox_id, date.today(), again, backfill)
+            scan.run(mailbox_id, date.today(), again, backfill, sender)
         except Exception as e:
             monitoring.report(e, values=False)
     threading.Thread(target=run, daemon=True, name="mail-scan-now").start()

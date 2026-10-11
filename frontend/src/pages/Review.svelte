@@ -149,9 +149,19 @@
 
   let ignoring = $state<ReviewItem | null>(null);
   let asking = $state(false);
+  const UNDO_MS = 8000;
+  const undoIgnore = (mailboxId: number, domain: string) => act(async () => {
+    await apiCall<"POST /api/mailboxes/{id}/unignore">(`/api/mailboxes/${mailboxId}/unignore`, { method: "POST", body: { domain }, failed: "Couldn’t undo that" });
+    toast.success(`Reading again what was skipped from ${domain}`);
+    await settle();
+  });
   const ignore = (i: ReviewItem) => act(async () => {
-    await apiCall<"POST /api/review/{id}/ignore">(`/api/review/${i.id}/ignore`, { method: "POST" });
-    toast.success(`Ignoring ${i.sender_domain}`);
+    const r = await apiCall<"POST /api/review/{id}/ignore">(`/api/review/${i.id}/ignore`, { method: "POST" });
+    toast.success(`Ignoring ${r.domain}`, {
+      description: "You can undo this in Settings → Mail and AI → Gmail",
+      duration: UNDO_MS,
+      action: { label: "Undo", onClick: () => { void undoIgnore(r.mailbox_id, r.domain); } },
+    });
     await settle();
   });
 
@@ -368,8 +378,13 @@
 {/if}
 
 <ConfirmDialog bind:open={asking} title={`Ignore ${ignoring?.sender_domain ?? "this sender"}?`} confirmLabel="Ignore" busyLabel="Ignoring…" destructive
-  description="Waypoint stops looking at mail from this sender in that mailbox, and their other items leave this list. Other mailboxes aren’t affected."
-  onconfirm={async () => { const i = ignoring; return i ? await ignore(i) : true; }} />
+  onconfirm={async () => { const i = ignoring; return i ? await ignore(i) : true; }}>
+  {#snippet description()}
+    {#if ignoring?.known_sender}<p class="text-signal-ink" data-testid="known-sender-warning">This sender is a travel company Waypoint knows. Ignoring it means its bookings won’t be added.</p>{/if}
+    <p>Waypoint stops looking at mail from this sender in that mailbox, and their other items leave this list. Other mailboxes aren’t affected.</p>
+    <p>You can undo this in Settings → Mail and AI → Gmail.</p>
+  {/snippet}
+</ConfirmDialog>
 
 <Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v && !saving) closeForm(); }} title={draft?.suggested ? "Check this suggestion" : "Add this booking by hand"}>
   {#if draft}

@@ -1,0 +1,15 @@
+{
+  "name": "ignore-undo",
+  "page": "review",
+  "steps": [
+    { "fake_ignore": "example-air.example" },
+    { "wait_for": "[data-testid='review-item']" },
+    { "click": "button:has-text('Ignore this sender') >> nth=0" },
+    { "wait_for": "[role='dialog']" },
+    { "expect_text": { "selector": "[role='dialog']", "text": "You can undo this in Settings" } },
+    { "screenshot": "confirm" },
+    { "click": "[role='dialog'] button[type=submit]" },
+    { "wait_for": "[data-sonner-toast] button:has-text('Undo')" },
+    { "screenshot": "toast-with-undo" }
+  ]
+}

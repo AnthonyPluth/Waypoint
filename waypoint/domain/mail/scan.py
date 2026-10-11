@@ -20,7 +20,8 @@ from ..visibility import Viewer
 from . import ai, extract, ingest, query, review, triage
 
 State = Literal["done", "failed", "not_started", "busy"]
-BOOKING, UNREADABLE, IGNORED, SKIPPED = "booking", "unreadable", "ignored", "skipped"
+BOOKING, UNREADABLE, SKIPPED = "booking", "unreadable", "skipped"
+IGNORED = review.IGNORED
 BUDGET = 1200
 _clock = time.monotonic
 MAX_CHAIN = 12
@@ -61,6 +62,7 @@ _running: set[int] = set()
 _lock = threading.Lock()
 _filing = threading.Lock()
 _notices: dict[int, str] = {}
+_reading: dict[int, str] = {}
 
 
 def running(mailbox_id: int) -> bool:
@@ -73,16 +75,24 @@ def notice(mailbox_id: int) -> str | None:
         return _notices.get(mailbox_id)
 
 
-def scan(mailbox_id: int, now: float, today: date, again: bool = False, backfill: bool = False) -> Result:
+def reading_again(mailbox_id: int) -> str | None:
+    with _lock:
+        return _reading.get(mailbox_id)
+
+
+def scan(mailbox_id: int, now: float, today: date, again: bool = False, backfill: bool = False, sender: str | None = None) -> Result:
     with _lock:
         if mailbox_id in _running:
             return Result("busy")
         _running.add(mailbox_id)
+        if sender:
+            _reading[mailbox_id] = sender
     try:
         result = _scan(mailbox_id, now, today, again, backfill)
     finally:
         with _lock:
             _running.discard(mailbox_id)
+            _reading.pop(mailbox_id, None)
     with _lock:
         if result.state == "not_started" and result.error:
             _notices[mailbox_id] = result.error
@@ -155,9 +165,9 @@ def _ignores(ignored: list[str], domain: str | None) -> bool:
     return bool(domain) and any(domain == d or (domain or "").endswith("." + d) for d in ignored)
 
 
-def _record(conn: db.Connection, mailbox_id: int, message_id: str, outcome: str, now: float) -> None:
+def _record(conn: db.Connection, mailbox_id: int, message_id: str, outcome: str, now: float, sender_domain: str | None = None) -> None:
     db.insert_ignore(conn, ScannedMessage, {"mailbox_id": mailbox_id, "message_id": message_id, "outcome": outcome,
-                                            "scanned": now}, key=["mailbox_id", "message_id"])
+                                            "scanned": now, "sender_domain": sender_domain}, key=["mailbox_id", "message_id"])
 
 
 def keep_message(mailbox_id: int, message_id: str, raw: dict[str, Any], segments: list[int], now: float) -> Content:
@@ -185,7 +195,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     if again:
         conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id))
     if _ignores(ignored, message.sender_domain):
-        _record(conn, mailbox_id, message_id, IGNORED, now)
+        _record(conn, mailbox_id, message_id, IGNORED, now, message.sender_domain)
         return 0, 0, None, None
     made, failed = 0, 0
     touched: list[int] = []
@@ -420,12 +430,12 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
     return Result("done", None, read, made, queued, len(pending), skipped, capped)
 
 
-def run(mailbox_id: int, today: date, again: bool = False, backfill: bool = False) -> Result:
-    result = scan(mailbox_id, time.time(), today, again, backfill)
+def run(mailbox_id: int, today: date, again: bool = False, backfill: bool = False, sender: str | None = None) -> Result:
+    result = scan(mailbox_id, time.time(), today, again, backfill, sender)
     chained = 0
     while result.state == "done" and result.capped and not again and chained < MAX_CHAIN:
         chained += 1
-        result = scan(mailbox_id, time.time(), today, False, backfill)
+        result = scan(mailbox_id, time.time(), today, False, backfill, sender)
     return result
 
 

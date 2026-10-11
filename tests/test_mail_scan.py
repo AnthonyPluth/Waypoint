@@ -918,7 +918,7 @@ class ReviewTests(ScanCase):
         self.assertEqual({(i["reason"], i["sender_domain"], i["received"]) for i in items},
                          {("no_markup", "example-air.example", "2026-10-17"), ("incomplete", "example-air.example", "2026-10-18")})
         nomarkup = next(i for i in items if i["reason"] == "no_markup")
-        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "subject", "has_email", "received", "reason", "gmail_url", "suggestion", "suggestion_error"}))
+        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "known_sender", "subject", "has_email", "received", "reason", "gmail_url", "suggestion", "suggestion_error"}))
         self.assertEqual((nomarkup["subject"], nomarkup["has_email"]), ("Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F", True))
         self.assertEqual((nomarkup["owner"], nomarkup["mine"]), ("Jane Doe", True))
         self.assertEqual(nomarkup["gmail_url"], "https://mail.google.com/mail/?authuser=jane%40gmail.example#all/msg-no_markup")
@@ -1048,6 +1048,84 @@ class ReviewTests(ScanCase):
         with mock.patch.object(gmail, "_post", return_value={}):
             self.read(lambda conn: gmail.disconnect(conn, self.mailbox, "u-jane"))
         self.assertEqual((self.items(), self.scanned()), ([], {}))
+
+
+class StopIgnoringTests(ScanCase):
+    DOMAIN = "example-air.example"
+
+    def seed(self, sam_box):
+        def go(conn):
+            for box in (self.mailbox, sam_box):
+                db.insert_ignore(conn, IgnoredSender, {"mailbox_id": box, "domain": self.DOMAIN}, key=["mailbox_id", "domain"])
+            db.insert_ignore(conn, IgnoredSender, {"mailbox_id": self.mailbox, "domain": "other.example"}, key=["mailbox_id", "domain"])
+            for box, mid, outcome, domain in ((self.mailbox, "a1", "ignored", self.DOMAIN), (self.mailbox, "a2", "ignored", f"mail.{self.DOMAIN}"),
+                                               (self.mailbox, "a3", "ignored", None), (self.mailbox, "b1", "ignored", "other.example"),
+                                               (self.mailbox, "c1", "unreadable", self.DOMAIN), (self.mailbox, "c2", "skipped", self.DOMAIN),
+                                               (sam_box, "s1", "ignored", self.DOMAIN)):
+                conn.execute(insert(ScannedMessage).values(mailbox_id=box, message_id=mid, outcome=outcome, scanned=NOW, sender_domain=domain))
+        self.read(go)
+
+    def records(self):
+        return self.read(lambda conn: sorted(conn.execute(select(ScannedMessage.mailbox_id, ScannedMessage.message_id)).fetchall()))
+
+    def test_stopping_a_sender_clears_only_that_mailboxs_ignored_records_for_it(self):
+        sam_box = self.connect("u-sam", "sam@gmail.example", "refresh-sam-1")
+        self.seed(sam_box)
+        self.assertTrue(self.read(lambda conn: review.stop_ignoring(conn, self.mailbox, self.DOMAIN)))
+        self.assertEqual(self.read(lambda conn: review.ignored(conn, self.mailbox)), ["other.example"])
+        self.assertEqual(self.read(lambda conn: review.ignored(conn, sam_box)), [self.DOMAIN])
+        self.assertEqual([tuple(r) for r in self.records()], [(self.mailbox, "b1"), (self.mailbox, "c1"), (self.mailbox, "c2"), (sam_box, "s1")])
+
+    def test_stopping_a_sender_that_is_not_ignored_changes_nothing(self):
+        sam_box = self.connect("u-sam", "sam@gmail.example", "refresh-sam-1")
+        self.seed(sam_box)
+        before = self.records()
+        self.assertFalse(self.read(lambda conn: review.stop_ignoring(conn, self.mailbox, "never.example")))
+        self.assertFalse(self.read(lambda conn: review.stop_ignoring(conn, sam_box, "other.example")))
+        self.assertEqual(self.records(), before)
+        self.assertEqual(self.read(lambda conn: review.ignored(conn, sam_box)), [self.DOMAIN])
+
+    def test_ignoring_a_sender_twice_leaves_one_row(self):
+        self.put("no_markup")
+        self.scan()
+        item = self.items()[0]["id"]
+        self.assertEqual(self.read(lambda conn: review.ignore_sender(conn, "u-jane", item)), 1)
+        self.assertEqual(self.read(lambda conn: review.ignore_sender(conn, "u-jane", item)), None)
+        self.assertEqual(self.read(lambda conn: review.ignored(conn, self.mailbox)), [self.DOMAIN])
+
+    def test_the_unknown_sender_is_never_ignorable(self):
+        self.read(lambda conn: review.add(conn, self.mailbox, "gone-sender", None, None, "broken", NOW))
+        item = self.items()[0]["id"]
+        self.assertIsNone(self.read(lambda conn: review.sender_to_ignore(conn, "u-jane", item)))
+        self.assertIsNone(self.read(lambda conn: review.ignore_sender(conn, "u-jane", item)))
+        self.assertEqual(self.read(lambda conn: review.ignored(conn, self.mailbox)), [])
+
+    def test_a_known_travel_sender_is_marked_in_the_list(self):
+        self.read(lambda conn: review.add(conn, self.mailbox, "m1", "mail.delta.com", None, "broken", NOW))
+        self.read(lambda conn: review.add(conn, self.mailbox, "m2", "seaside-stays.example", None, "broken", NOW))
+        self.assertEqual({i["sender_domain"]: i["known_sender"] for i in self.items()}, {"mail.delta.com": True, "seaside-stays.example": False})
+
+    def test_ignoring_and_stopping_brings_the_items_and_their_messages_back_from_gmail(self):
+        self.put("no_markup", "incomplete")
+        with no_leaks(self, *CANARIES, database=self.path):
+            self.scan()
+            before = sorted((i["reason"], i["subject"]) for i in self.items())
+            stored = self.read(lambda conn: conn.execute(select(StoredMessage.message_id)).scalars())
+            self.assertEqual(len(stored), 2)
+            item = self.items()[0]["id"]
+            self.assertEqual(self.read(lambda conn: review.ignore_sender(conn, "u-jane", item)), 2)
+            self.assertEqual((self.items(), self.read(lambda conn: conn.execute(select(StoredMessage.id)).scalars())), ([], []))
+            self.assertEqual(set(self.scanned().values()), {"ignored"})
+            self.assertTrue(self.read(lambda conn: review.stop_ignoring(conn, self.mailbox, self.DOMAIN)))
+            self.assertEqual(self.scanned(), {})
+            self.google.fetched.clear()
+            self.google.heads.clear()
+            result = self.scan(now=NOW + 60, backfill=True)
+        self.assertEqual((result.state, result.review), ("done", 2))
+        self.assertEqual(sorted((i["reason"], i["subject"]) for i in self.items()), before)
+        self.assertEqual(sorted(self.read(lambda conn: conn.execute(select(StoredMessage.message_id)).scalars())), sorted(stored))
+        self.assertEqual(self.google.heads, self.google.fetched)
+        self.assertEqual(self.google.fetched, ["msg-no_markup", "msg-incomplete"])
 
 
 class HeldMatchTests(ScanCase):
@@ -1959,6 +2037,75 @@ class MailScanApiTests(GoogleCase):
             time.sleep(0.1)
         self.fail("the scan didn't finish")
 
+    def ignore_first(self):
+        first = self.call("ana", "GET", "/api/review")[1]["items"][0]
+        status, body = self.call("ana", "POST", f"/api/review/{first['id']}/ignore", {})
+        self.assertEqual(status, 200)
+        return body
+
+    def wait_for_scan(self, who="ana"):
+        for _ in range(100):
+            [m] = [m for m in self.mailboxes(who) if m["id"] == self.ana_box]
+            if not m["scanning"] and self.google.queries:
+                return m
+            time.sleep(0.1)
+        self.fail("the scan didn't finish")
+
+    def test_the_ignored_senders_are_domains_for_the_mailboxs_owner_alone(self):
+        self.put("no_markup", "incomplete")
+        self.scan_now()
+        with no_leaks(self, *CANARIES):
+            self.assertEqual(self.call("ana", "GET", f"/api/mailboxes/{self.ana_box}/ignored"), (200, {"domains": []}))
+            self.assertEqual(self.ignore_first(), {"ok": True, "mailbox_id": self.ana_box, "domain": "example-air.example"})
+            self.assertEqual(self.call("ana", "GET", f"/api/mailboxes/{self.ana_box}/ignored"), (200, {"domains": ["example-air.example"]}))
+            self.assertEqual(self.call("ben", "GET", f"/api/mailboxes/{self.ana_box}/ignored"), (404, {"error": "Not found"}))
+            self.assertEqual(self.call("ana", "GET", "/api/mailboxes/abc/ignored")[0], 404)
+            self.assertEqual(self.call("ana", "GET", "/api/mailboxes/9999/ignored")[0], 404)
+        with db.session() as conn:
+            conn.execute(insert(IgnoredSender).values(mailbox_id=self.ana_box, domain=""))
+        self.assertEqual(self.call("ana", "GET", f"/api/mailboxes/{self.ana_box}/ignored")[1], {"domains": ["example-air.example"]})
+
+    def test_stopping_an_ignored_sender_starts_a_scan_that_reads_its_mail_again(self):
+        self.put("no_markup", "incomplete")
+        self.scan_now()
+        self.ignore_first()
+        self.assertEqual(self.call("ana", "GET", "/api/review")[1]["items"], [])
+        self.google.queries.clear()
+        seen = []
+        real = scan._scan
+
+        def spy(mailbox_id, *args, **kwargs):
+            seen.append(scan.reading_again(mailbox_id))
+            return real(mailbox_id, *args, **kwargs)
+        with no_leaks(self, *CANARIES), mock.patch.object(scan, "_scan", spy):
+            status, body = self.call("ana", "POST", f"/api/mailboxes/{self.ana_box}/unignore", {"domain": "example-air.example"})
+            self.assertEqual((status, body), (200, {"started": True}))
+            self.wait_for_scan()
+        self.assertEqual(seen, ["example-air.example"])
+        self.assertNotIn(" -from:example-air.example ", self.google.queries[-1])
+        self.assertEqual(sorted(i["reason"] for i in self.call("ana", "GET", "/api/review")[1]["items"]), ["incomplete", "no_markup"])
+        self.assertEqual(self.call("ana", "GET", f"/api/mailboxes/{self.ana_box}/ignored")[1], {"domains": []})
+        self.assertIsNone(self.mailboxes()[0]["reading_again"])
+
+    def test_stopping_a_sender_that_is_not_ignored_does_nothing_and_starts_no_scan(self):
+        for body in ({"domain": "never.example"}, {"domain": "example-air.example"}):
+            self.assertEqual(self.call("ana", "POST", f"/api/mailboxes/{self.ana_box}/unignore", body), (200, {"started": False}))
+        self.assertEqual(self.google.queries, [])
+
+    def test_stopping_needs_a_domain_and_belongs_to_the_mailboxs_owner(self):
+        for body in ({}, {"domain": 5}, {"domain": ""}, {"domain": "x" * 300}):
+            self.assertEqual(self.call("ana", "POST", f"/api/mailboxes/{self.ana_box}/unignore", body)[0], 400, body)
+        self.put("no_markup")
+        self.scan_now()
+        self.ignore_first()
+        self.google.queries.clear()
+        with no_leaks(self, *CANARIES):
+            self.assertEqual(self.call("ben", "POST", f"/api/mailboxes/{self.ana_box}/unignore", {"domain": "example-air.example"}),
+                             (404, {"error": "Not found"}))
+            self.assertEqual(self.call("ana", "POST", "/api/mailboxes/abc/unignore", {"domain": "example-air.example"})[0], 404)
+        self.assertEqual(self.call("ana", "GET", f"/api/mailboxes/{self.ana_box}/ignored")[1], {"domains": ["example-air.example"]})
+        self.assertEqual(self.google.queries, [])
+
     def test_scan_now_runs_a_scan_and_the_mailbox_says_how_it_went(self):
         self.put("flight_jsonld", "no_markup")
         self.assertEqual(self.mailboxes()[0]["scanning"], False)
@@ -2233,7 +2380,8 @@ class MailScanApiTests(GoogleCase):
         first, second = self.call("ana", "GET", "/api/review")[1]["items"]
         self.assertEqual(self.call("ana", "DELETE", f"/api/review/{first['id']}")[1], {"ok": True})
         self.assertEqual(self.call("ana", "DELETE", f"/api/review/{first['id']}")[0], 404)
-        self.assertEqual(self.call("ana", "POST", f"/api/review/{second['id']}/ignore", {})[1], {"ok": True})
+        self.assertEqual(self.call("ana", "POST", f"/api/review/{second['id']}/ignore", {})[1],
+                         {"ok": True, "mailbox_id": self.ana_box, "domain": "example-air.example"})
         self.assertEqual(self.call("ana", "GET", "/api/review")[1]["items"], [])
         self.assertEqual(self.call("ana", "DELETE", "/api/review/9999")[0], 404)
         self.assertEqual(self.call("ana", "POST", "/api/review/9999/ignore", {})[0], 404)
