@@ -335,6 +335,39 @@ class ConsentTests(OAuthServer):
         self.writes(True)
         self.assertEqual(self.granted(c, self.authorize(c, scope="read write"), ids=True), "read")
 
+    def test_the_consent_page_is_well_formed_around_its_boxes(self):
+        from html.parser import HTMLParser
+
+        class Balanced(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.open: list[str] = []
+                self.inside: dict[str, list[str]] = {}
+
+            def handle_starttag(self, tag, attrs):
+                if tag in ("input", "br", "meta", "link"):
+                    self.inside.setdefault(tag, []).append(self.open[-1] if self.open else "")
+                    return
+                if tag in ("button",):
+                    self.inside.setdefault(tag, []).append(self.open[-1] if self.open else "")
+                self.open.append(tag)
+
+            def handle_endtag(self, tag):
+                assert self.open and self.open[-1] == tag, f"</{tag}> closes {self.open[-1:]}"
+                self.open.pop()
+
+        c = self.client()
+        self.writes(True)
+        page = self.authorize(c, scope="read write").body.decode()
+        form = page[page.index("<form"):page.index("</form>") + len("</form>")]
+        parsed = Balanced()
+        parsed.feed(form)
+        parsed.close()
+        self.assertEqual(parsed.open, [])
+        self.assertEqual(set(parsed.inside["button"]), {"div"})
+        self.assertEqual(parsed.inside["input"].count("label"), 2)
+        self.assertIn("confirmation codes, addresses, phone numbers and traveller names", form)
+
     def test_the_write_box_follows_its_switch_and_is_never_ticked_for_you(self):
         c = self.client()
         page = self.authorize(c, scope="read write").body.decode()

@@ -103,9 +103,9 @@ class ListTests(ReviewTools):
         self.assertEqual([i["id"] for i in got["items"]], [self.flight_item, self.two_item, self.generic_item, self.unread_item])
         self.assertEqual((got["total"], got["not_shown"], got["next"]), (4, 0, None))
         text = json.dumps(got)
-        for canary in (SUBJECT, BODY):
+        for canary in (SUBJECT, BODY, PARSED):
             self.assertNotIn(canary, text)
-        for field in ("subject", "snippet", "text", "html", "raw", "body"):
+        for field in ("subject", "snippet", "text", "html", "raw", "body", "travelers", "travellers", "details", "address"):
             self.assertTrue(all(field not in i for i in got["items"]), field)
         first = got["items"][0]
         self.assertEqual((first["reason"], first["kind"], first["sender_domain"], first["mine"], first["has_email"], first["status"]),
