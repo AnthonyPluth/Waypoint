@@ -141,6 +141,22 @@ describe("Settings → AI assistants (MCP)", () => {
     expect(second).not.toHaveTextContent("by ");
   });
 
+  it("says on a read-only connection that it can’t make changes and what to do, and on a writing one why it still can’t while the switch is off", async () => {
+    serve(() => view({ connections: [conn({ scope: ["read"] }), conn({ id: 2, scope: ["read", "write"] })] }));
+    render(McpSection);
+    await screen.findAllByTestId("assistant");
+    const [first, second] = screen.getAllByTestId("assistant");
+    expect(first).toHaveTextContent("Read only: it can’t make changes. To allow them, disconnect it and connect it again");
+    expect(second).toHaveTextContent("It can’t make changes while “Let assistants change trips” above is off.");
+  });
+
+  it("says nothing about changes once the switch is on and the connection may make them", async () => {
+    serve(() => view({ allow_writes: true, connections: [conn({ scope: ["read", "write"] })] }));
+    render(McpSection);
+    await screen.findByTestId("assistant");
+    expect(screen.queryByTestId("no-changes")).toBeNull();
+  });
+
   it("disconnects after asking, then lists again", async () => {
     let connections = [conn(), conn({ id: 2, client: "Desktop app" })];
     serve(() => view({ connections }), (path, opts) => {

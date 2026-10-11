@@ -118,6 +118,14 @@ def subjects(conn: db.Connection, mailbox_ids: Iterable[int]) -> dict[tuple[int,
     return found
 
 
+def held(conn: db.Connection, mailbox_ids: Iterable[int]) -> set[tuple[int, str]]:
+    ids = sorted(set(mailbox_ids))
+    if not ids:
+        return set()
+    return {(int(r["mailbox_id"]), str(r["message_id"])) for r in
+            conn.execute(select(StoredMessage.mailbox_id, StoredMessage.message_id).where(StoredMessage.mailbox_id.in_(ids))).fetchall()}
+
+
 def reference_key(code: str) -> str:
     return hmac.new(secretbox.derived_key("review-reference"), code.encode(), hashlib.sha256).hexdigest()[:32]
 

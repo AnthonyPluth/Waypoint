@@ -274,6 +274,7 @@ review_items = Table(
     Column('created', Float, nullable=False),
     Column('suggestion', Text),
     Column('suggestion_error', Text),
+    Column('gap', Text, doc='for an "incomplete" item: the commonest missing piece, one of a few fixed labels (waypoint/domain/mail/glance.py), never text from the message'),
     Column('matches', Text, doc='for a "match" item: the bookings in the message that could be more than one of the segments added by hand (JSON, a list of {booking, candidates}), for the person to settle'),
     Column('reference', Text, doc="a keyed hash of the reservation code the message names, so items about one reservation show as one row; never the code itself; empty when the message names none or several"),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_review_items_mailbox_message'),

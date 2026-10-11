@@ -161,7 +161,7 @@ class FollowUpTests(FollowUpCase):
         self.assertEqual(result.review, 1)
         [item] = self.items()
         self.assertEqual(set(item), {"id", "address", "owner", "mine", "sender_domain", "known_sender", "holds_bookings", "subject",
-                                     "has_email", "received", "reason", "gmail_url", "suggestion", "suggestion_error", "count", "others"})
+                                     "has_email", "received", "reason", "gmail_url", "suggestions", "suggestion_error", "count", "others"})
         self.assertEqual(self.read(lambda conn: conn.execute(select(ScannedMessage.segment_id)).scalars()), [None])
         self.assertEqual(self.segments(self.sam)[0]["id"], sam_only)
 
@@ -280,6 +280,20 @@ class GroupingTests(FollowUpCase):
         self.assertEqual(self.read(lambda conn: review.count(conn, "u-jane")), 1)
         self.assertEqual(len(self.waiting()), 3)
 
+    def test_a_group_whose_newest_item_holds_several_suggestions_lists_them_all_and_counts_the_others(self):
+        for n, day in ((1, 14), (2, 18)):
+            self.add(*self.flight(n, day=day))
+        self.scan()
+        newest = max(self.items(), key=lambda r: r["received"])
+        picks = [{"kind": "flight", "origin": "BOS", "destination": "DEN", "start_local": "2026-12-02T07:15", "end_local": "2026-12-02T10:05"},
+                 {"kind": "flight", "origin": "DEN", "destination": "BOS", "start_local": "2026-12-08T16:20", "end_local": "2026-12-08T21:50"}]
+        box, message = self.read(lambda conn: conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id).where(ReviewItem.id == newest["id"])).fetchone())
+        self.read(lambda conn: review.set_suggestions(conn, box, message, picks, None))
+        [row] = self.items()
+        self.assertEqual((row["count"], len(row["suggestions"]), [s["origin"] for s in row["suggestions"]]), (2, 2, ["BOS", "DEN"]))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", row["id"])))
+        self.assertEqual(self.waiting(), [])
+
     def test_items_with_no_code_stay_separate(self):
         for n in (1, 2):
             self.add(*self.flight(n, code=None))
@@ -346,7 +360,7 @@ class GroupingTests(FollowUpCase):
         self.scan()
         [row] = self.items()
         segment = self.by_hand()
-        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", row["id"], (self.jane, segment))))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", row["id"], (self.jane, [segment]))))
         self.assertEqual(self.waiting(), [])
         self.assertEqual(self.stored(), 1)
         [kept] = self.read(lambda conn: stored_mail.for_segment(conn, segment))

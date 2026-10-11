@@ -29,6 +29,8 @@ export interface AiSuggestion {
   room?: string;
   ship?: string;
   deck?: string;
+  flight_number?: string;
+  cabin?: string;
   sources?: Record<string, string>;
 }
 
@@ -38,6 +40,129 @@ export interface Airport {
   city: string;
   country: string;
   zone: string;
+}
+
+export interface AssistantCandidate {
+  segment_id: number;
+  trip_id: number;
+  trip_name: string;
+  kind: string;
+  provider: string | null;
+  origin: string | null;
+  destination: string | null;
+  start_local: string;
+  end_local: string;
+  confidence: "exact" | "likely" | "possible";
+  agreed: string[];
+  differed: string[];
+}
+
+export interface AssistantCreateBody {
+  kind?: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
+  status?: "confirmed" | "changed" | "cancelled";
+  confirmation?: string | null;
+  provider?: string | null;
+  start_local?: string;
+  start_zone?: string | null;
+  end_local?: string;
+  end_zone?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  details?: Record<string, string>;
+  manage_url?: string | null;
+  travelers?: TravelerBody[];
+  itinerary?: Port[];
+  entry?: number | null;
+}
+
+export interface AssistantDismissBody {
+  reason: "not_travel" | "duplicate" | "already_added" | "other";
+  note?: string | null;
+}
+
+export interface AssistantDismissed {
+  ok: boolean;
+  reason: "not_travel" | "duplicate" | "already_added" | "other";
+}
+
+export interface AssistantEntry {
+  entry: number;
+  booking: AssistantParsed;
+  candidates: AssistantCandidate[];
+}
+
+export interface AssistantItem {
+  id: number;
+  mailbox_id: number;
+  mine: boolean;
+  sender_domain: string;
+  reason: "no_markup" | "incomplete" | "broken" | "match" | "generic";
+  status: string | null;
+  kind: string | null;
+  received: string | null;
+  has_email: boolean;
+  bookings: number;
+  match: AssistantMatch | null;
+}
+
+export interface AssistantItemDetail {
+  id: number;
+  mailbox_id: number;
+  mine: boolean;
+  sender_domain: string;
+  reason: "no_markup" | "incomplete" | "broken" | "match" | "generic";
+  status: string | null;
+  kind: string | null;
+  received: string | null;
+  has_email: boolean;
+  bookings: number;
+  match: AssistantMatch | null;
+  entries: AssistantEntry[];
+  suggestion: AssistantParsed | null;
+  suggestions: AssistantParsed[];
+}
+
+export interface AssistantItems {
+  items: AssistantItem[];
+  total: number;
+  not_shown: number;
+  next: string | null;
+}
+
+export interface AssistantMatch {
+  segment_id: number;
+  trip_id: number;
+  confidence: "exact" | "likely" | "possible";
+}
+
+export interface AssistantMatchBody {
+  entry?: number | null;
+  segment_id?: number | null;
+  trip_id?: number | null;
+}
+
+export interface AssistantMatched {
+  ok: boolean;
+  segment_id: number;
+  trip_id: number;
+}
+
+export interface AssistantParsed {
+  kind: string | null;
+  status: string | null;
+  provider: string | null;
+  confirmation: string | null;
+  origin: string | null;
+  destination: string | null;
+  address: string | null;
+  phone: string | null;
+  start_local: string | null;
+  start_zone: string | null;
+  end_local: string | null;
+  end_zone: string | null;
+  details: Record<string, string>;
+  travelers: string[];
+  read: Record<string, string>;
 }
 
 export interface BackupContents {
@@ -123,6 +248,30 @@ export interface FlightStatusList {
 export interface FlightStatusPause {
   until: string;
   reason: "limit" | "rate" | "key";
+}
+
+export interface GlanceDomain {
+  domain: string;
+  count: number;
+  reason: "no_markup" | "incomplete" | "broken" | "match" | "generic";
+  item_id: number | null;
+  known_sender: boolean;
+}
+
+export interface GlanceGap {
+  label: string;
+  count: number;
+}
+
+export interface GlanceReason {
+  reason: "no_markup" | "incomplete" | "broken" | "match" | "generic";
+  waiting: number;
+  recent: number;
+}
+
+export interface GlanceScan {
+  at: string;
+  added: number;
 }
 
 export interface IgnoredSenders {
@@ -426,6 +575,15 @@ export interface ReviewCandidate {
   end_local: string;
 }
 
+export interface ReviewGlance {
+  waiting: number;
+  days: number;
+  reasons: GlanceReason[];
+  gaps: GlanceGap[];
+  domains: GlanceDomain[];
+  scans: GlanceScan[];
+}
+
 export interface ReviewItem {
   id: number;
   address: string;
@@ -439,7 +597,7 @@ export interface ReviewItem {
   received: string | null;
   reason: "no_markup" | "incomplete" | "broken" | "generic";
   gmail_url: string | null;
-  suggestion: AiSuggestion | null;
+  suggestions: AiSuggestion[];
   suggestion_error: string | null;
   count: number;
   others: ReviewOther[];
@@ -863,6 +1021,7 @@ export interface Endpoints {
   "POST /api/mailboxes/{id}/reread": { body: never; reply: ScanStarted };
   "POST /api/mailboxes/{id}/backfill": { body: never; reply: ScanStarted };
   "GET /api/mailboxes/{id}/ignored": { body: never; reply: IgnoredSenders };
+  "GET /api/mailboxes/{id}/review-glance": { body: never; reply: ReviewGlance };
   "POST /api/mailboxes/{id}/unignore": { body: UnignoreBody; reply: ScanStarted };
   "GET /api/reminders": { body: never; reply: Reminders };
   "POST /api/reminders": { body: RemindersBody; reply: Reminders };
@@ -880,6 +1039,11 @@ export interface Endpoints {
   "GET /api/mcp-settings": { body: never; reply: McpSettings };
   "POST /api/mcp-settings/writes": { body: McpWritesBody; reply: McpWritesBody };
   "DELETE /api/mcp-settings/connections/{id}": { body: never; reply: Ok };
+  "GET /api/assistant/review": { body: never; reply: AssistantItems };
+  "GET /api/assistant/review/{id}": { body: never; reply: AssistantItemDetail };
+  "POST /api/assistant/review/{id}/match": { body: AssistantMatchBody; reply: AssistantMatched };
+  "POST /api/assistant/review/{id}/create": { body: AssistantCreateBody; reply: Segment };
+  "POST /api/assistant/review/{id}/dismiss": { body: AssistantDismissBody; reply: AssistantDismissed };
   "GET /api/state": { body: never; reply: State };
   "GET /api/offline": { body: never; reply: Offline };
 }

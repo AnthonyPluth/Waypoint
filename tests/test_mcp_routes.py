@@ -9,6 +9,7 @@ WRITE = ("write",)
 READS = [
     "GET /api/airports/{id}", "GET /api/distance-unit", "GET /api/flight-status", "GET /api/people",
     "GET /api/segments/{id}", "GET /api/stats", "GET /api/trips", "GET /api/trips/{id}",
+    "GET /api/assistant/review", "GET /api/assistant/review/{id}",
 ]
 WRITE_READS = ["GET /api/people/claim-suggestions"]
 CHANGES = [
@@ -16,11 +17,12 @@ CHANGES = [
     "POST /api/distance-unit", "POST /api/people", "POST /api/people/claim-suggestions/dismiss", "POST /api/people/{id}",
     "POST /api/people/{id}/claim", "POST /api/segments", "POST /api/segments/{id}", "POST /api/segments/{id}/move", "POST /api/trips", "POST /api/trips/{id}",
     "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
+    "POST /api/assistant/review/{id}/match", "POST /api/assistant/review/{id}/create", "POST /api/assistant/review/{id}/dismiss",
 ]
 BLOCKED = [
     "DELETE /api/loyalty/{id}", "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "POST /api/loyalty/{id}/reveal",
     "DELETE /api/feed", "DELETE /api/mailboxes/{id}", "DELETE /api/mcp-settings/connections/{id}", "DELETE /api/reminders/devices/{id}",
-    "DELETE /api/review/{id}", "GET /api/ai", "GET /api/backup", "GET /api/mailboxes", "GET /api/mailboxes/callback", "GET /api/mailboxes/{id}/ignored", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/unignore", "GET /api/offline",
+    "DELETE /api/review/{id}", "GET /api/ai", "GET /api/backup", "GET /api/mailboxes", "GET /api/mailboxes/callback", "GET /api/mailboxes/{id}/ignored", "GET /api/mailboxes/{id}/review-glance", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/unignore", "GET /api/offline",
     "GET /api/mcp-settings", "GET /api/reminders", "GET /api/review", "GET /api/review/{id}/preview", "GET /api/review/{id}/images/{id}", "GET /api/segments/{id}/emails/{id}/images/{id}", "GET /api/state",
     "POST /api/ai", "POST /api/backup/inspect", "POST /api/feed", "POST /api/flight-status/{id}", "POST /api/import",
     "POST /api/import/preview", "POST /api/mailboxes/connect", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/scan", "POST /api/mailboxes/{id}/share",
@@ -78,6 +80,20 @@ class RouteTests(unittest.TestCase):
         for m, p in (("POST", "/api/segments"), ("POST", "/api/segments/{id}"), ("POST", "/api/trips"),
                      ("POST", "/api/distance-unit")):
             self.assertFalse(mcp_access.destructive(m, p), f"{m} {p}")
+
+    def test_only_the_review_routes_made_for_assistants_are_reachable_under_the_review_names(self):
+        reachable = {r for r, scopes in self.reachable().items() if scopes}
+        mine = {r for r in reachable if "/review" in r}
+        self.assertEqual(mine, {r for r in READS + CHANGES if "/assistant/review" in r})
+        for route in BLOCKED:
+            if " /api/review" in route:
+                self.assertNotIn(route, reachable)
+
+    def test_dismissing_is_the_only_review_change_marked_destructive(self):
+        for m, p in (("POST", "/api/assistant/review/{id}/dismiss"),):
+            self.assertTrue(mcp_access.destructive(m, p))
+        for m, p in (("POST", "/api/assistant/review/{id}/match"), ("POST", "/api/assistant/review/{id}/create")):
+            self.assertFalse(mcp_access.destructive(m, p))
 
     def test_oauth_and_mcp_are_not_api_routes(self):
         for _m, p, *_ in ROUTES:

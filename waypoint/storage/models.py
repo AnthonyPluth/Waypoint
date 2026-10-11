@@ -231,6 +231,7 @@ class ReviewItem(Base):
     created: Mapped[float]
     suggestion: Mapped[str | None]
     suggestion_error: Mapped[str | None]
+    gap: Mapped[str | None]
     matches: Mapped[str | None]
     reference: Mapped[str | None]
 

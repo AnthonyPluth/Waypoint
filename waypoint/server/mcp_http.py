@@ -21,7 +21,7 @@ WRITES_OFF = "Changes are switched off. Turn on “Let assistants change trips�
 READ_ONLY = ("This connection can only read. To let the assistant change trips, reconnect Waypoint in the assistant and "
              "allow “Change trips” when Waypoint asks.")
 REFUSALS = {mcp_access.WRITE: (READ_ONLY, WRITES_OFF)}
-OUT_OF_REACH = ("Not found: assistants can't reach mailboxes, the “Couldn’t read” queue, AI settings, backups, loyalty and Known "
+OUT_OF_REACH = ("Not found: assistants can't reach mailboxes, the Review queue except through its own tools, AI settings, backups, loyalty and Known "
                 "Traveler numbers, sign-in, the calendar feed, notifications or the assistant settings. Use Waypoint itself for those.")
 METHODS = ("GET", "POST", "DELETE")
 
