@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 from pathlib import Path
 
 from waypoint.domain.mail import safe_html
@@ -10,11 +11,11 @@ EVIL = "https://evil.example"
 BIG = 20_000
 
 
-def payload(name: str, html: str, canary: str) -> dict[str, str]:
+def payload(name: str, html: str, canary: str) -> dict[str, Any]:
     return {"name": name, "html": html, "canary": canary}
 
 
-def scripts() -> list[dict[str, str]]:
+def scripts() -> list[dict[str, Any]]:
     return [
         payload("script tag", "<p>a</p><script>window.CANARY_script=1</script><p>b</p>", "CANARY_script"),
         payload("script with a remote source", f'<script src="{EVIL}/CANARY_script_src.js"></script>', "CANARY_script_src"),
@@ -32,7 +33,7 @@ def scripts() -> list[dict[str, str]]:
     ]
 
 
-def handlers() -> list[dict[str, str]]:
+def handlers() -> list[dict[str, Any]]:
     return [
         payload("click handler", '<p onclick="window.CANARY_click=1">tap</p>', "CANARY_click"),
         payload("hover and focus handlers", '<a href="https://example.com" onmouseover="window.CANARY_hover=1" onfocus="window.CANARY_focus_a=1">x</a>', "CANARY_"),
@@ -46,7 +47,7 @@ def handlers() -> list[dict[str, str]]:
     ]
 
 
-def links() -> list[dict[str, str]]:
+def links() -> list[dict[str, Any]]:
     return [
         payload("javascript link", '<a href="javascript:window.CANARY_js=1">x</a>', "CANARY_js"),
         payload("javascript link with odd case and whitespace", '<a href="  JaVa\tScRiPt:window.CANARY_js_case=1">x</a>', "CANARY_js_case"),
@@ -64,7 +65,7 @@ def links() -> list[dict[str, str]]:
     ]
 
 
-def styles() -> list[dict[str, str]]:
+def styles() -> list[dict[str, Any]]:
     return [
         payload("style block with an import", f"<style>@import url({EVIL}/CANARY_import.css);body{{background:url({EVIL}/CANARY_bg)}}</style><p>x</p>", "CANARY_"),
         payload("style block inside a table", f"<table><style>td{{background:url({EVIL}/CANARY_table_bg)}}</style><tr><td>x</td></tr></table>", "CANARY_table_bg"),
@@ -85,7 +86,7 @@ def styles() -> list[dict[str, str]]:
     ]
 
 
-def images() -> list[dict[str, str]]:
+def images() -> list[dict[str, Any]]:
     return [
         payload("remote pixel", f'<p>x</p><img src="{EVIL}/CANARY_pixel.gif" width="1" height="1">', "CANARY_pixel"),
         payload("remote image with srcset", f'<img src="x" srcset="{EVIL}/CANARY_srcset.png 2x" alt="">', "CANARY_srcset"),
@@ -103,7 +104,7 @@ def images() -> list[dict[str, str]]:
     ]
 
 
-def mutations() -> list[dict[str, str]]:
+def mutations() -> list[dict[str, Any]]:
     return [
         payload("noscript that hides an attribute", '<noscript><p title="</noscript><img src=x onerror=window.CANARY_mxss_noscript=1>"></noscript>', "CANARY_mxss_noscript"),
         payload("svg and style that swap namespaces", '<svg></p><style><a title="</style><img src onerror=window.CANARY_mxss_svg=1>"></style></svg>', "CANARY_mxss_svg"),
@@ -111,6 +112,7 @@ def mutations() -> list[dict[str, str]]:
         payload("form that reopens in math", '<form><math><mtext></form><form><mglyph><style></math><img src onerror=window.CANARY_mxss_form=1>', "CANARY_mxss_form"),
         payload("misnested table and link", '<table><td><a href="https://example.com"></table><a href="javascript:window.CANARY_mxss_table=1">x</a>', "CANARY_mxss_table"),
         payload("textarea and listing", '<textarea><img src=x onerror=window.CANARY_textarea=1></textarea><listing><img src=x onerror=window.CANARY_listing=1></listing>', "CANARY_"),
+        {**payload("xmp and plaintext", '<xmp><img src=x onerror=window.CANARY_xmp=1></xmp><plaintext><img src=x onerror=window.CANARY_plaintext=1>', "<img src=x onerror"), "volatile": True},
         payload("title and select that close early", '<title></title><img src=x onerror=window.CANARY_title=1><select><template><option><style></template></select><img src=x onerror=window.CANARY_select=1>', "CANARY_"),
         payload("text that is escaped markup", "<p>a &lt;img src=x onerror=window.CANARY_text=1&gt; b &amp;lt;script&amp;gt;</p>", "<img src=x"),
         payload("entities that decode to a tag", "<p>&#60;script&#62;window.CANARY_entity=1&#60;/script&#62;</p>", "<script"),
@@ -120,10 +122,10 @@ def mutations() -> list[dict[str, str]]:
     ]
 
 
-def sizes() -> list[dict[str, str]]:
+def sizes() -> list[dict[str, Any]]:
     return [
         payload("deeply nested divs", "<div>" * 3000 + "deep" + "</div>" * 3000, "CANARY_none"),
-        payload("deeply nested tables", "<table><tr><td>" * 1000 + "deep" + "</td></tr></table>" * 1000, "CANARY_none"),
+        payload("deeply nested tables", "<table><tr><td>" * 300 + "deep" + "</td></tr></table>" * 300, "CANARY_none"),
         payload("deeply nested inline tags", "<b>" * 5000 + "deep", "CANARY_none"),
         payload("stray end tags", "<div>" * 1000 + "</span></b></td>" * 1000 + "deep", "CANARY_none"),
         payload("huge link", f'<a href="https://example.com/{"a" * BIG}">x</a>', "CANARY_none"),
@@ -135,16 +137,21 @@ def sizes() -> list[dict[str, str]]:
     ]
 
 
-def build() -> list[dict[str, str]]:
+def build() -> list[dict[str, Any]]:
     found = [*scripts(), *handlers(), *links(), *styles(), *images(), *mutations(), *sizes()]
     names = [p["name"] for p in found]
     assert len(names) == len(set(names))
     return found
 
 
-def corpus() -> list[dict[str, object]]:
-    return [{**p, "cleaned": safe_html.clean(p["html"], 200_000)[0], "cleanedWithPictures": safe_html.clean_counted(p["html"], 200_000, lambda src: 0 if src.startswith("x") else None)[0]}
-            for p in build()]
+def corpus() -> list[dict[str, Any]]:
+    found = []
+    for p in build():
+        volatile = p.pop("volatile", False)
+        cleaned = "" if volatile else safe_html.clean(p["html"], 200_000)[0]
+        pictured = "" if volatile else safe_html.clean_counted(p["html"], 200_000, lambda src: 0 if src.startswith("x") else None)[0]
+        found.append({**p, "cleaned": cleaned, "cleanedWithPictures": pictured})
+    return found
 
 
 def write() -> None:

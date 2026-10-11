@@ -48,7 +48,7 @@ describe("the hostile corpus through the inline renderer", () => {
         expect(result.changedPage).toBe(false);
         expect(root.querySelectorAll("style")).toHaveLength(1);
         if (label !== "raw" && !found.canary.startsWith("<img")) expect(wrapperOf().innerHTML).not.toContain(found.canary);
-      }, 30_000);
+      });
     }
   }
 
