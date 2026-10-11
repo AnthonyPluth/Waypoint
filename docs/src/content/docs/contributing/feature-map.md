@@ -63,8 +63,8 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `DELETE /api/mailboxes/{id}` | `mailboxes.py:api_mailbox_disconnect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/scan` | `mailboxes.py:api_mailbox_scan` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/share` | `mailboxes.py:api_mailbox_share` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
-| `GET /api/mailboxes/{id}/labels` | `mailboxes.py:api_mailbox_labels` | `lib/components/settings/GmailSection.svelte` | `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
-| `POST /api/mailboxes/{id}/labels` | `mailboxes.py:api_mailbox_labels_save` | `lib/components/settings/GmailSection.svelte` | `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
+| `GET /api/mailboxes/{id}/labels` | `mailboxes.py:api_mailbox_labels` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
+| `POST /api/mailboxes/{id}/labels` | `mailboxes.py:api_mailbox_labels_save` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/reread` | `mailboxes.py:api_mailbox_reread` | - | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/backfill` | `mailboxes.py:api_mailbox_backfill` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `GET /api/reminders` | `reminders.py:api_reminders` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |

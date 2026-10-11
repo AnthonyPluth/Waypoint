@@ -816,6 +816,7 @@
         "frontend/src/lib/components/settings/GmailSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_mail_scan.py"
       ],
       "docs": [
@@ -830,6 +831,7 @@
         "frontend/src/lib/components/settings/GmailSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_mail_scan.py"
       ],
       "docs": [
