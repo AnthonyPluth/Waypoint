@@ -196,7 +196,7 @@ describe("Review", () => {
     await userEvent.type(screen.getByLabelText("To (airport code)"), "DEN");
     await userEvent.type(screen.getByLabelText("Departs"), "2027-01-02T07:15");
     await userEvent.type(screen.getByLabelText("Arrives"), "2027-01-02T09:40");
-    expect(screen.getByText(/time zones come from its airports/)).toBeInTheDocument();
+    expect(screen.queryByText(/time zones come from its airports/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", {
       kind: "flight", start_local: "2027-01-02T07:15", end_local: "2027-01-02T09:40", provider: "Example Air", confirmation: "ZZ9Y8X",
@@ -445,7 +445,7 @@ describe("Review: the AI’s suggestion", () => {
     held = { matches: [], items: [item({ suggestion: stay })], who: [], ai: false };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
-    expect(screen.getByText(/An AI read the email and suggested this. It can be wrong/)).toBeInTheDocument();
+    expect(screen.queryByText(/An AI read the email and suggested this/)).toBeNull();
     expect(screen.getByLabelText(/^Address/)).toHaveValue("1 Quay Road, Bristol BS1 4AA, UK");
     expect(screen.getByLabelText(/^Address/)).toHaveClass("ring-2");
     expect(screen.getByLabelText(/^Phone/)).toHaveValue("+44 117 555 0100");
@@ -479,6 +479,7 @@ describe("Review: the AI’s suggestion", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     first.unmount();
+    await waitFor(() => expect(document.body.style.pointerEvents).not.toBe("none"));
     const cruise = { kind: "cruise" as const, origin: "Miami", destination: "Nassau", start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00",
       start_zone: "America/New_York", end_zone: "America/Nassau", address: "1015 North America Way, Miami FL 33132", room: "8123", ship: "Example Voyager", deck: "8" };
     held = { matches: [], items: [item({ suggestion: cruise })], who: [], ai: false };
@@ -707,7 +708,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     expect(sheet).toHaveAttribute("data-side", side);
     expect(await within(sheet).findByTestId("preview")).toHaveTextContent("EX 410");
     expect(within(sheet).getByLabelText("Confirmation code")).toHaveValue("QW4R7T");
-    expect(within(sheet).getByText(/An AI read the email/)).toBeInTheDocument();
+    expect(within(sheet).queryByText(/An AI read the email/)).toBeNull();
     expect(screen.getByRole("list", { name: "Couldn’t read" }).querySelector("form")).toBeNull();
   });
 
@@ -874,5 +875,66 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     expect(screen.getByLabelText(/^Address/)).toHaveValue("12 Beach Road, Brighton, UK");
     expect(screen.getByLabelText(/^Address/)).toHaveClass("ring-2");
     expect(screen.getByLabelText(/^Hotel/)).toHaveClass("ring-2");
+  });
+});
+
+describe("Review: the form's explanatory text is gone", () => {
+  const KINDS = ["flight", "hotel", "car", "train", "cruise", "parking"];
+  const REMOVED = [
+    /Waypoint works the time zone out/,
+    /Check-in and check-out are both at the hotel/,
+    /Entry and exit are both at the lot/,
+    /A flight’s time zones come from its airports/,
+    /An AI read the email and suggested this/,
+    /The email was sent/,
+    /Leave this empty to work it out/,
+  ];
+  const noRemovedText = () => {
+    for (const text of REMOVED) expect(screen.queryByText(text)).toBeNull();
+  };
+  const noDanglingDescribedBy = () => {
+    for (const el of document.querySelectorAll("[aria-describedby]")) {
+      for (const id of el.getAttribute("aria-describedby")!.split(" ")) expect(document.getElementById(id), `aria-describedby ${id}`).not.toBeNull();
+    }
+  };
+  const suggestionOf = (kind: string, extra: Record<string, unknown> = {}) => ({
+    kind, provider: "Example Stays", confirmation: "QW4R7T", origin: "Harbour Hotel", destination: "Harbour Hotel",
+    start_local: "2026-12-02T15:00", end_local: "2026-12-05T11:00", start_zone: "Europe/London", address: "1 Quay Road, Bristol BS1 4AA, UK", ...extra,
+  }) as unknown as NonNullable<ReviewItem["suggestion"]>;
+
+  it.each(KINDS.flatMap((kind) => [[kind, "2026-10-17"], [kind, null]]))("the suggestion form for %s, received %s, shows none of it", async (kind, received) => {
+    held = { matches: [], items: [item({ suggestion: suggestionOf(kind), received })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByRole("heading", { name: "Check this suggestion" })).toBeInTheDocument();
+    noRemovedText();
+    noDanglingDescribedBy();
+  });
+
+  it.each(["flight", "hotel", "car", "train", "parking"].flatMap((kind) => [[kind, "2026-10-17"], [kind, null]]))("the form by hand for %s, received %s, shows none of it", async (kind, received) => {
+    held = { matches: [], items: [item({ received })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
+    await userEvent.selectOptions(screen.getByLabelText(/What is it/), kind);
+    noRemovedText();
+    noDanglingDescribedBy();
+  });
+
+  it("keeps the blank zone choice, the generic-reading note and the outlines of a suggestion", async () => {
+    held = { matches: [], items: [item({ reason: "generic", suggestion: suggestionOf("hotel") })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check what Waypoint read/ }));
+    expect(screen.getByRole("option", { name: "Work it out from the address" })).toBeInTheDocument();
+    expect(screen.getByText(/Waypoint read this from labelled lines in the email/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Address/)).toHaveClass("ring-2");
+  });
+
+  it("still says what to enter when a stay has neither a time zone nor an address", async () => {
+    held = { matches: [], items: [item({ suggestion: suggestionOf("hotel", { address: undefined, start_zone: undefined }) })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    expect(await screen.findByText(/Enter the hotel’s time zone/)).toBeInTheDocument();
+    expect(calls.some(([p]) => p === "/api/segments")).toBe(false);
   });
 });
