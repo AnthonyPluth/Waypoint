@@ -22,6 +22,13 @@ SENDERS = (
     "rssc.com", "silversea.com", "windstarcruises.com", "ponant.com", "lindblad.com", "costacruises.com", "avalonwaterways.com",
     "uniworld.com", "amawaterways.com", "vacationstogo.com",
 )
+RETAIL_SENDERS = (
+    "amazon.com", "amazon.co.uk", "amazon.co.jp", "amazon.de", "amazon.ca", "ebay.com", "etsy.com", "walmart.com", "target.com", "bestbuy.com",
+    "homedepot.com", "lowes.com", "wayfair.com", "costco.com", "aliexpress.com", "temu.com", "shein.com", "shopify.com", "shop.app",
+    "ikea.com", "chewy.com", "newegg.com", "nordstrom.com", "macys.com", "zappos.com", "rakuten.co.jp", "mercari.com", "instacart.com",
+    "blinds.com", "selectblinds.com", "ups.com", "fedex.com", "usps.com", "dhl.com", "ontrac.com", "lasership.com", "narvar.com",
+    "royalmail.com", "yamato-hd.co.jp",
+)
 BANK_SENDERS = ("chase.com", "capitalone.com", "americanexpress.com", "aexp.com")
 BANK_SUBJECT_WORDS = ("travel", "trip", "flight", "hotel", "cruise", "itinerary", "e-ticket")
 LOOKBACK_MONTHS = 18

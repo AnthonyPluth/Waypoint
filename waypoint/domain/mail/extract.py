@@ -500,7 +500,8 @@ def head(found: Mapping[str, Any]) -> triage.Head:
     labels = found.get("labelIds")
     return triage.Head(" ".join(headers.get("subject", "").split())[:300], _domain(headers.get("from")),
                        " ".join(str(found.get("snippet") or "").split())[:300],
-                       frozenset(str(label) for label in labels) if isinstance(labels, list) else frozenset())
+                       frozenset(str(label) for label in labels) if isinstance(labels, list) else frozenset(),
+                       " ".join(email.utils.parseaddr(headers.get("from", ""))[0].split())[:100])
 
 
 def read(message: Mapping[str, Any]) -> Message:

@@ -50,6 +50,7 @@ class ScanSummary(TypedDict):
     labels_dropped: int
     triaged: int
     total: int
+    not_travel: int
 
 
 class Mailbox(TypedDict):
@@ -143,6 +144,7 @@ class ReviewItem(TypedDict):
     mine: bool
     sender_domain: str
     known_sender: bool
+    holds_bookings: bool
     subject: str | None
     has_email: bool
     received: str | None

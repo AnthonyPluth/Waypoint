@@ -316,11 +316,6 @@ class TriageScanTests(ScanCase):
         result = self.scan()
         self.assertEqual((result.skipped, self.google.fetched), (1, ["known"]))
 
-    def test_gmails_own_reservation_and_purchase_categories_count_as_a_reason_to_read(self):
-        self.add_mail("cat", plain_mail("Pat <pat@shop.example>", "Notes", "Details inside."))
-        self.google.labels["cat"] = ["INBOX", "CATEGORY_PURCHASES"]
-        self.assertEqual(self.scan().messages, 1)
-
     def test_a_message_that_changes_a_booking_is_read_even_when_it_looks_like_an_auto_reply(self):
         head = triage.Head("Reservation modified", "harbour-stays.example", "We have received your request to change the dates", frozenset())
         self.assertEqual(triage.decide(head), "read")
@@ -328,7 +323,7 @@ class TriageScanTests(ScanCase):
         self.assertEqual(triage.decide(head), "read")
 
     def test_a_booking_like_message_that_cannot_be_read_waits_for_review_with_a_reason_instead_of_vanishing(self):
-        self.add_mail("odd", plain_mail(UNLISTED[1], "Your reservation is confirmed", "Everything is arranged for your stay."))
+        self.add_mail("odd", plain_mail(UNLISTED[1], "Your reservation is confirmed", "Your hotel stay is arranged: check-in is tomorrow."))
         result = self.scan()
         self.assertEqual((result.messages, result.bookings, result.review), (1, 0, 1))
         [item] = self.items()
@@ -343,7 +338,7 @@ class TriageScanTests(ScanCase):
 
     def test_a_scan_over_its_time_budget_stops_reports_it_and_the_next_scan_goes_on(self):
         for n in range(5):
-            self.add_mail(f"c{n}", plain_mail(UNLISTED[0], f"Your reservation is confirmed ({n})", "Reservation number HX4471."))
+            self.add_mail(f"c{n}", plain_mail(UNLISTED[0], f"Your reservation is confirmed ({n})", "Check-in 21 Nov, check-out 27 Nov. Reservation number HX4471."))
         with mock.patch.object(scan, "BUDGET", -1):
             first = self.scan()
         self.assertEqual((first.messages, first.capped, first.found), (1, True, 5))
@@ -358,7 +353,7 @@ class TriageScanTests(ScanCase):
 
     def test_a_capped_scan_is_followed_straight_away_until_every_message_is_looked_at(self):
         for n in range(5):
-            self.add_mail(f"c{n}", plain_mail(UNLISTED[0], f"Your reservation is confirmed ({n})", "Reservation number HX4471."))
+            self.add_mail(f"c{n}", plain_mail(UNLISTED[0], f"Your reservation is confirmed ({n})", "Check-in 21 Nov, check-out 27 Nov. Reservation number HX4471."))
         with mock.patch.object(scan, "BUDGET", -1):
             last = scan.run(self.mailbox, TODAY)
         self.assertEqual((last.state, last.capped), ("done", False))
@@ -368,7 +363,7 @@ class TriageScanTests(ScanCase):
 
     def test_chained_scans_stop_after_the_chain_limit_and_the_next_cycle_goes_on(self):
         for n in range(6):
-            self.add_mail(f"c{n}", plain_mail(UNLISTED[0], f"Your reservation is confirmed ({n})", "Reservation number HX4471."))
+            self.add_mail(f"c{n}", plain_mail(UNLISTED[0], f"Your reservation is confirmed ({n})", "Check-in 21 Nov, check-out 27 Nov. Reservation number HX4471."))
         with mock.patch.object(scan, "BUDGET", -1), mock.patch.object(scan, "MAX_CHAIN", 2):
             last = scan.run(self.mailbox, TODAY)
         self.assertEqual((last.state, last.capped), ("done", True))
@@ -377,14 +372,14 @@ class TriageScanTests(ScanCase):
     def test_the_summary_is_counts_only_and_is_what_the_mailbox_list_carries(self):
         self.add_mail("stay", eml("hotel_jsonld"))
         self.add_mail("l0", plain_mail(*LOOKALIKES[0]))
-        self.add_mail("odd", plain_mail(UNLISTED[1], "Your reservation is confirmed", "Everything is arranged."))
+        self.add_mail("odd", plain_mail(UNLISTED[1], "Your reservation is confirmed", "Your hotel check-in is arranged."))
         self.scan()
         self.assertEqual(scan.summary(self.mailbox), scan.Summary(3, 2, 1, 1, 1, False, 0, 3, 3))
         self.assertEqual(scan.decode(self.row()["scan_summary"]), scan.summary(self.mailbox))
-        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "found", "labels_dropped", "read", "review", "skipped", "total", "triaged"])
+        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "found", "labels_dropped", "not_travel", "read", "review", "skipped", "total", "triaged"])
 
     def test_a_reply_or_an_offer_looking_subject_from_a_travel_sender_is_still_read(self):
-        for subject in ("Re: Your reservation", "Autumn sale: your booking is confirmed", "Your deal is booked: reservation H77"):
+        for subject in ("Re: Your reservation", "Autumn sale: your hotel booking is confirmed", "Your deal is booked: hotel reservation H77"):
             self.assertEqual(triage.decide(triage.Head(subject, "delta.com", "", frozenset())), "read", subject)
             self.assertEqual(triage.decide(triage.Head(subject, "stranger.example", "", frozenset())), "skip" if subject.startswith("Re:") else "read", subject)
         self.assertEqual(triage.decide(triage.Head("Your verification code", "delta.com", "Your code is 123456", frozenset())), "skip")
@@ -394,7 +389,7 @@ class TriageScanTests(ScanCase):
         self.scan()
         before = self.row()["scan_summary"]
         self.assertTrue(before)
-        self.add_mail("later", plain_mail(UNLISTED[0], "Your reservation is confirmed", "Everything is arranged."))
+        self.add_mail("later", plain_mail(UNLISTED[0], "Your reservation is confirmed", "Your hotel check-in is arranged."))
         self.scan(backfill=True)
         self.assertEqual(self.row()["scan_summary"], before)
         self.scan(again=True)
@@ -411,7 +406,7 @@ class TriageScanTests(ScanCase):
         canaries = ("CANARY-SUBJECT-TRIAGE-4X7K", "CANARY-SENDER-TRIAGE-9M2Q", "CANARY-BODY-TRIAGE-6T3W")
         sender = f"Pat <{canaries[1].lower()}@harbour-stays.example>"
         self.add_mail("a", plain_mail(sender, f"Your verification code {canaries[0]}", f"Your code is 1234 {canaries[2]}"))
-        self.add_mail("b", plain_mail(sender, f"Your reservation is confirmed {canaries[0]}", f"Everything is arranged {canaries[2]}"))
+        self.add_mail("b", plain_mail(sender, f"Your reservation is confirmed {canaries[0]}", f"Your hotel check-in is arranged {canaries[2]}"))
         said: list[str] = []
         real = scan.monitoring.log
         with mock.patch.object(scan.monitoring, "log", side_effect=lambda text, *a, **k: (said.append(text), real(text, *a, **k))[1]), \
@@ -420,6 +415,112 @@ class TriageScanTests(ScanCase):
         summary = scan.summary(self.mailbox)
         self.assertEqual(summary, scan.Summary(2, 1, 0, 1, 1, False, 0, 2, 2))
         self.assertFalse([t for t in said for k in canaries if k.lower() in t.lower()])
+
+
+class QuietFailureTests(ScanCase):
+    WEAK = "CANARY-BODY-QUIET-7H2L"
+    CANARIES = ("CANARY-SUBJECT-QUIET-3F8N", "CANARY-SENDER-QUIET-5D1R", WEAK)
+
+    def weak_mail(self, mid="weak", sender="Pat Roe <canary-sender-quiet-5d1r@somewhere.example>"):
+        self.add_mail(mid, plain_mail(sender, "Your hotel booking CANARY-SUBJECT-QUIET-3F8N", f"Thanks for choosing us. {self.WEAK}"))
+
+    def stored(self):
+        return self.read(lambda conn: list(conn.execute(select(StoredMessage.message_id)).scalars()))
+
+    def test_a_weakly_signalled_message_from_an_unknown_sender_that_cannot_be_parsed_is_skipped_without_a_review_item_or_a_stored_body(self):
+        self.weak_mail()
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.messages, result.skipped, result.review, result.bookings), (0, 1, 0, 0))
+        self.assertEqual(self.google.fetched, ["weak"])
+        self.assertEqual((self.items(), self.stored(), self.scanned()), ([], [], {"weak": "skipped"}))
+        self.assertEqual(scan.summary(self.mailbox), scan.Summary(1, 0, 0, 0, 1, False, 0, 1, 1, 1))
+
+    def categorised(self, mid, category, subject="Your booking is confirmed", body="Table for four on Friday."):
+        self.add_mail(mid, plain_mail("Olive Kitchen <canary-sender-quiet-5d1r@tablebook.example>", f"{subject} CANARY-SUBJECT-QUIET-3F8N", f"{body} {self.WEAK}"))
+        self.google.labels[mid] = ["INBOX", category]
+
+    def test_a_purchases_or_reservations_message_with_a_generic_word_and_no_travel_word_that_cannot_be_parsed_goes_to_review_and_is_kept_only_while_it_waits(self):
+        self.categorised("cat1", "CATEGORY_RESERVATIONS")
+        self.categorised("cat2", "CATEGORY_PURCHASES")
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.messages, result.review, result.skipped), (2, 2, 0))
+        self.assertEqual({i["reason"] for i in self.items()}, {"no_markup"})
+        self.assertEqual(sorted(self.stored()), ["cat1", "cat2"])
+        for item_id in [i["id"] for i in self.items()]:
+            self.assertTrue(self.read(lambda conn, item_id=item_id: review.dismiss(conn, "u-jane", item_id)))
+        self.assertEqual((self.items(), self.stored()), ([], []))
+
+    def test_a_purchases_message_with_a_retail_word_a_generic_word_without_a_category_or_a_category_alone_is_skipped(self):
+        self.categorised("order", "CATEGORY_PURCHASES", "Your order is confirmed")
+        self.categorised("nogeneric", "CATEGORY_RESERVATIONS", "Your table")
+        self.add_mail("nocat", plain_mail("Olive Kitchen <canary-sender-quiet-5d1r@tablebook.example>", "Your booking is confirmed CANARY-SUBJECT-QUIET-3F8N", f"Table. {self.WEAK}"))
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.messages, result.skipped, result.review, self.google.fetched), (0, 3, 0, []))
+        self.assertEqual((self.items(), self.stored()), ([], []))
+
+    def test_it_is_not_looked_at_again(self):
+        self.weak_mail()
+        self.scan()
+        self.google.heads.clear()
+        self.google.fetched.clear()
+        self.scan(now=NOW + 5000)
+        self.assertEqual((self.google.heads, self.google.fetched), ([], []))
+
+    def test_a_message_with_two_travel_words_still_goes_to_review(self):
+        self.add_mail("strong", plain_mail("Pat Roe <pat@somewhere.example>", "Your hotel booking", "Check-in is soon. CANARY-BODY-QUIET-7H2L"))
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.messages, result.review), (1, 1))
+        self.assertEqual([i["reason"] for i in self.items()], ["no_markup"])
+
+    def test_a_known_travel_senders_message_still_goes_to_review(self):
+        self.add_mail("known", plain_mail("Delta <noreply@delta.com>", "Hello", "Thanks for choosing us. CANARY-BODY-QUIET-7H2L"))
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.messages, result.review), (1, 1))
+
+    def test_a_message_with_travel_markup_still_goes_to_review(self):
+        self.put("incomplete")
+        self.google.snippets["msg-incomplete"] = "Your itinerary"
+        with no_leaks(self, *CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.messages, result.review), (1, 1))
+        self.assertEqual([i["reason"] for i in self.items()], ["incomplete"])
+
+    def test_a_message_that_cannot_be_decoded_and_is_weak_is_skipped_too(self):
+        self.google.mail["bad"] = b""
+        self.google.snippets["bad"] = "Your hotel booking"
+        self.google.matches.append("bad")
+        with mock.patch("waypoint.domain.mail.extract._decode", return_value=None):
+            result = self.scan()
+        self.assertEqual((result.skipped, result.review, self.items()), (1, 0, []))
+
+    def test_shopping_mail_is_skipped_at_the_head_and_counted_as_not_travel(self):
+        self.add_mail("shop", plain_mail("Megastore <orders@megastore.example>", "Your order has shipped CANARY-SUBJECT-QUIET-3F8N",
+                                         f"Order number 114-1. {self.WEAK}"))
+        self.add_mail("lookalike", plain_mail(*LOOKALIKES[0]))
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.messages, result.skipped, self.google.fetched), (0, 2, []))
+        summary = scan.summary(self.mailbox)
+        assert summary is not None
+        self.assertEqual((summary.skipped, summary.not_travel), (2, 1))
+
+    def test_the_log_counts_not_travel_and_says_nothing_else_about_them(self):
+        self.weak_mail()
+        said: list[str] = []
+        real = scan.monitoring.log
+        with mock.patch.object(scan.monitoring, "log", side_effect=lambda text, *a, **k: (said.append(text), real(text, *a, **k))[1]), \
+                no_leaks(self, *self.CANARIES, database=self.path):
+            self.scan()
+        self.assertIn("Scanned a mailbox: 1 message(s) found, 0 read, 0 booking(s) added or changed, 0 to review, 1 skipped (1 as not travel).", said)
+
+    def test_an_older_stored_summary_without_the_new_figure_reads_as_zero(self):
+        old = '{"found":1,"read":1,"bookings":0,"review":0,"skipped":2,"capped":false}'
+        self.assertEqual(scan.decode(old), scan.Summary(1, 1, 0, 0, 2, False))
 
 
 LABELS = [{"id": "INBOX", "name": "INBOX", "type": "system"}, {"id": "CATEGORY_PURCHASES", "name": "CATEGORY_PURCHASES", "type": "system"},
@@ -453,6 +554,13 @@ class LabelScanTests(ScanCase):
         self.assertEqual(sorted(self.google.fetched), ["j1", "j2"])
         self.assertEqual(self.google.heads, [])
         self.assertEqual(self.google.label_queries, ["Label_1"])
+
+    def test_a_picked_labels_weak_unparseable_message_still_goes_to_review(self):
+        self.pick("Label_1")
+        self.in_label("Label_1", "j1", plain_mail("Pat <pat@friend.example>", "Notes", "Dinner on Friday. CANARY-BODY-LABEL-WEAK-2Q9S"))
+        with no_leaks(self, "CANARY-BODY-LABEL-WEAK-2Q9S", database=self.path):
+            result = self.scan()
+        self.assertEqual((result.messages, result.review, result.skipped), (1, 1, 0))
 
     def test_an_unpicked_label_is_not_scanned(self):
         self.pick("Label_1")
@@ -618,6 +726,7 @@ class GenericReaderScanTests(ScanCase):
     def test_the_lodging_mail_and_forwarded_headers_stay_on_the_server(self):
         forward = forwarded(eml("lodging_en"), "Fwd: Your booking is confirmed CANARY-FWD-SUBJECT-5T8M").replace(b"FYI", b"CANARY-FWD-NOTE-3H6B")
         self.add_mail("fw", forward)
+        self.google.snippets["fw"] = "Fwd: hotel booking, check-in and check-out"
         self.put("lodging_ja")
         with no_leaks(self, *CANARIES, "CANARY-FWD-SUBJECT-5T8M", "CANARY-FWD-NOTE-3H6B", database=self.path):
             result = self.scan()
@@ -918,7 +1027,7 @@ class ReviewTests(ScanCase):
         self.assertEqual({(i["reason"], i["sender_domain"], i["received"]) for i in items},
                          {("no_markup", "example-air.example", "2026-10-17"), ("incomplete", "example-air.example", "2026-10-18")})
         nomarkup = next(i for i in items if i["reason"] == "no_markup")
-        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "known_sender", "subject", "has_email", "received", "reason", "gmail_url", "suggestion", "suggestion_error"}))
+        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "known_sender", "holds_bookings", "subject", "has_email", "received", "reason", "gmail_url", "suggestion", "suggestion_error"}))
         self.assertEqual((nomarkup["subject"], nomarkup["has_email"]), ("Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F", True))
         self.assertEqual((nomarkup["owner"], nomarkup["mine"]), ("Jane Doe", True))
         self.assertEqual(nomarkup["gmail_url"], "https://mail.google.com/mail/?authuser=jane%40gmail.example#all/msg-no_markup")
@@ -943,7 +1052,7 @@ class ReviewTests(ScanCase):
 
     def test_a_message_that_cannot_be_decoded_is_queued_as_broken(self):
         self.google.mail["bad"] = b""
-        self.google.snippets["bad"] = "Your reservation is confirmed"
+        self.google.snippets["bad"] = "Your reservation is confirmed: hotel check-in"
         self.google.matches.append("bad")
         with mock.patch("waypoint.domain.mail.extract._decode", return_value=None):
             self.scan()
@@ -1000,6 +1109,7 @@ class ReviewTests(ScanCase):
         self.add_mail("unknown", unknown)
         other = eml("no_markup").replace(b"<html><body>", b'<html><head><script type="application/ld+json">{"@type":"EmailMessage"}</script></head><body>')
         self.add_mail("other", other)
+        self.google.snippets["other"] = "Your itinerary: flight EX 202 from Boston to Denver"
         self.put("no_markup", "incomplete")
         real = scan.monitoring.log
         with mock.patch.object(scan.monitoring, "log", side_effect=real) as log, no_leaks(self, *CANARIES, database=self.path):
@@ -1240,6 +1350,18 @@ class HeldMatchTests(ScanCase):
         self.assertTrue(self.read(lambda conn: review.drop(conn, "u-jane", match["item_id"], match["entry"])))
         self.assertEqual(self.held(), [])
         self.assertEqual([i["reason"] for i in self.items()], ["incomplete"])
+
+    def test_ignoring_a_sender_leaves_the_items_that_hold_bookings_to_settle(self):
+        self.by_hand(), self.by_hand()
+        self.put("hotel_jsonld")
+        self.add_mail("same", plain_mail("Example Stays <hello@example-stays.example>", "Your hotel booking", "Check-in is soon. CANARY-BODY-HOTEL-5R1M"))
+        with no_leaks(self, "CANARY-BODY-HOTEL-5R1M", database=self.path):
+            self.scan()
+        [unread] = [i for i in self.items() if i["sender_domain"] == "example-stays.example"]
+        self.assertEqual(len(self.held()), 1)
+        self.assertEqual(self.read(lambda conn: review.ignore_sender(conn, "u-jane", unread["id"])), 1)
+        self.assertEqual(self.items(), [])
+        self.assertEqual(len(self.held()), 1)
 
     def test_a_held_item_is_not_something_to_ask_the_ai_about(self):
         self.by_hand()
@@ -1863,6 +1985,20 @@ class KeptMessageTests(ScanCase):
         self.scan()
         self.assertTrue(self.read(lambda conn: review.ignore_sender(conn, "u-jane", self.item_id())) is not None)
         self.assertEqual(self.kept(), set())
+
+    def test_not_travel_ignores_the_domain_dismisses_its_other_items_and_leaves_bookings_alone(self):
+        self.put("flight_jsonld", "no_markup", "incomplete")
+        self.add_mail("elsewhere", plain_mail("Skyline Airways <hello@skyline-air.example>", "Your flight itinerary", "Boarding pass inside. CANARY-BODY-ELSEWHERE-8W3J"))
+        with no_leaks(self, "CANARY-BODY-NOMARKUP-6H9C", "CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-INCOMPLETE-4N7P", "CANARY-BODY-ELSEWHERE-8W3J", database=self.path):
+            self.scan()
+            self.assertEqual(self.kept(), {"msg-flight_jsonld", "msg-no_markup", "msg-incomplete", "elsewhere"})
+            self.assertEqual(len(self.items()), 3)
+            self.assertIsNone(self.read(lambda conn: review.ignore_sender(conn, "u-sam", self.item_id())))
+            self.assertEqual(self.read(lambda conn: review.ignore_sender(conn, "u-jane", self.item_id())), 2)
+        self.assertEqual([i["sender_domain"] for i in self.items()], ["skyline-air.example"])
+        self.assertEqual(self.kept(), {"msg-flight_jsonld", "elsewhere"})
+        self.assertEqual(len(self.segments()), 1)
+        self.assertEqual(self.read(lambda conn: review.ignored(conn, self.mailbox)), ["example-air.example"])
 
     def test_a_message_that_could_not_be_filed_is_kept_with_its_item(self):
         self.put("flight_jsonld")
