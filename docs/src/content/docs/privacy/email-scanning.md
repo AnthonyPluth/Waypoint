@@ -34,12 +34,22 @@ Messages kept before this was added show as before (their text and simple format
 
 ## How a booking is read
 
-Waypoint tries the cheapest, most reliable method first and falls through:
+Waypoint tries the cheapest, most reliable method first and falls through (the generic readers run in this order, and the first that yields a complete booking wins):
 
 1. **schema.org markup** (built). Many airlines, hotels, rental companies and railways embed structured data (`FlightReservation`, `LodgingReservation`, `RentalCarReservation`, `TrainReservation`) in the email for Gmail’s own cards. Waypoint reads it directly.
 2. **Per-vendor parsers** (started: Southwest Airlines and Disney Cruise Line). For senders without markup, a parser written for that vendor’s email reads its text for the same fields, and for its change and cancellation emails. A parser only ever sees the message’s text in memory, and keeps nothing of it. Disney Cruise Line’s parser reads the booking confirmation: the sailing, its ship, stateroom and deck, each guest’s name (never their Castaway Club number) and the ports of call with their times at each port’s own zone; a re-sent confirmation updates the same booking, a port it doesn’t know goes to review, and its change and cancellation emails aren’t read yet. More vendors come one at a time.
 3. **A generic lodging reader** (built). For a stay whose email has neither markup nor a vendor parser, Waypoint reads labelled lines (Check-in, Check-out, Hotel or Property, Address, Reservation or Confirmation number, in English and Japanese, as lines or table cells), or a start date plus a number of nights. It needs the place and both dates, the check-out after the check-in and no more than 60 nights; dates in cancellation text are ignored, and the times are the property’s own, in the zone worked out from its address. The first booking read this way from a sender you haven’t confirmed goes to Review as a suggestion with the fields it found outlined; adding it trusts that sender, and later mail from there is added without asking.
-4. **A “Couldn’t read” review queue** (built). What neither method understands lands in a queue where you can open it in Gmail, add the booking by hand, ignore the sender or dismiss it. Nothing is guessed silently.
+4. **A generic flight reader** (built). For a flight whose email has neither markup nor a vendor parser, Waypoint looks for a flight number (an airline code that exists in its airline table, then digits), two airports written as three capital letters that exist in its airport table, and the departure and arrival date and time written near them: as labelled lines, as rows of a table, or side by side in two columns. An email with several flights gives one booking per flight; a flight it can’t complete is counted and sent to Review while the others are kept. It needs both airports, both dates with a year and both times, an arrival after the departure (compared at each airport’s own zone) and no more than 30 hours in the air. The times are the airports’ own, written as the email gives them and never converted; each airport’s zone comes from its table. Dates in cancellation, refund or “booked on” text are ignored, and a confirmation or booking reference is read from its label. The same safeguards as the lodging reader apply: when it can’t read a message it says why, and the first flight read this way from a sender you haven’t confirmed goes to Review as a suggestion with the fields it found outlined (adding it trusts that sender).
+5. **A “Couldn’t read” review queue** (built). What neither method understands lands in a queue where you can open it in Gmail, add the booking by hand, ignore the sender or dismiss it. Nothing is guessed silently.
+
+## Languages the generic readers understand
+
+| Reader | English | French | German | Spanish | Japanese |
+| --- | --- | --- | --- | --- | --- |
+| Lodging | yes | no | no | no | yes |
+| Flights | yes | yes | yes | yes | yes |
+
+For flights that means the words for departure and arrival, booking and confirmation codes, and cancellation text, and dates written as “Nov 21, 2026”, “21 novembre 2026”, “21. November 2026”, “21 de noviembre de 2026”, “21.11.2026”, “2026-11-21” or “2026年11月21日” (a date such as 04/05/2026 that could be read two ways is not guessed), with times as “7:00 PM”, “19:00”, “15h05” or “15時05分”. The words are kept in one table per language in `waypoint/domain/mail/words.py`. Whether Waypoint reads a message at all still depends on its subject, sender and snippet (see above), whose booking words are mostly English and Japanese, so a message in another language is read only when its subject or snippet also has one of them (or its sender is a known travel one).
 
 ## Optional AI suggestions
 

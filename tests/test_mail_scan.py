@@ -624,6 +624,76 @@ class GenericReaderScanTests(ScanCase):
         self.assertEqual(result.review, 2)
 
 
+class GenericFlightScanTests(ScanCase):
+    CANARIES = ("CANARY-BODY-FLIGHT-EN-4J7S", "CANARY-BODY-FLIGHT-DE-8W2L", "CANARY-SENDER-FLIGHT-6P1R")
+
+    def first(self) -> bytes:
+        return eml("flight_generic_en").replace(b"Skyline Air <", b"CANARY-SENDER-FLIGHT-6P1R Air <")
+
+    def second(self) -> bytes:
+        return (eml("flight_generic_en").replace(b"ZK4R9T", b"ZK0000").replace(b"BA 9871", b"BA 9875")
+                .replace(b"November 21, 2026", b"December 5, 2026").replace(b"November 22, 2026", b"December 6, 2026"))
+
+    def test_a_generic_flight_from_a_new_sender_is_a_suggestion_not_a_booking(self):
+        self.add_mail("first", self.first())
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.bookings, result.review), (0, 1))
+        self.assertEqual(self.segments(), [])
+        [item] = self.items()
+        self.assertEqual((item["reason"], item["sender_domain"]), ("generic", "skyline-air.example"))
+        s = item["suggestion"]
+        self.assertEqual((s["kind"], s["origin"], s["destination"], s["confirmation"], s["start_local"], s["end_local"], s["start_zone"]),
+                         ("flight", "JFK", "LHR", "ZK4R9T", "2026-11-21T19:00", "2026-11-22T07:10", "America/New_York"))
+        self.assertEqual(s["sources"], {"origin": "airport code", "destination": "airport code", "start_local": "departs", "end_local": "arrives",
+                                        "confirmation": "booking reference"})
+        self.assertNotIn("CANARY", json.dumps(item))
+
+    def test_it_asks_once_per_sender_until_confirmed(self):
+        self.add_mail("first", self.first())
+        self.add_mail("second", self.second())
+        self.scan()
+        self.assertEqual(len(self.items()), 1)
+        self.assertNotIn("second", self.scanned())
+
+    def test_confirming_trusts_the_sender_and_later_mail_is_filed_with_the_airports_zones(self):
+        self.add_mail("first", self.first())
+        self.scan()
+        [item] = self.items()
+        seg = self.read(lambda conn: trips.add_segment(conn, self.jane, {
+            "kind": "flight", "status": "confirmed", "confirmation": "ZK4R9T", "provider": "British Airways", "start_local": "2026-11-21T19:00",
+            "start_zone": "America/New_York", "end_local": "2026-11-22T07:10", "end_zone": "Europe/London", "origin": "JFK",
+            "destination": "LHR", "details": {"flight_number": "BA 9871"}, "manage_url": None}))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, seg["id"]))))
+        self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, "skyline-air.example")))
+        self.add_mail("second", self.second())
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan(now=NOW + 60)
+        self.assertEqual((result.bookings, result.review), (1, 0))
+        later = next(s for s in self.segments() if s["confirmation"] == "ZK0000")
+        self.assertEqual((later["start_local"], later["start_zone"], later["end_local"], later["end_zone"], later["details"]),
+                         ("2026-12-05T19:00", "America/New_York", "2026-12-06T07:10", "Europe/London", {"flight_number": "BA 9875"}))
+
+    def test_german_mail_is_read_too_and_stays_on_the_server(self):
+        self.put("flight_generic_de")
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            self.scan()
+        [item] = self.items()
+        s = item["suggestion"]
+        self.assertEqual((s["origin"], s["destination"], s["start_local"], s["end_local"], s["start_zone"], s["confirmation"]),
+                         ("FRA", "JFK", "2026-11-21T15:05", "2026-11-21T18:20", "Europe/Berlin", "NL3X8Q"))
+
+    def test_a_flight_that_cannot_be_read_waits_in_review_with_no_text_in_the_reason(self):
+        broken = eml("flight_generic_en").replace(b"Arrives", b"Lands").replace(b"Sunday, November 22, 2026 7:10 AM", b"soon")
+        self.add_mail("broken", broken)
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.bookings, result.review), (0, 1))
+        [item] = self.items()
+        self.assertEqual(item["reason"], "no_markup")
+        self.assertNotIn("CANARY", json.dumps(item))
+
+
 class FirstScanTests(ScanCase):
     def test_each_kind_of_booking_becomes_a_segment_at_its_places_wall_clock_time(self):
         self.put("flight_jsonld", "hotel_jsonld", "car_jsonld", "train_jsonld")
@@ -935,7 +1005,7 @@ class ReviewTests(ScanCase):
         with mock.patch.object(scan.monitoring, "log", side_effect=real) as log, no_leaks(self, *CANARIES, database=self.path):
             self.scan()
         said = [c.args[0] for c in log.call_args_list]
-        self.assertIn("What stopped messages being read: 1 × arrival time; 1 × departure time; 1 × destination airport; 1 × no structured booking data; 1 × structured data, but no reservation; 1 × unknown airport.", said)
+        self.assertIn("What stopped messages being read: 1 × arrival time; 1 × departure time; 1 × destination airport; 2 × generic reader: fewer than two known airports found for the flight; 1 × no structured booking data; 1 × structured data, but no reservation; 1 × unknown airport.", said)
 
     def test_a_message_with_one_booking_read_and_one_not_does_both(self):
         both = eml("flight_jsonld").replace(b"</script></head>", b"</script><script type=\"application/ld+json\">"

@@ -1,0 +1,20 @@
+From: Skyline Air <reservations@skyline-air.example>
+To: traveller@gmail.example
+Subject: Your trip is confirmed
+Date: Wed, 14 Oct 2026 12:00:00 +0100
+Message-ID: <fx-flight-generic-en@skyline-air.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>CANARY-BODY-FLIGHT-EN-4J7S Thanks for flying with us.</p>
+<p>Cancel before Oct 20, 2026 6:00 PM for a full refund.</p>
+<table>
+<tr><td>Booking reference</td><td>ZK4R9T</td></tr>
+<tr><td>Flight</td><td>BA 9871</td></tr>
+<tr><td>From</td><td>JFK</td></tr>
+<tr><td>Departs</td><td>Saturday, November 21, 2026 7:00 PM</td></tr>
+<tr><td>To</td><td>LHR</td></tr>
+<tr><td>Arrives</td><td>Sunday, November 22, 2026 7:10 AM</td></tr>
+</table>
+</body></html>
