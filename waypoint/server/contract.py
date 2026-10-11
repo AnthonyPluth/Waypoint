@@ -134,6 +134,8 @@ class AiSuggestion(TypedDict):
     room: NotRequired[str]
     ship: NotRequired[str]
     deck: NotRequired[str]
+    flight_number: NotRequired[str]
+    cabin: NotRequired[str]
     sources: NotRequired[dict[str, str]]
 
 
@@ -150,7 +152,7 @@ class ReviewItem(TypedDict):
     received: str | None
     reason: Literal["no_markup", "incomplete", "broken", "generic"]
     gmail_url: str | None
-    suggestion: AiSuggestion | None
+    suggestions: list[AiSuggestion]
     suggestion_error: str | None
 
 

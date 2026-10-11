@@ -99,6 +99,8 @@ def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:
         out["destination"] = b.destination
     if address := dict(b.details).get("address"):
         out["address"] = address
+    if b.kind == "flight" and (number := dict(b.details).get("flight_number")):
+        out["flight_number"] = number
     if zone := _zone(conn, b, b.origin, b.start_place):
         out["start_zone"] = zone
     return out
