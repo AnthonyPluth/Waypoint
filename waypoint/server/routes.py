@@ -15,6 +15,8 @@ from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_e
 from .api.flight_import import api_import, api_import_preview
 from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
 from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loyalty_remove, api_loyalty_reveal
+from .api.assistant import (api_assistant_review, api_assistant_review_create, api_assistant_review_dismiss, api_assistant_review_item,
+                            api_assistant_review_match)
 from .api.mcp import api_mcp_revoke, api_mcp_settings, api_mcp_writes
 from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, api_person_add, api_person_claim,
                           api_person_edit, api_person_remove)
@@ -103,6 +105,11 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/mcp-settings", api_mcp_settings),
     ("POST", "/api/mcp-settings/writes", api_mcp_writes),
     ("DELETE", "/api/mcp-settings/connections/{id}", api_mcp_revoke),
+    ("GET", "/api/assistant/review", api_assistant_review),
+    ("GET", "/api/assistant/review/{id}", api_assistant_review_item),
+    ("POST", "/api/assistant/review/{id}/match", api_assistant_review_match),
+    ("POST", "/api/assistant/review/{id}/create", api_assistant_review_create),
+    ("POST", "/api/assistant/review/{id}/dismiss", api_assistant_review_dismiss),
     ("GET", "/api/state", api_state),
     ("GET", "/api/offline", api_offline),
 ]

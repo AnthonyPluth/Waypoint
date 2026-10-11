@@ -48,6 +48,10 @@ A booking prints each traveller’s name its own way (`DOE/JANE MS`). Waypoint m
 
 Each such name is listed here with the segment it’s on. Choose the person it is, or add a guest. Every traveller with that printed name on your trips becomes that person, and the printed name is kept as one of their aliases, so the next booking with it matches by itself.
 
+## Letting an AI assistant help
+
+An assistant you connected over [MCP](/Waypoint/start/mcp/#the-review-queue) can list these items, compare each with your trips (with a confidence of exact, likely or possible, and the fields that agreed), and, if you allowed changes, match, add or dismiss them for you. It sees only what Waypoint read from each email, never the email itself.
+
 ## When a scan has a problem
 
 A scan that stops halfway (Google couldn’t be reached, or refused a request) keeps everything it had already read and says what failed under the mailbox in Settings; the next scan carries on where it stopped. A scan that can’t start at all, because the mailbox needs reconnecting, is shown as **Reconnect**, not as a failed scan.
