@@ -34,7 +34,7 @@ REFRESH, ADDRESS = "refresh-jane-1", "jane@gmail.example"
 CANARIES = ("CANARY-BODY-FLIGHT-JSONLD-7Q2X", "CANARY-BODY-FLIGHT-MICRODATA-3K8D", "CANARY-BODY-HOTEL-5R1M",
             "CANARY-BODY-CAR-9T4V", "CANARY-BODY-TRAIN-2W6Z", "CANARY-BODY-NOMARKUP-6H9C", "CANARY-BODY-INCOMPLETE-4N7P",
             "CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-UTCLOCAL-4G8J", "CANARY-BODY-UTCCONV-6M2W", "CANARY-BODY-UTCNONE-9P5D",
-            "CANARY-BODY-OFFSET-3C7H", "CANARY-BODY-OVERNIGHT-8R4Y")
+            "CANARY-BODY-OFFSET-3C7H", "CANARY-BODY-OVERNIGHT-8R4Y", "CANARY-BODY-LODGING-EN-6V3T", "CANARY-BODY-LODGING-JA-2N9X")
 UTC_FIXTURES = ("utc_marked_local_in_text", "utc_marked_converted_in_text", "utc_marked_no_times_in_text", "offset_marked_times",
                 "utc_marked_overnight")
 
@@ -542,6 +542,63 @@ class ForwardScanTests(ScanCase):
         [item] = [c for c in [self.read(lambda conn: stored_mail.get(conn, self.mailbox, "fw1"))] if c]
         self.assertEqual((item["sender_domain"], item["subject"]), ("luv.southwest.com", "Your trip is confirmed (K7QW2N)"))
         self.assertNotIn("FYI", item["text"])
+
+
+class GenericReaderScanTests(ScanCase):
+    def second(self) -> bytes:
+        return eml("lodging_en").replace(b"SS48213", b"SS99999").replace(b"November 21, 2026", b"December 5, 2026").replace(b"November 25, 2026", b"December 9, 2026")
+
+    def test_a_generic_booking_from_a_new_sender_is_a_suggestion_not_a_booking(self):
+        self.put("lodging_en")
+        result = self.scan()
+        self.assertEqual((result.bookings, result.review), (0, 1))
+        self.assertEqual(self.segments(), [])
+        [item] = self.items()
+        self.assertEqual((item["reason"], item["sender_domain"]), ("generic", "seaside-stays.example"))
+        s = item["suggestion"]
+        self.assertEqual((s["kind"], s["origin"], s["confirmation"], s["start_local"], s["end_local"], s["address"]),
+                         ("hotel", "Seaside Inn", "SS48213", "2026-11-21T15:00", "2026-11-25T11:00", "12 Beach Road, Brighton, UK"))
+        self.assertEqual(s["start_zone"], "Europe/London")
+        self.assertEqual(s["sources"], {"origin": "property", "start_local": "check-in", "end_local": "check-out",
+                                        "confirmation": "confirmation number", "address": "address"})
+        self.assertNotIn("CANARY", json.dumps(item))
+
+    def test_it_asks_once_per_sender_until_confirmed(self):
+        self.put("lodging_en")
+        self.add_mail("second", self.second())
+        self.scan()
+        self.assertEqual(len(self.items()), 1)
+        self.assertEqual(self.scanned()["second"], "skipped")
+
+    def test_confirming_trusts_the_sender_and_later_mail_is_filed_directly(self):
+        self.put("lodging_en")
+        self.scan()
+        [item] = self.items()
+        seg = self.read(lambda conn: trips.add_segment(conn, self.jane, {
+            "kind": "hotel", "status": "confirmed", "confirmation": "SS48213", "provider": "Seaside Inn", "start_local": "2026-11-21T15:00",
+            "start_zone": "Europe/London", "end_local": "2026-11-25T11:00", "end_zone": "Europe/London", "origin": "Seaside Inn",
+            "destination": None, "details": {}, "manage_url": None}))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, seg["id"]))))
+        self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, "seaside-stays.example")))
+        self.add_mail("second", self.second())
+        result = self.scan(now=NOW + 60)
+        self.assertEqual((result.bookings, result.review), (1, 0))
+        self.assertEqual(sorted(s["confirmation"] for s in self.segments()), ["SS48213", "SS99999"])
+
+    def test_japanese_mail_is_read_too(self):
+        self.put("lodging_ja")
+        self.scan()
+        [item] = self.items()
+        self.assertEqual((item["suggestion"]["origin"], item["suggestion"]["start_local"], item["suggestion"]["start_zone"]),
+                         ("テスト温泉ホテル", "2026-11-21T15:00", "Asia/Tokyo"))
+
+    def test_the_lodging_mail_and_forwarded_headers_stay_on_the_server(self):
+        forward = forwarded(eml("lodging_en"), "Fwd: Your booking is confirmed CANARY-FWD-SUBJECT-5T8M").replace(b"FYI", b"CANARY-FWD-NOTE-3H6B")
+        self.add_mail("fw", forward)
+        self.put("lodging_ja")
+        with no_leaks(self, *CANARIES, "CANARY-FWD-SUBJECT-5T8M", "CANARY-FWD-NOTE-3H6B", database=self.path):
+            result = self.scan()
+        self.assertEqual(result.review, 2)
 
 
 class FirstScanTests(ScanCase):
