@@ -119,6 +119,7 @@ export interface AssistantItemDetail {
   match: AssistantMatch | null;
   entries: AssistantEntry[];
   suggestion: AssistantParsed | null;
+  suggestions: AssistantParsed[];
 }
 
 export interface AssistantItems {

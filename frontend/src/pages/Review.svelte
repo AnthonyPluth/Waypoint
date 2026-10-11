@@ -75,6 +75,7 @@
   let saving = $state(false);
   let emailOpen = $state(true);
   let baseline = "";
+  let addedIds: number[] = [];
   const fingerprint = (d: Draft) => JSON.stringify([d.kind, d.provider, d.confirmation, d.origin, d.destination, d.start, d.end, d.startZone, d.endZone,
     Object.entries(d.details).filter(([, v]) => v.trim()).sort(([a], [b]) => a.localeCompare(b))]);
   const fingerprints = () => JSON.stringify(drafts.map(fingerprint));
@@ -82,6 +83,7 @@
   const startAdd = (item: ReviewItem, use = false) => {
     if (draft && draft.item.id !== item.id) delete peeks[draft.item.id];
     emailOpen = true;
+    addedIds = [];
     drafts = use && item.suggestions.length ? item.suggestions.map((s) => suggestedDraft(item, s)) : [handDraft(item)];
     baseline = fingerprints();
     formError = "";
@@ -163,7 +165,8 @@
       if (typeof built === "string") { formError = built; return; }
       bodies.push(built);
     }
-    const added: number[] = [];
+    const added = addedIds;
+    const before = added.length;
     let listed = false;
     const ok = await act(async () => {
       for (const [n, body] of bodies.entries()) {
@@ -173,7 +176,7 @@
       }
       listed = true;
       await apiCall<"DELETE /api/review/{id}">(`/api/review/${first.item.id}?${added.map((id) => `segment=${id}`).join("&")}`, { method: "DELETE" });
-    }, { busy: (on) => (saving = on), onError: (m) => (formError = listed ? `Added, but couldn’t take it off this list: ${m}` : added.length ? `Added ${added.length} of ${bodies.length}, but couldn’t add the rest: ${m}` : m) });
+    }, { busy: (on) => (saving = on), onError: (m) => (formError = listed ? `Added, but couldn’t take it off this list: ${m}` : added.length ? `Added ${added.length} of ${before + bodies.length}, but couldn’t add the rest: ${m}` : m) });
     if (!ok) { if (listed) { closeForm(); await settle(); } else if (added.length) await settle(); return; }
     closeForm();
     toast.success(added.length > 1 ? `Added ${plural(added.length, legs)} to your trips` : "Added to your trips");

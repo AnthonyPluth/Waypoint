@@ -945,6 +945,17 @@ describe("Review: a booking email with several flights", () => {
     expect(calls.some(([p, m]) => m === "DELETE" && p.startsWith("/api/review/"))).toBe(false);
   });
 
+  it("sends every booking it added on the final take-off, even when one leg had to be retried", async () => {
+    secondSegmentFails = "The flight was refused.";
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Add 2 flights" }));
+    await screen.findByRole("alert");
+    secondSegmentFails = "";
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(calls.filter(([p, m]) => m === "DELETE" && p.startsWith("/api/review/")).map(([p]) => p)).toEqual(["/api/review/1?segment=42&segment=43"]);
+  });
+
   it("closes without adding anything on Cancel", async () => {
     await open();
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));

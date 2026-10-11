@@ -877,6 +877,7 @@ class AssistantEntry(TypedDict):
 class AssistantItemDetail(AssistantItem):
     entries: list[AssistantEntry]
     suggestion: AssistantParsed | None
+    suggestions: list[AssistantParsed]
 
 
 class AssistantMatchBody(TypedDict):

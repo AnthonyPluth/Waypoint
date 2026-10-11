@@ -3221,6 +3221,12 @@
                 "type": "null"
               }
             ]
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantParsed"
+            }
           }
         },
         "required": [
@@ -3236,7 +3242,8 @@
           "bookings",
           "match",
           "entries",
-          "suggestion"
+          "suggestion",
+          "suggestions"
         ],
         "additionalProperties": false
       },

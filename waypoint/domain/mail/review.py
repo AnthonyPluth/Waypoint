@@ -95,7 +95,7 @@ def pending(conn: db.Connection, owner: str) -> list[Any]:
 
 def visible(conn: db.Connection, owner: str, item_id: int) -> Any:
     return conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.sender_domain, ReviewItem.received,
-                               ReviewItem.reason, ReviewItem.suggestion, ReviewItem.matches, Mailbox.owner_sub)
+                               ReviewItem.reason, ReviewItem.suggestion, ReviewItem.suggestion_error, ReviewItem.matches, Mailbox.owner_sub)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
 
 
