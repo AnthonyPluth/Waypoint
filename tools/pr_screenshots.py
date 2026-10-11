@@ -87,6 +87,15 @@ def trailers_from(env: dict[str, str], extra: Sequence[str]) -> list[str]:
     return lines
 
 
+def git_config_from(env: dict[str, str], extra: Sequence[str]) -> list[str]:
+    settings = [s.strip() for s in env.get("PR_SCREENSHOTS_GIT_CONFIG", "").splitlines() if s.strip()]
+    settings += [s for s in extra if s]
+    for setting in settings:
+        if "=" not in setting or setting.startswith("="):
+            raise ScreenshotError(f"git config takes KEY=VALUE, not {setting!r}")
+    return settings
+
+
 def check_trailers(trailers: Sequence[str]) -> None:
     claude = [v for k, _, v in (t.partition(":") for t in trailers) if k.strip().lower() == "co-authored-by" and v.strip().startswith("Claude")]
     if len(claude) != 1 or not fleet_checks.GOOD_CO_AUTHOR.match(claude[0].strip()):
@@ -183,7 +192,7 @@ def main(argv: Sequence[str], cwd: Path | None = None, env: dict[str, str] | Non
     try:
         files = select_files(args.files)
         pushed = publish(ROOT, args.pr, files, args.remote, trailers_from(env if env is not None else dict(os.environ), args.trailer),
-                         git_config=args.git_config)
+                         git_config=git_config_from(env if env is not None else dict(os.environ), args.git_config))
     except ScreenshotError as e:
         print(f"pr_screenshots: {e}", file=sys.stderr)
         return 1

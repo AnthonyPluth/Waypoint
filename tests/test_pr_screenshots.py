@@ -93,6 +93,15 @@ class Arguments(unittest.TestCase):
             with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 ps.parse_args(["7", "--git-config", bad])
 
+    def test_git_config_comes_from_the_environment_one_setting_per_line_then_flags_and_keeps_spaces_and_quotes(self):
+        env = {"PR_SCREENSHOTS_GIT_CONFIG": "gpg.ssh.program=/x y/sign\n\nuser.name=A \"B\"; $(x)\n"}
+        self.assertEqual(ps.git_config_from(env, ["core.abbrev=9"]), ["gpg.ssh.program=/x y/sign", 'user.name=A "B"; $(x)', "core.abbrev=9"])
+        self.assertEqual(ps.git_config_from({}, []), [])
+
+    def test_a_git_config_line_in_the_environment_must_be_key_value(self):
+        with self.assertRaises(ps.ScreenshotError):
+            ps.git_config_from({"PR_SCREENSHOTS_GIT_CONFIG": "gpg.ssh.program"}, [])
+
     def test_rejects_a_theme_option_since_the_app_is_dark_only(self):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             ps.parse_args(["7", "--theme", "dark"])
