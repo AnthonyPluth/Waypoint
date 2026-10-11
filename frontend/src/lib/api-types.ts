@@ -447,6 +447,8 @@ export interface ScanSummary {
   skipped: number;
   capped: boolean;
   labels_dropped: number;
+  triaged: number;
+  total: number;
 }
 
 export interface Segment {

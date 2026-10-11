@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import threading
-import time
 from datetime import UTC, date, datetime
 
 from .. import monitoring, oidc
@@ -73,7 +72,7 @@ def scan_mailboxes() -> None:
     if not gmail.configured():
         return
     try:
-        scan.scan_all(time.time(), date.today())
+        scan.scan_all(date.today())
     except Exception as e:
         monitoring.report(e, values=False)
 
@@ -84,7 +83,7 @@ def scan_now(mailbox_id: int, again: bool = False, backfill: bool = False) -> bo
 
     def run() -> None:
         try:
-            scan.scan(mailbox_id, time.time(), date.today(), again, backfill)
+            scan.run(mailbox_id, date.today(), again, backfill)
         except Exception as e:
             monitoring.report(e, values=False)
     threading.Thread(target=run, daemon=True, name="mail-scan-now").start()

@@ -4326,6 +4326,12 @@
           },
           "labels_dropped": {
             "type": "integer"
+          },
+          "triaged": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
           }
         },
         "required": [
@@ -4335,7 +4341,9 @@
           "review",
           "skipped",
           "capped",
-          "labels_dropped"
+          "labels_dropped",
+          "triaged",
+          "total"
         ],
         "additionalProperties": false
       },
