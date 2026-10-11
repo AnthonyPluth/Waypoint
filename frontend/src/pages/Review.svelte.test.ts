@@ -191,6 +191,35 @@ describe("Review", () => {
     expect(calls.some(([p]) => p === "/api/segments")).toBe(false);
   });
 
+  it("adds a parking booking by hand with its lot, entry and exit, and the address to work the zone out from", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.selectOptions(screen.getByLabelText("What is it?"), "parking");
+    expect(screen.queryByLabelText("To (airport code)")).toBeNull();
+    await userEvent.type(screen.getByLabelText("Lot"), "Example Long-Term Lot");
+    await userEvent.type(screen.getByLabelText(/^Address/), "1 Terminal Road, Jamaica, NY");
+    await userEvent.type(screen.getByLabelText("Entry"), "2026-11-21T08:00");
+    await userEvent.type(screen.getByLabelText("Exit"), "2026-11-27T21:00");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({
+      kind: "parking", origin: "Example Long-Term Lot", start_zone: null, details: { address: "1 Terminal Road, Jamaica, NY" } })]));
+    expect(calls.find(([p]) => p === "/api/segments")?.[2]).not.toHaveProperty("end_zone");
+  });
+
+  it("opens a parking suggestion with its lot name and dates and asks for a zone or an address without either", async () => {
+    const lot = { kind: "parking" as const, provider: "Example Parking", confirmation: "PK1234", origin: "Example Long-Term Lot",
+      start_local: "2026-12-02T08:00", end_local: "2026-12-09T21:00" };
+    held = { matches: [], items: [item({ suggestion: lot })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText("Lot")).toHaveValue("Example Long-Term Lot");
+    expect(screen.getByLabelText("Entry")).toHaveValue("2026-12-02T08:00");
+    expect(screen.getByLabelText("Exit")).toHaveValue("2026-12-09T21:00");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("lot’s time zone");
+    expect(calls.some(([p]) => p === "/api/segments")).toBe(false);
+  });
+
   it("shows why a booking wasn’t added, and keeps what was typed", async () => {
     serve("/api/segments");
     render(ReviewPage);

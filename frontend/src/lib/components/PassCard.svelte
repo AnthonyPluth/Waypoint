@@ -42,6 +42,7 @@
     flight ? [["Terminal", s.details.terminal], ["Gate", status?.dep_gate], ["Seat", seat], ["Cabin", s.details.cabin]]
       : s.kind === "hotel" ? [["Address", s.details.address], ["Room", s.details.room]]
         : s.kind === "car" ? [["Car", s.details.car_class], ["Address", s.details.address]]
+          : s.kind === "parking" ? [["Address", s.details.address], ["Space", s.details.space_type], ["Vehicle", s.details.vehicle], ["Notes", s.details.notes]]
           : s.kind === "cruise" ? [["Ship", s.details.ship], ["Cabin", s.details.room], ["Deck", s.details.deck]]
             : [["Seat", seat], ["Cabin", s.details.cabin]],
   );

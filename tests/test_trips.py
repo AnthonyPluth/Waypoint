@@ -561,6 +561,51 @@ class RentalZoneTests(Household):
             self.add(self.jane, {**self.RENTAL, "kind": "cruise", "origin": "JFK"}, None, self.on(self.jane.person_id))
 
 
+PARKING = {"kind": "parking", "origin": "Example Long-Term Lot", "provider": "Example Parking", "confirmation": "PK1234",
+           "start_local": "2026-06-01T08:00", "end_local": "2026-06-04T21:00", "start_zone": "America/New_York",
+           "details": {"space_type": "Covered", "vehicle": "Blue hatchback", "notes": "Shuttle every 15 minutes", "address": "1 Terminal Road, Jamaica, NY"},
+           "manage_url": "https://example.com/manage/PK1234"}
+
+
+class ParkingTests(Household):
+    def test_a_parking_booking_keeps_its_lot_times_zone_and_details(self):
+        seg = self.add(self.jane, PARKING, None, self.on(self.jane.person_id))
+        self.assertEqual((seg["kind"], seg["origin"], seg["start_zone"], seg["end_zone"]), ("parking", "Example Long-Term Lot", "America/New_York", "America/New_York"))
+        self.assertEqual((seg["start_local"], seg["end_local"]), ("2026-06-01T08:00", "2026-06-04T21:00"))
+        self.assertEqual(seg["details"], PARKING["details"])
+        self.assertEqual(seg["links"]["directions"], "https://maps.apple.com/?q=1%20Terminal%20Road%2C%20Jamaica%2C%20NY")
+        self.assertEqual(seg["links"]["app"], "https://example.com/manage/PK1234")
+
+    def test_the_zone_comes_from_the_address_and_is_asked_for_when_it_cannot_be_told(self):
+        with self.assertRaisesRegex(trips.Invalid, "time zone of the stay"):
+            self.add(self.jane, {**PARKING, "start_zone": None, "details": {}}, None, self.on(self.jane.person_id))
+        with self.assertRaisesRegex(trips.Invalid, "isn’t one"):
+            self.add(self.jane, {**PARKING, "start_zone": "Mars/Olympus"}, None, self.on(self.jane.person_id))
+
+    def test_exit_before_entry_is_refused_the_exit_uses_the_lots_zone_and_an_unknown_detail_is_refused(self):
+        with self.assertRaisesRegex(trips.Invalid, "ends before it starts"):
+            self.add(self.jane, {**PARKING, "end_local": "2026-06-01T07:59"}, None, self.on(self.jane.person_id))
+        with self.assertRaisesRegex(trips.Invalid, "Details can hold only"):
+            self.add(self.jane, {**PARKING, "details": {"plate": "ABC123"}}, None, self.on(self.jane.person_id))
+        seg = self.add(self.jane, {**PARKING, "end_zone": "Europe/London"}, None, self.on(self.jane.person_id))
+        self.assertEqual(seg["end_zone"], "Europe/London")
+
+    def test_an_edit_locks_the_field_and_a_later_email_leaves_it(self):
+        seg = self.add(self.jane, PARKING, None, self.on(self.jane.person_id))
+        mine = {**PARKING["details"], "vehicle": "Green estate"}
+        edited = trips.edit_segment(self.c, self.jane, seg["id"], {"details": mine})
+        assert edited
+        self.assertEqual((edited["details"]["vehicle"], edited["locked_fields"]), ("Green estate", ["details"]))
+        self.assertEqual(trips.merge_email_segment(self.c, self.jane, {**PARKING, "end_local": "2026-06-05T21:00"}), "updated")
+        again = trips.get_segment(self.c, self.jane, seg["id"])
+        assert again
+        self.assertEqual((again["details"]["vehicle"], again["end_local"]), ("Green estate", "2026-06-05T21:00"))
+
+    def test_only_those_on_the_trip_see_the_booking(self):
+        seg = self.add(self.jane, PARKING, None, self.on(self.jane.person_id))
+        self.assertIsNone(trips.get_segment(self.c, self.sam, seg["id"]))
+
+
 class CruiseTests(Household):
     def test_a_cruise_keeps_its_ports_in_order_with_their_own_zones(self):
         seg = self.add(self.jane, {**CRUISE, "itinerary": PORTS})
@@ -1101,6 +1146,25 @@ class CruiseRouteTests(RouteCase):
                 status, got = self.call("ana", "POST", f"/api/segments/{seg['id']}", {"itinerary": bad})
                 self.assertEqual(status, 400, got)
                 self.assertIn(why, got["error"])
+        self.assertEqual(self.call("ben", "GET", f"/api/segments/{seg['id']}")[0], 404)
+
+
+class ParkingRouteTests(RouteCase):
+    def test_a_parking_booking_round_trips_and_a_bad_one_is_a_400(self):
+        seg = self.ok("ana", "POST", "/api/segments", PARKING)
+        self.assertEqual((seg["kind"], seg["origin"], seg["details"]), ("parking", "Example Long-Term Lot", PARKING["details"]))
+        self.assertEqual(self.ok("ana", "GET", f"/api/segments/{seg['id']}")["start_zone"], "America/New_York")
+        edited = self.ok("ana", "POST", f"/api/segments/{seg['id']}", {"details": {**PARKING["details"], "space_type": "Valet"}})
+        self.assertEqual((edited["details"]["space_type"], edited["locked_fields"]), ("Valet", ["details"]))
+        for body, why in (({"details": {"vehicle": "x" * 201}}, "200"), ({"details": {"plate": "ABC123"}}, "Details can hold only"),
+                          ({"end_local": "2026-06-01T07:00"}, "ends before")):
+            with self.subTest(why=why):
+                status, got = self.call("ana", "POST", f"/api/segments/{seg['id']}", body)
+                self.assertEqual(status, 400, got)
+                self.assertIn(why, got["error"])
+
+    def test_a_trip_you_are_not_on_is_a_404(self):
+        seg = self.ok("ana", "POST", "/api/segments", PARKING)
         self.assertEqual(self.call("ben", "GET", f"/api/segments/{seg['id']}")[0], 404)
 
 

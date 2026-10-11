@@ -489,6 +489,66 @@ describe("Trip", () => {
     expect(screen.getByLabelText(/Time zone at the end/)).toBeInTheDocument();
   });
 
+  it("adds a parking booking with its lot, entry, exit and details to this trip", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add a booking/ }));
+    await u.selectOptions(screen.getByLabelText("What is it"), "Parking");
+    expect(screen.queryByLabelText(/Time zone at the end/)).toBeNull();
+    expect(screen.getByText(/Entry and exit are both at the lot/)).toBeInTheDocument();
+    await u.type(screen.getByLabelText("Lot name"), "Example Long-Term Lot");
+    await u.type(screen.getByLabelText(/^Entry/), "2026-11-20T16:00");
+    await u.type(screen.getByLabelText(/^Exit/), "2026-11-27T21:00");
+    await u.selectOptions(screen.getByLabelText(/^Time zone/), "America/New_York");
+    await u.type(screen.getByLabelText("Space type (covered, economy, valet)"), "Covered");
+    await u.type(screen.getByLabelText("Vehicle (make and colour)"), "Blue hatchback");
+    await u.click(screen.getByLabelText("Sam Doe"));
+    await u.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({
+      trip_id: 1, kind: "parking", origin: "Example Long-Term Lot", start_zone: "America/New_York", details: { space_type: "Covered", vehicle: "Blue hatchback" }, travelers: [{ person_id: 2 }] }) }));
+  });
+
+  describe("a parking booking", () => {
+    const lot = segment({ id: 6, kind: "parking", provider: "Example Parking", origin: "Example Long-Term Lot", destination: null, start_zone: "America/New_York", end_zone: "America/New_York",
+      start_local: "2026-11-20T16:00", end_local: "2026-11-27T21:00", confirmation: "PK1234", details: { space_type: "Covered", address: "1 Terminal Road\nJamaica, NY", vehicle: "Blue hatchback" },
+      links: { app: null, open: null, open_kind: null, directions: "https://maps.apple.com/?q=1%20Terminal%20Road%20Jamaica%2C%20NY", call: null } });
+
+    it("leads with the lot, shows Entry and Exit at the lot’s times, its address, details and a Directions button", async () => {
+      held = trip([lot]);
+      render(TripPage);
+      const card = (await screen.findByRole("heading", { name: "Example Long-Term Lot" })).closest(".pass") as HTMLElement;
+      expect(within(card).getByText("Entry")).toBeInTheDocument();
+      expect(within(card).getByText("Exit")).toBeInTheDocument();
+      expect(within(card).getByText("4:00 PM")).toBeInTheDocument();
+      expect(within(card).getByText("9:00 PM")).toBeInTheDocument();
+      expect(within(card).getByText("Covered")).toBeInTheDocument();
+      expect(within(card).getByText("Blue hatchback")).toBeInTheDocument();
+      expect(screen.getByText("Address")).toBeInTheDocument();
+      expect(screen.getByTestId("stay-zone")).toHaveTextContent("America/New York");
+      expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", lot.links.directions!);
+    });
+
+    it("edits the lot and keeps the details it does not show", async () => {
+      held = trip([{ ...lot, details: { ...lot.details, time_unknown: "no" } }]);
+      const u = userEvent.setup();
+      render(TripPage);
+      await u.click(await screen.findByRole("button", { name: "Edit Example Long-Term Lot" }));
+      expect(screen.getByLabelText("Lot name")).toHaveValue("Example Long-Term Lot");
+      expect(screen.getByLabelText("Space type (covered, economy, valet)")).toHaveValue("Covered");
+      await u.clear(screen.getByLabelText("Space type (covered, economy, valet)"));
+      await u.type(screen.getByLabelText("Space type (covered, economy, valet)"), "Valet");
+      await u.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/6", { method: "POST", body: expect.objectContaining({
+        kind: "parking", origin: "Example Long-Term Lot", start_zone: "America/New_York", details: expect.objectContaining({ space_type: "Valet", vehicle: "Blue hatchback" }) }) }));
+    });
+
+    it("offers adding an address when there is none", async () => {
+      held = trip([{ ...lot, details: {}, links: { ...lot.links, directions: null } }]);
+      render(TripPage);
+      expect(await screen.findByRole("button", { name: "Add address to Example Long-Term Lot" })).toBeInTheDocument();
+    });
+  });
+
   it("removes a booking after asking", async () => {
     render(TripPage);
     const u = userEvent.setup();

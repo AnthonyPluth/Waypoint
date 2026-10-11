@@ -169,6 +169,41 @@ describe("Upcoming", () => {
     expect(within(card).getByText("3:00 PM")).toBeInTheDocument();
   });
 
+  describe("a parking booking", () => {
+    const lot = segment({ id: 7, kind: "parking", provider: "Example Parking", origin: "Example Long-Term Lot", destination: null, start_local: "2026-11-20T15:00", start_zone: NY,
+      end_local: "2026-11-27T21:00", end_zone: NY, confirmation: "PK1234", details: { space_type: "Covered", address: "1 Terminal Road, Jamaica, NY" } });
+
+    it("leads with the lot as Next up, counting down to entry", async () => {
+      at("2026-11-20T09:00:00-05:00");
+      serve([trip([lot, outbound, stay, home])]);
+      render(Upcoming);
+      const card = (await screen.findByRole("heading", { name: "Example Long-Term Lot" })).closest("section")!;
+      expect(within(card).getByText("Next up")).toBeInTheDocument();
+      expect(within(card).getByText("Entry in 6 h")).toBeInTheDocument();
+      expect(within(card).getByText("1 Terminal Road, Jamaica, NY", { selector: "dd" })).toBeInTheDocument();
+      expect(within(card).getByText("Exit")).toBeInTheDocument();
+    });
+
+    it("calls it under way while the vehicle is parked and nothing else is left", async () => {
+      at("2026-11-22T12:00:00-05:00");
+      serve([trip([lot])]);
+      render(Upcoming);
+      const card = (await screen.findByRole("heading", { name: "Example Long-Term Lot" })).closest("section")!;
+      expect(within(card).getByText("Under way")).toBeInTheDocument();
+      expect(within(card).getByText("Exit in 5 days 9 h")).toBeInTheDocument();
+    });
+
+    it("lists the lot on the day it starts and again on the day it ends, with the lot type", async () => {
+      at("2026-11-20T09:00:00-05:00");
+      serve([trip([lot, outbound, home])]);
+      render(Upcoming);
+      const days = await screen.findByRole("list", { name: "Trip to London, day by day" });
+      expect(within(days).getByRole("link", { name: "Example Long-Term Lot" })).toHaveAttribute("href", "#trip/1?segment=7");
+      expect(within(days).getByRole("link", { name: "Exit: Example Long-Term Lot" })).toHaveAttribute("href", "#trip/1?segment=7");
+      expect(within(days).getByText(/Covered/)).toBeInTheDocument();
+    });
+  });
+
   it("leaves a flight's cabin and a hotel's address out of the day-by-day list", async () => {
     at("2026-11-20T09:00:00-05:00");
     const economy = segment({ id: 1, details: { flight_number: "AA 101", seat: "12A", cabin: "Economy" } });

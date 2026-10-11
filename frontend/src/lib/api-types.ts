@@ -15,7 +15,7 @@ export interface AiSettings {
 }
 
 export interface AiSuggestion {
-  kind: "flight" | "hotel" | "car" | "train" | "cruise";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
   origin: string;
   start_local: string;
   end_local: string;
@@ -389,7 +389,7 @@ export interface Review {
 }
 
 export interface ReviewBooking {
-  kind: "flight" | "hotel" | "car" | "train" | "cruise";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
   provider: string | null;
   confirmation: string | null;
   origin: string | null;
@@ -402,7 +402,7 @@ export interface ReviewCandidate {
   segment_id: number;
   trip_id: number;
   trip_name: string;
-  kind: "flight" | "hotel" | "car" | "train" | "cruise";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
   provider: string | null;
   origin: string | null;
   destination: string | null;
@@ -454,7 +454,7 @@ export interface ScanSummary {
 export interface Segment {
   id: number;
   trip_id: number;
-  kind: "flight" | "hotel" | "car" | "train" | "cruise";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
   status: "confirmed" | "changed" | "cancelled";
   confirmation: string | null;
   provider: string | null;
@@ -481,7 +481,7 @@ export interface Segment {
 }
 
 export interface SegmentBody {
-  kind: "flight" | "hotel" | "car" | "train" | "cruise";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
   start_local: string;
   end_local: string;
   trip_id?: number | null;
@@ -499,7 +499,7 @@ export interface SegmentBody {
 }
 
 export interface SegmentEdit {
-  kind?: "flight" | "hotel" | "car" | "train" | "cruise";
+  kind?: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
   status?: "confirmed" | "changed" | "cancelled";
   confirmation?: string | null;
   provider?: string | null;
@@ -564,6 +564,7 @@ export interface Stats {
   stays: StatsStays;
   cars: StatsCars;
   cruises: StatsCruises;
+  parking: StatsParking;
   places: StatsPlaces;
 }
 
@@ -633,6 +634,12 @@ export interface StatsMapTrip {
 export interface StatsNamed {
   name: string;
   count: number;
+}
+
+export interface StatsParking {
+  days: number;
+  bookings: number;
+  lots: StatsNamed[];
 }
 
 export interface StatsPlace {
@@ -762,7 +769,7 @@ export interface WhoIsThis {
   name: string;
   segment_id: number;
   trip_id: number;
-  kind: "flight" | "hotel" | "car" | "train" | "cruise";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
   provider: string | null;
   origin: string | null;
   destination: string | null;

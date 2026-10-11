@@ -2,7 +2,7 @@ import type { Segment, SegmentBody, SegmentEdit } from "./api-types";
 import { instant, untimed } from "./trips";
 
 export type Kind = Segment["kind"];
-export const KINDS: [Kind, string][] = [["flight", "Flight"], ["hotel", "Hotel"], ["car", "Car rental"], ["train", "Train"], ["cruise", "Cruise"]];
+export const KINDS: [Kind, string][] = [["flight", "Flight"], ["hotel", "Hotel"], ["car", "Car rental"], ["train", "Train"], ["cruise", "Cruise"], ["parking", "Parking"]];
 
 export const MAX_PORTS = 40;
 
@@ -14,6 +14,7 @@ export const DETAILS: Record<Kind, [string, string][]> = {
   car: [["address", "Pick-up address"], ["car_class", "Car class"], ["phone", "Phone"]],
   train: [["cabin", "Class"]],
   cruise: [["ship", "Ship"], ["room", "Cabin"], ["deck", "Deck"], ["address", "Terminal address"], ["phone", "Phone"]],
+  parking: [["address", "Address"], ["space_type", "Space type (covered, economy, valet)"], ["vehicle", "Vehicle (make and colour)"], ["notes", "Notes"]],
 };
 
 export const SEAT_LIMIT = 10;
@@ -79,10 +80,12 @@ export function problem(d: Draft): string | null {
     if (!AIRPORT.test(d.destination.trim())) return "A flight’s destination is an airport code like LHR";
   } else if (d.kind === "hotel" && !d.origin.trim()) {
     return "Enter the hotel’s name";
+  } else if (d.kind === "parking" && !d.origin.trim()) {
+    return "Enter the lot’s name";
   }
-  if (!LOCAL.test(d.start_local)) return d.kind === "hotel" ? "Enter the check-in date and time" : "Enter when it starts";
-  if (!LOCAL.test(d.end_local)) return d.kind === "hotel" ? "Enter the check-out date and time" : "Enter when it ends";
-  const stay = d.kind === "hotel";
+  const stay = d.kind === "hotel" || d.kind === "parking";
+  if (!LOCAL.test(d.start_local)) return d.kind === "hotel" ? "Enter the check-in date and time" : d.kind === "parking" ? "Enter the entry date and time" : "Enter when it starts";
+  if (!LOCAL.test(d.end_local)) return d.kind === "hotel" ? "Enter the check-out date and time" : d.kind === "parking" ? "Enter the exit date and time" : "Enter when it ends";
   if (stay && !d.start_zone.trim() && !(d.details.address ?? "").trim()) return "Enter the time zone of the stay (for example America/New_York), or its address to work it out from";
   if (d.kind === "cruise" && !d.start_zone.trim()) return "Enter the time zone of the place (for example America/New_York)";
   for (const zone of [d.start_zone.trim(), stay ? "" : d.end_zone.trim()]) {
@@ -127,7 +130,7 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
     origin: flight ? d.origin.trim().toUpperCase() : text(d.origin), destination: flight ? d.destination.trim().toUpperCase() : text(d.destination),
     start_local: d.start_local, end_local: d.end_local,
     ...(flight || d.kind === "car" || d.kind === "train" ? { ...(startZone && { start_zone: startZone }), ...(d.end_zone.trim() && { end_zone: d.end_zone.trim() }) }
-      : d.kind === "hotel" ? { start_zone: startZone || null }
+      : d.kind === "hotel" || d.kind === "parking" ? { start_zone: startZone || null }
         : { start_zone: startZone, end_zone: endZone }),
     details, manage_url: text(d.manage_url),
     ...(flight || d.kind !== "cruise" ? {} : { itinerary: d.itinerary.map((p) => ({ name: p.name.trim(), zone: p.zone.trim(), arrive_local: p.arrive || null, depart_local: p.depart || null })) }),

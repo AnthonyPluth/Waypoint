@@ -15,6 +15,7 @@ export type ReviewFacts = {
   topAirports: string[];
   nights: number;
   cruises: { count: number; nights: number; seaDays: number };
+  parking: { days: number; bookings: number };
   map: { dots: { x: number; y: number; r: number }[]; arcs: { d: string; width: number }[] };
 };
 
@@ -38,6 +39,7 @@ export function reviewFacts(stats: Stats, allTime: Stats | null): ReviewFacts {
     topAirports: [...f.airports].sort((x, y) => y.visits - x.visits || x.code.localeCompare(y.code)).slice(0, 3).map((a) => a.code),
     nights: stats.stays.nights,
     cruises: { count: stats.cruises.count, nights: stats.cruises.nights, seaDays: stats.cruises.sea_days },
+    parking: { days: stats.parking.days, bookings: stats.parking.bookings },
     map: { dots: world.dots.map((d) => ({ x: d.x, y: d.y, r: d.r })), arcs: world.arcs.map((a) => ({ d: a.d, width: a.width })) },
   };
 }

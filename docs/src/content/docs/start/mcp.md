@@ -28,7 +28,7 @@ An app that registers but is never approved is forgotten after a day (and at mos
 
 ## What it can read
 
-An assistant always gets **read**: upcoming flights, stays, rentals and trains, trips and a trip’s segments with who is travelling, people and guests, [stats](/Waypoint/start/stats/), and the live [flight status](/Waypoint/start/flight-status/) Waypoint already holds (an assistant never makes Waypoint look anything up). Times are the wall-clock times at the place, with its zone, as in the app.
+An assistant always gets **read**: upcoming flights, stays, rentals, trains, cruises and parking, trips and a trip’s segments with who is travelling, people and guests, [stats](/Waypoint/start/stats/), and the live [flight status](/Waypoint/start/flight-status/) Waypoint already holds (an assistant never makes Waypoint look anything up). Times are the wall-clock times at the place, with its zone, as in the app.
 The tools are `upcoming`, `list_trips`, `get_trip`, `list_people`, `get_stats` and `flight_status`.
 
 ## Letting it change trips (optional)

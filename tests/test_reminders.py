@@ -95,6 +95,20 @@ class CalendarTests(unittest.TestCase):
         self.assertIn("LOCATION:5 Depot Way", self.lines(car))
         self.assertFalse([l for l in self.lines(segment()) if l.startswith("LOCATION")])
 
+    def test_parking_is_one_event_from_entry_to_exit_at_the_lots_zone_with_its_address_and_confirmation(self):
+        lot = segment(kind="parking", origin="Example Airport Long-Term Lot", destination=None, start_local="2026-10-30T08:00",
+                      end_local="2026-11-03T21:30", start_zone="America/New_York", end_zone="America/New_York", provider="Example Parking",
+                      confirmation="PK1234", details={"address": "1 Terminal Road\nJamaica, NY", "space_type": "Covered", "vehicle": "Blue hatchback"})
+        lines = self.lines(lot)
+        self.assertIn("SUMMARY:Parking: Example Airport Long-Term Lot", lines)
+        self.assertIn("DTSTART;TZID=America/New_York:20261030T080000", lines)
+        self.assertIn("DTEND;TZID=America/New_York:20261103T213000", lines)
+        self.assertIn("LOCATION:1 Terminal Road\\nJamaica\\, NY", lines)
+        text = "\n".join(lines)
+        self.assertIn("Confirmation: PK1234", text)
+        self.assertIn("Space: Covered", text)
+        self.assertIn("Vehicle: Blue hatchback", text)
+
     def test_a_flights_description_lists_the_seat_of_each_traveller(self):
         flight = segment(details={"flight_number": "NZ 6"}, travelers=[
             {"id": 1, "person_id": 1, "name": "Jane Doe", "seat": "31A"}, {"id": 2, "person_id": 2, "name": "Sam Doe", "seat": "31B"},
@@ -322,6 +336,16 @@ class SendingTests(Reminders):
         self.assertEqual(message["body"].split("\n"), ["15:00 Hotel check-in Harbour Hotel", "19:00 Flight EX 101 JFK → LHR"])
         self.assertEqual(self.due(later, hour=12), 0)
         self.assertEqual(self.due(later, hour=12, today=date(2026, 11, 21)), 0)
+
+    def test_the_morning_of_a_parking_entry_says_parking_once(self):
+        self.device()
+        self.add(self.jane, {"kind": "parking", "origin": "Example Long-Term Lot", "start_local": "2026-11-20T16:00", "end_local": "2026-11-24T20:00",
+                             "start_zone": "America/New_York", "end_zone": "America/New_York", "confirmation": "PK77"}, self.out["trip_id"])
+        self.assertEqual(self.due(LATER, hour=8), 1)
+        (_id, message), = self.sent
+        self.assertEqual(message["body"].split("\n"), ["16:00 Parking Example Long-Term Lot", "19:00 Flight EX 101 JFK → LHR"])
+        self.assertEqual(self.due(LATER, hour=9), 0)
+        self.assertEqual(len(self.sent), 1)
 
     def test_a_long_day_names_five_bookings_and_counts_the_rest(self):
         self.device()

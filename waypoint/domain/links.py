@@ -75,7 +75,7 @@ def call_link(phone: str | None) -> str | None:
 
 def segment_links(kind: str, provider: str | None, confirmation: str | None, last_name: str | None, manage_url: str | None,
                   details: dict[str, str], origin: str | None) -> Links:
-    stay = kind in ("hotel", "car", "cruise")
+    stay = kind in ("hotel", "car", "cruise", "parking")
     airline_page = manage_link(provider, confirmation, last_name) if kind == "flight" else None
     mine = https_only(manage_url) or airline_page
     vendor = None if mine else app_links.vendor_for(kind, provider, origin if kind == "hotel" else None)

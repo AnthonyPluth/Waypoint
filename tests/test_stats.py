@@ -486,6 +486,54 @@ class CruiseTests(StatsCase):
         self.assertEqual(self.stats(self.sam)["cruises"]["count"], 1)
 
 
+PARKING = {"kind": "parking", "origin": "Example Long-Term Lot", "provider": "Example Parking", "start_local": "2026-06-01T08:00",
+           "end_local": "2026-06-04T21:00", "start_zone": "America/New_York", "end_zone": "America/New_York"}
+
+
+class ParkingTests(StatsCase):
+    def test_every_date_from_entry_to_exit_counts_and_the_lots_are_ranked_by_stays(self):
+        self.mine(PARKING, {**PARKING, "confirmation": "B", "start_local": "2026-07-10T08:00", "end_local": "2026-07-11T09:00"},
+                  {**PARKING, "confirmation": "C", "origin": "Example Economy Lot", "start_local": "2026-08-01T08:00", "end_local": "2026-08-02T09:00"})
+        p = self.stats(self.jane)["parking"]
+        self.assertEqual((p["days"], p["bookings"]), (4 + 2 + 2, 3))
+        self.assertEqual(p["lots"], [{"name": "Example Long-Term Lot", "count": 2}, {"name": "Example Economy Lot", "count": 1}])
+
+    def test_overlapping_bookings_count_each_date_once_but_each_booking_once(self):
+        self.mine(PARKING, {**PARKING, "confirmation": "B", "start_local": "2026-06-03T08:00", "end_local": "2026-06-06T09:00"})
+        p = self.stats(self.jane)["parking"]
+        self.assertEqual((p["days"], p["bookings"], p["lots"]), (6, 2, [{"name": "Example Long-Term Lot", "count": 2}]))
+
+    def test_a_booking_that_ends_the_day_it_starts_counts_that_one_date(self):
+        self.mine({**PARKING, "end_local": "2026-06-01T20:00"})
+        self.assertEqual(self.stats(self.jane)["parking"]["days"], 1)
+
+    def test_a_year_takes_its_own_dates_and_the_years_list_has_the_booking(self):
+        self.mine({**PARKING, "start_local": "2025-12-30T08:00", "end_local": "2026-01-02T09:00"})
+        self.assertEqual(self.stats(self.jane)["years"], [2026, 2025])
+        a, b = (self.stats(self.jane, year=y)["parking"] for y in (2025, 2026))
+        self.assertEqual((a["days"], a["bookings"], b["days"], b["bookings"]), (2, 1, 2, 1))
+        none = self.stats(self.jane, year=2024)["parking"]
+        self.assertEqual((none["days"], none["bookings"], none["lots"]), (0, 0, []))
+
+    def test_a_cancelled_and_an_unfinished_booking_do_not_count(self):
+        self.mine(PARKING)
+        gone = self.add(self.jane, {**PARKING, "confirmation": "X", "start_local": "2026-05-01T08:00", "end_local": "2026-05-03T09:00"},
+                        travelers=self.on(self.jane.person_id))
+        trips.edit_segment(self.c, self.jane, gone["id"], {"status": "cancelled"})
+        self.mine({**PARKING, "confirmation": "Y", "start_local": "2026-09-22T08:00", "end_local": "2026-09-25T09:00"})
+        p = self.stats(self.jane)["parking"]
+        self.assertEqual((p["days"], p["bookings"]), (4, 1))
+
+    def test_the_numbers_are_the_viewers_own(self):
+        self.add(self.sam, PARKING, travelers=self.on(self.sam.person_id))
+        self.assertEqual(self.stats(self.jane)["parking"], {"days": 0, "bookings": 0, "lots": []})
+        self.assertEqual(self.stats(self.sam)["parking"]["days"], 4)
+
+    def test_without_parking_there_is_nothing_to_show(self):
+        self.mine(HOTEL)
+        self.assertEqual(self.stats(self.jane)["parking"], {"days": 0, "bookings": 0, "lots": []})
+
+
 class VisibilityTests(StatsCase):
     def test_the_household_as_one_user_sees_leaves_out_a_trip_only_another_user_is_on(self):
         self.mine(JFK_LHR)

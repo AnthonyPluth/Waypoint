@@ -12,7 +12,7 @@ Settings → Travel → **Reminders and calendar** is yours alone: each member c
 Waypoint sends two kinds of notification, and each person chooses which they get (both are on until you choose):
 
 - **Check-in opens**, 24 hours before a flight leaves. It names the flight, the airports and the departure time, written as it is at the airport. A flight moved to another time gets a new reminder.
-- **Day-of summary**, from 7:00 on Waypoint’s clock (its `TZ`) on any day something starts: your flights, hotel check-ins, car pickups and trains that day, each with its own local time.
+- **Day-of summary**, from 7:00 on Waypoint’s clock (its `TZ`) on any day something starts: your flights, hotel check-ins, car pickups, trains, cruises and parking entries that day, each with its own local time.
 
 Reminders cover only the trips you can see: the ones you’re on and the ones you booked. They never carry a loyalty or Known Traveler number, and a confirmation code isn’t in them either.
 
@@ -22,7 +22,7 @@ Notifications go through your browser’s own push service (Google’s, Apple’
 
 ## Calendar feed
 
-**Make my calendar address** gives you a private address that your calendar app (Apple Calendar, Google Calendar, Outlook, …) can subscribe to. It holds the trips you can see, each flight, stay, car and train as an event (a flight booked on two reservations is one event, listing both confirmation codes).
+**Make my calendar address** gives you a private address that your calendar app (Apple Calendar, Google Calendar, Outlook, …) can subscribe to. It holds the trips you can see, each flight, stay, car, train, cruise and parking booking as an event (a flight booked on two reservations is one event, listing both confirmation codes).
 
 - **Times are where they happen.** Each event’s start and end carry the time zone of their own place, so a flight that leaves Auckland at 22:15 and lands in Los Angeles at 15:10 the same day shows exactly that, wherever your calendar is.
 - **The address is shown once.** It holds a random key; Waypoint keeps only a hash of it, so it can’t show it again. Make a **new address** if you lose it: the old one stops working at once.
