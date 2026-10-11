@@ -569,9 +569,9 @@ def read(message: Mapping[str, Any]) -> Message:
                 generic_found, why = Parsed(), None
             if generic_found.bookings:
                 bookings, unread, seen = list(generic_found.bookings), generic_found.unread, True
-                for other in GENERIC_READERS[position + 1:]:
+                for later in GENERIC_READERS[position + 1:]:
                     try:
-                        left = other("\n".join(htmls), "\n".join(texts))[0]
+                        left = later("\n".join(htmls), "\n".join(texts))[0]
                     except Exception as e:
                         monitoring.report(e, values=False)
                         continue

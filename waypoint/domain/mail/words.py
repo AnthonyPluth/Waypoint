@@ -91,7 +91,7 @@ def _pattern(words: tuple[str, ...]) -> re.Pattern[str]:
 
 
 def _whole(words_: tuple[str, ...]) -> re.Pattern[str]:
-    latin = [re.escape(w) for w in sorted(words_, key=len, reverse=True) if w[0].isascii() or w[0].isalpha() and ord(w[0]) < 0x250]
+    latin = [re.escape(w) for w in sorted(words_, key=len, reverse=True) if w[0].isascii() or (w[0].isalpha() and ord(w[0]) < 0x250)]
     other = [re.escape(w) for w in sorted(words_, key=len, reverse=True) if re.escape(w) not in latin]
     parts = [rf"(?<![^\W\d_])(?:{'|'.join(latin)})(?![^\W\d_])"] if latin else []
     parts += other
