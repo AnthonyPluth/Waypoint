@@ -17,19 +17,27 @@ SHOPPING = (
     head("Your return is confirmed", "megastore.example", "We have received your return and will refund you soon.", PURCHASES),
     head("Refund issued for your return", "bargain-bay.example", "Your refund of 12.00 is on its way.", PURCHASES),
     head("Order #55-1234 confirmed", "blinds-and-more.example", "Your custom blinds order number is 55-1234.", PURCHASES, "Blinds And More"),
-    head("Booking your delivery slot", "grocer.example", "Confirm a slot for your delivery.", PURCHASES),
     head("Your package is out for delivery", "ups.com", "Tracking number 1Z0000000000000000.", NONE),
     head("Delivered: your package", "carrier.example", "Your package was delivered today.", NONE),
     head("Thanks for your purchase", "gadget-hub.example", "Receipt inside.", PURCHASES),
     head("Your receipt from Corner Cafe", "pay-receipts.example", "Receipt for your payment.", NONE),
     head("Invoice 8841 is ready", "supplies-direct.example", "Invoice for your order.", NONE),
-    head("Your reservation is confirmed", "tablebook.example", "Table for 4 at Olive Street Kitchen, Friday 7:30 pm.", RESERVATIONS, "TableBook"),
-    head("Appointment confirmed", "clinic-booking.example", "Your appointment is confirmed for Tuesday at 9:00.", RESERVATIONS),
-    head("Tickets confirmed: Saturday concert", "gigs.example", "Your seats for the concert are confirmed.", RESERVATIONS),
     head("Your order confirmation", "amazon.com", "Order number 111-2222222.", PURCHASES),
     head("Your order of 3 items", "store.shopify.com", "Thank you for your order.", NONE),
     head("Your return label", "walmart.com", "Return window closes soon.", NONE),
     head("Booking confirmed", "selectblinds.com", "Your booking for a measuring visit is confirmed.", NONE),
+    head("Your table at Olive Street Kitchen", "tablebook.example", "Table for 4, Friday 7:30 pm.", RESERVATIONS, "TableBook"),
+    head("Your delivery slot", "grocer.example", "Pick a slot for Friday.", PURCHASES),
+    head("Your order confirmation", "megastore.example", "Order number 114-0000002.", RESERVATIONS),
+    head("Appointment", "clinic-booking.example", "Your appointment on Tuesday at 9:00.", RESERVATIONS),
+)
+
+CATEGORISED = (
+    head("Your reservation is confirmed", "tablebook.example", "Table for 4 at Olive Street Kitchen, Friday 7:30 pm.", RESERVATIONS, "TableBook"),
+    head("Appointment confirmed", "clinic-booking.example", "Your appointment is confirmed for Tuesday at 9:00.", RESERVATIONS),
+    head("Booking your delivery slot", "grocer.example", "Confirm a slot for your delivery.", PURCHASES),
+    head("Tickets confirmed: Saturday concert", "gigs.example", "Your seats for the concert are confirmed.", RESERVATIONS),
+    head("予約確認", "salon-booking.example", "ご予約ありがとうございます。", PURCHASES),
 )
 
 TRAVEL = (
@@ -65,22 +73,41 @@ class CorpusTests(unittest.TestCase):
 
     def test_shopping_mail_is_counted_as_not_travel_and_travel_mail_never_is(self):
         self.assertTrue(triage.shopping(SHOPPING[0]))
-        self.assertTrue(triage.shopping(SHOPPING[14]))
+        self.assertTrue(triage.shopping(next(h for h in SHOPPING if h.sender_domain == "amazon.com")))
         self.assertFalse([h.subject for h in TRAVEL if triage.shopping(h)])
+        self.assertFalse([h.subject for h in CATEGORISED if triage.shopping(h)])
 
 
 class CategoryTests(unittest.TestCase):
     def test_gmails_purchases_category_alone_never_reads_a_message(self):
         self.assertEqual(triage.decide(head("Notes", "pat.example", "Details inside.", PURCHASES)), "skip")
-        self.assertEqual(triage.decide(head("Your confirmation", "pat.example", "All set.", PURCHASES)), "skip")
+        self.assertEqual(triage.decide(head("Your appointment", "pat.example", "Tuesday at 9:00.", PURCHASES)), "skip")
 
     def test_gmails_reservations_category_alone_never_reads_a_message(self):
         self.assertEqual(triage.decide(head("Notes", "pat.example", "Details inside.", RESERVATIONS)), "skip")
-        self.assertEqual(triage.decide(head("Your reservation", "tablebook.example", "Table for two.", RESERVATIONS)), "skip")
+        self.assertEqual(triage.decide(head("Table for two", "tablebook.example", "Friday at 7:30.", RESERVATIONS)), "skip")
 
-    def test_the_reservations_category_reads_a_message_only_with_a_travel_word(self):
+    def test_a_category_with_a_generic_word_and_no_travel_word_or_retail_word_is_read(self):
+        missed = [h.subject for h in CATEGORISED if triage.decide(h) != "read"]
+        self.assertEqual(missed, [])
+
+    def test_a_category_with_a_generic_word_and_a_retail_word_is_skipped(self):
+        for labels in (PURCHASES, RESERVATIONS):
+            self.assertEqual(triage.decide(head("Your order is confirmed", "pat.example", "Thanks.", labels)), "skip")
+            self.assertEqual(triage.decide(head("Booking: your return", "pat.example", "Thanks.", labels)), "skip")
+
+    def test_a_category_with_a_generic_word_from_a_retail_sender_is_skipped(self):
+        self.assertEqual(triage.decide(head("Your booking is confirmed", "megastore.amazon.com", "Thanks.", PURCHASES)), "skip")
+
+    def test_a_generic_word_without_a_category_is_skipped(self):
+        self.assertEqual(triage.decide(head("Your reservation is confirmed", "tablebook.example", "Table for 4.", NONE)), "skip")
+
+    def test_the_reservations_category_still_reads_a_message_with_a_travel_word(self):
         self.assertEqual(triage.decide(head("Your reservation", "tablebook.example", "Hotel check-in at 3 pm.", RESERVATIONS)), "read")
-        self.assertEqual(triage.decide(head("Your reservation", "tablebook.example", "Hotel check-in at 3 pm.", NONE)), "read")
+
+    def test_a_categorised_generic_message_is_strong_enough_for_review(self):
+        self.assertTrue(triage.strong(CATEGORISED[0]))
+        self.assertFalse(triage.strong(head("Your booking", "pat.example", "Thanks.", NONE)))
 
 
 class WordTests(unittest.TestCase):

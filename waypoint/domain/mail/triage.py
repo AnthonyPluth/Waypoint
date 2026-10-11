@@ -7,6 +7,7 @@ from typing import Literal
 from . import query
 
 Decision = Literal["read", "skip"]
+CATEGORY_SIGNALS = frozenset({"CATEGORY_RESERVATIONS", "CATEGORY_PURCHASES"})
 TRAVEL = (
     re.compile(r"\bflights?\b", re.IGNORECASE),
     re.compile(r"itinerar", re.IGNORECASE),
@@ -56,8 +57,13 @@ def _named(head: Head) -> bool:
     return bool(SENDER_NAME.search(head.sender_name))
 
 
+def _categorised(head: Head) -> bool:
+    text = f"{head.subject} {head.snippet}"
+    return bool(head.labels & CATEGORY_SIGNALS) and bool(GENERIC.search(text)) and not RETAIL.search(text)
+
+
 def strong(head: Head) -> bool:
-    return sender_in(head.sender_domain, query.SENDERS) or travel_words(f"{head.subject} {head.snippet}") >= 2
+    return sender_in(head.sender_domain, query.SENDERS) or travel_words(f"{head.subject} {head.snippet}") >= 2 or _categorised(head)
 
 
 def shopping(head: Head) -> bool:
@@ -82,6 +88,6 @@ def decide(head: Head) -> Decision:
         return "read"
     if sender_in(head.sender_domain, query.RETAIL_SENDERS):
         return "skip"
-    if words or (_named(head) and (GENERIC.search(text) or RETAIL.search(text))) or (changes and GENERIC.search(text) and not RETAIL.search(text)):
+    if words or _categorised(head) or (_named(head) and (GENERIC.search(text) or RETAIL.search(text))) or (changes and GENERIC.search(text) and not RETAIL.search(text)):
         return "read"
     return "skip"

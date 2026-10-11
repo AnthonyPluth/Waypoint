@@ -436,6 +436,31 @@ class QuietFailureTests(ScanCase):
         self.assertEqual((self.items(), self.stored(), self.scanned()), ([], [], {"weak": "skipped"}))
         self.assertEqual(scan.summary(self.mailbox), scan.Summary(1, 0, 0, 0, 1, False, 0, 1, 1, 1))
 
+    def categorised(self, mid, category, subject="Your booking is confirmed", body="Table for four on Friday."):
+        self.add_mail(mid, plain_mail("Olive Kitchen <canary-sender-quiet-5d1r@tablebook.example>", f"{subject} CANARY-SUBJECT-QUIET-3F8N", f"{body} {self.WEAK}"))
+        self.google.labels[mid] = ["INBOX", category]
+
+    def test_a_purchases_or_reservations_message_with_a_generic_word_and_no_travel_word_that_cannot_be_parsed_goes_to_review_and_is_kept_only_while_it_waits(self):
+        self.categorised("cat1", "CATEGORY_RESERVATIONS")
+        self.categorised("cat2", "CATEGORY_PURCHASES")
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.messages, result.review, result.skipped), (2, 2, 0))
+        self.assertEqual({i["reason"] for i in self.items()}, {"no_markup"})
+        self.assertEqual(sorted(self.stored()), ["cat1", "cat2"])
+        for item_id in [i["id"] for i in self.items()]:
+            self.assertTrue(self.read(lambda conn, item_id=item_id: review.dismiss(conn, "u-jane", item_id)))
+        self.assertEqual((self.items(), self.stored()), ([], []))
+
+    def test_a_purchases_message_with_a_retail_word_a_generic_word_without_a_category_or_a_category_alone_is_skipped(self):
+        self.categorised("order", "CATEGORY_PURCHASES", "Your order is confirmed")
+        self.categorised("nogeneric", "CATEGORY_RESERVATIONS", "Your table")
+        self.add_mail("nocat", plain_mail("Olive Kitchen <canary-sender-quiet-5d1r@tablebook.example>", "Your booking is confirmed CANARY-SUBJECT-QUIET-3F8N", f"Table. {self.WEAK}"))
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.messages, result.skipped, result.review, self.google.fetched), (0, 3, 0, []))
+        self.assertEqual((self.items(), self.stored()), ([], []))
+
     def test_it_is_not_looked_at_again(self):
         self.weak_mail()
         self.scan()
