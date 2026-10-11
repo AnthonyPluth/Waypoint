@@ -257,6 +257,7 @@ scanned_messages = Table(
     Column('message_id', Text, nullable=False),
     Column('outcome', Text, nullable=False),
     Column('scanned', Float, nullable=False),
+    Column('sender_domain', Text, doc="for an ignored message, its sender's domain, so stopping the ignore brings that sender's mail back; empty for older records"),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_scanned_messages_mailbox_message'),
     info={'doc': "each Gmail message id a scan has looked at and what came of it (booking, unreadable, ignored), so nothing is read twice; holds no content"},
 )

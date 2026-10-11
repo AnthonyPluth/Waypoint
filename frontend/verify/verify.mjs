@@ -24,7 +24,7 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -104,6 +104,15 @@ async function runStep(page, step, shot, saveDownload) {
       if (route.request().method() === "POST") return route.fulfill({ json: { ok: true } });
       return route.fulfill({ json: { labels: names.map((name, i) => ({ id: `Label_${i + 1}`, name, count: (i + 1) * 4, picked: false })) } });
     });
+  } else if ("fake_ignored" in step) {
+    let domains = step.fake_ignored.split(",").map((n) => n.trim()).filter(Boolean);
+    await page.route("**/api/mailboxes/*/ignored", (route) => route.fulfill({ json: { domains } }));
+    await page.route("**/api/mailboxes/*/unignore", async (route) => {
+      domains = domains.filter((d) => d !== route.request().postDataJSON()?.domain);
+      await route.fulfill({ json: { started: true } });
+    });
+  } else if ("fake_ignore" in step) {
+    await page.route("**/api/review/*/ignore", (route) => route.fulfill({ json: { ok: true, mailbox_id: 1, domain: step.fake_ignore } }));
   } else if ("long_names" in step) {
     await page.route("**/api/stats**", async (route) => {
       const response = await route.fetch();
