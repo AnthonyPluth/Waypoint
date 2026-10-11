@@ -165,7 +165,7 @@ describe("Upcoming", () => {
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "Harbour Hotel" })).closest("section")!;
     expect(within(card).getByText("Check-in in 7 h")).toBeInTheDocument();
-    expect(within(card).getByText("1 Quay Street, London", { selector: "dd" })).toBeInTheDocument();
+    expect(within(card).getByText("London", { selector: "dd" })).toBeInTheDocument();
     expect(within(card).getByText("3:00 PM")).toBeInTheDocument();
   });
 
@@ -194,6 +194,20 @@ describe("Upcoming", () => {
     expect(within(days).getByText("Fort Lauderdale, FL")).toBeInTheDocument();
     expect(within(days).queryByText(/100 Example Blvd/)).toBeNull();
     expect(within(days).getByRole("link", { name: "Check-out: Hyatt Place" })).toBeInTheDocument();
+  });
+
+  it("shows the same city and state on the Next up card and in the day-by-day list", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const hotel = segment({ id: 2, kind: "hotel", provider: "Hyatt", origin: "Hyatt Place Example Beach Convention Center", hotel_brand: "Hyatt Place", destination: null,
+      start_local: "2026-11-21T15:00", start_zone: LON, end_local: "2026-11-27T10:00", end_zone: LON,
+      details: { address: "100 Example Blvd, Minneapolis, Minnesota 55401" } });
+    serve([trip([hotel])]);
+    render(Upcoming);
+    const days = await screen.findByRole("list", { name: "Trip to London, day by day" });
+    expect(within(days).getByText("Minneapolis, Minnesota")).toBeInTheDocument();
+    const nextCard = screen.getByRole("heading", { name: "Hyatt Place Example Beach Convention Center" }).closest("section") as HTMLElement;
+    expect(within(nextCard).getByText("Minneapolis, Minnesota")).toBeInTheDocument();
+    expect(within(nextCard).queryByText(/100 Example Blvd/)).toBeNull();
   });
 
   it("lists the trip day by day, with the stay's check-out on its last day", async () => {

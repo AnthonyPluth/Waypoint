@@ -12,14 +12,14 @@
   import { flightStatus, statusFor } from "$lib/flightstatus.svelte";
   import { isMobile } from "$lib/platform";
   import { segmentChips } from "$lib/status";
-  import { appWord, dayLabel, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
+  import { appWord, dayLabel, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
 
   type Props = {
     segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
-    as?: "section" | "li"; id?: string; highlight?: boolean; label?: string; showCode?: boolean; showApp?: boolean; omit?: string[];
+    as?: "section" | "li"; id?: string; highlight?: boolean; label?: string; showCode?: boolean; showApp?: boolean; omit?: string[]; condensed?: boolean;
     live?: Snippet; footer?: Snippet; times?: Snippet; details?: Snippet;
   };
-  let { segment: s, bookings = [s], now = Date.now(), eyebrow = "", pulse = false, level = 3, class: cls = "", as: tag = "section", id, highlight = false, label, showCode = true, showApp = true, omit = [],
+  let { segment: s, bookings = [s], now = Date.now(), eyebrow = "", pulse = false, level = 3, class: cls = "", as: tag = "section", id, highlight = false, label, showCode = true, showApp = true, omit = [], condensed = false,
     live: liveArea, footer, times: timesArea, details }: Props = $props();
 
   const flight = $derived(s.kind === "flight");
@@ -40,8 +40,8 @@
   const quiet = $derived(status ? [status.delay_minutes ? `${status.delay_minutes} min late` : "", where, `as of ${asOf(status.fetched_at)}`].filter(Boolean).join(" · ") : "");
   const rows = $derived<[string, string | null | undefined][]>(
     flight ? [["Terminal", s.details.terminal], ["Gate", status?.dep_gate], ["Seat", seat], ["Cabin", s.details.cabin]]
-      : s.kind === "hotel" ? [["Address", s.details.address], ["Room", s.details.room]]
-        : s.kind === "car" ? [["Car", s.details.car_class], ["Address", s.details.address]]
+      : s.kind === "hotel" ? [["Address", condensed ? placeOf(s.details.address) : s.details.address], ["Room", s.details.room]]
+        : s.kind === "car" ? [["Car", s.details.car_class], ["Address", condensed ? placeOf(s.details.address) : s.details.address]]
           : s.kind === "cruise" ? [["Ship", s.details.ship], ["Cabin", s.details.room], ["Deck", s.details.deck]]
             : [["Seat", seat], ["Cabin", s.details.cabin]],
   );

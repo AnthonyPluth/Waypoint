@@ -199,16 +199,28 @@ export function headline(s: Segment): string {
 }
 
 const COUNTRIES = /^(usa|us|u\.s\.a\.|united states( of america)?)$/i;
+const POSTAL_CODE = "\\d{5}(?:-\\d{4})?|[A-Z]{1,2}\\d[A-Z\\d]? ?\\d[A-Z]{2}|[A-Z]\\d[A-Z] ?\\d[A-Z]\\d";
+const POSTAL_PART = new RegExp(`^(${POSTAL_CODE}|\\d{4,6})$`, "i");
+const POSTAL_SUFFIX = new RegExp(`\\s+(${POSTAL_CODE})$`, "i");
+const POSTAL_PREFIX = /^\d{4,6}\s+/;
+const STREET_NUMBER = /^\d/;
+
+function addressParts(address: string | undefined): string[] {
+  const parts = (address ?? "").split(/[,\n]/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length > 1 && COUNTRIES.test(parts[parts.length - 1])) parts.pop();
+  return parts.filter((p) => !POSTAL_PART.test(p));
+}
 
 export function cityState(address: string | undefined): string {
-  const parts = (address ?? "").split(",").map((p) => p.trim()).filter(Boolean);
-  if (parts.length > 1 && COUNTRIES.test(parts[parts.length - 1])) parts.pop();
+  const parts = addressParts(address);
   if (parts.length < 2) return "";
-  const last = parts[parts.length - 1].replace(/\s+\d[\dA-Za-z -]*$/, "");
-  if (parts.length === 2) return last;
-  const city = parts[parts.length - 2].replace(/^\d[\d -]*\s+/, "");
+  const last = parts[parts.length - 1].replace(POSTAL_SUFFIX, "");
+  if (parts.length === 2) return STREET_NUMBER.test(parts[0]) ? last : `${parts[0]}, ${last}`;
+  const city = parts[parts.length - 2].replace(POSTAL_PREFIX, "");
   return `${city}, ${last}`;
 }
+
+export const placeOf = (address: string | undefined): string => cityState(address) || (address ?? "").trim();
 
 export function upcomingTitle(s: Segment): string {
   return s.kind === "hotel" && s.hotel_brand ? s.hotel_brand : headline(s);
@@ -221,8 +233,8 @@ export function seatsInOrder(seats: string): string {
 export function subline(s: Segment, condensed = false): string {
   const d = s.details;
   const parts = s.kind === "flight" ? [[s.provider, d.flight_number].filter(Boolean).join(" "), d.aircraft, d.terminal && `Terminal ${d.terminal}`, d.seat && `Seat ${seatsInOrder(d.seat)}`, condensed ? null : d.cabin]
-    : s.kind === "hotel" ? [condensed ? (s.hotel_brand ? cityState(d.address) : null) : d.address, d.room]
-      : s.kind === "car" ? [d.car_class, d.address] : s.kind === "cruise" ? [s.details.ship ? s.provider : null, d.room && `Cabin ${d.room}`, d.deck && `Deck ${d.deck}`] : [s.provider, d.seat && `Seat ${seatsInOrder(d.seat)}`, d.cabin];
+    : s.kind === "hotel" ? [condensed ? placeOf(d.address) : d.address, d.room]
+      : s.kind === "car" ? [d.car_class, condensed ? placeOf(d.address) : d.address] :s.kind === "cruise" ? [s.details.ship ? s.provider : null, d.room && `Cabin ${d.room}`, d.deck && `Deck ${d.deck}`] : [s.provider, d.seat && `Seat ${seatsInOrder(d.seat)}`, d.cabin];
   return parts.filter(Boolean).join(" · ");
 }
 

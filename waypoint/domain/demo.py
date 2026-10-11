@@ -146,7 +146,7 @@ def _jane_alone(today: date) -> list[trips.SegmentIn]:
          "confirmation": "PL4N9R", "provider": "United Airlines", "details": {"flight_number": "UA 311", "terminal": "7"}},
         {"kind": "car", "origin": "SFO airport", "destination": "SFO airport", "start_local": _at(today, 20, "12:30"), "end_local": _at(today, 22, "16:00"),
          "start_zone": "America/Los_Angeles", "end_zone": "America/Los_Angeles", "confirmation": "C7710", "provider": "Hertz",
-         "details": {"car_class": "Midsize", "address": "1 Rental Way, San Francisco", "phone": "+1 415 555 0100"}},
+         "details": {"car_class": "Midsize", "address": "1 Rental Way, San Francisco, CA 94103", "phone": "+1 415 555 0100"}},
         {"kind": "flight", "origin": "SFO", "destination": "JFK", "start_local": _at(today, 22, "17:00"), "end_local": _at(today, 23, "01:35"),
          "confirmation": "PL4N9R", "provider": "United Airlines", "details": {"flight_number": "UA 318"}},
     ]
