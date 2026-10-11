@@ -22,6 +22,11 @@ const PROPERTIES = new Set([
   "max-height", "line-height", "letter-spacing", "text-indent", "border-width", "border-radius", "border-spacing", "padding", "margin", "border",
   ...SIDES.flatMap((side) => [`border-${side}-color`, `border-${side}-width`, `padding-${side}`, `margin-${side}`, `border-${side}`]),
 ]);
+const LENGTH = "(?:\\d{1,4}(?:\\.\\d{1,3})?(?:px|em|rem|pt|ex|ch|%)?|auto)";
+const LENGTHS = new RegExp(`^${LENGTH}(?:\\s+${LENGTH}){0,3}$`);
+const LENGTH_PROPERTIES = new Set(["width", "height", "max-width", "min-width", "min-height", "max-height", "font-size", "line-height", "letter-spacing", "text-indent",
+  "border-width", "border-radius", "border-spacing", "padding", "margin", ...SIDES.flatMap((side) => [`padding-${side}`, `margin-${side}`, `border-${side}-width`])]);
+const DISPLAYS = new Set(["none", "block", "inline", "inline-block", "table", "table-row", "table-cell"]);
 const STYLE_VALUE = /^[A-Za-z0-9\s#%.,'"()/-]+$/;
 const STYLE_FORBIDDEN = /url|expression|image|var\(|attr\(|env\(|javascript|binding|behavior|import|src\(|element\(|paint\(/i;
 
@@ -43,6 +48,8 @@ export function safeStyle(value: string | null): string {
     const name = declaration.slice(0, colon).trim().toLowerCase();
     const text = declaration.slice(colon + 1).trim();
     if (!PROPERTIES.has(name) || !text || text.length > MAX_STYLE || !STYLE_VALUE.test(text) || STYLE_FORBIDDEN.test(text)) continue;
+    if (LENGTH_PROPERTIES.has(name) && !LENGTHS.test(text.toLowerCase())) continue;
+    if (name === "display" && !DISPLAYS.has(text.toLowerCase())) continue;
     kept.push(`${name}:${text}`);
   }
   return kept.join(";");

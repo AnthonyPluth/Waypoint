@@ -61,7 +61,7 @@
     <div class="overflow-hidden" style={sized ? `width:${layout.width * scale}px;height:${layout.height * scale}px` : ""} data-testid="preview-sizer">
       <div style={box.width > 0 ? `width:${box.width}px` : "width:100%"}>
         <div bind:this={host} role="article" aria-label={title} aria-busy={busy} data-testid="preview-html"
-          style={`all:initial;display:block;width:100%;min-width:min-content;transform:scale(${scale});transform-origin:0 0`}></div>
+          style={`all:initial;display:block;width:100%;min-width:min-content;contain:paint;transform:scale(${scale});transform-origin:0 0`}></div>
       </div>
     </div>
   </div>

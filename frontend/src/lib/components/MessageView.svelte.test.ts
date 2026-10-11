@@ -60,6 +60,14 @@ describe("MessageView", () => {
     appStyle.remove();
   });
 
+  it("contains the email: the sizer clips it and the host is cut off from the app's layout", () => {
+    render(MessageView, { text: "Hi", html: '<div style="margin:-9999px;width:99999px;height:99999px">x</div>' });
+    expect(screen.getByTestId("preview-sizer").className).toContain("overflow-hidden");
+    expect(hostOf().getAttribute("style")).toMatch(/all: initial;/);
+    expect(hostOf().getAttribute("style")).toContain("contain: paint");
+    expect(hostOf().shadowRoot?.querySelector(".email div")?.hasAttribute("style")).toBe(false);
+  });
+
   it("opens a link in a new tab without the opener, and a click never reaches or navigates the app", async () => {
     const reached = vi.fn();
     document.addEventListener("click", reached);

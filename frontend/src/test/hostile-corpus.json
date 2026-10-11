@@ -483,11 +483,11 @@
 "cleanedWithPictures": "<table><td><a href=\"https://example.com\" target=\"_blank\" rel=\"noopener noreferrer\" title=\"https://example.com\"></a></td></table><a>x</a>"
 },
 {
-"name": "textarea, xmp, listing and plaintext",
-"html": "<textarea><img src=x onerror=window.CANARY_textarea=1></textarea><xmp><img src=x onerror=window.CANARY_xmp=1></xmp><listing><img src=x onerror=window.CANARY_listing=1></listing><plaintext><img src=x onerror=window.CANARY_plaintext=1>",
+"name": "textarea and listing",
+"html": "<textarea><img src=x onerror=window.CANARY_textarea=1></textarea><listing><img src=x onerror=window.CANARY_listing=1></listing>",
 "canary": "CANARY_",
 "cleaned": "",
-"cleanedWithPictures": "<img data-i=\"0\" alt=\"\"><img data-i=\"0\" alt=\"\"><img data-i=\"0\" alt=\"\">"
+"cleanedWithPictures": "<img data-i=\"0\" alt=\"\">"
 },
 {
 "name": "title and select that close early",

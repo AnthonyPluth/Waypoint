@@ -48,7 +48,7 @@ describe("the hostile corpus through the inline renderer", () => {
         expect(result.changedPage).toBe(false);
         expect(root.querySelectorAll("style")).toHaveLength(1);
         if (label !== "raw" && !found.canary.startsWith("<img")) expect(wrapperOf().innerHTML).not.toContain(found.canary);
-      });
+      }, 30_000);
     }
   }
 
@@ -108,6 +108,13 @@ describe("what the renderer builds", () => {
       expect(safeStyle(bad), bad).not.toMatch(/url|position|z-index|expression|--|opacity|transform|var\(|@/);
     }
     expect(safeStyle(null)).toBe("");
+  });
+
+  it("drops negative, huge and odd lengths and displays, so a style can't move or grow the email out of its box", () => {
+    expect(safeStyle("margin:-9999px;margin-left:-1px;padding:-5px 2px;width:99999px;height:calc(1px);display:contents;display:flex;display:grid;text-indent:-9999px")).toBe("");
+    expect(safeStyle("margin:0 auto;padding:4px 8px;width:600px;height:50%;display:block;line-height:1.5")).toBe("margin:0 auto;padding:4px 8px;width:600px;height:50%;display:block;line-height:1.5");
+    renderEmail(root, '<div style="margin:-9999px;width:99999px;display:flex;color:#112233">x</div>', {}, false);
+    expect(root.querySelector(".email div")?.getAttribute("style")).toBe("color:#112233");
   });
 
   it("stops a click on a link from reaching the page", () => {

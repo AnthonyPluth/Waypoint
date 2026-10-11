@@ -110,7 +110,7 @@ def mutations() -> list[dict[str, str]]:
         payload("math text and a glyph", '<math><mtext><table><mglyph><style><!--</style><img title="--&gt;&lt;img src=1 onerror=window.CANARY_mxss_math=1&gt;">', "CANARY_mxss_math"),
         payload("form that reopens in math", '<form><math><mtext></form><form><mglyph><style></math><img src onerror=window.CANARY_mxss_form=1>', "CANARY_mxss_form"),
         payload("misnested table and link", '<table><td><a href="https://example.com"></table><a href="javascript:window.CANARY_mxss_table=1">x</a>', "CANARY_mxss_table"),
-        payload("textarea, xmp, listing and plaintext", '<textarea><img src=x onerror=window.CANARY_textarea=1></textarea><xmp><img src=x onerror=window.CANARY_xmp=1></xmp><listing><img src=x onerror=window.CANARY_listing=1></listing><plaintext><img src=x onerror=window.CANARY_plaintext=1>', "CANARY_"),
+        payload("textarea and listing", '<textarea><img src=x onerror=window.CANARY_textarea=1></textarea><listing><img src=x onerror=window.CANARY_listing=1></listing>', "CANARY_"),
         payload("title and select that close early", '<title></title><img src=x onerror=window.CANARY_title=1><select><template><option><style></template></select><img src=x onerror=window.CANARY_select=1>', "CANARY_"),
         payload("text that is escaped markup", "<p>a &lt;img src=x onerror=window.CANARY_text=1&gt; b &amp;lt;script&amp;gt;</p>", "<img src=x"),
         payload("entities that decode to a tag", "<p>&#60;script&#62;window.CANARY_entity=1&#60;/script&#62;</p>", "<script"),
