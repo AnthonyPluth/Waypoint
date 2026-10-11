@@ -125,6 +125,30 @@ export interface FlightStatusPause {
   reason: "limit" | "rate" | "key";
 }
 
+export interface GlanceDomain {
+  domain: string;
+  count: number;
+  reason: "no_markup" | "incomplete" | "broken" | "match" | "generic";
+  item_id: number | null;
+  known_sender: boolean;
+}
+
+export interface GlanceGap {
+  label: string;
+  count: number;
+}
+
+export interface GlanceReason {
+  reason: "no_markup" | "incomplete" | "broken" | "match" | "generic";
+  waiting: number;
+  recent: number;
+}
+
+export interface GlanceScan {
+  at: string;
+  added: number;
+}
+
 export interface IgnoredSenders {
   domains: string[];
 }
@@ -424,6 +448,15 @@ export interface ReviewCandidate {
   destination: string | null;
   start_local: string;
   end_local: string;
+}
+
+export interface ReviewGlance {
+  waiting: number;
+  days: number;
+  reasons: GlanceReason[];
+  gaps: GlanceGap[];
+  domains: GlanceDomain[];
+  scans: GlanceScan[];
 }
 
 export interface ReviewItem {
@@ -852,6 +885,7 @@ export interface Endpoints {
   "POST /api/mailboxes/{id}/reread": { body: never; reply: ScanStarted };
   "POST /api/mailboxes/{id}/backfill": { body: never; reply: ScanStarted };
   "GET /api/mailboxes/{id}/ignored": { body: never; reply: IgnoredSenders };
+  "GET /api/mailboxes/{id}/review-glance": { body: never; reply: ReviewGlance };
   "POST /api/mailboxes/{id}/unignore": { body: UnignoreBody; reply: ScanStarted };
   "GET /api/reminders": { body: never; reply: Reminders };
   "POST /api/reminders": { body: RemindersBody; reply: Reminders };

@@ -17,7 +17,7 @@ from ...storage.models import Mailbox, ScannedMessage
 from ...storage.stored_mail import Content
 from .. import loyalty, people
 from ..visibility import Viewer
-from . import ai, extract, ingest, query, review, triage
+from . import ai, extract, glance, ingest, query, review, triage
 
 State = Literal["done", "failed", "not_started", "busy"]
 BOOKING, UNREADABLE, SKIPPED = "booking", "unreadable", "skipped"
@@ -201,6 +201,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     made, failed = 0, 0
     touched: list[int] = []
     held: list[ingest.Held] = []
+    lacks: list[str] = []
     proposed: list[extract.Booking] = []
     for booking in message.bookings:
         if booking.generic and not review.trusted(conn, mailbox_id, message.sender_domain):
@@ -209,7 +210,8 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
         filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill, held)
         if filed is None:
             failed += 1
-            why[ingest.explain(conn, booking)] += 1
+            lacks.append(ingest.explain(conn, booking))
+            why[lacks[-1]] += 1
         elif filed not in ("unchanged", "ambiguous"):
             made += 1
     if proposed:
@@ -226,7 +228,8 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
         if not message.bookings and not message.unread:
             why["no structured booking data" if not message.other_markup else "structured data, but no reservation"] += 1
         reason: review.Reason = "broken" if message.broken else "incomplete" if message.markup or message.bookings else "no_markup"
-        review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, reason, now, held)
+        review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, reason, now, held,
+                   glance.gap_of(lacks + list(message.gaps)) if reason == "incomplete" else None)
         queued = 1
     elif held:
         review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "match", now, held)
