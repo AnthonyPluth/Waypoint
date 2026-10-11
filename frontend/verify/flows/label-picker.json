@@ -1,0 +1,14 @@
+{
+  "name": "label-picker",
+  "page": "settings",
+  "steps": [
+    { "fake_labels": "Japan 2026, Taxes, Family stays" },
+    { "goto": "#settings/mail" },
+    { "wait_for": "[data-testid='mailbox']" },
+    { "click": "button:has-text('Choose labels')" },
+    { "wait_for": "[role='group'][aria-label^='Labels to read in full']" },
+    { "click": "label:has-text('Japan 2026') input" },
+    { "scroll_to": "[role='group'][aria-label^='Labels to read in full']" },
+    { "screenshot": "choose-labels" }
+  ]
+}

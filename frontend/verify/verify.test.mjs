@@ -56,6 +56,8 @@ describe("flowProblems", () => {
   it("takes a suffix for the names of a list, to check a long one's layout", () => {
     expect(flowProblems({ ...ok, steps: [{ long_names: ", a long name" }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ long_names: 3 }] })).toEqual(["step 1: long_names takes a string"]);
+    expect(flowProblems({ ...ok, steps: [{ fake_labels: "Japan 2026, Taxes" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ fake_labels: 3 }] })).toEqual(["step 1: fake_labels takes a string"]);
   });
 
   it("takes a download to click and save, named", () => {
