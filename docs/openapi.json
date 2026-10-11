@@ -2572,6 +2572,18 @@
           "address": {
             "type": "string"
           },
+          "phone": {
+            "type": "string"
+          },
+          "room": {
+            "type": "string"
+          },
+          "ship": {
+            "type": "string"
+          },
+          "deck": {
+            "type": "string"
+          },
           "sources": {
             "type": "object",
             "additionalProperties": {

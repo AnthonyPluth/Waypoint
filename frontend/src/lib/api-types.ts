@@ -25,6 +25,10 @@ export interface AiSuggestion {
   start_zone?: string;
   end_zone?: string;
   address?: string;
+  phone?: string;
+  room?: string;
+  ship?: string;
+  deck?: string;
   sources?: Record<string, string>;
 }
 

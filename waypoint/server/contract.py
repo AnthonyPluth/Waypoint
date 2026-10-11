@@ -129,6 +129,10 @@ class AiSuggestion(TypedDict):
     start_zone: NotRequired[str]
     end_zone: NotRequired[str]
     address: NotRequired[str]
+    phone: NotRequired[str]
+    room: NotRequired[str]
+    ship: NotRequired[str]
+    deck: NotRequired[str]
     sources: NotRequired[dict[str, str]]
 
 
