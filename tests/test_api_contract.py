@@ -170,7 +170,7 @@ class Replies(DbCase):
                                                   last_scan=1790000000.0, created=1.0,
                                                   scan_summary='{"found":3,"read":2,"bookings":1,"review":1,"skipped":1,"capped":false}' if status == "connected" else None))
         reply = mailboxes.api_mailboxes(self.c, {}, {})
-        self.assertEqual(reply["mailboxes"][0]["scan_summary"], {"found": 3, "read": 2, "bookings": 1, "review": 1, "skipped": 1, "capped": False})
+        self.assertEqual(reply["mailboxes"][0]["scan_summary"], {"found": 3, "read": 2, "bookings": 1, "review": 1, "skipped": 1, "capped": False, "labels_dropped": 0})
         self.assertIsNone(reply["mailboxes"][1]["scan_summary"])
         self.assertEqual([m["status"] for m in reply["mailboxes"]], ["connected", "reconnect", "error"])
         self.check("GET /api/mailboxes", reply)
@@ -179,6 +179,11 @@ class Replies(DbCase):
             self.check("POST /api/mailboxes/{id}/reread", mailboxes.api_mailbox_reread(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
             self.check("POST /api/mailboxes/{id}/backfill", mailboxes.api_mailbox_backfill(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
         self.check("POST /api/mailboxes/{id}/share", mailboxes.api_mailbox_share(self.c, {}, {"share": True}, str(reply["mailboxes"][0]["id"])))
+        live = [{"id": "Label_1", "name": "Japan 2026", "count": 12}]
+        with mock.patch.object(gmail, "labels", return_value=live), mock.patch.object(gmail, "access_token", return_value="t"):
+            box = str(reply["mailboxes"][0]["id"])
+            self.check("POST /api/mailboxes/{id}/labels", mailboxes.api_mailbox_labels_save(self.c, {}, {"labels": ["Label_1"]}, box))
+            self.check("GET /api/mailboxes/{id}/labels", mailboxes.api_mailbox_labels(self.c, {}, {}, box))
         with mock.patch.object(gmail, "_post", return_value={}):
             self.check("DELETE /api/mailboxes/{id}", mailboxes.api_mailbox_disconnect(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
 
@@ -188,16 +193,18 @@ class Replies(DbCase):
         self.check("GET /api/review", review_api.api_review(self.c, {}, {}))
         box = self.c.execute(insert(Mailbox).values(owner_sub="u1", address="rosa@gmail.example", token=secretbox.encrypt("t"),
                                                     status="connected", created=1.0)).lastrowid
-        for n, reason in enumerate(("no_markup", "incomplete", "broken")):
-            review.add(self.c, box, f"m{n}", f"air{n}.example", "2026-10-17", reason, 1.0)   # type: ignore[arg-type]
+        for n, reason in enumerate(("no_markup", "incomplete", "broken", "generic")):
+            review.add(self.c, box, f"m{n}", f"air{n}.example", "2026-10-17" if reason != "generic" else "2026-01-01", reason, 1.0)   # type: ignore[arg-type]
         review.set_suggestion(self.c, box, "m0", {"kind": "flight", "origin": "BOS", "destination": "DEN", "start_local": "2026-12-02T07:15",
                                                   "end_local": "2026-12-02T10:05"}, None)
+        review.set_suggestion(self.c, box, "m3", {"kind": "hotel", "origin": "Seaside Inn", "start_local": "2026-11-21T15:00", "end_local": "2026-11-25T11:00",
+                                                  "address": "12 Beach Road, Brighton, UK", "sources": {"origin": "property", "start_local": "check-in"}}, None)
         review.set_suggestion(self.c, box, "m1", None, "The AI didn’t find a booking in this message.")
         me = Viewer(people_domain.person_for_sub(self.c, "u1"))
         trips.add_segment(self.c, me, {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": "2026-12-08T08:00",
                                        "end_local": "2026-12-08T11:20", "travelers": [{"person_id": None, "name": "DOE/MIA MISS"}]}, source="email")
         listed = review_api.api_review(self.c, {}, {})
-        self.assertEqual((len(listed["items"]), len(listed["who"])), (3, 1))
+        self.assertEqual((len(listed["items"]), len(listed["who"])), (4, 1))
         self.check("GET /api/review", listed)
         self.check("POST /api/review/who/{id}", review_api.api_review_who(self.c, {}, {"person_id": me.person_id}, str(listed["who"][0]["id"])))
         self.check("POST /api/review/{id}/ignore", review_api.api_review_ignore(self.c, {}, {}, str(listed["items"][0]["id"])))
@@ -395,7 +402,7 @@ class Generated(unittest.TestCase):
 
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
-                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan",
+                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels",
                                      "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/share",
                                      "GET /api/ai", "POST /api/ai", "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "DELETE /api/review/{id}",
