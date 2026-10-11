@@ -5359,12 +5359,6 @@
               "generic"
             ]
           },
-          "gmail_url": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "suggestions": {
             "type": "array",
             "items": {
@@ -5390,7 +5384,6 @@
           "has_email",
           "received",
           "reason",
-          "gmail_url",
           "suggestions",
           "suggestion_error"
         ],
