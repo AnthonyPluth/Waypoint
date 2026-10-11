@@ -24,6 +24,8 @@ export interface AiSuggestion {
   destination?: string;
   start_zone?: string;
   end_zone?: string;
+  address?: string;
+  sources?: Record<string, string>;
 }
 
 export interface Airport {
@@ -164,6 +166,10 @@ export interface Imported {
   existing: number;
 }
 
+export interface LabelsBody {
+  labels: string[];
+}
+
 export interface LogoDevBody {
   token?: string;
   secret?: string;
@@ -227,7 +233,19 @@ export interface Mailbox {
   scanning: boolean;
   scan_notice: string | null;
   scan_summary: ScanSummary | null;
+  labels_picked: number;
   share_review: boolean;
+}
+
+export interface MailboxLabel {
+  id: string;
+  name: string;
+  count: number;
+  picked: boolean;
+}
+
+export interface MailboxLabels {
+  labels: MailboxLabel[];
 }
 
 export interface MailboxList {
@@ -401,7 +419,7 @@ export interface ReviewItem {
   subject: string | null;
   has_email: boolean;
   received: string | null;
-  reason: "no_markup" | "incomplete" | "broken";
+  reason: "no_markup" | "incomplete" | "broken" | "generic";
   gmail_url: string | null;
   suggestion: AiSuggestion | null;
   suggestion_error: string | null;
@@ -428,6 +446,7 @@ export interface ScanSummary {
   review: number;
   skipped: number;
   capped: boolean;
+  labels_dropped: number;
 }
 
 export interface Segment {
@@ -795,6 +814,8 @@ export interface Endpoints {
   "DELETE /api/mailboxes/{id}": { body: never; reply: Disconnected };
   "POST /api/mailboxes/{id}/scan": { body: never; reply: ScanStarted };
   "POST /api/mailboxes/{id}/share": { body: ShareBody; reply: Ok };
+  "GET /api/mailboxes/{id}/labels": { body: never; reply: MailboxLabels };
+  "POST /api/mailboxes/{id}/labels": { body: LabelsBody; reply: Ok };
   "POST /api/mailboxes/{id}/reread": { body: never; reply: ScanStarted };
   "POST /api/mailboxes/{id}/backfill": { body: never; reply: ScanStarted };
   "GET /api/reminders": { body: never; reply: Reminders };

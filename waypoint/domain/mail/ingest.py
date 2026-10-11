@@ -5,7 +5,7 @@ from typing import Literal
 from ...storage import db
 from .. import airports, loyalty, people, place_zones, trips
 from ..visibility import Viewer
-from . import extract
+from . import ai, extract
 
 
 def _zone(conn: db.Connection, b: extract.Booking, code: str | None, place: extract.Place) -> str | None:
@@ -86,6 +86,21 @@ def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
         out["travelers"] = travelers(conn, b.passengers)
     if b.ports:
         out["itinerary"] = [{"name": p.name, "zone": p.zone, "arrive_local": p.arrive_local, "depart_local": p.depart_local} for p in b.ports]
+    return out
+
+
+def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:
+    out: ai.Suggestion = {"kind": b.kind, "start_local": b.start, "end_local": b.end, "origin": b.origin or "", "sources": dict(b.generic)}
+    if b.provider:
+        out["provider"] = b.provider
+    if b.confirmation:
+        out["confirmation"] = b.confirmation
+    if b.destination:
+        out["destination"] = b.destination
+    if address := dict(b.details).get("address"):
+        out["address"] = address
+    if zone := _zone(conn, b, b.origin, b.start_place):
+        out["start_zone"] = zone
     return out
 
 

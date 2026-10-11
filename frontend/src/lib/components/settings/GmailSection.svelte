@@ -10,7 +10,7 @@
 
 <script lang="ts">
   import { act, errMsg } from "$lib/act";
-  import type { Mailbox, MailboxList } from "$lib/api-types";
+  import type { Mailbox, MailboxLabel, MailboxList } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -82,6 +82,32 @@
     } finally { await load(); box.checked = list?.mailboxes.find((x) => x.id === m.id)?.share_review ?? m.share_review; }
   });
 
+  let choosing = $state<number | null>(null);
+  let offered = $state<MailboxLabel[]>([]);
+  let chosen = $state<string[]>([]);
+  let loadingLabels = $state(false);
+  let savingLabels = $state(false);
+  let labelsProblem = $state("");
+
+  async function openLabels(m: Mailbox) {
+    if (choosing === m.id) { choosing = null; return; }
+    choosing = m.id; offered = []; labelsProblem = ""; loadingLabels = true;
+    try {
+      const r = await apiCall<"GET /api/mailboxes/{id}/labels">(`/api/mailboxes/${m.id}/labels`);
+      offered = r.labels; chosen = r.labels.filter((l) => l.picked).map((l) => l.id);
+    } catch (err) { labelsProblem = errMsg(err); }
+    finally { loadingLabels = false; }
+  }
+
+  const toggleLabel = (id: string, on: boolean) => { chosen = on ? [...chosen, id] : chosen.filter((x) => x !== id); };
+
+  const saveLabels = (m: Mailbox) => act(async () => {
+    await apiCall<"POST /api/mailboxes/{id}/labels">(`/api/mailboxes/${m.id}/labels`, { method: "POST", body: { labels: chosen }, failed: "Couldn’t save the labels" });
+    toast.success(chosen.length ? "Labels saved. The next scan reads everything in them." : "No labels picked");
+    choosing = null;
+    await load();
+  }, { busy: (on) => (savingLabels = on) });
+
   async function disconnect() {
     const m = leaving;
     if (!m) return false;
@@ -95,7 +121,7 @@
 
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const summary = (c: NonNullable<Mailbox["scan_summary"]>) =>
-    `${plural(c.found, "new message", "new messages")} found, ${c.read} read, ${plural(c.bookings, "booking", "bookings")} added or changed, ${c.review} couldn’t be read, ${c.skipped} skipped.${c.capped ? " More are waiting; the next scan carries on." : ""}`;
+    `${plural(c.found, "new message", "new messages")} found, ${c.read} read, ${plural(c.bookings, "booking", "bookings")} added or changed, ${c.review} couldn’t be read, ${c.skipped} skipped.${c.capped ? " More are waiting; the next scan carries on." : ""}${c.labels_dropped ? ` ${plural(c.labels_dropped, "label you picked was", "labels you picked were")} deleted in Gmail and ${c.labels_dropped === 1 ? "was" : "were"} dropped.` : ""}`;
   const scanned = (m: Mailbox) => (m.last_scan ? new Date(m.last_scan).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : null);
 
   const label = (m: Mailbox) => (m.status === "connected" ? "Connected" : m.status === "reconnect" ? "Reconnect" : "Couldn’t reach Google");
@@ -131,6 +157,29 @@
               <input type="checkbox" class="mt-0.5 size-4 shrink-0" checked={m.share_review} onchange={(e) => share(m, e.currentTarget)} />
               <span>Show this mailbox’s unread mail to the household<span class="block text-muted-foreground">Anyone in the household sees each one’s subject, who it is from and its day in Review, can read the message (Waypoint keeps it, encrypted, until it’s dismissed or added) and can add it by hand or dismiss it. Only you can open it in Gmail. Off until you turn it on.</span></span>
             </label>
+            {#if m.status === "connected"}
+              <p class="mt-2 text-sm text-muted-foreground">
+                {m.labels_picked ? `Reading everything in ${plural(m.labels_picked, "label", "labels")} you picked.` : "Waypoint reads mail that looks like a booking. You can also pick your own labels to read in full."}
+                <button type="button" class="underline underline-offset-2" aria-expanded={choosing === m.id} onclick={() => openLabels(m)}>{choosing === m.id ? "Close" : "Choose labels"}</button>
+              </p>
+              {#if choosing === m.id}
+                <div class="mt-2 space-y-2 rounded-xl border p-3" role="group" aria-label={`Labels to read in full for ${m.address}`}>
+                  {#if loadingLabels}<p class="text-sm text-muted-foreground" role="status">Loading your labels…</p>
+                  {:else if labelsProblem}<p class="text-sm text-signal-ink" role="alert">{labelsProblem}</p>
+                  {:else if !offered.length}<p class="text-sm text-muted-foreground">You have no labels of your own in this mailbox.</p>
+                  {:else}
+                    <p class="text-sm text-muted-foreground">Every message in a label you tick is read for bookings, whoever sent it. Nothing is read from the others beyond what looks like a booking. Gmail’s own labels, such as Inbox and Promotions, aren’t offered.</p>
+                    {#each offered as l (l.id)}
+                      <label class="flex items-start gap-2 text-sm">
+                        <input type="checkbox" class="mt-0.5 size-4 shrink-0" checked={chosen.includes(l.id)} onchange={(e) => toggleLabel(l.id, e.currentTarget.checked)} />
+                        <span>{l.name}<span class="text-muted-foreground"> · {plural(l.count, "message", "messages")}</span></span>
+                      </label>
+                    {/each}
+                    <Button size="sm" disabled={savingLabels} onclick={() => saveLabels(m)}>{savingLabels ? "Saving…" : "Save labels"}</Button>
+                  {/if}
+                </div>
+              {/if}
+            {/if}
             {#if m.scan_notice && !m.scanning && m.status !== "reconnect"}<p class="text-sm text-muted-foreground" role="status">The scan couldn’t start: {m.scan_notice}</p>{/if}
             {#if m.scan_error}<p class="text-sm text-signal-ink" role="status">The last scan stopped: {m.scan_error} What it had read is kept, and the next scan carries on.</p>{/if}
           </div>

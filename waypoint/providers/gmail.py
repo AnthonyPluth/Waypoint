@@ -189,11 +189,20 @@ def _revoke_quietly(token: str) -> None:
 
 def listing(conn: db.Connection, owner: str) -> list[dict[str, Any]]:
     return db.rows(conn.execute(select(Mailbox.id, Mailbox.address, Mailbox.status, Mailbox.last_error, Mailbox.last_scan,
-                                       Mailbox.scan_error, Mailbox.scan_summary, Mailbox.share_review).where(Mailbox.owner_sub == owner).order_by(Mailbox.id)))
+                                       Mailbox.scan_error, Mailbox.scan_summary, Mailbox.scan_labels, Mailbox.share_review).where(Mailbox.owner_sub == owner).order_by(Mailbox.id)))
 
 
 def set_share_review(conn: db.Connection, mailbox_id: int, owner: str, share: bool) -> bool:
     return conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id, Mailbox.owner_sub == owner).values(share_review=share)).rowcount > 0
+
+
+def stored_labels(conn: db.Connection, mailbox_id: int, owner: str) -> str | None:
+    found = conn.execute(select(Mailbox.scan_labels).where(Mailbox.id == mailbox_id, Mailbox.owner_sub == owner)).scalar()
+    return str(found) if found is not None else None
+
+
+def set_labels(conn: db.Connection, mailbox_id: int, owner: str, encoded: str | None) -> bool:
+    return conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id, Mailbox.owner_sub == owner).values(scan_labels=encoded)).rowcount > 0
 
 
 def _find(conn: db.Connection, mailbox_id: int, owner: str | None = None) -> Any:
@@ -319,11 +328,24 @@ def history_id(token: str) -> str | None:
     return str(found) if found is not None else None
 
 
-def search(token: str, query: str) -> list[str]:
+def labels(token: str, counts: bool = True) -> list[dict[str, Any]]:
+    found = _api("/labels", token)
+    listed = found.get("labels") if isinstance(found, dict) else None
+    out: list[dict[str, Any]] = []
+    for label in listed or []:
+        if not (isinstance(label, dict) and label.get("type") == "user" and label.get("id") and label.get("name")):
+            continue
+        detail = _api("/labels/" + urllib.parse.quote(str(label["id"]), safe=""), token) if counts else {}
+        total = detail.get("messagesTotal") if isinstance(detail, dict) else None
+        out.append({"id": str(label["id"]), "name": str(label["name"]), "count": total if isinstance(total, int) else 0})
+    return sorted(out, key=lambda x: x["name"].casefold())
+
+
+def search(token: str, query: str, label: str | None = None) -> list[str]:
     ids: list[str] = []
     page: str | None = None
     while len(ids) < MAX_FOUND:
-        params = {"q": query, "maxResults": str(SEARCH_PAGE), **({"pageToken": page} if page else {})}
+        params = {**({"labelIds": label} if label else {"q": query}), "maxResults": str(SEARCH_PAGE), **({"pageToken": page} if page else {})}
         found = _api("/messages", token, params)
         listed = found.get("messages") if isinstance(found, dict) else None
         ids += [str(m["id"]) for m in listed or [] if isinstance(m, dict) and m.get("id")]

@@ -5,6 +5,7 @@
     no_markup: "No booking details found",
     incomplete: "Some details missing",
     broken: "Couldn’t be opened",
+    generic: "Read from the email",
   };
 
   const SECOND_LEVEL = new Set(["co", "com", "org", "net", "ac", "gov"]);
@@ -58,7 +59,7 @@
   const sender = (i: ReviewItem) => i.sender_domain || "Unknown sender";
   const subject = (i: ReviewItem) => i.subject || `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
 
-  type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; address: string };
+  type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; address: string; sources: Record<string, string> };
   let draft = $state<Draft | null>(null);
   let formError = $state("");
   let saving = $state(false);
@@ -68,8 +69,8 @@
     const s = use ? item.suggestion : null;
     draft = s
       ? { item, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
-          destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", address: "" }
-      : { item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", address: "" };
+          destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", address: s.address ?? "", sources: s.sources ?? {} }
+      : { item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", address: "", sources: {} };
     formError = "";
     void peek(item);
   };
@@ -184,27 +185,28 @@
   {@const labels = placeLabels(d.kind)}
   <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-labelledby={titled ? `add-${item.id}` : undefined} aria-label={titled ? undefined : "Add this booking by hand"}>
     {#if titled}<h3 id={`add-${item.id}`} class="font-medium">{d.suggested ? "Check this suggestion" : "Add this booking by hand"}</h3>{/if}
-    {#if d.suggested}<p class="text-sm text-muted-foreground">An AI read the email and suggested this. It can be wrong: check each field against the booking, change what’s off, then add it.</p>{/if}
+    {#if d.suggested && item.reason === "generic"}<p class="text-sm text-muted-foreground">Waypoint read this from labelled lines in the email, not from the vendor’s own booking data. The fields it found are outlined: check each against the booking, change what’s off, then add it. Adding it also trusts {sender(item)}, so later mail from there is added without asking.</p>
+    {:else if d.suggested}<p class="text-sm text-muted-foreground">An AI read the email and suggested this. It can be wrong: check each field against the booking, change what’s off, then add it.</p>{/if}
     {#if item.received}<p class="text-sm text-muted-foreground">The email was sent {item.received}. Enter the times as they read on the booking, at the place they happen.</p>{/if}
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">What is it?</span>
       <select bind:value={d.kind} class={selectClass}>{#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}</select></label>
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Provider</span>
       <Input bind:value={d.provider} maxlength={100} autocomplete="off" /></label>
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Confirmation code</span>
-      <Input bind:value={d.confirmation} maxlength={50} autocomplete="off" spellcheck={false} /></label>
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[0]}</span>
-      <Input bind:value={d.origin} required maxlength={100} autocomplete="off" /></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Confirmation code {#if d.sources["confirmation"]}<span class="font-normal text-muted-foreground">from “{d.sources["confirmation"]}”</span>{/if}</span>
+      <Input class={d.sources["confirmation"] ? "ring-2 ring-primary" : ""} bind:value={d.confirmation} maxlength={50} autocomplete="off" spellcheck={false} /></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[0]} {#if d.sources["origin"]}<span class="font-normal text-muted-foreground">from “{d.sources["origin"]}”</span>{/if}</span>
+      <Input class={d.sources["origin"] ? "ring-2 ring-primary" : ""} bind:value={d.origin} required maxlength={100} autocomplete="off" /></label>
     {#if labels[1]}
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[1]}</span>
         <Input bind:value={d.destination} required={d.kind === "flight"} maxlength={100} autocomplete="off" /></label>
     {/if}
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "car" ? "Pick-up time" : "Departs"}</span>
-      <Input type="datetime-local" bind:value={d.start} required /></label>
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off time" : "Arrives"}</span>
-      <Input type="datetime-local" bind:value={d.end} required /></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "car" ? "Pick-up time" : "Departs"} {#if d.sources["start_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["start_local"]}”</span>{/if}</span>
+      <Input type="datetime-local" class={d.sources["start_local"] ? "ring-2 ring-primary" : ""} bind:value={d.start} required /></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "car" ? "Drop-off time" : "Arrives"} {#if d.sources["end_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["end_local"]}”</span>{/if}</span>
+      <Input type="datetime-local" class={d.sources["end_local"] ? "ring-2 ring-primary" : ""} bind:value={d.end} required /></label>
     {#if d.kind === "hotel"}
-      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Address</span>
-        <Input bind:value={d.address} maxlength={300} autocomplete="off" />
+      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Address {#if d.sources["address"]}<span class="font-normal text-muted-foreground">from “{d.sources["address"]}”</span>{/if}</span>
+        <Input class={d.sources["address"] ? "ring-2 ring-primary" : ""} bind:value={d.address} maxlength={300} autocomplete="off" />
         <span class="text-muted-foreground">Waypoint works the time zone out from it when you leave the time zone empty.</span></label>
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>
         <ZoneSelect bind:value={d.startZone} blank="Work it out from the address" />
@@ -262,13 +264,13 @@
               <div class="min-w-0 basis-full">
                 <p class="break-words font-medium">{subject(item)}</p>
                 <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, item.mine ? `to ${item.address}` : `in ${item.owner}’s mailbox, shared with the household`].filter(Boolean).join(" · ")}</p>
-                <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestion} <Badge variant="outline">AI suggestion</Badge>{/if}</p>
+                <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestion && item.reason !== "generic"} <Badge variant="outline">AI suggestion</Badge>{/if}</p>
                 {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
               </div>
               <div class="flex basis-full flex-wrap gap-2">
                 {#if item.gmail_url}<a class={buttonVariants({ variant: "outline", size: "sm" })} href={item.gmail_url} target="_blank" rel="noopener noreferrer" aria-label={`Open “${subject(item)}” in Gmail`}>Open in Gmail</a>{/if}
-                {#if review.ai && item.mine}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestion ? "Ask again" : "Ask AI"}</Button>{/if}
-                {#if item.suggestion}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={`Check the AI’s suggestion for “${subject(item)}”`}>Check suggestion</Button>{/if}
+                {#if review.ai && item.mine && item.reason !== "generic"}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestion ? "Ask again" : "Ask AI"}</Button>{/if}
+                {#if item.suggestion}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>Check suggestion</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
                 {#if item.sender_domain && item.mine}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Ignore ${item.sender_domain}`}>Ignore this sender</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={`Dismiss “${subject(item)}”`}>Dismiss</Button>

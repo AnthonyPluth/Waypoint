@@ -197,6 +197,7 @@ class Mailbox(Base):
     created: Mapped[float | None]
     scan_error: Mapped[str | None]
     scan_summary: Mapped[str | None]
+    scan_labels: Mapped[str | None]
     share_review: Mapped[bool]
 
 
@@ -249,6 +250,13 @@ class SegmentMessage(Base):
 
 class IgnoredSender(Base):
     __table__ = schema.ignored_senders
+    id: Mapped[int]
+    mailbox_id: Mapped[int]
+    domain: Mapped[str]
+
+
+class TrustedSender(Base):
+    __table__ = schema.trusted_senders
     id: Mapped[int]
     mailbox_id: Mapped[int]
     domain: Mapped[str]

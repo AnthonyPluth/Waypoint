@@ -19,7 +19,7 @@ from ... import monitoring
 from ...providers import mailimages
 from ...storage.stored_mail import Content, Image
 from .. import seatmaps
-from . import parsers, safe_html, seats, triage
+from . import lodging, parsers, safe_html, seats, triage
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger
@@ -46,6 +46,46 @@ class Message:
     markup: bool = False
     gaps: tuple[str, ...] = ()
     other_markup: bool = False
+    forwarded_by: str | None = None
+
+
+FORWARD_MARK = re.compile(r"^[\s>]*(?:-{2,}\s*forwarded message\s*-{2,}|begin forwarded message\s*:?)\s*$", re.IGNORECASE | re.MULTILINE)
+FORWARD_SUBJECT = re.compile(r"^\s*(?:fwd?|fw)\s*:", re.IGNORECASE)
+HEADER_LINE = re.compile(r"^[\s>]*(from|date|sent|subject|to|cc|bcc|reply-to)\s*:\s*(.*)$", re.IGNORECASE)
+NO_ORIGINAL = "forward with no recognisable original"
+
+
+@dataclass(frozen=True)
+class Forward:
+    sender_domain: str | None
+    subject: str
+    rest: str
+
+
+def unwrap(text: str) -> Forward | None:
+    found = FORWARD_MARK.search(text)
+    if found is None:
+        return None
+    lines = text[found.end():].split("\n")
+    header: dict[str, str] = {}
+    used = 0
+    for i, line in enumerate(lines):
+        if not line.strip():
+            ahead = next((x for x in lines[i + 1:i + 4] if x.strip()), "")
+            if header and HEADER_LINE.match(ahead) is None:
+                used = i + 1
+                break
+            continue
+        match = HEADER_LINE.match(line)
+        if match is None:
+            used = i
+            break
+        header.setdefault(match.group(1).lower(), match.group(2).strip())
+        used = i + 1
+    else:
+        used = len(lines)
+    subject = " ".join(header.get("subject", "").split())[:SUBJECT_LIMIT]
+    return Forward(_domain(header.get("from")), subject, "\n".join(lines[used:]).strip())
 
 
 class _Frame:
@@ -495,6 +535,12 @@ def read(message: Mapping[str, Any]) -> Message:
         for ld in scanner.jsonld:
             nodes.extend(_jsonld_nodes(ld))
         nodes.extend(scanner.items)
+    forwarded_by: str | None = None
+    wrapped = unwrap(_visible(htmls, texts))
+    if wrapped is not None or FORWARD_SUBJECT.match(" ".join(str(parsed.get("Subject") or "").split())):
+        if wrapped is None or wrapped.sender_domain is None or not wrapped.subject:
+            return Message(sender, received, unread=1, gaps=(NO_ORIGINAL,), forwarded_by=sender)
+        forwarded_by, sender = sender, wrapped.sender_domain
     bookings, unread, seen, gaps = _bookings(nodes)
     other = bool(nodes) and not seen
     parse = parsers.for_sender(sender)
@@ -513,10 +559,20 @@ def read(message: Mapping[str, Any]) -> Message:
         elif len(text_flights := [x for x in found.bookings if x.kind == "flight"]) > len(flights):
             bookings = [x for x in bookings if x.kind != "flight"] + text_flights
             unread += found.unread
+    if not bookings and not unread and not seen:
+        try:
+            lodged, why = lodging.read("\n".join(htmls), "\n".join(texts))
+        except Exception as e:
+            monitoring.report(e, values=False)
+            lodged, why = Parsed(), None
+        if lodged.bookings:
+            bookings, seen = list(lodged.bookings), True
+        elif why:
+            gaps.append(f"generic reader: {why}")
     if any(utc_marked(t) for b in bookings for t in (b.start, b.end)):
         shown = clock_times(_visible(htmls, texts))
         bookings = [replace(b, clock_times=shown) if utc_marked(b.start) or utc_marked(b.end) else b for b in bookings]
-    return Message(sender, received, tuple(bookings), unread, markup=seen, gaps=tuple(gaps), other_markup=other)
+    return Message(sender, received, tuple(bookings), unread, markup=seen, gaps=tuple(gaps), other_markup=other, forwarded_by=forwarded_by)
 
 
 class _Text(HTMLParser):
@@ -687,6 +743,9 @@ def keep(message: Mapping[str, Any], fetch: Fetch | None = None) -> tuple[Conten
     bodies = None if parsed is None else _split(parsed)
     pictures = _Pictures(parsed, fetch)
     text = _plain(bodies, KEPT_LIMIT + 1)
+    wrapped = unwrap(text)
+    if wrapped is not None and wrapped.sender_domain and wrapped.subject:
+        sender, subject, text = wrapped.sender_domain, wrapped.subject, wrapped.rest
     shown = _markup(bodies, KEPT_LIMIT, pictures.resolve)
     content: Content = {"subject": subject, "sender_domain": sender, "received": received, "text": text[:KEPT_LIMIT],
                         "html": shown[0] if shown else None, "truncated": len(text) > KEPT_LIMIT or bool(shown and shown[1]),

@@ -24,7 +24,7 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -98,6 +98,12 @@ async function runStep(page, step, shot, saveDownload) {
     await page.context().setOffline(step.offline);
   } else if ("reload" in step) {
     await page.reload({ waitUntil: "domcontentloaded", timeout });
+  } else if ("fake_labels" in step) {
+    const names = step.fake_labels.split(",").map((n) => n.trim()).filter(Boolean);
+    await page.route("**/api/mailboxes/*/labels", async (route) => {
+      if (route.request().method() === "POST") return route.fulfill({ json: { ok: true } });
+      return route.fulfill({ json: { labels: names.map((name, i) => ({ id: `Label_${i + 1}`, name, count: (i + 1) * 4, picked: false })) } });
+    });
   } else if ("long_names" in step) {
     await page.route("**/api/stats**", async (route) => {
       const response = await route.fetch();

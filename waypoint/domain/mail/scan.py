@@ -50,6 +50,7 @@ class Summary:
     review: int
     skipped: int
     capped: bool
+    labels_dropped: int = 0
 
 
 _running: set[int] = set()
@@ -88,7 +89,7 @@ def scan(mailbox_id: int, now: float, today: date, again: bool = False, backfill
 
 def encode(found: Summary) -> str:
     return json.dumps({"found": found.found, "read": found.read, "bookings": found.bookings, "review": found.review,
-                       "skipped": found.skipped, "capped": found.capped}, separators=(",", ":"))
+                       "skipped": found.skipped, "capped": found.capped, "labels_dropped": found.labels_dropped}, separators=(",", ":"))
 
 
 def decode(text: str | None) -> Summary | None:
@@ -100,7 +101,21 @@ def decode(text: str | None) -> Summary | None:
     if not isinstance(raw, dict) or not all(isinstance(raw.get(k), int) and not isinstance(raw.get(k), bool) for k in counts) \
             or not isinstance(raw.get("capped"), bool):
         return None
-    return Summary(raw["found"], raw["read"], raw["bookings"], raw["review"], raw["skipped"], raw["capped"])
+    dropped = raw.get("labels_dropped", 0)
+    return Summary(raw["found"], raw["read"], raw["bookings"], raw["review"], raw["skipped"], raw["capped"],
+                   dropped if isinstance(dropped, int) and not isinstance(dropped, bool) else 0)
+
+
+def decode_labels(text: str | None) -> list[str]:
+    try:
+        raw = json.loads(text) if text else []
+    except ValueError:
+        return []
+    return [x for x in raw if isinstance(x, str)] if isinstance(raw, list) else []
+
+
+def encode_labels(ids: list[str]) -> str | None:
+    return json.dumps(list(dict.fromkeys(ids)), separators=(",", ":")) if ids else None
 
 
 def summary(mailbox_id: int) -> Summary | None:
@@ -170,13 +185,22 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     made, failed = 0, 0
     touched: list[int] = []
     held: list[ingest.Held] = []
+    proposed: list[extract.Booking] = []
     for booking in message.bookings:
+        if booking.generic and not review.trusted(conn, mailbox_id, message.sender_domain):
+            proposed.append(booking)
+            continue
         filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill, held)
         if filed is None:
             failed += 1
             why[ingest.explain(conn, booking)] += 1
         elif filed not in ("unchanged", "ambiguous"):
             made += 1
+    if proposed:
+        if review.asked(conn, mailbox_id, message.sender_domain):
+            return made, 0, list(dict.fromkeys(touched)) if touched else None, None
+        review.add_generic(conn, mailbox_id, message_id, message.sender_domain, message.received, ingest.suggestion(conn, proposed[0]), now)
+        return made, 1, [], UNREADABLE
     usable = len(message.bookings) - failed
     queued = 0
     if failed or message.unread or not usable:
@@ -205,6 +229,7 @@ class NotAskable(Exception):
 
 
 HOLDS_BOOKINGS = "This item holds bookings to settle, not a message to read."
+READ_ALREADY = "Waypoint already read this one: check what it found."
 
 
 def _again(owner: str, item_id: int) -> tuple[int, str, dict[str, Any]]:
@@ -228,6 +253,8 @@ def suggest_now(owner: str, item_id: int, now: float) -> None:
             raise KeyError(item_id)
         if review.is_match(conn, *found):
             raise NotAskable(HOLDS_BOOKINGS)
+        if review.is_generic(conn, *found):
+            raise NotAskable(READ_ALREADY)
         if ai.config(conn) is None:
             raise NoAi(NO_AI)
     mailbox_id, message_id, raw = _again(owner, item_id)
@@ -254,6 +281,11 @@ def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) 
         review.set_suggestion(conn, mailbox_id, message_id, suggestion, error)
 
 
+def _generic(mailbox_id: int, message_id: str) -> bool:
+    with db.session() as conn:
+        return review.is_generic(conn, mailbox_id, message_id)
+
+
 def _fail(mailbox_id: int, text: str, partial: tuple[int, int, int]) -> Result:
     with db.session() as conn:
         conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(scan_error=text))
@@ -262,7 +294,7 @@ def _fail(mailbox_id: int, text: str, partial: tuple[int, int, int]) -> Result:
 
 def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfill: bool = False) -> Result:
     with db.session() as conn:
-        row = conn.execute(select(Mailbox.owner_sub, Mailbox.address, Mailbox.history_id, Mailbox.last_scan)
+        row = conn.execute(select(Mailbox.owner_sub, Mailbox.address, Mailbox.history_id, Mailbox.last_scan, Mailbox.scan_labels)
                            .where(Mailbox.id == mailbox_id)).fetchone()
         if row is None:
             return Result("not_started", GONE)
@@ -275,7 +307,8 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             return Result("not_started", str(e))
         ignored = review.ignored(conn, mailbox_id)
     history, last_scan = row["history_id"], row["last_scan"]
-    read = made = queued = skipped = 0
+    read = made = queued = skipped = dropped = 0
+    forced: set[str] = set()
     pending: list[str] = []
     capped = False
     why: Counter[str] = Counter()
@@ -297,7 +330,21 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                     found = [m for m in found if m in added]
                 except gmail.HistoryExpired:
                     pass
+            picked = decode_labels(row["scan_labels"])
+            if picked:
+                alive = {label["id"] for label in gmail.labels(token, counts=False)}
+                kept = [label for label in picked if label in alive]
+                dropped = len(picked) - len(kept)
+                if dropped:
+                    with db.session() as conn:
+                        conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(scan_labels=encode_labels(kept)))
+                labelled = list(dict.fromkeys(m for label in kept for m in gmail.search(token, "", label)))
+                forced = set(labelled)
+                found = found + [m for m in labelled if m not in set(found)]
             with db.session() as conn:
+                if forced:
+                    conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.outcome == SKIPPED,
+                                                              ScannedMessage.message_id.in_(forced)))
                 seen = set(conn.execute(select(ScannedMessage.message_id).where(
                     ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id.in_(found))).scalars()) if found else set()
         pending = [m for m in found if m not in seen]
@@ -306,7 +353,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 with db.session() as conn:
                     token = gmail.access_token(conn, mailbox_id, time.time())
                 issued = time.monotonic()
-            if not again:
+            if not again and message_id not in forced:
                 try:
                     verdict = triage.decide(extract.head(gmail.fetch_head(token, message_id)))
                 except gmail.MessageGone:
@@ -321,6 +368,9 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 if read >= MAX_READ:
                     capped = True
                     break
+            elif not again and read >= MAX_READ:
+                capped = True
+                break
             try:
                 raw = gmail.fetch(token, message_id)
                 message = extract.read(raw)
@@ -344,7 +394,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             if outcome is not None:
                 with db.session() as conn:
                     _record(conn, mailbox_id, message_id, outcome, now)
-            if b:
+            if b and not _generic(mailbox_id, message_id):
                 _suggest(mailbox_id, message_id, raw, now)
             read, made, queued = read + 1, made + a, queued + b
         if not again and not backfill:
@@ -357,7 +407,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
         monitoring.report(e, values=False)
         return _fail(mailbox_id, FAILED_GENERALLY, (read, made, queued))
     if not again and not backfill:
-        remember(mailbox_id, Summary(len(pending), read, made, queued, skipped, capped))
+        remember(mailbox_id, Summary(len(pending), read, made, queued, skipped, capped, dropped))
     monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {len(pending)} message(s) found, "
                    f"{read} read, {made} booking(s) added or changed, {queued} to review, {skipped} skipped{', more waiting' if capped else ''}.")
     if why:

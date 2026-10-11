@@ -24,8 +24,8 @@ SENDERS = (
 )
 BANK_SENDERS = ("chase.com", "capitalone.com", "americanexpress.com", "aexp.com")
 BANK_SUBJECT_WORDS = ("travel", "trip", "flight", "hotel", "cruise", "itinerary", "e-ticket")
-WORDS = ("confirmation", "itinerary", "reservation", "e-ticket", "booking", "cruise", "sailing")
-LODGING_WORDS = ('"check-in"', '"check-out"', '"your stay"', "hotel", '"reservation number"')
+WORDS = ("confirmation", "itinerary", "reservation", "e-ticket", "booking", "booked", "cruise", "sailing", '"boarding pass"')
+LODGING_WORDS = ('"check-in"', '"check-out"', '"your stay"', "hotel", '"reservation number"', '"check in"')
 JAPANESE_WORDS = ("宿泊", "予約", "確認")
 LOOKBACK_MONTHS = 18
 
@@ -33,7 +33,7 @@ LOOKBACK_MONTHS = 18
 def build(since: date, ignored: Iterable[str] = ()) -> str:
     words = _any((*WORDS, *LODGING_WORDS, *JAPANESE_WORDS))
     skipped = "".join(f" -from:{d}" for d in sorted(set(ignored)))
-    return f"({words}) -category:promotions -in:spam -in:trash{skipped} after:{since:%Y/%m/%d}"
+    return f"({words}) -in:spam -in:trash{skipped} after:{since:%Y/%m/%d}"
 
 
 def _any(words: Iterable[str]) -> str:

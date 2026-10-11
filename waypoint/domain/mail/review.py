@@ -7,12 +7,12 @@ from sqlalchemy import delete, func, or_, select, update
 
 from ...providers import gmail
 from ...storage import db, stored_mail
-from ...storage.models import IgnoredSender, Mailbox, Person, ReviewItem
+from ...storage.models import IgnoredSender, Mailbox, Person, ReviewItem, TrustedSender
 from .. import trips, visibility
 from ..visibility import Viewer
 from . import ai
 
-Reason = Literal["no_markup", "incomplete", "broken", "match"]
+Reason = Literal["no_markup", "incomplete", "broken", "match", "generic"]
 UNKNOWN_SENDER = ""
 
 
@@ -43,6 +43,11 @@ def add(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: st
 def is_match(conn: db.Connection, mailbox_id: int, message_id: str) -> bool:
     reason = conn.execute(select(ReviewItem.reason).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).scalar()
     return bool(reason == "match")
+
+
+def is_generic(conn: db.Connection, mailbox_id: int, message_id: str) -> bool:
+    reason = conn.execute(select(ReviewItem.reason).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).scalar()
+    return bool(reason == "generic")
 
 
 def set_suggestion(conn: db.Connection, mailbox_id: int, message_id: str, suggestion: ai.Suggestion | None,
@@ -107,12 +112,15 @@ def stored_image(conn: db.Connection, owner: str, item_id: int, index: int) -> s
 
 
 def dismiss(conn: db.Connection, owner: str, item_id: int, booking: tuple[Viewer, int] | None = None) -> bool:
-    seen = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id).join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
+    seen = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.sender_domain)
+                        .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
     if seen is None:
         return False
     if booking is not None and visibility.visible_segment(conn, booking[0], booking[1]) is not None:
         stored_mail.link(conn, booking[1], int(seen["mailbox_id"]), str(seen["message_id"]))
+        if seen["reason"] == "generic" and seen["sender_domain"] != UNKNOWN_SENDER:
+            db.insert_ignore(conn, TrustedSender, {"mailbox_id": seen["mailbox_id"], "domain": seen["sender_domain"]}, key=["mailbox_id", "domain"])
     conn.execute(delete(ReviewItem).where(ReviewItem.id == item_id))
     stored_mail.prune(conn)
     return True
@@ -128,6 +136,24 @@ def ignore_sender(conn: db.Connection, owner: str, item_id: int) -> int | None:
                                                      ReviewItem.sender_domain == row["sender_domain"])).rowcount)
     stored_mail.prune(conn)
     return left
+
+
+def trusted(conn: db.Connection, mailbox_id: int, domain: str | None) -> bool:
+    if not domain:
+        return False
+    known = conn.execute(select(TrustedSender.domain).where(TrustedSender.mailbox_id == mailbox_id)).scalars()
+    return any(domain == d or domain.endswith("." + d) for d in known)
+
+
+def asked(conn: db.Connection, mailbox_id: int, domain: str | None) -> bool:
+    return conn.execute(select(ReviewItem.id).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.reason == "generic",
+                                                    ReviewItem.sender_domain == (domain or UNKNOWN_SENDER))).fetchone() is not None
+
+
+def add_generic(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: str | None, received: str | None,
+                suggestion: ai.Suggestion, now: float) -> None:
+    add(conn, mailbox_id, message_id, sender_domain, received, "generic", now)
+    set_suggestion(conn, mailbox_id, message_id, suggestion, None)
 
 
 def ignored(conn: db.Connection, mailbox_id: int) -> list[str]:

@@ -261,6 +261,14 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     stay, stay_images = _styled_message("example-stays.example", 4, today, "Your stay: Quay Street Lodge",
                                         ("Hello Jane,", "Your stay at Quay Street Lodge is booked.", "Confirmation: DEMO77"))
     stored_mail.put(conn, box.id, "demo-held-stay", stay, 0.0, stay_images)
+    review.add_generic(conn, box.id, "demo-read-lodging", "seaside-stays.example", (today - timedelta(days=2)).isoformat(), {
+        "kind": "hotel", "provider": "Seaside Inn", "confirmation": "DEMO88", "origin": "Seaside Inn", "address": "12 Beach Road, Brighton, UK",
+        "start_local": f"{today + timedelta(days=40):%Y-%m-%d}T15:00", "end_local": f"{today + timedelta(days=44):%Y-%m-%d}T11:00",
+        "start_zone": "Europe/London", "sources": {"origin": "property", "start_local": "check-in", "end_local": "check-out",
+                                                     "confirmation": "confirmation number", "address": "address"}}, 0.0)
+    stored_mail.put(conn, box.id, "demo-read-lodging", _message("seaside-stays.example", 2, today, "Your booking is confirmed",
+                                                               ("Confirmation number: DEMO88", "Property: Seaside Inn", "Address: 12 Beach Road, Brighton, UK",
+                                                                "Check-in: made-up date after 3:00 PM", "Check-out: made-up date 11:00 AM")), 0.0)
     if from_email:
         itinerary, itinerary_images = _styled_message("example-air.example", 60, today, "Your itinerary: flight EX 410",
                                                       ("Hello,", "Your flight EX 410 leaves New York (JFK) at 7:00 am.", "Confirmation: CH3K5P"))

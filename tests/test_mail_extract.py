@@ -298,3 +298,38 @@ class WallClockTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+SOUTHWEST = (FIXTURES / "southwest" / "booking.eml").read_text()
+
+
+def forward(original: str = SOUTHWEST, subject: str = "Fwd: Your trip is confirmed (K7QW2N)", sender: str = "Pat Doe <pat@family.example>") -> dict:
+    head, body = original.split("\n\n", 1)
+    fields = dict(line.split(": ", 1) for line in head.splitlines() if ": " in line)
+    block = (f"<p>FYI</p><p>---------- Forwarded message ---------</p><p>From: {fields['From'].replace('<', '&lt;').replace('>', '&gt;')}</p>"
+             f"<p>Date: {fields['Date']}</p><p>Subject: {fields['Subject']}</p><p>To: {fields['To']}</p>{body}")
+    return message(eml(block, subject=subject, sender=sender))
+
+
+class ForwardTests(unittest.TestCase):
+    def test_a_forward_is_read_as_the_original_and_names_the_forwarder(self):
+        m = extract.read(forward())
+        self.assertEqual((m.sender_domain, m.forwarded_by, m.unread), ("luv.southwest.com", "family.example", 0))
+        self.assertEqual(sorted(b.confirmation for b in m.bookings), ["K7QW2N"] * len(m.bookings))
+        self.assertTrue(m.bookings)
+
+    def test_a_forward_with_no_recognisable_original_is_a_gap(self):
+        m = extract.read(message(eml("<p>look at this</p>", subject="Fwd: hotel", sender="pat@family.example")))
+        self.assertEqual((m.bookings, m.gaps, m.forwarded_by), ((), (extract.NO_ORIGINAL,), "family.example"))
+        m = extract.read(message(eml("<p>---------- Forwarded message ---------</p><p>nothing else</p>", sender="pat@family.example")))
+        self.assertEqual(m.gaps, (extract.NO_ORIGINAL,))
+
+    def test_mail_that_is_not_a_forward_is_unchanged(self):
+        m = extract.read(message(SOUTHWEST.encode()))
+        self.assertEqual((m.sender_domain, m.forwarded_by), ("luv.southwest.com", None))
+
+    def test_unwrap_reads_the_first_level_only(self):
+        inner = extract.unwrap("hi\n---------- Forwarded message ---------\nFrom: A <a@one.example>\nSubject: One\n\n"
+                               "---------- Forwarded message ---------\nFrom: B <b@two.example>\nSubject: Two\n\nbody")
+        self.assertEqual((inner.sender_domain, inner.subject), ("one.example", "One"))
+        self.assertIn("Forwarded message", inner.rest)

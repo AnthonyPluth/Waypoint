@@ -47,6 +47,7 @@ class ScanSummary(TypedDict):
     review: int
     skipped: int
     capped: bool
+    labels_dropped: int
 
 
 class Mailbox(TypedDict):
@@ -59,12 +60,28 @@ class Mailbox(TypedDict):
     scanning: bool
     scan_notice: str | None
     scan_summary: ScanSummary | None
+    labels_picked: int
     share_review: bool
 
 
 class MailboxList(TypedDict):
     configured: bool
     mailboxes: list[Mailbox]
+
+
+class MailboxLabel(TypedDict):
+    id: str
+    name: str
+    count: int
+    picked: bool
+
+
+class MailboxLabels(TypedDict):
+    labels: list[MailboxLabel]
+
+
+class LabelsBody(TypedDict):
+    labels: list[str]
 
 
 class ShareBody(TypedDict):
@@ -94,6 +111,8 @@ class AiSuggestion(TypedDict):
     destination: NotRequired[str]
     start_zone: NotRequired[str]
     end_zone: NotRequired[str]
+    address: NotRequired[str]
+    sources: NotRequired[dict[str, str]]
 
 
 class ReviewItem(TypedDict):
@@ -105,7 +124,7 @@ class ReviewItem(TypedDict):
     subject: str | None
     has_email: bool
     received: str | None
-    reason: Literal["no_markup", "incomplete", "broken"]
+    reason: Literal["no_markup", "incomplete", "broken", "generic"]
     gmail_url: str | None
     suggestion: AiSuggestion | None
     suggestion_error: str | None

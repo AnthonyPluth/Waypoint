@@ -235,9 +235,10 @@ mailboxes = Table(
     Column('created', Float),
     Column('scan_error', Text),
     Column('scan_summary', Text),
+    Column('scan_labels', Text),
     Column('share_review', Boolean, nullable=False, server_default=false()),
     UniqueConstraint('owner_sub', 'address', name='uq_mailboxes_owner_address'),
-    info={'doc': "Gmail accounts members connected (read-only); each belongs to the member who connected it, its refresh token is kept encrypted; scan_summary is the counts of its last scan (found, read, bookings, review, skipped, capped) and nothing of any message"},
+    info={'doc': "Gmail accounts members connected (read-only); each belongs to the member who connected it, its refresh token is kept encrypted; scan_summary is the counts of its last scan (found, read, bookings, review, skipped, capped) and nothing of any message; scan_labels is the list of Gmail label ids its owner chose to scan in full"},
 )
 
 mailbox_pending = Table(
@@ -302,6 +303,15 @@ ignored_senders = Table(
     Column('domain', Text, nullable=False),
     UniqueConstraint('mailbox_id', 'domain', name='uq_ignored_senders_mailbox_domain'),
     info={'doc': "sender domains a mailbox's owner chose to stop reviewing: their mail is skipped by later scans"},
+)
+
+trusted_senders = Table(
+    'trusted_senders', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('mailbox_id', Integer, refers('trusted_senders', 'mailbox_id', 'mailboxes.id', 'CASCADE'), nullable=False),
+    Column('domain', Text, nullable=False),
+    UniqueConstraint('mailbox_id', 'domain', name='uq_trusted_senders_mailbox_domain'),
+    info={'doc': "sender domains whose first generically-read booking its mailbox's owner confirmed: later ones from that sender are filed without review; holds no content"},
 )
 
 push_devices = Table(

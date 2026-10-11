@@ -152,10 +152,15 @@ def _city_zone(conn: db.Connection, tokens: list[str], country: str | None) -> s
     return None
 
 
+JAPAN = re.compile(r"日本|東京都|北海道|[\u4e00-\u9fff]{1,4}[府県]")
+
+
 def zone_for_address(conn: db.Connection, address: str | None) -> str | None:
     text = (address or "").strip()
     if not text:
         return None
+    if JAPAN.search(text):
+        return "Asia/Tokyo"
     tokens = _tokens(text)
     country = _country(tokens)
     if country in (None, "US"):

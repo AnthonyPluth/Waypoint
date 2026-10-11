@@ -22,6 +22,8 @@ from waypoint.domain import loyalty, people, trips
 from waypoint.domain.mail import extract, ingest, query, review, scan, triage
 from waypoint.domain.visibility import Viewer
 from waypoint.providers import gmail
+from waypoint.server.api import mailboxes as mailboxes_api
+from waypoint.server.common import ApiError
 from waypoint.server import jobs
 from waypoint.storage import db, secretbox, stored_mail
 from waypoint.storage.models import IgnoredSender, Mailbox, ReviewItem, ScannedMessage, Segment, SegmentMessage, SegmentTraveler, StoredMessage
@@ -32,7 +34,7 @@ REFRESH, ADDRESS = "refresh-jane-1", "jane@gmail.example"
 CANARIES = ("CANARY-BODY-FLIGHT-JSONLD-7Q2X", "CANARY-BODY-FLIGHT-MICRODATA-3K8D", "CANARY-BODY-HOTEL-5R1M",
             "CANARY-BODY-CAR-9T4V", "CANARY-BODY-TRAIN-2W6Z", "CANARY-BODY-NOMARKUP-6H9C", "CANARY-BODY-INCOMPLETE-4N7P",
             "CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-UTCLOCAL-4G8J", "CANARY-BODY-UTCCONV-6M2W", "CANARY-BODY-UTCNONE-9P5D",
-            "CANARY-BODY-OFFSET-3C7H", "CANARY-BODY-OVERNIGHT-8R4Y")
+            "CANARY-BODY-OFFSET-3C7H", "CANARY-BODY-OVERNIGHT-8R4Y", "CANARY-BODY-LODGING-EN-6V3T", "CANARY-BODY-LODGING-JA-2N9X")
 UTC_FIXTURES = ("utc_marked_local_in_text", "utc_marked_converted_in_text", "utc_marked_no_times_in_text", "offset_marked_times",
                 "utc_marked_overnight")
 
@@ -80,6 +82,17 @@ class FakeGmail(FakeGoogle):
         if token not in g.owners:
             return self.reply({"error": "unauthorized"}, 401)
         rest = url.path.removeprefix("/gmail/v1/users/me")
+        if rest == "/labels":
+            return self.reply({"labels": g.mailbox_labels})
+        if rest.startswith("/labels/"):
+            label = urllib.parse.unquote(rest.removeprefix("/labels/"))
+            if label not in {x["id"] for x in g.mailbox_labels}:
+                return self.reply({"error": "not_found"}, 404)
+            return self.reply({"id": label, "messagesTotal": len(g.label_mail.get(label, []))})
+        if rest == "/messages" and "labelIds" in q:
+            g.label_queries.append(q["labelIds"])
+            ids = g.label_mail.get(q["labelIds"], [])
+            return self.reply({"messages": [{"id": i, "threadId": i} for i in ids]} if ids else {"resultSizeEstimate": 0})
         if rest == "/messages":
             g.queries.append(q["q"])
             page = int(q.get("pageToken") or 0)
@@ -124,6 +137,7 @@ def reset(g) -> None:
     g.mail, g.matches, g.added, g.queries, g.fetched, g.history_calls = {}, [], [], [], [], []
     g.fail_on, g.history_gone, g.history_id, g.page = None, False, "200", 100
     g.heads, g.snippets, g.labels = [], {}, {}
+    g.mailbox_labels, g.label_mail, g.label_queries = [], {}, []
 
 
 def serve_fake_gmail(case) -> Google:
@@ -212,12 +226,13 @@ class ScanCase(DbCase):
 
 
 class SearchTests(ScanCase):
-    def test_the_search_is_for_booking_words_from_any_sender_without_promotions_spam_or_trash_since_18_months_ago(self):
+    def test_the_search_is_for_booking_words_from_any_sender_without_spam_or_trash_since_18_months_ago(self):
         self.assertEqual(self.scan().state, "done")
         [q] = self.google.queries
         self.assertTrue(q.startswith("(confirmation OR itinerary OR reservation OR "), q)
         self.assertNotIn("from:", q)
-        self.assertIn("-category:promotions -in:spam -in:trash", q)
+        self.assertIn("-in:spam -in:trash", q)
+        self.assertNotIn("promotions", q)
         self.assertTrue(q.endswith("after:2025/03/23"), q)
         self.assertLess(len(q), 1500)
 
@@ -239,7 +254,7 @@ class SearchTests(ScanCase):
     def test_the_search_is_one_group_of_words_so_gmail_cant_read_the_or_across_the_rest(self):
         q = query.build(date(2026, 1, 31), ["a.example"])
         words = "(" + query._any((*query.WORDS, *query.LODGING_WORDS, *query.JAPANESE_WORDS)) + ")"
-        self.assertTrue(q.startswith(f"{words} -category:promotions -in:spam -in:trash -from:a.example after:2026/01/31"), q)
+        self.assertTrue(q.startswith(f"{words} -in:spam -in:trash -from:a.example after:2026/01/31"), q)
 
     def test_a_banks_mail_has_to_be_about_travel_to_be_read(self):
         self.assertEqual(triage.decide(triage.Head("Your statement is ready", "chase.com", "reservation", frozenset())), "skip")
@@ -356,7 +371,7 @@ class TriageScanTests(ScanCase):
         self.scan()
         self.assertEqual(scan.summary(self.mailbox), scan.Summary(3, 2, 1, 1, 1, False))
         self.assertEqual(scan.decode(self.row()["scan_summary"]), scan.summary(self.mailbox))
-        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "found", "read", "review", "skipped"])
+        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "found", "labels_dropped", "read", "review", "skipped"])
 
     def test_a_reply_or_an_offer_looking_subject_from_a_travel_sender_is_still_read(self):
         for subject in ("Re: Your reservation", "Autumn sale: your booking is confirmed", "Your deal is booked: reservation H77"):
@@ -395,6 +410,208 @@ class TriageScanTests(ScanCase):
         summary = scan.summary(self.mailbox)
         self.assertEqual(summary, scan.Summary(2, 1, 0, 1, 1, False))
         self.assertFalse([t for t in said for k in canaries if k.lower() in t.lower()])
+
+
+LABELS = [{"id": "INBOX", "name": "INBOX", "type": "system"}, {"id": "CATEGORY_PURCHASES", "name": "CATEGORY_PURCHASES", "type": "system"},
+          {"id": "Label_1", "name": "Japan 2026", "type": "user"}, {"id": "Label_2", "name": "Taxes", "type": "user"}]
+
+
+class LabelScanTests(ScanCase):
+    def setUp(self):
+        super().setUp()
+        self.google.mailbox_labels = [dict(x) for x in LABELS]
+
+    def pick(self, *ids):
+        self.c.execute(update(Mailbox).where(Mailbox.id == self.mailbox).values(scan_labels=scan.encode_labels(list(ids))))
+        self.c.commit()
+
+    def in_label(self, label, mid, raw):
+        self.google.mail[mid] = raw
+        self.google.label_mail.setdefault(label, []).append(mid)
+
+    def test_nothing_is_picked_by_default_and_no_label_is_scanned(self):
+        self.in_label("Label_1", "j1", plain_mail("Pat <pat@friend.example>", "Notes", "Itinerary attached."))
+        result = self.scan()
+        self.assertEqual((result.messages, self.google.label_queries), (0, []))
+
+    def test_a_message_in_a_picked_label_is_read_whatever_its_sender_and_words(self):
+        self.pick("Label_1")
+        self.in_label("Label_1", "j1", plain_mail("Pat <pat@friend.example>", "Notes", "Dinner on Friday."))
+        self.in_label("Label_1", "j2", eml("hotel_jsonld"))
+        result = self.scan()
+        self.assertEqual((result.messages, result.skipped, result.bookings), (2, 0, 1))
+        self.assertEqual(sorted(self.google.fetched), ["j1", "j2"])
+        self.assertEqual(self.google.heads, [])
+        self.assertEqual(self.google.label_queries, ["Label_1"])
+
+    def test_an_unpicked_label_is_not_scanned(self):
+        self.pick("Label_1")
+        self.in_label("Label_2", "t1", plain_mail("Tax Office <office@tax.example>", "Your return", "Reservation of funds."))
+        self.scan()
+        self.assertEqual((self.google.fetched, self.google.label_queries), ([], ["Label_1"]))
+
+    def test_a_message_skipped_before_its_label_was_picked_is_read_once_it_is(self):
+        raw = plain_mail("Pat <pat@family.example>", "Lunch on Sunday?", "See you there.")
+        self.in_label("Label_1", "old", raw)
+        self.google.matches.append("old")
+        self.google.added.append("old")
+        self.scan()
+        self.assertEqual(self.scanned()["old"], "skipped")
+        self.pick("Label_1")
+        self.scan(now=NOW + 60)
+        self.assertEqual(self.scanned()["old"], "unreadable")
+        self.assertIn("old", self.google.fetched)
+
+    def test_a_label_deleted_in_gmail_drops_out_with_a_note_and_the_scan_goes_on(self):
+        self.pick("Label_1", "Label_Gone")
+        self.in_label("Label_1", "j1", eml("hotel_jsonld"))
+        result = self.scan()
+        self.assertEqual((result.state, result.bookings), ("done", 1))
+        self.assertEqual(scan.decode_labels(self.row()["scan_labels"]), ["Label_1"])
+        self.assertEqual(scan.summary(self.mailbox).labels_dropped, 1)
+
+    def test_a_message_in_a_label_is_read_once_even_when_the_search_finds_it_too(self):
+        self.pick("Label_1")
+        raw = eml("hotel_jsonld")
+        self.in_label("Label_1", "same", raw)
+        self.google.matches.append("same")
+        self.google.added.append("same")
+        self.assertEqual(self.scan().messages, 1)
+        self.assertEqual(self.google.fetched, ["same"])
+
+    def test_the_labels_offered_are_the_users_own_with_their_counts_and_no_system_ones(self):
+        self.in_label("Label_1", "j1", eml("hotel_jsonld"))
+        self.pick("Label_1")
+        with mock.patch.dict(mailboxes_api._current.__dict__, {"user": {"sub": "u-jane"}}):
+            offered = mailboxes_api.api_mailbox_labels(self.c, {}, {}, str(self.mailbox))
+        self.assertEqual(offered, {"labels": [{"id": "Label_1", "name": "Japan 2026", "count": 1, "picked": True},
+                                              {"id": "Label_2", "name": "Taxes", "count": 0, "picked": False}]})
+
+    def test_a_selection_is_saved_for_the_owner_alone_and_only_from_the_mailboxs_own_labels(self):
+        with mock.patch.dict(mailboxes_api._current.__dict__, {"user": {"sub": "u-jane"}}):
+            self.assertEqual(mailboxes_api.api_mailbox_labels_save(self.c, {}, {"labels": ["Label_2"]}, str(self.mailbox)), {"ok": True})
+            self.c.commit()
+            self.assertEqual(scan.decode_labels(self.row()["scan_labels"]), ["Label_2"])
+            for bad in ({"labels": ["INBOX"]}, {"labels": ["Nope"]}, {"labels": "Label_1"}, {"labels": [3]}, {}):
+                with self.assertRaises(ApiError, msg=str(bad)):
+                    mailboxes_api.api_mailbox_labels_save(self.c, {}, bad, str(self.mailbox))
+            self.assertEqual(mailboxes_api.api_mailbox_labels_save(self.c, {}, {"labels": []}, str(self.mailbox)), {"ok": True})
+            self.c.commit()
+            self.assertIsNone(self.row()["scan_labels"])
+        with mock.patch.dict(mailboxes_api._current.__dict__, {"user": {"sub": "u-sam"}}):
+            for call in (lambda: mailboxes_api.api_mailbox_labels(self.c, {}, {}, str(self.mailbox)),
+                         lambda: mailboxes_api.api_mailbox_labels_save(self.c, {}, {"labels": []}, str(self.mailbox))):
+                with self.assertRaises(ApiError) as caught:
+                    call()
+                self.assertEqual(caught.exception.status, 404)
+
+    def test_nothing_in_a_label_name_or_message_reaches_the_log_or_anywhere_else(self):
+        canaries = ("CANARY-LABEL-NAME-5H8R", "CANARY-LABEL-BODY-2D6V")
+        self.google.mailbox_labels.append({"id": "Label_9", "name": canaries[0], "type": "user"})
+        self.pick("Label_9")
+        self.in_label("Label_9", "k1", plain_mail("Pat <pat@friend.example>", "Notes", f"Plans {canaries[1]}"))
+        with no_leaks(self, *canaries, database=self.path), mock.patch.dict(mailboxes_api._current.__dict__, {"user": {"sub": "u-jane"}}):
+            self.scan()
+            offered = mailboxes_api.api_mailbox_labels(self.c, {}, {}, str(self.mailbox))
+        self.assertIn(canaries[0], str(offered))
+        self.assertNotIn(canaries[1], str(scan.summary(self.mailbox)))
+
+
+def forwarded(raw: bytes, subject: str = "Fwd: Your trip is confirmed (K7QW2N)") -> bytes:
+    head, body = raw.decode().split("\n\n", 1)
+    fields = dict(line.split(": ", 1) for line in head.splitlines() if ": " in line)
+    quoted = fields["From"].replace("<", "&lt;").replace(">", "&gt;")
+    return (f"From: Pat Doe <pat@family.example>\nTo: traveller@gmail.example\nSubject: {subject}\nDate: Wed, 07 Oct 2026 08:00:00 -0500\n"
+            "MIME-Version: 1.0\nContent-Type: text/html; charset=utf-8\n\n"
+            f"<p>FYI</p><p>---------- Forwarded message ---------</p><p>From: {quoted}</p><p>Date: {fields['Date']}</p>"
+            f"<p>Subject: {fields['Subject']}</p><p>To: {fields['To']}</p>{body}").encode()
+
+
+class ForwardScanTests(ScanCase):
+    def test_a_forward_is_filed_as_the_original_booking(self):
+        self.add_mail("fw1", forwarded(eml("southwest/booking")))
+        self.scan()
+        self.assertEqual(self.scanned(), {"fw1": "booking"})
+        self.assertEqual({s["provider"] for s in self.segments()}, {"Southwest Airlines"})
+        self.assertEqual(self.items(), [])
+
+    def test_a_forward_of_an_imported_reservation_updates_and_does_not_duplicate(self):
+        self.put("southwest/booking")
+        self.scan()
+        before = [(s["id"], s["start_local"]) for s in self.segments()]
+        self.add_mail("fw1", forwarded(eml("southwest/booking")))
+        self.scan(now=NOW + 60)
+        self.assertEqual([(s["id"], s["start_local"]) for s in self.segments()], before)
+
+    def test_a_forward_with_no_original_goes_to_review(self):
+        self.add_mail("fw2", b"From: Pat Doe <pat@family.example>\nSubject: Fwd: hotel\nContent-Type: text/plain\n\nlook at this hotel booking")
+        self.scan()
+        self.assertEqual([(i["reason"], i["sender_domain"]) for i in self.items()], [("no_markup", "family.example")])
+        self.assertEqual(self.segments(), [])
+
+    def test_the_kept_forward_shows_the_originals_sender_and_subject(self):
+        self.add_mail("fw1", forwarded(eml("southwest/booking")))
+        self.scan()
+        [item] = [c for c in [self.read(lambda conn: stored_mail.get(conn, self.mailbox, "fw1"))] if c]
+        self.assertEqual((item["sender_domain"], item["subject"]), ("luv.southwest.com", "Your trip is confirmed (K7QW2N)"))
+        self.assertNotIn("FYI", item["text"])
+
+
+class GenericReaderScanTests(ScanCase):
+    def second(self) -> bytes:
+        return eml("lodging_en").replace(b"SS48213", b"SS99999").replace(b"November 21, 2026", b"December 5, 2026").replace(b"November 25, 2026", b"December 9, 2026")
+
+    def test_a_generic_booking_from_a_new_sender_is_a_suggestion_not_a_booking(self):
+        self.put("lodging_en")
+        result = self.scan()
+        self.assertEqual((result.bookings, result.review), (0, 1))
+        self.assertEqual(self.segments(), [])
+        [item] = self.items()
+        self.assertEqual((item["reason"], item["sender_domain"]), ("generic", "seaside-stays.example"))
+        s = item["suggestion"]
+        self.assertEqual((s["kind"], s["origin"], s["confirmation"], s["start_local"], s["end_local"], s["address"]),
+                         ("hotel", "Seaside Inn", "SS48213", "2026-11-21T15:00", "2026-11-25T11:00", "12 Beach Road, Brighton, UK"))
+        self.assertEqual(s["start_zone"], "Europe/London")
+        self.assertEqual(s["sources"], {"origin": "property", "start_local": "check-in", "end_local": "check-out",
+                                        "confirmation": "confirmation number", "address": "address"})
+        self.assertNotIn("CANARY", json.dumps(item))
+
+    def test_it_asks_once_per_sender_until_confirmed(self):
+        self.put("lodging_en")
+        self.add_mail("second", self.second())
+        self.scan()
+        self.assertEqual(len(self.items()), 1)
+        self.assertNotIn("second", self.scanned())
+
+    def test_confirming_trusts_the_sender_and_later_mail_is_filed_directly(self):
+        self.put("lodging_en")
+        self.scan()
+        [item] = self.items()
+        seg = self.read(lambda conn: trips.add_segment(conn, self.jane, {
+            "kind": "hotel", "status": "confirmed", "confirmation": "SS48213", "provider": "Seaside Inn", "start_local": "2026-11-21T15:00",
+            "start_zone": "Europe/London", "end_local": "2026-11-25T11:00", "end_zone": "Europe/London", "origin": "Seaside Inn",
+            "destination": None, "details": {}, "manage_url": None}))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, seg["id"]))))
+        self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, "seaside-stays.example")))
+        self.add_mail("second", self.second())
+        result = self.scan(now=NOW + 60)
+        self.assertEqual((result.bookings, result.review), (1, 0))
+        self.assertEqual(sorted(s["confirmation"] for s in self.segments()), ["SS48213", "SS99999"])
+
+    def test_japanese_mail_is_read_too(self):
+        self.put("lodging_ja")
+        self.scan()
+        [item] = self.items()
+        self.assertEqual((item["suggestion"]["origin"], item["suggestion"]["start_local"], item["suggestion"]["start_zone"]),
+                         ("テスト温泉ホテル", "2026-11-21T15:00", "Asia/Tokyo"))
+
+    def test_the_lodging_mail_and_forwarded_headers_stay_on_the_server(self):
+        forward = forwarded(eml("lodging_en"), "Fwd: Your booking is confirmed CANARY-FWD-SUBJECT-5T8M").replace(b"FYI", b"CANARY-FWD-NOTE-3H6B")
+        self.add_mail("fw", forward)
+        self.put("lodging_ja")
+        with no_leaks(self, *CANARIES, "CANARY-FWD-SUBJECT-5T8M", "CANARY-FWD-NOTE-3H6B", database=self.path):
+            result = self.scan()
+        self.assertEqual(result.review, 2)
 
 
 class FirstScanTests(ScanCase):
