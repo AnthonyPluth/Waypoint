@@ -837,3 +837,100 @@ class McpSettings(TypedDict):
 
 class McpWritesBody(TypedDict):
     allow: bool
+
+
+class AssistantMatch(TypedDict):
+    segment_id: int
+    trip_id: int
+    confidence: Literal["exact", "likely", "possible"]
+
+
+class AssistantItem(TypedDict):
+    id: int
+    mailbox_id: int
+    mine: bool
+    sender_domain: str
+    reason: Literal["no_markup", "incomplete", "broken", "match", "generic"]
+    status: str | None
+    kind: str | None
+    received: str | None
+    has_email: bool
+    bookings: int
+    match: AssistantMatch | None
+
+
+class AssistantItems(TypedDict):
+    items: list[AssistantItem]
+    total: int
+    not_shown: int
+    next: str | None
+
+
+class AssistantParsed(TypedDict):
+    kind: str | None
+    status: str | None
+    provider: str | None
+    confirmation: str | None
+    origin: str | None
+    destination: str | None
+    address: str | None
+    phone: str | None
+    start_local: str | None
+    start_zone: str | None
+    end_local: str | None
+    end_zone: str | None
+    details: dict[str, str]
+    travelers: list[str]
+    read: dict[str, str]
+
+
+class AssistantCandidate(TypedDict):
+    segment_id: int
+    trip_id: int
+    trip_name: str
+    kind: str
+    provider: str | None
+    origin: str | None
+    destination: str | None
+    start_local: str
+    end_local: str
+    confidence: Literal["exact", "likely", "possible"]
+    agreed: list[str]
+    differed: list[str]
+
+
+class AssistantEntry(TypedDict):
+    entry: int
+    booking: AssistantParsed
+    candidates: list[AssistantCandidate]
+
+
+class AssistantItemDetail(AssistantItem):
+    entries: list[AssistantEntry]
+    suggestion: AssistantParsed | None
+
+
+class AssistantMatchBody(TypedDict):
+    entry: NotRequired[int | None]
+    segment_id: NotRequired[int | None]
+    trip_id: NotRequired[int | None]
+
+
+class AssistantCreateBody(SegmentEdit):
+    entry: NotRequired[int | None]
+
+
+class AssistantDismissBody(TypedDict):
+    reason: Literal["not_travel", "duplicate", "already_added", "other"]
+    note: NotRequired[str | None]
+
+
+class AssistantDismissed(TypedDict):
+    ok: bool
+    reason: Literal["not_travel", "duplicate", "already_added", "other"]
+
+
+class AssistantMatched(TypedDict):
+    ok: bool
+    segment_id: int
+    trip_id: int
