@@ -1,0 +1,13 @@
+{
+  "name": "review-view-email",
+  "page": "review",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Review" } },
+    { "wait_for": "[data-testid='review-item']" },
+    { "click": "button:has-text('View email') >> visible=true" },
+    { "wait_for": "[data-testid='preview']" },
+    { "wait_for": "iframe[data-testid='preview-html'][aria-busy='false'], [data-testid='preview']" },
+    { "scroll_to": "[data-testid='preview']" },
+    { "screenshot": "view-email-open" }
+  ]
+}
