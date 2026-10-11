@@ -217,6 +217,7 @@ class ScannedMessage(Base):
     outcome: Mapped[str]
     scanned: Mapped[float]
     sender_domain: Mapped[str | None]
+    segment_id: Mapped[int | None]
 
 
 class ReviewItem(Base):
@@ -231,6 +232,7 @@ class ReviewItem(Base):
     suggestion: Mapped[str | None]
     suggestion_error: Mapped[str | None]
     matches: Mapped[str | None]
+    reference: Mapped[str | None]
 
 
 class StoredMessage(Base):

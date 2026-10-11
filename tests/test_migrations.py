@@ -599,6 +599,30 @@ class MigrationTests(unittest.TestCase):
             self.assertIsNone(c.execute(select(schema.scanned_messages.c.sender_domain)).scalar())
         self.assertEqual(drift(self.path), [])
 
+    def test_0026_adds_the_reference_to_review_items_and_the_booking_to_seen_messages_and_takes_them_away_leaving_the_rows(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            self.assertIn("reference", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
+            self.assertIn("segment_id", {col["name"] for col in sa.inspect(c).get_columns("scanned_messages")})
+            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected"))
+            c.execute(insert(schema.trips).values(id=1, name="t", auto=True))
+            c.execute(insert(schema.segments).values(id=1, trip_id=1, kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="Europe/London",
+                                                     end_local="2026-11-02T10:00", end_zone="Europe/London", source="email"))
+            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m1", sender_domain="example-stays.example", reason="no_markup",
+                                                         created=1.0, reference="abc"))
+            c.execute(insert(schema.scanned_messages).values(mailbox_id=1, message_id="m1", outcome="follow-up", scanned=1.0, segment_id=1))
+            c.execute(delete(schema.segments).where(schema.segments.c.id == 1))
+            self.assertIsNone(c.execute(select(schema.scanned_messages.c.segment_id)).scalar())
+            command.downgrade(db.alembic_config(c), "0025")
+            self.assertNotIn("reference", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
+            self.assertNotIn("segment_id", {col["name"] for col in sa.inspect(c).get_columns("scanned_messages")})
+            self.assertEqual(c.execute(select(schema.review_items.c.message_id)).scalars().all(), ["m1"])
+            self.assertEqual(c.execute(select(schema.scanned_messages.c.outcome)).scalars().all(), ["follow-up"])
+            command.upgrade(db.alembic_config(c), "head")
+            self.assertIsNone(c.execute(select(schema.review_items.c.reference)).scalar())
+        self.assertEqual(drift(self.path), [])
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:

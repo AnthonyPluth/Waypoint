@@ -51,6 +51,8 @@ class ScanSummary(TypedDict):
     triaged: int
     total: int
     not_travel: int
+    followups: int
+    with_facts: int
 
 
 class Mailbox(TypedDict):
@@ -137,6 +139,13 @@ class AiSuggestion(TypedDict):
     sources: NotRequired[dict[str, str]]
 
 
+class ReviewOther(TypedDict):
+    id: int
+    subject: str | None
+    has_email: bool
+    received: str | None
+
+
 class ReviewItem(TypedDict):
     id: int
     address: str
@@ -152,6 +161,8 @@ class ReviewItem(TypedDict):
     gmail_url: str | None
     suggestion: AiSuggestion | None
     suggestion_error: str | None
+    count: int
+    others: list[ReviewOther]
 
 
 class WhoIsThis(TypedDict):

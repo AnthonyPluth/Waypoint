@@ -217,6 +217,7 @@ SUBJECTS = {"example-air.example": "Your itinerary", "example-stays.example": "Y
 DEMO_MAILBOX = "jane.doe@gmail.example"
 UNREAD: list[tuple[str, int, review.Reason]] = [("example-air.example", 21, "no_markup"), ("example-stays.example", 15, "incomplete")]
 DEMO_SHARED_MAILBOX = "sam.doe@gmail.example"
+SAME_RESERVATION: list[tuple[str, int, str]] = [("Online check-in is open", 18, "demo-checkin"), ("Your flight is a week away", 14, "demo-reminder")]
 SHARED_UNREAD: list[tuple[str, int, review.Reason]] = [("example-cruises.example", 9, "no_markup")]
 
 
@@ -256,13 +257,18 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     held_ids = [added["id"] for added in (trips.add_segment(conn, jane, {**_held_stay(today), "travelers": _on(jane.person_id)}) for _ in range(2)) if added]
     box = Mailbox(owner_sub="local", address=DEMO_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
                   status="connected", created=0.0, last_scan=datetime.now(UTC).timestamp() - 3600,
-                  scan_summary=scan.encode(scan.Summary(found=2140, read=18, bookings=3, review=2, skipped=312, capped=True, triaged=1260, total=3400, not_travel=47)))
+                  scan_summary=scan.encode(scan.Summary(found=2140, read=18, bookings=3, review=2, skipped=312, capped=True, triaged=1260, total=3400, not_travel=47, followups=6, with_facts=1)))
     conn.orm.add(box)
     conn.orm.flush()
     for domain, ago, reason in UNREAD:
-        review.add(conn, box.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0)
+        review.add(conn, box.id, f"demo-{domain}", domain, (today - timedelta(days=ago)).isoformat(), reason, 0.0,
+                   reference="DEMO42" if domain == "example-air.example" else None)
         stored_mail.put(conn, box.id, f"demo-{domain}", _message(domain, ago, today, f"{SUBJECTS[domain]}: made-up details",
                                                                  ("Hello Jane,", "These are made-up details for the demo.", "Confirmation: DEMO42")), 0.0)
+    for title, ago, key in SAME_RESERVATION:
+        review.add(conn, box.id, key, "example-air.example", (today - timedelta(days=ago)).isoformat(), "no_markup", 0.0, reference="DEMO42")
+        stored_mail.put(conn, box.id, key, _message("example-air.example", ago, today, f"{title}: made-up details",
+                                                    ("Hello Jane,", "These are made-up details for the demo.", "Confirmation: DEMO42")), 0.0)
     review.add(conn, box.id, "demo-held-stay", "example-stays.example", (today - timedelta(days=4)).isoformat(), "match", 0.0,
                [({**_held_stay(today), "confirmation": "DEMO77", "provider": "Example Stays"}, held_ids)])
     stay, stay_images = _styled_message("example-stays.example", 4, today, "Your stay: Quay Street Lodge",

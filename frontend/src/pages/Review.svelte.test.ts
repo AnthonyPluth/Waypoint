@@ -14,7 +14,7 @@ import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
 
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
   id: 1, address: "ana@gmail.example", owner: "Ana Doe", mine: true, sender_domain: "example-air.example", known_sender: false, holds_bookings: false, subject: null, has_email: true, received: "2026-10-17",
-  reason: "no_markup", gmail_url: "https://mail.google.com/mail/?authuser=ana%40gmail.example#all/abc", suggestion: null, suggestion_error: null, ...extra });
+  reason: "no_markup", gmail_url: "https://mail.google.com/mail/?authuser=ana%40gmail.example#all/abc", suggestion: null, suggestion_error: null, count: 1, others: [], ...extra });
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
   start_local: "2026-12-08T08:00", start_zone: "America/New_York", ...extra });
@@ -119,6 +119,62 @@ describe("Review", () => {
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
     expect(toast.success).toHaveBeenCalledWith("Dismissed");
     await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+  });
+
+  it("shows items about one reservation as one row with a count, the newest first, and the others behind a disclosure", async () => {
+    held = { ...held, who: [], items: [item({ subject: "Online check-in is open", count: 3, others: [
+      { id: 2, subject: "Your payment receipt", has_email: true, received: "2026-10-12" },
+      { id: 3, subject: null, has_email: false, received: "2026-10-10" }] })] };
+    render(ReviewPage);
+    const rows = await screen.findAllByTestId("review-item");
+    expect(rows).toHaveLength(1);
+    expect(within(rows[0]!).getByText("Online check-in is open")).toBeInTheDocument();
+    const disclosure = within(rows[0]!).getByTestId("same-reservation");
+    expect(within(disclosure).getByText("3 emails about the same reservation")).toBeInTheDocument();
+    expect(disclosure).not.toHaveAttribute("open");
+    await userEvent.click(within(disclosure).getByText("3 emails about the same reservation"));
+    expect(disclosure).toHaveAttribute("open");
+    const others = within(disclosure).getByRole("list", { name: "The other emails about it" });
+    expect(within(others).getByText("Your payment receipt · 2026-10-12")).toBeInTheDocument();
+    expect(within(others).getByText("Mail from example-air.example on 2026-10-10")).toBeInTheDocument();
+  });
+
+  it("shows no disclosure for a single email", async () => {
+    render(ReviewPage);
+    await screen.findByTestId("review-item");
+    expect(screen.queryByTestId("same-reservation")).toBeNull();
+  });
+
+  it("dismisses the whole group from its row and says how many went", async () => {
+    held = { ...held, who: [], items: [item({ subject: "Online check-in is open", count: 3, others: [
+      { id: 2, subject: "Your payment receipt", has_email: true, received: "2026-10-12" },
+      { id: 3, subject: "Your reminder", has_email: true, received: "2026-10-10" }] })] };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Dismiss all 3 emails about “Online check-in is open”" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
+    expect(toast.success).toHaveBeenCalledWith("Dismissed 3 emails");
+    await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+  });
+
+  it("adds a booking from a grouped row through the newest item alone", async () => {
+    held = { ...held, who: [], items: [item({ subject: "Online check-in is open", count: 2, others: [{ id: 2, subject: "Your payment receipt", has_email: true, received: "2026-10-12" }] })] };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Add “Online check-in is open” by hand" }));
+    await userEvent.type(screen.getByLabelText("From (airport code)"), "BOS");
+    await userEvent.type(screen.getByLabelText("To (airport code)"), "DEN");
+    await userEvent.type(screen.getByLabelText("Departs"), "2027-01-02T07:15");
+    await userEvent.type(screen.getByLabelText("Arrives"), "2027-01-02T09:40");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42", "DELETE", undefined]));
+    expect(calls.filter(([path]) => path.startsWith("/api/review/2"))).toEqual([]);
+  });
+
+  it("counts every email of a group in the ignore question", async () => {
+    held = { ...held, who: [], items: [item({ count: 3, others: [
+      { id: 2, subject: null, has_email: true, received: null }, { id: 3, subject: null, has_email: true, received: null }] }), item({ id: 4 })] };
+    render(ReviewPage);
+    await userEvent.click((await screen.findAllByRole("button", { name: "Not travel: ignore example-air.example" }))[0]!);
+    expect(await screen.findByText(/4 items from them \(this one included\) leave this list/)).toBeInTheDocument();
   });
 
   it("ignores a sender only after asking", async () => {

@@ -37,7 +37,8 @@ def _summary(text: str | None) -> ScanSummary | None:
     found = scan.decode(text)
     return None if found is None else {"found": found.found, "read": found.read, "bookings": found.bookings, "review": found.review,
                                       "skipped": found.skipped, "capped": found.capped, "labels_dropped": found.labels_dropped,
-                                      "triaged": found.triaged, "total": found.total, "not_travel": found.not_travel}
+                                      "triaged": found.triaged, "total": found.total, "not_travel": found.not_travel,
+                                      "followups": found.followups, "with_facts": found.with_facts}
 
 
 def api_mailboxes(conn, _q, _b) -> MailboxList:

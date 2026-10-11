@@ -531,7 +531,7 @@ class ScanTests(ScanAiCase):
         self.fake.on_request = lambda n: self.turn_off() if n == 1 else None
         self.assertEqual(self.scan().review, 3)
         self.assertEqual(len(self.fake.requests), 1)
-        notes = sorted((i["suggestion"] is not None) for i in self.items())
+        notes = sorted(self.read(lambda conn: [r is not None for r in conn.execute(select(ReviewItem.suggestion)).scalars()]))
         self.assertEqual(notes, [False, False, True])
 
     def test_an_item_keeps_nothing_of_the_email_but_its_suggestion(self):

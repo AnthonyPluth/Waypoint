@@ -258,8 +258,9 @@ scanned_messages = Table(
     Column('outcome', Text, nullable=False),
     Column('scanned', Float, nullable=False),
     Column('sender_domain', Text, doc="for an ignored message, its sender's domain, so stopping the ignore brings that sender's mail back; empty for older records"),
+    Column('segment_id', Integer, refers('scanned_messages', 'segment_id', 'segments.id', 'SET NULL'), doc='for a follow-up, the booking it was about; empty once that booking is removed'),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_scanned_messages_mailbox_message'),
-    info={'doc': "each Gmail message id a scan has looked at and what came of it (booking, unreadable, ignored), so nothing is read twice; holds no content"},
+    info={'doc': "each Gmail message id a scan has looked at and what came of it (booking, unreadable, ignored, skipped, follow-up), so nothing is read twice; holds no content"},
 )
 
 review_items = Table(
@@ -274,6 +275,7 @@ review_items = Table(
     Column('suggestion', Text),
     Column('suggestion_error', Text),
     Column('matches', Text, doc='for a "match" item: the bookings in the message that could be more than one of the segments added by hand (JSON, a list of {booking, candidates}), for the person to settle'),
+    Column('reference', Text, doc="a keyed hash of the reservation code the message names, so items about one reservation show as one row; never the code itself; empty when the message names none or several"),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_review_items_mailbox_message'),
     info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner (and the household, when they share it); the message itself is in stored_messages; `suggestion` is the booking's fields (JSON) the optional AI read from it, for the person to confirm or edit, and `suggestion_error` why it couldn't (fixed text)"},
 )

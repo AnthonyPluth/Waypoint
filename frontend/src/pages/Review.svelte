@@ -144,13 +144,13 @@
 
   const dismiss = (i: ReviewItem) => act(async () => {
     await apiCall<"DELETE /api/review/{id}">(`/api/review/${i.id}`, { method: "DELETE" });
-    toast.success("Dismissed");
+    toast.success(i.count > 1 ? `Dismissed ${i.count} emails` : "Dismissed");
     await settle();
   });
 
   let ignoring = $state<ReviewItem | null>(null);
   let asking = $state(false);
-  const goingCount = $derived(ignoring && review ? review.items.filter((i) => i.address === ignoring?.address && i.sender_domain === ignoring?.sender_domain && !i.holds_bookings).length : 0);
+  const goingCount = $derived(ignoring && review ? review.items.filter((i) => i.address === ignoring?.address && i.sender_domain === ignoring?.sender_domain && !i.holds_bookings).reduce((n, i) => n + i.count, 0) : 0);
   const UNDO_MS = 8000;
   const undoIgnore = (mailboxId: number, domain: string) => act(async () => {
     await apiCall<"POST /api/mailboxes/{id}/unignore">(`/api/mailboxes/${mailboxId}/unignore`, { method: "POST", body: { domain }, failed: "Couldn’t undo that" });
@@ -291,6 +291,16 @@
                 <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, item.mine ? `to ${item.address}` : `in ${item.owner}’s mailbox, shared with the household`].filter(Boolean).join(" · ")}</p>
                 <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestion && item.reason !== "generic"} <Badge variant="outline">AI suggestion</Badge>{/if}</p>
                 {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
+                {#if item.count > 1}
+                  <details class="mt-2 text-sm" data-testid="same-reservation">
+                    <summary class="cursor-pointer text-muted-foreground">{item.count} emails about the same reservation</summary>
+                    <ul class="mt-1 space-y-1 pl-4" aria-label="The other emails about it">
+                      {#each item.others as other (other.id)}
+                        <li class="break-words">{other.subject ?? `Mail from ${sender(item)}${other.received ? ` on ${other.received}` : ""}`}{other.subject && other.received ? ` · ${other.received}` : ""}</li>
+                      {/each}
+                    </ul>
+                  </details>
+                {/if}
               </div>
               <div class="flex basis-full flex-wrap gap-2">
                 {#if item.gmail_url}<a class={buttonVariants({ variant: "outline", size: "sm" })} href={item.gmail_url} target="_blank" rel="noopener noreferrer" aria-label={`Open “${subject(item)}” in Gmail`}>Open in Gmail</a>{/if}
@@ -298,7 +308,7 @@
                 {#if item.suggestion}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>Check suggestion</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
                 {#if item.sender_domain && item.mine}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Not travel: ignore ${item.sender_domain}`}>Not travel: ignore this sender</Button>{/if}
-                <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={`Dismiss “${subject(item)}”`}>Dismiss</Button>
+                <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={item.count > 1 ? `Dismiss all ${item.count} emails about “${subject(item)}”` : `Dismiss “${subject(item)}”`}>{item.count > 1 ? "Dismiss all" : "Dismiss"}</Button>
               </div>
             </li>
             {#if peeks[item.id] && draft?.item.id === item.id && !inSheet}
