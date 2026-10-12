@@ -631,11 +631,30 @@ describe("Review: the AI’s suggestion", () => {
     held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
-    expect(screen.queryByLabelText(/address/i)).toBeNull();
+    expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
     expect(screen.getByPlaceholderText("Same as pick-up")).toHaveValue("");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
     expect(calls.find(([p]) => p === "/api/segments")?.[2]).toMatchObject({ destination: "Bristol Airport", details: { address: "4 Runway Drive, Bristol BS48 3DY" } });
+  });
+
+  it("lets a kept rental address be cleared, and then the address is the pick-up", async () => {
+    const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "4 Runway Drive, Bristol BS48 3DY" };
+    held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.clear(screen.getByLabelText(/^Pick-up address/));
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.find(([p]) => p === "/api/segments")?.[2]).toMatchObject({ details: { address: "Bristol Airport" } });
+  });
+
+  it("shows no address field for a rental whose address is its pick-up, or one without an address", async () => {
+    const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00" };
+    held = { matches: [], items: [item({ suggestions: [{ ...car, address: "Bristol Airport" }] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.queryByLabelText(/address/i)).toBeNull();
   });
 
   it("sets a rental’s address from the pick-up when the email gave the same text, and keeps a stated drop-off", async () => {
@@ -654,8 +673,8 @@ describe("Review: the AI’s suggestion", () => {
     held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
     const first = render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
-    expect(screen.queryByLabelText(/^Pick-up address/)).toBeNull();
-    expect(screen.getByLabelText(/^Pick-up\b(?! time)/)).toHaveValue("Bristol Airport");
+    expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
+    expect(screen.getByLabelText(/^Pick-up(?! time| address)/)).toHaveValue("Bristol Airport");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     first.unmount();

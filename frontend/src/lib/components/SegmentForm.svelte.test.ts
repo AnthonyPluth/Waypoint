@@ -29,6 +29,31 @@ describe("SegmentForm: a rental car", () => {
   });
 });
 
+describe("SegmentForm: a rental car's kept address", () => {
+  const kept = "1 Rental Way, Bristol BS48 3DY";
+
+  it("shows a Pick-up address field only for a car whose address differs from its pick-up", () => {
+    mount({ ...draft("car", { origin: "Example Rental", details: { address: kept } }), addressField: true });
+    expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue(kept);
+  });
+
+  it("shows no address field for a new car, or one whose address equals its pick-up", () => {
+    mount(draft("car", { origin: "Example Rental", details: { address: "Example Rental" } }));
+    expect(screen.queryByLabelText(/address/i)).toBeNull();
+  });
+
+  it("lets the address be edited and cleared, and a cleared one follows the pick-up again", async () => {
+    const initial = { ...draft("car", { origin: "Example Rental", pickup: "Example Rental", details: { address: kept } }), addressField: true };
+    mount(initial);
+    const field = screen.getByLabelText(/^Pick-up address/);
+    await userEvent.clear(field);
+    await userEvent.type(field, "2 Depot Road");
+    expect(field).toHaveValue("2 Depot Road");
+    await userEvent.clear(field);
+    expect(field).toHaveValue("");
+  });
+});
+
 describe("SegmentForm: who is travelling", () => {
   const withPeople = (initial: Draft) => render(SegmentForm, { props: { initial, people: [{ id: 1, display_name: "Jane Doe" }, { id: 2, display_name: "Sam Doe" }] as never, onsaved: vi.fn(), oncancel: vi.fn() } });
 

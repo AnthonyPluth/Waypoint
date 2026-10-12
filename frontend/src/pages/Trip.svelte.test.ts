@@ -905,7 +905,7 @@ describe("Trip", () => {
         start_zone: "Europe/London", end_local: "2026-11-25T09:00", end_zone: "Europe/London", details: { address: "1 Rental Way, Bristol BS48 3DY" } });
       held = trip([flight, car]);
       render(TripPage);
-      expect(await screen.findByText("Pick-up address")).toBeInTheDocument();
+      expect((await screen.findAllByText("Pick-up address")).length).toBeGreaterThan(0);
       expect(screen.getByRole("button", { name: /Copy address 1 Rental Way/ })).toBeInTheDocument();
     });
 

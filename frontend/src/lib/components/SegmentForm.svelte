@@ -98,6 +98,12 @@
             <Input value={d.details[key] ?? ""} oninput={(e) => (d.details[key] = e.currentTarget.value)} maxlength={200} autocomplete="off" />
           {/if}</label>
       {/each}
+      {#if d.kind === "car" && d.addressField}
+        <label class={label}><span class="font-medium">Pick-up address</span>
+          <textarea id="segment-address" rows="3" maxlength={ADDRESS_LIMIT} value={d.details.address ?? ""} oninput={(e) => (d.details.address = e.currentTarget.value)}
+            autocomplete="off" class={selectClass}></textarea>
+          <span class="text-muted-foreground">Leave it empty to use the pick-up place.</span></label>
+      {/if}
       {#if d.kind === "cruise"}
         <fieldset class="flex flex-col gap-3" data-itinerary>
           <legend class="mb-1.5 text-sm font-medium">Ports of call</legend>

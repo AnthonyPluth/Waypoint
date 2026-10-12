@@ -53,6 +53,7 @@ export type Draft = {
   costSource: "email" | "manual" | null;
   untimed?: [string, string];
   pickup?: string;
+  addressField?: boolean;
 };
 
 export const blank = (tripId: number | null = null, currency = DEFAULT_CURRENCY): Draft => ({
@@ -73,7 +74,7 @@ export const draftOf = (s: Segment, currency = DEFAULT_CURRENCY): Draft => ({
   printed: s.travelers.flatMap((t) => (t.person_id === null ? [t.name] : [])),
   cost: s.price ? amountText(s.price.amount_minor, s.price.currency) : "", currency: s.price?.currency ?? currency, costSource: s.price?.source ?? null,
   ...(untimed(s) && { untimed: [s.start_local, s.end_local] as [string, string] }),
-  ...(s.kind === "car" && { pickup: s.origin ?? "" }),
+  ...(s.kind === "car" && { pickup: s.origin ?? "", addressField: differs(s.details.address, s.origin) }),
 });
 
 const AIRPORT = /^[A-Za-z]{3}$/;
@@ -135,6 +136,9 @@ export function problem(d: Draft): string | null {
   if (!FOR_EVERYONE.includes(d.kind) && d.people.length + d.printed.length === 0) return "Choose who’s travelling";
   return null;
 }
+
+export const differs = (address: string | undefined, origin: string | null | undefined): boolean =>
+  !!address?.trim() && address.trim().split(/\s+/).join(" ").toLowerCase() !== (origin ?? "").trim().split(/\s+/).join(" ").toLowerCase();
 
 export const SAME_AS_PICKUP = "Same as pick-up";
 

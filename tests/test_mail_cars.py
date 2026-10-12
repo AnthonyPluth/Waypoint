@@ -114,7 +114,7 @@ class CarReaderTests(unittest.TestCase):
     def test_a_stated_drop_off_place_is_kept(self):
         [b] = read("<p>Car rental</p>" + "<p>Pick-up location: SFO</p><p>Pick-up date: Dec 8, 2026</p>"
                    "<p>Drop-off location: LAX</p><p>Drop-off date: Dec 10, 2026</p>")[0].bookings
-        self.assertNotEqual(b.origin, b.destination)
+        self.assertEqual((b.origin, b.destination), ("SFO", "LAX"))
 
     def test_what_cannot_be_read_gets_a_reason_and_no_booking(self):
         base = "<p>Car rental</p>"

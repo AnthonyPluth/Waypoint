@@ -32,7 +32,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Sheet } from "$lib/components/ui/sheet";
   import { amountText } from "$lib/money";
-  import { carAddress, DEFAULT_CURRENCY, DETAILS, KINDS as FORM_KINDS, priceOf, SAME_AS_PICKUP, type Kind } from "$lib/segment-form";
+  import { carAddress, differs, DEFAULT_CURRENCY, DETAILS, KINDS as FORM_KINDS, priceOf, SAME_AS_PICKUP, type Kind } from "$lib/segment-form";
   import { apiCall } from "$lib/contract";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import { toast } from "svelte-sonner";
@@ -70,14 +70,15 @@
 
   const SHOWN: Record<string, string[]> = { flight: ["flight_number", "cabin"], hotel: ["address", "phone"], car: ["phone"], train: ["address"], parking: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
   const detailLabel = (kind: string, key: string) => DETAILS[kind as Kind].find(([k]) => k === key)?.[1] ?? key;
-  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string>; cost: string; currency: string };
+  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string>; cost: string; currency: string; addressField: boolean };
   const detailsOf = (s: ReviewItem["suggestions"][number]): Record<string, string> => ({ address: s.address ?? "", phone: s.phone ?? "", room: s.room ?? "", ship: s.ship ?? "", deck: s.deck ?? "", flight_number: s.flight_number ?? "", cabin: s.cabin ?? "" });
   const suggestedDraft = (item: ReviewItem, s: ReviewItem["suggestions"][number], pick: number): Draft => ({
     item, pick, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
     destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", details: s.kind === "car" && s.address?.trim() === s.origin.trim() ? { ...detailsOf(s), address: "" } : detailsOf(s),
     read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), sources: s.sources ?? {},
-    cost: s.price_minor && s.price_currency ? amountText(s.price_minor, s.price_currency) : "", currency: s.price_currency ?? DEFAULT_CURRENCY });
-  const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {}, cost: "", currency: DEFAULT_CURRENCY });
+    cost: s.price_minor && s.price_currency ? amountText(s.price_minor, s.price_currency) : "", currency: s.price_currency ?? DEFAULT_CURRENCY,
+    addressField: s.kind === "car" && differs(s.address, s.origin) });
+  const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {}, cost: "", currency: DEFAULT_CURRENCY, addressField: false });
   let drafts = $state<Draft[]>([]);
   let joining = $state<{ legs: Draft[]; bodies: SegmentBody[]; found: (ReviewCandidate | null)[] } | null>(null);
   const draft = $derived(drafts[0] ?? null);
@@ -341,6 +342,10 @@
       <ZoneSelect bind:value={d.startZone} blank={d.kind === "cruise" ? "Choose a time zone" : "Work it out from the airport"} required={d.kind === "cruise"} /></label>
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it ends</span>
       <ZoneSelect bind:value={d.endZone} blank="Same as where it starts" /></label>
+    {#if d.kind === "car" && d.addressField}
+      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Pick-up address</span>
+        <Input value={d.details["address"] ?? ""} oninput={(e) => (d.details["address"] = e.currentTarget.value)} maxlength={300} autocomplete="off" /></label>
+    {/if}
     {#each SHOWN[d.kind] ?? [] as key (key)}{@render detailField(d, key)}{/each}
   {:else}
     {#each SHOWN.flight as key (key)}{#if d.read.includes(key)}{@render detailField(d, key)}{/if}{/each}

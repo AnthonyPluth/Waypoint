@@ -42,7 +42,7 @@
   const rows = $derived<[string, string | null | undefined][]>(
     flight ? [["Terminal", s.details.terminal], ["Gate", status?.dep_gate], ["Seat", seat], ["Cabin", s.details.cabin]]
       : s.kind === "hotel" ? [["Address", condensed ? placeOf(s.details.address) : s.details.address], ["Room", s.details.room]]
-        : s.kind === "car" ? [["Car", s.details.car_class], ["Address", condensed ? placeOf(extraAddress(s)) : extraAddress(s)]]
+        : s.kind === "car" ? [["Car", s.details.car_class], ["Pick-up address", condensed ? placeOf(extraAddress(s)) : extraAddress(s)]]
           : s.kind === "parking" ? [["Address", condensed ? placeOf(s.details.address) : s.details.address], ["Space", s.details.space_type], ["Vehicle", s.details.vehicle], ["Notes", s.details.notes]]
           : s.kind === "cruise" ? [["Ship", s.details.ship], ["Cabin", s.details.room], ["Deck", s.details.deck]]
             : [["Seat", seat], ["Cabin", s.details.cabin]],
