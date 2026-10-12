@@ -954,7 +954,7 @@ describe("Trip", () => {
 
     it("shows the traveller's cruise-line membership number masked on the cruise card", async () => {
       loyalty = [membership({ id: 31, person_id: 1, kind: "cruise", program: "Disney Castaway Club", masked: "••••0042" })];
-      held = trip([{ ...ship, provider: "Disney Cruise Line", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] }]);
+      held = trip([{ ...ship, provider: "Disney Cruise Line", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] }], { end_date: "2999-01-01" });
       render(TripPage);
       await screen.findByRole("heading", { name: "Example Voyager · Miami" });
       const line = document.querySelector("[data-membership]")!;
@@ -965,7 +965,7 @@ describe("Trip", () => {
 
     it("shows no membership on a cruise from a line with no program saved for the traveller", async () => {
       loyalty = [membership({ id: 31, person_id: 1, kind: "cruise", program: "Disney Castaway Club", masked: "••••0042" })];
-      held = trip([{ ...ship, provider: "Carnival Cruise Line", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] }]);
+      held = trip([{ ...ship, provider: "Carnival Cruise Line", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] }], { end_date: "2999-01-01" });
       render(TripPage);
       await screen.findByRole("heading", { name: "Example Voyager · Miami" });
       expect(document.querySelector("[data-membership]")).toBeNull();
