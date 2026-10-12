@@ -185,4 +185,59 @@ describe("RouteReplayMap", () => {
     expect(container.querySelectorAll("[data-leg]")).toHaveLength(4);
     expect(container.querySelectorAll("[data-plane]")).toHaveLength(2);
   });
+
+  const la = "America/Los_Angeles";
+  const hotel = segment({ id: 3, kind: "hotel", origin: "Bayview Inn", destination: "San Francisco", start_local: "2025-12-05T15:00", start_zone: la, end_local: "2025-12-11T11:00", end_zone: la });
+  const hotelStops = stopsOf(trip([...flights, hotel]), { ...places, cities: [{ city: "san francisco", latitude: 37.6213, longitude: -122.379 }] });
+  const viewBox = (container: HTMLElement) => container.querySelector("svg")!.getAttribute("viewBox")!.split(" ").map(Number);
+
+  it("sends a car from the airport to the hotel, zooming in after the flight and back out before the next one", async () => {
+    const { container } = render(RouteReplayMap, { stops: hotelStops, year: 2025, still: false });
+    expect(viewBox(container)).toEqual([0, 0, 960, 520]);
+    await fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    advance(3750);
+    await Promise.resolve();
+    expect(container.querySelector("[data-car='1']")!.getAttribute("data-flying")).toBe("true");
+    expect(container.querySelector("[data-car='1']")!.closest("[aria-hidden='true']")).toBeTruthy();
+    expect(container.querySelector("svg")!.getAttribute("data-zoomed")).toBe("true");
+    expect(viewBox(container)[2]).toBeLessThan(960);
+    advance(6250);
+    await Promise.resolve();
+    expect(viewBox(container)).toEqual([0, 0, 960, 520]);
+    expect(container.querySelector("svg")!.getAttribute("data-zoomed")).toBe("false");
+  });
+
+  it("returns to the whole map when scrubbed to the start or the end", async () => {
+    const { container } = render(RouteReplayMap, { stops: hotelStops, year: 2025, still: false });
+    const slider = screen.getByRole("slider", { name: "Position along the route" });
+    await fireEvent.input(slider, { target: { value: "375" } });
+    expect(viewBox(container)[2]).toBeLessThan(960);
+    await fireEvent.input(slider, { target: { value: "0" } });
+    expect(viewBox(container)).toEqual([0, 0, 960, 520]);
+    await fireEvent.input(slider, { target: { value: "1000" } });
+    expect(viewBox(container)).toEqual([0, 0, 960, 520]);
+  });
+
+  it("sends a boat along a cruise", async () => {
+    const cruise = segment({ id: 5, kind: "cruise", origin: "San Francisco", destination: "San Francisco", start_local: "2025-12-09T16:00", start_zone: la, end_local: "2025-12-13T07:00", end_zone: la,
+      itinerary: [{ name: "Napa", zone: la, arrive_local: "2025-12-11T08:00", depart_local: "2025-12-11T17:00" }] });
+    const ship = stopsOf(trip([cruise]), { ...places, cities: [{ city: "san francisco", latitude: 37.6213, longitude: -122.379 }, { city: "napa", latitude: 38.2975, longitude: -122.2869 }] });
+    const { container } = render(RouteReplayMap, { stops: ship, year: 2025, still: false });
+    await fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    advance(1500);
+    await Promise.resolve();
+    expect(container.querySelector("[data-boat='0']")).toBeTruthy();
+    expect(container.querySelector("[data-car]")).toBeNull();
+  });
+
+  it("with reduced motion keeps the whole map, with no zoom and static icons", () => {
+    const far = stopsOf(trip([...flights, segment({ id: 3, kind: "hotel", origin: "Bay Lodge", destination: "Monterey", start_local: "2025-12-05T15:00", start_zone: la, end_local: "2025-12-11T11:00", end_zone: la })]),
+      { ...places, stays: [{ segment_id: 3, latitude: 36.6, longitude: -121.9, precision: "city" }] });
+    const { container } = render(RouteReplayMap, { stops: far, year: 2025, still: true });
+    expect(viewBox(container)).toEqual([0, 0, 960, 520]);
+    expect(container.querySelector("svg")!.getAttribute("data-zoomed")).toBe("false");
+    expect(container.querySelector("[data-car]")!.getAttribute("data-flying")).toBe("false");
+    expect(container.querySelector("[data-plane]")!.getAttribute("data-flying")).toBe("false");
+    expect(container.querySelector(".animate-ping")).toBeNull();
+  });
 });

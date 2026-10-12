@@ -7,7 +7,9 @@ export type Kind = Segment["kind"];
 export type StopKind = "airport" | "stay" | "place";
 export type Stop = { name: string; city: string; code: string | null; kind: StopKind; latitude: number; longitude: number; from: string; to: string; via: Kind | null; back: boolean };
 export type Spot = { x: number; y: number };
-export type Leg = { d: string; flight: boolean; from: Spot; control: Spot; to: Spot };
+export type Vehicle = "plane" | "car" | "boat";
+export type Leg = { d: string; flight: boolean; vehicle: Vehicle; from: Spot; control: Spot; to: Spot };
+export type Box = { x: number; y: number; w: number; h: number };
 type Visit = Omit<Stop, "back"> & { exact?: boolean };
 type Point = { name: string; city?: string; code?: string | null; kind?: StopKind; latitude: number; longitude: number; exact?: boolean };
 
@@ -16,6 +18,10 @@ export const SAME_PLACE_KM = 30;
 export const CROWDED_PX = 14;
 export const NUDGE_PX = 13;
 export const BOW = 0.22;
+export const LOCAL_BOW = 0.1;
+export const ZOOM_UNITS = 0.35;
+export const MIN_ZOOM_SHARE = 0.25;
+export const STATIC_MOVER_PX = 16;
 export const MIN_MS = 6000;
 export const MAX_MS = 12000;
 export const PER_STOP_MS = 2000;
@@ -144,9 +150,10 @@ export function legsOf(stops: Stop[], projection: GeoProjection): Leg[] {
     const from = spots[i - 1], to = spots[i];
     const flight = stops[i].via === "flight";
     const length = Math.hypot(to.x - from.x, to.y - from.y);
-    const bow = flight ? length * BOW : 0;
+    const bow = length * (flight ? BOW : LOCAL_BOW);
     const control = length === 0 ? from : { x: (from.x + to.x) / 2 + ((to.y - from.y) / length) * bow, y: (from.y + to.y) / 2 - ((to.x - from.x) / length) * bow };
-    out.push({ d: `M${from.x.toFixed(1)},${from.y.toFixed(1)} Q${control.x.toFixed(1)},${control.y.toFixed(1)} ${to.x.toFixed(1)},${to.y.toFixed(1)}`, flight, from, control, to });
+    const vehicle: Vehicle = flight ? "plane" : stops[i].via === "cruise" ? "boat" : "car";
+    out.push({ vehicle, d: `M${from.x.toFixed(1)},${from.y.toFixed(1)} Q${control.x.toFixed(1)},${control.y.toFixed(1)} ${to.x.toFixed(1)},${to.y.toFixed(1)}`, flight, from, control, to });
   }
   return out;
 }
@@ -199,4 +206,43 @@ export function labelLit(stop: number, stops: number, progress: number, held: bo
   if (held && stop === activeStop(stops, progress)) return true;
   const hold = Math.min(0.85, LABEL_HOLD_MS / (replayMs(stops) / (stops - 1)));
   return progress * (stops - 1) - stop < hold;
+}
+
+export type LocalRun = { from: number; to: number };
+
+export function localRuns(stops: Stop[]): LocalRun[] {
+  const runs: LocalRun[] = [];
+  for (let k = 0; k < stops.length - 1; k++) {
+    if (stops[k].via !== "flight" || stops[k + 1].via === "flight") continue;
+    let m = k + 1;
+    while (m + 1 < stops.length && stops[m + 1].via !== "flight") m++;
+    runs.push({ from: k, to: m });
+    k = m - 1;
+  }
+  return runs;
+}
+
+const smooth = (t: number): number => {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * (3 - 2 * c);
+};
+
+export function cameraAt(stops: Stop[], spots: Spot[], width: number, height: number, progress: number): Box {
+  const full: Box = { x: 0, y: 0, w: width, h: height };
+  const units = progress * (stops.length - 1);
+  let best = 0;
+  let target = full;
+  for (const run of localRuns(stops)) {
+    if (units < run.from || units > run.to) continue;
+    const share = Math.min(smooth((units - run.from) / ZOOM_UNITS), smooth((run.to - units) / ZOOM_UNITS));
+    if (share <= best) continue;
+    const area = spots.slice(run.from, run.to + 1);
+    const xs = area.map((p) => p.x), ys = area.map((p) => p.y);
+    const w = Math.min(width, Math.max(width * MIN_ZOOM_SHARE, (Math.max(...xs) - Math.min(...xs)) * 1.6, ((Math.max(...ys) - Math.min(...ys)) * 1.6 * width) / height));
+    const h = (w * height) / width;
+    const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+    best = share;
+    target = { x: Math.min(width - w, Math.max(0, cx - w / 2)), y: Math.min(height - h, Math.max(0, cy - h / 2)), w, h };
+  }
+  return { x: full.x + (target.x - full.x) * best, y: full.y + (target.y - full.y) * best, w: width + (target.w - width) * best, h: height + (target.h - height) * best };
 }

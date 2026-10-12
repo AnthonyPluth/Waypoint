@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TripPlaces } from "./api-types";
-import { activeStop, canReplay, legProgress, labelLit, legsOf, maxStops, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopsOf, worthLocating, type Stop } from "./route-replay";
+import { activeStop, cameraAt, canReplay, legProgress, labelLit, legsOf, localRuns, maxStops, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopsOf, worthLocating, type Stop } from "./route-replay";
 import { segment, trip } from "../test/fixtures";
 
 const places: TripPlaces = {
@@ -226,5 +226,43 @@ describe("the camera and the timeline", () => {
 
   it("plays for between six and twelve seconds", () => {
     expect([2, 3, 4, 6, 9].map(replayMs)).toEqual([6000, 6000, 8000, 12000, 12000]);
+  });
+});
+
+describe("the local legs and the camera", () => {
+  const la = "America/Los_Angeles";
+  const hotelNear = segment({ id: 4, kind: "hotel", origin: "Vine Inn", destination: "Napa, CA", start_local: "2025-12-06T15:00", start_zone: la, end_local: "2025-12-08T11:00", end_zone: la });
+  const cruise = segment({ id: 5, kind: "cruise", origin: "San Francisco", destination: "San Francisco", start_local: "2025-12-09T16:00", start_zone: la, end_local: "2025-12-13T07:00", end_zone: la,
+    itinerary: [{ name: "Napa", zone: la, arrive_local: "2025-12-11T08:00", depart_local: "2025-12-11T17:00" }] });
+
+  it("gives a car to a leg on the ground, a boat to a cruise leg and a plane to a flight", () => {
+    const set = stopsOf(trip([out, hotelNear, cruise]), places);
+    const legs = legsOf(set, routeProjection(set, 960, 520));
+    expect(legs.map((l) => l.vehicle)).toEqual(["plane", "car", "car", "boat", "boat"]);
+    expect(legs.every((l) => l.d.startsWith("M"))).toBe(true);
+  });
+
+  it("finds the local run after each flight, up to the next flight", () => {
+    const set = stopsOf(trip([out, stay, back]), places);
+    expect(localRuns(set)).toEqual([{ from: 1, to: 3 }]);
+    expect(localRuns(stopsOf(trip([out, back]), places))).toEqual([]);
+  });
+
+  it("zooms in after a flight lands, holds, and is back at the whole map before the next flight and at both ends", () => {
+    const set = stopsOf(trip([out, hotelNear, back]), places);
+    const projection = routeProjection(set, 960, 520);
+    const spots = positions(set, projection);
+    const at = (p: number) => cameraAt(set, spots, 960, 520, p);
+    const whole = { x: 0, y: 0, w: 960, h: 520 };
+    expect(at(0)).toEqual(whole);
+    expect(at(1)).toEqual(whole);
+    const units = set.length - 1;
+    const held = at((1 + 0.5) / units);
+    expect(held.w).toBeLessThan(960 * 0.5);
+    expect(held.h / held.w).toBeCloseTo(520 / 960);
+    expect(at(1 / units + 0.01).w).toBeGreaterThan(held.w);
+    expect(at((units - 1) / units).w).toBeCloseTo(960);
+    expect(held.x).toBeGreaterThanOrEqual(0);
+    expect(held.x + held.w).toBeLessThanOrEqual(960);
   });
 });

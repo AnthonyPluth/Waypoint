@@ -3,7 +3,7 @@
   import { Button } from "$lib/components/ui/button";
   import { loadCountries, type Country } from "$lib/map";
   import { viewport } from "$lib/phone.svelte";
-  import { activeStop, labelLit, legProgress, legsOf, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Stop } from "$lib/route-replay";
+  import { activeStop, cameraAt, labelLit, STATIC_MOVER_PX, legProgress, legsOf, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
@@ -64,28 +64,32 @@
   const scrub = (e: Event) => { playing = false; progress = Number((e.currentTarget as HTMLInputElement).value) / 1000; };
 
   const showing = (i: number) => calm || reached(i, stops.length, progress);
-  const crowd = $derived(spots.map((p, i) => spots.slice(0, i).filter((q) => Math.hypot(p.x - q.x, p.y - q.y) < 40).length));
+  const crowd = $derived(spots.map((p, i) => spots.slice(0, i).filter((q) => Math.hypot(p.x - q.x, p.y - q.y) / zoom < 40).length));
   const above = (i: number) => {
-    const base = spots[i].y > height * 0.72 ? true : spots[i].y < height * 0.28 ? false : i % 2 === 0;
+    const base = fy(spots[i].y) > 0.72 ? true : fy(spots[i].y) < 0.28 ? false : i % 2 === 0;
     return crowd[i] % 2 === 0 ? base : !base;
   };
   const shift = (i: number) => 12 + Math.floor(crowd[i] / 2) * 40;
-  const edge = (x: number) => (x < width * 0.22 ? "0%" : x > width * 0.78 ? "-100%" : "-50%");
+  const edge = (x: number) => (fx(x) < 0.22 ? "0%" : fx(x) > 0.78 ? "-100%" : "-50%");
   const lit = (i: number) => calm || labelLit(i, stops.length, progress, !playing);
-  const planeSize = 1.1;
-  const planes = $derived(legs.flatMap((leg, i) => {
-    if (!leg.flight) return [];
+  const box = $derived(calm ? { x: 0, y: 0, w: width, h: height } : cameraAt(stops, spots, width, height, progress));
+  const zoom = $derived(box.w / width);
+  const zoomed = $derived(box.w < width - 0.5);
+  const fx = (x: number) => (x - box.x) / box.w;
+  const fy = (y: number) => (y - box.y) / box.h;
+  const movers = $derived(legs.flatMap((leg, i) => {
     const done = calm ? 1 : legProgress(i, stops.length, progress);
     if (done <= 0) return [];
-    const flying = !calm && done < 1;
-    return [{ i, flying, ...planeAt(leg, flying ? done : 0.5) }];
+    const moving = !calm && done < 1;
+    if (!moving && Math.hypot(leg.to.x - leg.from.x, leg.to.y - leg.from.y) < STATIC_MOVER_PX) return [];
+    return [{ i, moving, vehicle: leg.vehicle, ...planeAt(leg, moving ? done : 0.5) }];
   }));
   const buttonLabel = $derived(progress >= 1 ? "Replay" : playing ? "Pause" : progress > 0 ? "Resume" : "Play");
 </script>
 
 <div class="space-y-3">
   <div class="relative overflow-hidden rounded-2xl border border-border bg-map-sea" style="aspect-ratio: {width} / {height}" data-testid="replay-map">
-    <svg viewBox="0 0 {width} {height}" role="img" aria-label="Map of the route, stop by stop; the stops are listed below" class="block h-full w-full">
+    <svg viewBox="{box.x} {box.y} {box.w} {box.h}" data-zoomed={zoomed} role="img" aria-label="Map of the route, stop by stop; the stops are listed below" class="block h-full w-full">
       <path d={sphere} class="fill-map-sea" />
       <g class="fill-map-land stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke">
         {#each land as c (c.id)}<path d={c.d} />{/each}
@@ -94,7 +98,7 @@
         {#each legs as leg, i (i)}
           {@const done = calm ? 1 : legProgress(i, stops.length, progress)}
           {#if done > 0}
-            <path d={leg.d} pathLength="1" stroke-dasharray="1" stroke-dashoffset={1 - done} stroke-width={leg.flight ? 2.5 : 2}
+            <path d={leg.d} pathLength="1" stroke-dasharray="1" stroke-dashoffset={1 - done} stroke-width={(leg.flight ? 2.5 : 2) * zoom}
               class={leg.flight ? "stroke-map-route" : "stroke-map-stay"} data-leg={leg.flight ? "flight" : "ground"} />
           {/if}
         {/each}
@@ -102,30 +106,38 @@
       <g data-testid="stops">
         {#each stops as s, i (i)}
           {#if showing(i)}
-            <g data-stop={s.name} data-kind={s.kind}>
-              {#if !calm && playing && i === now}<circle cx={spots[i].x} cy={spots[i].y} r="10" class="animate-ping fill-map-airport/60" style="transform-box: fill-box; transform-origin: center" />{/if}
+            <g data-stop={s.name} data-kind={s.kind} transform="translate({spots[i].x} {spots[i].y}) scale({zoom})">
+              {#if !calm && playing && i === now}<circle r="10" class="animate-ping fill-map-airport/60" style="transform-box: fill-box; transform-origin: center" />{/if}
               {#if s.kind === "stay"}
-                <rect x={spots[i].x - 6} y={spots[i].y - 6} width="12" height="12" rx="2" transform="rotate(45 {spots[i].x} {spots[i].y})" class="fill-map-stay stroke-map-sea" stroke-width="2" />
+                <rect x="-6" y="-6" width="12" height="12" rx="2" transform="rotate(45)" class="fill-map-stay stroke-map-sea" stroke-width="2" />
               {:else if s.kind === "airport"}
-                <circle cx={spots[i].x} cy={spots[i].y} r="6" class="fill-map-airport stroke-map-sea" stroke-width="2" />
+                <circle r="6" class="fill-map-airport stroke-map-sea" stroke-width="2" />
               {:else}
-                <circle cx={spots[i].x} cy={spots[i].y} r="4.5" class="fill-map-visited stroke-map-sea" stroke-width="2" />
+                <circle r="4.5" class="fill-map-visited stroke-map-sea" stroke-width="2" />
               {/if}
             </g>
           {/if}
         {/each}
       </g>
-      <g data-testid="planes" aria-hidden="true">
-        {#each planes as p (p.i)}
-          <g data-plane={p.i} data-flying={p.flying} transform="translate({p.x.toFixed(1)} {p.y.toFixed(1)}) rotate({p.angle.toFixed(1)}) scale({planeSize})">
-            <path d="M12 0 L3 -2.5 L-2 -10 L-5 -10 L-3 -1.5 L-8 -1.5 L-10 -4 L-12.5 -4 L-10.5 0 L-12.5 4 L-10 4 L-8 1.5 L-3 1.5 L-5 10 L-2 10 L3 2.5 Z" class="fill-map-route stroke-map-sea" stroke-width="1.2" stroke-linejoin="round" />
+      <g data-testid="movers" aria-hidden="true">
+        {#each movers as m (m.i)}
+          <g data-mover={m.i} data-vehicle={m.vehicle} data-plane={m.vehicle === "plane" ? m.i : undefined} data-car={m.vehicle === "car" ? m.i : undefined} data-boat={m.vehicle === "boat" ? m.i : undefined}
+            data-flying={m.moving} transform="translate({m.x.toFixed(1)} {m.y.toFixed(1)}) rotate({m.angle.toFixed(1)}) scale({1.1 * zoom})">
+            {#if m.vehicle === "plane"}
+              <path d="M12 0 L3 -2.5 L-2 -10 L-5 -10 L-3 -1.5 L-8 -1.5 L-10 -4 L-12.5 -4 L-10.5 0 L-12.5 4 L-10 4 L-8 1.5 L-3 1.5 L-5 10 L-2 10 L3 2.5 Z" class="fill-map-route stroke-map-sea" stroke-width="1.2" stroke-linejoin="round" />
+            {:else if m.vehicle === "car"}
+              <rect x="-9" y="-5" width="18" height="10" rx="3" class="fill-map-stay stroke-map-sea" stroke-width="1.2" />
+              <rect x="1" y="-3.5" width="4" height="7" rx="1" class="fill-map-sea" />
+            {:else}
+              <path d="M12 0 L6 6 L-10 6 L-8 0 L-10 -6 L6 -6 Z" class="fill-map-visited stroke-map-sea" stroke-width="1.2" stroke-linejoin="round" />
+            {/if}
           </g>
         {/each}
       </g>
     </svg>
     {#each stops as s, i (i)}
       <div aria-hidden="true" class="pointer-events-none absolute w-max max-w-[11rem] rounded-lg transition-opacity duration-500 motion-reduce:transition-none border border-border bg-card px-2 py-1 text-xs leading-tight shadow-elevation-1"
-          style="left: {(spots[i].x / width) * 100}%; top: {(spots[i].y / height) * 100}%; transform: translate({edge(spots[i].x)}, {above(i) ? `calc(-100% - ${shift(i)}px)` : `${shift(i)}px`})"
+          style="left: {fx(spots[i].x) * 100}%; top: {fy(spots[i].y) * 100}%; transform: translate({edge(spots[i].x)}, {above(i) ? `calc(-100% - ${shift(i)}px)` : `${shift(i)}px`})"
           class:opacity-0={!lit(i)} data-visible={lit(i)} data-label={s.name}>
           <p class="break-words font-semibold text-foreground">{s.back ? "Back in " : ""}{stopTitle(s)}</p>
           <p class="text-muted-foreground">{stopDates(s, year)}</p>
