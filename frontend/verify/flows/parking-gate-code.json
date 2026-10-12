@@ -1,0 +1,22 @@
+{
+  "name": "parking-gate-code",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has([aria-label*='parking']) >> visible=true >> nth=0" },
+    { "wait_for": "button[aria-label^='Show the QR code']" },
+    { "expect_text": { "selector": "main", "text": "Example Airport Long-Term Lot" } },
+    { "scroll_to": "[data-kind='parking']" },
+    { "screenshot": "booking" },
+    { "click": "button[aria-label^='Show the QR code']" },
+    { "wait_for": "[data-testid='code-square'] img" },
+    { "expect_text": { "selector": "[data-testid='code-lot']", "text": "Example Airport Long-Term Lot" } },
+    { "expect_text": { "selector": "[role='dialog']", "text": "Turn your screen brightness up" } },
+    { "screenshot": "dialog" },
+    { "press": { "selector": "[role='dialog']", "key": "Escape" } },
+    { "wait_for": "button[aria-label^='Choose a different picture']" },
+    { "click": "button[aria-label^='Choose a different picture']" },
+    { "wait_for": "ul[aria-label='Pictures in the emails'] button" },
+    { "screenshot": "chooser" }
+  ]
+}

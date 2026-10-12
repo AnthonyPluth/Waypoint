@@ -320,6 +320,16 @@ segment_messages = Table(
     info={'doc': "which stored messages a booking was made from (an email that made or updated it, or the one a person added it from by hand)"},
 )
 
+segment_codes = Table(
+    'segment_codes', metadata,
+    Column('segment_id', Integer, refers('segment_codes', 'segment_id', 'segments.id', 'CASCADE'), primary_key=True),
+    Column('mailbox_id', Integer, refers('segment_codes', 'mailbox_id', 'mailboxes.id', 'CASCADE'), nullable=False),
+    Column('content', Text, doc="the picture of a parking booking's gate code (its type and bytes, JSON), encrypted (waypoint/storage/secretbox.py); empty while several pictures qualify and none is chosen"),
+    Column('day', Text, doc='the day of the email the picture came from'),
+    Column('created', Float, nullable=False),
+    info={'doc': "the gate code's picture kept with a parking booking (waypoint/storage/gate_codes.py); deleted with the booking and with the mailbox it came from; never read, only shown"},
+)
+
 ignored_senders = Table(
     'ignored_senders', metadata,
     Column('id', Integer, primary_key=True, autoincrement=True),

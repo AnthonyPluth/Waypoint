@@ -952,6 +952,56 @@
         }
       }
     },
+    "/api/segments/{id}/code": {
+      "post": {
+        "operationId": "api_segment_code_choose",
+        "x-handler": "waypoint/server/api/trips.py:api_segment_code_choose",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GateCodeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/segments/{id}/move": {
       "post": {
         "operationId": "api_segment_move",
@@ -4362,6 +4412,44 @@
         ],
         "additionalProperties": false
       },
+      "GateCode": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "enum": [
+              "ready",
+              "choose"
+            ]
+          },
+          "day": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "day"
+        ],
+        "additionalProperties": false
+      },
+      "GateCodeBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "integer"
+          },
+          "image": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "email",
+          "image"
+        ],
+        "additionalProperties": false
+      },
       "GlanceDomain": {
         "type": "object",
         "properties": {
@@ -6238,6 +6326,16 @@
           "has_email": {
             "type": "boolean"
           },
+          "gate_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GateCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "price": {
             "anyOf": [
               {
@@ -6278,6 +6376,7 @@
           "logo_label",
           "hotel_brand",
           "has_email",
+          "gate_code",
           "price",
           "links"
         ],

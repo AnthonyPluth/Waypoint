@@ -12,7 +12,7 @@ from ...domain.mail import ai
 from ...domain.visibility import Viewer
 from ...storage import db
 from ..common import NO_IMAGE, ApiError, Response, _current, image_response, own_session, position, row_id
-from ..contract import (Airport, DestinationSuggestion, EmailsCleared, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
+from ..contract import (Airport, DestinationSuggestion, EmailsCleared, GateCodeBody, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
                         TripList, TripPlaces)
 
 NAME_LIMIT = 100
@@ -24,6 +24,8 @@ _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {li
 
 NO_TRIP = "No such trip"
 NO_SEGMENT = "No such segment"
+NO_CODE = NO_IMAGE
+MAX_PICTURE_POSITION = 999
 NO_AI = "Suggestions need the AI fallback, which is off. Turn it on under Settings, in Mail and AI."
 NO_PLACES = "Add a booking to this trip first, so there are places to describe."
 TEXTS = {"confirmation": ("confirmation code", 50), "provider": ("provider", 100), "origin": ("origin", 100),
@@ -287,6 +289,20 @@ def api_segment_email_image(conn, _q, _b, segment_id, email, index) -> Response:
     if found is None:
         raise ApiError(NO_IMAGE, 404)
     return image_response(found)
+
+
+def api_segment_code(conn, _q, _b, segment_id) -> Response:
+    found = trips.gate_code_of(conn, viewer(conn), row_id(segment_id, NO_CODE))
+    if found is None:
+        raise ApiError(NO_CODE, 404)
+    return image_response(found)
+
+
+def api_segment_code_choose(conn, _q, body: GateCodeBody, segment_id) -> Segment:
+    who, this = viewer(conn), row_id(segment_id, NO_SEGMENT)
+    email = _v.integer(body.get("email"), "email", 0, MAX_PICTURE_POSITION, required=True)
+    image = _v.integer(body.get("image"), "picture", 0, MAX_PICTURE_POSITION, required=True)
+    return Segment(**_run(lambda: trips.choose_gate_code(conn, who, this, email, image, time.time()), NO_SEGMENT))
 
 
 def api_segment_edit(conn, _q, body: SegmentEdit, segment_id) -> Segment:

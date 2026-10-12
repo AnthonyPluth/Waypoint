@@ -366,13 +366,21 @@ def _annotations(t: dict) -> dict:
             "openWorldHint": False}
 
 
+def _without_gate_codes(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _without_gate_codes(v) for k, v in value.items() if k != "gate_code"}
+    if isinstance(value, list):
+        return [_without_gate_codes(v) for v in value]
+    return value
+
+
 def call_tool(name: str, args: dict, fetch: Fetch) -> str:
     tool = BY_NAME.get(name)
     if not tool:
         raise ToolError(f"Unknown tool {name}.")
     if tool["needs"] != (READ,) and not allowed(fetch, tool["needs"]):
         raise ToolError(_refusal(fetch, tool["needs"]))
-    text = json.dumps(tool["run"](fetch, args or {}), ensure_ascii=False, separators=(",", ":"))
+    text = json.dumps(_without_gate_codes(tool["run"](fetch, args or {})), ensure_ascii=False, separators=(",", ":"))
     if len(text) > MAX_TEXT:
         text = text[:MAX_TEXT] + f"… (cut at {MAX_TEXT:,} characters: narrow it with days, a trip or a person)"
     return text
