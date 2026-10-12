@@ -12,7 +12,7 @@ MAX_TEXT = 200_000
 
 Fetch = Callable[..., Any]
 
-READ, WRITE = mcp_access.READ, mcp_access.WRITE
+READ, WRITE, MAIL = mcp_access.READ, mcp_access.WRITE, mcp_access.MAIL
 
 
 class ToolError(Exception):
@@ -107,7 +107,14 @@ def list_review_items(fetch: Fetch, a: dict) -> Any:
 
 def get_review_item(fetch: Fetch, a: dict) -> Any:
     item = _need(a, "item_id")
-    return fetch(f"assistant/review/{item}", {})
+    out = fetch(f"assistant/review/{item}", {})
+    if allowed(fetch, (MAIL,)):
+        try:
+            out["email"] = fetch(f"assistant/review/{item}/email", {})
+        except ToolError as e:
+            out["email"] = None
+            out["email_note"] = str(e)
+    return out
 
 
 TOOLS: list[dict[str, Any]] = [
@@ -148,13 +155,13 @@ TOOLS: list[dict[str, Any]] = [
      "run": list_review_items, "needs": (READ,)},
     {"name": "get_review_item", "description": "One Review item in full: what Waypoint read from the email (provider, confirmation code, places, "
      "address, phone, start and end with zones, travellers, which fields the reader read), and for each booking in it the bookings it could "
-     "be, each with a deterministic confidence (exact, likely or possible) and the fields that agreed and differed. Never the email's "
-     "subject or text.",
+     "be, each with a deterministic confidence (exact, likely or possible) and the fields that agreed and differed. Without email access it "
+     "has no subject or text.",
      "inputSchema": _schema({"item_id": _ITEM_ID}, ["item_id"]), "run": get_review_item, "needs": (READ,)},
 ]
 
 
-_SWITCHES = {WRITE: "Let assistants change trips"}
+_SWITCHES = {WRITE: "Let assistants change trips", MAIL: "Read email text"}
 WRITE_RULES = (
     "You can change the household's travel: the changing tools, and call_endpoint (list_endpoints) for anything else. Rules: "
     "1) Before every change, say in plain words what you'll change and wait for the person's explicit yes. "
@@ -163,6 +170,10 @@ WRITE_RULES = (
     "never under one blanket yes for several. "
     "3) Times are wall-clock times at the place (start_local in start_zone); never convert them. "
     "Mailboxes, AI settings, backups, sign-in and these assistant settings are out of reach.")
+MAIL_RULES = (
+    "This connection may read the text and kept markup of kept emails (get_segment_email, and the email in get_review_item). That is the household's "
+    "private mail: use it only for what the person asked, quote as little as you can, and never repeat it anywhere else.")
+NO_MAIL_RULES = "Email text is off for this connection: the review tools give what Waypoint read, never an email's subject or text."
 ASK = "Ask the person before calling this."
 DESTRUCTIVE = "Destructive: tell the person exactly what will be removed or merged and get a clear yes first."
 
@@ -313,6 +324,14 @@ def _call_endpoint(fetch: Fetch, a: dict) -> Any:
     return fetch(path, query, body) if method == "POST" else fetch(path, query, body, "DELETE")
 
 
+MAIL_TOOLS: list[dict[str, Any]] = [
+    {"name": "get_segment_email", "description": "The emails kept with a booking (newest first, at most 5): subject, sender's domain, the text and, for a message kept as "
+     "the original, its kept markup (html: cleaned HTML, cut at 100,000 characters, html_truncated says if it was), never images. Only when "
+     "this connection was allowed to read email text.",
+     "inputSchema": _schema({"segment_id": _SEGMENT_ID}, ["segment_id"]),
+     "run": lambda fetch, a: fetch(f"assistant/segments/{_need(a, 'segment_id')}/email", {}), "needs": (MAIL,)},
+]
+
 ANY_TOOLS: list[dict[str, Any]] = [
     {"name": "list_endpoints", "description": "Every Waypoint endpoint call_endpoint can reach, by area, the destructive ones marked.",
      "inputSchema": _schema(), "run": lambda fetch, _a: fetch("endpoints", {}), "needs": (WRITE,), "reads": True},
@@ -324,7 +343,7 @@ ANY_TOOLS: list[dict[str, Any]] = [
                              "body": {"type": "object"}, "query": {"type": "object"}}, ["method", "path"]),
      "run": _call_endpoint, "needs": (WRITE,), "write": True, "idempotent": False, "destructive": True},
 ]
-ALL_TOOLS = TOOLS + WRITE_TOOLS + ANY_TOOLS
+ALL_TOOLS = TOOLS + MAIL_TOOLS + WRITE_TOOLS + ANY_TOOLS
 BY_NAME = {t["name"]: t for t in ALL_TOOLS}
 
 
@@ -356,7 +375,7 @@ def _about(fetch: Fetch) -> str:
              "trains), the people who travel, stats, live flight status and the Review queue. Times are wall-clock times at the place, "
              "with its zone.")
     rules = WRITE_RULES if allowed(fetch, (WRITE,)) else f"Everything is read-only. {_refusal(fetch, (WRITE,))}"
-    return f"{about} {rules}"
+    return f"{about} {rules} {MAIL_RULES if allowed(fetch, (MAIL,)) else NO_MAIL_RULES}"
 
 
 def handle(msg: Any, fetch: Fetch) -> dict | None:

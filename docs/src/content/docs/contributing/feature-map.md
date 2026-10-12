@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-81 routes; 0 have no test yet.
+84 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -84,13 +84,16 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/review/{id}/images/{id}` | `review.py:api_review_image` | - | `test_mail_scan.py`, `test_mcp_routes.py` | [start/review](/Waypoint/start/review/) |
 | `POST /api/review/{id}/suggest` | `review.py:api_review_suggest` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `DELETE /api/review/{id}` | `review.py:api_review_dismiss` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
-| `GET /api/mcp-settings` | `mcp.py:api_mcp_settings` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py` | [start/mcp](/Waypoint/start/mcp/) |
+| `GET /api/mcp-settings` | `mcp.py:api_mcp_settings` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `POST /api/mcp-settings/writes` | `mcp.py:api_mcp_writes` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py` | [start/mcp](/Waypoint/start/mcp/) |
+| `POST /api/mcp-settings/connections/{id}/mail` | `mcp.py:api_mcp_mail` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `DELETE /api/mcp-settings/connections/{id}` | `mcp.py:api_mcp_revoke` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `GET /api/assistant/review` | `assistant.py:api_assistant_review` | - | `test_api_contract.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `GET /api/assistant/review/{id}` | `assistant.py:api_assistant_review_item` | - | `test_api_contract.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
+| `GET /api/assistant/review/{id}/email` | `assistant.py:api_assistant_review_email` | - | `test_api_contract.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `POST /api/assistant/review/{id}/match` | `assistant.py:api_assistant_review_match` | - | `test_api_contract.py`, `test_mcp_review.py`, `test_mcp_routes.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `POST /api/assistant/review/{id}/create` | `assistant.py:api_assistant_review_create` | - | `test_api_contract.py`, `test_mcp_review.py`, `test_mcp_routes.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `POST /api/assistant/review/{id}/dismiss` | `assistant.py:api_assistant_review_dismiss` | - | `test_api_contract.py`, `test_mcp_review.py`, `test_mcp_routes.py` | [start/mcp](/Waypoint/start/mcp/) |
+| `GET /api/assistant/segments/{id}/email` | `assistant.py:api_assistant_segment_emails` | - | `test_api_contract.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `GET /api/state` | `state.py:api_state` | `lib/app.svelte.ts` | `test_api_contract.py`, `test_api_state.py`, `test_backup.py`, `test_http_pinned.py`, `test_http_server.py`, `test_mail_scan.py`, `test_monitoring.py`, `test_security.py`, `test_server.py`, `test_server_errors.py` | [start/docker](/Waypoint/start/docker/) |
 | `GET /api/offline` | `offline.py:api_offline` | `lib/offline.ts` | `test_api_contract.py`, `test_offline.py` | [start/offline](/Waypoint/start/offline/) |

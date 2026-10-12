@@ -85,6 +85,17 @@ export interface AssistantDismissed {
   reason: "not_travel" | "duplicate" | "already_added" | "other";
 }
 
+export interface AssistantEmail {
+  subject: string | null;
+  sender_domain: string | null;
+  received: string | null;
+  text: string;
+  truncated: boolean;
+  html: string | null;
+  html_truncated: boolean;
+  kept: "original" | "plain text";
+}
+
 export interface AssistantEntry {
   entry: number;
   booking: AssistantParsed;
@@ -163,6 +174,10 @@ export interface AssistantParsed {
   details: Record<string, string>;
   travelers: string[];
   read: Record<string, string>;
+}
+
+export interface AssistantSegmentEmails {
+  emails: AssistantEmail[];
 }
 
 export interface BackupContents {
@@ -434,6 +449,10 @@ export interface McpConnection {
   scope: string[];
   created: string | null;
   last_used: string | null;
+}
+
+export interface McpMailBody {
+  allow: boolean;
 }
 
 export interface McpSettings {
@@ -1035,12 +1054,15 @@ export interface Endpoints {
   "DELETE /api/review/{id}": { body: never; reply: Ok };
   "GET /api/mcp-settings": { body: never; reply: McpSettings };
   "POST /api/mcp-settings/writes": { body: McpWritesBody; reply: McpWritesBody };
+  "POST /api/mcp-settings/connections/{id}/mail": { body: McpMailBody; reply: McpMailBody };
   "DELETE /api/mcp-settings/connections/{id}": { body: never; reply: Ok };
   "GET /api/assistant/review": { body: never; reply: AssistantItems };
   "GET /api/assistant/review/{id}": { body: never; reply: AssistantItemDetail };
+  "GET /api/assistant/review/{id}/email": { body: never; reply: AssistantEmail };
   "POST /api/assistant/review/{id}/match": { body: AssistantMatchBody; reply: AssistantMatched };
   "POST /api/assistant/review/{id}/create": { body: AssistantCreateBody; reply: Segment };
   "POST /api/assistant/review/{id}/dismiss": { body: AssistantDismissBody; reply: AssistantDismissed };
+  "GET /api/assistant/segments/{id}/email": { body: never; reply: AssistantSegmentEmails };
   "GET /api/state": { body: never; reply: State };
   "GET /api/offline": { body: never; reply: Offline };
 }
