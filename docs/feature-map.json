@@ -476,7 +476,8 @@
       "web": [],
       "tests": [
         "tests/test_mcp.py",
-        "tests/test_mcp_routes.py"
+        "tests/test_mcp_routes.py",
+        "tests/test_trips.py"
       ],
       "docs": [
         "start/trips"
@@ -490,9 +491,11 @@
         "frontend/src/lib/components/GateCode.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_gate_codes.py",
         "tests/test_mcp.py",
-        "tests/test_mcp_routes.py"
+        "tests/test_mcp_routes.py",
+        "tests/test_trips.py"
       ],
       "docs": [
         "start/trips"
