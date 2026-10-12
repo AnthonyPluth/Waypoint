@@ -28,7 +28,7 @@
   import TripDestination from "$lib/components/TripDestination.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { appWord, bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, loyaltyNumbers, showBookingTravellers, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink } from "$lib/trips";
+  import { appWord, bookingCards, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
@@ -123,6 +123,7 @@
     tick().then(() => document.getElementById(`segment-${wanted}`)?.scrollIntoView({ block: "start" }));
   });
 
+  const over = $derived(trip ? isPast(trip, dayIn(now, viewerZone())) : false);
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
   const everyone = $derived(trip ? tripTravellers(trip.segments) : []);
   const eyebrowOf = (s: Segment) => `${kindName(s)} · ${dayLabel(s.start_local)}`;
@@ -169,7 +170,8 @@
   });
 
   const loadOthers = () => act(async () => {
-    others = (await apiCall<"GET /api/trips">("/api/trips")).trips.filter((o) => o.id !== (trip?.id ?? -1));
+    others = (await apiCall<"GET /api/trips">("/api/trips")).trips.filter((o) => o.id !== (trip?.id ?? -1))
+      .sort((a, b) => (b.start_date ?? "").localeCompare(a.start_date ?? ""));
   });
 
   const merge = () => act(async () => {
@@ -289,14 +291,14 @@
         <PassCard as="li" id={`segment-${s.id}`} highlight={wanted === String(s.id)} segment={s} {now} level={2} eyebrow={eyebrowOf(s)} showApp={false} omit={["Address"]}>
           {#snippet times()}<dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(s)}</dl>{/snippet}
           {#snippet details()}{@render ports(s)}{@render links(s)}{/snippet}
-          {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
+          {#snippet live()}{#if !over && s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
           {#snippet footer()}
             <div class="flex flex-col gap-3">
               {#if showBookingTravellers(s, everyone)}
                 <h3 class="eyebrow">Travellers</h3>
                 {@render travellerList(s)}
-                {#if s.kind === "cruise"}{@render membershipList(s)}{/if}
-              {:else}
+                {#if s.kind === "cruise" && !over}{@render membershipList(s)}{/if}
+              {:else if !over}
                 {@render membershipList(s)}
               {/if}
               {@render buttons(s, headline(s))}
@@ -313,7 +315,7 @@
               <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(s)}</dl>
             {/if}
           {/snippet}
-          {#snippet live()}{#if !card.cancelled && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
+          {#snippet live()}{#if !over && !card.cancelled && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
           {#snippet footer()}
             <div class="flex flex-col gap-4">
               <h3 class="eyebrow">Bookings</h3>
@@ -367,13 +369,13 @@
     {#if s.details.address}
       <div class="mt-2 text-sm"><p class="eyebrow">{s.kind === "car" ? "Pick-up address" : s.kind === "cruise" ? "Terminal address" : "Address"}</p>
         <CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" /></div>
-    {:else if s.status !== "cancelled"}
+    {:else if s.status !== "cancelled" && !over}
       <p class="mt-2 text-sm"><button type="button" class="underline underline-offset-2 phone:min-h-11" onclick={() => edit(s, "segment-address")}
         aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
     {/if}
   {/if}
   {@const vendor = vendorLink(s, isMobile())}
-  {#if s.links.app || vendor || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email}
+  {#if !over && (s.links.app || vendor || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email)}
     <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
       {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>
       {:else if vendor}<Button variant="outline" size="sm" href={vendor.href}>{vendor.label}</Button>{/if}
@@ -385,7 +387,7 @@
       {/if}
     </div>
   {/if}
-  {#if s.has_email}
+  {#if !over && s.has_email}
     {@const mail = mails[s.id]}
     {#if mail}
       <div class="mt-2 space-y-4" role="region" aria-label={`The email for ${headline(s)}`}>
