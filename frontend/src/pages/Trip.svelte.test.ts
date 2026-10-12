@@ -921,7 +921,7 @@ describe("Trip", () => {
         { day: 5, date: "2026-03-05", sea: false, stops: [{ name: "Miami", zone: "America/New_York", arrive_local: "2026-03-05T07:00", depart_local: null, recorded: true }] }] });
 
     it("lists its ports of call with their local times, its terminal address, and Directions to it", async () => {
-      held = trip([ship]);
+      held = trip([ship], { end_date: "2999-01-01" });
       render(TripPage);
       const days = (await screen.findByText("Itinerary")).closest("[data-itinerary]") as HTMLElement;
       const rows = within(days).getAllByRole("listitem");
@@ -975,6 +975,36 @@ describe("Trip", () => {
       await u.click(screen.getByRole("button", { name: "Cancel" }));
       await u.click(screen.getByRole("button", { name: "Edit JFK → LHR" }));
       expect(screen.queryByText("Ports of call", { selector: "legend" })).toBeNull();
+    });
+  });
+
+  describe("a trip that is over", () => {
+    const hotel = { ...stay, status: "confirmed" as const, has_email: true, start_local: "2020-03-01T15:00", end_local: "2020-03-04T10:00", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] };
+    const cardOf = async (s: ReturnType<typeof segment>) => (await screen.findByRole("list", { name: "Bookings" })).querySelector(`#segment-${s.id}`) as HTMLElement;
+    const past = (extra: Partial<TripT> = {}) => trip([hotel], { start_date: "2020-03-01", end_date: "2020-03-04", ...extra });
+
+    it("keeps the essentials and drops the actions and loyalty numbers", async () => {
+      loyalty = [membership({ id: 12, person_id: 1, kind: "hotel", program: "Marriott Bonvoy", masked: "••••821L" })];
+      held = past();
+      render(TripPage);
+      const card = await cardOf(hotel);
+      expect(card).toHaveTextContent("H88231");
+      expect(card).toHaveTextContent("1 Quay Street, London");
+      expect(within(card).queryByRole("link", { name: "Directions" })).toBeNull();
+      expect(within(card).queryByRole("link", { name: "Call" })).toBeNull();
+      expect(within(card).queryByRole("button", { name: /email/i })).toBeNull();
+      expect(card.querySelector("[data-membership]")).toBeNull();
+      expect(within(card).getByRole("button", { name: /^Edit/ })).toBeInTheDocument();
+    });
+
+    it("leaves a trip still to come as it was", async () => {
+      loyalty = [membership({ id: 12, person_id: 1, kind: "hotel", program: "Marriott Bonvoy", masked: "••••821L" })];
+      held = past({ end_date: "2999-01-01" });
+      render(TripPage);
+      const card = await cardOf(hotel);
+      expect(within(card).getByRole("link", { name: "Directions" })).toBeInTheDocument();
+      expect(within(card).getByRole("link", { name: "Call" })).toBeInTheDocument();
+      expect(card.querySelector("[data-membership]")).not.toBeNull();
     });
   });
 });
