@@ -1,3 +1,4 @@
+import dataclasses
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -62,6 +63,16 @@ class EmailBookingsForEveryone(IngestCase):
         flight = self.c.orm.scalars(select(Segment).where(Segment.kind == "flight")).first()
         self.assertFalse(flight.travelers_from_trip)
         self.assertEqual([(t.person_id, t.seat) for t in self.rows(flight.id)], [(self.jid, None)])
+
+    def test_a_cruise_email_keeps_its_travellers_including_a_name_nobody_matches(self):
+        cruise = dataclasses.replace(booking("hotel_jsonld"), kind="cruise", start_zone="Europe/London", end_zone="Europe/London",
+                                     origin="Example Line", destination="Example Line",
+                                     passengers=(extract.Passenger("Jane Doe"), extract.Passenger(LEAD_CANARY)))
+        self.file(self.jane, cruise)
+        ship = self.c.orm.scalars(select(Segment).where(Segment.kind == "cruise")).first()
+        self.assertFalse(ship.travelers_from_trip)
+        self.assertEqual([(t.person_id, t.name) for t in self.rows(ship.id)], [(self.jid, None), (None, LEAD_CANARY)])
+        self.assertEqual(self.aboard(ship.trip_id), [self.jid])
 
     def test_a_car_email_is_for_everyone_too(self):
         self.file(self.sam, booking("car_jsonld"))

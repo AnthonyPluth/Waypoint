@@ -18,7 +18,7 @@ from .visibility import Viewer
 
 Kind = Literal["flight", "hotel", "car", "train", "cruise", "parking"]
 Status = Literal["confirmed", "changed", "cancelled"]
-SHARED_KINDS = frozenset({"hotel", "car", "parking", "cruise"})
+SHARED_KINDS = frozenset({"hotel", "car", "parking"})
 KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train", "cruise", "parking")
 STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
 TIME_UNKNOWN = "time_unknown"
