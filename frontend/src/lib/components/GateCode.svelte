@@ -3,11 +3,11 @@
   import { apiImage } from "$lib/api";
   import { apiCall } from "$lib/contract";
   import type { Segment } from "$lib/api-types";
-  import PlaceTime from "$lib/components/PlaceTime.svelte";
+  import DayTime from "$lib/components/DayTime.svelte";
   import { Button } from "$lib/components/ui/button";
   import { Sheet } from "$lib/components/ui/sheet";
   import { SHARE, squareSide } from "$lib/gate-code";
-  import { dayLabel, endAt, headline, untimed } from "$lib/trips";
+  import { endAt, headline } from "$lib/trips";
   import { Dialog } from "bits-ui";
   import X from "@lucide/svelte/icons/x";
   import { toast } from "svelte-sonner";
@@ -143,8 +143,7 @@
       <div class="space-y-1 text-center">
         <p class="break-words text-lg font-semibold" data-testid="code-lot">{lot}</p>
         <p class="text-sm text-muted-foreground" data-testid="code-times">
-          {#if untimed(segment)}Entry {dayLabel(segment.start_local)}, time not recorded · Exit {dayLabel(segment.end_local)}, time not recorded
-          {:else}Entry {dayLabel(segment.start_local)}, <PlaceTime local={segment.start_local} /> · Exit {dayLabel(segment.end_local)}, <PlaceTime local={segment.end_local} />{/if}
+          Entry <DayTime segment={segment} dated /> · Exit <DayTime segment={segment} end dated />
         </p>
         <p class="text-sm font-medium">Turn your screen brightness up</p>
       </div>

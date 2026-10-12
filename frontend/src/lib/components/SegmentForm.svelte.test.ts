@@ -2,6 +2,7 @@
 import { render, screen, waitFor } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { chooseZone } from "../../test/zone";
 import { blank, type Draft, type Kind } from "$lib/segment-form";
 import SegmentForm from "./SegmentForm.svelte";
 
@@ -88,7 +89,7 @@ describe("SegmentForm: the explanatory text is gone", () => {
 
   it.each(["hotel", "parking"] as const)("keeps the blank zone choice for a %s", (kind) => {
     mount(draft(kind));
-    expect(screen.getByRole("option", { name: "Work it out from the address" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Work it out from the address")).toBeInTheDocument();
   });
 
   it("still says what to enter when a stay has neither a time zone nor an address", async () => {
@@ -141,5 +142,26 @@ describe("SegmentForm: a past trip's state", () => {
     expect(screen.getByLabelText("State (optional)")).toHaveValue("");
     await userEvent.selectOptions(screen.getByLabelText("State (optional)"), "HI");
     expect(screen.getByLabelText("State (optional)")).toHaveValue("HI");
+  });
+});
+
+describe("SegmentForm: the time zone field", () => {
+  it("searches the start zone of a stay and fills it in", async () => {
+    mount(draft("hotel"));
+    const field = screen.getByLabelText("Time zone");
+    await chooseZone(field, "America/Chicago");
+    expect(field).toHaveValue("America/Chicago");
+    expect(screen.queryAllByRole("listbox", { hidden: true })).toHaveLength(0);
+  });
+
+  it("searches a cruise port’s zone with one list open at a time", async () => {
+    mount(draft("cruise", { itinerary: [{ name: "Nassau", zone: "", arrive: "", depart: "" }] }));
+    const port = screen.getByLabelText("Port 1 time zone");
+    await userEvent.click(port);
+    await userEvent.keyboard("nassau");
+    expect(screen.getAllByRole("listbox", { hidden: true })).toHaveLength(1);
+    await userEvent.keyboard("{Enter}");
+    expect(port).toHaveValue("America/Nassau");
+    expect(screen.queryAllByRole("listbox", { hidden: true })).toHaveLength(0);
   });
 });
