@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import ColumnElement, false, or_, select, true
 
 from ..storage import db
-from ..storage.models import Segment, SegmentRecipient, SegmentTraveler, Trip
+from ..storage.models import Segment, SegmentRecipient, SegmentTraveler, Trip, TripPerson
 
 
 @dataclass(frozen=True)
@@ -26,7 +26,8 @@ def can_see(viewer: Viewer) -> ColumnElement[bool]:
     booked_a_segment = select(Segment.trip_id).where(Segment.booked_by == me)
     received = select(Segment.trip_id).join(SegmentRecipient, SegmentRecipient.segment_id == Segment.id) \
         .where(SegmentRecipient.person_id == me)
-    return or_(Trip.booked_by == me, Trip.id.in_(travelling), Trip.id.in_(booked_a_segment), Trip.id.in_(received))
+    listed = select(TripPerson.trip_id).where(TripPerson.person_id == me)
+    return or_(Trip.booked_by == me, Trip.id.in_(listed), Trip.id.in_(travelling), Trip.id.in_(booked_a_segment), Trip.id.in_(received))
 
 
 def visible_trips(conn: db.Connection, viewer: Viewer) -> list[Trip]:
