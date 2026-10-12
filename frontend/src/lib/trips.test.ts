@@ -503,4 +503,13 @@ describe("trip travellers", () => {
     expect(showBookingTravellers(segment({ kind: "hotel", provider: "Marriott", booked_by: 1, travelers: [jane] }), all, [])).toBe(true);
     expect(showBookingTravellers(segment({ kind: "hotel", provider: "Marriott", booked_by: 1, travelers: [jane] }), all, null)).toBe(false);
   });
+
+  it("leaves out someone who is only on a cancelled booking, and still shows that booking's travellers", () => {
+    const live = segment({ id: 1, travelers: [jane] });
+    const cancelled = stay([sam], { status: "cancelled" });
+    const all = tripTravellers([live, cancelled]);
+    expect(all.map((who) => who.name)).toEqual(["Jane Doe"]);
+    expect(showBookingTravellers(cancelled, all, [])).toBe(true);
+    expect(showBookingTravellers(stay([jane]), all, [])).toBe(false);
+  });
 });

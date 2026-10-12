@@ -198,6 +198,7 @@ export type TripTraveller = { key: string; name: string };
 export function tripTravellers(segments: Segment[]): TripTraveller[] {
   const seen = new Map<string, TripTraveller>();
   for (const s of segments) {
+    if (s.status === "cancelled") continue;
     for (const who of s.travelers) {
       const key = travellerKey(who);
       if (!seen.has(key)) seen.set(key, { key, name: who.name.trim() || UNNAMED_TRAVELLER });
@@ -210,7 +211,7 @@ export const showTripTravellers = (everyone: TripTraveller[], viewer: number | n
   everyone.length > 1 || (everyone.length === 1 && (viewer === null || everyone[0].key !== `person:${viewer}`));
 
 export function showBookingTravellers(s: Segment, everyone: TripTraveller[], loyalty: LoyaltyEntry[] | null): boolean {
-  if (s.kind === "flight") return true;
+  if (s.kind === "flight" || s.status === "cancelled") return true;
   if (s.travelers.some((who) => who.seat || (loyalty !== null && membershipFor(s, who, loyalty)))) return true;
   const here = new Set(s.travelers.map(travellerKey));
   return here.size !== everyone.length || everyone.some((who) => !here.has(who.key));
