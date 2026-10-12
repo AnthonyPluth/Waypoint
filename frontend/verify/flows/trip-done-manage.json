@@ -8,7 +8,7 @@
     { "screenshot": "past-not-done" },
     { "goto": "#trips" },
     { "expect_text": { "selector": "h1", "text": "Trips" } },
-    { "click": "a[href^='#trip/']:has-text('San Francisco') >> visible=true" },
+    { "click": "a[href^='#trip/']:has-text('San Francisco (Sep 2025)') >> visible=true" },
     { "wait_for": "ul[aria-label='Bookings']" },
     { "expect_text": { "selector": "main", "text": "Jane Doe" } },
     { "screenshot": "past-done" }
