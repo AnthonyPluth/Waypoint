@@ -124,7 +124,7 @@ class StorageTests(DbCase):
 
 
 class PrivacyTests(DbCase):
-    def test_a_saved_cruise_number_is_known_and_never_reaches_a_hosted_ai_prompt(self):
+    def test_a_saved_cruise_number_is_known_and_never_reaches_an_ai_prompt(self):
         from waypoint.domain.mail import ai
         who = guest(self.c)
         loyalty.add(self.c, membership(who, kind="cruise", program="Disney Castaway Club", number=CANARY))

@@ -519,7 +519,7 @@ class SuggestTests(unittest.TestCase):
             self.assertIn(ai.EMAIL_REMOVED, sent)
             self.assertEqual(reading.bookings, [GOOD])
 
-    def test_what_is_sent_hosted_is_the_redacted_text_only(self):
+    def test_what_is_sent_is_the_redacted_text_only(self):
         ai.suggest(self.router, f"Confirmation code: QW4R7T BOS DEN\nKnown Traveler Number: TT87654321\n> {QUOTED}")
         sent = json.dumps(self.fake.requests[0][2])
         self.assertIn("QW4R7T", sent)
@@ -655,7 +655,7 @@ class ScanTests(ScanAiCase):
         self.assertEqual(self.scan().bookings, 2)
         self.assertEqual(self.fake.requests, [])
 
-    def test_the_hosted_request_carries_the_body_but_none_of_the_ids_and_nothing_else_leaks(self):
+    def test_the_request_carries_the_body_but_none_of_the_ids_and_nothing_else_leaks(self):
         os.environ[ai.KEY_ENV] = KEY
         self.turn_on("openrouter")
         with db.session() as conn:
