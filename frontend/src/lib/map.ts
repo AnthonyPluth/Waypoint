@@ -1,7 +1,7 @@
-import { geoContains, geoEqualEarth, geoPath, type GeoProjection } from "d3-geo";
+import { geoBounds, geoContains, geoEqualEarth, geoPath, type GeoProjection } from "d3-geo";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import type { GeometryCollection, Topology } from "topojson-specification";
-import type { StatsAirport, StatsFlights, StatsMapTrip, StatsRoute, StatsStayPin } from "./api-types";
+import type { StatsAirport, StatsFlights, StatsMapTrip, StatsPlacePoint, StatsRoute, StatsStayPin, StatsVisit } from "./api-types";
 
 export const MAP_WIDTH = 960;
 export const MAP_HEIGHT = 500;
@@ -69,9 +69,9 @@ export function zoomAt(t: Transform, factor: number, px: number, py: number, wid
   return clampPan({ k, x: px - ((px - t.x) / t.k) * k, y: py - ((py - t.y) / t.k) * k }, width, height);
 }
 
-export function flownBounds(flights: StatsFlights, projection: GeoProjection, pins: StatsStayPin[] = []): [[number, number], [number, number]] | null {
+export function flownBounds(flights: StatsFlights, projection: GeoProjection, pins: StatsStayPin[] = [], more: { latitude: number; longitude: number }[] = []): [[number, number], [number, number]] | null {
   const geometries: Geometry[] = [];
-  for (const p of pins) geometries.push({ type: "Point", coordinates: [p.longitude, p.latitude] });
+  for (const p of [...pins, ...more]) geometries.push({ type: "Point", coordinates: [p.longitude, p.latitude] });
   for (const a of flights.airports) if (placed(a)) geometries.push({ type: "Point", coordinates: [a.longitude, a.latitude] });
   for (const r of flights.routes) {
     if (r.a_latitude === null || r.a_longitude === null || r.b_latitude === null || r.b_longitude === null) continue;
@@ -108,6 +108,57 @@ export function visitedFeatureIds<F extends { id?: string | number }>(
 
 export function visitedPoints(airports: StatsAirport[], pins: StatsStayPin[], visits: { latitude: number; longitude: number }[] = []): [number, number][] {
   return [...visits.map((v): [number, number] => [v.longitude, v.latitude]), ...airports.filter(placed).map((a): [number, number] => [a.longitude, a.latitude]), ...pins.map((p): [number, number] => [p.longitude, p.latitude])];
+}
+
+export type StateSource = { point: [number, number]; trips: StatsMapTrip[] };
+
+export function stateSources(flights: StatsFlights, stays: StatsStayPin[], points: StatsPlacePoint[], visits: StatsVisit[]): StateSource[] {
+  const touching = (code: string) => flights.routes.filter((r) => r.a === code || r.b === code).flatMap((r) => r.trips);
+  return [
+    ...flights.airports.filter(placed).map((a): StateSource => ({ point: [a.longitude, a.latitude], trips: touching(a.code) })),
+    ...stays.map((p): StateSource => ({ point: [p.longitude, p.latitude], trips: p.trips })),
+    ...points.map((p): StateSource => ({ point: [p.longitude, p.latitude], trips: p.trips })),
+    ...visits.filter((v) => v.country === "US" && v.state).map((v): StateSource => ({ point: [v.longitude, v.latitude], trips: v.trips })),
+  ];
+}
+
+const SHORE_DEGREES = 0.03;
+const SHORE_RING: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+const extents = new WeakMap<object, [[number, number], [number, number]]>();
+
+function nearExtent(f: Feature<Geometry>, point: [number, number]): boolean {
+  let box = extents.get(f);
+  if (!box) { box = geoBounds(f); extents.set(f, box); }
+  const [[west, south], [east, north]] = box;
+  if (point[1] < south - SHORE_DEGREES || point[1] > north + SHORE_DEGREES) return false;
+  return west <= east ? point[0] >= west - SHORE_DEGREES && point[0] <= east + SHORE_DEGREES : point[0] >= west - SHORE_DEGREES || point[0] <= east + SHORE_DEGREES;
+}
+
+export function stateAt<F extends Feature<Geometry> & { id?: string | number }>(point: [number, number], states: F[], contains: (f: F, lonLat: [number, number]) => boolean): F | undefined {
+  const inside = states.find((f) => f.id !== undefined && contains(f, point));
+  if (inside) return inside;
+  const close = states.filter((f) => f.id !== undefined && nearExtent(f, point));
+  for (const [dx, dy] of SHORE_RING) {
+    const near = close.find((f) => contains(f, [point[0] + dx * SHORE_DEGREES, point[1] + dy * SHORE_DEGREES]));
+    if (near) return near;
+  }
+  return undefined;
+}
+
+export function visitedStateTrips<F extends Feature<Geometry> & { id?: string | number }>(
+  sources: StateSource[], states: F[], contains: (f: F, lonLat: [number, number]) => boolean,
+): Map<string | number, StatsMapTrip[]> {
+  const out = new Map<string | number, StatsMapTrip[]>();
+  for (const s of sources) {
+    const f = stateAt(s.point, states, contains);
+    if (f?.id === undefined) continue;
+    const kept = out.get(f.id) ?? [];
+    for (const t of s.trips) if (!kept.some((k) => k.trip_id === t.trip_id && k.start === t.start)) kept.push(t);
+    out.set(f.id, kept);
+  }
+  for (const trips of out.values()) trips.sort((a, b) => a.start.localeCompare(b.start) || a.trip_id - b.trip_id);
+  return out;
 }
 
 export type Pin = { key: string; city: string; stays: number; nights: number; x: number; y: number; label: string; trips: StatsMapTrip[] };

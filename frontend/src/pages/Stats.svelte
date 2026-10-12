@@ -35,7 +35,7 @@
     apiCall<"GET /api/people">("/api/people").then((p) => { people = p.people; }).catch(() => { people = []; });
   });
 
-  let TravelMap = $state<Component<{ flights: Stats["flights"]; stays: Stats["stays"]["pins"]; visits: Stats["places"]["visits"] }> | null>(null);
+  let TravelMap = $state<Component<{ flights: Stats["flights"]; stays: Stats["stays"]["pins"]; visits: Stats["places"]["visits"]; points: Stats["places"]["points"] }> | null>(null);
   let mapError = $state("");
   async function loadMap() {
     mapError = "";
@@ -224,7 +224,7 @@
       <h2 id="places-title" class="text-2xl font-bold tracking-tight">Where you’ve been</h2>
       {@render tileGrid([{ label: "Countries", value: count(current.places.countries.length) }])}
       {#if TravelMap}
-        <TravelMap flights={f} stays={current?.stays.pins ?? []} visits={current?.places.visits ?? []} />
+        <TravelMap flights={f} stays={current?.stays.pins ?? []} visits={current?.places.visits ?? []} points={current?.places.points ?? []} />
       {:else if mapError}
         <p class="text-sm text-muted-foreground">The map couldn’t load: {mapError} <Button variant="outline" size="sm" onclick={loadMap}>Try again</Button></p>
       {:else}

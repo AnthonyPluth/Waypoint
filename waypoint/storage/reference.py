@@ -8,6 +8,17 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
+SMALL_PLACE_WEIGHT = 30_000
+SMALL_PLACES: tuple[tuple[str, str, float, float], ...] = (
+    ("Skagway", "AK", 59.4583, -135.3139), ("Ketchikan", "AK", 55.3422, -131.6461), ("Sitka", "AK", 57.0531, -135.3300),
+    ("Seward", "AK", 60.1042, -149.4422), ("Haines", "AK", 59.2358, -135.4458), ("Whittier", "AK", 60.7728, -148.6850),
+    ("Wrangell", "AK", 56.4708, -132.3767), ("Petersburg", "AK", 56.8125, -132.9556), ("Valdez", "AK", 61.1308, -146.3483),
+    ("Homer", "AK", 59.6425, -151.5483), ("Kodiak", "AK", 57.7900, -152.4072), ("Hoonah", "AK", 58.1103, -135.4439),
+    ("Icy Strait Point", "AK", 58.1103, -135.4439), ("Glacier Bay", "AK", 58.6658, -136.9002), ("Denali Park", "AK", 63.7342, -148.9139),
+    ("Talkeetna", "AK", 62.3231, -150.1063), ("Cordova", "AK", 60.5428, -145.7575), ("Nome", "AK", 64.5011, -165.4064),
+    ("Girdwood", "AK", 60.9425, -149.1653),
+)
+
 
 def _rows(name: str) -> list[list[str]]:
     with gzip.open(HERE / name, "rt", encoding="utf-8") as f:
@@ -90,4 +101,16 @@ def city_points() -> dict[str, tuple[tuple[str, str, float, float, int], ...]]:
         if row[0] == "C" and len(row) >= 6:
             state, _, population = row[5].partition("|")
             found.setdefault(place_key(row[2]), []).append((row[1], state, float(row[3]), float(row[4]), int(population or 0)))
+    for name, state, lat, lon in SMALL_PLACES:
+        found.setdefault(place_key(name), []).append(("US", state, lat, lon, SMALL_PLACE_WEIGHT))
     return {name: tuple(places) for name, places in found.items()}
+
+
+@cache
+def us_state_points() -> dict[str, tuple[float, float]]:
+    largest: dict[str, tuple[float, float, int]] = {}
+    for places in city_points().values():
+        for country, state, lat, lon, population in places:
+            if country == "US" and state and population > largest.get(state, (0.0, 0.0, -1))[2]:
+                largest[state] = (lat, lon, population)
+    return {state: (lat, lon) for state, (lat, lon, _) in largest.items()}

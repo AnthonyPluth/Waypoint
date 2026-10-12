@@ -22,11 +22,12 @@ SHARED_KINDS = frozenset({"hotel", "car", "parking"})
 KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train", "cruise", "parking", "visit")
 STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
 TIME_UNKNOWN = "time_unknown"
+STATE = "state"
 ADDRESS_LIMIT = 300
 EMAILS_CLEARABLE_AFTER_DAYS = 7
 MAX_PORTS = 40
 SEAT_LIMIT = 10
-DETAIL_KEYS = ("flight_number", "terminal", "seat", "seat_position", "aircraft", "cabin", "room", "car_class", "address", "phone", "ship", "deck", "space_type", "vehicle", "notes", TIME_UNKNOWN)
+DETAIL_KEYS = ("flight_number", "terminal", "seat", "seat_position", "aircraft", "cabin", "room", "car_class", "address", "phone", "ship", "deck", "space_type", "vehicle", "notes", TIME_UNKNOWN, STATE)
 
 
 def untimed(details: Mapping[str, str]) -> bool:
@@ -390,6 +391,15 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
         zone = reference.country_zones().get(destination)
         if not zone:
             raise Invalid("A visit’s country is a two-letter country code like JP")
+        state = (details.get(STATE) or "").strip().upper()
+        details = {k: v for k, v in details.items() if k != STATE}
+        if state:
+            if destination != "US":
+                raise Invalid("Only a visit to the United States can have a state")
+            if state not in place_zones.STATE_NAMES:
+                raise Invalid("A visit’s state is a two-letter state code like AK")
+            zone = place_zones.US_STATES[state][0] or zone
+            details[STATE] = state
         start_zone = end_zone = zone
         details = {**details, TIME_UNKNOWN: "yes"}
     elif kind in ("hotel", "parking"):
@@ -415,7 +425,8 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
 
 
 def located(values: Mapping[str, str | None]) -> dict[str, float | str | None]:
-    point = geocode.locate(values["kind"] or "", values["origin"], values["destination"], decode_details(values["details"]).get("address"))
+    details = decode_details(values["details"])
+    point = geocode.locate(values["kind"] or "", values["origin"], values["destination"], details.get("address"), details.get(STATE))
     return {"latitude": point.latitude if point else None, "longitude": point.longitude if point else None,
             "geo_precision": point.precision if point else None}
 
@@ -704,12 +715,19 @@ def _candidates(conn: db.Connection, viewer: Viewer) -> list[Candidate]:
     return found
 
 
+def visit_place(state: str | None, country: str) -> str:
+    country = country.upper()
+    if country == "US" and state and state.upper() in place_zones.STATE_NAMES:
+        return place_zones.STATE_NAMES[state.upper()]
+    return reference.country_names().get(country, country)
+
+
 def _headline(conn: db.Connection, values: Mapping[str, str | None]) -> str | None:
     if values["kind"] == "flight" and values["destination"]:
         known = airports.lookup(conn, values["destination"])
         return known["city"] if known else values["destination"]
     if values["kind"] == "visit" and values["destination"]:
-        return reference.country_names().get(values["destination"], values["destination"])
+        return visit_place(decode_details(values.get("details")).get(STATE), values["destination"])
     return values["destination"] or values["origin"]
 
 
@@ -721,7 +739,7 @@ def _name_for(place: str | None, start: str) -> str:
 def _region(conn: db.Connection, seg: Segment) -> str | None:
     address = decode_details(seg.details).get("address")
     if seg.kind == "visit":
-        return reference.country_names().get((seg.destination or "").upper())
+        return visit_place(decode_details(seg.details).get(STATE), seg.destination) if seg.destination else None
     if seg.kind in ("flight", "train"):
         return regions.of_place(conn, seg.destination)
     if seg.kind in ("hotel", "parking"):
@@ -744,7 +762,7 @@ def auto_destination(conn: db.Connection, segs: Sequence[Segment]) -> str | None
     home = regions.of_place(conn, leaving.origin) if leaving else None
     named = regions.phrase([r for s in ordered if (r := _region(conn, s))], home)
     first = ordered[0]
-    return named or _headline(conn, {"kind": first.kind, "origin": first.origin, "destination": first.destination})
+    return named or _headline(conn, {"kind": first.kind, "origin": first.origin, "destination": first.destination, "details": first.details})
 
 
 def destination_facts(conn: db.Connection, viewer: Viewer, trip_id: int) -> regions.Facts | None:
@@ -1454,7 +1472,7 @@ def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: 
     if trip_id is None:
         if conn.orm.scalars(select(Segment.id).where(Segment.trip_id == seg.trip_id, Segment.id != seg.id)).first() is None:
             raise Invalid("It’s already in a trip of its own")
-        place = _headline(conn, {"kind": seg.kind, "origin": seg.origin, "destination": seg.destination})
+        place = _headline(conn, {"kind": seg.kind, "origin": seg.origin, "destination": seg.destination, "details": seg.details})
         target = Trip(name=_name_for(place, seg.start_local), destination=place, auto=True, booked_by=viewer.person_id)
         conn.orm.add(target)
         conn.orm.flush()

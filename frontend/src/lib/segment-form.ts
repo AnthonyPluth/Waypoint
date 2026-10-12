@@ -1,4 +1,5 @@
 import type { Segment, SegmentBody, SegmentEdit } from "./api-types";
+import { isUsState } from "./countries";
 import { amountText, toMinor } from "./money";
 import { instant, untimed } from "./trips";
 
@@ -98,6 +99,7 @@ function knownZone(zone: string): boolean {
 export function problem(d: Draft): string | null {
   if (d.kind === "visit") {
     if (!/^[A-Za-z]{2}$/.test(d.destination.trim())) return "Choose the country";
+    if (d.destination.trim().toUpperCase() === "US" && (d.details.state ?? "").trim() && !isUsState(d.details.state.trim().toUpperCase())) return "Choose one of the states, or leave the state blank";
     if (!LOCAL.test(d.start_local)) return "Enter the first day you were there";
     if (!LOCAL.test(d.end_local)) return "Enter the last day you were there";
     if (d.end_local < d.start_local) return "The last day can’t be before the first";
@@ -177,6 +179,7 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
   }
   if (d.untimed && d.untimed[0] === d.start_local && d.untimed[1] === d.end_local) details.time_unknown = "yes";
   else delete details.time_unknown;
+  if (d.kind === "visit" && d.destination.trim().toUpperCase() !== "US") delete details.state;
   const startZone = d.start_zone.trim(), endZone = d.end_zone.trim() || startZone;
   const seated = SEATED.includes(d.kind);
   if (seated && d.people.length + d.printed.length === 1) delete details.seat;

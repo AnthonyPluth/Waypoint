@@ -917,10 +917,19 @@ export interface StatsPlace {
   visits: number;
 }
 
+export interface StatsPlacePoint {
+  name: string;
+  kind: string;
+  latitude: number;
+  longitude: number;
+  trips: StatsMapTrip[];
+}
+
 export interface StatsPlaces {
   countries: StatsPlace[];
   cities: StatsPlace[];
   visits: StatsVisit[];
+  points: StatsPlacePoint[];
 }
 
 export interface StatsRoute {
@@ -983,8 +992,10 @@ export interface StatsStays {
 
 export interface StatsVisit {
   country: string;
+  state: string | null;
   latitude: number;
   longitude: number;
+  trips: StatsMapTrip[];
 }
 
 export interface StoredEmail {

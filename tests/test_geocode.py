@@ -91,6 +91,36 @@ class LookupTests(unittest.TestCase):
         self.assertAlmostEqual(train.latitude, 39.74, delta=0.1)
         self.assertAlmostEqual(cruise.latitude, 25.77, delta=0.1)
 
+    def test_alaska_stays_rentals_and_trains_are_placed_by_zip_state_or_town(self):
+        zip_hotel = geocode.locate("hotel", "Harbour Inn", "Anchorage", "1 Quay Street, Anchorage, AK 99501")
+        state_hotel = geocode.locate("hotel", "Harbour Inn", None, "1 Quay Street, Anchorage, AK")
+        car = geocode.locate("car", "Example Rentals", "Fairbanks", None)
+        seward = geocode.locate("car", "Example Rentals", "Seward", None)
+        train = geocode.locate("train", "Anchorage", "Fairbanks", None)
+        assert zip_hotel is not None and state_hotel is not None and car is not None and seward is not None and train is not None
+        self.assertEqual(zip_hotel.precision, "zip")
+        for point in (zip_hotel, state_hotel, car, seward, train):
+            self.assertGreater(point.latitude, 59.0)
+            self.assertLess(point.longitude, -145.0)
+
+    def test_a_port_of_call_is_placed_by_name_and_one_that_is_unknown_or_shared_is_left_out(self):
+        for name, lat in (("Juneau", 58.3), ("Skagway", 59.46), ("Ketchikan", 55.34), ("Sitka, Alaska", 57.05)):
+            got = geocode.locate_port(name)
+            assert got is not None
+            self.assertAlmostEqual(got.latitude, lat, delta=0.1)
+        for name in ("Nowhere Bay", "Whittier", "", "  "):
+            self.assertIsNone(geocode.locate_port(name))
+
+    def test_a_visit_with_a_state_is_placed_inside_that_state_and_without_one_at_the_country(self):
+        alaska = geocode.locate("visit", None, "US", None, "ak")
+        country = geocode.locate("visit", None, "US", None)
+        assert alaska is not None and country is not None
+        self.assertEqual((alaska.latitude, alaska.longitude), reference.us_state_points()["AK"])
+        self.assertAlmostEqual(alaska.latitude, 61.2, delta=0.1)
+        self.assertNotEqual((alaska.latitude, alaska.longitude), (country.latitude, country.longitude))
+        self.assertEqual(geocode.locate("visit", None, "JP", None, "AK"), geocode.locate("visit", None, "JP", None))
+        self.assertEqual(set(reference.us_state_points()), set(geocode.US_STATES))
+
     def test_a_flight_and_a_place_that_cannot_be_read_have_no_point(self):
         self.assertIsNone(geocode.locate("flight", "JFK", "LHR", "1 Main Street, Boulder, CO 80302"))
         self.assertIsNone(geocode.locate("hotel", "Quay Inn", "Nowhereville", None))

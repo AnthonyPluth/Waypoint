@@ -128,11 +128,14 @@ def places_of(kind: str, origin: str | None, destination: str | None) -> list[st
     return [p.strip() for p in ordered if p and p.strip()]
 
 
-def locate(kind: str, origin: str | None, destination: str | None, address: str | None) -> Point | None:
+def locate(kind: str, origin: str | None, destination: str | None, address: str | None, visit_state: str | None = None) -> Point | None:
     if kind not in LOCATED_KINDS:
         return None
     if kind == "visit":
-        found = reference.country_points().get((destination or "").strip().upper())
+        nation = (destination or "").strip().upper()
+        if nation == "US" and (code := (visit_state or "").strip().upper()) in US_STATES and (inside := reference.us_state_points().get(code)):
+            return Point(inside[0], inside[1], "city")
+        found = reference.country_points().get(nation)
         return Point(found[0], found[1], "city") if found else None
     places = places_of(kind, origin, destination)
     where = (address or "").strip()
@@ -150,3 +153,7 @@ def locate(kind: str, origin: str | None, destination: str | None, address: str 
             return point
     return _city_in(where, country, state) if where else None
 
+
+
+def locate_port(name: str) -> Point | None:
+    return _city_in(name.strip(), None, None) if name.strip() else None

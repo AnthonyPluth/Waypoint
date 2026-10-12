@@ -7,7 +7,7 @@
   import { Input } from "$lib/components/ui/input";
   import FlightLength from "$lib/components/FlightLength.svelte";
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
-  import { countryChoices } from "$lib/countries";
+  import { countryChoices, usStateChoices } from "$lib/countries";
   import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, SEAT_LIMIT, SEATED, FOR_EVERYONE, SAME_AS_PICKUP, seatKey, type Draft } from "$lib/segment-form";
 
   let { initial, people, onsaved, oncancel, focus = "", titled = true }: { initial: Draft; people: Person[]; onsaved: (s: Segment) => void; oncancel: () => void; focus?: string; titled?: boolean } = $props();
@@ -28,6 +28,7 @@
   const editing = $derived(d.id !== null);
   const visit = $derived(d.kind === "visit");
   const countries = countryChoices();
+  const usStates = usStateChoices();
   const day = (local: string) => local.slice(0, 10);
   const stay = $derived(d.kind === "hotel" || d.kind === "parking");
   const startBlank = $derived(flight ? "Work it out from the airport" : stay ? "Work it out from the address" : d.kind === "cruise" ? "Choose a time zone" : "Work it out from the airport or address");
@@ -64,6 +65,13 @@
             <option value="">Choose a country</option>
             {#each countries as [code, name] (code)}<option value={code}>{name}</option>{/each}
           </select></label>
+        {#if d.destination === "US"}
+          <label class={label}><span class="font-medium">State (optional)</span>
+            <select value={d.details.state ?? ""} onchange={(e) => { if (e.currentTarget.value) d.details.state = e.currentTarget.value; else delete d.details.state; }} class={selectClass}>
+              <option value="">Any state</option>
+              {#each usStates as [code, name] (code)}<option value={code}>{name}</option>{/each}
+            </select></label>
+        {/if}
         <div class="grid grid-cols-2 gap-3">
           <label class={label}><span class="font-medium">First day</span>
             <Input type="date" value={day(d.start_local)} oninput={(e) => { d.start_local = e.currentTarget.value ? `${e.currentTarget.value}T00:00` : ""; }} autocomplete="off" /></label>
