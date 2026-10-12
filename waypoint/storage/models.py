@@ -96,6 +96,13 @@ class Trip(Base):
     booked_by: Mapped[int | None]
 
 
+class TripPerson(Base):
+    __table__ = schema.trip_people
+    id: Mapped[int]
+    trip_id: Mapped[int]
+    person_id: Mapped[int]
+
+
 class Segment(Base):
     __table__ = schema.segments
     id: Mapped[int]
@@ -119,6 +126,7 @@ class Segment(Base):
     latitude: Mapped[float | None]
     longitude: Mapped[float | None]
     geo_precision: Mapped[str | None]
+    travelers_from_trip: Mapped[bool]
 
 
 class SegmentTraveler(Base):

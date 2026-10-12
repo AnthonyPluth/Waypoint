@@ -17,7 +17,7 @@ from sqlalchemy import func, insert, select, update
 from waypoint.storage import backup, db, secretbox
 from waypoint import server
 from waypoint.storage import settings_keys as sk
-from waypoint.storage.models import AuthSession, LoyaltyId, Person, Setting, User
+from waypoint.storage.models import AuthSession, LoyaltyId, Person, Segment, SegmentTraveler, Setting, Trip, TripPerson, User
 from tests.shared import add_database, fetch, own_database, serve
 
 db_session = db.session
@@ -103,6 +103,44 @@ class BackupTests(unittest.TestCase):
             rows["settings"] = [(k, secretbox_plain(v) if k == sk.VAPID_PRIVATE_KEY else v) for k, v in rows["settings"]]
         self.assertEqual(exported, want)
         self.assertEqual(db.get_setting(dst, sk.VAPID_PRIVATE_KEY), "secret ’ 🐶")
+        src.close(); dst.close()
+
+    def trip_with_people(self, c):
+        c.execute(insert(Person).values(id=11, display_name="Pat Example"))
+        c.execute(insert(Person).values(id=12, display_name="Quinn Example"))
+        c.execute(insert(Trip).values(id=5, name="Trip", auto=False))
+        c.execute(insert(Segment).values(id=9, trip_id=5, kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="Europe/London",
+                                         end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual"))
+        c.execute(insert(SegmentTraveler).values(segment_id=9, person_id=11))
+
+    def test_a_trips_people_come_back_with_it(self):
+        src = db.connect(self.a)
+        self.trip_with_people(src)
+        src.execute(insert(TripPerson), [{"trip_id": 5, "person_id": 11}, {"trip_id": 5, "person_id": 12}])
+        src.execute(update(Segment).where(Segment.id == 9).values(travelers_from_trip=False))
+        src.commit()
+        dst = db.connect(self.b)
+        backup.restore(dst, backup.load(backup.dump(src)))
+        dst.commit()
+        self.assertEqual(sorted((t.trip_id, t.person_id) for t in dst.orm.scalars(select(TripPerson))), [(5, 11), (5, 12)])
+        src.close(); dst.close()
+
+    def test_a_backup_from_before_trip_people_gets_each_trips_people_from_its_bookings(self):
+        src = db.connect(self.a)
+        self.trip_with_people(src)
+        src.commit()
+        data = backup.load(backup.dump(src))
+        data["revision"] = "0029"
+        data["tables"].pop("trip_people")
+        seg = data["tables"]["segments"]
+        keep = [i for i, name in enumerate(seg["columns"]) if name != "travelers_from_trip"]
+        seg["columns"] = [seg["columns"][i] for i in keep]
+        seg["rows"] = [[row[i] for i in keep] for row in seg["rows"]]
+        dst = db.connect(self.b)
+        with mock.patch.object(backup, "head", return_value="not-this-one"):
+            backup.restore(dst, data)
+        dst.commit()
+        self.assertEqual([(t.trip_id, t.person_id) for t in dst.orm.scalars(select(TripPerson))], [(5, 11)])
         src.close(); dst.close()
 
     def test_people_come_back_exactly_with_their_links(self):

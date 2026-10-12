@@ -47,7 +47,7 @@ An assistant can also ask for **Change trips**: everything the app changes, as t
 - **Change trips** ticked on the approval page (offered only when the assistant asks for it, and never ticked for you), and
 - **Let assistants change trips** switched on in the card. It’s off until you turn it on, and checked on every change.
 
-Waypoint tells the assistant to describe every change and wait for your yes, and to confirm separately before anything destructive. The changing tools are `add_segment`, `update_segment`, `remove_segment`, `create_trip`, `update_trip`, `merge_trips`, `add_guest` and `update_person`. `list_endpoints` lists everything else it can reach and `call_endpoint` calls it, through the same checks.
+Waypoint tells the assistant to describe every change and wait for your yes, and to confirm separately before anything destructive. The changing tools are `add_segment`, `update_segment`, `remove_segment`, `create_trip`, `update_trip`, `merge_trips`, `add_guest` and `update_person`. A trip can have a list of people (`people` on `create_trip` and `update_trip`). An assistant can take people off it, but not someone who is a traveller on one of its flights, and it can’t add anyone who couldn’t already see the trip: that needs you, in the app. `list_endpoints` lists everything else it can reach and `call_endpoint` calls it, through the same checks.
 
 ## Reading email text (optional)
 

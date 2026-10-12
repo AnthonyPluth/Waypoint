@@ -7409,6 +7409,12 @@
           "can_clear_emails": {
             "type": "boolean"
           },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
           "segments": {
             "type": "array",
             "items": {
@@ -7428,6 +7434,7 @@
           "booked_by",
           "emails",
           "can_clear_emails",
+          "people",
           "segments"
         ],
         "additionalProperties": false
@@ -7485,6 +7492,15 @@
               "string",
               "null"
             ]
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "confirm": {
+            "type": "boolean"
           }
         },
         "required": [],

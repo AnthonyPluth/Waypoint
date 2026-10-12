@@ -7,7 +7,7 @@ from typing import Any, TypedDict
 from sqlalchemy import delete, select, update
 
 from ..storage import db
-from ..storage.models import LoyaltyId, Person, Segment, SegmentRecipient, SegmentTraveler, Trip
+from ..storage.models import LoyaltyId, Person, Segment, SegmentRecipient, SegmentTraveler, Trip, TripPerson
 from . import visibility
 
 
@@ -185,6 +185,9 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
     mine = select(SegmentTraveler.segment_id).where(SegmentTraveler.person_id == member_id)
     conn.execute(delete(SegmentTraveler).where(SegmentTraveler.person_id == guest_id, SegmentTraveler.segment_id.in_(mine)))
     conn.execute(update(SegmentTraveler).where(SegmentTraveler.person_id == guest_id).values(person_id=member_id))
+    aboard = select(TripPerson.trip_id).where(TripPerson.person_id == member_id)
+    conn.execute(delete(TripPerson).where(TripPerson.person_id == guest_id, TripPerson.trip_id.in_(aboard)))
+    conn.execute(update(TripPerson).where(TripPerson.person_id == guest_id).values(person_id=member_id))
     has = select(SegmentRecipient.segment_id).where(SegmentRecipient.person_id == member_id)
     conn.execute(delete(SegmentRecipient).where(SegmentRecipient.person_id == guest_id, SegmentRecipient.segment_id.in_(has)))
     conn.execute(update(SegmentRecipient).where(SegmentRecipient.person_id == guest_id).values(person_id=member_id))

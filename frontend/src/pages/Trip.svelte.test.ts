@@ -91,21 +91,50 @@ describe("Trip", () => {
       expect(card).toHaveTextContent("Sam Doe · Seat 31B");
     });
 
-    it("drops the travellers from a non-flight booking that has the trip's full set", async () => {
+    it("never lists travellers on a rental car, whether it has the trip's full set or a smaller one", async () => {
       held = trip([flightFor, car]);
+      const { unmount } = render(TripPage);
+      let card = await cardOf(car);
+      expect(within(card).queryByText("Travellers")).toBeNull();
+      expect(card).not.toHaveTextContent("Sam Doe");
+      unmount();
+      held = trip([flightFor, { ...car, travelers: [car.travelers[1]] }]);
       render(TripPage);
-      const card = await cardOf(car);
+      card = await cardOf(car);
       expect(within(card).queryByText("Travellers")).toBeNull();
       expect(card).not.toHaveTextContent("Sam Doe");
     });
 
-    it("still shows a smaller set on a non-flight booking", async () => {
-      held = trip([flightFor, { ...car, travelers: [car.travelers[1]] }]);
+    it("shows a hotel's loyalty number on its own line without the traveller list", async () => {
+      loyalty = [membership({ id: 12, person_id: 1, kind: "hotel", program: "Marriott Bonvoy", masked: "••••821L" })];
+      held = trip([flightFor, { ...stay, booked_by: 1, travelers: [
+        { id: 4, person_id: 1, name: "Jane Doe", seat: null }, { id: 5, person_id: 2, name: "Sam Doe", seat: null }, { id: 6, person_id: null, name: "DOE/MIA MISS", seat: null }] }]);
       render(TripPage);
-      const card = await cardOf(car);
-      expect(within(card).getByText("Travellers")).toBeInTheDocument();
-      expect(card).toHaveTextContent("Sam Doe");
+      const card = await cardOf(stay);
+      expect(within(card).queryByText("Travellers")).toBeNull();
+      expect(card).not.toHaveTextContent("Sam Doe");
+      expect(card).not.toHaveTextContent("DOE/MIA MISS");
+      const line = card.querySelector("[data-membership]")!;
+      expect(line).toHaveTextContent("Marriott Bonvoy");
+      expect(line).toHaveTextContent("••••821L");
       expect(card).not.toHaveTextContent("Jane Doe");
+    });
+
+    it("lists several loyalty numbers one per line under Loyalty, with no names, and no block without one", async () => {
+      loyalty = [membership({ id: 12, person_id: 1, kind: "hotel", program: "Marriott Bonvoy", masked: "••••821L" }), membership({ id: 13, person_id: 2, kind: "hotel", program: "Marriott Bonvoy", masked: "••••5512" })];
+      held = trip([flightFor, { ...stay, travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }, { id: 5, person_id: 2, name: "Sam Doe", seat: null }] }]);
+      const { unmount } = render(TripPage);
+      let card = await cardOf(stay);
+      expect(card.querySelectorAll("[data-membership] li")).toHaveLength(2);
+      expect(within(card).getByText("Loyalty")).toBeInTheDocument();
+      expect(card).not.toHaveTextContent("Sam Doe");
+      expect(card).not.toHaveTextContent("Jane Doe");
+      unmount();
+      loyalty = [];
+      render(TripPage);
+      card = await cardOf(stay);
+      expect(card.querySelector("[data-membership]")).toBeNull();
+      expect(within(card).queryByText("Loyalty")).toBeNull();
     });
 
     it("leaves the line out for a trip only the viewer is on, and shows it for someone else", async () => {
@@ -586,10 +615,12 @@ describe("Trip", () => {
       trip_id: 1, kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London", travelers: [{ person_id: 2 }] }) }));
   });
 
-  it("says which time zone a stay's times are in, so one worked out from its address can be checked", async () => {
+  it("doesn't show a stay's time zone on its card", async () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
-    expect(screen.getByTestId("stay-zone")).toHaveTextContent("Europe/London");
+    expect(screen.queryByTestId("stay-zone")).toBeNull();
+    expect(screen.queryByText("Time zone")).toBeNull();
+    expect(screen.queryByText(/Europe\/London|Europe London/)).toBeNull();
   });
 
   it("asks a stay for one time zone, and says it can be worked out from the address", async () => {
@@ -638,7 +669,7 @@ describe("Trip", () => {
       expect(within(card).getByText("Covered")).toBeInTheDocument();
       expect(within(card).getByText("Blue hatchback")).toBeInTheDocument();
       expect(screen.getByText("Address")).toBeInTheDocument();
-      expect(screen.getByTestId("stay-zone")).toHaveTextContent("America/New York");
+      expect(screen.queryByTestId("stay-zone")).toBeNull();
       expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", lot.links.directions!);
     });
 
@@ -764,15 +795,14 @@ describe("Trip", () => {
     });
   });
 
-  it("tells only the person who booked a hotel room that they have no number for its chain", async () => {
+  it("says nothing about travellers or missing numbers on a hotel with no loyalty number to show", async () => {
     loyalty = [];
     held = trip([{ ...stay, booked_by: 1, travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }, { id: 5, person_id: 2, name: "Sam Doe", seat: null }, { id: 6, person_id: null, name: "DOE/MIA MISS", seat: null }] }]);
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
-    expect(screen.getAllByText(/number yet/)).toHaveLength(1);
-    expect(screen.getByText(/No Marriott Bonvoy number yet/).closest("li")).toHaveTextContent("Jane Doe");
+    expect(screen.queryByText(/number yet/)).toBeNull();
     expect(screen.queryByText(/Not matched to a person/)).toBeNull();
-    expect(screen.getByText("Sam Doe")).toBeInTheDocument();
+    expect(screen.queryByText("Sam Doe")).toBeNull();
   });
 
   describe("a link to one booking", () => {

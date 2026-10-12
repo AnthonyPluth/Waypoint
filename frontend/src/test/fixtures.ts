@@ -14,7 +14,7 @@ export const segment = (extra: Partial<Segment> = {}): Segment => ({
 
 export const trip = (segments: Segment[], extra: Partial<Trip> = {}): Trip => ({
   id: 1, name: "Trip to London", start_date: segments[0]?.start_local.slice(0, 10) ?? null, end_date: segments.at(-1)?.end_local.slice(0, 10) ?? null,
-  destination: "London", destination_manual: false, notes: null, auto: true, booked_by: 1, emails: 0, can_clear_emails: false, segments, ...extra,
+  destination: "London", destination_manual: false, notes: null, auto: true, booked_by: 1, emails: 0, can_clear_emails: false, people: [], segments, ...extra,
 });
 
 export const membership = (extra: Partial<LoyaltyEntry> = {}): LoyaltyEntry => ({

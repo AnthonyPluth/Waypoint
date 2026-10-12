@@ -460,6 +460,7 @@ class Trip(TypedDict):
     booked_by: int | None
     emails: int
     can_clear_emails: bool
+    people: list[int]
     segments: list[Segment]
 
 
@@ -499,6 +500,8 @@ class TripBody(TypedDict):
     notes: NotRequired[str | None]
     start_date: NotRequired[str | None]
     end_date: NotRequired[str | None]
+    people: NotRequired[list[int]]
+    confirm: NotRequired[bool]
 
 
 class DestinationSuggestion(TypedDict):

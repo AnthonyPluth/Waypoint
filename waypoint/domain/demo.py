@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from ..storage import db, secretbox, stored_mail
 from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentMessage, SegmentPort, SegmentTraveler,
-                              StoredMessage, Trip, User)
+                              StoredMessage, Trip, TripPerson, User)
 from . import logos, loyalty, people, trips
 from .mail import ai, review, scan
 from .visibility import Viewer
@@ -333,4 +333,4 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
 
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
-               for m in (User, Person, LoyaltyId, BrandLogo, Trip, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage))
+               for m in (User, Person, LoyaltyId, BrandLogo, Trip, TripPerson, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage))
