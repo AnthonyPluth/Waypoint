@@ -210,11 +210,22 @@ export function tripTravellers(segments: Segment[]): TripTraveller[] {
 export const showTripTravellers = (everyone: TripTraveller[], viewer: number | null): boolean =>
   everyone.length > 1 || (everyone.length === 1 && (viewer === null || everyone[0].key !== `person:${viewer}`));
 
-export function showBookingTravellers(s: Segment, everyone: TripTraveller[], loyalty: LoyaltyEntry[] | null): boolean {
-  if (s.kind === "flight" || s.status === "cancelled") return true;
-  if (s.travelers.some((who) => who.seat || (loyalty !== null && membershipFor(s, who, loyalty)))) return true;
+const LISTS_NO_TRAVELLERS: Segment["kind"][] = ["hotel", "car", "parking", "cruise"];
+
+export function showBookingTravellers(s: Segment, everyone: TripTraveller[]): boolean {
+  if (s.kind === "flight") return true;
+  if (LISTS_NO_TRAVELLERS.includes(s.kind)) return false;
+  if (s.status === "cancelled" || s.travelers.some((who) => who.seat)) return true;
   const here = new Set(s.travelers.map(travellerKey));
   return here.size !== everyone.length || everyone.some((who) => !here.has(who.key));
+}
+
+export function loyaltyNumbers(s: Segment, loyalty: LoyaltyEntry[]): LoyaltyEntry[] {
+  const found = s.travelers.flatMap((who) => {
+    const m = membershipFor(s, who, loyalty);
+    return m?.state === "found" ? [m.entry] : [];
+  });
+  return found.filter((entry, i) => found.findIndex((e) => e.id === entry.id) === i);
 }
 
 export function headline(s: Segment): string {

@@ -75,7 +75,7 @@
             <div class="flex flex-col gap-2" data-booking>
               {#if card.segments.length > 1 && b.confirmation}<p class="text-lg"><CopyCode code={b.confirmation} /></p>{/if}
               {#if b.details.phone}<p class="text-sm"><span class="eyebrow">Phone</span> <a class="underline underline-offset-2" href={b.links.call ?? `tel:${b.details.phone}`}>{b.details.phone}</a></p>{/if}
-              {#if b.travelers.length && showBookingTravellers(b, everyone, null)}
+              {#if b.travelers.length && showBookingTravellers(b, everyone)}
                 <h3 class="eyebrow">Travellers</h3>
                 <ul class="flex flex-col gap-1">
                   {#each b.travelers as who (who.id)}

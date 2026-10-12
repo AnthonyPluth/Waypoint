@@ -28,7 +28,7 @@
   import TripDestination from "$lib/components/TripDestination.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { appWord, bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, showBookingTravellers, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink } from "$lib/trips";
+  import { appWord, bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, loyaltyNumbers, showBookingTravellers, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
@@ -292,9 +292,11 @@
           {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
           {#snippet footer()}
             <div class="flex flex-col gap-3">
-              {#if showBookingTravellers(s, everyone, loyalty)}
+              {#if showBookingTravellers(s, everyone)}
                 <h3 class="eyebrow">Travellers</h3>
                 {@render travellerList(s)}
+              {:else}
+                {@render membershipList(s)}
               {/if}
               {@render buttons(s, headline(s))}
             </div>
@@ -356,9 +358,6 @@
     <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} />{/if}</dd></div>
   <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
     <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} />{/if}</dd></div>
-  {#if (s.kind === "hotel" || s.kind === "parking") && !untimed(s)}
-    <div><dt class="eyebrow">Time zone</dt><dd class="mt-1 text-sm text-muted-foreground" data-testid="stay-zone">{s.start_zone.replaceAll("_", " ")}</dd></div>
-  {/if}
 {/snippet}
 
 {#snippet links(s: Segment)}
@@ -431,6 +430,18 @@
   {/if}
 {/snippet}
 
+{#snippet membershipList(s: Segment)}
+  {@const numbers = loyaltyNumbers(s, loyalty)}
+  {#if numbers.length}
+    <h3 class="eyebrow">Loyalty</h3>
+    <ul class="flex flex-col gap-1" data-membership>
+      {#each numbers as entry (entry.id)}
+        <li class="text-sm text-muted-foreground">{entry.program} <LoyaltyNumber {entry} /></li>
+      {/each}
+    </ul>
+  {/if}
+{/snippet}
+
 {#snippet travellerList(s: Segment)}
   {#if s.travelers.length === 0}<p class="text-sm text-muted-foreground">Nobody is listed on this booking.</p>{/if}
   <ul class="flex flex-col gap-2">
@@ -439,9 +450,7 @@
       <li class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
         <span class="break-words font-medium">{who.name}{#if who.seat}{" "}<span class="font-normal text-muted-foreground">· Seat {who.seat}</span>{/if}</span>
         <span class="text-muted-foreground">
-          {#if m?.state === "found"}{m.entry.program} <LoyaltyNumber entry={m.entry} />
-          {:else if m?.state === "none"}No {m.program} number yet · <a class="underline" href="#people">add one in People</a>
-          {:else if m?.state === "unmatched"}Not matched to a person in <a class="underline" href="#people">People</a>{/if}
+          {#if m?.state === "unmatched"}Not matched to a person in <a class="underline" href="#people">People</a>{/if}
         </span>
       </li>
     {/each}
