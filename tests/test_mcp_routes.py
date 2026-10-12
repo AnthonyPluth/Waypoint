@@ -31,6 +31,7 @@ BLOCKED = [
     "POST /api/mcp-settings/writes", "POST /api/mcp-settings/connections/{id}/mail", "POST /api/reminders", "POST /api/reminders/devices",
     "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch", "GET /api/segments/{id}/logo", "GET /api/loyalty/{id}/logo", "GET /api/segments/{id}/emails",
     "POST /api/trips/{id}/emails/clear", "POST /api/restore", "POST /api/trips/{id}/destination/suggest", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "POST /api/review/{id}/suggest",
+    "POST /api/review/{id}/same", "POST /api/review/{id}/attach",
 ]
 NEVER = re.compile(r"^/api/(mailboxes|review|ai|backup|restore|state|offline|feed|reminders|mcp-settings|import|loyalty|logodev)(/|$)|^/api/flight-status/|^/api/segments/\{id\}/emails(/|$)|^/api/trips/\{id\}/emails(/|$)|^/api/trips/\{id\}/destination(/|$)")
 

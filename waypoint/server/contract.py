@@ -58,6 +58,7 @@ class ScanSummary(TypedDict):
     not_travel: int
     followups: int
     with_facts: int
+    attached: int
 
 
 class Mailbox(TypedDict):
@@ -252,6 +253,15 @@ class ReviewMatch(TypedDict):
 class MatchBody(TypedDict):
     entry: int
     segment_id: int | None
+
+
+class SameBooking(TypedDict):
+    booking: ReviewCandidate | None
+
+
+class Attached(TypedDict):
+    ok: bool
+    segment_id: int
 
 
 class Review(TypedDict):

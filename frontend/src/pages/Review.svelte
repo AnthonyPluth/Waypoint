@@ -20,7 +20,7 @@
 <script lang="ts">
   import { SvelteSet } from "svelte/reactivity";
   import { act, errMsg, ignoreFailure } from "$lib/act";
-  import type { Person, Review, ReviewMatch, SegmentBody, WhoIsThis } from "$lib/api-types";
+  import type { Person, Review, ReviewCandidate, ReviewMatch, SegmentBody, WhoIsThis } from "$lib/api-types";
   import { refreshState, route, setQuery } from "$lib/app.svelte";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
@@ -77,6 +77,7 @@
     read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), sources: s.sources ?? {} });
   const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {} });
   let drafts = $state<Draft[]>([]);
+  let joining = $state<{ legs: Draft[]; bodies: SegmentBody[]; found: (ReviewCandidate | null)[] } | null>(null);
   const draft = $derived(drafts[0] ?? null);
   let formError = $state("");
   let saving = $state(false);
@@ -93,6 +94,7 @@
     emailOpen = true;
     addedIds = [];
     addedPicks = [];
+    joining = null;
     drafts = use && item.suggestions.length ? item.suggestions.map((s, n) => suggestedDraft(item, s, n + 1)) : [handDraft(item)];
     baseline = fingerprints();
     formError = "";
@@ -149,6 +151,7 @@
     addedPicks = [];
     if (open && viewing !== open.item.id) delete peeks[open.item.id];
     drafts = [];
+    joining = null;
     if (open && picks.length) void act(async () => {
       await apiCall<"DELETE /api/review/{id}">(`/api/review/${open.item.id}?${picks.map((n) => `suggestion=${n}`).join("&")}`, { method: "DELETE" });
       await settle();
@@ -187,13 +190,38 @@
       if (typeof built === "string") { formError = built; return; }
       bodies.push(built);
     }
+    const found: (ReviewCandidate | null)[] = [];
+    const checked = await act(async () => {
+      for (const body of bodies) found.push((await apiCall<"POST /api/review/{id}/same">(`/api/review/${first.item.id}/same`, { method: "POST", body })).booking);
+    }, { busy: (on) => (saving = on), onError: (m) => (formError = m) });
+    if (!checked) return;
+    if (found.some(Boolean)) { formError = ""; joining = { legs, bodies, found }; return; }
+    await save(legs, bodies, found, false);
+  }
+
+  const joinSame = (attach: boolean) => {
+    const open = joining;
+    if (open) void save(open.legs, open.bodies, open.found, attach);
+  };
+
+  async function save(legs: Draft[], bodies: SegmentBody[], found: (ReviewCandidate | null)[], attach: boolean) {
+    const first = legs[0];
+    if (!first) return;
     const added = addedIds;
     const before = added.length;
     let listed = false;
+    let attached = 0;
     const ok = await act(async () => {
       for (const [n, body] of bodies.entries()) {
-        const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
-        added.push(made.id);
+        const same = found[n];
+        if (attach && same) {
+          const joined = await apiCall<"POST /api/review/{id}/attach">(`/api/review/${first.item.id}/attach`, { method: "POST", body });
+          added.push(joined.segment_id);
+          attached++;
+        } else {
+          const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
+          added.push(made.id);
+        }
         const leg = legs[n];
         if (leg?.pick) addedPicks.push(leg.pick);
         if (n < bodies.length - 1) drafts = drafts.filter((d) => d !== leg);
@@ -204,10 +232,10 @@
       if (listed) toast.error(`Added, but couldn’t take it off this list: ${m}`);
       else formError = added.length ? `Added ${added.length} of ${before + bodies.length}, but couldn’t add the rest: ${m}` : m;
     } });
-    if (!ok) { if (listed) { closeForm(); await settle(); } else if (added.length) await settle(); return; }
+    if (!ok) { joining = null; if (listed) { closeForm(); await settle(); } else if (added.length) await settle(); return; }
     addedPicks = [];
     closeForm();
-    toast.success(added.length > 1 ? `Added ${plural(added.length, legs)} to your trips` : "Added to your trips");
+    toast.success(attached === bodies.length ? (attached > 1 ? "Added the email to your existing bookings" : "Added the email to your existing booking") : added.length > 1 ? `Added ${plural(added.length, legs)} to your trips` : "Added to your trips");
     await settle();
   }
 
@@ -327,10 +355,26 @@
       {@render legFields(lead)}
     {/if}
     {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
-    <div class="flex flex-wrap gap-2">
-      <Button type="submit" disabled={saving}>{saving ? "Adding…" : many ? `Add ${plural(drafts.length, drafts)}` : "Add to my trips"}</Button>
-      <Button type="button" variant="outline" disabled={saving} onclick={requestClose}>Cancel</Button>
-    </div>
+    {#if joining}
+      {@const matches = joining.found.filter((f): f is ReviewCandidate => f !== null)}
+      <div class="flex flex-col gap-3 rounded-xl border border-primary p-3" role="group" aria-label="This looks like a booking you already have" data-testid="same-booking">
+        <p class="text-sm font-medium">{matches.length > 1 ? "These look like bookings you already have" : "This looks like a booking you already have"}</p>
+        <ul class="list-disc space-y-1 pl-5 text-sm">
+          {#each matches as m (m.segment_id)}<li>{what(m)}{m.trip_name ? `, in ${m.trip_name}` : ""}</li>{/each}
+        </ul>
+        <p class="text-sm text-muted-foreground">Same code, same {joining.found.every((f) => f?.kind === "flight") ? "flight" : "booking"} and the same time. Add this email to {matches.length > 1 ? "them" : "it"} instead of making another booking? Nothing already there is changed, only what’s missing is filled in.</p>
+        <div class="flex flex-wrap gap-2">
+          <Button type="button" disabled={saving} onclick={() => joinSame(true)}>{saving ? "Adding…" : matches.length > 1 ? "Add the email to those bookings" : "Add the email to that booking"}</Button>
+          <Button type="button" variant="outline" disabled={saving} onclick={() => joinSame(false)}>Add as a separate booking</Button>
+          <Button type="button" variant="ghost" disabled={saving} onclick={() => (joining = null)}>Go back</Button>
+        </div>
+      </div>
+    {:else}
+      <div class="flex flex-wrap gap-2">
+        <Button type="submit" disabled={saving}>{saving ? "Adding…" : many ? `Add ${plural(drafts.length, drafts)}` : "Add to my trips"}</Button>
+        <Button type="button" variant="outline" disabled={saving} onclick={requestClose}>Cancel</Button>
+      </div>
+    {/if}
   </form>
 {/snippet}
 

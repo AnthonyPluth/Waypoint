@@ -803,6 +803,45 @@ def _same_leg(seg: Segment, values: Mapping[str, str | None], details: Mapping[s
             and _text_key(seg.origin) == _text_key(values["origin"]) and _text_key(seg.destination) == _text_key(values["destination"]))
 
 
+def _minute(local: str | None) -> str:
+    return (local or "")[:16]
+
+
+def same_booking(seg: Segment, values: Mapping[str, str | None], details: Mapping[str, str]) -> bool:
+    if seg.kind != values["kind"] or seg.status != "confirmed" or values["status"] != "confirmed":
+        return False
+    if not seg.confirmation or not values["confirmation"] or _code_key(seg.confirmation) != _code_key(values["confirmation"]):
+        return False
+    mine, theirs = flight_key(decode_details(seg.details).get("flight_number")), flight_key(details.get("flight_number"))
+    same_flight = seg.kind == "flight" and mine is not None and mine == theirs
+    if seg.kind == "flight" and mine is not None and theirs is not None and mine != theirs:
+        return False
+    named = bool(seg.provider and values["provider"]) and provider_key(seg.provider) == provider_key(values["provider"])
+    if not (same_flight or named):
+        return False
+    if (_minute(seg.start_local) != _minute(values["start_local"]) or seg.start_zone != values["start_zone"]
+            or _text_key(seg.destination) != _text_key(values["destination"])):
+        return False
+    if seg.kind == "flight":
+        return _text_key(seg.origin) == _text_key(values["origin"])
+    return (_minute(seg.end_local) == _minute(values["end_local"]) and seg.end_zone == values["end_zone"]
+            and (_text_key(seg.origin) == _text_key(values["origin"]) or _same_place(seg.origin, values["origin"])))
+
+
+def find_same_booking(conn: db.Connection, viewer: Viewer, fields: SegmentIn) -> Segment | None:
+    values = check(conn, fields)
+    details = fields.get("details") or {}
+    return next((s for s in visibility.visible_segments(conn, viewer) if same_booking(s, values, details)), None)
+
+
+def attach_to_same_booking(conn: db.Connection, viewer: Viewer, fields: SegmentIn, touched: list[int] | None = None) -> bool:
+    found = find_same_booking(conn, viewer, fields)
+    if found is None:
+        return False
+    merge_email_segment(conn, viewer, fields, touched=touched, fill_only=True, into=found.id)
+    return True
+
+
 def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, again: bool = False,
                         touched: list[int] | None = None, fill_only: bool = False, candidates: list[int] | None = None,
                         into: int | None = None) -> Literal["added", "updated", "unchanged", "ambiguous"]:

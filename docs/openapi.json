@@ -2352,6 +2352,106 @@
         }
       }
     },
+    "/api/review/{id}/same": {
+      "post": {
+        "operationId": "api_review_same",
+        "x-handler": "waypoint/server/api/review.py:api_review_same",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SameBooking"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/review/{id}/attach": {
+      "post": {
+        "operationId": "api_review_attach",
+        "x-handler": "waypoint/server/api/review.py:api_review_attach",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attached"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/review/{id}/preview": {
       "get": {
         "operationId": "api_review_preview",
@@ -3780,6 +3880,22 @@
         },
         "required": [
           "emails"
+        ],
+        "additionalProperties": false
+      },
+      "Attached": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "segment_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "segment_id"
         ],
         "additionalProperties": false
       },
@@ -5797,6 +5913,25 @@
         ],
         "additionalProperties": false
       },
+      "SameBooking": {
+        "type": "object",
+        "properties": {
+          "booking": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewCandidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "booking"
+        ],
+        "additionalProperties": false
+      },
       "ScanStarted": {
         "type": "object",
         "properties": {
@@ -5847,6 +5982,9 @@
           },
           "with_facts": {
             "type": "integer"
+          },
+          "attached": {
+            "type": "integer"
           }
         },
         "required": [
@@ -5861,7 +5999,8 @@
           "total",
           "not_travel",
           "followups",
-          "with_facts"
+          "with_facts",
+          "attached"
         ],
         "additionalProperties": false
       },
