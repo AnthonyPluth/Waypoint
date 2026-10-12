@@ -24,7 +24,7 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", fake_merge_warning: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -119,6 +119,13 @@ async function runStep(page, step, shot, saveDownload) {
       await route.fulfill({ response, json: { ...(await response.json()), ai: true } });
     });
     await page.route("**/api/trips/*/destination/suggest", (route) => route.fulfill({ json: { suggestion: step.fake_destination } }));
+  } else if ("fake_merge_warning" in step) {
+    const [first, second] = step.fake_merge_warning.split("|").map((part) => part.split(",").map((n) => n.trim()).filter(Boolean));
+    const named = (names = []) => names.map((name, i) => ({ id: i + 1, name }));
+    await page.route("**/api/trips/*/merge", async (route) => {
+      if (route.request().postDataJSON()?.confirm) return route.continue();
+      return route.fulfill({ status: 409, json: { error: "Merging these trips changes who sees what.", see_booking: named(first), see_trip: named(second) } });
+    });
   } else if ("long_names" in step) {
     await page.route("**/api/stats**", async (route) => {
       const response = await route.fetch();

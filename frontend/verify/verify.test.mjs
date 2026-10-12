@@ -63,6 +63,8 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ fake_ignore: true }] })).toEqual(["step 1: fake_ignore takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_destination: "Colorado & Texas" }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_destination: 3 }] })).toEqual(["step 1: fake_destination takes a string"]);
+    expect(flowProblems({ ...ok, steps: [{ fake_merge_warning: "Sam Doe | Mia Doe" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ fake_merge_warning: 3 }] })).toEqual(["step 1: fake_merge_warning takes a string"]);
   });
 
   it("takes a download to click and save, named", () => {
