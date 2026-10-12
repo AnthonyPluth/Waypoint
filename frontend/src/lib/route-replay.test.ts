@@ -78,6 +78,23 @@ describe("stopsOf", () => {
     expect(stopsOf(trip([out, napa]), places).at(-1)?.latitude).toBe(38.2975);
   });
 
+  it("places a car, a train arrival and a cruise embarkation at their stored points, and a port of call by its city", () => {
+    const la = "America/Los_Angeles";
+    const car = segment({ id: 4, kind: "car", origin: "Depot One", destination: "Depot Two", start_local: "2025-12-06T09:00", start_zone: la, end_local: "2025-12-06T18:00", end_zone: la });
+    const ride = segment({ id: 5, kind: "train", origin: "Napa", destination: "Sacramento", start_local: "2025-12-07T09:00", start_zone: la, end_local: "2025-12-07T11:00", end_zone: la });
+    const cruise = segment({ id: 6, kind: "cruise", origin: "Pier 9", destination: "Pier 9", start_local: "2025-12-09T16:00", start_zone: la, end_local: "2025-12-13T07:00", end_zone: la,
+      itinerary: [{ name: "Napa", zone: la, arrive_local: "2025-12-11T08:00", depart_local: "2025-12-11T17:00" }] });
+    const stays = [
+      { segment_id: 4, latitude: 36.6, longitude: -121.9, precision: "zip" as const },
+      { segment_id: 5, latitude: 38.58, longitude: -121.49, precision: "city" as const },
+      { segment_id: 6, latitude: 33.77, longitude: -118.19, precision: "city" as const },
+    ];
+    const stops = stopsOf(trip([car, ride, cruise]), { ...places, stays });
+    expect(stops.map((s) => [s.latitude, s.longitude])).toEqual([[36.6, -121.9], [38.2975, -122.2869], [38.58, -121.49], [33.77, -118.19], [38.2975, -122.2869]]);
+    expect(names(stops)).toEqual(["Depot Two", "Napa", "Sacramento", "Pier 9", "Napa"]);
+    expect(stops.map((s) => s.via)).toEqual([null, null, "train", null, "cruise"]);
+  });
+
   it("reads a cruise's ports in order", () => {
     const cruise = segment({ id: 4, kind: "cruise", origin: "San Francisco", destination: "San Francisco", start_local: "2025-12-06T16:00", start_zone: "America/Los_Angeles", end_local: "2025-12-13T07:00", end_zone: "America/Los_Angeles",
       itinerary: [{ name: "Napa", zone: "America/Los_Angeles", arrive_local: "2025-12-08T08:00", depart_local: "2025-12-08T17:00" }, { name: "Nowhere", zone: "UTC", arrive_local: "2025-12-09T08:00", depart_local: null }] });
