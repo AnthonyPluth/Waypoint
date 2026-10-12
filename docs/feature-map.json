@@ -1105,6 +1105,34 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/api/review/{id}/same",
+      "handler": "waypoint/server/api/review.py:api_review_same",
+      "web": [
+        "frontend/src/pages/Review.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/review/{id}/attach",
+      "handler": "waypoint/server/api/review.py:api_review_attach",
+      "web": [
+        "frontend/src/pages/Review.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py"
+      ],
+      "docs": [
+        "start/review"
+      ]
+    },
+    {
       "method": "GET",
       "path": "/api/review/{id}/preview",
       "handler": "waypoint/server/api/review.py:api_review_preview",

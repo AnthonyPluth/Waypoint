@@ -172,7 +172,7 @@ class Replies(DbCase):
                                                   last_scan=1790000000.0, created=1.0,
                                                   scan_summary='{"found":3,"read":2,"bookings":1,"review":1,"skipped":1,"capped":false}' if status == "connected" else None))
         reply = mailboxes.api_mailboxes(self.c, {}, {})
-        self.assertEqual(reply["mailboxes"][0]["scan_summary"], {"found": 3, "read": 2, "bookings": 1, "review": 1, "skipped": 1, "capped": False, "labels_dropped": 0, "triaged": 0, "total": 0, "not_travel": 0, "followups": 0, "with_facts": 0})
+        self.assertEqual(reply["mailboxes"][0]["scan_summary"], {"found": 3, "read": 2, "bookings": 1, "review": 1, "skipped": 1, "capped": False, "labels_dropped": 0, "triaged": 0, "total": 0, "not_travel": 0, "followups": 0, "with_facts": 0, "attached": 0})
         self.assertIsNone(reply["mailboxes"][1]["scan_summary"])
         self.assertEqual([m["status"] for m in reply["mailboxes"]], ["connected", "reconnect", "error"])
         self.check("GET /api/mailboxes", reply)
@@ -238,6 +238,14 @@ class Replies(DbCase):
         self.assertEqual([len(m["candidates"]) for m in held["matches"]], [2])
         self.check("GET /api/review", held)
         self.check("POST /api/review/{id}/match", review_api.api_review_match(self.c, {}, {"entry": 1, "segment_id": pair[0]}, str(held["matches"][0]["item_id"])))
+        review.add(self.c, box, "m10", "hotel.example", "2026-10-19", "no_markup", 1.0)
+        item = str(next(i["id"] for i in review_api.api_review(self.c, {}, {})["items"] if i["reason"] == "no_markup" and i["received"] == "2026-10-19"))
+        same = {**stay, "confirmation": "H88231", "provider": "Example Hotels"}
+        found = review_api.api_review_same(self.c, {}, same, item)
+        self.assertEqual(found["booking"]["segment_id"], pair[0])   # type: ignore[index]
+        self.check("POST /api/review/{id}/same", found)
+        self.check("POST /api/review/{id}/same", review_api.api_review_same(self.c, {}, {**same, "confirmation": "OTHER1"}, item))
+        self.check("POST /api/review/{id}/attach", review_api.api_review_attach(self.c, {}, same, item))
 
     def test_ai(self):
         self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))
@@ -455,7 +463,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/share",
                                      "GET /api/ai", "POST /api/ai", "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "DELETE /api/review/{id}",
-                                     "GET /api/review/{id}/preview", "POST /api/review/{id}/suggest",
+                                     "GET /api/review/{id}/preview", "POST /api/review/{id}/suggest", "POST /api/review/{id}/same", "POST /api/review/{id}/attach",
                                      "GET /api/people", "POST /api/people",
                                      "POST /api/people/{id}", "DELETE /api/people/{id}", "POST /api/people/{id}/claim",
                                      "GET /api/people/claim-suggestions", "POST /api/people/claim-suggestions/dismiss",

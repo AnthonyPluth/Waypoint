@@ -171,6 +171,20 @@ class OfflineRouteTests(ServerCase):
         self.assertNotIn(MESSAGE_CANARY, json.dumps(self.ok("ben")))
         self.assertNotIn(MESSAGE_CANARY, json.dumps(self.ok("cy")))
 
+    def test_several_emails_on_one_booking_are_all_in_the_device_copy_newest_first(self):
+        seg = self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
+        with db.session() as conn:
+            box = conn.execute(insert(Mailbox).values(owner_sub="sub-ana", address="ana-many@gmail.example", token=secretbox.encrypt("t"),
+                                                      status="connected", created=1.0)).lastrowid
+            for n, created in ((1, 10.0), (2, 30.0), (3, 20.0)):
+                stored_mail.put(conn, box, f"many{n}", {"subject": f"Email {n}", "sender_domain": "air.example", "received": "2026-10-01",
+                                                        "text": f"{MESSAGE_CANARY} {n}", "html": None, "truncated": False}, created)   # type: ignore[arg-type]
+                stored_mail.link(conn, seg["id"], box, f"many{n}")   # type: ignore[arg-type]
+        got = self.ok("ana")
+        self.assertEqual([e["subject"] for e in got["messages"][0]["emails"]], ["Email 2", "Email 3", "Email 1"])
+        self.assertEqual([e["images"] for e in got["messages"][0]["emails"]], [0, 0, 0])
+        self.assertNotIn(MESSAGE_CANARY, json.dumps(self.ok("ben")))
+
     def test_a_booking_with_no_stored_message_has_no_entry(self):
         self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
         self.assertEqual(self.ok("ana")["messages"], [])

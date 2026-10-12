@@ -129,12 +129,14 @@ Held = tuple[trips.SegmentIn, list[int]]
 
 def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking, again: bool = False,
                  touched: list[int] | None = None, fill_only: bool = False,
-                 held: list[Held] | None = None) -> Literal["added", "updated", "unchanged", "ambiguous"] | None:
+                 held: list[Held] | None = None) -> Literal["added", "updated", "unchanged", "ambiguous", "attached"] | None:
     found = fields(conn, b)
     if found is None:
         return None
     candidates: list[int] | None = [] if held is not None else None
     try:
+        if not again and trips.attach_to_same_booking(conn, viewer, found, touched):
+            return "attached"
         outcome = trips.merge_email_segment(conn, viewer, found, again, touched, fill_only, candidates)
         if outcome == "ambiguous" and held is not None and candidates:
             held.append((found, candidates))

@@ -8,7 +8,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import { forgetAirportZones } from "$lib/airport-zones";
-import type { Person, Review, ReviewItem, ReviewMatch, WhoIsThis } from "$lib/api-types";
+import type { Person, Review, ReviewCandidate, ReviewItem, ReviewMatch, WhoIsThis } from "$lib/api-types";
 import { setQuery } from "$lib/app.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { toast } from "svelte-sonner";
@@ -45,6 +45,9 @@ let takeOffFails = "";
 const ZONES: Record<string, string> = { BOS: "America/New_York", DEN: "America/Denver" };
 let truncated = false;
 let held: Review;
+let sameAs: ReviewCandidate | null = null;
+let sameFails = "";
+let sameQueue: (ReviewCandidate | null)[] = [];
 let calls: [string, string | undefined, unknown][];
 function serve(failOn?: string) {
   vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string; body?: unknown }) => {
@@ -55,6 +58,8 @@ function serve(failOn?: string) {
     if (path === "/api/state") return {} as never;
     if (path.startsWith("/api/airports/")) { const code = path.split("/")[3] ?? ""; if (!ZONES[code]) throw new Error("No such airport"); return { code, name: code, city: code, country: "US", zone: ZONES[code] } as never; }
     if (path === "/api/segments") { if (secondSegmentFails && segmentsMade === 1) throw new Error(secondSegmentFails); return { id: 42 + segmentsMade++ } as never; }
+    if (path.endsWith("/same")) { if (sameFails) throw new Error(sameFails); return { booking: sameQueue.length ? sameQueue.shift() ?? null : sameAs } as never; }
+    if (path.endsWith("/attach")) return { ok: true, segment_id: 99 } as never;
     if (path.endsWith("/preview")) { if (previewFails) throw new Error(previewFails); return { text: PREVIEW, html: null, truncated } as never; }
     if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestions: [SUGGESTION] })) }; return { ok: true } as never; }
     if (path.endsWith("/unignore")) return { started: true } as never;
@@ -69,7 +74,7 @@ function serve(failOn?: string) {
 }
 
 afterEach(() => { setQuery(""); });
-beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
+beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
@@ -386,7 +391,7 @@ describe("Review", () => {
   });
 
   it("says when a booking was added but its item couldn’t be taken off the list", async () => {
-    serve("/api/review/1");
+    serve("/api/review/1?");
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
     await userEvent.type(screen.getByLabelText("From (airport code)"), "BOS");
@@ -1224,5 +1229,79 @@ describe("Review: the form's explanatory text is gone", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     expect(await screen.findByText(/Enter the hotel’s time zone/)).toBeInTheDocument();
     expect(calls.some(([p]) => p === "/api/segments")).toBe(false);
+  });
+});
+
+describe("Review: a suggestion that is a booking already in your trips", () => {
+  const suggestion = { kind: "flight" as const, provider: "Example Air", confirmation: "QW4R7T", origin: "BOS", destination: "DEN",
+    start_local: "2026-12-02T07:15", end_local: "2026-12-02T10:05", flight_number: "EX 204" };
+  const back = { ...suggestion, origin: "DEN", destination: "BOS", start_local: "2026-12-08T16:20", end_local: "2026-12-08T21:50", flight_number: "EX 205" };
+  const existing = (): ReviewCandidate => ({ segment_id: 31, trip_id: 6, trip_name: "Denver in December", kind: "flight", provider: "Example Air", origin: "BOS", destination: "DEN",
+    start_local: "2026-12-02T07:15", end_local: "2026-12-02T10:05" });
+  const open = async (...legs: (typeof suggestion)[]) => {
+    held = { matches: [], items: [item({ suggestions: legs.length ? legs : [suggestion] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Add (to my trips|2 flights)$/ }));
+  };
+
+  it("adds as before, with one question to the server first, when it is not the same as anything", async () => {
+    await open();
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.map(([p]) => p).filter((p) => p.endsWith("/same") || p.endsWith("/attach") || p === "/api/segments")).toEqual(["/api/review/1/same", "/api/segments"]);
+    expect(screen.queryByTestId("same-booking")).toBeNull();
+  });
+
+  it("says so in the confirm step and adds nothing until the person chooses", async () => {
+    sameAs = existing();
+    await open();
+    const panel = await screen.findByTestId("same-booking");
+    expect(panel).toHaveTextContent("This looks like a booking you already have");
+    expect(panel).toHaveTextContent("Flight BOS → DEN on 2026-12-02 (Example Air), in Denver in December");
+    expect(screen.queryByRole("button", { name: "Add to my trips" })).toBeNull();
+    expect(calls.some(([p]) => p === "/api/segments" || p.endsWith("/attach"))).toBe(false);
+  });
+
+  it("adds the email to the existing booking instead of making another", async () => {
+    sameAs = existing();
+    await open();
+    await userEvent.click(await screen.findByRole("button", { name: "Add the email to that booking" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added the email to your existing booking"));
+    expect(calls.some(([p]) => p === "/api/segments")).toBe(false);
+    expect(calls.filter(([p]) => p.endsWith("/attach")).map(([p, m]) => [p, m])).toEqual([["/api/review/1/attach", "POST"]]);
+    expect(calls.some(([p, m]) => m === "DELETE" && p === "/api/review/1?segment=99")).toBe(true);
+  });
+
+  it("adds a separate booking when the person says it is another one", async () => {
+    sameAs = existing();
+    await open();
+    await userEvent.click(await screen.findByRole("button", { name: "Add as a separate booking" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.some(([p]) => p.endsWith("/attach"))).toBe(false);
+    expect(calls.filter(([p]) => p === "/api/segments")).toHaveLength(1);
+  });
+
+  it("goes back to the form from the confirm step", async () => {
+    sameAs = existing();
+    await open();
+    await userEvent.click(await screen.findByRole("button", { name: "Go back" }));
+    expect(screen.queryByTestId("same-booking")).toBeNull();
+    expect(screen.getByRole("button", { name: "Add to my trips" })).toBeInTheDocument();
+  });
+
+  it("shows the server's reason and adds nothing when the check fails", async () => {
+    sameFails = "The time zone is unknown.";
+    await open();
+    expect(await screen.findByRole("alert")).toHaveTextContent("The time zone is unknown.");
+    expect(calls.some(([p]) => p === "/api/segments")).toBe(false);
+  });
+
+  it("attaches the legs that match and adds the rest when there are several", async () => {
+    sameQueue = [existing(), null];
+    await open(suggestion, back);
+    await userEvent.click(await screen.findByRole("button", { name: "Add the email to that booking" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added 2 flights to your trips"));
+    expect(calls.filter(([p]) => p.endsWith("/attach"))).toHaveLength(1);
+    expect(calls.filter(([p]) => p === "/api/segments")).toHaveLength(1);
   });
 });

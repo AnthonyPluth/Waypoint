@@ -11,9 +11,9 @@ from ...domain.mail import ai, review, scan
 from ...providers import gmail
 from ...storage import db
 from ..common import NO_IMAGE, ApiError, Response, image_response, own_session, position, row_id
-from ..contract import Ignoring, Matched, MatchBody, Ok, Preview, Review, ReviewItem, ReviewMatch, WhoBody
+from ..contract import Attached, Ignoring, Matched, MatchBody, Ok, Preview, Review, ReviewCandidate, ReviewItem, ReviewMatch, SameBooking, SegmentBody, WhoBody
 from .mailboxes import owner
-from .trips import viewer
+from .trips import segment_fields, viewer
 
 NO_ITEM = "No such item"
 _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {limit} characters)")
@@ -61,6 +61,28 @@ def api_review_match(conn, _q, body: MatchBody, item_id: str) -> Ok:
     if settled is None:
         raise ApiError(NO_ITEM, 404)
     return {"ok": True}
+
+
+def api_review_same(conn, _q, body: SegmentBody, item_id: str) -> SameBooking:
+    fields = segment_fields(body)
+    try:
+        seen, found = review.same_booking(conn, owner(), viewer(conn), row_id(item_id, NO_ITEM), fields)
+    except trips.Invalid as e:
+        raise ApiError(str(e)) from e
+    if not seen:
+        raise ApiError(NO_ITEM, 404)
+    return {"booking": cast(ReviewCandidate, found) if found else None}
+
+
+def api_review_attach(conn, _q, body: SegmentBody, item_id: str) -> Attached:
+    fields = segment_fields(body)
+    try:
+        attached = review.attach(conn, owner(), viewer(conn), row_id(item_id, NO_ITEM), fields)
+    except trips.Invalid as e:
+        raise ApiError(str(e)) from e
+    if attached is None:
+        raise ApiError(NO_ITEM, 404)
+    return {"ok": True, "segment_id": attached}
 
 
 def api_review_ignore(conn, _q, _b, item_id: str) -> Ignoring:

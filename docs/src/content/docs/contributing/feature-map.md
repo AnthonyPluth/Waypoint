@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-86 routes; 0 have no test yet.
+88 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -82,6 +82,8 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/review/who/{id}` | `review.py:api_review_who` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `POST /api/review/{id}/ignore` | `review.py:api_review_ignore` | `lib/components/settings/ReviewGlance.svelte`, `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `POST /api/review/{id}/match` | `review.py:api_review_match` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
+| `POST /api/review/{id}/same` | `review.py:api_review_same` | `pages/Review.svelte` | `test_api_contract.py` | [start/review](/Waypoint/start/review/) |
+| `POST /api/review/{id}/attach` | `review.py:api_review_attach` | `pages/Review.svelte` | `test_api_contract.py` | [start/review](/Waypoint/start/review/) |
 | `GET /api/review/{id}/preview` | `review.py:api_review_preview` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `GET /api/review/{id}/images/{id}` | `review.py:api_review_image` | - | `test_mail_scan.py`, `test_mcp_routes.py` | [start/review](/Waypoint/start/review/) |
 | `POST /api/review/{id}/suggest` | `review.py:api_review_suggest` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |

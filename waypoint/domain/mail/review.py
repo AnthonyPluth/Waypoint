@@ -357,6 +357,30 @@ def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_
     return int(target)
 
 
+def same_booking(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, fields: trips.SegmentIn) -> tuple[bool, CandidateOut | None]:
+    if _seen_message(conn, owner, item_id) is None:
+        return False, None
+    found = trips.find_same_booking(conn, viewer, fields)
+    if found is None:
+        return True, None
+    trip = visibility.visible_trip(conn, viewer, found.trip_id)
+    return True, {"segment_id": found.id, "trip_id": found.trip_id, "trip_name": trip.name if trip else "", "kind": found.kind,
+                  "provider": found.provider, "origin": found.origin, "destination": found.destination,
+                  "start_local": found.start_local, "end_local": found.end_local}
+
+
+def attach(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, fields: trips.SegmentIn) -> int | None:
+    seen = _seen_message(conn, owner, item_id)
+    if seen is None:
+        return None
+    found = trips.find_same_booking(conn, viewer, fields)
+    if found is None:
+        raise trips.Invalid("That is no longer the same as a booking you can see")
+    trips.merge_email_segment(conn, viewer, fields, fill_only=True, into=found.id)
+    stored_mail.link(conn, found.id, *seen)
+    return int(found.id)
+
+
 def drop(conn: db.Connection, owner: str, item_id: int, entry_id: int) -> bool:
     row = _held(conn, owner, item_id)
     if row is None:

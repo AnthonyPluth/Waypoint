@@ -59,6 +59,7 @@ class Summary:
     not_travel: int = 0
     followups: int = 0
     with_facts: int = 0
+    attached: int = 0
 
 
 _running: set[int] = set()
@@ -108,7 +109,7 @@ def encode(found: Summary) -> str:
     return json.dumps({"found": found.found, "read": found.read, "bookings": found.bookings, "review": found.review,
                        "skipped": found.skipped, "capped": found.capped, "labels_dropped": found.labels_dropped,
                        "triaged": found.triaged, "total": found.total, "not_travel": found.not_travel,
-                       "followups": found.followups, "with_facts": found.with_facts}, separators=(",", ":"))
+                       "followups": found.followups, "with_facts": found.with_facts, "attached": found.attached}, separators=(",", ":"))
 
 
 def decode(text: str | None) -> Summary | None:
@@ -120,7 +121,7 @@ def decode(text: str | None) -> Summary | None:
     if not isinstance(raw, dict) or not all(isinstance(raw.get(k), int) and not isinstance(raw.get(k), bool) for k in counts) \
             or not isinstance(raw.get("capped"), bool):
         return None
-    extra = [raw.get(k, 0) for k in ("labels_dropped", "triaged", "total", "not_travel", "followups", "with_facts")]
+    extra = [raw.get(k, 0) for k in ("labels_dropped", "triaged", "total", "not_travel", "followups", "with_facts", "attached")]
     return Summary(raw["found"], raw["read"], raw["bookings"], raw["review"], raw["skipped"], raw["capped"],
                    *(n if isinstance(n, int) and not isinstance(n, bool) else 0 for n in extra))
 
@@ -196,7 +197,8 @@ def _keep_quietly(mailbox_id: int, message_id: str, raw: dict[str, Any], segment
 
 def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str, message: extract.Message,
           ignored: list[str], now: float, why: Counter[str] | None = None, again: bool = False,
-          backfill: bool = False, strong: bool = True, follow: list[followup.Followed] | None = None) -> tuple[int, int, list[int] | None, str | None]:
+          backfill: bool = False, strong: bool = True, follow: list[followup.Followed] | None = None,
+          joined: list[int] | None = None) -> tuple[int, int, list[int] | None, str | None]:
     why = Counter() if why is None else why
     if again:
         conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id))
@@ -217,6 +219,9 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
             failed += 1
             lacks.append(ingest.explain(conn, booking))
             why[lacks[-1]] += 1
+        elif filed == "attached":
+            if joined is not None:
+                joined.append(1)
         elif filed not in ("unchanged", "ambiguous"):
             made += 1
     if proposed:
@@ -341,7 +346,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             return Result("not_started", str(e))
         ignored = review.ignored(conn, mailbox_id)
     history, last_scan = row["history_id"], row["last_scan"]
-    read = made = queued = skipped = dropped = handled = total = not_travel = followups = with_facts = 0
+    read = made = queued = skipped = dropped = handled = total = not_travel = followups = with_facts = attached = 0
     started = _clock()
     forced: set[str] = set()
     strong = True
@@ -419,9 +424,10 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                         _record(conn, mailbox_id, message_id, IGNORED, now)
                 continue
             followed: list[followup.Followed] = []
+            joined: list[int] = []
             try:
                 with _filing, db.session() as conn:
-                    a, b, wanted, outcome = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, backfill, strong, followed)
+                    a, b, wanted, outcome = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, backfill, strong, followed, joined)
             except Exception as e:
                 if db.is_busy(e):
                     raise
@@ -441,6 +447,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 continue
             if followed:
                 followups, with_facts = followups + 1, with_facts + followed[0].new_facts
+            attached += bool(joined) and not a
             read, made, queued, handled = read + 1, made + a, queued + b, handled + 1
         if not again and not backfill:
             with db.session() as conn:
@@ -452,9 +459,9 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
         monitoring.report(e, values=False)
         return _fail(mailbox_id, FAILED_GENERALLY, (read, made, queued))
     if not again and not backfill:
-        remember(mailbox_id, Summary(len(pending), read, made, queued, skipped, capped, dropped, total - len(pending) + handled, total, not_travel, followups, with_facts))
+        remember(mailbox_id, Summary(len(pending), read, made, queued, skipped, capped, dropped, total - len(pending) + handled, total, not_travel, followups, with_facts, attached))
     monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {len(pending)} message(s) found, "
-                   f"{read} read, {made} booking(s) added or changed, {queued} to review, {f'{followups} follow-up(s) attached ({with_facts} with details not applied), ' if followups else ''}{skipped} skipped ({not_travel} as not travel){', more waiting' if capped else ''}.")
+                   f"{read} read, {made} booking(s) added or changed, {queued} to review, {f'{followups} follow-up(s) attached ({with_facts} with details not applied), ' if followups else ''}{f'{attached} email(s) attached to an existing booking, ' if attached else ''}{skipped} skipped ({not_travel} as not travel){', more waiting' if capped else ''}.")
     if why:
         monitoring.log("What stopped messages being read: " + "; ".join(f"{n} × {what}" for what, n in sorted(why.items())) + ".")
     return Result("done", None, read, made, queued, len(pending), skipped, capped)
