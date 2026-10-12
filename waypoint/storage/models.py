@@ -127,6 +127,9 @@ class Segment(Base):
     longitude: Mapped[float | None]
     geo_precision: Mapped[str | None]
     travelers_from_trip: Mapped[bool]
+    price_minor: Mapped[int | None]
+    price_currency: Mapped[str | None]
+    price_source: Mapped[str | None]
 
 
 class SegmentTraveler(Base):

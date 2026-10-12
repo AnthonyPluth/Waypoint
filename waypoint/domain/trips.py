@@ -13,7 +13,7 @@ from sqlalchemy import delete, select, update
 from .. import dates
 from ..storage import db, geocode, stored_mail
 from ..storage.models import Segment, SegmentPort, SegmentRecipient, SegmentTraveler, Trip
-from . import airports, links, logos, people, place_zones, regions, trippeople, visibility
+from . import airports, links, logos, money, people, place_zones, regions, trippeople, visibility
 from .visibility import Viewer
 
 Kind = Literal["flight", "hotel", "car", "train", "cruise", "parking"]
@@ -75,6 +75,11 @@ class PortIn(TypedDict):
     depart_local: str | None
 
 
+class PriceIn(TypedDict):
+    amount_minor: int
+    currency: str
+
+
 class SegmentIn(TypedDict, total=False):
     kind: str
     status: str
@@ -91,6 +96,7 @@ class SegmentIn(TypedDict, total=False):
     travelers: list[TravelerIn]
     itinerary: list[PortIn]
     check_times: bool
+    price: PriceIn | None
 
 
 class TripIn(TypedDict, total=False):
@@ -124,6 +130,23 @@ class CruiseDay(TypedDict):
     stops: list[CruiseStop]
 
 
+class PriceOut(TypedDict):
+    amount_minor: int
+    currency: str
+    source: Literal["email", "manual"]
+
+
+class CostTotal(TypedDict):
+    currency: str
+    amount_minor: int
+
+
+class CostsOut(TypedDict):
+    totals: list[CostTotal]
+    priced: int
+    bookings: int
+
+
 class SegmentOut(TypedDict):
     id: int
     trip_id: int
@@ -150,6 +173,7 @@ class SegmentOut(TypedDict):
     logo_label: str | None
     hotel_brand: str | None
     has_email: bool
+    price: PriceOut | None
     links: links.Links
 
 
@@ -166,6 +190,7 @@ class TripOut(TypedDict):
     emails: int
     can_clear_emails: bool
     people: list[int]
+    costs: CostsOut
     segments: list[SegmentOut]
 
 
@@ -449,6 +474,56 @@ def _keep_seats(given: list[TravelerIn], old: Sequence[TravelerIn]) -> list[Trav
     return [t if "seat" in t else {**t, "seat": seats.get(_who(t))} for t in given]
 
 
+def priced(seg: Segment) -> PriceOut | None:
+    if seg.price_minor is None or seg.price_currency is None or seg.price_source not in ("email", "manual"):
+        return None
+    return {"amount_minor": seg.price_minor, "currency": seg.price_currency, "source": cast(Literal["email", "manual"], seg.price_source)}
+
+
+def costs_of(segs: Sequence[SegmentOut]) -> CostsOut:
+    live = [s for s in segs if s["status"] != "cancelled"]
+    units: dict[str, bool] = {}
+    sums: dict[str, int] = {}
+    counts: dict[str, int] = {}
+    for s in live:
+        unit = f"{provider_key(s['provider'])}|{_code_key(s['confirmation'])}" if s["confirmation"] else f"#{s['id']}"
+        units[unit] = units.get(unit, False) or s["price"] is not None
+        if s["price"] is not None:
+            code = s["price"]["currency"]
+            sums[code] = sums.get(code, 0) + s["price"]["amount_minor"]
+            counts[code] = counts.get(code, 0) + 1
+    totals: list[CostTotal] = [{"currency": c, "amount_minor": sums[c]} for c in sorted(sums, key=lambda c: (-counts[c], c))]
+    return {"totals": totals, "priced": sum(units.values()), "bookings": len(units)}
+
+
+def check_price(given: PriceIn | None) -> PriceIn | None:
+    if given is None:
+        return None
+    if not money.valid(given.get("amount_minor"), given.get("currency")):
+        raise Invalid("The cost needs an amount and a three-letter currency code like USD")
+    return {"amount_minor": given["amount_minor"], "currency": given["currency"]}
+
+
+def email_price(given: PriceIn | None) -> PriceIn | None:
+    return given if given is not None and money.valid(given.get("amount_minor"), given.get("currency")) else None
+
+
+def set_price(seg: Segment, given: PriceIn | None, source: Literal["email", "manual"]) -> bool:
+    now = None if seg.price_minor is None else (seg.price_minor, seg.price_currency)
+    if given is None:
+        seg.price_minor = seg.price_currency = seg.price_source = None
+        return now is not None
+    if now == (given["amount_minor"], given["currency"]):
+        return False
+    seg.price_minor, seg.price_currency, seg.price_source = given["amount_minor"], given["currency"], source
+    return True
+
+
+def fill_price(seg: Segment, given: PriceIn | None) -> bool:
+    found = email_price(given)
+    return found is not None and seg.price_minor is None and set_price(seg, found, "email")
+
+
 def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[SegmentTraveler],
                   viewer: Viewer | None = None) -> list[SegmentOut]:
     ports = ports_of(conn, [s.id for s in segs if s.kind == "cruise"])
@@ -484,6 +559,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
          "logo_label": logos.chip(s.kind, s.origin, brand) if brand and logos.key(brand) in with_logo else None,
          "hotel_brand": logos.sub_brand(s.origin) if s.kind == "hotel" else None,
          "has_email": s.id in with_mail,
+         "price": priced(s),
          "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, details, s.origin)}
         for s, details, brand in zip(segs, decoded, brands, strict=True)]
     return sorted(out, key=lambda s: (instant(s["start_local"], s["start_zone"]), s["id"]))
@@ -504,7 +580,7 @@ def _trip_outs(conn: db.Connection, viewer: Viewer, trips: Sequence[Trip], today
     return [{"id": t.id, "name": t.name, "start_date": t.start_date, "end_date": t.end_date,
              "destination": t.destination, "destination_manual": t.destination_manual, "notes": t.notes, "auto": t.auto, "booked_by": t.booked_by,
              "emails": (n := emails_of_trip(t)), "can_clear_emails": n > 0 and emails_clearable(t, day),
-             "people": aboard[t.id], "segments": [s for s in outs if s["trip_id"] == t.id]} for t in trips]
+             "people": aboard[t.id], "costs": costs_of(mine := [s for s in outs if s["trip_id"] == t.id]), "segments": mine} for t in trips]
 
 
 def emails_clearable(trip: Trip, today: date) -> bool:
@@ -719,6 +795,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
                 source: Literal["manual", "email", "import"] = "manual") -> SegmentOut | None:
     _needs_person(viewer)
     values = check(conn, fields)
+    cost = email_price(fields.get("price")) if source == "email" else check_price(fields.get("price"))
     ports = check_itinerary(fields.get("kind") or "", fields.get("itinerary") or [], _span(values, "start"), _span(values, "end"))
     given = fields.get("travelers")
     travelers = _travelers(conn, given if given is not None else
@@ -744,6 +821,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
                     and set(named) <= _seen_by_bookings(conn, trip) | {viewer.person_id})
     seg = Segment(**values, **located(values), trip_id=trip.id, source=source, booked_by=viewer.person_id, locked_fields=None,
                   check_times=bool(fields.get("check_times")))
+    set_price(seg, cost, "email" if source == "email" else "manual")
     conn.orm.add(seg)
     conn.orm.flush()
     if for_everyone:
@@ -806,6 +884,8 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
     if "travelers" in changed:
         _set_travelers(conn, seg.id, travelers)
         trippeople.keep_lists_inside(conn, seg.trip_id)
+    if "price" in changes:
+        set_price(seg, check_price(changes["price"]), "manual")
     if any(f in changes for f in TIME_FIELDS):
         if seg.check_times:
             changed += [f for f in ("start_local", "end_local") if f not in changed]
@@ -984,6 +1064,9 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
             _set_travelers(conn, seg.id, [*old, *extra])
             trippeople.keep_lists_inside(conn, seg.trip_id)
             changed.append("travelers")
+    wanted = email_price(fields.get("price"))
+    if wanted is not None and (seg.price_minor is None or (seg.price_source == "email" and not fill_only)) and set_price(seg, wanted, "email"):
+        changed.append("price")
     conn.orm.flush()
     visibility.note_recipient(conn, viewer, seg)
     trip = conn.orm.get(Trip, seg.trip_id)

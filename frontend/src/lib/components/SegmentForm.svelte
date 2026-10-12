@@ -126,6 +126,14 @@
       {/if}
       <label class={label}><span class="font-medium">Manage link</span>
         <Input bind:value={d.manage_url} maxlength={500} autocomplete="off" spellcheck={false} placeholder="https://" /></label>
+      <fieldset class="flex flex-col gap-1.5 text-sm" data-cost>
+        <legend class="mb-1.5 font-medium">Cost</legend>
+        <div class="flex gap-3">
+          <Input class="min-w-0 flex-1" bind:value={d.cost} inputmode="decimal" autocomplete="off" spellcheck={false} placeholder="1,240.00" aria-label="Cost amount" />
+          <Input class="w-24 uppercase" bind:value={d.currency} maxlength={3} autocomplete="off" spellcheck={false} placeholder="USD" aria-label="Cost currency" />
+        </div>
+        <span class="text-muted-foreground">{d.costSource === "email" ? "Read from an email. Change it and your amount is kept: a later email won’t replace it. " : ""}The total for this booking, in its own currency (nothing is converted). Clear it to remove the cost.</span>
+      </fieldset>
       <fieldset class="flex flex-col gap-2 text-sm">
         <legend class="mb-1.5 font-medium">Who’s travelling</legend>
         {#each people as p (p.id)}

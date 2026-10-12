@@ -40,3 +40,25 @@ describe("SegmentForm: the explanatory text is gone", () => {
     await waitFor(() => expect(onsaved).not.toHaveBeenCalled());
   });
 });
+
+describe("SegmentForm: the cost", () => {
+  it("has an amount and a currency, filled from the booking, with a note when an email supplied it", () => {
+    mount(draft("hotel", { id: 5, cost: "310.00", currency: "EUR", costSource: "email" }));
+    expect(screen.getByLabelText("Cost amount")).toHaveValue("310.00");
+    expect(screen.getByLabelText("Cost currency")).toHaveValue("EUR");
+    expect(screen.getByText(/Read from an email\. Change it and your amount is kept/)).toBeInTheDocument();
+  });
+  it("says nothing about an email for a cost entered by hand or none, and starts in the given currency", () => {
+    mount(draft("hotel", { currency: "GBP" }));
+    expect(screen.getByLabelText("Cost amount")).toHaveValue("");
+    expect(screen.getByLabelText("Cost currency")).toHaveValue("GBP");
+    expect(screen.queryByText(/Read from an email/)).toBeNull();
+  });
+  it("refuses an amount it can't read, before saving", async () => {
+    const onsaved = vi.fn();
+    mount(draft("hotel", { start_zone: "Europe/London", cost: "abc" }), onsaved);
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Enter the cost as an amount like 1240.00");
+    expect(onsaved).not.toHaveBeenCalled();
+  });
+});

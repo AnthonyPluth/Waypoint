@@ -47,6 +47,10 @@ Waypoint tries the cheapest, most reliable method first and falls through (the g
 7. **A generic cruise reader** (built). For a cruise whose email has neither markup nor a vendor parser, Waypoint reads the ship, the cruise line, the embarkation and disembarkation port and date (and time, if given) and a booking number. It needs the ship or the line, both ports and both dates, the disembarkation after the embarkation and within 200 days; without times it takes noon to embark and 8:00 to disembark, and marks the booking as having no time recorded. Ports of call are not read.
 8. **A “Couldn’t read” review queue** (built). What neither method understands lands in a queue where you can read it in Waypoint, add the booking by hand, ignore the sender (and undo that later from Settings) or dismiss it. Nothing is guessed silently.
 
+## The total on a confirmation or receipt
+
+When a message is read for a booking, Waypoint also looks in it for the booking’s total and, if it finds a clearly labelled one, stores three things on the booking: the amount in the currency’s smallest unit, the currency code, and whether it came from an email or was entered by hand. Nothing else about the total is kept: not the line it was on, the label, or the rest of the message. A follow-up to a booking you can already see (one that names its confirmation code, as described above) can add a missing total in the same way; the follow-up itself is still remembered only by its Gmail id and the booking’s id. Amounts are never converted and nothing is sent anywhere to read them. The cost is visible to exactly the people who see the booking. See [Cost](/Waypoint/start/trips/#cost).
+
 ## Languages the generic readers understand
 
 | Reader | English | French | German | Spanish | Japanese |
@@ -66,7 +70,7 @@ Off by default (Settings → Mail and AI → AI; see [AI suggestions](/Waypoint/
 - **Local:** an [Ollama](https://ollama.com) on your own network. The email text never leaves it.
 - **Hosted:** [OpenRouter](https://openrouter.ai), restricted to providers with zero data retention (every request denies data collection and requires zero retention).
 
-Only the plain text goes out, with every email address (the sender’s, the recipient’s, those in a forwarded message’s header lines) replaced by `[email]`, quoted replies and footers removed, and labelled or number-shaped loyalty, Known Traveler and card numbers removed (as well as the numbers saved under Loyalty). Either way the suggestion is a draft for you to confirm, not something Waypoint saves on its own, and prompts and replies are never logged.
+The suggestion may include the booking's total and its currency, when the email prints them (see [AI suggestions](/Waypoint/start/ai/#what-comes-back)); that adds two fields to the reply, not to what is sent. Only the plain text goes out, with every email address (the sender’s, the recipient’s, those in a forwarded message’s header lines) replaced by `[email]`, quoted replies and footers removed, and labelled or number-shaped loyalty, Known Traveler and card numbers removed (as well as the numbers saved under Loyalty). Either way the suggestion is a draft for you to confirm, not something Waypoint saves on its own, and prompts and replies are never logged.
 
 The same setting powers one small button that doesn’t involve email at all: the sparkle beside a trip’s destination, which asks the model for a short subtitle such as “Colorado & Texas”. It sends only the trip’s name (without its dates) and the cities, states and countries of its bookings, in order, with the kind of booking: no email text, confirmation code, name, email address, street address or loyalty number, and only when you press it. See [AI suggestions](/Waypoint/start/ai/#the-destination-button-on-a-trip).
 

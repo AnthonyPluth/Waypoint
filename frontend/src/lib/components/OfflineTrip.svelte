@@ -5,6 +5,7 @@
   import PassCard from "$lib/components/PassCard.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import { Button } from "$lib/components/ui/button";
+  import { countNote, formatMoney, formatTotals } from "$lib/money";
   import { ago, type SavedCopy } from "$lib/offline";
   import { bookingCards, dateLabel, dayLabel, headline, showBookingTravellers, showTripTravellers, tripTravellers } from "$lib/trips";
   import WifiOff from "@lucide/svelte/icons/wifi-off";
@@ -40,6 +41,9 @@
   {#if showTripTravellers(everyone, null)}
     <p class="text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
   {/if}
+  {#if trip.costs?.totals.length}
+    <p class="text-sm" data-trip-total><span class="eyebrow">Total</span> <span class="font-medium">{formatTotals(trip.costs.totals)}</span>{#if countNote(trip.costs)}<span class="text-muted-foreground"> · {countNote(trip.costs)}</span>{/if}</p>
+  {/if}
   {#if trip.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{trip.notes}</p>{/if}
 </div>
 
@@ -74,6 +78,7 @@
           {#each card.segments as b (b.id)}
             <div class="flex flex-col gap-2" data-booking>
               {#if card.segments.length > 1 && b.confirmation}<p class="text-lg"><CopyCode code={b.confirmation} /></p>{/if}
+              {#if card.segments.length > 1 && b.price}<p class="text-sm" data-cost><span class="eyebrow">Cost</span> <span class="font-medium" class:line-through={b.status === "cancelled"}>{formatMoney(b.price.amount_minor, b.price.currency)}</span></p>{/if}
               {#if b.details.phone}<p class="text-sm"><span class="eyebrow">Phone</span> <a class="underline underline-offset-2" href={b.links.call ?? `tel:${b.details.phone}`}>{b.details.phone}</a></p>{/if}
               {#if b.travelers.length && showBookingTravellers(b, everyone)}
                 <h3 class="eyebrow">Travellers</h3>

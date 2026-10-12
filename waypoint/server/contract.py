@@ -177,6 +177,8 @@ class AiSuggestion(TypedDict):
     deck: NotRequired[str]
     flight_number: NotRequired[str]
     cabin: NotRequired[str]
+    price_minor: NotRequired[int]
+    price_currency: NotRequired[str]
     sources: NotRequired[dict[str, str]]
 
 
@@ -419,6 +421,28 @@ class CruiseDay(TypedDict):
     stops: list[CruiseStop]
 
 
+class Price(TypedDict):
+    amount_minor: int
+    currency: str
+    source: Literal["email", "manual"]
+
+
+class PriceBody(TypedDict):
+    amount_minor: int
+    currency: str
+
+
+class CostTotal(TypedDict):
+    currency: str
+    amount_minor: int
+
+
+class TripCosts(TypedDict):
+    totals: list[CostTotal]
+    priced: int
+    bookings: int
+
+
 class Segment(TypedDict):
     id: int
     trip_id: int
@@ -445,6 +469,7 @@ class Segment(TypedDict):
     logo_label: str | None
     hotel_brand: str | None
     has_email: bool
+    price: Price | None
     links: SegmentLinks
 
 
@@ -461,6 +486,7 @@ class Trip(TypedDict):
     emails: int
     can_clear_emails: bool
     people: list[int]
+    costs: TripCosts
     segments: list[Segment]
 
 
@@ -561,6 +587,7 @@ class SegmentBody(TypedDict):
     manage_url: NotRequired[str | None]
     travelers: NotRequired[list[TravelerBody]]
     itinerary: NotRequired[list[Port]]
+    price: NotRequired[PriceBody | None]
 
 
 class SegmentEdit(TypedDict):
@@ -578,6 +605,7 @@ class SegmentEdit(TypedDict):
     manage_url: NotRequired[str | None]
     travelers: NotRequired[list[TravelerBody]]
     itinerary: NotRequired[list[Port]]
+    price: NotRequired[PriceBody | None]
 
 
 class Airport(TypedDict):
