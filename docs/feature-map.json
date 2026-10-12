@@ -665,6 +665,7 @@
         "frontend/src/lib/components/settings/HomeSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_home.py",
         "tests/test_mcp_routes.py"
       ],
@@ -680,6 +681,7 @@
         "frontend/src/lib/components/settings/HomeSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_home.py",
         "tests/test_mcp_routes.py",
         "tests/test_trip_destination.py"
@@ -696,6 +698,7 @@
         "frontend/src/lib/components/settings/HomeSection.svelte"
       ],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_home.py",
         "tests/test_mcp_routes.py"
       ],

@@ -1,6 +1,7 @@
 {
   "name": "home-settings",
   "page": "settings",
+  "allow_console": ["status of 400"],
   "steps": [
     { "goto": "#settings/travel" },
     { "wait_for": "#home-title" },

@@ -17,8 +17,8 @@ beforeEach(() => vi.mocked(api).mockReset());
 
 describe("Settings → Home", () => {
   it("starts empty with the household's country filled in, and saves what is typed", async () => {
-    vi.mocked(api).mockImplementation(async (_p: string, opts?: { method?: string; body?: Record<string, string> }) =>
-      (opts?.method === "POST" ? { ...opts.body, saved: true, placed: true } : empty) as never);
+    vi.mocked(api).mockImplementation(async (_p: string, opts?: { method?: string; body?: unknown }) =>
+      (opts?.method === "POST" ? { ...(opts.body as object), saved: true, placed: true } : empty) as never);
     render(HomeSection);
     expect(await screen.findByLabelText("City")).toHaveValue("");
     expect(screen.getByLabelText("Country code")).toHaveValue("US");

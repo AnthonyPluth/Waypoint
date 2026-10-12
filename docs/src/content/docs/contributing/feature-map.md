@@ -51,9 +51,9 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/stats` | `stats.py:api_stats` | `lib/components/YearInReview.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `GET /api/distance-unit` | `stats.py:api_distance_unit` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `POST /api/distance-unit` | `stats.py:api_distance_unit_save` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
-| `GET /api/home` | `home.py:api_home` | `lib/components/settings/HomeSection.svelte` | `test_home.py`, `test_mcp_routes.py` | [start/trips](/Waypoint/start/trips/) |
-| `POST /api/home` | `home.py:api_home_save` | `lib/components/settings/HomeSection.svelte` | `test_home.py`, `test_mcp_routes.py`, `test_trip_destination.py` | [start/trips](/Waypoint/start/trips/) |
-| `DELETE /api/home` | `home.py:api_home_clear` | `lib/components/settings/HomeSection.svelte` | `test_home.py`, `test_mcp_routes.py` | [start/trips](/Waypoint/start/trips/) |
+| `GET /api/home` | `home.py:api_home` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py` | [start/trips](/Waypoint/start/trips/) |
+| `POST /api/home` | `home.py:api_home_save` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py`, `test_trip_destination.py` | [start/trips](/Waypoint/start/trips/) |
+| `DELETE /api/home` | `home.py:api_home_clear` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/flight-status` | `flightstatus.py:api_flight_statuses` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py`, `test_mcp_routes.py` | [start/flight-status](/Waypoint/start/flight-status/) |
 | `POST /api/flight-status/{id}` | `flightstatus.py:api_flight_status_refresh` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py`, `test_mcp.py` | [start/flight-status](/Waypoint/start/flight-status/) |
 | `GET /api/loyalty/{id}/logo` | `logos.py:api_loyalty_logo` | - | `test_loyalty.py` | [start/loyalty](/Waypoint/start/loyalty/) |
