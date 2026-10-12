@@ -128,6 +128,46 @@ class RedactTests(unittest.TestCase):
                 self.assertNotIn("1234567", out)
                 self.assertIn(ai.REMOVED, out)
 
+    def test_email_addresses_are_removed_wherever_they_are_written(self):
+        cases = {
+            "Write to jane.doe@example.com for help": "Write to [email] for help",
+            "From: Jane Doe <jane.doe@mail.example.co.uk>\nTo: Bob <bob@example.org>\nDate: Mon, 5 Oct 2026 10:30":
+                "From: Jane Doe [email]\nTo: Bob [email]\nDate: Mon, 5 Oct 2026 10:30",
+            "JANE.DOE@EXAMPLE.COM": "[email]",
+            "jane+trips.2026@example.com": "[email]",
+            "Send it to jane@example.com.": "Send it to [email].",
+            "Send it to jane@example.com, then wait": "Send it to [email], then wait",
+            "a@one.example.com; b@two.example.org and c@three.io": "[email]; [email] and [email]",
+            "Click mailto:jane@example.com?subject=Trip": "Click [email]?subject=Trip",
+            '"Jane" <jane@example.com>': '"Jane" [email]',
+            "(jane@example.com)": "([email])",
+        }
+        for text, want in cases.items():
+            with self.subTest(text=text):
+                self.assertEqual(ai.redact(text), want)
+
+    def test_email_addresses_in_a_forward_header_block_do_not_survive(self):
+        text = ("Booked.\n---------- Forwarded message ---------\nFrom: Example Air <noreply@example-air.example.com>\n"
+                "Date: Mon, Oct 5, 2026 at 10:30 AM\nSubject: Your trip\nTo: Jane <jane.doe+travel@example.com>\n"
+                "Cc: bob@example.org\n\nConfirmation code: QW4R7T")
+        out = ai.redact(text)
+        self.assertNotIn("@", out)
+        for kept in ("Example Air", "Date: Mon, Oct 5, 2026 at 10:30 AM", "QW4R7T"):
+            self.assertIn(kept, out)
+
+    def test_an_address_is_removed_before_the_number_rules_run(self):
+        out = ai.redact("Contact 12345678901@example.com and FXLOY-4400123@example.com", known=("ZZZZ-9999",))
+        self.assertEqual(out, "Contact [email] and [email]")
+
+    def test_the_households_saved_numbers_path_also_removes_addresses(self):
+        out = ai.redact("Member FX LOY-44 00123 mail jane@example.com", known=("FXLOY-4400123",))
+        self.assertEqual(out, f"Member {ai.REMOVED} mail [email]")
+
+    def test_things_that_are_not_addresses_stay(self):
+        text = ("Depart 10:30, follow @airline on social, meet @ gate B7, flight EX 303 @10:30.\n"
+                "Hotel website: www.harbour-hotel.example.com, harbour-hotel.example.com/book\nPhone: +44 117 555 0100\nuser@localhost")
+        self.assertEqual(ai.redact(text), text)
+
     def test_only_so_much_goes_out(self):
         self.assertEqual(len(ai.redact("word " * 10_000)), ai.MAX_SENT)
         self.assertEqual(ai.redact("   \n"), "")
@@ -464,6 +504,20 @@ class SuggestTests(unittest.TestCase):
         self.assertFalse(ai.request(self.router, "text")[3] and not ai.HOSTS.allow_http)
         self.assertEqual(ai.Hosts().openrouter, "https://openrouter.ai/api/v1")
         self.assertFalse(ai.Hosts().allow_http)
+
+    def test_an_email_address_in_the_body_never_reaches_the_request(self):
+        address = "canary.traveller+5k2m@canary-mail.example.com"
+        text = (f"From: Example Air <{address}>\nTo: {address.upper()}\nConfirmation code: QW4R7T flight BOS DEN\n"
+                f"Questions: mailto:{address}")
+        for cfg in (self.local, self.router):
+            self.fake.reset()
+            with no_leaks(self, address, address.upper(), "canary-mail"):
+                reading = ai.suggest(cfg, text)
+            sent = json.dumps(self.fake.requests[0][2])
+            self.assertNotIn("canary", sent)
+            self.assertNotIn("@", sent.replace(ai.SYSTEM, ""))
+            self.assertIn(ai.EMAIL_REMOVED, sent)
+            self.assertEqual(reading.bookings, [GOOD])
 
     def test_what_is_sent_is_the_redacted_text_only(self):
         ai.suggest(self.local, f"Confirmation code: QW4R7T BOS DEN\nKnown Traveler Number: TT87654321\n> {QUOTED}")

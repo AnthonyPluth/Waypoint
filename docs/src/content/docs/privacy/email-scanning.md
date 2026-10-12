@@ -65,7 +65,7 @@ Off by default (Settings → Mail and AI → AI; see [AI suggestions](/Waypoint/
 - **Local:** an [Ollama](https://ollama.com) on your own network. The email text never leaves it.
 - **Hosted:** [OpenRouter](https://openrouter.ai), restricted to providers with zero data retention (every request denies data collection and requires zero retention).
 
-Only the plain text goes out, with quoted replies, footers and labelled or number-shaped loyalty, Known Traveler and card numbers removed (as well as the numbers saved under Loyalty). Either way the suggestion is a draft for you to confirm, not something Waypoint saves on its own, and prompts and replies are never logged.
+Only the plain text goes out, with every email address (the sender’s, the recipient’s, those in a forwarded message’s header lines) replaced by `[email]`, quoted replies and footers removed, and labelled or number-shaped loyalty, Known Traveler and card numbers removed (as well as the numbers saved under Loyalty). Either way the suggestion is a draft for you to confirm, not something Waypoint saves on its own, and prompts and replies are never logged.
 
 ## What this means for the rest of the setup
 
