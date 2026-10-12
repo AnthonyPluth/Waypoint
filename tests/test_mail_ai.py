@@ -935,5 +935,119 @@ class ScanAddressTests(ScanAiCase):
         self.assertEqual((item["suggestions"], item["suggestion_error"]), ([STAY], None))
 
 
+SEAT_SENT = "Confirmation code: QW4R7T\nFlight BOS to DEN\nPassengers\nAda Example   Seat 23A\nBen Sample   Seat 23B\nCy Invented   no seat yet\n"
+
+
+class SeatTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.fake = serve_fake_ai(cls)
+
+    def setUp(self):
+        self.fake.reset()
+        self.local = ai.Config("local", "llama3", url=self.fake.url)
+        self.router = ai.Config("openrouter", "some/model", key=KEY)
+        patch = mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True))
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def read(self, travelers, sent=SEAT_SENT, cfg=None, base=GOOD):
+        self.fake.content = json.dumps({"bookings": [{**base, "travelers": travelers}]})
+        return ai.suggest(cfg or self.local, sent).bookings[0]
+
+    def test_ollama_is_asked_for_seats_and_each_seat_lands_on_its_traveller(self):
+        found = self.read([{"name": "Ada Example", "seat": "23A"}, {"name": "ben sample", "seat": "23 b"}])
+        self.assertEqual(found["travelers"], [{"name": "Ada Example", "seat": "23A"}, {"name": "ben sample", "seat": "23B"}])
+        system = self.fake.requests[0][2]["messages"][0]["content"]
+        self.assertEqual(system, ai.SYSTEM + ai.SYSTEM_SEATS)
+        self.assertIn("never choose, guess, assign or suggest a seat", system)
+
+    def test_openrouter_is_not_asked_and_ignores_seats_it_is_given(self):
+        found = self.read([{"name": "Ada Example", "seat": "23A"}], cfg=self.router)
+        self.assertEqual(found, GOOD)
+        self.assertEqual(self.fake.requests[0][2]["messages"][0]["content"], ai.SYSTEM)
+        self.assertNotIn("travelers", self.fake.requests[0][2]["messages"][0]["content"])
+
+    def test_a_seat_or_name_that_is_not_in_the_text_is_dropped_and_the_rest_kept(self):
+        found = self.read([{"name": "Ada Example", "seat": "23A"}, {"name": "Ben Sample", "seat": "31F"}, {"name": "Dee Madeup", "seat": "23B"},
+                           {"name": "Cy Invented", "seat": "9Z"}])
+        self.assertEqual(found["travelers"], [{"name": "Ada Example", "seat": "23A"}])
+        self.assertEqual({k: v for k, v in found.items() if k != "travelers"}, GOOD)
+
+    def test_nothing_valid_leaves_the_suggestion_without_travellers(self):
+        for bad in ([{"name": "Dee Madeup", "seat": "23A"}], [{"name": "Ada Example", "seat": "row 23"}], [{"name": "Ada Example"}], ["Ada Example"],
+                    "Ada Example 23A", [{"name": "Ada Example", "seat": 23}], []):
+            self.assertEqual(self.read(bad), GOOD)
+
+    def test_a_seat_must_stand_alone_in_the_text(self):
+        self.assertEqual(self.read([{"name": "Ada Example", "seat": "3A"}], sent=SEAT_SENT.replace("23A", "123A")), GOOD)
+        self.assertEqual(self.read([{"name": "Ada Example", "seat": "23A"}], sent=SEAT_SENT.replace("23A", "23AB")), GOOD)
+
+    def test_duplicate_or_ambiguous_names_and_shared_seats_are_dropped(self):
+        found = self.read([{"name": "Ada Example", "seat": "23A"}, {"name": "ADA  example", "seat": "23A"}, {"name": "Ben Sample", "seat": "23B"}])
+        self.assertEqual(found["travelers"], [{"name": "Ben Sample", "seat": "23B"}])
+        found = self.read([{"name": "Ada Example", "seat": "23A"}, {"name": "Ben Sample", "seat": "23A"}], sent="Confirmation code: QW4R7T Flight BOS to DEN Ada Example Ben Sample Seat 23A")
+        self.assertNotIn("travelers", found)
+
+    def test_swapped_seats_between_two_passengers_are_dropped(self):
+        found = self.read([{"name": "Ada Example", "seat": "23B"}, {"name": "Ben Sample", "seat": "23A"}])
+        self.assertNotIn("travelers", found)
+        self.assertEqual(found, GOOD)
+
+    def test_a_seat_beside_its_name_is_kept_on_the_same_line_the_next_line_or_in_a_table(self):
+        both = [{"name": "Ada Example", "seat": "23A"}, {"name": "Ben Sample", "seat": "23B"}]
+        for layout in ("Ada Example Seat 23A Ben Sample Seat 23B", "Ada Example\n23A\nBen Sample\n23B\n", "Passenger  Seat\nAda Example  23A\nBen Sample  23B\n",
+                       "23A Ada Example\n23B Ben Sample\n"):
+            found = self.read(both, sent="Confirmation code: QW4R7T\nFlight BOS to DEN\n" + layout)
+            self.assertEqual(found["travelers"], both, layout)
+
+    def test_a_seat_far_from_its_name_is_dropped_and_the_rest_kept(self):
+        sent = "Confirmation code: QW4R7T\nFlight BOS to DEN\nAda Example\n\nBaggage and check-in information for every passenger.\nSeat 23A"
+        found = self.read([{"name": "Ada Example", "seat": "23A"}], sent=sent)
+        self.assertEqual(found, GOOD)
+        sent = "Confirmation code: QW4R7T\nFlight BOS to DEN\nAda Example " + "x" * 80 + " Seat 23A"
+        self.assertEqual(self.read([{"name": "Ada Example", "seat": "23A"}], sent=sent), GOOD)
+
+    def test_too_many_travellers_is_no_seats(self):
+        sent = SEAT_SENT + "".join(f"Person{n} Name{n} Seat {n}C\n" for n in range(1, 14))
+        crowd = [{"name": f"Person{n} Name{n}", "seat": f"{n}C"} for n in range(1, 14)]
+        self.assertEqual(self.read(crowd, sent=sent), GOOD)
+
+    def test_only_a_flight_takes_seats(self):
+        found = self.read([{"name": "Ada Example", "seat": "23A"}], sent="Ada Example 23A\n" + STAY_SENT, base=STAY)
+        self.assertNotIn("travelers", found)
+
+
+class ScanSeatTests(ScanAiCase):
+    CANARY = "CANARY-BODY-SEATS-AI-9V3C"
+    TRAVELERS = [{"name": "Ada Example", "seat": "23A"}, {"name": "Ben Sample", "seat": "23B"}]
+
+    def unreadable(self) -> bytes:
+        raw = RoundTripScanTests.unreadable(self)
+        return raw.replace(b"Outbound to Denver", b"Ada Example Seat 23A Ben Sample Seat 23B Outbound to Denver", 1)
+
+    def ask_with(self, mode):
+        self.turn_on(mode)
+        self.add_mail("seats", self.unreadable())
+        self.fake.content = json.dumps({"bookings": [{**OUTBOUND, "travelers": self.TRAVELERS}]})
+        with no_leaks(self, self.CANARY, database=self.path, sent_ok=True):
+            self.assertEqual(self.scan().review, 1)
+        return self.items()[0]
+
+    def test_with_ollama_the_seats_reach_the_stored_suggestion_for_a_person_to_check(self):
+        item = self.ask_with("local")
+        self.assertEqual(item["suggestions"], [{**OUTBOUND, "travelers": self.TRAVELERS}])
+        self.assertIn(ai.SYSTEM_SEATS, self.fake.requests[0][2]["messages"][0]["content"])
+
+    def test_with_openrouter_nothing_about_seats_is_asked_or_kept(self):
+        with db.session() as conn:
+            db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "some/model")
+            db.set_setting(conn, sk.AI_OPENROUTER_KEY, KEY)
+        with mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True)):
+            item = self.ask_with("openrouter")
+        self.assertEqual(item["suggestions"], [OUTBOUND])
+        self.assertNotIn("travelers", json.dumps(self.fake.requests[0][2]))
+
+
 if __name__ == "__main__":
     unittest.main()

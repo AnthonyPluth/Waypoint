@@ -3204,6 +3204,12 @@
           "cabin": {
             "type": "string"
           },
+          "travelers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiTraveler"
+            }
+          },
           "price_minor": {
             "type": "integer"
           },
@@ -3222,6 +3228,22 @@
           "origin",
           "start_local",
           "end_local"
+        ],
+        "additionalProperties": false
+      },
+      "AiTraveler": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "seat": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "seat"
         ],
         "additionalProperties": false
       },

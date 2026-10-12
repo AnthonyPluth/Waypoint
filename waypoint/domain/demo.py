@@ -255,7 +255,8 @@ FAMILY_SEATS = {"DL 1412": ("22A", "22B", "22C"), "AA 101": ("31A", "31B", "31C"
 def _round_trip(today: date) -> list[ai.Suggestion]:
     out, back = today + timedelta(days=30), today + timedelta(days=36)
     return [{"kind": "flight", "provider": "Example Air", "confirmation": "DEMO99", "origin": "BOS", "destination": "DEN", "flight_number": "EX 204",
-             "cabin": "Economy", "start_local": f"{out:%Y-%m-%d}T07:15", "end_local": f"{out:%Y-%m-%d}T10:05"},
+             "cabin": "Economy", "start_local": f"{out:%Y-%m-%d}T07:15", "end_local": f"{out:%Y-%m-%d}T10:05",
+             "travelers": [{"name": "Jane Doe", "seat": "14A"}, {"name": "Mia Doe", "seat": "14B"}]},
             {"kind": "flight", "provider": "Example Air", "confirmation": "DEMO99", "origin": "DEN", "destination": "BOS", "flight_number": "EX 205",
              "cabin": "Economy", "start_local": f"{back:%Y-%m-%d}T16:20", "end_local": f"{back:%Y-%m-%d}T21:50"}]
 
