@@ -11,7 +11,7 @@ from .common import ApiError, server_error
 from .api.ai import api_ai, api_ai_save
 from .api.backups import api_backup, api_backup_inspect, api_restore
 from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_edit, api_segment_email_image, api_segment_emails, api_segment_move, api_segment_remove, api_trip,
-                        api_trip_add, api_trip_edit, api_trip_merge, api_trip_places, api_trip_remove, api_trip_split, api_trips)
+                        api_trip_add, api_trip_edit, api_trip_emails_clear, api_trip_merge, api_trip_places, api_trip_remove, api_trip_split, api_trips)
 from .api.flight_import import api_import, api_import_preview
 from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
 from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loyalty_remove, api_loyalty_reveal
@@ -50,6 +50,7 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/trips/{id}/places", api_trip_places),
     ("POST", "/api/trips/{id}", api_trip_edit),
     ("DELETE", "/api/trips/{id}", api_trip_remove),
+    ("POST", "/api/trips/{id}/emails/clear", api_trip_emails_clear),
     ("POST", "/api/trips/{id}/merge", api_trip_merge),
     ("POST", "/api/trips/{id}/split", api_trip_split),
     ("POST", "/api/segments", api_segment_add),

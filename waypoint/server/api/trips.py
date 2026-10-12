@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import date
 from typing import Any
 from urllib.parse import urlsplit
 
-from ... import validate
+from ... import monitoring, validate
 from ...domain import airports, people, tripmap, trips
 from ...domain.visibility import Viewer
 from ..common import NO_IMAGE, ApiError, Response, _current, image_response, position, row_id
-from ..contract import (Airport, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
+from ..contract import (Airport, EmailsCleared, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
                         TripList, TripPlaces)
 
 NAME_LIMIT = 100
@@ -160,6 +161,13 @@ def api_trip_remove(conn, _q, _b, trip_id) -> Ok:
     if not trips.delete_trip(conn, who, row_id(trip_id, NO_TRIP)):
         raise ApiError(NO_TRIP, 404)
     return {"ok": True}
+
+
+def api_trip_emails_clear(conn, _q, _b, trip_id) -> EmailsCleared:
+    who, this = viewer(conn), row_id(trip_id, NO_TRIP)
+    removed = _run(lambda: trips.clear_emails(conn, who, this, date.today()), NO_TRIP)
+    monitoring.log(f"Removed {removed} saved emails of a trip")
+    return {"removed": removed}
 
 
 def api_trip_merge(conn, _q, body: MergeBody, trip_id) -> Trip:

@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import delete, select, update
 
+from .. import dates
 from ..storage import db, stored_mail
 from ..storage.models import Segment, SegmentPort, SegmentTraveler, Trip
 from . import airports, links, logos, people, place_zones, visibility
@@ -21,6 +22,7 @@ KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train", "cruise", "parking
 STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
 TIME_UNKNOWN = "time_unknown"
 ADDRESS_LIMIT = 300
+EMAILS_CLEARABLE_AFTER_DAYS = 7
 MAX_PORTS = 40
 SEAT_LIMIT = 10
 DETAIL_KEYS = ("flight_number", "terminal", "seat", "seat_position", "aircraft", "cabin", "room", "car_class", "address", "phone", "ship", "deck", "space_type", "vehicle", "notes", TIME_UNKNOWN)
@@ -146,6 +148,8 @@ class TripOut(TypedDict):
     notes: str | None
     auto: bool
     booked_by: int | None
+    emails: int
+    can_clear_emails: bool
     segments: list[SegmentOut]
 
 
@@ -457,13 +461,22 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
     return sorted(out, key=lambda s: (instant(s["start_local"], s["start_zone"]), s["id"]))
 
 
-def _trip_outs(conn: db.Connection, viewer: Viewer, trips: Sequence[Trip]) -> list[TripOut]:
+def _trip_outs(conn: db.Connection, viewer: Viewer, trips: Sequence[Trip], today: date | None = None) -> list[TripOut]:
     segs = visibility.visible_segments(conn, viewer, [t.id for t in trips])
     travs = visibility.visible_travelers(conn, viewer, [s.id for s in segs])
     outs = _segment_outs(conn, segs, travs, viewer)
+    kept = stored_mail.message_ids(conn, [s.id for s in segs])
+    day = today or date.today()
+    def emails_of_trip(trip: Trip) -> int:
+        return len({m for s in segs if s.trip_id == trip.id for m in kept.get(s.id, ())})
     return [{"id": t.id, "name": t.name, "start_date": t.start_date, "end_date": t.end_date,
              "destination": t.destination, "notes": t.notes, "auto": t.auto, "booked_by": t.booked_by,
+             "emails": (n := emails_of_trip(t)), "can_clear_emails": n > 0 and emails_clearable(t, day),
              "segments": [s for s in outs if s["trip_id"] == t.id]} for t in trips]
+
+
+def emails_clearable(trip: Trip, today: date) -> bool:
+    return trip.end_date is not None and (today - dates.parse_day(trip.end_date)).days >= EMAILS_CLEARABLE_AFTER_DAYS
 
 
 def listing(conn: db.Connection, viewer: Viewer) -> list[TripOut]:
@@ -846,6 +859,16 @@ def emails_of(conn: db.Connection, viewer: Viewer, segment_id: int) -> list[stor
 def email_image_of(conn: db.Connection, viewer: Viewer, segment_id: int, email: int, index: int) -> stored_mail.Image | None:
     seg = visibility.visible_segment(conn, viewer, segment_id)
     return None if seg is None else stored_mail.image_for_segment(conn, seg.id, email, index)
+
+
+def clear_emails(conn: db.Connection, viewer: Viewer, trip_id: int, today: date) -> int | None:
+    trip = visibility.visible_trip(conn, viewer, trip_id)
+    if trip is None:
+        return None
+    if not emails_clearable(trip, today):
+        raise Invalid(f"The saved emails can be removed once a trip has ended at least {EMAILS_CLEARABLE_AFTER_DAYS} days ago")
+    segment_ids = [s.id for s in visibility.visible_segments(conn, viewer, [trip.id])]
+    return stored_mail.clear_for_segments(conn, segment_ids)
 
 
 def delete_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> bool:
