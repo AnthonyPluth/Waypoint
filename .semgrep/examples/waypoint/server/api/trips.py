@@ -30,6 +30,8 @@ def api_trip(conn, _q, _b, trip_id):
     # ruleid: waypoint-trip-visibility
     aboard = conn.execute(select(TripPerson.person_id).where(TripPerson.trip_id == trip_id)).fetchall()
     # ruleid: waypoint-trip-visibility
+    mine = conn.execute(select(Person.id).join(TripPerson, TripPerson.person_id == Person.id).where(TripPerson.trip_id == trip_id)).fetchall()
+    # ruleid: waypoint-trip-visibility
     raw = "SELECT person_id FROM trip_people WHERE trip_id = :id"
     # ruleid: waypoint-trip-visibility
     table = schema.trip_people

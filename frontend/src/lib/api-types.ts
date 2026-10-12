@@ -490,6 +490,7 @@ export interface McpWritesBody {
 
 export interface MergeBody {
   merge: number;
+  confirm?: boolean;
 }
 
 export interface MoveBody {
