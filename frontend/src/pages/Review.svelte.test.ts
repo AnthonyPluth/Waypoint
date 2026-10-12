@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { chooseZone } from "../test/zone";
 import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -319,7 +320,7 @@ describe("Review", () => {
     await userEvent.type(screen.getByLabelText("Check-out"), "2026-11-27T10:00");
     expect(screen.queryByLabelText("Time zone where it starts")).toBeNull();
     expect(screen.queryByLabelText("Time zone where it ends")).toBeNull();
-    await userEvent.selectOptions(screen.getByLabelText(/^Time zone/), "Europe/London");
+    await chooseZone(screen.getByLabelText(/^Time zone/), "Europe/London");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({
       kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London" })]));
@@ -338,7 +339,9 @@ describe("Review", () => {
     await userEvent.type(screen.getByLabelText("Arrives"), "2026-12-09T07:00");
     await userEvent.type(screen.getByLabelText(/^Ship/), "Example Voyager");
     expect(screen.getByLabelText(/^Cabin/)).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText("Time zone where it starts"), "America/New_York");
+    await chooseZone(screen.getByLabelText("Time zone where it starts"), "America/New_York");
+    expect(screen.queryAllByRole("listbox", { hidden: true })).toHaveLength(0);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({
       kind: "cruise", origin: "Miami", destination: "Nassau", start_zone: "America/New_York", end_zone: "America/New_York", details: { ship: "Example Voyager" } })]));
@@ -1582,7 +1585,7 @@ describe("Review: the form's explanatory text is gone", () => {
     held = { matches: [], items: [item({ reason: "generic", suggestions: [suggestionOf("hotel")] })], who: [], ai: false };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check what Waypoint read/ }));
-    expect(screen.getByRole("option", { name: "Work it out from the address" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Work it out from the address")).toBeInTheDocument();
     expect(screen.getByText(/Waypoint read this from labelled lines in the email/)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Address/)).toHaveClass("ring-2");
   });

@@ -60,7 +60,7 @@ describe("RouteReplayMap on the state lines", () => {
     const { container } = render(RouteReplayMap, { stops: [newYork, airport, denver, saltLake], year: 2025, roads, boundaries: east, still: false });
     expect(drawn(container)).toBe(3);
     const slider = screen.getByRole("slider", { name: "Position along the route" });
-    await fireEvent.input(slider, { target: { value: "667" } });
+    await fireEvent.input(slider, { target: { value: "2667" } });
     expect(container.querySelector("svg")!.getAttribute("data-zoomed")).toBe("true");
     expect(drawn(container)).toBe(2);
   });

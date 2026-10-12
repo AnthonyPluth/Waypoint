@@ -6,11 +6,11 @@
   import { Button } from "$lib/components/ui/button";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
+  import DayTime from "$lib/components/DayTime.svelte";
   import GateCode from "$lib/components/GateCode.svelte";
   import { takeEarlyTrips } from "$lib/early";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
-  import PlaceTime from "$lib/components/PlaceTime.svelte";
   import { dateLabel, dayIn, dayLabel, END_WORD, featuredTrip, headline, nextUp, subline, timesDiffer, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
@@ -132,9 +132,7 @@
                   {#if item.role === "start" && item.bookings.length > 1}<p class="text-caption text-muted-foreground">{item.bookings.length} bookings{timesDiffer(item.bookings) ? " · times differ between bookings" : ""}</p>{/if}
                 </div>
                 <p class="text-body font-medium">
-                  {#if untimed(seg)}<span class="text-muted-foreground">time not recorded</span>
-                  {:else if item.role === "end"}<PlaceTime local={seg.end_local} />
-                  {:else}<PlaceTime local={seg.start_local} />{/if}
+                  <DayTime segment={seg} end={item.role === "end"} />
                 </p>
               </li>
             {/each}

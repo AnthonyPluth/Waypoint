@@ -11,6 +11,7 @@
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
+  import DayTime from "$lib/components/DayTime.svelte";
   import GateCode from "$lib/components/GateCode.svelte";
   import { isMobile } from "$lib/platform";
   import { viewport } from "$lib/phone.svelte";
@@ -386,9 +387,9 @@
 
 {#snippet timeRows(s: Segment)}
   <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
-    <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} />{/if}</dd></div>
+    <dd class="mt-1 text-base font-medium"><DayTime segment={s} dated /></dd></div>
   <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
-    <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} />{/if}</dd></div>
+    <dd class="mt-1 text-base font-medium"><DayTime segment={s} end dated /></dd></div>
 {/snippet}
 
 {#snippet links(s: Segment)}

@@ -229,8 +229,19 @@ describe("the camera and the timeline", () => {
     expect([0, 0.49, 0.5, 0.99, 1].map((p) => activeStop(3, p))).toEqual([0, 0, 1, 1, 2]);
   });
 
-  it("plays for between six and twelve seconds", () => {
-    expect([2, 3, 4, 6, 9].map(replayMs)).toEqual([6000, 6000, 8000, 12000, 12000]);
+  it("plays for between six seconds and a minute, two seconds a stop", () => {
+    expect([2, 3, 4, 6, 9, 12, 20, 30, 40].map(replayMs)).toEqual([6000, 6000, 8000, 12000, 18000, 24000, 40000, 60000, 60000]);
+  });
+
+  it("gives a 25-stop trip's labels their full hold, one at a time", () => {
+    const stops = 25;
+    const lit = (p: number) => Array.from({ length: stops - 1 }, (_, i) => labelLit(i, stops, p, false));
+    for (let i = 0; i < stops - 1; i++) {
+      expect(labelLit(i, stops, (i + 0.01) / (stops - 1), false)).toBe(true);
+      expect(labelLit(i, stops, (i + 0.82) / (stops - 1), false)).toBe(true);
+      expect(labelLit(i, stops, (i + 0.86) / (stops - 1), false)).toBe(false);
+    }
+    for (let step = 0; step < 1000; step++) expect(lit(step / 1000).filter(Boolean).length).toBeLessThanOrEqual(1);
   });
 });
 
