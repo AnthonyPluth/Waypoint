@@ -86,7 +86,7 @@ def _unsealed(value: str | None) -> Image | None:
 
 
 def _replaces(day: str | None, held: str | None) -> bool:
-    return held is None or (day is not None and day >= held)
+    return held is None or (day is not None and day > held)
 
 
 def is_parking(conn: db.Connection, segment_id: int) -> bool:

@@ -192,6 +192,22 @@ class ConfirmationTests(Kept):
         self.assertIsNone(self.read(lambda conn: trips.choose_gate_code(conn, self.sam, self.segment, 0, 0, NOW)))
         self.assertEqual(self.state(), ("choose", "2026-10-16"))
 
+    def test_a_picture_chosen_by_hand_survives_reading_the_same_email_again_and_an_edit_and_a_strictly_newer_email_replaces_it(self):
+        mine = png(64, 64, CANARY_OTHER)
+        message = raw_of("Your parking reservation", {"qr": QR, "mine": mine})
+        self.keep("m1", message)
+        self.assertEqual(self.image(), {"type": "image/png", "data": QR})
+        self.assertTrue(self.read(lambda conn: gate_codes.choose(conn, self.segment, 0, 1, NOW)))
+        chosen = {"type": "image/png", "data": mine}
+        self.assertEqual(self.image(), chosen)
+        self.keep("m1", message, now=NOW + 5)
+        self.read(lambda conn: stored_mail.link(conn, self.segment, self.mailbox, "m1"))
+        self.assertEqual(self.image(), chosen)
+        self.read(lambda conn: trips.edit_segment(conn, self.jane, self.segment, {"end_local": "2026-12-05T03:00"}))
+        self.assertEqual(self.image(), chosen)
+        self.keep("m2", raw_of("Reminder", {"qr": OTHER_QR}, day="Mon, 19 Oct 2026 09:00:00 +0100"))
+        self.assertEqual((self.state(), self.image()), (("ready", "2026-10-19"), {"type": "image/png", "data": OTHER_QR}))
+
     def test_a_booking_edit_never_removes_the_code(self):
         self.keep("m1", raw_of("Your parking reservation", {"qr": QR}))
         edited = self.read(lambda conn: trips.edit_segment(conn, self.jane, self.segment, {"origin": "Example Airport Economy Lot", "end_local": "2026-12-05T03:00"}))
