@@ -1334,19 +1334,29 @@ def delete_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> bool:
     return True
 
 
-def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int) -> TripOut | None:
+def _merge_needs_confirmation(conn: db.Connection, trip: Trip, other: Trip) -> None:
+    mine, theirs = _seeing(conn, trip), _seeing(conn, other)
+    see_booking, see_trip = _named(conn, theirs - mine), _named(conn, mine - theirs)
+    if not see_booking and not see_trip:
+        return
+    parts = []
+    if see_booking:
+        parts.append("could newly see this trip’s bookings: " + ", ".join(p["name"] for p in see_booking))
+    if see_trip:
+        parts.append("could newly see the other trip’s bookings: " + ", ".join(p["name"] for p in see_trip))
+    said = "; ".join(parts)
+    raise NeedsConfirmation(f"Merging these trips changes who sees what. {said[0].upper()}{said[1:]}. Confirm to merge them anyway.",
+                            see_booking, see_trip)
+
+
+def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int, confirmed: bool = False) -> TripOut | None:
     if trip_id == other_id:
         raise Invalid("Choose another trip to merge into this one")
     trip, other = visibility.visible_trip(conn, viewer, trip_id), visibility.visible_trip(conn, viewer, other_id)
     if trip is None or other is None:
         return None
-    if not viewer.household:
-        _, who = _involved(conn, [trip.id, other.id])
-        mine = who[trip.id] | ({trip.booked_by} if trip.booked_by is not None else set())
-        theirs = who[other.id] | ({other.booked_by} if other.booked_by is not None else set())
-        if mine != theirs:
-            raise Invalid("These trips involve different people, and merging would show each one’s segments to people who "
-                          "aren’t on it. Move a segment into the other trip by adding the missing travellers first.")
+    if not viewer.household and not confirmed:
+        _merge_needs_confirmation(conn, trip, other)
     aboard = trippeople.of(conn, [trip.id, other.id])
     joined = list(dict.fromkeys([*aboard[trip.id], *aboard[other.id]]))
     for seg in conn.orm.scalars(select(Segment).where(Segment.trip_id.in_([trip.id, other.id]), Segment.travelers_from_trip.is_(True))

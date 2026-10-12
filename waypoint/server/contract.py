@@ -571,6 +571,7 @@ class DestinationSuggestion(TypedDict):
 
 class MergeBody(TypedDict):
     merge: int
+    confirm: NotRequired[bool]
 
 
 class MoveBody(TypedDict):

@@ -221,6 +221,32 @@ describe("Trip", () => {
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1/merge", { method: "POST", body: { merge: 7 } }));
     });
 
+    it("asks before merging among different people, then merges anyway", async () => {
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips/1/merge" && !(opts?.body as { confirm?: boolean }).confirm) {
+          throw Object.assign(new Error("Merging these trips changes who sees what."), { status: 409, data: { see_booking: [{ id: 3, name: "Mia Doe" }], see_trip: [{ id: 2, name: "Sam Doe" }] } });
+        }
+        if (path === "/api/trips" && !opts) return { trips: [held, march] } as never;
+        if (path === "/api/trips/1/merge") return { ...held, segments: [...held.segments, ...march.segments] } as never;
+        return answer(path, opts) as never;
+      });
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Merge another trip" }));
+      let dialog = await screen.findByRole("dialog");
+      const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
+      await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
+      await u.selectOptions(choose, "7");
+      await u.click(within(dialog).getByRole("button", { name: "Merge" }));
+      dialog = await screen.findByRole("dialog", { name: "Merge them anyway?" });
+      expect(dialog).toHaveTextContent("Will newly see this trip’s bookings: Mia Doe");
+      expect(dialog).toHaveTextContent("Will newly see the other trip’s bookings: Sam Doe");
+      expect(api).not.toHaveBeenCalledWith("/api/trips/1/merge", { method: "POST", body: { merge: 7, confirm: true } });
+      await u.click(within(dialog).getByRole("button", { name: "Merge anyway" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1/merge", { method: "POST", body: { merge: 7, confirm: true } }));
+    });
+
     it("lists the trips to merge newest first, undated ones last", async () => {
       const answer = vi.mocked(api).getMockImplementation()!;
       const named = (id: number, name: string, start_date: string | null) => ({ ...march, id, name, start_date, end_date: start_date });

@@ -5292,6 +5292,9 @@
         "properties": {
           "merge": {
             "type": "integer"
+          },
+          "confirm": {
+            "type": "boolean"
           }
         },
         "required": [
