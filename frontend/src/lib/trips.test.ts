@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when } from "./trips";
+import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -458,5 +458,49 @@ describe("vendorLink", () => {
     expect(vendorLink(withOpen("https://www.marriott.com/", "app"), false)).toBeNull();
     expect(vendorLink(withOpen(null, null), true)).toBeNull();
     expect(vendorLink(withOpen("https://www.marriott.com/", "app", "https://example.com/manage"), true)).toBeNull();
+  });
+});
+
+describe("trip travellers", () => {
+  const jane: Traveler = { id: 1, person_id: 1, name: "Jane Doe", seat: null };
+  const sam: Traveler = { id: 2, person_id: 2, name: "Sam Doe", seat: null };
+  const printed: Traveler = { id: 3, person_id: null, name: "DOE/MIA MISS", seat: null };
+  const stay = (travelers: Traveler[], extra = {}) => segment({ id: 9, kind: "hotel", provider: "Local Inn", booked_by: 1, travelers, ...extra });
+
+  it("lists everyone once, in order of first appearance", () => {
+    const all = tripTravellers([
+      segment({ id: 1, travelers: [sam, printed] }),
+      stay([{ ...jane, id: 4 }, { ...sam, id: 5 }, { ...printed, id: 6, name: "doe/mia miss" }]),
+    ]);
+    expect(all.map((who) => who.name)).toEqual(["Sam Doe", "DOE/MIA MISS", "Jane Doe"]);
+  });
+
+  it("falls back for an unnamed traveller", () => {
+    expect(tripTravellers([segment({ travelers: [{ id: 1, person_id: null, name: "  ", seat: null }] })]).map((who) => who.name)).toEqual([UNNAMED_TRAVELLER]);
+  });
+
+  it("shows the top line for several people or for one who is not the viewer", () => {
+    const one = tripTravellers([segment({ travelers: [jane] })]);
+    expect(showTripTravellers(one, 1)).toBe(false);
+    expect(showTripTravellers(one, 2)).toBe(true);
+    expect(showTripTravellers(one, null)).toBe(true);
+    expect(showTripTravellers(tripTravellers([segment({ travelers: [jane, sam] })]), 1)).toBe(true);
+    expect(showTripTravellers([], 1)).toBe(false);
+  });
+
+  it("keeps travellers on a flight, hides a non-flight booking with the trip's full set, and shows a smaller one", () => {
+    const flight = segment({ id: 1, travelers: [jane, sam] });
+    const all = tripTravellers([flight, stay([jane, sam])]);
+    expect(showBookingTravellers(flight, all, [])).toBe(true);
+    expect(showBookingTravellers(segment({ kind: "car", provider: "Local Cars", travelers: [jane, sam] }), all, [])).toBe(false);
+    expect(showBookingTravellers(stay([jane]), all, [])).toBe(true);
+    expect(showBookingTravellers(stay([]), all, [])).toBe(true);
+  });
+
+  it("keeps a seat, and a loyalty line, on a booking of the full set", () => {
+    const all = tripTravellers([segment({ travelers: [jane] })]);
+    expect(showBookingTravellers(segment({ kind: "train", provider: "Local Rail", travelers: [{ ...jane, seat: "12A" }] }), all, [])).toBe(true);
+    expect(showBookingTravellers(segment({ kind: "hotel", provider: "Marriott", booked_by: 1, travelers: [jane] }), all, [])).toBe(true);
+    expect(showBookingTravellers(segment({ kind: "hotel", provider: "Marriott", booked_by: 1, travelers: [jane] }), all, null)).toBe(false);
   });
 });
