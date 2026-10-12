@@ -54,7 +54,7 @@
     await refreshState().catch(ignoreFailure);
   };
 
-  const KINDS: [string, string][] = [["flight", "Flight"], ["hotel", "Hotel stay"], ["car", "Car rental"], ["train", "Train"], ["parking", "Parking"]];
+  const KINDS: [string, string][] = [["flight", "Flight"], ["hotel", "Hotel stay"], ["car", "Car rental"], ["train", "Train"], ["cruise", "Cruise"], ["parking", "Parking"]];
   const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
   const only = $derived.by(() => {
