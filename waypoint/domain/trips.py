@@ -931,47 +931,124 @@ def _same_uncoded(seg: Segment, values: Mapping[str, str | None], details: Mappi
             and _same_place(seg.origin, values["origin"]))
 
 
-def _same_leg(seg: Segment, values: Mapping[str, str | None], details: Mapping[str, str]) -> bool:
-    if not seg.confirmation:
-        return _same_uncoded(seg, values, details)
-    mine, theirs = flight_key(decode_details(seg.details).get("flight_number")), flight_key(details.get("flight_number"))
-    near = abs((date.fromisoformat(seg.start_local[:10]) - date.fromisoformat((values["start_local"] or "")[:10])).days) <= EMAIL_MERGE_DAYS
-    providers = bool(mine and theirs) or not seg.provider or not values["provider"] or provider_key(seg.provider) == provider_key(values["provider"])
-    return (bool(values["confirmation"]) and near and seg.kind == values["kind"]
-            and _code_key(seg.confirmation) == _code_key(values["confirmation"])
-            and (not mine or not theirs or mine == theirs) and providers
-            and _text_key(seg.origin) == _text_key(values["origin"]) and _text_key(seg.destination) == _text_key(values["destination"]))
+LEGS = frozenset({"flight", "train"})
+Sameness = Literal["same", "unsure", "other"]
+
+
+def _words_agree(mine: frozenset[str], theirs: frozenset[str]) -> bool:
+    return bool(mine and theirs) and (mine <= theirs or theirs <= mine)
+
+
+def _same_text(mine: str | None, theirs: str | None) -> bool:
+    return _text_key(mine) == _text_key(theirs)
+
+
+def _places_agree(mine: str | None, theirs: str | None) -> bool:
+    return not mine or not theirs or _same_text(mine, theirs) or _words_agree(_place_words(mine), _place_words(theirs))
+
+
+def _airline_code(provider: str, number: str | None) -> bool:
+    code = provider.strip().upper()
+    return len(code) <= 3 and bool(number) and (number or "").startswith(code)
+
+
+def _providers_agree(mine: str | None, theirs: str | None, number: str | None) -> bool:
+    if not mine or not theirs or _airline_code(mine, number) or _airline_code(theirs, number):
+        return True
+    return _words_agree(frozenset(provider_key(mine).split()), frozenset(provider_key(theirs).split()))
+
+
+def _day(local: str | None) -> date:
+    return date.fromisoformat((local or "")[:10])
+
+
+def _near(seg: Segment, values: Mapping[str, str | None]) -> bool:
+    start, end = _day(values["start_local"]), _day(values["end_local"])
+    first, last = _day(seg.start_local), _day(seg.end_local)
+    return abs((first - start).days) <= EMAIL_MERGE_DAYS or (start <= last and first <= end)
+
+
+def dated_only(kind: str | None, start: str | None, end: str | None, details: Mapping[str, str]) -> bool:
+    return untimed(details) or (kind != "flight" and (start or "")[10:16] == "T00:00" and (end or "")[10:16] == "T00:00")
+
+
+def _stored_dated_only(seg: Segment) -> bool:
+    return dated_only(seg.kind, seg.start_local, seg.end_local, decode_details(seg.details))
+
+
+def _incoming_dated_only(values: Mapping[str, str | None], details: Mapping[str, str]) -> bool:
+    return dated_only(values["kind"], values["start_local"], values["end_local"], details)
+
+
+def _same_days(seg: Segment, values: Mapping[str, str | None]) -> bool:
+    return seg.start_local[:10] == (values["start_local"] or "")[:10] and seg.end_local[:10] == (values["end_local"] or "")[:10]
+
+
+def reservation(seg: Segment, values: Mapping[str, str | None], details: Mapping[str, str]) -> Sameness:
+    if (seg.kind != values["kind"] or not seg.confirmation or not values["confirmation"]
+            or _code_key(seg.confirmation) != _code_key(values["confirmation"]) or not _near(seg, values)):
+        return "other"
+    stored = decode_details(seg.details)
+    mine, theirs = flight_key(stored.get("flight_number")), flight_key(details.get("flight_number"))
+    if seg.kind in LEGS:
+        agree = _same_text if seg.kind == "flight" else _places_agree
+        if (mine and theirs and mine != theirs) or not (agree(seg.origin, values["origin"]) and agree(seg.destination, values["destination"])):
+            return "other"
+    unsure = ((not (mine and theirs) and not _providers_agree(seg.provider, values["provider"], mine or theirs))
+              or (seg.kind == "cruise" and not _places_agree(stored.get("ship"), details.get("ship")))
+              or (seg.kind in ("hotel", "parking") and not _places_agree(seg.origin, values["origin"])
+                  and not _same_place(stored.get("address"), details.get("address"))))
+    return "unsure" if unsure else "same"
 
 
 def _minute(local: str | None) -> str:
     return (local or "")[:16]
 
 
+def _moves(seg: Segment, values: Mapping[str, str | None], details: Mapping[str, str]) -> bool:
+    if seg.start_zone != values["start_zone"] or seg.end_zone != values["end_zone"]:
+        return True
+    if seg.kind == "car" and not (_places_agree(seg.origin, values["origin"]) and _places_agree(seg.destination, values["destination"])):
+        return True
+    if _incoming_dated_only(values, details):
+        return not _same_days(seg, values)
+    return _minute(seg.start_local) != _minute(values["start_local"]) or (seg.kind != "flight" and _minute(seg.end_local) != _minute(values["end_local"]))
+
+
 def same_booking(seg: Segment, values: Mapping[str, str | None], details: Mapping[str, str]) -> bool:
-    if seg.kind != values["kind"] or seg.status != "confirmed" or values["status"] != "confirmed":
-        return False
-    if not seg.confirmation or not values["confirmation"] or _code_key(seg.confirmation) != _code_key(values["confirmation"]):
-        return False
-    mine, theirs = flight_key(decode_details(seg.details).get("flight_number")), flight_key(details.get("flight_number"))
-    same_flight = seg.kind == "flight" and mine is not None and mine == theirs
-    if seg.kind == "flight" and mine is not None and theirs is not None and mine != theirs:
-        return False
-    named = bool(seg.provider and values["provider"]) and provider_key(seg.provider) == provider_key(values["provider"])
-    if not (same_flight or named):
-        return False
-    if (_minute(seg.start_local) != _minute(values["start_local"]) or seg.start_zone != values["start_zone"]
-            or _text_key(seg.destination) != _text_key(values["destination"])):
-        return False
-    if seg.kind == "flight":
-        return _text_key(seg.origin) == _text_key(values["origin"])
-    return (_minute(seg.end_local) == _minute(values["end_local"]) and seg.end_zone == values["end_zone"]
-            and (_text_key(seg.origin) == _text_key(values["origin"]) or _same_place(seg.origin, values["origin"])))
+    return (seg.status == "confirmed" and values["status"] == "confirmed" and reservation(seg, values, details) == "same"
+            and not _moves(seg, values, details))
 
 
 def find_same_booking(conn: db.Connection, viewer: Viewer, fields: SegmentIn) -> Segment | None:
     values = check(conn, fields)
     details = fields.get("details") or {}
     return next((s for s in visibility.visible_segments(conn, viewer) if same_booking(s, values, details)), None)
+
+
+def find_same_reservation(conn: db.Connection, viewer: Viewer, fields: SegmentIn, sure: bool = False) -> Segment | None:
+    values = check(conn, fields)
+    details = fields.get("details") or {}
+    wanted = ("same",) if sure else ("same", "unsure")
+    found = [(verdict != "same", abs((_day(s.start_local) - _day(values["start_local"])).days), s.id, s)
+             for s in visibility.visible_segments(conn, viewer) if s.status != "cancelled" and (verdict := reservation(s, values, details)) in wanted]
+    return min(found, key=lambda f: f[:3])[3] if found else None
+
+
+def _kept_place(kind: str, mine: str | None, theirs: str | None) -> str | None:
+    return mine if mine and theirs and (kind == "cruise" or _places_agree(mine, theirs)) else theirs
+
+
+def _in_stored_terms(seg: Segment, fields: SegmentIn, values: Mapping[str, str | None]) -> SegmentIn:
+    out: SegmentIn = {**fields, "origin": _kept_place(seg.kind, seg.origin, values["origin"]),
+                      "destination": _kept_place(seg.kind, seg.destination, values["destination"])}
+    details = fields.get("details") or {}
+    if _incoming_dated_only(values, details) and not _stored_dated_only(seg):
+        out["start_local"] = (values["start_local"] or "")[:10] + seg.start_local[10:]
+        out["end_local"] = (values["end_local"] or "")[:10] + seg.end_local[10:]
+        if TIME_UNKNOWN in details:
+            out["details"] = {k: v for k, v in details.items() if k != TIME_UNKNOWN}
+    return out
 
 
 def attach_to_same_booking(conn: db.Connection, viewer: Viewer, fields: SegmentIn, touched: list[int] | None = None) -> bool:
@@ -993,13 +1070,16 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
             raise Invalid("No such booking")
         found, seen = [target], {target.id}
     else:
-        found = [s for s in visibility.household_segments(conn, values["kind"] or "") if _same_leg(s, values, fields.get("details") or {})]
-        coded = [s for s in found if s.confirmation]
-        uncoded = [s for s in found if not s.confirmation]
-        seen = {s.id for s in visibility.visible_segments(conn, viewer)} if found else set()
+        wrote = fields.get("details") or {}
+        household = visibility.household_segments(conn, values["kind"] or "")
+        verdicts = {s.id: reservation(s, values, wrote) for s in household if s.confirmation}
+        coded = [s for s in household if verdicts.get(s.id) == "same"]
+        uncoded = [s for s in household if not s.confirmation and _same_uncoded(s, values, wrote)]
+        seen = {s.id for s in visibility.visible_segments(conn, viewer)} if coded or uncoded or "unsure" in verdicts.values() else set()
         uncoded = [s for s in uncoded if s.id in seen]
-        if candidates is not None and not coded and len(uncoded) > 1:
-            candidates.extend(s.id for s in uncoded)
+        unsure = [s for s in household if verdicts.get(s.id) == "unsure" and s.id in seen]
+        if candidates is not None and not coded and (unsure or len(uncoded) > 1):
+            candidates.extend(s.id for s in [*unsure, *uncoded])
             return "ambiguous"
         found = coded or (uncoded if len(uncoded) == 1 else [])
     if len(found) > 1:
@@ -1014,6 +1094,12 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
     seg = found[0]
     if touched is not None:
         touched.append(seg.id)
+    filled_times = _stored_dated_only(seg) and not _incoming_dated_only(values, fields.get("details") or {}) and _same_days(seg, values)
+    try:
+        restated = _in_stored_terms(seg, fields, values)
+        values, fields = check(conn, restated), restated
+    except Invalid:
+        pass
     old = effective_travelers(conn, seg)
     locked = decode_locked(seg.locked_fields)
     given: SegmentIn = {**fields}
@@ -1026,10 +1112,8 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
     if flight_key(stored.get("flight_number")) is not None and flight_key(stored.get("flight_number")) == flight_key(said.get("flight_number")):
         said["flight_number"] = stored["flight_number"]
     named = given.get("provider")
-    if seg.provider and named:
-        code = named.strip().upper()
-        if provider_key(seg.provider) == provider_key(named) or (len(code) <= 3 and (flight_key(said.get("flight_number")) or "").startswith(code)):
-            given["provider"] = seg.provider
+    if seg.provider and named and _providers_agree(seg.provider, named, flight_key(said.get("flight_number"))):
+        given["provider"] = seg.provider
     if "seat_position" not in (fields.get("details") or {}):
         said = _stale_position(stored, said, bool(stored.get("seat")) and said.get("seat") != stored.get("seat"))
     incoming = unlocked({**given, "details": said}, locked)
@@ -1037,7 +1121,7 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
         incoming = cast(SegmentIn, {k: v for k, v in incoming.items() if k == "details" or (k in ("provider", "confirmation", "manage_url") and not getattr(seg, k))})
     if not fill_only and "status" not in locked and incoming.get("status") != "cancelled":
         moved = any(values[f] != getattr(seg, f) for f in ("start_local", "start_zone", "end_local", "end_zone", "origin", "destination"))
-        if moved and not again and "start_local" not in locked and "end_local" not in locked:
+        if moved and not filled_times and not again and "start_local" not in locked and "end_local" not in locked:
             incoming["status"] = "changed"
         else:
             incoming["status"] = cast(Status, seg.status)

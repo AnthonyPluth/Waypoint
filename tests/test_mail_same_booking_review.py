@@ -32,14 +32,39 @@ class SameBookingReviewTests(SameBookingCase):
                          (segment, "flight", "BOS", "2027-01-02T07:15", "Example Air"))
         self.assertTrue(found["trip_name"])
 
-    def test_nothing_is_named_when_the_time_the_place_the_code_or_the_kind_differs(self):
+    def test_nothing_is_named_when_the_place_the_code_the_flight_number_the_kind_or_the_dates_differ(self):
         item = self.waiting()
         self.by_hand()
-        for swaps in ({"start_local": "2027-01-02T07:20"}, {"destination": "SFO"}, {"confirmation": "ZZ9Y8Y"}, {"details": {"flight_number": "EX 203"}}):
+        for swaps in ({"destination": "SFO"}, {"confirmation": "ZZ9Y8Y"}, {"details": {"flight_number": "EX 203"}},
+                      {"start_local": "2027-02-02T07:15", "end_local": "2027-02-02T10:05"}):
             with self.subTest(swaps):
                 self.assertEqual(self.same(item, **swaps), (True, None))
         hotel = {"kind": "hotel", "origin": "Harbour Hotel", "destination": None, "start_zone": "Europe/London", "end_zone": "Europe/London"}
         self.assertEqual(self.same(item, **hotel), (True, None))
+
+    def test_the_same_reservation_is_named_when_its_time_its_spelling_or_its_company_differs(self):
+        item = self.waiting()
+        segment = self.by_hand()
+        for swaps in ({"start_local": "2027-01-02T07:20"}, {"provider": "Example", "details": {}}, {"provider": "Other Air", "details": {}},
+                      {"end_local": "2027-01-09T10:05", "details": {}}):
+            with self.subTest(swaps):
+                _, found = self.same(item, **swaps)
+                assert found is not None
+                self.assertEqual(found["segment_id"], segment)
+
+    def test_a_cruise_with_dates_only_or_its_port_written_as_a_city_is_named_and_attaching_keeps_the_booking_as_it_was(self):
+        item = self.waiting()
+        cruise = {"kind": "cruise", "confirmation": "55001122", "provider": "Example Cruise Line", "origin": "PORT EXAMPLE", "destination": "PORT EXAMPLE",
+                  "start_zone": "America/New_York", "end_zone": "America/New_York", "start_local": "2027-03-02T15:00", "end_local": "2027-03-07T08:00",
+                  "details": {"ship": "Example Star", "room": "7001"}}
+        segment = self.by_hand(**cruise)
+        loose = {**cruise, "origin": "Example City, FL", "destination": "Example City, FL", "start_local": "2027-03-02T00:00", "end_local": "2027-03-07T00:00"}
+        _, found = self.same(item, **loose)
+        assert found is not None
+        self.assertEqual(found["segment_id"], segment)
+        self.assertEqual(self.read(lambda conn: review.attach(conn, "u-jane", self.jane, item, loose)), segment)
+        [seg] = [s for s in self.segments() if s["kind"] == "cruise"]
+        self.assertEqual((seg["origin"], seg["start_local"], seg["end_local"], seg["status"]), ("PORT EXAMPLE", "2027-03-02T15:00", "2027-03-07T08:00", "confirmed"))
 
     def test_a_cancelled_booking_is_not_named(self):
         item = self.waiting()

@@ -364,15 +364,21 @@ def create(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_
     fields: trips.SegmentIn = {**base, **overrides}
     if "details" in overrides:
         fields["details"] = {**(base.get("details") or {}), **overrides["details"]}
-    added = trips.add_segment(conn, viewer, fields, source="email" if entry is not None else "manual")
-    if added is None:
-        raise trips.Invalid("The booking couldn’t be added")
+    same = trips.find_same_reservation(conn, viewer, fields, sure=True)
+    if same is not None:
+        trips.merge_email_segment(conn, viewer, fields, fill_only=True, into=same.id)
+        target = int(same.id)
+    else:
+        added = trips.add_segment(conn, viewer, fields, source="email" if entry is not None else "manual")
+        if added is None:
+            raise trips.Invalid("The booking couldn’t be added")
+        target = added["id"]
     if entry is not None:
-        review.finish_entry(conn, row, int(entry["id"]), added["id"])
+        review.finish_entry(conn, row, int(entry["id"]), target)
     elif pick and len(suggestions) > 1:
-        stored_mail.link(conn, added["id"], int(row["mailbox_id"]), str(row["message_id"]))
+        stored_mail.link(conn, target, int(row["mailbox_id"]), str(row["message_id"]))
         left = [x for n, x in enumerate(suggestions, 1) if n != pick]
         review.set_suggestions(conn, int(row["mailbox_id"]), str(row["message_id"]), left, row["suggestion_error"])  # type: ignore[arg-type]
     else:
-        review.dismiss(conn, owner, item_id, (viewer, [added["id"]]))
-    return trips.get_segment(conn, viewer, added["id"]) or added
+        review.dismiss(conn, owner, item_id, (viewer, [target]))
+    return trips.get_segment(conn, viewer, target)

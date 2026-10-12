@@ -360,7 +360,7 @@ def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_
 def same_booking(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, fields: trips.SegmentIn) -> tuple[bool, CandidateOut | None]:
     if _seen_message(conn, owner, item_id) is None:
         return False, None
-    found = trips.find_same_booking(conn, viewer, fields)
+    found = trips.find_same_reservation(conn, viewer, fields)
     if found is None:
         return True, None
     trip = visibility.visible_trip(conn, viewer, found.trip_id)
@@ -373,7 +373,7 @@ def attach(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, fields
     seen = _seen_message(conn, owner, item_id)
     if seen is None:
         return None
-    found = trips.find_same_booking(conn, viewer, fields)
+    found = trips.find_same_reservation(conn, viewer, fields)
     if found is None:
         raise trips.Invalid("That is no longer the same as a booking you can see")
     trips.merge_email_segment(conn, viewer, fields, fill_only=True, into=found.id)
