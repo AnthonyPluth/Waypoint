@@ -287,6 +287,14 @@ class AddressTests(unittest.TestCase):
     def test_a_models_extra_keys_do_not_fail_the_suggestion(self):
         self.assertEqual(self.parse({"note": REPLY_CANARY, "extras": {"a": 1}, "loyalty": 5, "phone": 12345}), STAY)
 
+    def test_a_car_with_no_drop_off_is_dropped_off_at_its_pick_up_and_a_stated_drop_off_is_kept(self):
+        car = {"kind": "car", "provider": "Example Rentals", "origin": "Bristol Airport", "start_local": "2026-12-02T10:00", "end_local": "2026-12-05T10:00"}
+        self.assertEqual(ai.parse(json.dumps(car), "Pick-up: Bristol Airport").bookings[0]["destination"], "Bristol Airport")
+        other = ai.parse(json.dumps({**car, "destination": "Cardiff Station"}), "Pick-up: Bristol Airport Drop-off: Cardiff Station").bookings[0]
+        self.assertEqual(other["destination"], "Cardiff Station")
+        train = ai.parse(json.dumps({**car, "kind": "train"}), "Bristol Airport").bookings[0]
+        self.assertNotIn("destination", train)
+
     def test_a_car_and_a_cruise_and_a_train_take_their_pick_up_and_terminal_addresses(self):
         car = {"kind": "car", "provider": "Example Rentals", "origin": "Bristol Airport", "destination": "Bristol Airport",
                "start_local": "2026-12-02T10:00", "end_local": "2026-12-05T10:00", "confirmation": "QW4R7T"}

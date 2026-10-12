@@ -105,7 +105,7 @@ describe("Review", () => {
     expect(screen.getAllByRole("button", { name: /ignore/i })).toHaveLength(1);
   });
 
-  it("shows an item shared by another member with whose mailbox it is, and only View email, Add by hand and Dismiss", async () => {
+  it("shows an item shared by another member with whose mailbox it is, and View email, Add by hand, Ask AI and Dismiss", async () => {
     held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe", address: "sam@gmail.example" })], who: [], ai: true };
     render(ReviewPage);
     const row = await screen.findByTestId("review-item");
@@ -114,9 +114,16 @@ describe("Review", () => {
     expect(within(row).getByRole("button", { name: /View email .Mail from example-air.example.* on 2026-10-17/ })).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: /Add .Mail from example-air.example.* by hand/ })).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: /Dismiss/ })).toBeInTheDocument();
-    for (const name of [/Ask AI about/, /ignore example-air.example/i]) expect(within(row).queryByRole("button", { name })).toBeNull();
+    expect(within(row).getByRole("button", { name: /Ask AI about/ })).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: /ignore example-air.example/i })).toBeNull();
     expect(within(row).queryByRole("link")).toBeNull();
-    expect(screen.queryByRole("button", { name: /Ask AI about all/ })).toBeNull();
+  });
+
+  it("offers no Ask AI on a shared item while the AI is off", async () => {
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" })], who: [], ai: false };
+    render(ReviewPage);
+    const row = await screen.findByTestId("review-item");
+    expect(within(row).queryByRole("button", { name: /Ask AI about/ })).toBeNull();
   });
 
   it("opens a shared item's message beside the form like any other, and dismisses it", async () => {
@@ -651,6 +658,47 @@ describe("Review: the AI’s suggestion", () => {
     expect(calls.find(([p]) => p === "/api/segments")?.[2]).not.toHaveProperty("details");
   });
 
+  it("asks a rental for one pick-up place, keeps a different address and saves an empty drop-off as the pick-up", async () => {
+    const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "4 Runway Drive, Bristol BS48 3DY" };
+    held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
+    expect(screen.getByPlaceholderText("Same as pick-up")).toHaveValue("");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.find(([p]) => p === "/api/segments")?.[2]).toMatchObject({ destination: "Bristol Airport", details: { address: "4 Runway Drive, Bristol BS48 3DY" } });
+  });
+
+  it("lets a kept rental address be cleared, and then the address is the pick-up", async () => {
+    const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "4 Runway Drive, Bristol BS48 3DY" };
+    held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.clear(screen.getByLabelText(/^Pick-up address/));
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.find(([p]) => p === "/api/segments")?.[2]).toMatchObject({ details: { address: "Bristol Airport" } });
+  });
+
+  it("shows no address field for a rental whose address is its pick-up, or one without an address", async () => {
+    const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00" };
+    held = { matches: [], items: [item({ suggestions: [{ ...car, address: "Bristol Airport" }] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.queryByLabelText(/address/i)).toBeNull();
+  });
+
+  it("sets a rental’s address from the pick-up when the email gave the same text, and keeps a stated drop-off", async () => {
+    const car = { kind: "car" as const, origin: "Bristol Airport", destination: "Cardiff Station", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "Bristol Airport" };
+    held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.find(([p]) => p === "/api/segments")?.[2]).toMatchObject({ destination: "Cardiff Station", details: { address: "Bristol Airport" } });
+  });
+
   it("takes a rental’s pick-up address and a cruise’s terminal, cabin, ship and deck", async () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", destination: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00",
       address: "4 Runway Drive, Bristol BS48 3DY" };
@@ -658,7 +706,7 @@ describe("Review: the AI’s suggestion", () => {
     const first = render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
     expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
-    expect(screen.getByLabelText(/^Pick-up address/)).toHaveClass("ring-2");
+    expect(screen.getByLabelText(/^Pick-up(?! time| address)/)).toHaveValue("Bristol Airport");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     first.unmount();
@@ -876,6 +924,14 @@ describe("Review: Ask AI", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 3" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 3 messages"));
     expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest", "/api/review/2/suggest", "/api/review/3/suggest"]);
+  });
+
+  it("asks about shared items too, alone and in bulk", async () => {
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" }), item({ id: 5, mine: true })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 2 messages"));
+    expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/4/suggest", "/api/review/5/suggest"]);
   });
 
   it("stops the bulk ask at the first failure and says how far it got", async () => {
@@ -1323,6 +1379,17 @@ describe("Review: several legs or bookings added by hand from one email", () => 
     expect(screen.getByRole("button", { name: "Add 2 flights" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add another leg or booking" })).toBeInTheDocument();
     expect(within(legs[1]).getByLabelText("What is it?")).toHaveFocus();
+  });
+
+  it("adds a rental car leg whose drop-off says Same as pick-up and saves as the pick-up", async () => {
+    const u = await openByHand();
+    await u.selectOptions(screen.getByLabelText("What is it?"), "car");
+    await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
+    const legs = screen.getAllByTestId("leg");
+    expect(within(legs[1]).getByLabelText("What is it?")).toHaveValue("car");
+    expect(within(legs[1]).getByPlaceholderText("Same as pick-up")).toHaveValue("");
+    expect(within(legs[1]).queryByLabelText(/address/i)).toBeNull();
+    await u.click(screen.getByRole("button", { name: "Cancel" }));
   });
 
   it("adds a round trip as two flights from one email and takes the item off the list once", async () => {

@@ -149,6 +149,12 @@ def _seen_message(conn: db.Connection, owner: str, item_id: int) -> tuple[int, s
     return None if row is None else (int(row["mailbox_id"]), str(row["message_id"]))
 
 
+def seen_message(conn: db.Connection, owner: str, item_id: int) -> tuple[int, str, bool] | None:
+    row = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id, Mailbox.owner_sub).join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
+                       .where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
+    return None if row is None else (int(row["mailbox_id"]), str(row["message_id"]), row["owner_sub"] == owner)
+
+
 def stored_email(conn: db.Connection, owner: str, item_id: int) -> tuple[bool, stored_mail.Content | None]:
     found = _seen_message(conn, owner, item_id)
     return (False, None) if found is None else (True, stored_mail.get(conn, *found))

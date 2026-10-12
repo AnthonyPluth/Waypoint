@@ -47,7 +47,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Sheet } from "$lib/components/ui/sheet";
   import { amountText } from "$lib/money";
-  import { DEFAULT_CURRENCY, DETAILS, KINDS as FORM_KINDS, priceOf, SEAT_LIMIT, type Kind } from "$lib/segment-form";
+  import { carAddress, differs, DEFAULT_CURRENCY, DETAILS, KINDS as FORM_KINDS, priceOf, SAME_AS_PICKUP, SEAT_LIMIT, type Kind } from "$lib/segment-form";
   import { apiCall } from "$lib/contract";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import { toast } from "svelte-sonner";
@@ -83,16 +83,17 @@
   const sender = (i: ReviewItem) => i.sender_domain || "Unknown sender";
   const subject = (i: ReviewItem) => i.subject || `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
 
-  const SHOWN: Record<string, string[]> = { flight: ["flight_number", "cabin"], hotel: ["address", "phone"], car: ["address", "phone"], train: ["address"], parking: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
+  const SHOWN: Record<string, string[]> = { flight: ["flight_number", "cabin"], hotel: ["address", "phone"], car: ["phone"], train: ["address"], parking: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
   const detailLabel = (kind: string, key: string) => DETAILS[kind as Kind].find(([k]) => k === key)?.[1] ?? key;
-  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; travelers: { name: string; seat: string }[]; sources: Record<string, string>; cost: string; currency: string };
+  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; travelers: { name: string; seat: string }[]; sources: Record<string, string>; cost: string; currency: string; addressField: boolean };
   const detailsOf = (s: ReviewItem["suggestions"][number]): Record<string, string> => ({ address: s.address ?? "", phone: s.phone ?? "", room: s.room ?? "", ship: s.ship ?? "", deck: s.deck ?? "", flight_number: s.flight_number ?? "", cabin: s.cabin ?? "" });
   const suggestedDraft = (item: ReviewItem, s: ReviewItem["suggestions"][number], pick: number): Draft => ({
     item, pick, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
-    destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", details: detailsOf(s),
+    destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", details: s.kind === "car" && s.address?.trim() === s.origin.trim() ? { ...detailsOf(s), address: "" } : detailsOf(s),
     read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), travelers: (s.travelers ?? []).map((t) => ({ ...t })), sources: s.sources ?? {},
-    cost: s.price_minor && s.price_currency ? amountText(s.price_minor, s.price_currency) : "", currency: s.price_currency ?? DEFAULT_CURRENCY });
-  const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], travelers: [], sources: {}, cost: "", currency: DEFAULT_CURRENCY });
+    cost: s.price_minor && s.price_currency ? amountText(s.price_minor, s.price_currency) : "", currency: s.price_currency ?? DEFAULT_CURRENCY,
+    addressField: s.kind === "car" && differs(s.address, s.origin) });
+  const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], travelers: [], sources: {}, cost: "", currency: DEFAULT_CURRENCY, addressField: false });
   let drafts = $state<Draft[]>([]);
   let joining = $state<{ legs: Draft[]; bodies: SegmentBody[]; found: (ReviewCandidate | null)[] } | null>(null);
   const draft = $derived(drafts[0] ?? null);
@@ -130,7 +131,7 @@
   };
   const kindChanged = (leg: Draft, kind: string) => {
     if (!addedLegs.has(leg) || kind === leg.kind) return;
-    Object.assign(leg, { kind, origin: "", destination: "", startZone: "", endZone: "", details: {}, read: [], sources: {} });
+    Object.assign(leg, { kind, origin: "", destination: "", startZone: "", endZone: "", details: {}, read: [], sources: {}, addressField: false });
   };
   const plural = (n: number, ds: Draft[]) => (ds.every((d) => d.kind === "flight") ? `${n} flights` : `${n} bookings`);
   const legTitle = (leg: Draft, n: number) => `${leg.kind === "flight" ? "Flight" : "Booking"} ${n + 1} of ${drafts.length}${leg.origin && leg.destination ? `: ${leg.origin.toUpperCase()} → ${leg.destination.toUpperCase()}` : ""}`;
@@ -158,7 +159,7 @@
   }, { busy: (on) => (on ? asking_ai.add(item.id) : asking_ai.delete(item.id)) });
 
   let asking_all = $state(false);
-  const unasked = $derived(review?.ai ? review.items.filter((i) => i.mine && !i.suggestions.length && !asking_ai.has(i.id)) : []);
+  const unasked = $derived(review?.ai ? review.items.filter((i) => !i.suggestions.length && !asking_ai.has(i.id)) : []);
   const askAll = (items: ReviewItem[]) => act(async () => {
     let done = 0;
     try {
@@ -205,10 +206,12 @@
     const flight = d.kind === "flight";
     const details = Object.fromEntries((SHOWN[d.kind] ?? []).map((key) => [key, (d.details[key] ?? "").trim()] as const).filter(([, v]) => v));
     const stay = d.kind === "hotel" || d.kind === "parking";
+    const pickup = carAddress(d.details["address"], d.origin, undefined);
+    if (d.kind === "car" && pickup) details["address"] = pickup;
     if (d.cost.trim() && (!/^[A-Za-z]{3}$/.test(d.currency.trim()) || priceOf(d) === null)) return "Enter the cost as an amount like 1240.00 and a three-letter currency code like USD";
     if (stay && !d.startZone.trim() && !details["address"]) return `Enter the ${d.kind === "hotel" ? "hotel" : "lot"}’s time zone (for example America/New_York), or its address to work it out from`;
     return { kind: d.kind as "flight" | "hotel" | "car" | "train" | "cruise" | "parking", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
-      destination: d.destination, ...(Object.keys(details).length && { details }), ...(priceOf(d) && { price: priceOf(d) }),
+      destination: d.kind === "car" && !d.destination.trim() ? d.origin : d.destination, ...(Object.keys(details).length && { details }), ...(priceOf(d) && { price: priceOf(d) }),
       ...(flight && d.travelers.length && { travelers: d.travelers.map((t) => { const id = personFor(people, t.name); return { ...(id === null ? { person_id: null, name: t.name } : { person_id: id }), seat: t.seat.trim() || null }; }) }),
       ...(flight ? {} : stay ? { start_zone: d.startZone.trim() || null } : d.kind === "cruise" ? { start_zone: d.startZone, end_zone: d.endZone || d.startZone } : { ...(d.startZone && { start_zone: d.startZone }), ...(d.endZone && { end_zone: d.endZone }) }) };
   }
@@ -348,7 +351,7 @@
     <Input class={d.sources["origin"] ? "ring-2 ring-primary" : ""} bind:value={d.origin} required maxlength={100} autocomplete="off" /></label>
   {#if labels[1]}
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{labels[1]}</span>
-      <Input bind:value={d.destination} required={d.kind === "flight"} maxlength={100} autocomplete="off" /></label>
+      <Input bind:value={d.destination} required={d.kind === "flight"} maxlength={100} autocomplete="off" placeholder={d.kind === "car" ? SAME_AS_PICKUP : ""} /></label>
   {/if}
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-in" : d.kind === "parking" ? "Entry" : d.kind === "car" ? "Pick-up time" : "Departs"} {#if d.sources["start_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["start_local"]}”</span>{/if}</span>
     <Input type="datetime-local" class={d.sources["start_local"] ? "ring-2 ring-primary" : ""} bind:value={d.start} required /></label>
@@ -370,6 +373,10 @@
       <ZoneSelect bind:value={d.startZone} blank={d.kind === "cruise" ? "Choose a time zone" : "Work it out from the airport"} required={d.kind === "cruise"} /></label>
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone where it ends</span>
       <ZoneSelect bind:value={d.endZone} blank="Same as where it starts" /></label>
+    {#if d.kind === "car" && d.addressField}
+      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Pick-up address</span>
+        <Input value={d.details["address"] ?? ""} oninput={(e) => (d.details["address"] = e.currentTarget.value)} maxlength={300} autocomplete="off" /></label>
+    {/if}
     {#each SHOWN[d.kind] ?? [] as key (key)}{@render detailField(d, key)}{/each}
   {:else}
     {#each SHOWN.flight as key (key)}{#if d.read.includes(key)}{@render detailField(d, key)}{/if}{/each}
@@ -483,7 +490,7 @@
               </div>
               <div class="flex basis-full flex-wrap gap-2">
                 <Button variant="outline" size="sm" aria-expanded={viewing === item.id} onclick={() => toggleView(item)} aria-label={`View email “${subject(item)}”`}>View email</Button>
-                {#if review.ai && item.mine && item.reason !== "generic"}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestions.length ? "Ask again" : "Ask AI"}</Button>{/if}
+                {#if review.ai && item.reason !== "generic"}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestions.length ? "Ask again" : "Ask AI"}</Button>{/if}
                 {#if item.suggestions.length}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : item.suggestions.length > 1 ? `Check the AI’s ${item.suggestions.length} suggestions for “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>{item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
                 {#if item.sender_domain && item.mine}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Not travel: ignore ${item.sender_domain}`}>Not travel: ignore this sender</Button>{/if}

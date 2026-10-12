@@ -404,6 +404,8 @@ def booking(found: dict[str, Any], sent: str, seats: bool = False) -> Suggestion
     for name in FIELDS:
         if name in values and not (kind == "flight" and name in ("start_zone", "end_zone")):
             out[name] = values[name]   # type: ignore[literal-required]
+    if kind == "car" and "destination" not in out:
+        out["destination"] = out["origin"]
     out.update(_details(kind, values, sent))
     if seats and kind == "flight" and (travelers := _travelers(found.get("travelers"), sent)):
         out["travelers"] = travelers

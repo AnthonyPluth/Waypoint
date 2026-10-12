@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -541,5 +541,22 @@ describe("trip travellers", () => {
     expect(all.map((who) => who.name)).toEqual(["Jane Doe"]);
     expect(showBookingTravellers(cancelled, all)).toBe(false);
     expect(showBookingTravellers(segment({ kind: "train", provider: "Local Rail", status: "cancelled", travelers: [sam] }), all)).toBe(true);
+  });
+});
+
+
+describe("a rental car's address beside its pick-up", () => {
+  it("is the same place when the text matches, ignoring case and spacing", () => {
+    expect(samePlace("Example  Rental", "example rental ")).toBe(true);
+    expect(samePlace("1 Rental Way", "Example Rental")).toBe(false);
+    expect(samePlace("", "")).toBe(false);
+    expect(samePlace(undefined, "Example Rental")).toBe(false);
+  });
+
+  it("is left out for a car only when it repeats the pick-up", () => {
+    const car = (address: string) => ({ kind: "car" as const, origin: "Example Rental", details: { address } });
+    expect(extraAddress(car("Example Rental"))).toBeUndefined();
+    expect(extraAddress(car("1 Rental Way"))).toBe("1 Rental Way");
+    expect(extraAddress({ kind: "hotel", origin: "Example Rental", details: { address: "Example Rental" } })).toBe("Example Rental");
   });
 });
