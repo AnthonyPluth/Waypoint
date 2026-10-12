@@ -67,6 +67,8 @@ Off by default (Settings → Mail and AI → AI; see [AI suggestions](/Waypoint/
 
 Only the plain text goes out, with every email address (the sender’s, the recipient’s, those in a forwarded message’s header lines) replaced by `[email]`, quoted replies and footers removed, and labelled or number-shaped loyalty, Known Traveler and card numbers removed (as well as the numbers saved under Loyalty). Either way the suggestion is a draft for you to confirm, not something Waypoint saves on its own, and prompts and replies are never logged.
 
+The same setting powers one small button that doesn’t involve email at all: the sparkle beside a trip’s destination, which asks the model for a short subtitle such as “Colorado & Texas”. It sends only the trip’s name (without its dates) and the cities, states and countries of its bookings, in order, with the kind of booking: no email text, confirmation code, name, email address, street address or loyalty number, and only when you press it. See [AI suggestions](/Waypoint/start/ai/#the-destination-button-on-a-trip).
+
 ## What this means for the rest of the setup
 
 - The Google OAuth client’s ID and secret are set in `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`); each connected mailbox’s refresh token is stored encrypted with `WAYPOINT_SECRET_KEY`, and backups hold it encrypted too ([Configuration](/Waypoint/reference/configuration/)).

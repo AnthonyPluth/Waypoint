@@ -230,6 +230,7 @@
         "tests/test_api_contract.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
+        "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -249,6 +250,7 @@
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_routes.py",
+        "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -260,6 +262,7 @@
       "path": "/api/trips/{id}",
       "handler": "waypoint/server/api/trips.py:api_trip_edit",
       "web": [
+        "frontend/src/lib/components/TripDestination.svelte",
         "frontend/src/pages/Trip.svelte"
       ],
       "tests": [
@@ -267,6 +270,7 @@
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_routes.py",
+        "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -285,6 +289,7 @@
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_monitoring.py",
+        "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -316,6 +321,22 @@
         "tests/test_api_contract.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/trips/{id}/destination/suggest",
+      "handler": "waypoint/server/api/trips.py:api_trip_destination_suggest",
+      "web": [
+        "frontend/src/lib/components/TripDestination.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -416,6 +437,7 @@
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_offline.py",
+        "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -435,6 +457,7 @@
         "tests/test_mail_scan.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
+        "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -1297,7 +1320,8 @@
         "tests/test_monitoring.py",
         "tests/test_security.py",
         "tests/test_server.py",
-        "tests/test_server_errors.py"
+        "tests/test_server_errors.py",
+        "tests/test_trip_destination.py"
       ],
       "docs": [
         "start/docker"

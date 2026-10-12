@@ -651,6 +651,46 @@
         }
       }
     },
+    "/api/trips/{id}/destination/suggest": {
+      "post": {
+        "operationId": "api_trip_destination_suggest",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_destination_suggest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DestinationSuggestion"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/segments": {
       "post": {
         "operationId": "api_segment_add",
@@ -3791,6 +3831,18 @@
         ],
         "additionalProperties": false
       },
+      "DestinationSuggestion": {
+        "type": "object",
+        "properties": {
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "suggestion"
+        ],
+        "additionalProperties": false
+      },
       "DeviceBody": {
         "type": "object",
         "properties": {
@@ -6251,6 +6303,9 @@
               "integer",
               "null"
             ]
+          },
+          "ai": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -6259,7 +6314,8 @@
           "user",
           "last_backup",
           "review_count",
-          "person_id"
+          "person_id",
+          "ai"
         ],
         "additionalProperties": false
       },
@@ -7104,6 +7160,9 @@
               "null"
             ]
           },
+          "destination_manual": {
+            "type": "boolean"
+          },
           "notes": {
             "type": [
               "string",
@@ -7132,6 +7191,7 @@
           "start_date",
           "end_date",
           "destination",
+          "destination_manual",
           "notes",
           "auto",
           "booked_by",

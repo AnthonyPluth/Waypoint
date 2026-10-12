@@ -9,7 +9,7 @@ Waypoint ships with two reference lists, loaded into the database by its migrati
 
 ## Airports
 
-The airports (name, city, country, time zone and coordinates, by three-letter IATA code) come from [OurAirports](https://ourairports.com/data/)’ public-domain data, through the [`airportsdata`](https://pypi.org/project/airportsdata/) package, which adds each airport’s time zone. `tools/airports.py` writes `waypoint/storage/airports.tsv.gz`.
+The airports (name, city, country, time zone and coordinates, by three-letter IATA code) come from [OurAirports](https://ourairports.com/data/)’ public-domain data, through the [`airportsdata`](https://pypi.org/project/airportsdata/) package, which adds each airport’s time zone. `tools/airports.py` writes `waypoint/storage/airports.tsv.gz`. It also writes `waypoint/storage/regions.tsv.gz` from the same data: the state of each US airport and the English name of each country, which name the places in a trip’s destination (country names come from the system’s ISO 3166 list, with a few shortened).
 
 ## Airlines
 

@@ -413,6 +413,18 @@ describe("Trip", () => {
     expect(screen.queryByLabelText("Trip name")).toBeNull();
   });
 
+  it("edits the destination under the dates, sending only the destination, and shows the new one", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit destination" }));
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST"
+      ? { ...held, destination: "Colorado & Texas", destination_manual: true } : held) as never);
+    await u.type(screen.getByLabelText("Destination"), "Colorado & Texas");
+    await u.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "POST", body: { destination: "Colorado & Texas" } }));
+    expect(await screen.findByText(/· Colorado & Texas/)).toBeInTheDocument();
+  });
+
   it("won't save an empty trip name, says why when the server refuses, and Cancel keeps the old name", async () => {
     render(TripPage);
     const u = userEvent.setup();
