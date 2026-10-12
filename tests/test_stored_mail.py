@@ -8,16 +8,8 @@ from tests.shared import DbCase
 from waypoint.storage import backup, db, schema, secretbox, stored_mail
 from waypoint.storage.models import Mailbox, ReviewItem, Segment, StoredMessage, Trip
 
-CONTENT: stored_mail.Content = {
-    "subject": "Your itinerary: CANARY-KEPT-SUBJECT-5T2K",
-    "sender_domain": "example-air.example",
-    "received": "2026-10-17",
-    "text": "Hello CANARY-KEPT-BODY-8W3M.",
-    "html": "<p>Hello CANARY-KEPT-BODY-8W3M.</p>",
-    "truncated": False,
-    "original": False,
-    "images": 0,
-}
+CONTENT: stored_mail.Content = {"subject": "Your itinerary: CANARY-KEPT-SUBJECT-5T2K", "sender_domain": "example-air.example", "received": "2026-10-17",
+                                "text": "Hello CANARY-KEPT-BODY-8W3M.", "html": "<p>Hello CANARY-KEPT-BODY-8W3M.</p>", "truncated": False, "original": False, "images": 0}
 
 PICTURE = b"\x89PNG\r\n\x1a\n" + b"CANARY-PICTURE-BYTES-2R8T" + bytes(40)
 
@@ -27,32 +19,12 @@ class KeptMessageTests(DbCase):
         super().setUp()
         db.init(self.path)
         with db.session() as conn:
-            self.box = int(
-                conn.execute(
-                    insert(Mailbox).values(
-                        owner_sub="u-jane",
-                        address="jane@gmail.example",
-                        token=secretbox.encrypt("t"),
-                        status="connected",
-                        created=1.0,
-                    )
-                ).lastrowid
-            )
+            self.box = int(conn.execute(insert(Mailbox).values(owner_sub="u-jane", address="jane@gmail.example", token=secretbox.encrypt("t"),
+                                                               status="connected", created=1.0)).lastrowid)
             conn.execute(insert(Trip).values(id=1, name="T", auto=True))
             for i in (1, 2):
-                conn.execute(
-                    insert(Segment).values(
-                        id=i,
-                        trip_id=1,
-                        kind="flight",
-                        status="confirmed",
-                        start_local="2026-11-20T19:00",
-                        start_zone="UTC",
-                        end_local="2026-11-21T07:10",
-                        end_zone="UTC",
-                        source="email",
-                    )
-                )
+                conn.execute(insert(Segment).values(id=i, trip_id=1, kind="flight", status="confirmed", start_local="2026-11-20T19:00", start_zone="UTC",
+                                                    end_local="2026-11-21T07:10", end_zone="UTC", source="email"))
 
     def test_a_message_is_kept_as_one_encrypted_value_and_comes_back_as_it_was(self):
         with db.session() as conn:
@@ -66,96 +38,47 @@ class KeptMessageTests(DbCase):
     def test_keeping_a_message_again_replaces_it(self):
         with db.session() as conn:
             first = stored_mail.put(conn, self.box, "m1", CONTENT, 5.0)
-            again = stored_mail.put(
-                conn, self.box, "m1", {**CONTENT, "text": "Changed"}, 9.0
-            )
+            again = stored_mail.put(conn, self.box, "m1", {**CONTENT, "text": "Changed"}, 9.0)
             self.assertEqual(first, again)
             found = stored_mail.get(conn, self.box, "m1")
             assert found
             self.assertEqual(found["text"], "Changed")
 
-    def test_a_message_that_cannot_be_unlocked_or_isnt_what_was_kept_reads_as_none(
-        self,
-    ):
+    def test_a_message_that_cannot_be_unlocked_or_isnt_what_was_kept_reads_as_none(self):
         with db.session() as conn:
             stored_mail.put(conn, self.box, "m1", CONTENT, 5.0)
-            conn.execute(
-                StoredMessage.__table__.update().values(
-                    content=secretbox.PREFIX + "bad"
-                )
-            )
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.PREFIX + "bad"))
             self.assertIsNone(stored_mail.get(conn, self.box, "m1"))
-            conn.execute(
-                StoredMessage.__table__.update().values(
-                    content=secretbox.encrypt(json.dumps([1, 2]))
-                )
-            )
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.encrypt(json.dumps([1, 2]))))
             self.assertIsNone(stored_mail.get(conn, self.box, "m1"))
-            conn.execute(
-                StoredMessage.__table__.update().values(
-                    content=secretbox.encrypt(
-                        json.dumps({"subject": 5, "text": None, "html": 7})
-                    )
-                )
-            )
-            self.assertEqual(
-                stored_mail.get(conn, self.box, "m1"),
-                {
-                    "subject": None,
-                    "sender_domain": None,
-                    "received": None,
-                    "text": "",
-                    "html": None,
-                    "truncated": False,
-                    "original": False,
-                    "images": 0,
-                },
-            )
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.encrypt(json.dumps({"subject": 5, "text": None, "html": 7}))))
+            self.assertEqual(stored_mail.get(conn, self.box, "m1"), {"subject": None, "sender_domain": None, "received": None, "text": "",
+                                                                      "html": None, "truncated": False, "original": False, "images": 0})
 
-    def test_subjects_come_without_opening_the_messages_and_are_encrypted_on_their_own(
-        self,
-    ):
+    def test_subjects_come_without_opening_the_messages_and_are_encrypted_on_their_own(self):
         with db.session() as conn:
             stored_mail.put(conn, self.box, "m1", CONTENT, 5.0)
             stored_mail.put(conn, self.box, "m2", {**CONTENT, "subject": None}, 5.0)
-            raw = conn.execute(
-                select(StoredMessage.subject).where(StoredMessage.message_id == "m1")
-            ).scalar()
+            raw = conn.execute(select(StoredMessage.subject).where(StoredMessage.message_id == "m1")).scalar()
             self.assertTrue(secretbox.is_encrypted(raw))
             self.assertNotIn("CANARY-KEPT", raw)
-            self.assertEqual(
-                stored_mail.subjects(conn, [self.box]),
-                {(self.box, "m1"): CONTENT["subject"], (self.box, "m2"): None},
-            )
+            self.assertEqual(stored_mail.subjects(conn, [self.box]), {(self.box, "m1"): CONTENT["subject"], (self.box, "m2"): None})
             self.assertEqual(stored_mail.subjects(conn, [self.box + 99]), {})
             self.assertEqual(stored_mail.subjects(conn, []), {})
-            with mock.patch.object(
-                stored_mail, "get", side_effect=AssertionError("opened a message")
-            ):
+            with mock.patch.object(stored_mail, "get", side_effect=AssertionError("opened a message")):
                 stored_mail.subjects(conn, [self.box])
-            conn.execute(
-                StoredMessage.__table__.update().values(
-                    subject=secretbox.PREFIX + "bad"
-                )
-            )
-            self.assertEqual(
-                stored_mail.subjects(conn, [self.box])[(self.box, "m1")], None
-            )
+            conn.execute(StoredMessage.__table__.update().values(subject=secretbox.PREFIX + "bad"))
+            self.assertEqual(stored_mail.subjects(conn, [self.box])[(self.box, "m1")], None)
 
     def test_a_booking_keeps_the_messages_it_was_made_from_newest_first(self):
         with db.session() as conn:
             stored_mail.put(conn, self.box, "old", {**CONTENT, "subject": "First"}, 1.0)
-            stored_mail.put(
-                conn, self.box, "new", {**CONTENT, "subject": "Update"}, 2.0
-            )
+            stored_mail.put(conn, self.box, "new", {**CONTENT, "subject": "Update"}, 2.0)
             self.assertFalse(stored_mail.link(conn, 1, self.box, "none-kept"))
             self.assertTrue(stored_mail.link(conn, 1, self.box, "old"))
             self.assertTrue(stored_mail.link(conn, 1, self.box, "new"))
             stored_mail.link(conn, 1, self.box, "new")
-            self.assertEqual(
-                [c["subject"] for c in stored_mail.for_segment(conn, 1)],
-                ["Update", "First"],
-            )
+            self.assertEqual([c["subject"] for c in stored_mail.for_segment(conn, 1)], ["Update", "First"])
             self.assertEqual(stored_mail.for_segment(conn, 2), [])
             self.assertEqual(stored_mail.with_messages(conn, [1, 2]), {1})
             self.assertEqual(stored_mail.with_messages(conn, []), set())
@@ -165,15 +88,7 @@ class KeptMessageTests(DbCase):
             for mid in ("item", "booking", "both", "nobody"):
                 stored_mail.put(conn, self.box, mid, CONTENT, 1.0)
             for mid in ("item", "both"):
-                conn.execute(
-                    insert(ReviewItem).values(
-                        mailbox_id=self.box,
-                        message_id=mid,
-                        sender_domain="x.example",
-                        reason="no_markup",
-                        created=1.0,
-                    )
-                )
+                conn.execute(insert(ReviewItem).values(mailbox_id=self.box, message_id=mid, sender_domain="x.example", reason="no_markup", created=1.0))
             for mid in ("booking", "both"):
                 stored_mail.link(conn, 1, self.box, mid)
             self.assertEqual(stored_mail.prune(conn), 1)
@@ -185,59 +100,20 @@ class KeptMessageTests(DbCase):
             self.assertEqual(stored_mail.prune(conn), 2)
             self.assertEqual(conn.execute(select(StoredMessage.id)).fetchall(), [])
 
-    def test_clearing_a_bookings_messages_unlinks_them_and_deletes_only_those_nothing_else_needs(
-        self,
-    ):
+    def test_clearing_a_bookings_messages_unlinks_them_and_deletes_only_those_nothing_else_needs(self):
         with db.session() as conn:
             conn.execute(insert(Trip).values(id=2, name="Other", auto=True))
-            conn.execute(
-                insert(Segment).values(
-                    id=3,
-                    trip_id=2,
-                    kind="flight",
-                    status="confirmed",
-                    start_local="2026-12-20T19:00",
-                    start_zone="UTC",
-                    end_local="2026-12-21T07:10",
-                    end_zone="UTC",
-                    source="email",
-                )
-            )
+            conn.execute(insert(Segment).values(id=3, trip_id=2, kind="flight", status="confirmed", start_local="2026-12-20T19:00", start_zone="UTC",
+                                                end_local="2026-12-21T07:10", end_zone="UTC", source="email"))
             for mid in ("alone", "shared", "waiting", "stray"):
-                stored_mail.put(
-                    conn,
-                    self.box,
-                    mid,
-                    CONTENT,
-                    1.0,
-                    [{"type": "image/png", "data": PICTURE}],
-                )
-            conn.execute(
-                insert(ReviewItem).values(
-                    mailbox_id=self.box,
-                    message_id="waiting",
-                    sender_domain="x.example",
-                    reason="no_markup",
-                    created=1.0,
-                )
-            )
-            for segment, mid in (
-                (1, "alone"),
-                (2, "alone"),
-                (2, "shared"),
-                (3, "shared"),
-                (1, "waiting"),
-            ):
+                stored_mail.put(conn, self.box, mid, CONTENT, 1.0, [{"type": "image/png", "data": PICTURE}])
+            conn.execute(insert(ReviewItem).values(mailbox_id=self.box, message_id="waiting", sender_domain="x.example", reason="no_markup", created=1.0))
+            for segment, mid in ((1, "alone"), (2, "alone"), (2, "shared"), (3, "shared"), (1, "waiting")):
                 stored_mail.link(conn, segment, self.box, mid)
-            self.assertEqual(
-                stored_mail.message_ids(conn, [1, 2, 3, 99]).keys(), {1, 2, 3}
-            )
+            self.assertEqual(stored_mail.message_ids(conn, [1, 2, 3, 99]).keys(), {1, 2, 3})
             self.assertEqual(stored_mail.clear_for_segments(conn, []), 0)
             self.assertEqual(stored_mail.clear_for_segments(conn, [1, 2]), 1)
-            self.assertEqual(
-                {m for (m,) in conn.execute(select(StoredMessage.message_id))},
-                {"shared", "waiting", "stray"},
-            )
+            self.assertEqual({m for (m,) in conn.execute(select(StoredMessage.message_id))}, {"shared", "waiting", "stray"})
             self.assertEqual(stored_mail.with_messages(conn, [1, 2, 3]), {3})
             self.assertEqual(stored_mail.clear_for_segments(conn, [1, 2]), 0)
 
@@ -247,10 +123,7 @@ class KeptMessageTests(DbCase):
             stored_mail.link(conn, 1, self.box, "m1")
             conn.execute(Mailbox.__table__.delete().where(Mailbox.id == self.box))
             self.assertEqual(conn.execute(select(StoredMessage.id)).fetchall(), [])
-            self.assertEqual(
-                conn.execute(select(schema.segment_messages.c.segment_id)).fetchall(),
-                [],
-            )
+            self.assertEqual(conn.execute(select(schema.segment_messages.c.segment_id)).fetchall(), [])
             self.assertEqual(conn.execute(select(Segment.id)).fetchall(), [(1,), (2,)])
 
     def test_a_backup_carries_kept_messages_encrypted_and_never_in_the_clear(self):
@@ -265,24 +138,12 @@ class KeptMessageTests(DbCase):
             self.assertTrue(secretbox.is_encrypted(row[columns.index("subject")]))
             self.assertEqual(len(exported["tables"]["segment_messages"]["rows"]), 1)
             self.assertNotIn(b"CANARY-KEPT", backup.dump(conn))
-            self.assertNotIn(
-                b"CANARY-KEPT", __import__("gzip").decompress(backup.dump(conn))
-            )
+            self.assertNotIn(b"CANARY-KEPT", __import__("gzip").decompress(backup.dump(conn)))
 
     def test_pictures_are_kept_in_the_same_encrypted_value_and_come_back_exact(self):
-        pictures: list[stored_mail.Image] = [
-            {"type": "image/png", "data": PICTURE},
-            {"type": "image/gif", "data": bytes(range(256))},
-        ]
+        pictures: list[stored_mail.Image] = [{"type": "image/png", "data": PICTURE}, {"type": "image/gif", "data": bytes(range(256))}]
         with db.session() as conn:
-            stored_mail.put(
-                conn,
-                self.box,
-                "m1",
-                {**CONTENT, "images": 2, "original": True},
-                5.0,
-                pictures,
-            )
+            stored_mail.put(conn, self.box, "m1", {**CONTENT, "images": 2, "original": True}, 5.0, pictures)
             raw = conn.execute(select(StoredMessage.content)).scalar()
             self.assertTrue(secretbox.is_encrypted(raw))
             self.assertNotIn("CANARY-PICTURE", raw)
@@ -290,10 +151,7 @@ class KeptMessageTests(DbCase):
             assert opened
             self.assertEqual((opened["images"], opened["original"]), (2, True))
             self.assertNotIn("data", opened)
-            self.assertEqual(
-                [stored_mail.image_of(conn, self.box, "m1", i) for i in (0, 1)],
-                pictures,
-            )
+            self.assertEqual([stored_mail.image_of(conn, self.box, "m1", i) for i in (0, 1)], pictures)
             for index in (-1, 2, 99):
                 self.assertIsNone(stored_mail.image_of(conn, self.box, "m1", index))
             self.assertIsNone(stored_mail.image_of(conn, self.box, "other", 0))
@@ -303,20 +161,8 @@ class KeptMessageTests(DbCase):
     def test_a_message_kept_before_pictures_shows_as_not_original_with_none(self):
         with db.session() as conn:
             stored_mail.put(conn, self.box, "m1", CONTENT, 5.0)
-            conn.execute(
-                StoredMessage.__table__.update().values(
-                    content=secretbox.encrypt(
-                        json.dumps(
-                            {
-                                "subject": "S",
-                                "text": "T",
-                                "html": "<p>T</p>",
-                                "truncated": False,
-                            }
-                        )
-                    )
-                )
-            )
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.encrypt(json.dumps(
+                {"subject": "S", "text": "T", "html": "<p>T</p>", "truncated": False}))))
             opened = stored_mail.get(conn, self.box, "m1")
             assert opened
             self.assertEqual((opened["original"], opened["images"]), (False, 0))
@@ -325,112 +171,47 @@ class KeptMessageTests(DbCase):
     def test_a_picture_that_cannot_be_read_is_not_served(self):
         with db.session() as conn:
             stored_mail.put(conn, self.box, "m1", CONTENT, 5.0)
-            damaged = {
-                **CONTENT,
-                "images": [
-                    {"type": "image/png", "data": "!!not base64!!"},
-                    {"type": "image/png"},
-                    "x",
-                    {"type": "image/png", "data": ""},
-                ],
-            }
-            conn.execute(
-                StoredMessage.__table__.update().values(
-                    content=secretbox.encrypt(json.dumps(damaged))
-                )
-            )
-            self.assertEqual(
-                [stored_mail.image_of(conn, self.box, "m1", i) for i in range(4)],
-                [None] * 4,
-            )
-            conn.execute(
-                StoredMessage.__table__.update().values(
-                    content=secretbox.PREFIX + "bad"
-                )
-            )
+            damaged = {**CONTENT, "images": [{"type": "image/png", "data": "!!not base64!!"}, {"type": "image/png"}, "x", {"type": "image/png", "data": ""}]}
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.encrypt(json.dumps(damaged))))
+            self.assertEqual([stored_mail.image_of(conn, self.box, "m1", i) for i in range(4)], [None] * 4)
+            conn.execute(StoredMessage.__table__.update().values(content=secretbox.PREFIX + "bad"))
             self.assertIsNone(stored_mail.image_of(conn, self.box, "m1", 0))
 
-    def test_the_pictures_of_the_bookings_messages_follow_the_same_order_as_the_messages(
-        self,
-    ):
+    def test_the_pictures_of_the_bookings_messages_follow_the_same_order_as_the_messages(self):
         with db.session() as conn:
-            stored_mail.put(
-                conn,
-                self.box,
-                "old",
-                {**CONTENT, "images": 1},
-                1.0,
-                [{"type": "image/png", "data": b"OLD-PICTURE"}],
-            )
-            stored_mail.put(
-                conn,
-                self.box,
-                "new",
-                {**CONTENT, "images": 1},
-                2.0,
-                [{"type": "image/png", "data": b"NEW-PICTURE"}],
-            )
+            stored_mail.put(conn, self.box, "old", {**CONTENT, "images": 1}, 1.0, [{"type": "image/png", "data": b"OLD-PICTURE"}])
+            stored_mail.put(conn, self.box, "new", {**CONTENT, "images": 1}, 2.0, [{"type": "image/png", "data": b"NEW-PICTURE"}])
             stored_mail.put(conn, self.box, "unreadable", CONTENT, 3.0)
-            conn.execute(
-                StoredMessage.__table__.update()
-                .where(StoredMessage.message_id == "unreadable")
-                .values(content=secretbox.PREFIX + "bad")
-            )
+            conn.execute(StoredMessage.__table__.update().where(StoredMessage.message_id == "unreadable").values(content=secretbox.PREFIX + "bad"))
             for mid in ("old", "new", "unreadable"):
                 stored_mail.link(conn, 1, self.box, mid)
             self.assertEqual(len(stored_mail.for_segment(conn, 1)), 2)
-            self.assertEqual(
-                [
-                    (stored_mail.image_for_segment(conn, 1, i, 0) or {})["data"]
-                    for i in (0, 1)
-                ],
-                [b"NEW-PICTURE", b"OLD-PICTURE"],
-            )
+            self.assertEqual([(stored_mail.image_for_segment(conn, 1, i, 0) or {})["data"] for i in (0, 1)], [b"NEW-PICTURE", b"OLD-PICTURE"])
             self.assertIsNone(stored_mail.image_for_segment(conn, 1, 2, 0))
             self.assertIsNone(stored_mail.image_for_segment(conn, 1, -1, 0))
             self.assertIsNone(stored_mail.image_for_segment(conn, 2, 0, 0))
 
     def test_a_backup_carries_the_pictures_encrypted_and_they_come_back_exact(self):
         with db.session() as conn:
-            stored_mail.put(
-                conn,
-                self.box,
-                "m1",
-                {**CONTENT, "images": 1, "original": True},
-                1.0,
-                [{"type": "image/png", "data": PICTURE}],
-            )
+            stored_mail.put(conn, self.box, "m1", {**CONTENT, "images": 1, "original": True}, 1.0, [{"type": "image/png", "data": PICTURE}])
             stored_mail.link(conn, 1, self.box, "m1")
             conn.commit()
             dumped = backup.dump(conn)
             self.assertNotIn(b"CANARY-PICTURE", dumped)
             self.assertNotIn(b"CANARY-PICTURE", __import__("gzip").decompress(dumped))
-            self.assertNotIn(
-                base64.b64encode(PICTURE), __import__("gzip").decompress(dumped)
-            )
+            self.assertNotIn(base64.b64encode(PICTURE), __import__("gzip").decompress(dumped))
             data = backup.load(dumped)
             columns = data["tables"]["stored_messages"]["columns"]
             [row] = data["tables"]["stored_messages"]["rows"]
             sealed = row[columns.index("content")]
             self.assertTrue(secretbox.is_encrypted(sealed))
             conn.execute(StoredMessage.__table__.update().values(content=sealed))
-            self.assertEqual(
-                stored_mail.image_of(conn, self.box, "m1", 0),
-                {"type": "image/png", "data": PICTURE},
-            )
+            self.assertEqual(stored_mail.image_of(conn, self.box, "m1", 0), {"type": "image/png", "data": PICTURE})
 
     def test_a_message_kept_before_encryption_is_encrypted_at_start(self):
         with db.session() as conn:
             stored_mail.put(conn, self.box, "m1", CONTENT, 1.0)
-            conn.execute(
-                StoredMessage.__table__.update().values(
-                    content=json.dumps(dict(CONTENT))
-                )
-            )
+            conn.execute(StoredMessage.__table__.update().values(content=json.dumps(dict(CONTENT))))
             self.assertGreaterEqual(secretbox.encrypt_stored(conn), 1)
-            self.assertTrue(
-                secretbox.is_encrypted(
-                    conn.execute(select(StoredMessage.content)).scalar()
-                )
-            )
+            self.assertTrue(secretbox.is_encrypted(conn.execute(select(StoredMessage.content)).scalar()))
             self.assertEqual(stored_mail.get(conn, self.box, "m1"), CONTENT)
