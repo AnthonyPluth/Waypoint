@@ -100,6 +100,23 @@ class KeptMessageTests(DbCase):
             self.assertEqual(stored_mail.prune(conn), 2)
             self.assertEqual(conn.execute(select(StoredMessage.id)).fetchall(), [])
 
+    def test_clearing_a_bookings_messages_unlinks_them_and_deletes_only_those_nothing_else_needs(self):
+        with db.session() as conn:
+            conn.execute(insert(Trip).values(id=2, name="Other", auto=True))
+            conn.execute(insert(Segment).values(id=3, trip_id=2, kind="flight", status="confirmed", start_local="2026-12-20T19:00", start_zone="UTC",
+                                                end_local="2026-12-21T07:10", end_zone="UTC", source="email"))
+            for mid in ("alone", "shared", "waiting", "stray"):
+                stored_mail.put(conn, self.box, mid, CONTENT, 1.0, [{"type": "image/png", "data": PICTURE}])
+            conn.execute(insert(ReviewItem).values(mailbox_id=self.box, message_id="waiting", sender_domain="x.example", reason="no_markup", created=1.0))
+            for segment, mid in ((1, "alone"), (2, "alone"), (2, "shared"), (3, "shared"), (1, "waiting")):
+                stored_mail.link(conn, segment, self.box, mid)
+            self.assertEqual(stored_mail.message_ids(conn, [1, 2, 3, 99]).keys(), {1, 2, 3})
+            self.assertEqual(stored_mail.clear_for_segments(conn, []), 0)
+            self.assertEqual(stored_mail.clear_for_segments(conn, [1, 2]), 3)
+            self.assertEqual({m for (m,) in conn.execute(select(StoredMessage.message_id))}, {"shared", "waiting", "stray"})
+            self.assertEqual(stored_mail.with_messages(conn, [1, 2, 3]), {3})
+            self.assertEqual(stored_mail.clear_for_segments(conn, [1, 2]), 0)
+
     def test_a_mailbox_that_goes_takes_its_messages_and_the_links(self):
         with db.session() as conn:
             stored_mail.put(conn, self.box, "m1", CONTENT, 1.0)

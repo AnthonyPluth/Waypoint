@@ -8,7 +8,7 @@ import json
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, TypedDict
 
-from sqlalchemy import delete, exists, select
+from sqlalchemy import ColumnElement, delete, exists, select
 
 from . import db, secretbox
 from .models import ReviewItem, SegmentMessage, StoredMessage
@@ -158,7 +158,32 @@ def with_messages(conn: db.Connection, segment_ids: Iterable[int]) -> set[int]:
     return set(conn.execute(select(SegmentMessage.segment_id).where(SegmentMessage.segment_id.in_(ids)).distinct()).scalars())
 
 
-def prune(conn: db.Connection) -> int:
+def _needed() -> tuple[ColumnElement[bool], ColumnElement[bool]]:
     held_by_item = exists().where(ReviewItem.mailbox_id == StoredMessage.mailbox_id, ReviewItem.message_id == StoredMessage.message_id)
     held_by_booking = exists().where(SegmentMessage.stored_message_id == StoredMessage.id)
-    return int(conn.execute(delete(StoredMessage).where(~held_by_item, ~held_by_booking)).rowcount)
+    return ~held_by_item, ~held_by_booking
+
+
+def prune(conn: db.Connection) -> int:
+    return int(conn.execute(delete(StoredMessage).where(*_needed())).rowcount)
+
+
+def message_ids(conn: db.Connection, segment_ids: Iterable[int]) -> dict[int, set[int]]:
+    ids = sorted(set(segment_ids))
+    found: dict[int, set[int]] = {}
+    if ids:
+        for r in conn.execute(select(SegmentMessage.segment_id, SegmentMessage.stored_message_id).where(SegmentMessage.segment_id.in_(ids))).fetchall():
+            found.setdefault(int(r["segment_id"]), set()).add(int(r["stored_message_id"]))
+    return found
+
+
+def clear_for_segments(conn: db.Connection, segment_ids: Iterable[int]) -> int:
+    ids = sorted(set(segment_ids))
+    if not ids:
+        return 0
+    linked = {m for kept in message_ids(conn, ids).values() for m in kept}
+    if not linked:
+        return 0
+    conn.execute(delete(SegmentMessage).where(SegmentMessage.segment_id.in_(ids)))
+    conn.execute(delete(StoredMessage).where(StoredMessage.id.in_(sorted(linked)), *_needed()))
+    return len(linked)

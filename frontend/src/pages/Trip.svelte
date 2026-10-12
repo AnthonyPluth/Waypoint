@@ -24,6 +24,7 @@
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
+  import TripDone from "$lib/components/TripDone.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
   import { appWord, bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, untimed, vendorLink } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
@@ -311,6 +312,7 @@
       {/if}
     {/each}
   </ul>
+  <TripDone trip={t} ondone={() => { onchanged?.(); void load(); }} />
 {/if}
 
 <OfflineSetup bind:open={askOffline} onenabled={() => trip && void saveTripCopy(trip)} />

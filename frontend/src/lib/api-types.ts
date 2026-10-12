@@ -211,6 +211,10 @@ export interface DistanceUnitBody {
   distance_unit: "mi" | "km";
 }
 
+export interface EmailsCleared {
+  removed: number;
+}
+
 export interface FeedMade {
   url: string;
 }
@@ -930,6 +934,8 @@ export interface Trip {
   notes: string | null;
   auto: boolean;
   booked_by: number | null;
+  emails: number;
+  can_clear_emails: boolean;
   segments: Segment[];
 }
 
@@ -984,6 +990,7 @@ export interface Endpoints {
   "GET /api/trips/{id}": { body: never; reply: Trip };
   "POST /api/trips/{id}": { body: TripBody; reply: Trip };
   "DELETE /api/trips/{id}": { body: never; reply: Ok };
+  "POST /api/trips/{id}/emails/clear": { body: never; reply: EmailsCleared };
   "POST /api/trips/{id}/merge": { body: MergeBody; reply: Trip };
   "POST /api/trips/{id}/split": { body: SplitBody; reply: Trip };
   "POST /api/segments": { body: SegmentBody; reply: Segment };

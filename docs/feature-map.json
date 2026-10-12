@@ -230,6 +230,7 @@
         "tests/test_api_contract.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
+        "tests/test_trip_emails_clear.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -249,6 +250,7 @@
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_routes.py",
+        "tests/test_trip_emails_clear.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -267,6 +269,7 @@
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_routes.py",
+        "tests/test_trip_emails_clear.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -285,6 +288,23 @@
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_monitoring.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/trips/{id}/emails/clear",
+      "handler": "waypoint/server/api/trips.py:api_trip_emails_clear",
+      "web": [
+        "frontend/src/lib/components/TripDone.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_trip_emails_clear.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -336,6 +356,7 @@
         "tests/test_mcp_routes.py",
         "tests/test_offline.py",
         "tests/test_reminders.py",
+        "tests/test_trip_emails_clear.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -353,6 +374,7 @@
         "tests/test_mail_scan.py",
         "tests/test_mcp.py",
         "tests/test_offline.py",
+        "tests/test_trip_emails_clear.py",
         "tests/test_trips.py"
       ],
       "docs": [
