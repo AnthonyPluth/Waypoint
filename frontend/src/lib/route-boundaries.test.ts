@@ -57,7 +57,7 @@ describe("the state lines on long flights", () => {
   const seattle = stopAt("Seattle", 47.45, -122.31, "airport"), miami = stopAt("Miami", 25.79, -80.29, "airport");
   const portland = stopAt("Portland", 43.65, -70.31, "airport"), sanDiego = stopAt("San Diego", 32.73, -117.19, "airport");
 
-  it("shows at the full view of a coast-to-coast flight at phone, tablet and desktop widths", () => {
+  it("shows at the full view of a coast-to-coast flight in the phone and the wide layouts", () => {
     for (const [width, height] of [[600, 640], [960, 520]]) {
       for (const pair of [[seattle, miami], [sanDiego, portland]]) {
         const projection = routeProjection(pair, width, height);
