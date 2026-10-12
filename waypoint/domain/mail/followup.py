@@ -55,8 +55,10 @@ def attach(conn: db.Connection, viewer: Viewer, message: extract.Message) -> Fol
         return None
     sharing = [s for s in visibility.visible_segments(conn, viewer) if s.confirmation and references.normal(s.confirmation) in message.found.codes]
     related = [s for s in sharing if _same_sender(conn, s, message.sender_domain)]
-    if len(related) != 1:
+    if len({(references.normal(s.confirmation or ""), s.trip_id) for s in related}) != 1:
         return None
-    if message.price is not None and trips.fill_price(related[0], {"amount_minor": message.price.amount_minor, "currency": message.price.currency}):
+    if (len(related) == 1 and message.price is not None
+            and trips.fill_price(related[0], {"amount_minor": message.price.amount_minor, "currency": message.price.currency})):
         conn.orm.flush()
-    return Followed(related[0].id, _lacks(conn, related[0], message.found.facts))
+    first = min(related, key=lambda s: (s.start_local, s.id))
+    return Followed(first.id, any(_lacks(conn, s, message.found.facts) for s in related))

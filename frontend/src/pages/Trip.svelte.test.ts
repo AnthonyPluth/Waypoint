@@ -1062,6 +1062,31 @@ describe("Trip", () => {
       expect(within(card).getByRole("button", { name: /^Edit/ })).toBeInTheDocument();
     });
 
+    it("keeps Edit, Move and Remove on a trip that was never marked Done", async () => {
+      held = past({ done_at: null });
+      render(TripPage);
+      const card = await cardOf(hotel);
+      for (const verb of ["Edit", "Move", "Remove"]) expect(within(card).getByRole("button", { name: `${verb} Harbour Hotel` })).toBeInTheDocument();
+    });
+
+    it("hides Edit, Move and Remove once the trip is Done, and keeps the booking's details", async () => {
+      held = past({ done_at: 1700000000 });
+      render(TripPage);
+      const card = await cardOf(hotel);
+      expect(card).toHaveTextContent("H88231");
+      for (const verb of ["Edit", "Move", "Remove"]) expect(within(card).queryByRole("button", { name: new RegExp(`^${verb}`) })).toBeNull();
+    });
+
+    it("hides them on each booking of a combined flight card once the trip is Done", async () => {
+      const first = segment({ id: 1, confirmation: "KQ7M2X", start_local: "2020-03-01T19:00", end_local: "2020-03-02T07:10", details: { flight_number: "AA0101" } });
+      const second = segment({ id: 2, confirmation: "BBBBBB", start_local: "2020-03-01T19:00", end_local: "2020-03-02T07:10", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe", seat: null }] });
+      held = trip([first, second], { start_date: "2020-03-01", end_date: "2020-03-02", done_at: 1700000000 });
+      render(TripPage);
+      const blocks = await screen.findAllByRole("listitem").then((all) => all.filter((li) => li.hasAttribute("data-booking")));
+      expect(blocks).toHaveLength(2);
+      for (const block of blocks) expect(within(block).queryByRole("button", { name: /^(Edit|Move|Remove)/ })).toBeNull();
+    });
+
     describe("live flight status", () => {
       const sams = segment({ id: 5, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe", seat: null }] });
       const gone = { start_local: "2020-03-01T19:00", end_local: "2020-03-02T07:10" };

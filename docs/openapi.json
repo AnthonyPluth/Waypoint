@@ -7514,6 +7514,12 @@
           "can_clear_emails": {
             "type": "boolean"
           },
+          "done_at": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
           "people": {
             "type": "array",
             "items": {
@@ -7542,6 +7548,7 @@
           "booked_by",
           "emails",
           "can_clear_emails",
+          "done_at",
           "people",
           "costs",
           "segments"

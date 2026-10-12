@@ -147,6 +147,22 @@ class FollowUpTests(FollowUpCase):
         self.assertEqual(len(self.items()), 1)
         self.assertNotIn("follow-up", self.outcomes().values())
 
+    def test_a_code_shared_by_the_legs_of_one_reservation_in_one_trip_attaches_and_adds_no_cost(self):
+        legs = [{"kind": "flight", "confirmation": "ZZ9Y8X", "provider": "Example Air", "origin": origin, "destination": destination,
+                 "start_local": start, "end_local": end, "details": {"flight_number": number}}
+                for origin, destination, start, end, number in (("BOS", "DEN", "2026-11-21T07:15", "2026-11-21T10:05", "EX 202"),
+                                                               ("DEN", "BOS", "2026-11-24T18:00", "2026-11-24T23:40", "EX 203"))]
+        out, back = (self.read(lambda conn, leg=leg: trips.add_segment(conn, self.jane, leg)) for leg in legs)
+        assert out is not None and back is not None
+        self.assertEqual(out["trip_id"], back["trip_id"])
+        self.add("m-checkin", follow("Check in for your trip", "Check-in is open for confirmation ZZ9Y8X.\nAmount charged: $410.00", "example-air.example"))
+        result = self.scan()
+        self.assertEqual((result.review, self.items()), (0, []))
+        self.assertEqual(self.outcomes(), {"m-checkin": "follow-up"})
+        self.assertEqual(self.read(lambda conn: conn.execute(select(ScannedMessage.segment_id)).scalar()), out["id"])
+        self.assertEqual(self.read(lambda conn: list(conn.execute(select(Segment.price_minor)).scalars())), [None, None])
+        self.assertEqual(self.stored(), 0)
+
     def test_a_code_that_matches_no_booking_queues_as_before(self):
         self.by_hand(confirmation="Z99999")
         self.add("m-checkin", follow("Your stay: online check-in is open", f"Check-in opens soon for reservation {CODE}.", HOTEL))
