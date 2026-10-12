@@ -246,10 +246,11 @@
               <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.name}</h3>
               <ul class="mt-1 flex flex-col gap-2">
                 {#each group.items as m (m.id)}
+                  {@const reserve = group.items.some((x) => x.logo)}
                   <li class="flex items-start justify-between gap-x-3 text-sm">
                     <div class="min-w-0 flex-1">
                       <p class="flex items-center gap-x-2">
-                        <BrandLogo src={m.logo} size={20} />
+                        <BrandLogo src={m.logo} size={20} monogram={reserve ? m.program : null} />
                         <span class="min-w-0 break-words font-medium">{m.program}</span>
                         {#if m.readable}
                           <button type="button" class="shrink-0 rounded-md px-1.5 py-0.5 phone:min-h-11 phone:-my-3 font-mono underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"

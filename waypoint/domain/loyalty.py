@@ -21,13 +21,38 @@ PROGRAMS: dict[str, tuple[str, ...]] = {
     "known_traveler": ("Global Entry", "NEXUS", "SENTRI", "TSA PreCheck", OTHER),
     "redress": ("DHS TRIP", OTHER),
 }
-AIRLINE_BRANDS: dict[str, str] = {
+PROGRAM_BRANDS: dict[str, str | None] = {
     "Alaska Mileage Plan": "Alaska Airlines",
     "American AAdvantage": "American Airlines",
     "Delta SkyMiles": "Delta Air Lines",
     "JetBlue TrueBlue": "JetBlue Airways",
     "Southwest Rapid Rewards": "Southwest Airlines",
     "United MileagePlus": "United Airlines",
+    "Hilton Honors": "Hilton",
+    "Hyatt World of Hyatt": "Hyatt",
+    "IHG One Rewards": "IHG Hotels & Resorts",
+    "Marriott Bonvoy": "Marriott",
+    "Wyndham Rewards": "Wyndham Hotels & Resorts",
+    "Avis Preferred": "Avis",
+    "Enterprise Plus": "Enterprise",
+    "Hertz Gold Plus Rewards": "Hertz",
+    "National Emerald Club": "National",
+    "Carnival Rewards (formerly VIFP Club)": "Carnival Cruise Line",
+    "Celebrity Captain's Club": "Celebrity Cruises",
+    "Cunard World Club": "Cunard",
+    "Disney Castaway Club": "Disney Cruise Line",
+    "Holland America Mariner Society": "Holland America Line",
+    "MSC Voyagers Club": "MSC Cruises",
+    "Norwegian Latitudes Rewards": "Norwegian Cruise Line",
+    "Oceania Club": "Oceania Cruises",
+    "Princess Captain's Circle": "Princess Cruises",
+    "Royal Caribbean Crown & Anchor Society": "Royal Caribbean",
+    "Virgin Voyages Sailing Club": "Virgin Voyages",
+    "Global Entry": "U.S. Customs and Border Protection",
+    "NEXUS": "U.S. Customs and Border Protection",
+    "SENTRI": "U.S. Customs and Border Protection",
+    "TSA PreCheck": "Transportation Security Administration",
+    "DHS TRIP": "U.S. Department of Homeland Security",
 }
 MASK = "••••"
 
@@ -71,7 +96,7 @@ class Unreadable(Exception):
 
 
 def logo_brand(kind: str, program: str) -> str | None:
-    return AIRLINE_BRANDS.get(program) if kind == "airline" else None
+    return PROGRAM_BRANDS.get(program) if program in PROGRAMS.get(kind, ()) else None
 
 
 def mask(number: str) -> str:

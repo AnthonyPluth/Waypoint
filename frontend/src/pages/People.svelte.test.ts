@@ -65,25 +65,50 @@ describe("People", () => {
     expect(within(list).getByText(/Legal name Mia Rose Doe · Printed as DOE\/MIA MISS/)).toBeInTheDocument();
   });
 
-  it("shows an airline membership's logo beside its program, decoratively, and none for any other kind or a missing one", async () => {
+  it("shows a logo beside every kind of program that has one, decoratively, and a monogram in its space for a row without", async () => {
     const delta: LoyaltyEntry = { ...aa, id: 13, program: "Delta SkyMiles", logo: "/api/loyalty/13/logo" };
     const other: LoyaltyEntry = { ...aa, id: 14, program: "Other" };
-    const hotel: LoyaltyEntry = { ...aa, id: 15, kind: "hotel", program: "Marriott Bonvoy" };
-    ids = [{ ...aa, logo: "/api/loyalty/11/logo" }, delta, other, hotel, tsa];
+    const marriott: LoyaltyEntry = { ...aa, id: 15, kind: "hotel", program: "Marriott Bonvoy", logo: "/api/loyalty/15/logo" };
+    const hertz: LoyaltyEntry = { ...aa, id: 16, kind: "car", program: "Hertz Gold Plus Rewards", logo: "/api/loyalty/16/logo" };
+    const disney: LoyaltyEntry = { ...aa, id: 17, kind: "cruise", program: "Disney Castaway Club", logo: "/api/loyalty/17/logo" };
+    const global: LoyaltyEntry = { ...tsa, id: 18, program: "Global Entry" };
+    ids = [{ ...aa, logo: "/api/loyalty/11/logo" }, delta, other, marriott, hertz, disney, { ...tsa, logo: "/api/loyalty/12/logo" }, global];
     const { container } = render(People);
     await screen.findByRole("list", { name: "People" });
     const rows = (name: string) => screen.getByText(name).closest("li") as HTMLElement;
-    for (const name of ["American AAdvantage", "Delta SkyMiles"]) {
+    const logos: Record<string, number> = { "American AAdvantage": 11, "Delta SkyMiles": 13, "Marriott Bonvoy": 15, "Hertz Gold Plus Rewards": 16, "Disney Castaway Club": 17, "TSA PreCheck": 12 };
+    for (const [name, id] of Object.entries(logos)) {
       const img = rows(name).querySelector("img");
-      expect(img).toHaveAttribute("src", name === "Delta SkyMiles" ? "/api/loyalty/13/logo" : "/api/loyalty/11/logo");
+      expect(img).toHaveAttribute("src", `/api/loyalty/${id}/logo`);
       expect(img).toHaveAttribute("alt", "");
     }
-    for (const name of ["Marriott Bonvoy", "TSA PreCheck"]) expect(rows(name).querySelector("img")).toBeNull();
-    expect(screen.getAllByText("Other").map((e) => e.closest("li")?.querySelector("img")).filter(Boolean)).toHaveLength(0);
-    expect(container.querySelectorAll("img")).toHaveLength(2);
+    expect(container.querySelectorAll("img")).toHaveLength(6);
+    for (const name of ["Global Entry", "Other"]) {
+      const row = rows(name);
+      expect(row.querySelector("img")).toBeNull();
+      const mark = row.querySelector("span[aria-hidden='true']") as HTMLElement;
+      expect(mark.textContent).toBe(name[0]);
+      expect(mark.style.width).toBe("20px");
+      expect(mark.className).toContain("rounded-full");
+    }
     expect(screen.getByRole("button", { name: "Edit Jane Doe’s Delta SkyMiles" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove Jane Doe’s Delta SkyMiles" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show and copy Delta SkyMiles number" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show and copy Global Entry number" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Jane Doe’s Other" })).toBeInTheDocument();
+  });
+
+  it("reserves no logo space in a kind where no row has a logo", async () => {
+    ids = [{ ...aa, logo: "/api/loyalty/11/logo" }, { ...aa, id: 14, program: "Other" }, tsa, { ...tsa, id: 18, program: "Global Entry" }];
+    const { container } = render(People);
+    await screen.findByRole("list", { name: "People" });
+    const known = screen.getByRole("region", { name: "Jane Doe’s Known Traveler memberships" });
+    expect(known.querySelector("img")).toBeNull();
+    expect(known.querySelector("span[aria-hidden='true']")).toBeNull();
+    const airline = screen.getByRole("region", { name: "Jane Doe’s Airline memberships" });
+    expect(airline.querySelectorAll("img")).toHaveLength(1);
+    expect(airline.querySelectorAll("span[aria-hidden='true']")).toHaveLength(1);
+    expect(container.querySelectorAll("img")).toHaveLength(1);
   });
 
   it("keeps a membership's logo, program name and number together on one line", async () => {
@@ -104,6 +129,7 @@ describe("People", () => {
     img.dispatchEvent(new Event("error"));
     await waitFor(() => expect(container.querySelector("img")).toBeNull());
     expect(screen.getByText("American AAdvantage")).toBeInTheDocument();
+    expect(screen.getByText("A", { selector: "span[aria-hidden='true']" })).toBeInTheDocument();
   });
 
   it("offers Remove for a guest but never for a member", async () => {
