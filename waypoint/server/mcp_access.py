@@ -7,19 +7,22 @@ from ..storage import db
 from ..storage import settings_keys as sk
 from . import mcp_oauth
 
-READ, WRITE = "read", "write"
+READ, WRITE, MAIL = "read", "write", "mail"
 
 READABLE = frozenset({
     "/api/trips", "/api/trips/{id}", "/api/segments/{id}", "/api/airports/{id}", "/api/people", "/api/stats",
     "/api/distance-unit", "/api/flight-status", "/api/assistant/review", "/api/assistant/review/{id}",
 })
 
+MAIL_READABLE = frozenset({"/api/assistant/review/{id}/email", "/api/assistant/segments/{id}/email"})
+
 SWITCHES = {WRITE: sk.MCP_ALLOW_WRITES}
 
 BLOCKED = (
     "/api/mcp-settings", "/api/mailboxes", "/api/review", "/api/ai", "/api/backup", "/api/restore", "/api/state", "/api/feed",
     "/api/reminders", "/api/flight-status/{id}", "/api/import", "/api/loyalty", "/api/logodev", "/api/segments/{id}/emails",
-    "/api/offline",
+    "/api/trips/{id}/emails",
+    "/api/offline", "/api/trips/{id}/destination",
 )
 
 WRITE_READABLE = ("/api/people/claim-suggestions",)

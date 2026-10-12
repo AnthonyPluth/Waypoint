@@ -11,21 +11,21 @@ from .common import ApiError, server_error
 from .api.ai import api_ai, api_ai_save
 from .api.backups import api_backup, api_backup_inspect, api_restore
 from .api.trips import (api_airport, api_segment, api_segment_add, api_segment_edit, api_segment_email_image, api_segment_emails, api_segment_move, api_segment_remove, api_trip,
-                        api_trip_add, api_trip_edit, api_trip_merge, api_trip_remove, api_trip_split, api_trips)
+                        api_trip_add, api_trip_destination_suggest, api_trip_edit, api_trip_emails_clear, api_trip_merge, api_trip_places, api_trip_remove, api_trip_split, api_trips)
 from .api.flight_import import api_import, api_import_preview
 from .api.flightstatus import api_flight_status_refresh, api_flight_statuses
 from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loyalty_remove, api_loyalty_reveal
-from .api.assistant import (api_assistant_review, api_assistant_review_create, api_assistant_review_dismiss, api_assistant_review_item,
-                            api_assistant_review_match)
-from .api.mcp import api_mcp_revoke, api_mcp_settings, api_mcp_writes
+from .api.assistant import (api_assistant_review, api_assistant_review_create, api_assistant_review_dismiss, api_assistant_review_email,
+                            api_assistant_review_item, api_assistant_review_match, api_assistant_segment_emails)
+from .api.mcp import api_mcp_mail, api_mcp_revoke, api_mcp_settings, api_mcp_writes
 from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, api_person_add, api_person_claim,
                           api_person_edit, api_person_remove)
 from .api.logos import api_logodev, api_logodev_fetch, api_logodev_save, api_loyalty_logo, api_segment_logo
 from .api.mailboxes import api_mailbox_backfill, api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_ignored, api_mailbox_labels, api_mailbox_labels_save, api_mailbox_reread, api_mailbox_review_glance, api_mailbox_scan, api_mailbox_share, api_mailbox_unignore, api_mailboxes
 from .api.reminders import (api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
                             api_reminders_set)
-from .api.review import (api_review, api_review_dismiss, api_review_ignore, api_review_image, api_review_match, api_review_preview,
-                         api_review_suggest, api_review_who)
+from .api.review import (api_review, api_review_attach, api_review_dismiss, api_review_ignore, api_review_image, api_review_match, api_review_preview,
+                         api_review_same, api_review_suggest, api_review_who)
 from .api.offline import api_offline
 from .api.state import api_state
 from .api.stats import api_distance_unit, api_distance_unit_save, api_stats
@@ -47,10 +47,13 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/trips", api_trips),
     ("POST", "/api/trips", api_trip_add),
     ("GET", "/api/trips/{id}", api_trip),
+    ("GET", "/api/trips/{id}/places", api_trip_places),
     ("POST", "/api/trips/{id}", api_trip_edit),
     ("DELETE", "/api/trips/{id}", api_trip_remove),
+    ("POST", "/api/trips/{id}/emails/clear", api_trip_emails_clear),
     ("POST", "/api/trips/{id}/merge", api_trip_merge),
     ("POST", "/api/trips/{id}/split", api_trip_split),
+    ("POST", "/api/trips/{id}/destination/suggest", api_trip_destination_suggest),
     ("POST", "/api/segments", api_segment_add),
     ("GET", "/api/segments/{id}", api_segment),
     ("GET", "/api/segments/{id}/logo", api_segment_logo),
@@ -99,18 +102,23 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/review/who/{id}", api_review_who),
     ("POST", "/api/review/{id}/ignore", api_review_ignore),
     ("POST", "/api/review/{id}/match", api_review_match),
+    ("POST", "/api/review/{id}/same", api_review_same),
+    ("POST", "/api/review/{id}/attach", api_review_attach),
     ("GET", "/api/review/{id}/preview", api_review_preview),
     ("GET", "/api/review/{id}/images/{id}", api_review_image),
     ("POST", "/api/review/{id}/suggest", api_review_suggest),
     ("DELETE", "/api/review/{id}", api_review_dismiss),
     ("GET", "/api/mcp-settings", api_mcp_settings),
     ("POST", "/api/mcp-settings/writes", api_mcp_writes),
+    ("POST", "/api/mcp-settings/connections/{id}/mail", api_mcp_mail),
     ("DELETE", "/api/mcp-settings/connections/{id}", api_mcp_revoke),
     ("GET", "/api/assistant/review", api_assistant_review),
     ("GET", "/api/assistant/review/{id}", api_assistant_review_item),
+    ("GET", "/api/assistant/review/{id}/email", api_assistant_review_email),
     ("POST", "/api/assistant/review/{id}/match", api_assistant_review_match),
     ("POST", "/api/assistant/review/{id}/create", api_assistant_review_create),
     ("POST", "/api/assistant/review/{id}/dismiss", api_assistant_review_dismiss),
+    ("GET", "/api/assistant/segments/{id}/email", api_assistant_segment_emails),
     ("GET", "/api/state", api_state),
     ("GET", "/api/offline", api_offline),
 ]

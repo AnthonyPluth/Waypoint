@@ -551,6 +551,77 @@
         }
       }
     },
+    "/api/trips/{id}/places": {
+      "get": {
+        "operationId": "api_trip_places",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_places",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripPlaces"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/emails/clear": {
+      "post": {
+        "operationId": "api_trip_emails_clear",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_emails_clear",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailsCleared"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/trips/{id}/merge": {
       "post": {
         "operationId": "api_trip_merge",
@@ -641,6 +712,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Trip"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/destination/suggest": {
+      "post": {
+        "operationId": "api_trip_destination_suggest",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_destination_suggest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DestinationSuggestion"
                 }
               }
             }
@@ -2241,6 +2352,106 @@
         }
       }
     },
+    "/api/review/{id}/same": {
+      "post": {
+        "operationId": "api_review_same",
+        "x-handler": "waypoint/server/api/review.py:api_review_same",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SameBooking"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/review/{id}/attach": {
+      "post": {
+        "operationId": "api_review_attach",
+        "x-handler": "waypoint/server/api/review.py:api_review_attach",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attached"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/review/{id}/preview": {
       "get": {
         "operationId": "api_review_preview",
@@ -2415,6 +2626,56 @@
         }
       }
     },
+    "/api/mcp-settings/connections/{id}/mail": {
+      "post": {
+        "operationId": "api_mcp_mail",
+        "x-handler": "waypoint/server/api/mcp.py:api_mcp_mail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpMailBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpMailBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/mcp-settings/connections/{id}": {
       "delete": {
         "operationId": "api_mcp_revoke",
@@ -2497,6 +2758,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AssistantItemDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/assistant/review/{id}/email": {
+      "get": {
+        "operationId": "api_assistant_review_email",
+        "x-handler": "waypoint/server/api/assistant.py:api_assistant_review_email",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantEmail"
                 }
               }
             }
@@ -2647,6 +2939,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AssistantDismissed"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/assistant/segments/{id}/email": {
+      "get": {
+        "operationId": "api_assistant_segment_emails",
+        "x-handler": "waypoint/server/api/assistant.py:api_assistant_segment_emails",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantSegmentEmails"
                 }
               }
             }
@@ -3082,6 +3405,61 @@
         ],
         "additionalProperties": false
       },
+      "AssistantEmail": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sender_domain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "received": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "html_truncated": {
+            "type": "boolean"
+          },
+          "kept": {
+            "enum": [
+              "original",
+              "plain text"
+            ]
+          }
+        },
+        "required": [
+          "subject",
+          "sender_domain",
+          "received",
+          "text",
+          "truncated",
+          "html",
+          "html_truncated",
+          "kept"
+        ],
+        "additionalProperties": false
+      },
       "AssistantEntry": {
         "type": "object",
         "properties": {
@@ -3490,6 +3868,37 @@
         ],
         "additionalProperties": false
       },
+      "AssistantSegmentEmails": {
+        "type": "object",
+        "properties": {
+          "emails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantEmail"
+            }
+          }
+        },
+        "required": [
+          "emails"
+        ],
+        "additionalProperties": false
+      },
+      "Attached": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "segment_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "segment_id"
+        ],
+        "additionalProperties": false
+      },
       "BackupContents": {
         "type": "object",
         "properties": {
@@ -3609,6 +4018,18 @@
         ],
         "additionalProperties": false
       },
+      "DestinationSuggestion": {
+        "type": "object",
+        "properties": {
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "suggestion"
+        ],
+        "additionalProperties": false
+      },
       "DeviceBody": {
         "type": "object",
         "properties": {
@@ -3672,6 +4093,18 @@
         },
         "required": [
           "distance_unit"
+        ],
+        "additionalProperties": false
+      },
+      "EmailsCleared": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "removed"
         ],
         "additionalProperties": false
       },
@@ -4673,6 +5106,18 @@
         ],
         "additionalProperties": false
       },
+      "McpMailBody": {
+        "type": "object",
+        "properties": {
+          "allow": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "allow"
+        ],
+        "additionalProperties": false
+      },
       "McpSettings": {
         "type": "object",
         "properties": {
@@ -5471,6 +5916,25 @@
         ],
         "additionalProperties": false
       },
+      "SameBooking": {
+        "type": "object",
+        "properties": {
+          "booking": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewCandidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "booking"
+        ],
+        "additionalProperties": false
+      },
       "ScanStarted": {
         "type": "object",
         "properties": {
@@ -5521,6 +5985,9 @@
           },
           "with_facts": {
             "type": "integer"
+          },
+          "attached": {
+            "type": "integer"
           }
         },
         "required": [
@@ -5535,7 +6002,8 @@
           "total",
           "not_travel",
           "followups",
-          "with_facts"
+          "with_facts",
+          "attached"
         ],
         "additionalProperties": false
       },
@@ -6060,6 +6528,9 @@
               "integer",
               "null"
             ]
+          },
+          "ai": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -6068,7 +6539,8 @@
           "user",
           "last_backup",
           "review_count",
-          "person_id"
+          "person_id",
+          "ai"
         ],
         "additionalProperties": false
       },
@@ -6913,6 +7385,9 @@
               "null"
             ]
           },
+          "destination_manual": {
+            "type": "boolean"
+          },
           "notes": {
             "type": [
               "string",
@@ -6928,6 +7403,12 @@
               "null"
             ]
           },
+          "emails": {
+            "type": "integer"
+          },
+          "can_clear_emails": {
+            "type": "boolean"
+          },
           "segments": {
             "type": "array",
             "items": {
@@ -6941,10 +7422,37 @@
           "start_date",
           "end_date",
           "destination",
+          "destination_manual",
           "notes",
           "auto",
           "booked_by",
+          "emails",
+          "can_clear_emails",
           "segments"
+        ],
+        "additionalProperties": false
+      },
+      "TripAirportPoint": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "city",
+          "latitude",
+          "longitude"
         ],
         "additionalProperties": false
       },
@@ -6982,6 +7490,26 @@
         "required": [],
         "additionalProperties": false
       },
+      "TripCityPoint": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "city",
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
       "TripList": {
         "type": "object",
         "properties": {
@@ -6994,6 +7522,28 @@
         },
         "required": [
           "trips"
+        ],
+        "additionalProperties": false
+      },
+      "TripPlaces": {
+        "type": "object",
+        "properties": {
+          "airports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripAirportPoint"
+            }
+          },
+          "cities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripCityPoint"
+            }
+          }
+        },
+        "required": [
+          "airports",
+          "cities"
         ],
         "additionalProperties": false
       },

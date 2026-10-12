@@ -1,0 +1,16 @@
+{
+  "name": "trip-done",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Orlando') >> visible=true" },
+    { "wait_for": "section[aria-label='Done with this trip']" },
+    { "scroll_to": "section[aria-label='Done with this trip']" },
+    { "screenshot": "done-action" },
+    { "click": "button:has-text('remove the emails') >> visible=true" },
+    { "wait_for": "[role='dialog']" },
+    { "expect_text": { "selector": "[role='dialog']", "text": "The bookings stay. This can’t be undone." } },
+    { "screenshot": "done-confirm" },
+    { "click": "[role='dialog'] button:has-text('Cancel')" }
+  ]
+}

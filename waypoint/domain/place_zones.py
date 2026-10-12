@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import NamedTuple
 
 from ..storage import db
 from . import airports
@@ -58,6 +59,8 @@ US_NAMES = {
     "WEST VIRGINIA": "WV", "WISCONSIN": "WI", "WYOMING": "WY",
 }
 
+STATE_NAMES = {code: name.title().replace(" Of ", " of ") for name, code in US_NAMES.items()}
+
 CA_PROVINCES = {
     "BC": "America/Vancouver", "AB": "America/Edmonton", "SK": "America/Regina", "MB": "America/Winnipeg",
     "ON": "America/Toronto", "QC": "America/Toronto", "NB": "America/Moncton", "NS": "America/Halifax",
@@ -101,7 +104,7 @@ def _country(tokens: list[str]) -> str | None:
     return None
 
 
-def _us_zone(address: str, tokens: list[str], country: str | None) -> str | None:
+def _us_state(address: str, tokens: list[str], country: str | None) -> tuple[str | None, str | None]:
     found = re.search(r"\b([A-Z]{2})\s+(\d{5})(?:-\d{4})?\b", address)
     state: str | None = found.group(1) if found and found.group(1) in US_STATES else None
     zip3: str | None = found.group(2)[:3] if state and found else None
@@ -113,6 +116,11 @@ def _us_zone(address: str, tokens: list[str], country: str | None) -> str | None
             if bare in US_STATES or bare.upper() in US_NAMES:
                 state = bare if bare in US_STATES else US_NAMES[bare.upper()]
                 break
+    return state, zip3
+
+
+def _us_zone(address: str, tokens: list[str], country: str | None) -> str | None:
+    state, zip3 = _us_state(address, tokens, country)
     if state is None:
         return None
     zone, exceptions = US_STATES[state]
@@ -175,3 +183,27 @@ def zone_for_address(conn: db.Connection, address: str | None) -> str | None:
     if zone:
         return zone
     return airports.zone_for_place(conn, None, country) if country else None
+
+
+class Parsed(NamedTuple):
+    country: str | None
+    state: str | None
+    tokens: list[str]
+
+
+def parse(address: str | None) -> Parsed:
+    text = (address or "").strip()
+    if not text:
+        return Parsed(None, None, [])
+    if JAPAN.search(text):
+        return Parsed("JP", None, _tokens(text))
+    tokens = _tokens(text)
+    country = _country(tokens)
+    state = _us_state(text, tokens, country)[0]
+    if country is None and state is None and CA_POSTAL.search(text):
+        country = "CA"
+    return Parsed("US" if state else country, state, tokens)
+
+
+def state_name(code: str) -> str | None:
+    return STATE_NAMES.get(code)

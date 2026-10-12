@@ -112,11 +112,12 @@ trips = Table(
     Column('start_date', Text),
     Column('end_date', Text),
     Column('destination', Text),
+    Column('destination_manual', Boolean, nullable=False, server_default=false()),
     Column('notes', Text),
     Column('auto', Boolean, nullable=False),
     Column('booked_by', Integer, refers('trips', 'booked_by', 'people.id', 'SET NULL')),
     Index('ix_trips_booked_by', 'booked_by'),
-    info={'doc': 'a journey: its segments, grouped by Waypoint (auto) or made by hand; its dates are its local dates'},
+    info={'doc': 'a journey: its segments, grouped by Waypoint (auto) or made by hand; its dates are its local dates; its destination is worked out from its bookings unless destination_manual says a person set it'},
 )
 
 segments = Table(

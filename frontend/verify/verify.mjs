@@ -24,7 +24,7 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -113,6 +113,12 @@ async function runStep(page, step, shot, saveDownload) {
     });
   } else if ("fake_ignore" in step) {
     await page.route("**/api/review/*/ignore", (route) => route.fulfill({ json: { ok: true, mailbox_id: 1, domain: step.fake_ignore } }));
+  } else if ("fake_destination" in step) {
+    await page.route("**/api/state", async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: { ...(await response.json()), ai: true } });
+    });
+    await page.route("**/api/trips/*/destination/suggest", (route) => route.fulfill({ json: { suggestion: step.fake_destination } }));
   } else if ("long_names" in step) {
     await page.route("**/api/stats**", async (route) => {
       const response = await route.fetch();

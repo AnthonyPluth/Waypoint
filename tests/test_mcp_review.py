@@ -1,4 +1,7 @@
+import contextlib
+import io
 import json
+import re
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -10,11 +13,12 @@ from tests.privacy import no_leaks
 from waypoint import tls
 from waypoint.domain import trips
 from waypoint.domain.mail import assist, review
-from waypoint.server import mcp_access, mcp_http, mcp_server
+from waypoint.server import mcp_access, mcp_http, mcp_oauth, mcp_server
 from waypoint.server.api import assistant as assistant_api
+from waypoint.server.api import mcp as mcp_api
 from waypoint.server.common import ApiError, _current
 from waypoint.storage import db, secretbox, stored_mail
-from waypoint.storage.models import Mailbox, ReviewItem, Segment, SegmentMessage, StoredMessage
+from waypoint.storage.models import Mailbox, OAuthGrant, ReviewItem, Segment, SegmentMessage, StoredMessage
 
 SUBJECT = "CANARY-SUBJECT-4K9X2M"
 BODY = "CANARY-BODY-7Q3L9X"
@@ -22,7 +26,8 @@ SENDER = "canary-sender-5t8w1z.example"
 PARSED = "CANARY-PARSED-6B2N4R"
 READ = ("read",)
 WRITE = ("read", "write")
-EVERYTHING = WRITE
+MAIL = ("read", "mail")
+EVERYTHING = ("read", "write", "mail")
 
 FLIGHT = {"kind": "flight", "provider": "Example Air", "confirmation": "ZQ4PXD", "origin": "JFK", "destination": "LHR",
           "start_local": "2026-10-01T19:00", "end_local": "2026-10-02T07:10", "start_zone": "America/New_York",
@@ -191,11 +196,69 @@ class GetTests(ReviewTools):
         got = self.tool(READ, "get_review_item", {"item_id": self.unread_item})
         self.assertEqual((got["entries"], got["suggestion"], got["kind"], got["bookings"]), ([], None, None, 0))
 
+    def test_the_text_comes_only_with_mail_and_says_which_form_was_kept(self):
+        got = self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})
+        self.assertEqual(got["email"]["subject"], SUBJECT)
+        self.assertIn(BODY, got["email"]["text"])
+        self.assertEqual(got["email"]["kept"], "original")
+        self.assertEqual(got["email"]["html"], f"<p>{BODY}</p>")
+        self.assertFalse(got["email"]["html_truncated"])
+        self.assertNotIn("images", got["email"])
+        with db.session() as conn:
+            stored_mail.put(conn, self.jane_box, "m-flight", {**kept(), "original": False}, 6.0)
+        self.assertEqual(self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})["email"]["kept"], "plain text")
+
+    def test_an_item_whose_message_was_not_kept_says_so_and_still_answers(self):
+        with db.session() as conn:
+            conn.execute(delete(StoredMessage).where(StoredMessage.message_id == "m-flight"))
+        got = self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})
+        self.assertIsNone(got["email"])
+        self.assertIn("wasn’t kept", got["email_note"])
+        self.assertFalse(got["has_email"])
+
+    def test_the_email_is_cut_to_a_size(self):
+        with db.session() as conn:
+            stored_mail.put(conn, self.jane_box, "m-flight", kept(text="x" * 50_000), 6.0)
+        got = self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})["email"]
+        self.assertEqual((len(got["text"]), got["truncated"]), (assist.MAX_TEXT, True))
+
+    def test_the_markup_is_cut_to_a_size_and_says_so(self):
+        with db.session() as conn:
+            stored_mail.put(conn, self.jane_box, "m-flight", {**kept(), "html": "<p>" + "y" * 150_000 + "</p>"}, 6.0)
+            stored_mail.link(conn, self.jane_trip["segment"], self.jane_box, "m-flight")
+        for got in (self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})["email"],
+                    self.tool(MAIL, "get_segment_email", {"segment_id": self.jane_trip["segment"]})["emails"][0]):
+            self.assertEqual((len(got["html"]), got["html_truncated"]), (assist.MAX_HTML, True))
+
+    def test_a_message_kept_as_plain_text_has_no_markup(self):
+        with db.session() as conn:
+            stored_mail.put(conn, self.jane_box, "m-flight", {**kept(), "original": False, "html": None}, 6.0)
+            stored_mail.link(conn, self.jane_trip["segment"], self.jane_box, "m-flight")
+        for got in (self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})["email"],
+                    self.tool(MAIL, "get_segment_email", {"segment_id": self.jane_trip["segment"]})["emails"][0]):
+            self.assertEqual((got["html"], got["html_truncated"], got["kept"]), (None, False, "plain text"))
+        with db.session() as conn:
+            stored_mail.put(conn, self.jane_box, "m-flight", {**kept(), "original": False, "html": "<p>stale</p>"}, 7.0)
+        self.assertIsNone(self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})["email"]["html"])
+
+    def test_the_markup_never_reaches_a_connection_without_the_mail_scope(self):
+        with db.session() as conn:
+            stored_mail.link(conn, self.jane_trip["segment"], self.jane_box, "m-flight")
+        seen = [json.dumps(self.tool(WRITE, "get_review_item", {"item_id": self.flight_item})),
+                json.dumps(self.tool(WRITE, "list_review_items", {})),
+                self.refused(WRITE, "get_segment_email", {"segment_id": self.jane_trip["segment"]}),
+                self.refused(WRITE, "call_endpoint", {"method": "GET", "path": f"/api/assistant/review/{self.flight_item}/email"})]
+        for text in seen:
+            self.assertNotIn("<p>", text)
+            self.assertNotIn(BODY, text)
+
     def test_what_isnt_the_viewers_is_not_found_like_what_doesnt_exist(self):
-        for tool_scopes in (READ, WRITE):
+        for tool_scopes in (READ, MAIL):
             self.assertEqual(self.refused(tool_scopes, "get_review_item", {"item_id": self.sams_item}), "No such item")
             self.assertEqual(self.refused(tool_scopes, "get_review_item", {"item_id": 987654}), "No such item")
         self.assertEqual(self.refused(WRITE, "call_endpoint", {"method": "GET", "path": f"/api/assistant/review/{self.sams_item}"}), "No such item")
+        self.assertEqual(self.refused(EVERYTHING, "call_endpoint", {"method": "GET", "path": f"/api/assistant/review/{self.sams_item}/email"}),
+                         "No such item")
 
     def test_a_candidate_the_viewer_cannot_see_is_not_shown(self):
         with db.session() as conn:
@@ -440,7 +503,8 @@ class DismissTests(ReviewTools):
         self.assertIn(self.generic_item, self.left())
 
     def test_only_dismissing_is_marked_destructive_among_the_new_tools(self):
-        new = {"match_review_item", "create_segment_from_review_item", "dismiss_review_item", "list_review_items", "get_review_item"}
+        new = {"match_review_item", "create_segment_from_review_item", "dismiss_review_item", "list_review_items", "get_review_item",
+               "get_segment_email"}
         marked = {t["name"] for t in mcp_server.ALL_TOOLS if t["name"] in new and t.get("destructive")}
         self.assertEqual(marked, {"dismiss_review_item"})
         by = {t["name"]: t for t in mcp_server.ALL_TOOLS}
@@ -453,6 +517,7 @@ class DismissTests(ReviewTools):
         for name in ("list_review_items", "get_review_item"):
             self.assertEqual(by[name]["needs"], ("read",))
             self.assertFalse(by[name].get("write"))
+        self.assertEqual(by["get_segment_email"]["needs"], ("mail",))
 
     def test_no_new_tool_removes_a_segment_trip_person_or_mailbox(self):
         with db.session() as conn:
@@ -466,15 +531,81 @@ class DismissTests(ReviewTools):
             self.assertEqual(int(conn.execute(select(func.count()).select_from(Segment)).scalar() or 0), counts[0] + 1)
 
 
+class MailScopeTests(ReviewTools):
+
+    def linked(self) -> None:
+        with db.session() as conn:
+            stored_mail.link(conn, self.jane_trip["segment"], self.jane_box, "m-flight")
+
+    def test_the_email_tool_is_offered_only_with_the_scope(self):
+        names = lambda scopes: {t["name"] for t in mcp_server.offered(mcp_http.fetch_for(self.access(scopes)))}
+        self.assertNotIn("get_segment_email", names(READ))
+        self.assertNotIn("get_segment_email", names(WRITE))
+        self.assertIn("get_segment_email", names(MAIL))
+        self.assertIn("get_segment_email", names(EVERYTHING))
+        self.assertLessEqual({"list_review_items", "get_review_item"}, names(READ))
+
+    def test_without_the_scope_the_email_is_refused_naming_the_setting(self):
+        self.linked()
+        for scopes in (READ, WRITE):
+            got = self.refused(scopes, "get_segment_email", {"segment_id": self.jane_trip["segment"]})
+            self.assertIn("Read email text", got)
+            self.assertIn("Settings", got)
+        self.assertIn("Read email text", self.refused(WRITE, "call_endpoint", {"method": "GET", "path": f"/api/assistant/segments/{self.jane_trip['segment']}/email"}))
+
+    def test_with_the_scope_the_booking_s_messages_come_as_text_only(self):
+        self.linked()
+        got = self.tool(MAIL, "get_segment_email", {"segment_id": self.jane_trip["segment"]})
+        self.assertEqual(len(got["emails"]), 1)
+        self.assertEqual(got["emails"][0]["subject"], SUBJECT)
+        self.assertIn(BODY, got["emails"][0]["text"])
+        self.assertEqual(got["emails"][0]["html"], f"<p>{BODY}</p>")
+        self.assertEqual(set(got["emails"][0]), {"subject", "sender_domain", "received", "text", "truncated", "html", "html_truncated", "kept"})
+        self.assertEqual(got["emails"][0]["kept"], "original")
+
+    def test_a_booking_with_no_message_has_none(self):
+        self.assertEqual(self.tool(MAIL, "get_segment_email", {"segment_id": self.jane_trip["segment"]}), {"emails": []})
+
+    def test_a_segment_the_viewer_is_not_on_is_not_found(self):
+        self.assertEqual(self.refused(MAIL, "get_segment_email", {"segment_id": self.sam_trip["segment"]}), "No such segment")
+        self.assertEqual(self.refused(MAIL, "get_segment_email", {"segment_id": 987654}), "No such segment")
+
+    def test_at_most_five_messages(self):
+        with db.session() as conn:
+            for n in range(7):
+                stored_mail.put(conn, self.jane_box, f"extra-{n}", kept(subject=f"Update {n}"), 10.0 + n)
+                stored_mail.link(conn, self.jane_trip["segment"], self.jane_box, f"extra-{n}")
+        self.assertEqual(len(self.tool(MAIL, "get_segment_email", {"segment_id": self.jane_trip["segment"]})["emails"]), assist.MAX_EMAILS)
+
+    def test_the_assistant_instructions_say_where_email_stands(self):
+        text = lambda scopes: mcp_server._about(mcp_http.fetch_for(self.access(scopes)))
+        self.assertIn("never an email's subject or text", text(READ))
+        self.assertIn("private mail", text(MAIL))
+        self.assertIn("Everything is read-only. This connection can only read", text(MAIL))
+        self.assertIn("Before every change", text(EVERYTHING))
+        self.switch(False)
+        self.assertIn("switched off", text(WRITE))
+
+    def test_reading_email_is_logged_as_a_count_and_the_tool_only(self):
+        self.linked()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.tool(MAIL, "get_segment_email", {"segment_id": self.jane_trip["segment"]})
+            self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})
+        lines = [line for line in out.getvalue().splitlines() if "assistant read email" in line]
+        self.assertEqual(lines, ["assistant read email: get_segment_email, 1 messages", "assistant read email: get_review_item, 1 message"])
+
+
 class PrivacyTests(ReviewTools):
 
     def everything(self) -> None:
         self.linked_message()
-        for scopes in (READ, WRITE):
+        for scopes in (READ, WRITE, MAIL, EVERYTHING):
             self.tool(scopes, "list_review_items", {})
             self.tool(scopes, "list_review_items", {"limit": 1})
             for item in (self.flight_item, self.two_item, self.generic_item, self.unread_item, self.sams_item):
                 self.tool(scopes, "get_review_item", {"item_id": item})
+            self.tool(scopes, "get_segment_email", {"segment_id": self.jane_trip["segment"]})
         self.tool(EVERYTHING, "match_review_item", {"item_id": self.flight_item, "segment_id": self.jane_trip["segment"]})
         self.tool(EVERYTHING, "create_segment_from_review_item", {"item_id": self.generic_item})
         self.tool(EVERYTHING, "dismiss_review_item", {"item_id": self.unread_item, "reason": "other", "note": "no text"})
@@ -548,11 +679,76 @@ class RouteTests(ReviewTools):
                                      (assistant_api.api_assistant_review_dismiss, {"reason": "other", "note": 5}, "text")):
             with self.subTest(body=body), self.assertRaisesRegex(ApiError, words):
                 self.call(handler, {}, body, item)
-        for handler in (assistant_api.api_assistant_review_item, assistant_api.api_assistant_review_match,
+        for handler in (assistant_api.api_assistant_review_item, assistant_api.api_assistant_review_email, assistant_api.api_assistant_review_match,
                         assistant_api.api_assistant_review_create, assistant_api.api_assistant_review_dismiss):
             with self.assertRaisesRegex(ApiError, "No such item"):
                 self.call(handler, {}, {"reason": "other"}, "x")
+        with self.assertRaisesRegex(ApiError, "No such segment"):
+            self.call(assistant_api.api_assistant_segment_emails, {}, {}, "x")
 
+    def test_a_message_that_was_not_kept_is_not_found_with_why(self):
+        with db.session() as conn:
+            conn.execute(delete(StoredMessage))
+        with self.assertRaisesRegex(ApiError, "wasn’t kept"):
+            self.call(assistant_api.api_assistant_review_email, {}, {}, str(self.flight_item))
+
+    def mail(self, conn, body, grant, sub="u-jane"):
+        _current.user = {"sub": sub}
+        try:
+            return mcp_api.api_mcp_mail(conn, {}, body, grant)
+        finally:
+            _current.user = None
+
+    def test_only_the_member_who_connected_it_switches_email_on_or_off(self):
+        token = self.make_token("read", sub="u-jane")
+        with db.session() as conn:
+            grant = int(conn.execute(select(OAuthGrant.id)).scalar())
+        for body in ({"allow": True}, {"allow": False}):
+            with db.session() as conn, self.assertRaisesRegex(ApiError, "isn't there"):
+                self.mail(conn, body, str(grant), sub="u-sam")
+        with db.session() as conn:
+            self.assertEqual(conn.execute(select(OAuthGrant.scope)).scalar(), "read")
+            self.mail(conn, {"allow": True}, str(grant))
+        with db.session() as conn, self.assertRaisesRegex(ApiError, "isn't there"):
+            self.mail(conn, {"allow": False}, str(grant), sub="u-sam")
+        with db.session() as conn, self.assertRaisesRegex(ApiError, "isn't there"):
+            self.mail(conn, {"allow": False}, str(grant), sub=None)
+        with db.session() as conn:
+            self.assertEqual(conn.execute(select(OAuthGrant.scope)).scalar(), "read mail")
+            self.assertTrue(mcp_http.authorized(conn, f"Bearer {token}", self.base + "/mcp").has("mail"))
+
+    def test_the_settings_switch_for_email_follows_the_connection_at_once(self):
+        token = self.make_token("read", sub="u-jane")
+        with db.session() as conn:
+            grant = int(conn.execute(select(OAuthGrant.id)).scalar())
+            self.assertFalse(mcp_http.authorized(conn, f"Bearer {token}", self.base + "/mcp").has("mail"))
+        with db.session() as conn:
+            self.assertEqual(self.mail(conn, {"allow": True}, str(grant)), {"allow": True})
+        with db.session() as conn:
+            access = mcp_http.authorized(conn, f"Bearer {token}", self.base + "/mcp")
+            self.assertEqual(sorted(access.scopes), ["mail", "read"])
+            self.assertEqual(conn.execute(select(OAuthGrant.scope)).scalar(), "read mail")
+            listed = mcp_api.api_mcp_settings(conn, {}, {})
+            self.assertEqual(listed["connections"][0]["scope"], ["read", "mail"])
+        with db.session() as conn:
+            self.mail(conn, {"allow": False}, str(grant))
+            self.assertEqual(conn.execute(select(OAuthGrant.scope)).scalar(), "read")
+            self.assertFalse(mcp_http.authorized(conn, f"Bearer {token}", self.base + "/mcp").has("mail"))
+            mcp_oauth.revoke_grant(conn, grant, "revoked_in_settings")
+        with db.session() as conn, self.assertRaisesRegex(ApiError, "isn't there"):
+            self.mail(conn, {"allow": True}, str(grant))
+        with db.session() as conn, self.assertRaisesRegex(ApiError, "isn't there"):
+            self.mail(conn, {"allow": True}, "987654")
+
+    def test_a_client_cannot_ask_for_the_mail_scope_itself(self):
+        with self.assertRaises(mcp_oauth.OAuthError):
+            mcp_oauth.parse_scope("read mail")
+        self.assertEqual(mcp_oauth.scope_text(frozenset({"mail", "read", "write"})), "read write mail")
+
+    def test_the_mail_scope_alone_opens_no_other_door(self):
+        for path in ("trips", "assistant/review/1/match", "loyalty"):
+            with self.subTest(path=path), self.assertRaises(mcp_server.ToolError):
+                mcp_http.local_fetch(path, {}, {}, mcp_access.Access(frozenset({"mail"}), None, "u-jane", "jane@example.com"), "POST")
 
 
 class SegmentAddressTests(ReviewTools):
@@ -610,10 +806,11 @@ class EveryNewRouteTests(unittest.TestCase):
     def test_every_new_route_is_for_signed_in_people_and_none_is_blocked_for_the_wrong_reason(self):
         from waypoint.server import ROUTES
         mine = [(m, p) for m, p, *_ in ROUTES if p.startswith("/api/assistant/")]
-        self.assertEqual(len(mine), 5)
+        self.assertEqual(len(mine), 7)
         for m, p in mine:
             self.assertFalse(mcp_access.blocked(p), p)
             self.assertIsNotNone(mcp_http.needs(m, p), p)
+        self.assertEqual(len({p for _, p in mine if re.search(r"/email$", p)}), 2)
 
 
 if __name__ == "__main__":
