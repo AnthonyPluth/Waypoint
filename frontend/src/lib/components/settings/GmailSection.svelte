@@ -30,8 +30,6 @@
   let ignored = $state<Record<number, string[] | null>>({});
   let unignoring = $state<{ box: Mailbox; domain: string } | null>(null);
   let askingToStop = $state(false);
-  let lookingBack = $state<Mailbox | null>(null);
-  let askingToLookBack = $state(false);
 
   async function loadIgnored(boxes: Mailbox[]) {
     const found = await Promise.all(boxes.map(async (m) => {
@@ -99,7 +97,7 @@
     return act(async () => {
       const r = await apiCall<"POST /api/mailboxes/{id}/unignore">(`/api/mailboxes/${target.box.id}/unignore`, { method: "POST", body: { domain: target.domain }, failed: "Couldn’t stop ignoring it" });
       if (r.started) toast.success(`Reading again what was skipped from ${target.domain}`);
-      else toast("Waypoint will read this sender again. A scan of this mailbox is already running, so choose Look back through all mail when it finishes.");
+      else toast("Waypoint will read this sender again. A scan of this mailbox is already running, so choose Look back 18 months when it finishes.");
       await load();
       watchUntil = Date.now() + 2 * POLL_MS + 500;
       watching = true;
@@ -241,7 +239,7 @@
             <Badge variant={m.status === "connected" ? "outline" : "secondary"}>{label(m)}</Badge>
             {#if m.status === "reconnect"}<Button disabled={connecting} onclick={connect}>Reconnect</Button>
             {:else}<Button variant="outline" disabled={m.scanning || starting === m.id} onclick={() => scan(m)}>{m.scanning ? "Scanning…" : "Scan now"}</Button>
-              <Button variant="outline" disabled={m.scanning || starting === m.id} onclick={() => { lookingBack = m; askingToLookBack = true; }} title="Search all the mail in this mailbox, newest first, for bookings Waypoint hasn’t read yet, such as ones from a sender added since your last scan, or for trips you entered by hand">Look back through all mail</Button>{/if}
+              <Button variant="outline" disabled={m.scanning || starting === m.id} onclick={() => lookBack(m)} title="Search the last 18 months for bookings Waypoint hasn’t read yet, such as ones from a sender added since your last scan, or for trips you entered by hand">Look back 18 months</Button>{/if}
             <Button variant="outline" onclick={() => { leaving = m; asking = true; }}>Disconnect</Button>
           </div>
         </div>
@@ -274,15 +272,6 @@
   onconfirm={stopIgnoring}>
   {#snippet description()}
     <p>Waypoint will read mail from this sender again and look back through what it skipped.</p>
-    <p>The look-back covers the whole mailbox, newest first, so it can take a while for a large inbox.</p>
-  {/snippet}
-</ConfirmDialog>
-
-<ConfirmDialog bind:open={askingToLookBack} title="Look back through all mail?" confirmLabel="Continue" busyLabel="Starting…"
-  onconfirm={() => lookingBack ? lookBack(lookingBack) : false}>
-  {#snippet description()}
-    <p>This reads every message in the mailbox, newest first, and can take hours for a large inbox. Bookings found are added as past trips.</p>
-    <p>Continue?</p>
   {/snippet}
 </ConfirmDialog>
 

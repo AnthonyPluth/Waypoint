@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import itertools
 import json
 import threading
 import time
 from collections import Counter
-from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
@@ -166,19 +164,6 @@ def _since(last_scan: float | None, today: date) -> date:
     if last_scan is None:
         return dates.add_months(today, -query.LOOKBACK_MONTHS)
     return datetime.fromtimestamp(last_scan, UTC).date() - timedelta(days=OVERLAP_DAYS)
-
-
-def _unread(mailbox_id: int, pages: Iterable[list[str]], filtering: bool, tally: Counter[str]) -> Iterator[str]:
-    for page in pages:
-        tally["found"] += len(page)
-        seen: set[str] = set()
-        for start in range(0, len(page) if filtering else 0, gmail.SEARCH_PAGE):
-            with db.session() as conn:
-                seen.update(conn.execute(select(ScannedMessage.message_id).where(
-                    ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id.in_(page[start:start + gmail.SEARCH_PAGE]))).scalars())
-        fresh = [m for m in page if m not in seen]
-        tally["pending"] += len(fresh)
-        yield from fresh
 
 
 def _ignores(ignored: list[str], domain: str | None) -> bool:
@@ -361,43 +346,31 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             return Result("not_started", str(e))
         ignored = review.ignored(conn, mailbox_id)
     history, last_scan = row["history_id"], row["last_scan"]
-    read = made = queued = skipped = dropped = handled = not_travel = followups = with_facts = attached = 0
+    read = made = queued = skipped = dropped = handled = total = not_travel = followups = with_facts = attached = 0
     started = _clock()
     forced: set[str] = set()
     strong = True
-    tally: Counter[str] = Counter()
+    pending: list[str] = []
     capped = False
     why: Counter[str] = Counter()
     issued = time.monotonic()
-
-    def current() -> str:
-        nonlocal token, issued
-        if time.monotonic() - issued > TOKEN_LIFE:
-            with db.session() as conn:
-                token = gmail.access_token(conn, mailbox_id, time.time())
-            issued = time.monotonic()
-        return token
-
     try:
         if again:
             arrived = None
             with db.session() as conn:
                 found = list(conn.execute(select(ScannedMessage.message_id).where(
                     ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.outcome == BOOKING).order_by(ScannedMessage.message_id)).scalars())
-            pages: Iterable[list[str]] = [found]
+            seen: set[str] = set()
         else:
             arrived = None if backfill else gmail.history_id(token)
-            term = query.build(None if backfill else _since(last_scan, today), ignored)
-            found = []
-            pages = gmail.search_pages(current, term) if backfill else [found]
-            if not backfill:
-                found += gmail.search(token, term)
-                if history and last_scan is not None:
-                    try:
-                        added = gmail.added_since(token, history)
-                        found[:] = [m for m in found if m in added]
-                    except gmail.HistoryExpired:
-                        pass
+            since = dates.add_months(today, -query.LOOKBACK_MONTHS) if backfill else _since(last_scan, today)
+            found = gmail.search(token, query.build(since, ignored))
+            if history and last_scan is not None and not backfill:
+                try:
+                    added = gmail.added_since(token, history)
+                    found = [m for m in found if m in added]
+                except gmail.HistoryExpired:
+                    pass
             picked = decode_labels(row["scan_labels"])
             if picked:
                 alive = {label["id"] for label in gmail.labels(token, counts=False)}
@@ -408,20 +381,23 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                         conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(scan_labels=encode_labels(kept)))
                 labelled = list(dict.fromkeys(m for label in kept for m in gmail.search(token, "", label)))
                 forced = set(labelled)
-                if backfill:
-                    pages = itertools.chain(([m for m in page if m not in forced] for page in pages), [labelled])
-                else:
-                    already = set(found)
-                    found += [m for m in labelled if m not in already]
-            if forced:
-                with db.session() as conn:
+                found = found + [m for m in labelled if m not in set(found)]
+            with db.session() as conn:
+                if forced:
                     conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.outcome == SKIPPED,
                                                               ScannedMessage.message_id.in_(forced)))
-        for message_id in _unread(mailbox_id, pages, not again, tally):
+                seen = set(conn.execute(select(ScannedMessage.message_id).where(
+                    ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id.in_(found))).scalars()) if found else set()
+        pending = [m for m in found if m not in seen]
+        total = len(found)
+        for message_id in pending:
             if handled and _clock() - started > BUDGET:
                 capped = True
                 break
-            token = current()
+            if time.monotonic() - issued > TOKEN_LIFE:
+                with db.session() as conn:
+                    token = gmail.access_token(conn, mailbox_id, time.time())
+                issued = time.monotonic()
             strong = True
             if not again and message_id not in forced:
                 try:
@@ -483,12 +459,12 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
         monitoring.report(e, values=False)
         return _fail(mailbox_id, FAILED_GENERALLY, (read, made, queued))
     if not again and not backfill:
-        remember(mailbox_id, Summary(tally["pending"], read, made, queued, skipped, capped, dropped, tally["found"] - tally["pending"] + handled, tally["found"], not_travel, followups, with_facts, attached))
-    monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {tally['pending']} message(s) found, "
+        remember(mailbox_id, Summary(len(pending), read, made, queued, skipped, capped, dropped, total - len(pending) + handled, total, not_travel, followups, with_facts, attached))
+    monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {len(pending)} message(s) found, "
                    f"{read} read, {made} booking(s) added or changed, {queued} to review, {f'{followups} follow-up(s) attached ({with_facts} with details not applied), ' if followups else ''}{f'{attached} email(s) attached to an existing booking, ' if attached else ''}{skipped} skipped ({not_travel} as not travel){', more waiting' if capped else ''}.")
     if why:
         monitoring.log("What stopped messages being read: " + "; ".join(f"{n} × {what}" for what, n in sorted(why.items())) + ".")
-    return Result("done", None, read, made, queued, tally["pending"], skipped, capped)
+    return Result("done", None, read, made, queued, len(pending), skipped, capped)
 
 
 def run(mailbox_id: int, today: date, again: bool = False, backfill: bool = False, sender: str | None = None) -> Result:

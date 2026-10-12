@@ -33,34 +33,11 @@ describe("MessageView", () => {
     expect(screen.queryByTestId("message-old")).toBeNull();
   });
 
-  it("isolates an app's inherited styles: the host is reset and the base is explicit", () => {
-    const ancestor = document.body;
-    ancestor.style.cssText = "color:rgb(250,250,250);font-size:40px;line-height:3;text-align:right;letter-spacing:9px;white-space:pre";
-    render(MessageView, { text: "Hi", html: '<p>Hi</p><p style="color:#112233">Mine</p>' });
-    const root = hostOf().shadowRoot as ShadowRoot;
-    const sheet = root.querySelector("style")?.textContent ?? "";
-    expect(hostOf().getAttribute("style")).toMatch(/^all: initial;/);
-    expect(sheet).toMatch(/\.email\{[^}]*font:14px\/1\.5[^}]*text-align:left;direction:ltr;letter-spacing:normal;[^}]*white-space:normal/);
-    expect(sheet).toContain("color-scheme:light");
-    expect(root.querySelectorAll("style")).toHaveLength(1);
-    expect(root.querySelectorAll("link")).toHaveLength(0);
-    expect(root.querySelectorAll("p")[1].getAttribute("style")).toBe("color:#112233");
-    ancestor.removeAttribute("style");
-  });
-
-  it("shows a message with no markup as readable themed text, outside the email page", () => {
-    render(MessageView, { text: "Plain words" });
-    expect(screen.getByText("Plain words").tagName).toBe("PRE");
-    expect(screen.queryByTestId("preview-html")).toBeNull();
-  });
-
-  it("puts the email on its own light page in one wrapper, so a dark app never shows light on dark or dark on dark", () => {
+  it("gives the email the app’s own colours in one wrapper, so a dark app never shows dark on dark", () => {
     render(MessageView, { text: "Gate B12", html: "<p>Gate B12</p>" });
     const root = hostOf().shadowRoot as ShadowRoot;
     const sheet = root.querySelector("style")?.textContent ?? "";
-    expect(sheet).toContain("background:#ffffff;color:#1f1f1f");
-    expect(sheet).toContain(":host{all:initial;display:block;color-scheme:light}");
-    expect(sheet).not.toContain("var(");
+    expect(sheet).toContain("background:var(--muted);color:var(--foreground)");
     expect(root.querySelectorAll(".email")).toHaveLength(1);
     expect(root.querySelector(".email p")).not.toBeNull();
     expect(hostOf().getAttribute("style")).toMatch(/^all: initial;/);
@@ -166,13 +143,5 @@ describe("MessageView", () => {
   it("says when a message has no text", () => {
     render(MessageView, { text: "" });
     expect(screen.getByText("(This message has no text.)")).toBeInTheDocument();
-  });
-
-  it("is the one way every page shows an email: built only in email-render.ts, mounted only in EmailView", () => {
-    const sources = import.meta.glob(["/src/**/*.svelte", "/src/**/*.ts", "!/src/**/*.test.ts", "!/src/test/**"], { query: "?raw", import: "default", eager: true }) as Record<string, string>;
-    const using = (pattern: RegExp) => Object.entries(sources).filter(([, text]) => pattern.test(text)).map(([path]) => path).sort();
-    expect(using(/\{@html/)).toEqual([]);
-    expect(using(/buildEmail|renderEmail|attachEmail/)).toEqual(["/src/lib/components/EmailView.svelte", "/src/lib/email-render.ts"]);
-    expect(using(/components\/MessageView\.svelte/)).toEqual(["/src/lib/components/OfflineTrip.svelte", "/src/pages/Review.svelte", "/src/pages/Trip.svelte"]);
   });
 });

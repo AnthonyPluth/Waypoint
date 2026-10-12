@@ -997,6 +997,42 @@ describe("Trip", () => {
       expect(within(card).getByRole("button", { name: /^Edit/ })).toBeInTheDocument();
     });
 
+    describe("live flight status", () => {
+      const sams = segment({ id: 5, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe", seat: null }] });
+      const gone = { start_local: "2020-03-01T19:00", end_local: "2020-03-02T07:10" };
+      const withStatus = () => {
+        const answer = vi.mocked(api).getMockImplementation()!;
+        vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? delayed : answer(path, opts)) as never);
+      };
+      const flightCard = async () => within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"))[0];
+
+      it("shows none on a past flight, and still shows it on a future one", async () => {
+        held = trip([{ ...flight, ...gone }], { start_date: "2020-03-01", end_date: "2020-03-02" });
+        withStatus();
+        const view = render(TripPage);
+        const card = await flightCard();
+        await waitFor(() => expect(card).toHaveTextContent("JFK"));
+        expect(within(card).queryByTestId("flight-status")).toBeNull();
+        view.unmount();
+        held = trip([flight]);
+        render(TripPage);
+        expect(await within(await flightCard()).findByTestId("flight-status")).toBeInTheDocument();
+      });
+
+      it("shows none on a past flight with two bookings, and still shows it on a future one", async () => {
+        held = trip([{ ...flight, ...gone }, { ...sams, ...gone }], { start_date: "2020-03-01", end_date: "2020-03-02" });
+        withStatus();
+        const view = render(TripPage);
+        const card = await flightCard();
+        await waitFor(() => expect(card).toHaveTextContent("BBBBBB"));
+        expect(within(card).queryByTestId("flight-status")).toBeNull();
+        view.unmount();
+        held = trip([flight, sams]);
+        render(TripPage);
+        expect(await within(await flightCard()).findByTestId("flight-status")).toBeInTheDocument();
+      });
+    });
+
     it("leaves a trip still to come as it was", async () => {
       loyalty = [membership({ id: 12, person_id: 1, kind: "hotel", program: "Marriott Bonvoy", masked: "••••821L" })];
       held = past({ end_date: "2999-01-01" });

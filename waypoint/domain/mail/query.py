@@ -34,6 +34,6 @@ BANK_SUBJECT_WORDS = ("travel", "trip", "flight", "hotel", "cruise", "itinerary"
 LOOKBACK_MONTHS = 18
 
 
-def build(since: date | None, ignored: Iterable[str] = ()) -> str:
+def build(since: date, ignored: Iterable[str] = ()) -> str:
     skipped = "".join(f" -from:{d}" for d in sorted(set(ignored)))
-    return f"-in:spam -in:trash{skipped}" + (f" after:{since:%Y/%m/%d}" if since else "")
+    return f"-in:spam -in:trash{skipped} after:{since:%Y/%m/%d}"
