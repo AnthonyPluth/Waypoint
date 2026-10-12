@@ -531,11 +531,16 @@ class TripRoads(TypedDict):
     interstates: list[TripRoadLine]
 
 
+class TripStateLine(TypedDict):
+    points: list[list[float]]
+
+
 class TripPlaces(TypedDict):
     airports: list[TripAirportPoint]
     cities: list[TripCityPoint]
     stays: list[TripStayPoint]
     roads: TripRoads
+    boundaries: list[TripStateLine]
 
 
 class TripBody(TypedDict):

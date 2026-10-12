@@ -18,6 +18,7 @@ const places: TripPlaces = {
   cities: [],
   stays: [],
   roads: { legs: [], interstates: [] },
+  boundaries: [],
 };
 const there = segment({ id: 1, origin: "MSP", destination: "SFO", start_local: "2025-12-05T08:00", start_zone: "America/Chicago", end_local: "2025-12-05T10:30", end_zone: "America/Los_Angeles" });
 const home = segment({ id: 2, origin: "SFO", destination: "MSP", start_local: "2025-12-11T13:00", start_zone: "America/Los_Angeles", end_local: "2025-12-11T18:50", end_zone: "America/Chicago" });
@@ -94,6 +95,19 @@ describe("RouteReplay", () => {
       expect(items[1]).toContain("(via I-25, I-80)");
       expect(document.querySelector("path[data-road-leg='I-25 I-80']")).toBeTruthy();
       expect(document.querySelector("[data-road='I-80']")).toBeTruthy();
+    });
+
+    it("draws the state lines the server sent, and none when the reply has none", async () => {
+      reduced();
+      vi.mocked(api).mockResolvedValue({ ...drive, boundaries: [{ points: [[37.0, -109.05], [41.0, -109.05]] }] } as never);
+      const { unmount } = render(RouteReplay, { trip: trip([first, second]), now: after });
+      expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
+      expect(document.querySelectorAll("[data-testid='state-lines'] path")).toHaveLength(1);
+      unmount();
+      vi.mocked(api).mockResolvedValue(drive as never);
+      render(RouteReplay, { trip: trip([first, second]), now: after });
+      expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
+      expect(document.querySelector("[data-testid='state-lines']")).toBeNull();
     });
 
     it("keeps the curve when the reply has no roads", async () => {

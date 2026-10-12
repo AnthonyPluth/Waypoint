@@ -4,7 +4,7 @@ from typing import TypedDict, cast
 
 from sqlalchemy import select
 
-from ..storage import db, roads
+from ..storage import db, roads, states
 from ..storage.geocode import Precision
 from ..storage.models import Airport, Segment
 from . import stats, trips
@@ -48,11 +48,16 @@ class Roads(TypedDict):
     interstates: list[RoadLine]
 
 
+class StateLine(TypedDict):
+    points: list[list[float]]
+
+
 class Places(TypedDict):
     airports: list[AirportPoint]
     cities: list[CityPoint]
     stays: list[StayPoint]
     roads: Roads
+    boundaries: list[StateLine]
 
 
 def _names(segment: trips.SegmentOut) -> set[str]:
@@ -110,6 +115,14 @@ def road_legs(live: list[trips.SegmentOut], located: dict[int, roads.Point]) -> 
     return {"legs": legs, "interstates": [{"ref": ref, "points": _round(line)} for ref, line in nearby]}
 
 
+def state_lines(waypoints: list[roads.Point], legs: list[RoadLeg]) -> list[StateLine]:
+    paths: list[list[roads.Point]] = [[p] for p in waypoints]
+    paths += [[(lat, lon) for lat, lon in leg["points"]] for leg in legs]
+    if not paths:
+        return []
+    return [{"points": _round(line)} for line in states.state_lines().near(paths)]
+
+
 def places(conn: db.Connection, viewer: Viewer, trip_id: int) -> Places | None:
     trip = trips.get(conn, viewer, trip_id)
     if trip is None:
@@ -125,10 +138,13 @@ def places(conn: db.Connection, viewer: Viewer, trip_id: int) -> Places | None:
                                                     Segment.latitude.is_not(None), Segment.longitude.is_not(None)).order_by(Segment.id)).all()
     located = {g.id: (g.latitude, g.longitude) for g in stored if g.latitude is not None and g.longitude is not None}
     points = stats.points_of(conn, stats.countries_of(conn, cities))
+    drives = road_legs(live, located)
+    waypoints = [(a.latitude, a.longitude) for a in found] + list(points.values()) + list(located.values())
     return {
         "airports": [{"code": a.code, "city": a.city, "latitude": a.latitude, "longitude": a.longitude} for a in sorted(found, key=lambda a: a.code)],
         "cities": [{"city": c, "latitude": points[c][0], "longitude": points[c][1]} for c in sorted(points)],
         "stays": [{"segment_id": g.id, "latitude": g.latitude, "longitude": g.longitude, "precision": cast(Precision, g.geo_precision or "city")}
                   for g in stored if g.latitude is not None and g.longitude is not None],
-        "roads": road_legs(live, located),
+        "roads": drives,
+        "boundaries": state_lines(waypoints, drives["legs"]),
     }
