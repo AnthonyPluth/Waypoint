@@ -638,6 +638,45 @@ class MigrationTests(unittest.TestCase):
             self.assertIsNone(c.execute(select(schema.review_items.c.reference)).scalar())
         self.assertEqual(drift(self.path), [])
 
+    def test_0029_adds_coordinates_to_bookings_locates_the_existing_ones_offline_and_takes_them_away_leaving_the_rows(self):
+        from alembic import command
+        import json
+        db.init(self.path)
+        stay = dict(trip_id=1, kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="America/Denver",
+                    end_local="2026-11-02T10:00", end_zone="America/Denver", source="email")
+        with db.engine(self.path).begin() as c:
+            names = {col["name"] for col in sa.inspect(c).get_columns("segments")}
+            self.assertLessEqual({"latitude", "longitude", "geo_precision"}, names)
+            command.downgrade(db.alembic_config(c), "0027")
+            names = {col["name"] for col in sa.inspect(c).get_columns("segments")}
+            self.assertFalse({"latitude", "longitude", "geo_precision"} & names)
+            c.execute(insert(schema.trips).values(id=1, name="t", auto=True))
+            rows = [
+                dict(id=1, destination="Boulder", details=json.dumps({"address": "100 Pearl Street, Boulder, CO 80302"}), **stay),
+                dict(id=2, destination="Boulder", details=None, **stay),
+                dict(id=3, destination="Nowhereville", details="not json", **stay),
+                dict(id=4, destination="Nowhereville", details=json.dumps(["list"]), **stay),
+                dict(id=5, kind="car", origin="SFO airport", destination="SFO airport", **{k: v for k, v in stay.items() if k != "kind"}),
+                dict(id=6, kind="flight", origin="JFK", destination="LHR", **{k: v for k, v in stay.items() if k != "kind"}),
+            ]
+            c.execute(insert(schema.segments), [{"origin": None, "details": None, **r} for r in rows])
+            c.execute(insert(schema.segment_travelers).values(segment_id=1, name="A Traveller"))
+            command.upgrade(db.alembic_config(c), "head")
+            got = {r.id: (r.geo_precision, r.latitude, r.longitude) for r in c.execute(select(
+                schema.segments.c.id, schema.segments.c.geo_precision, schema.segments.c.latitude, schema.segments.c.longitude))}
+            self.assertEqual({k: v[0] for k, v in got.items()}, {1: "zip", 2: "city", 3: None, 4: None, 5: "airport", 6: None})
+            self.assertAlmostEqual(got[1][1], 40.0, delta=0.15)
+            self.assertAlmostEqual(got[2][1], 40.015, delta=0.05)
+            self.assertAlmostEqual(got[5][1], 37.62, delta=0.05)
+            self.assertEqual(got[3][1:], (None, None))
+            command.downgrade(db.alembic_config(c), "0027")
+            self.assertEqual(c.execute(select(schema.segments.c.id)).scalars().all(), [1, 2, 3, 4, 5, 6])
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 1)
+            command.upgrade(db.alembic_config(c), "head")
+            self.assertEqual(c.execute(select(schema.segments.c.geo_precision).order_by(schema.segments.c.id)).scalars().all(),
+                             ["zip", "city", None, None, "airport", None])
+        self.assertEqual(drift(self.path), [])
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:

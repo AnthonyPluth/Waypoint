@@ -67,6 +67,10 @@ Off by default (Settings → Mail and AI → AI; see [AI suggestions](/Waypoint/
 
 Only the plain text goes out, with every email address (the sender’s, the recipient’s, those in a forwarded message’s header lines) replaced by `[email]`, quoted replies and footers removed, and labelled or number-shaped loyalty, Known Traveler and card numbers removed (as well as the numbers saved under Loyalty). Either way the suggestion is a draft for you to confirm, not something Waypoint saves on its own, and prompts and replies are never logged.
 
+## Addresses are looked up on your server
+
+A booking’s address or place is turned into a rough point on the map (the centre of its ZIP or postal code, an airport or a city) when the booking is saved, so the Stats map can show where you stayed. This is done entirely on your server from lists that ship with Waypoint ([Data sources](/Waypoint/reference/data-sources/)): no geocoding or map service is asked, no request is made, and the address is not sent anywhere. See [Where a booking is on the map](/Waypoint/start/trips/#where-a-booking-is-on-the-map).
+
 ## What this means for the rest of the setup
 
 - The Google OAuth client’s ID and secret are set in `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`); each connected mailbox’s refresh token is stored encrypted with `WAYPOINT_SECRET_KEY`, and backups hold it encrypted too ([Configuration](/Waypoint/reference/configuration/)).

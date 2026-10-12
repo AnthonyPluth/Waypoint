@@ -115,6 +115,9 @@ class Segment(Base):
     booked_by: Mapped[int | None]
     locked_fields: Mapped[str | None]
     check_times: Mapped[bool]
+    latitude: Mapped[float | None]
+    longitude: Mapped[float | None]
+    geo_precision: Mapped[str | None]
 
 
 class SegmentTraveler(Base):

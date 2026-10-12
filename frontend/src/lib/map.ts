@@ -117,7 +117,7 @@ export function pins(stays: StatsStayPin[], projection: GeoProjection): Pin[] {
   for (const p of stays) {
     const at = projection([p.longitude, p.latitude]);
     if (!at) continue;
-    out.push({ key: `${p.city}-${p.country ?? ""}`, city: p.city, stays: p.stays, nights: p.nights, x: at[0], y: at[1], trips: p.trips,
+    out.push({ key: `${p.city}-${p.country ?? ""}-${p.latitude}-${p.longitude}`, city: p.city, stays: p.stays, nights: p.nights, x: at[0], y: at[1], trips: p.trips,
       label: `${p.city}: ${plural(p.stays, "stay", "stays")}, ${plural(p.nights, "night", "nights")}` });
   }
   return out;

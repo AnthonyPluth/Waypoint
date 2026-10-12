@@ -9,3 +9,10 @@ License, https://opendatacommons.org/licenses/dbcl/1-0/. The derived file is sha
 Airports: waypoint/storage/airports.tsv.gz is derived from OurAirports' public-domain data
 (https://ourairports.com/data/), through the airportsdata package (https://pypi.org/project/airportsdata/), which adds
 time zones.
+
+Places: waypoint/storage/places.tsv.gz holds US ZIP code centres from the U.S. Census Bureau's 2023 Gazetteer ZIP Code
+Tabulation Areas (US government data, public domain; https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.html)
+and Canadian and British postal-code areas and the cities of 15,000 people or more from GeoNames
+(https://www.geonames.org/, files GB.zip, CA.zip and cities15000.zip), which is licensed under Creative Commons
+Attribution 4.0, https://creativecommons.org/licenses/by/4.0/. The names and coordinates were rounded and combined; the
+file is shared here under the same licence.
