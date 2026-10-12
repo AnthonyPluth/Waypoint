@@ -23,6 +23,7 @@
   import PassCard from "$lib/components/PassCard.svelte";
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
+  import RouteReplay from "$lib/components/RouteReplay.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import TripDestination from "$lib/components/TripDestination.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
@@ -253,6 +254,8 @@
       </div>
     {/if}
   </div>
+
+  <RouteReplay trip={t} {now} />
 
   {#if form && form.id === null}
     <SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} />

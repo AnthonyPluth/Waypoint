@@ -457,6 +457,24 @@ class TripList(TypedDict):
     trips: list[Trip]
 
 
+class TripAirportPoint(TypedDict):
+    code: str
+    city: str
+    latitude: float
+    longitude: float
+
+
+class TripCityPoint(TypedDict):
+    city: str
+    latitude: float
+    longitude: float
+
+
+class TripPlaces(TypedDict):
+    airports: list[TripAirportPoint]
+    cities: list[TripCityPoint]
+
+
 class TripBody(TypedDict):
     name: NotRequired[str]
     destination: NotRequired[str | None]

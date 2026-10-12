@@ -1,0 +1,17 @@
+{
+  "name": "trip-route-replay",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Orlando') >> visible=true" },
+    { "wait_for": "h1:has-text('Orlando')" },
+    { "click": "button:has-text('Replay the route')" },
+    { "wait_for": "[data-testid='replay-map']" },
+    { "expect_text": { "selector": "[data-testid='stop-list']", "text": "Orlando" } },
+    { "screenshot": "replay-start" },
+    { "press": { "selector": "input[aria-label='Position along the route']", "key": "End" } },
+    { "wait_for": "[data-label='Orlando']" },
+    { "expect_text": { "selector": "[data-testid='stop-list']", "text": "Back in New York" } },
+    { "screenshot": "replay-end" }
+  ]
+}

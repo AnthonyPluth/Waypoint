@@ -551,6 +551,37 @@
         }
       }
     },
+    "/api/trips/{id}/places": {
+      "get": {
+        "operationId": "api_trip_places",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_places",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripPlaces"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/trips/{id}/emails/clear": {
       "post": {
         "operationId": "api_trip_emails_clear",
@@ -7259,6 +7290,30 @@
         ],
         "additionalProperties": false
       },
+      "TripAirportPoint": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "city",
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
       "TripBody": {
         "type": "object",
         "properties": {
@@ -7293,6 +7348,26 @@
         "required": [],
         "additionalProperties": false
       },
+      "TripCityPoint": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "city",
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
       "TripList": {
         "type": "object",
         "properties": {
@@ -7305,6 +7380,28 @@
         },
         "required": [
           "trips"
+        ],
+        "additionalProperties": false
+      },
+      "TripPlaces": {
+        "type": "object",
+        "properties": {
+          "airports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripAirportPoint"
+            }
+          },
+          "cities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripCityPoint"
+            }
+          }
+        },
+        "required": [
+          "airports",
+          "cities"
         ],
         "additionalProperties": false
       },
