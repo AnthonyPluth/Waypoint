@@ -1,5 +1,7 @@
 import os
+import shutil
 import unittest
+from unittest import mock
 
 import sqlalchemy as sa
 from alembic.autogenerate import compare_metadata
@@ -9,7 +11,7 @@ from sqlalchemy import delete, insert, select
 
 from waypoint.storage import db, schema
 from waypoint.storage.models import Setting, User
-from tests.shared import database_path
+from tests.shared import database_path, scratch_dir
 
 
 def json_list(raw):
@@ -30,6 +32,58 @@ def drift(path):
             and not (isinstance(d, list) and d[0][0] == "modify_nullable" and pk(d[0][2], d[0][3]))]
 
 
+def replay(path):
+    from alembic import command
+    with db.engine(path).begin() as c:
+        command.upgrade(db.alembic_config(c), "head")
+
+
+def shape(path):
+    with db.engine(path).connect() as c:
+        insp = sa.inspect(c)
+        out = {}
+        for table in sorted(insp.get_table_names()):
+            out[table] = dict(
+                columns=[(col["name"], str(col["type"]), col["nullable"], str(col["default"]), col.get("autoincrement"))
+                         for col in insp.get_columns(table)],
+                pk=insp.get_pk_constraint(table)["constrained_columns"],
+                fks=sorted((fk["name"], tuple(fk["constrained_columns"]), fk["referred_table"], tuple(fk["referred_columns"]),
+                            str(fk.get("options"))) for fk in insp.get_foreign_keys(table)),
+                uniques=sorted((u["name"], tuple(u["column_names"])) for u in insp.get_unique_constraints(table)),
+                indexes=sorted((i["name"], tuple(i["column_names"]), bool(i["unique"])) for i in insp.get_indexes(table)))
+        return out
+
+
+def rows_of(path, table):
+    with db.engine(path).connect() as c:
+        return sorted(tuple(r) for r in c.exec_driver_sql(f"SELECT * FROM {table}"))
+
+
+def with_next_migration(case, probe="9001"):
+    source = os.path.join(os.path.dirname(db.__file__), "migrations")
+    root = os.path.join(scratch_dir(case), "migrations")
+    os.makedirs(root)
+    for name in ("env.py", "script.py.mako"):
+        shutil.copy(os.path.join(source, name), root)
+    shutil.copytree(os.path.join(source, "versions"), os.path.join(root, "versions"), ignore=shutil.ignore_patterns("__pycache__"))
+    head = ScriptDirectory.from_config(db.alembic_config()).get_current_head()
+    with open(os.path.join(root, "versions", f"{probe}_probe.py"), "w") as f:
+        f.write(f"import sqlalchemy as sa\nfrom alembic import op\n\nrevision = {probe!r}\ndown_revision = {head!r}\n"
+                "branch_labels = None\ndepends_on = None\n\n\ndef upgrade() -> None:\n"
+                "    op.add_column('settings', sa.Column('probe', sa.Text()))\n\n\ndef downgrade() -> None:\n"
+                "    op.drop_column('settings', 'probe')\n")
+    real = db.alembic_config
+
+    def config(connection=None):
+        cfg = real(connection)
+        cfg.set_main_option("script_location", root)
+        return cfg
+    patch = mock.patch.object(db, "alembic_config", config)
+    patch.start()
+    case.addCleanup(patch.stop)
+    return probe
+
+
 class MigrationTests(unittest.TestCase):
     def setUp(self):
         self.path = database_path(self, "m.db")
@@ -42,6 +96,70 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(c.exec_driver_sql("SELECT version_num FROM alembic_version").scalar(), head)
         db.init(self.path)
         self.assertEqual(drift(self.path), [])
+
+    def test_a_new_database_is_made_in_one_step_and_equals_one_made_by_running_the_migrations(self):
+        made = database_path(self, "replayed.db")
+        replay(made)
+        db.init(self.path)
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual(shape(self.path), shape(made))
+        for table in ("airports", "airlines", "alembic_version"):
+            with self.subTest(table=table):
+                self.assertEqual(rows_of(self.path, table), rows_of(made, table))
+        self.assertGreater(len(rows_of(self.path, "airports")), 5000)
+        self.assertGreater(len(rows_of(self.path, "airlines")), 500)
+
+    def test_the_first_start_makes_the_schema_in_one_step_and_the_second_does_nothing_more(self):
+        from alembic import command
+        with mock.patch.object(command, "upgrade", wraps=command.upgrade) as upgrade, \
+                mock.patch.object(schema.metadata, "create_all", wraps=schema.metadata.create_all) as create_all:
+            db.init(self.path)
+            self.assertEqual((create_all.call_count, upgrade.call_count), (1, 0))
+            head = ScriptDirectory.from_config(db.alembic_config()).get_current_head()
+            self.assertEqual(rows_of(self.path, "alembic_version"), [(head,)])
+            with db.session(self.path) as conn:
+                conn.execute(insert(User).values(sub="s1", email="ana@example.com"))
+            before = shape(self.path)
+            db.init(self.path)
+            self.assertEqual(create_all.call_count, 1)
+            self.assertEqual(shape(self.path), before)
+            self.assertEqual(rows_of(self.path, "alembic_version"), [(head,)])
+            self.assertEqual([r[0] for r in rows_of(self.path, "users")], ["s1"])
+
+    def test_a_database_the_migrations_made_starts_with_nothing_to_do_and_keeps_its_rows(self):
+        from alembic import command
+        replay(self.path)
+        with db.session(self.path) as conn:
+            conn.execute(insert(User).values(sub="s1", email="ana@example.com"))
+            conn.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
+        head = ScriptDirectory.from_config(db.alembic_config()).get_current_head()
+        before = (shape(self.path), rows_of(self.path, "users"), rows_of(self.path, "trips"), rows_of(self.path, "airports"))
+        with mock.patch.object(schema.metadata, "create_all") as create_all, \
+                mock.patch.object(command, "upgrade", wraps=command.upgrade) as upgrade:
+            db.init(self.path)
+        create_all.assert_not_called()
+        self.assertEqual(upgrade.call_count, 1)
+        self.assertEqual((shape(self.path), rows_of(self.path, "users"), rows_of(self.path, "trips"), rows_of(self.path, "airports")), before)
+        self.assertEqual(rows_of(self.path, "alembic_version"), [(head,)])
+        self.assertEqual(drift(self.path), [])
+
+    def test_a_migration_added_later_upgrades_a_database_of_either_kind(self):
+        fresh, replayed = database_path(self, "fresh.db"), database_path(self, "replayed.db")
+        db.init(fresh)
+        replay(replayed)
+        for path in (fresh, replayed):
+            with db.session(path) as conn:
+                conn.execute(insert(Setting).values(key="kept", value="yes"))
+        probe = with_next_migration(self)
+        for path in (fresh, replayed):
+            with self.subTest(path=os.path.basename(path)):
+                db.init(path)
+                with db.engine(path).connect() as c:
+                    self.assertIn("probe", {col["name"] for col in sa.inspect(c).get_columns("settings")})
+                self.assertEqual(rows_of(path, "alembic_version"), [(probe,)])
+                self.assertEqual([r[:2] for r in rows_of(path, "settings")], [("kept", "yes")])
+                db.init(path)
+                self.assertEqual(rows_of(path, "alembic_version"), [(probe,)])
 
     def test_every_migration_goes_down_and_up_again(self):
         from alembic import command
