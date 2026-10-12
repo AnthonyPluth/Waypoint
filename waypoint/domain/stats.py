@@ -591,12 +591,12 @@ def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: in
     prefixes = {c for s in seen if s.kind == "flight" and (c := _airline_code(s))}
     names = dict(conn.execute(select(Airline.code, Airline.name).where(Airline.code.in_(sorted(prefixes)))).fetchall())
     stay_cities = {s.destination.strip().lower() for s in seen if s.kind == "hotel" and s.destination}
-    countries = _countries_of(conn, stay_cities)
+    countries = countries_of(conn, stay_cities)
     trip_names = {t.id: t.name for t in visibility.visible_trips(conn, viewer)}
-    return build(seen, known, names, countries, now=now, year=year, city_points=_points_of(conn, countries), trip_names=trip_names)
+    return build(seen, known, names, countries, now=now, year=year, city_points=points_of(conn, countries), trip_names=trip_names)
 
 
-def _points_of(conn: db.Connection, countries: Mapping[str, str]) -> dict[str, tuple[float, float]]:
+def points_of(conn: db.Connection, countries: Mapping[str, str]) -> dict[str, tuple[float, float]]:
     if not countries:
         return {}
     found: dict[str, list[tuple[float, float]]] = {}
@@ -607,7 +607,7 @@ def _points_of(conn: db.Connection, countries: Mapping[str, str]) -> dict[str, t
     return {c: (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)) for c, pts in found.items()}
 
 
-def _countries_of(conn: db.Connection, cities: set[str]) -> dict[str, str]:
+def countries_of(conn: db.Connection, cities: set[str]) -> dict[str, str]:
     if not cities:
         return {}
     found: dict[str, Counter[str]] = {}
