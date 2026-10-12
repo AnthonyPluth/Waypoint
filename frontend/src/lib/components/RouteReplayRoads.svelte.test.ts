@@ -70,7 +70,7 @@ describe("RouteReplayMap on the interstates", () => {
     expect(ground(container).getAttribute("d")).toContain("Q");
   });
 
-  it("with reduced motion shows the road, no vehicle icon and no controls", () => {
+  it("with reduced motion shows the road, a still car on it and no controls", () => {
     const { container } = render(RouteReplayMap, { stops: [denver, saltLake], year: 2025, roads, still: true });
     expect(container.querySelector("[data-car]")).toBeNull();
     expect(container.querySelector("path[data-leg][stroke-dashoffset='0']")).toBeTruthy();

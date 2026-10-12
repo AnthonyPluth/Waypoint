@@ -245,7 +245,7 @@ describe("RouteReplayMap", () => {
     expect(container.querySelector("[data-car]")).toBeNull();
   });
 
-  it("with reduced motion keeps the whole map, with no zoom and no vehicle icons", () => {
+  it("with reduced motion keeps the whole map, with no zoom and static icons", () => {
     const far = stopsOf(trip([...flights, segment({ id: 3, kind: "hotel", origin: "Bay Lodge", destination: "Monterey", start_local: "2025-12-05T15:00", start_zone: la, end_local: "2025-12-11T11:00", end_zone: la })]),
       { ...places, stays: [{ segment_id: 3, latitude: 36.6, longitude: -121.9, precision: "city" }] });
     const { container } = render(RouteReplayMap, { stops: far, year: 2025, still: true });
