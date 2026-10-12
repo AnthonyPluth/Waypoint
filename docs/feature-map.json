@@ -258,6 +258,21 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/trips/{id}/places",
+      "handler": "waypoint/server/api/trips.py:api_trip_places",
+      "web": [
+        "frontend/src/lib/components/RouteReplay.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/trips/{id}",
       "handler": "waypoint/server/api/trips.py:api_trip_edit",

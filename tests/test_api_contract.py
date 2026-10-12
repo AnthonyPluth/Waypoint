@@ -370,6 +370,7 @@ class Replies(DbCase):
                                                       "details": {"seat": "34K"}, "travelers": [{"name": "DOE/JANE MS"}]})
         self.check("POST /api/segments", seg)
         self.check("GET /api/segments/{id}", trips_api.api_segment(self.c, {}, {}, str(seg["id"])))
+        self.check("GET /api/trips/{id}/places", trips_api.api_trip_places(self.c, {}, {}, str(seg["trip_id"])))
         box = self.c.execute(insert(Mailbox).values(owner_sub="u9", address="jane@gmail.example", token=secretbox.encrypt("t"), status="connected",
                                                     created=1.0)).lastrowid
         stored_mail.put(self.c, box, "m9", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-02-20", "text": "Hello.",
@@ -461,7 +462,7 @@ class Generated(unittest.TestCase):
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/emails/clear", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
-                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/offline",
+                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
