@@ -437,13 +437,13 @@ STOP_WORDS = {"flight": "flight to", "train": "train to", "hotel": "hotel in", "
 FORBIDDEN_CHARS = re.compile(r"[\x00-\x1f\x7f<>{}\[\]\\]")
 
 
-def _scrubbed(text: str, limit: int) -> str:
-    return " ".join(redact(text).split())[:limit]
+def _scrubbed(text: str, limit: int, known: tuple[str, ...] = ()) -> str:
+    return " ".join(redact(text, known).split())[:limit]
 
 
-def destination_prompt(facts: regions.Facts) -> str:
-    name = _scrubbed(NAME_DATE.sub("", facts["name"]), PLACE_LIMIT)
-    lines = [f"- {STOP_WORDS.get(stop['kind'], 'booking in')} {_scrubbed(stop['place'], PLACE_LIMIT)}" for stop in facts["stops"][:MAX_STOPS]]
+def destination_prompt(facts: regions.Facts, known: tuple[str, ...] = ()) -> str:
+    name = _scrubbed(NAME_DATE.sub("", facts["name"]), PLACE_LIMIT, known)
+    lines = [f"- {STOP_WORDS.get(stop['kind'], 'booking in')} {_scrubbed(stop['place'], PLACE_LIMIT, known)}" for stop in facts["stops"][:MAX_STOPS]]
     return "\n".join([f"Trip name: {name}", "Bookings, in order:", *lines])
 
 
@@ -463,5 +463,5 @@ def clean_destination(content: Any) -> str:
     return text
 
 
-def destination(cfg: Config, facts: regions.Facts) -> str:
-    return clean_destination(_ask(cfg, destination_prompt(facts), SYSTEM_DESTINATION, BAD_DESTINATION))
+def destination(cfg: Config, facts: regions.Facts, known: tuple[str, ...] = ()) -> str:
+    return clean_destination(_ask(cfg, destination_prompt(facts, known), SYSTEM_DESTINATION, BAD_DESTINATION))

@@ -5,7 +5,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from ... import validate
-from ...domain import airports, people, trips
+from ...domain import airports, loyalty, people, trips
 from ...domain.mail import ai
 from ...domain.visibility import Viewer
 from ...storage import db
@@ -182,6 +182,7 @@ def api_trip_destination_suggest(_conn, _q, _b, trip_id) -> DestinationSuggestio
     with db.session() as conn:
         facts = trips.destination_facts(conn, viewer(conn), this)
         cfg = ai.config(conn)
+        known = tuple(loyalty.known_numbers(conn)) if cfg else ()
     if facts is None:
         raise ApiError(NO_TRIP, 404)
     if cfg is None:
@@ -189,7 +190,7 @@ def api_trip_destination_suggest(_conn, _q, _b, trip_id) -> DestinationSuggestio
     if not facts["stops"]:
         raise ApiError(NO_PLACES)
     try:
-        return {"suggestion": ai.destination(cfg, facts)}
+        return {"suggestion": ai.destination(cfg, facts, known)}
     except ai.AiError as e:
         raise ApiError(str(e), 502) from e
 

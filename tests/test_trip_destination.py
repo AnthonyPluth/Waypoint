@@ -430,6 +430,19 @@ class SuggestRouteTests(RouteCase):
             self.assertNotIn(private, everything)
         self.assertEqual(body["messages"][0]["content"], ai.SYSTEM_DESTINATION)
 
+    def test_a_saved_membership_number_in_the_trip_name_is_not_sent(self):
+        from waypoint.domain import loyalty
+        self.set_mode("local")
+        trip_id = self.trip()
+        with db.session() as conn:
+            loyalty.add(conn, {"person_id": self.person["ana"], "kind": "airline", "program": "Example Miles", "number": "12345678",
+                               "expiry": None, "notes": None})
+        self.ok("ana", "POST", f"/api/trips/{trip_id}", {"name": "Trip with 12345678"})
+        self.assertEqual(self.suggest("ana", trip_id)[0], 200)
+        sent = json.dumps(self.fake.requests[0][2])
+        self.assertNotIn("12345678", sent)
+        self.assertIn("Trip with [removed]", sent)
+
     def test_an_automatic_name_is_sent_without_its_month_and_year(self):
         self.set_mode("local")
         first = self.book("ana", leg("JFK", "DEN", 1))
