@@ -37,7 +37,7 @@ The image is `ghcr.io/anthonypluth/waypoint` (Intel/AMD and ARM). One deployment
 
 ## Privacy
 
-Waypoint sends nothing about itself to any outside service. Your email stays on your server, you see only the trips you’re on, and loyalty and Known Traveler numbers are encrypted and never in logs or AI prompts. These are held by checks in the code, and [Waypoint’s promises](AGENTS.md#waypoints-promises) in AGENTS.md are the exact wording. [Email scanning](https://anthonypluth.github.io/Waypoint/privacy/email-scanning/) says what a scan reads and keeps, and [SECURITY.md](SECURITY.md) covers what Waypoint holds and how to run it safely.
+Waypoint sends nothing about itself to any outside service. Your email stays on your server, you see only the trips you’re on, and loyalty and Known Traveler numbers are encrypted and never in logs or hosted AI prompts (with the AI set to Local, the email text goes unredacted to your own Ollama server). These are held by checks in the code, and [Waypoint’s promises](AGENTS.md#waypoints-promises) in AGENTS.md are the exact wording. [Email scanning](https://anthonypluth.github.io/Waypoint/privacy/email-scanning/) says what a scan reads and keeps, and [SECURITY.md](SECURITY.md) covers what Waypoint holds and how to run it safely.
 
 ## Documentation
 
