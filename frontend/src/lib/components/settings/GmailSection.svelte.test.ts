@@ -106,7 +106,7 @@ describe("Settings → Gmail → Ignored senders", () => {
     render(GmailSection);
     await userEvent.click(await screen.findByRole("button", { name: "Stop ignoring example-air.example" }));
     await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
-    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("Look back 18 months")));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("Look back through all mail")));
   });
 });
 
@@ -310,11 +310,21 @@ describe("Settings → Gmail", () => {
     await waitFor(() => expect(toast).toHaveBeenCalledWith("A scan of this mailbox is already running."));
   });
 
-  it("looks back 18 months, and says when a scan is already running", async () => {
+  it("asks before looking back through all mail, then starts it, and says when a scan is already running", async () => {
     serve(list([box()]), (path) => (path === "/api/mailboxes/1/backfill" ? { started: false } : {}));
     render(GmailSection);
-    await userEvent.click(await screen.findByRole("button", { name: "Look back 18 months" }));
-    expect(api).toHaveBeenCalledWith("/api/mailboxes/1/backfill", { method: "POST", failed: "Couldn’t start the look-back" });
+    await userEvent.click(await screen.findByRole("button", { name: "Look back through all mail" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/reads every message in the mailbox, newest first, and can take hours for a large inbox\. Bookings found are added as past trips\./)).toBeInTheDocument();
+    expect(api).not.toHaveBeenCalledWith("/api/mailboxes/1/backfill", expect.anything());
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    document.body.style.pointerEvents = "";
+    expect(api).not.toHaveBeenCalledWith("/api/mailboxes/1/backfill", expect.anything());
+    await userEvent.click(screen.getByRole("button", { name: "Look back through all mail" }));
+    await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/mailboxes/1/backfill", { method: "POST", failed: "Couldn’t start the look-back" }));
     await waitFor(() => expect(toast).toHaveBeenCalledWith("A scan of this mailbox is already running."));
   });
 
@@ -323,8 +333,12 @@ describe("Settings → Gmail", () => {
     mockApi(async (_path: string, opts?: { method?: string }) =>
       (opts?.method === "POST" ? { started: true } : list([box({ scan_error: stopped ? "Couldn’t reach Google while reading the mailbox." : null })])) as never);
     render(GmailSection);
-    await userEvent.click(await screen.findByRole("button", { name: "Look back 18 months" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Look back through all mail" }));
+    await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/mailboxes/1/backfill", { method: "POST", failed: "Couldn’t start the look-back" }));
     expect(toast).not.toHaveBeenCalled();
+    document.body.style.pointerEvents = "";
     stopped = true;
     await userEvent.click(screen.getByRole("button", { name: "Scan now" }));
     expect(await screen.findByText(/The last scan stopped: Couldn’t reach Google while reading the mailbox\. What it had read is kept/)).toBeInTheDocument();
