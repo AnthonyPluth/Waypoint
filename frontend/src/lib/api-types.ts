@@ -180,6 +180,11 @@ export interface AssistantSegmentEmails {
   emails: AssistantEmail[];
 }
 
+export interface Attached {
+  ok: boolean;
+  segment_id: number;
+}
+
 export interface BackupContents {
   created: string | null;
   source: string | null;
@@ -207,6 +212,10 @@ export interface CruiseStop {
   recorded: boolean;
 }
 
+export interface DestinationSuggestion {
+  suggestion: string;
+}
+
 export interface DeviceBody {
   endpoint: string;
   p256dh: string;
@@ -224,6 +233,10 @@ export interface DistanceUnit {
 
 export interface DistanceUnitBody {
   distance_unit: "mi" | "km";
+}
+
+export interface EmailsCleared {
+  removed: number;
 }
 
 export interface FeedMade {
@@ -637,6 +650,10 @@ export interface ReviewOther {
   received: string | null;
 }
 
+export interface SameBooking {
+  booking: ReviewCandidate | null;
+}
+
 export interface ScanStarted {
   started: boolean;
 }
@@ -654,6 +671,7 @@ export interface ScanSummary {
   not_travel: number;
   followups: number;
   with_facts: number;
+  attached: number;
 }
 
 export interface Segment {
@@ -758,6 +776,7 @@ export interface State {
   last_backup: string | null;
   review_count: number;
   person_id: number | null;
+  ai: boolean;
 }
 
 export interface Stats {
@@ -946,10 +965,20 @@ export interface Trip {
   start_date: string | null;
   end_date: string | null;
   destination: string | null;
+  destination_manual: boolean;
   notes: string | null;
   auto: boolean;
   booked_by: number | null;
+  emails: number;
+  can_clear_emails: boolean;
   segments: Segment[];
+}
+
+export interface TripAirportPoint {
+  code: string;
+  city: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface TripBody {
@@ -960,8 +989,19 @@ export interface TripBody {
   end_date?: string | null;
 }
 
+export interface TripCityPoint {
+  city: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface TripList {
   trips: Trip[];
+}
+
+export interface TripPlaces {
+  airports: TripAirportPoint[];
+  cities: TripCityPoint[];
 }
 
 export interface UnignoreBody {
@@ -1003,8 +1043,11 @@ export interface Endpoints {
   "GET /api/trips/{id}": { body: never; reply: Trip };
   "POST /api/trips/{id}": { body: TripBody; reply: Trip };
   "DELETE /api/trips/{id}": { body: never; reply: Ok };
+  "GET /api/trips/{id}/places": { body: never; reply: TripPlaces };
+  "POST /api/trips/{id}/emails/clear": { body: never; reply: EmailsCleared };
   "POST /api/trips/{id}/merge": { body: MergeBody; reply: Trip };
   "POST /api/trips/{id}/split": { body: SplitBody; reply: Trip };
+  "POST /api/trips/{id}/destination/suggest": { body: never; reply: DestinationSuggestion };
   "POST /api/segments": { body: SegmentBody; reply: Segment };
   "GET /api/segments/{id}": { body: never; reply: Segment };
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };
@@ -1049,6 +1092,8 @@ export interface Endpoints {
   "POST /api/review/who/{id}": { body: WhoBody; reply: Matched };
   "POST /api/review/{id}/ignore": { body: never; reply: Ignoring };
   "POST /api/review/{id}/match": { body: MatchBody; reply: Ok };
+  "POST /api/review/{id}/same": { body: SegmentBody; reply: SameBooking };
+  "POST /api/review/{id}/attach": { body: SegmentBody; reply: Attached };
   "GET /api/review/{id}/preview": { body: never; reply: Preview };
   "POST /api/review/{id}/suggest": { body: never; reply: Ok };
   "DELETE /api/review/{id}": { body: never; reply: Ok };

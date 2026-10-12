@@ -8,10 +8,10 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import type { LoyaltyEntry, Person, Trip as TripT } from "$lib/api-types";
-import { route } from "$lib/app.svelte";
+import { app, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { viewport } from "$lib/phone.svelte";
-import { membership, segment, trip } from "../test/fixtures";
+import { membership, segment, state, trip } from "../test/fixtures";
 import TripPage from "./Trip.svelte";
 
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
@@ -46,7 +46,7 @@ beforeEach(() => {
   route.page = "trip"; route.sub = "1"; route.query = ""; location.hash = "#trip/1";
   serve();
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); flightStatus.list = null; delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
+afterEach(() => { app.state = null; vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); flightStatus.list = null; delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
 
 describe("Trip", () => {
   it("shows a flight’s live status on its card and none on a stay", async () => {
@@ -64,6 +64,61 @@ describe("Trip", () => {
     const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
     expect(cards[0].querySelector("img")?.getAttribute("src")).toBe("/api/segments/1/logo");
     expect(cards[1].querySelector("img")).toBeNull();
+  });
+
+  describe("travellers", () => {
+    const at = (s: ReturnType<typeof segment>) => `segment-${s.id}`;
+    const car = segment({ id: 3, kind: "car", provider: "Local Cars", origin: "LHR", destination: null, confirmation: "C1", start_local: "2026-11-22T09:00", start_zone: "Europe/London",
+      end_local: "2026-11-25T09:00", end_zone: "Europe/London", travelers: [{ id: 5, person_id: 1, name: "Jane Doe", seat: null }, { id: 6, person_id: 2, name: "Sam Doe", seat: null }] });
+    const flightFor = segment({ id: 1, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: "31A" }, { id: 2, person_id: 2, name: "Sam Doe", seat: "31B" }] });
+    const cardOf = async (s: ReturnType<typeof segment>) => (await screen.findByRole("list", { name: "Bookings" })).querySelector(`#${at(s)}`) as HTMLElement;
+
+    beforeEach(() => { app.state = state({ person_id: 1 }); });
+
+    it("lists the trip's people once at the top, without repeats", async () => {
+      held = trip([flightFor, car, { ...stay, travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] }]);
+      render(TripPage);
+      await screen.findByRole("list", { name: "Bookings" });
+      expect(document.querySelectorAll("[data-trip-travellers]")).toHaveLength(1);
+      expect(document.querySelector("[data-trip-travellers]")).toHaveTextContent("Travellers Jane Doe, Sam Doe");
+    });
+
+    it("keeps a flight's travellers and seats", async () => {
+      held = trip([flightFor, car]);
+      render(TripPage);
+      const card = await cardOf(flightFor);
+      expect(card).toHaveTextContent("Jane Doe · Seat 31A");
+      expect(card).toHaveTextContent("Sam Doe · Seat 31B");
+    });
+
+    it("drops the travellers from a non-flight booking that has the trip's full set", async () => {
+      held = trip([flightFor, car]);
+      render(TripPage);
+      const card = await cardOf(car);
+      expect(within(card).queryByText("Travellers")).toBeNull();
+      expect(card).not.toHaveTextContent("Sam Doe");
+    });
+
+    it("still shows a smaller set on a non-flight booking", async () => {
+      held = trip([flightFor, { ...car, travelers: [car.travelers[1]] }]);
+      render(TripPage);
+      const card = await cardOf(car);
+      expect(within(card).getByText("Travellers")).toBeInTheDocument();
+      expect(card).toHaveTextContent("Sam Doe");
+      expect(card).not.toHaveTextContent("Jane Doe");
+    });
+
+    it("leaves the line out for a trip only the viewer is on, and shows it for someone else", async () => {
+      held = trip([segment({ id: 1, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }] })]);
+      const { unmount } = render(TripPage);
+      await screen.findByRole("list", { name: "Bookings" });
+      expect(document.querySelector("[data-trip-travellers]")).toBeNull();
+      unmount();
+      app.state = state({ person_id: 2 });
+      render(TripPage);
+      await screen.findByRole("list", { name: "Bookings" });
+      expect(document.querySelector("[data-trip-travellers]")).toHaveTextContent("Jane Doe");
+    });
   });
 
   describe("deleting a trip", () => {
@@ -411,6 +466,18 @@ describe("Trip", () => {
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "POST", body: { name: "Lisbon in spring" } }));
     expect(await screen.findByRole("heading", { name: "Lisbon in spring" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Trip name")).toBeNull();
+  });
+
+  it("edits the destination under the dates, sending only the destination, and shows the new one", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit destination" }));
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST"
+      ? { ...held, destination: "Colorado & Texas", destination_manual: true } : held) as never);
+    await u.type(screen.getByLabelText("Destination"), "Colorado & Texas");
+    await u.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "POST", body: { destination: "Colorado & Texas" } }));
+    expect(await screen.findByText(/· Colorado & Texas/)).toBeInTheDocument();
   });
 
   it("won't save an empty trip name, says why when the server refuses, and Cancel keeps the old name", async () => {

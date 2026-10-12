@@ -172,7 +172,7 @@ class Replies(DbCase):
                                                   last_scan=1790000000.0, created=1.0,
                                                   scan_summary='{"found":3,"read":2,"bookings":1,"review":1,"skipped":1,"capped":false}' if status == "connected" else None))
         reply = mailboxes.api_mailboxes(self.c, {}, {})
-        self.assertEqual(reply["mailboxes"][0]["scan_summary"], {"found": 3, "read": 2, "bookings": 1, "review": 1, "skipped": 1, "capped": False, "labels_dropped": 0, "triaged": 0, "total": 0, "not_travel": 0, "followups": 0, "with_facts": 0})
+        self.assertEqual(reply["mailboxes"][0]["scan_summary"], {"found": 3, "read": 2, "bookings": 1, "review": 1, "skipped": 1, "capped": False, "labels_dropped": 0, "triaged": 0, "total": 0, "not_travel": 0, "followups": 0, "with_facts": 0, "attached": 0})
         self.assertIsNone(reply["mailboxes"][1]["scan_summary"])
         self.assertEqual([m["status"] for m in reply["mailboxes"]], ["connected", "reconnect", "error"])
         self.check("GET /api/mailboxes", reply)
@@ -238,6 +238,14 @@ class Replies(DbCase):
         self.assertEqual([len(m["candidates"]) for m in held["matches"]], [2])
         self.check("GET /api/review", held)
         self.check("POST /api/review/{id}/match", review_api.api_review_match(self.c, {}, {"entry": 1, "segment_id": pair[0]}, str(held["matches"][0]["item_id"])))
+        review.add(self.c, box, "m10", "hotel.example", "2026-10-19", "no_markup", 1.0)
+        item = str(next(i["id"] for i in review_api.api_review(self.c, {}, {})["items"] if i["reason"] == "no_markup" and i["received"] == "2026-10-19"))
+        same = {**stay, "confirmation": "H88231", "provider": "Example Hotels"}
+        found = review_api.api_review_same(self.c, {}, same, item)
+        self.assertEqual(found["booking"]["segment_id"], pair[0])   # type: ignore[index]
+        self.check("POST /api/review/{id}/same", found)
+        self.check("POST /api/review/{id}/same", review_api.api_review_same(self.c, {}, {**same, "confirmation": "OTHER1"}, item))
+        self.check("POST /api/review/{id}/attach", review_api.api_review_attach(self.c, {}, same, item))
 
     def test_ai(self):
         self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))
@@ -370,6 +378,7 @@ class Replies(DbCase):
                                                       "details": {"seat": "34K"}, "travelers": [{"name": "DOE/JANE MS"}]})
         self.check("POST /api/segments", seg)
         self.check("GET /api/segments/{id}", trips_api.api_segment(self.c, {}, {}, str(seg["id"])))
+        self.check("GET /api/trips/{id}/places", trips_api.api_trip_places(self.c, {}, {}, str(seg["trip_id"])))
         box = self.c.execute(insert(Mailbox).values(owner_sub="u9", address="jane@gmail.example", token=secretbox.encrypt("t"), status="connected",
                                                     created=1.0)).lastrowid
         stored_mail.put(self.c, box, "m9", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-02-20", "text": "Hello.",
@@ -380,11 +389,17 @@ class Replies(DbCase):
         self.check("GET /api/trips", trips_api.api_trips(self.c, {}, {}))
         self.check("GET /api/trips/{id}", trips_api.api_trip(self.c, {}, {}, str(seg["trip_id"])))
         self.check("POST /api/trips/{id}", trips_api.api_trip_edit(self.c, {}, {"notes": "Skates"}, str(made["id"])))
+        self.check("POST /api/trips/{id}/emails/clear", trips_api.api_trip_emails_clear(self.c, {}, {}, str(seg["trip_id"])))
         self.check("POST /api/trips/{id}/merge", trips_api.api_trip_merge(self.c, {}, {"merge": seg["trip_id"]}, str(made["id"])))
         other = trips_api.api_segment_add(self.c, {}, {"kind": "hotel", "origin": "Harbour Hotel", "start_zone": "Europe/London",
                                                         "end_zone": "Europe/London", "start_local": "2026-06-02T15:00",
                                                         "end_local": "2026-06-08T10:00", "trip_id": made["id"]})
         self.check("POST /api/trips/{id}/split", trips_api.api_trip_split(self.c, {}, {"segment_ids": [other["id"]]}, str(made["id"])))
+        for key, value in ((sk.AI_MODE, "local"), (sk.AI_OLLAMA_URL, "http://ollama.example:1234"), (sk.AI_OLLAMA_MODEL, "llama3")):
+            db.set_setting(self.c, key, value)
+        self.c.commit()
+        with mock.patch.object(trips_api.ai, "destination", return_value="Colorado & Texas"):
+            self.check("POST /api/trips/{id}/destination/suggest", trips_api.api_trip_destination_suggest(None, {}, {}, str(made["id"])))
         self.check("POST /api/segments/{id}/move", trips_api.api_segment_move(self.c, {}, {"trip_id": made["id"]}, str(other["id"])))
         self.check("DELETE /api/segments/{id}", trips_api.api_segment_remove(self.c, {}, {}, str(other["id"])))
         self.check("DELETE /api/trips/{id}", trips_api.api_trip_remove(self.c, {}, {}, str(made["id"])))
@@ -429,7 +444,7 @@ class Mismatches(unittest.TestCase):
 
     def test_a_renamed_field_a_wrong_type_and_a_missing_one(self):
         st = {"version": "dev", "database": "sqlite", "user": {"name": None, "email": None, "local": True},
-              "last_backup": None, "review_count": 0, "person_id": None}
+              "last_backup": None, "review_count": 0, "person_id": None, "ai": False}
         schema = reply_schema("GET /api/state")
         self.assertEqual(problems(st, schema), [])
         renamed = {("backed_up" if k == "last_backup" else k): v for k, v in st.items()}
@@ -453,14 +468,14 @@ class Generated(unittest.TestCase):
                                      "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/share",
                                      "GET /api/ai", "POST /api/ai", "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "DELETE /api/review/{id}",
-                                     "GET /api/review/{id}/preview", "POST /api/review/{id}/suggest",
+                                     "GET /api/review/{id}/preview", "POST /api/review/{id}/suggest", "POST /api/review/{id}/same", "POST /api/review/{id}/attach",
                                      "GET /api/people", "POST /api/people",
                                      "POST /api/people/{id}", "DELETE /api/people/{id}", "POST /api/people/{id}/claim",
                                      "GET /api/people/claim-suggestions", "POST /api/people/claim-suggestions/dismiss",
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
-                                     "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
+                                     "DELETE /api/trips/{id}", "POST /api/trips/{id}/emails/clear", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split", "POST /api/trips/{id}/destination/suggest",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
-                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/offline",
+                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",

@@ -722,7 +722,7 @@ class TripTests(Household):
         trip = self.add(self.jane, OUT)["trip_id"]
         edited = trips.edit_trip(self.c, self.jane, trip, {"name": "Summer in London", "destination": None, "notes": "Pack light"})
         assert edited
-        self.assertEqual((edited["name"], edited["destination"], edited["notes"], edited["auto"]), ("Summer in London", None, "Pack light", True))
+        self.assertEqual((edited["name"], edited["destination"], edited["notes"], edited["auto"]), ("Summer in London", "United Kingdom", "Pack light", True))
         with self.assertRaisesRegex(trips.Invalid, "come from its segments"):
             trips.edit_trip(self.c, self.jane, trip, {"start_date": "2026-01-01"})
 
@@ -802,7 +802,7 @@ class GroupingTests(Household):
         self.assertEqual({out["trip_id"], stay["trip_id"], back["trip_id"]}, {out["trip_id"]})
         trip = trips.get(self.c, self.jane, out["trip_id"])
         assert trip
-        self.assertEqual((trip["auto"], trip["name"], trip["destination"]), (True, "Trip to London (Jun 2026)", "London"))
+        self.assertEqual((trip["auto"], trip["name"], trip["destination"]), (True, "Trip to London (Jun 2026)", "United Kingdom"))
 
     def test_a_trip_after_getting_home_is_a_new_one(self):
         a, b = self.add(self.jane, OUT), self.add(self.jane, BACK)
@@ -940,10 +940,12 @@ class VisibilityRouteTests(RouteCase):
         second = self.book("ana", BACK, trip_id=seg["trip_id"])
         mine = self.book("cy", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"})
         trip, segs = seg["trip_id"], [seg["id"], second["id"]]
-        calls = [("GET", f"/api/trips/{trip}", None), ("POST", f"/api/trips/{trip}", {"name": "Stolen"}),
-                 ("DELETE", f"/api/trips/{trip}", None), ("POST", f"/api/trips/{trip}/merge", {"merge": mine["trip_id"]}),
+        calls = [("GET", f"/api/trips/{trip}", None), ("GET", f"/api/trips/{trip}/places", None), ("POST", f"/api/trips/{trip}", {"name": "Stolen"}),
+                 ("DELETE", f"/api/trips/{trip}", None), ("POST", f"/api/trips/{trip}/emails/clear", None),
+                 ("POST", f"/api/trips/{trip}/merge", {"merge": mine["trip_id"]}),
                  ("POST", f"/api/trips/{mine['trip_id']}/merge", {"merge": trip}),
                  ("POST", f"/api/trips/{trip}/split", {"segment_ids": segs[:1]}),
+                 ("POST", f"/api/trips/{trip}/destination/suggest", None),
                  ("POST", "/api/segments", {**HOTEL, "trip_id": trip})]
         for s in segs:
             calls += [("GET", f"/api/segments/{s}", None), ("GET", f"/api/segments/{s}/logo", None), ("GET", f"/api/segments/{s}/emails", None), ("GET", f"/api/segments/{s}/emails/0/images/0", None),
@@ -966,8 +968,9 @@ class VisibilityRouteTests(RouteCase):
         self.assertEqual([t["id"] for t in self.ok("cy", "GET", "/api/trips")["trips"]], [mine["trip_id"]])
 
     def test_every_trip_and_segment_route_with_an_id_is_covered_above(self):
-        covered = {("GET", "/api/trips/{id}"), ("POST", "/api/trips/{id}"), ("DELETE", "/api/trips/{id}"),
-                   ("POST", "/api/trips/{id}/merge"), ("POST", "/api/trips/{id}/split"), ("POST", "/api/segments"),
+        covered = {("GET", "/api/trips/{id}"), ("GET", "/api/trips/{id}/places"), ("POST", "/api/trips/{id}"), ("DELETE", "/api/trips/{id}"),
+                   ("POST", "/api/trips/{id}/emails/clear"), ("POST", "/api/trips/{id}/merge"), ("POST", "/api/trips/{id}/split"), ("POST", "/api/segments"),
+                   ("POST", "/api/trips/{id}/destination/suggest"),
                    ("GET", "/api/segments/{id}"), ("POST", "/api/segments/{id}"), ("DELETE", "/api/segments/{id}"),
                    ("GET", "/api/segments/{id}/logo"), ("GET", "/api/segments/{id}/emails"),
                    ("GET", "/api/segments/{id}/emails/{id}/images/{id}"), ("POST", "/api/segments/{id}/move")}
@@ -1051,7 +1054,7 @@ class SegmentRouteTests(RouteCase):
         self.assertEqual((seg["source"], seg["booked_by"], seg["details"]), ("manual", self.person["ana"], {"flight_number": "NZ6", "seat": "34K"}))
         self.assertEqual(self.ok("ana", "GET", f"/api/segments/{seg['id']}"), seg)
         trip = self.ok("ana", "GET", f"/api/trips/{seg['trip_id']}")
-        self.assertEqual((trip["segments"], trip["name"], trip["destination"]), ([seg], "Trip to Los Angeles (Mar 2026)", "Los Angeles"))
+        self.assertEqual((trip["segments"], trip["name"], trip["destination"]), ([seg], "Trip to Los Angeles (Mar 2026)", "California"))
         edited = self.ok("ana", "POST", f"/api/segments/{seg['id']}", {"status": "changed", "details": {"seat": "35A", "terminal": " 2 "},
                                                                      "provider": None})
         self.assertEqual((edited["status"], edited["details"], edited["provider"], edited["locked_fields"]),
@@ -1118,6 +1121,35 @@ class AirportRouteTests(RouteCase):
         for code in ("ZZZ", "AK", "AKLX", "12A", "ÅKL"):
             with self.subTest(code=code):
                 self.assertEqual(self.call("ana", "GET", f"/api/airports/{urllib.parse.quote(code)}")[0], 404)
+
+
+class TripPlacesRouteTests(RouteCase):
+    def test_coordinates_for_the_airports_and_cities_of_a_trip(self):
+        out = self.book("ana")
+        trip = out["trip_id"]
+        self.book("ana", BACK, trip_id=trip)
+        self.book("ana", {**HOTEL, "destination": "London"}, trip_id=trip)
+        self.book("ana", {**HOTEL, "origin": "Nowhere Inn", "destination": "Nowhereville"}, trip_id=trip)
+        got = self.ok("ana", "GET", f"/api/trips/{trip}/places")
+        self.assertEqual([a["code"] for a in got["airports"]], ["JFK", "LHR"])
+        for a in got["airports"]:
+            self.assertEqual(sorted(a), ["city", "code", "latitude", "longitude"])
+            self.assertIsInstance(a["latitude"], float)
+        self.assertEqual([a["city"] for a in got["airports"]], ["New York", "London"])
+        self.assertEqual([c["city"] for c in got["cities"]], ["london"])
+        self.assertAlmostEqual(got["cities"][0]["latitude"], 51.5, delta=1.5)
+
+    def test_a_cancelled_segment_adds_no_place(self):
+        seg = self.book("ana")
+        self.book("ana", {**HOTEL, "destination": "Paris", "status": "cancelled"}, trip_id=seg["trip_id"])
+        got = self.ok("ana", "GET", f"/api/trips/{seg['trip_id']}/places")
+        self.assertEqual(got["cities"], [])
+
+    def test_a_stranger_and_a_missing_trip_get_404(self):
+        seg = self.book("ana")
+        self.assertEqual(self.call("ben", "GET", f"/api/trips/{seg['trip_id']}/places")[0], 404)
+        self.assertEqual(self.call("ana", "GET", "/api/trips/99999/places")[0], 404)
+        self.assertEqual(self.call("ana", "GET", "/api/trips/x/places")[0], 404)
 
 
 class LocalHouseholdTests(ServerCase):

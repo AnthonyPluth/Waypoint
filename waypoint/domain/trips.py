@@ -10,9 +10,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import delete, select, update
 
+from .. import dates
 from ..storage import db, geocode, stored_mail
 from ..storage.models import Segment, SegmentPort, SegmentTraveler, Trip
-from . import airports, links, logos, people, place_zones, visibility
+from . import airports, links, logos, people, place_zones, regions, visibility
 from .visibility import Viewer
 
 Kind = Literal["flight", "hotel", "car", "train", "cruise", "parking"]
@@ -21,6 +22,7 @@ KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train", "cruise", "parking
 STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
 TIME_UNKNOWN = "time_unknown"
 ADDRESS_LIMIT = 300
+EMAILS_CLEARABLE_AFTER_DAYS = 7
 MAX_PORTS = 40
 SEAT_LIMIT = 10
 DETAIL_KEYS = ("flight_number", "terminal", "seat", "seat_position", "aircraft", "cabin", "room", "car_class", "address", "phone", "ship", "deck", "space_type", "vehicle", "notes", TIME_UNKNOWN)
@@ -143,9 +145,12 @@ class TripOut(TypedDict):
     start_date: str | None
     end_date: str | None
     destination: str | None
+    destination_manual: bool
     notes: str | None
     auto: bool
     booked_by: int | None
+    emails: int
+    can_clear_emails: bool
     segments: list[SegmentOut]
 
 
@@ -463,13 +468,22 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
     return sorted(out, key=lambda s: (instant(s["start_local"], s["start_zone"]), s["id"]))
 
 
-def _trip_outs(conn: db.Connection, viewer: Viewer, trips: Sequence[Trip]) -> list[TripOut]:
+def _trip_outs(conn: db.Connection, viewer: Viewer, trips: Sequence[Trip], today: date | None = None) -> list[TripOut]:
     segs = visibility.visible_segments(conn, viewer, [t.id for t in trips])
     travs = visibility.visible_travelers(conn, viewer, [s.id for s in segs])
     outs = _segment_outs(conn, segs, travs, viewer)
+    kept = stored_mail.message_ids(conn, [s.id for s in segs])
+    day = today or date.today()
+    def emails_of_trip(trip: Trip) -> int:
+        return len({m for s in segs if s.trip_id == trip.id for m in kept.get(s.id, ())})
     return [{"id": t.id, "name": t.name, "start_date": t.start_date, "end_date": t.end_date,
-             "destination": t.destination, "notes": t.notes, "auto": t.auto, "booked_by": t.booked_by,
+             "destination": t.destination, "destination_manual": t.destination_manual, "notes": t.notes, "auto": t.auto, "booked_by": t.booked_by,
+             "emails": (n := emails_of_trip(t)), "can_clear_emails": n > 0 and emails_clearable(t, day),
              "segments": [s for s in outs if s["trip_id"] == t.id]} for t in trips]
+
+
+def emails_clearable(trip: Trip, today: date) -> bool:
+    return trip.end_date is not None and (today - dates.parse_day(trip.end_date)).days >= EMAILS_CLEARABLE_AFTER_DAYS
 
 
 def listing(conn: db.Connection, viewer: Viewer) -> list[TripOut]:
@@ -581,13 +595,58 @@ def _name_for(place: str | None, start: str) -> str:
     return f"Trip to {place} ({when})" if place else f"Trip ({when})"
 
 
+def _region(conn: db.Connection, seg: Segment) -> str | None:
+    address = decode_details(seg.details).get("address")
+    if seg.kind in ("flight", "train"):
+        return regions.of_place(conn, seg.destination)
+    if seg.kind in ("hotel", "parking"):
+        return regions.of_address(conn, address) or regions.of_place(conn, seg.destination)
+    if seg.kind == "car":
+        return regions.of_address(conn, address) or regions.of_place(conn, seg.origin, fallback=False)
+    return regions.of_place(conn, seg.origin)
+
+
+def _in_order(segs: Sequence[Segment]) -> list[Segment]:
+    live = [s for s in segs if s.status != "cancelled"] or list(segs)
+    return sorted(live, key=lambda s: (instant(s.start_local, s.start_zone), s.id))
+
+
+def auto_destination(conn: db.Connection, segs: Sequence[Segment]) -> str | None:
+    ordered = _in_order(segs)
+    if not ordered:
+        return None
+    leaving = next((s for s in ordered if s.kind in ("flight", "train") and s.origin), None)
+    home = regions.of_place(conn, leaving.origin) if leaving else None
+    named = regions.phrase([r for s in ordered if (r := _region(conn, s))], home)
+    first = ordered[0]
+    return named or _headline(conn, {"kind": first.kind, "origin": first.origin, "destination": first.destination})
+
+
+def destination_facts(conn: db.Connection, viewer: Viewer, trip_id: int) -> regions.Facts | None:
+    trip = visibility.visible_trip(conn, viewer, trip_id)
+    if trip is None:
+        return None
+    stops: list[regions.Stop] = []
+    for seg in _in_order(visibility.visible_segments(conn, viewer, [trip.id])):
+        region = _region(conn, seg)
+        if not region:
+            continue
+        city = airports.lookup(conn, seg.destination or "") if seg.kind == "flight" else None
+        place = f"{city['city']}, {region}" if city and city["city"] != region else region
+        if {"kind": seg.kind, "place": place} not in stops:
+            stops.append({"kind": seg.kind, "place": place})
+    return {"name": trip.name, "stops": stops}
+
+
 def refresh(conn: db.Connection, trip: Trip) -> None:
     segs = list(conn.orm.scalars(select(Segment).where(Segment.trip_id == trip.id)).all())
     live = [s for s in segs if s.status != "cancelled"] or segs
     if live:
         trip.start_date = min(s.start_local[:10] for s in live)
         trip.end_date = max(s.end_local[:10] for s in live)
-        conn.orm.flush()
+    if not trip.destination_manual:
+        trip.destination = auto_destination(conn, segs)
+    conn.orm.flush()
 
 
 def _set_travelers(conn: db.Connection, segment_id: int, travelers: Sequence[TravelerIn]) -> None:
@@ -750,6 +809,45 @@ def _same_leg(seg: Segment, values: Mapping[str, str | None], details: Mapping[s
             and _text_key(seg.origin) == _text_key(values["origin"]) and _text_key(seg.destination) == _text_key(values["destination"]))
 
 
+def _minute(local: str | None) -> str:
+    return (local or "")[:16]
+
+
+def same_booking(seg: Segment, values: Mapping[str, str | None], details: Mapping[str, str]) -> bool:
+    if seg.kind != values["kind"] or seg.status != "confirmed" or values["status"] != "confirmed":
+        return False
+    if not seg.confirmation or not values["confirmation"] or _code_key(seg.confirmation) != _code_key(values["confirmation"]):
+        return False
+    mine, theirs = flight_key(decode_details(seg.details).get("flight_number")), flight_key(details.get("flight_number"))
+    same_flight = seg.kind == "flight" and mine is not None and mine == theirs
+    if seg.kind == "flight" and mine is not None and theirs is not None and mine != theirs:
+        return False
+    named = bool(seg.provider and values["provider"]) and provider_key(seg.provider) == provider_key(values["provider"])
+    if not (same_flight or named):
+        return False
+    if (_minute(seg.start_local) != _minute(values["start_local"]) or seg.start_zone != values["start_zone"]
+            or _text_key(seg.destination) != _text_key(values["destination"])):
+        return False
+    if seg.kind == "flight":
+        return _text_key(seg.origin) == _text_key(values["origin"])
+    return (_minute(seg.end_local) == _minute(values["end_local"]) and seg.end_zone == values["end_zone"]
+            and (_text_key(seg.origin) == _text_key(values["origin"]) or _same_place(seg.origin, values["origin"])))
+
+
+def find_same_booking(conn: db.Connection, viewer: Viewer, fields: SegmentIn) -> Segment | None:
+    values = check(conn, fields)
+    details = fields.get("details") or {}
+    return next((s for s in visibility.visible_segments(conn, viewer) if same_booking(s, values, details)), None)
+
+
+def attach_to_same_booking(conn: db.Connection, viewer: Viewer, fields: SegmentIn, touched: list[int] | None = None) -> bool:
+    found = find_same_booking(conn, viewer, fields)
+    if found is None:
+        return False
+    merge_email_segment(conn, viewer, fields, touched=touched, fill_only=True, into=found.id)
+    return True
+
+
 def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, again: bool = False,
                         touched: list[int] | None = None, fill_only: bool = False, candidates: list[int] | None = None,
                         into: int | None = None) -> Literal["added", "updated", "unchanged", "ambiguous"]:
@@ -856,6 +954,16 @@ def email_image_of(conn: db.Connection, viewer: Viewer, segment_id: int, email: 
     return None if seg is None else stored_mail.image_for_segment(conn, seg.id, email, index)
 
 
+def clear_emails(conn: db.Connection, viewer: Viewer, trip_id: int, today: date) -> int | None:
+    trip = visibility.visible_trip(conn, viewer, trip_id)
+    if trip is None:
+        return None
+    if not emails_clearable(trip, today):
+        raise Invalid(f"The saved emails can be removed once a trip has ended at least {EMAILS_CLEARABLE_AFTER_DAYS} days ago")
+    segment_ids = [s.id for s in visibility.visible_segments(conn, viewer, [trip.id])]
+    return stored_mail.clear_for_segments(conn, segment_ids)
+
+
 def delete_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> bool:
     seg = visibility.visible_segment(conn, viewer, segment_id)
     if seg is None:
@@ -880,7 +988,8 @@ def create_trip(conn: db.Connection, viewer: Viewer, fields: TripIn) -> TripOut:
         raise Invalid("Give both dates of a trip, or neither")
     if start and end and end < start:
         raise Invalid("A trip can’t end before it starts")
-    trip = Trip(name=fields.get("name") or "", destination=fields.get("destination"), notes=fields.get("notes"),
+    given = (fields.get("destination") or "").strip() or None
+    trip = Trip(name=fields.get("name") or "", destination=given, destination_manual=given is not None, notes=fields.get("notes"),
                 start_date=start, end_date=end, auto=False, booked_by=viewer.person_id)
     conn.orm.add(trip)
     conn.orm.flush()
@@ -896,10 +1005,12 @@ def edit_trip(conn: db.Connection, viewer: Viewer, trip_id: int, fields: TripIn)
     if "name" in fields:
         trip.name = fields["name"]
     if "destination" in fields:
-        trip.destination = fields["destination"]
+        given = (fields["destination"] or "").strip() or None
+        trip.destination, trip.destination_manual = given, given is not None
     if "notes" in fields:
         trip.notes = fields["notes"]
     conn.orm.flush()
+    refresh(conn, trip)
     return _trip_outs(conn, viewer, [trip])[0]
 
 
@@ -927,7 +1038,8 @@ def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int) -> T
                           "aren’t on it. Move a segment into the other trip by adding the missing travellers first.")
     conn.execute(update(Segment).where(Segment.trip_id == other.id).values(trip_id=trip.id))
     trip.auto = False
-    trip.destination = trip.destination or other.destination
+    if other.destination_manual and not trip.destination_manual:
+        trip.destination, trip.destination_manual = other.destination, True
     trip.notes = trip.notes or other.notes
     trip.booked_by = trip.booked_by if trip.booked_by is not None else other.booked_by
     conn.orm.flush()

@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import Literal, NotRequired, TypedDict
 
 
+class EmailsCleared(TypedDict):
+    removed: int
+
+
 class Ok(TypedDict):
     ok: bool
 
@@ -21,6 +25,7 @@ class State(TypedDict):
     last_backup: str | None
     review_count: int
     person_id: int | None
+    ai: bool
 
 
 class BackupContents(TypedDict):
@@ -53,6 +58,7 @@ class ScanSummary(TypedDict):
     not_travel: int
     followups: int
     with_facts: int
+    attached: int
 
 
 class Mailbox(TypedDict):
@@ -249,6 +255,15 @@ class MatchBody(TypedDict):
     segment_id: int | None
 
 
+class SameBooking(TypedDict):
+    booking: ReviewCandidate | None
+
+
+class Attached(TypedDict):
+    ok: bool
+    segment_id: int
+
+
 class Review(TypedDict):
     items: list[ReviewItem]
     matches: list[ReviewMatch]
@@ -439,14 +454,35 @@ class Trip(TypedDict):
     start_date: str | None
     end_date: str | None
     destination: str | None
+    destination_manual: bool
     notes: str | None
     auto: bool
     booked_by: int | None
+    emails: int
+    can_clear_emails: bool
     segments: list[Segment]
 
 
 class TripList(TypedDict):
     trips: list[Trip]
+
+
+class TripAirportPoint(TypedDict):
+    code: str
+    city: str
+    latitude: float
+    longitude: float
+
+
+class TripCityPoint(TypedDict):
+    city: str
+    latitude: float
+    longitude: float
+
+
+class TripPlaces(TypedDict):
+    airports: list[TripAirportPoint]
+    cities: list[TripCityPoint]
 
 
 class TripBody(TypedDict):
@@ -455,6 +491,10 @@ class TripBody(TypedDict):
     notes: NotRequired[str | None]
     start_date: NotRequired[str | None]
     end_date: NotRequired[str | None]
+
+
+class DestinationSuggestion(TypedDict):
+    suggestion: str
 
 
 class MergeBody(TypedDict):

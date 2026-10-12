@@ -638,6 +638,42 @@ class MigrationTests(unittest.TestCase):
             self.assertIsNone(c.execute(select(schema.review_items.c.reference)).scalar())
         self.assertEqual(drift(self.path), [])
 
+    def test_0028_marks_the_destinations_a_person_wrote_and_leaves_the_ones_waypoint_made_automatic(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            self.assertIn("destination_manual", {col["name"] for col in sa.inspect(c).get_columns("trips")})
+            command.downgrade(db.alembic_config(c), "0027")
+            self.assertNotIn("destination_manual", {col["name"] for col in sa.inspect(c).get_columns("trips")})
+            made = {1: "Denver", 2: "Colorado & Texas", 3: None, 4: "", 5: "Paris", 6: "Harbour Hotel", 7: "Lake", 8: "Seattle, WA", 9: "Orlando"}
+            for trip_id, destination in made.items():
+                c.execute(insert(schema.trips).values(id=trip_id, name=f"trip {trip_id}", auto=trip_id != 7, destination=destination))
+
+            def add(seg_id, trip_id, kind, origin, destination):
+                c.execute(insert(schema.segments).values(
+                    id=seg_id, trip_id=trip_id, kind=kind, status="confirmed", origin=origin, destination=destination,
+                    start_local="2026-11-01T15:00", start_zone="Europe/London", end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual"))
+            add(1, 1, "flight", "JFK", "DEN")
+            add(2, 2, "flight", "JFK", "DEN")
+            add(3, 3, "flight", "JFK", "DEN")
+            add(4, 4, "flight", "JFK", "DEN")
+            add(5, 5, "hotel", "Hôtel du Parc", "Paris")
+            add(6, 6, "hotel", "Harbour Hotel", None)
+            add(8, 8, "flight", "JFK", "SEA")
+            add(9, 9, "flight", "JFK", "MCO")
+            add(10, 9, "flight", "MCO", "JFK")
+            add(11, 1, "flight", "DEN", "DFW")
+            command.upgrade(db.alembic_config(c), "head")
+            flags = dict(c.execute(select(schema.trips.c.id, schema.trips.c.destination_manual)).all())
+            self.assertEqual({k: bool(v) for k, v in flags.items()},
+                             {1: False, 2: True, 3: False, 4: False, 5: False, 6: False, 7: True, 8: True, 9: False})
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 10)
+            self.assertEqual(dict(c.execute(select(schema.trips.c.id, schema.trips.c.destination)).all()), {**made, 4: ""})
+            command.downgrade(db.alembic_config(c), "0027")
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 10)
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+
     def test_0029_adds_coordinates_to_bookings_locates_the_existing_ones_offline_and_takes_them_away_leaving_the_rows(self):
         from alembic import command
         import json
@@ -647,7 +683,7 @@ class MigrationTests(unittest.TestCase):
         with db.engine(self.path).begin() as c:
             names = {col["name"] for col in sa.inspect(c).get_columns("segments")}
             self.assertLessEqual({"latitude", "longitude", "geo_precision"}, names)
-            command.downgrade(db.alembic_config(c), "0027")
+            command.downgrade(db.alembic_config(c), "0028")
             names = {col["name"] for col in sa.inspect(c).get_columns("segments")}
             self.assertFalse({"latitude", "longitude", "geo_precision"} & names)
             c.execute(insert(schema.trips).values(id=1, name="t", auto=True))
@@ -669,7 +705,7 @@ class MigrationTests(unittest.TestCase):
             self.assertAlmostEqual(got[2][1], 40.015, delta=0.05)
             self.assertAlmostEqual(got[5][1], 37.62, delta=0.05)
             self.assertEqual(got[3][1:], (None, None))
-            command.downgrade(db.alembic_config(c), "0027")
+            command.downgrade(db.alembic_config(c), "0028")
             self.assertEqual(c.execute(select(schema.segments.c.id).order_by(schema.segments.c.id)).scalars().all(), [1, 2, 3, 4, 5, 6])
             self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 1)
             command.upgrade(db.alembic_config(c), "head")
