@@ -849,6 +849,24 @@ class MigrationTests(unittest.TestCase):
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
 
+    def test_0034_adds_the_automatic_ai_state_to_review_items_and_takes_it_away_leaving_the_rows(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            names = lambda table: {col["name"] for col in sa.inspect(c).get_columns(table)}
+            self.assertLessEqual({"auto_state", "auto_tries"}, names("review_items"))
+            command.downgrade(db.alembic_config(c), "0033")
+            self.assertFalse({"auto_state", "auto_tries"} & names("review_items"))
+            c.execute(insert(schema.mailboxes), [dict(id=1, owner_sub="u", address="a@x.example", token="t", status="connected")])
+            c.execute(insert(schema.review_items), [dict(id=1, mailbox_id=1, message_id="m", sender_domain="x.example", reason="no_markup", created=1.0)])
+            command.upgrade(db.alembic_config(c), "head")
+            self.assertEqual(c.execute(select(schema.review_items.c.auto_state, schema.review_items.c.auto_tries)).fetchone(), (None, 0))
+            c.execute(sa.update(schema.review_items).values(auto_state="waiting", auto_tries=2))
+            command.downgrade(db.alembic_config(c), "0033")
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+
     def test_0033_adds_the_table_of_gate_codes_empty_and_takes_it_away_leaving_the_bookings(self):
         from alembic import command
         db.init(self.path)

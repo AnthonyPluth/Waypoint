@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-**Settings → Mail and AI → AI** is off until you turn it on. When it’s on, mail that lands in [Review](/Waypoint/start/review/)’s “Couldn’t read” list from then on is also offered to an AI, which suggests the booking in it. Items already in the list when you turn it on are not offered. A booking Waypoint could already read is never sent.
+**Settings → Mail and AI → AI** is off until you turn it on. When it’s on, you can choose **Ask AI** on an item in [Review](/Waypoint/start/review/)’s “Couldn’t read” list, and an AI suggests the booking. A booking Waypoint could already read is never sent. Nothing is sent until someone chooses **Ask AI**, unless you also turn on the second switch below.
 
 ## Choosing where it runs
 
@@ -15,11 +15,25 @@ sidebar:
 
 The OpenRouter key is saved encrypted with `WAYPOINT_SECRET_KEY` (and encrypted in backups), or read from the `OPENROUTER_API_KEY` environment variable, which wins. It never shows again once saved, and is never logged.
 
+## Reading unreadable mail automatically
+
+Below the choice of where the AI runs, **Read unreadable mail with AI automatically** is a second, separate switch. It is off until you turn it on, and it is offered only while the AI is set to Local or OpenRouter. Turning it on shows a warning: “Waypoint will send the text of travel emails it couldn’t read to the AI you chose, without asking each time.” Choosing **Off** for the AI turns this switch off with it.
+
+Both switches are needed. With the AI off, or with this switch off, a scan sends no email text anywhere; **Ask AI** on an item still works either way. With both on, a scan asks the AI about a message by itself only when all of these hold:
+
+- It passed Waypoint’s check for travel mail with a strong travel signal: it is from a travel sender Waypoint knows, or it is in a label you picked, or it carries structured booking data, or its subject and snippet have two or more travel words. Shopping, codes, newsletters and replies are never sent.
+- No reader made a booking from it.
+- It isn’t a follow-up of a booking you can see (a receipt, a check-in notice or a reminder that Waypoint attaches to the booking).
+
+There is no limit on how many messages a scan asks about. A request that fails leaves the item as it was, with a note that the AI couldn’t be asked, and is tried again on the next scans, at most twice more. Each mailbox’s last-scan line in Settings says how many messages the AI was asked about. A count only, never a subject, a sender or any text.
+
+What is sent, whether it is redacted (it is for OpenRouter, not for Local) and where it goes are exactly the same as for **Ask AI**. The item in Review shows the suggestion as it does any AI suggestion, with a **read automatically** label so you can tell it wasn’t asked for. You still check and confirm every suggestion; nothing is added to your trips without you.
+
 ## What is sent
 
-The setting is the household’s: any member can change it, and once it’s on, new “Couldn’t read” mail from every connected mailbox is offered, not just the mailbox of whoever turned it on. Whoever sets the Ollama address chooses where that mail goes, so use a server you trust.
+The setting is the household’s: any member can change it, and once the automatic switch is on, qualifying mail from every connected mailbox is sent, not just the mailbox of whoever turned it on. Whoever sets the Ollama address chooses where that mail goes, so use a server you trust.
 
-Only the message’s plain text, and only for an item in “Couldn’t read” (when a scan queues it, or when you choose **Ask AI** on it).
+Only the message’s plain text, and only for an item in “Couldn’t read” (when you choose **Ask AI** on it, or, with the automatic switch on, when a scan reads it by itself as above).
 
 **With Local (Ollama), the text goes to your Ollama server unredacted and untrimmed**: quoted replies, signatures and footers stay, and email addresses, loyalty, Known Traveler, account and card numbers, long digit runs and the numbers saved under [Loyalty](/Waypoint/start/loyalty/) are sent as written. This is the household’s choice, because the model runs on your own network; it means those numbers do reach that server, so use one you trust and don’t point it at a hosted address. The sender and the subject are still not sent, and prompts and replies are never logged.
 
@@ -35,7 +49,7 @@ The one other thing this setting sends is for the sparkle button beside a trip�
 
 ## What comes back
 
-The reply must be JSON with the fields of a booking: kind, provider, confirmation code, origin, destination, start and end times, and zones for hotels, cars, trains and cruises. It may also give the booking’s **total** and its currency: the instructions to the model ask for it only when the email labels the amount as the total, grand total, amount charged or amount paid, and Waypoint checks it against the text that was sent (the amount must be printed there, and its currency’s code or symbol must be too) and keeps it as a suggested cost in the form, where you can correct or clear it. A total that doesn’t check out is left out and the rest of the suggestion is kept. What is sent is unchanged by this; only the reply has two more fields. For a hotel, car, train or cruise it may also hold the **address** (the hotel’s, the rental’s pick-up place’s, the station’s or the cruise terminal’s); for a hotel, car or cruise the **phone number** the email prints for the property or company (so **Call** works); and for a cruise the **cabin**, **ship** and **deck**. Nothing is asked for a flight beyond its airports. These are the only details it reads: Waypoint doesn’t read a seat from an email this way.
+The reply must be JSON with the fields of a booking: kind, provider, confirmation code, origin, destination, start and end times, and zones for hotels, cars, trains and cruises. It may also give the booking’s **total** and its currency: the instructions to the model ask for it only when the email labels the amount as the total, grand total, amount charged or amount paid, and Waypoint checks it against the text that was sent (the amount must be printed there, and its currency’s code or symbol must be too) and keeps it as a suggested cost in the form, where you can correct or clear it. A total that doesn’t check out is left out and the rest of the suggestion is kept. What is sent is unchanged by this; only the reply has two more fields. For a hotel, car, train or cruise it may also hold the **address** (the hotel’s, the rental’s pick-up place’s, the station’s or the cruise terminal’s); for a hotel, car or cruise the **phone number** the email prints for the property or company (so **Call** works); and for a cruise the **cabin**, **ship** and **deck**. For a flight it may also hold the **flight number** and **cabin**, and, only with **Local (Ollama)**, each traveller’s **seat** (below). These are the only details it reads.
 
 Anything the booking needs that is wrong throws the whole reply away, and the item shows a short note saying so: a time that isn’t a date and time, an unknown kind, a missing place, a confirmation code that isn’t in the email, a reply that isn’t JSON. A field the AI adds that Waypoint didn’t ask for is ignored.
 
@@ -47,6 +61,14 @@ A suggestion is a draft. **Check suggestion** opens the same form as **Add by ha
 
 Several flights in one email become several suggestions. The model replies with a list of bookings, one for each flight (a round trip is an outbound and a return, each with its own airports, date, times and flight number), and each is checked on its own: a flight that leaves from and arrives at the same airport, or that lasts longer than 30 hours, is left out with a reason, and the others are kept. In Review the item shows one editable suggestion for each flight, in order, with **Dismiss** for a flight you don’t want and a single **Add 2 flights** (the count of flights) that adds them together; they land in the same trip when their dates fit one. The form also warns, without stopping you, when a flight is longer than 30 hours (“This flight is 6 days long. Check the times.”). Items made before this keep their one suggestion; **Ask again** gets the new reading.
 
+## Seats on a flight (Local only)
+
+With **Local (Ollama)** the model is also asked, for a flight, which traveller has which seat when the email prints a seat for each passenger by name. With **OpenRouter** nothing about seats is asked and a seat in the reply is ignored, so a traveller’s name and seat never leave your network. There is no separate switch: it follows the AI setting. What is sent is unchanged; only the instructions and the reply have more in them.
+
+Waypoint matches seats from the email’s text. It never chooses or assigns a seat, and it can’t book one. A seat is kept for a traveller only when both the traveller’s name and the seat appear in the text that was sent (a seat must stand alone, such as `23A` or `23 A`, not inside a longer code), and the seat must be printed right beside the name: the first seat after the name on its line (within about 60 characters), else the last one just before it, else the first one on the next line, so two passengers’ seats swapped by the model are dropped. One that fails is dropped and the rest of the suggestion is kept. A name given twice, or two travellers given the same seat, are dropped too, as ambiguous. Flights only: a hotel, car, train, cruise or parking suggestion never takes seats.
+
+In the form the seats show under the flight, one per traveller by name as printed, outlined like the other details the AI read so you check them first. When you add the flight, a name that matches one person in [People](/Waypoint/start/people/) (by display name, legal name or alias) is put on the flight as that person, and any other name stays as printed; you can change a seat before adding. Seats are saved with the suggestion in Review, never the email. This applies to the suggestion in Review only: when an assistant adopts a suggestion over [MCP](/Waypoint/start/mcp/), the seats are not carried over.
+
 ## Turning it off
 
-Choosing **Off** stops the sending at once, including a scan that’s under way: the setting is read again before each message.
+Choosing **Off**, or turning the automatic switch off, stops the sending at once, including a scan that’s under way: the settings are read again before each message.

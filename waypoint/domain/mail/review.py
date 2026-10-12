@@ -38,6 +38,7 @@ class ItemOut(TypedDict):
     reason: Reason
     suggestions: list[ai.Suggestion]
     suggestion_error: str | None
+    auto_read: bool
     count: int
     others: list[OtherOut]
 
@@ -64,9 +65,10 @@ def is_generic(conn: db.Connection, mailbox_id: int, message_id: str) -> bool:
 
 
 def set_suggestions(conn: db.Connection, mailbox_id: int, message_id: str, suggestions: list[ai.Suggestion],
-                    error: str | None) -> None:
+                    error: str | None, auto: bool | None = None) -> None:
+    kept = {} if auto is None else {"auto_state": "read" if auto and suggestions else None, "auto_tries": 0}
     conn.execute(update(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)
-                 .values(suggestion=json.dumps(suggestions) if suggestions else None, suggestion_error=error))
+                 .values(suggestion=json.dumps(suggestions) if suggestions else None, suggestion_error=error, **kept))
 
 
 def suggestions_of(stored: str | None) -> list[ai.Suggestion]:
@@ -89,7 +91,8 @@ def _group_key(row: Any, alone: int) -> tuple[Any, ...]:
 def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
     rows = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.sender_domain,
                                ReviewItem.received, ReviewItem.reason, Mailbox.address, Mailbox.owner_sub, Person.display_name,
-                               ReviewItem.suggestion, ReviewItem.suggestion_error, ReviewItem.matches, ReviewItem.reference)
+                               ReviewItem.suggestion, ReviewItem.suggestion_error, ReviewItem.matches, ReviewItem.reference,
+                               ReviewItem.auto_state)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .outerjoin(Person, Person.user_sub == Mailbox.owner_sub).where(_seen_by(owner), ReviewItem.reason != "match")
                         .order_by(ReviewItem.received.is_(None), ReviewItem.received.desc(), ReviewItem.id.desc())).fetchall()
@@ -102,6 +105,7 @@ def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
              "has_email": (r["mailbox_id"], r["message_id"]) in subjects,
              "received": r["received"], "reason": r["reason"],
              "suggestions": suggestions_of(r["suggestion"]), "suggestion_error": r["suggestion_error"],
+             "auto_read": r["auto_state"] == "read" and bool(r["suggestion"]),
              "count": len(members),
              "others": [{"id": o["id"], "subject": subjects.get((o["mailbox_id"], o["message_id"])),
                          "has_email": (o["mailbox_id"], o["message_id"]) in subjects, "received": o["received"]} for o in members[1:]]}

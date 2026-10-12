@@ -255,7 +255,8 @@ FAMILY_SEATS = {"DL 1412": ("22A", "22B", "22C"), "AA 101": ("31A", "31B", "31C"
 def _round_trip(today: date) -> list[ai.Suggestion]:
     out, back = today + timedelta(days=30), today + timedelta(days=36)
     return [{"kind": "flight", "provider": "Example Air", "confirmation": "DEMO99", "origin": "BOS", "destination": "DEN", "flight_number": "EX 204",
-             "cabin": "Economy", "start_local": f"{out:%Y-%m-%d}T07:15", "end_local": f"{out:%Y-%m-%d}T10:05"},
+             "cabin": "Economy", "start_local": f"{out:%Y-%m-%d}T07:15", "end_local": f"{out:%Y-%m-%d}T10:05",
+             "travelers": [{"name": "Jane Doe", "seat": "14A"}, {"name": "Mia Doe", "seat": "14B"}]},
             {"kind": "flight", "provider": "Example Air", "confirmation": "DEMO99", "origin": "DEN", "destination": "BOS", "flight_number": "EX 205",
              "cabin": "Economy", "start_local": f"{back:%Y-%m-%d}T16:20", "end_local": f"{back:%Y-%m-%d}T21:50"}]
 
@@ -306,7 +307,7 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     held_ids = [added["id"] for added in (trips.add_segment(conn, jane, {**_held_stay(today), "travelers": _on(jane.person_id)}) for _ in range(2)) if added]
     box = Mailbox(owner_sub="local", address=DEMO_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
                   status="connected", created=0.0, last_scan=datetime.now(UTC).timestamp() - 3600,
-                  scan_summary=scan.encode(scan.Summary(found=2140, read=18, bookings=3, review=2, skipped=312, capped=True, triaged=1260, total=3400, not_travel=47, followups=6, with_facts=1)))
+                  scan_summary=scan.encode(scan.Summary(found=2140, read=18, bookings=3, review=2, skipped=312, capped=True, triaged=1260, total=3400, not_travel=47, followups=6, with_facts=1, ai_asked=1)))
     conn.orm.add(box)
     conn.orm.flush()
     scanned = datetime.now(UTC).timestamp()
@@ -333,7 +334,7 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
                                                                ("Confirmation number: DEMO88", "Property: Seaside Inn", "Address: 12 Beach Road, Brighton, UK",
                                                                 "Check-in: made-up date after 3:00 PM", "Check-out: made-up date 11:00 AM")), 0.0)
     review.add(conn, box.id, "demo-round-trip", "example-card-travel.example", (today - timedelta(days=3)).isoformat(), "no_markup", 0.0)
-    review.set_suggestions(conn, box.id, "demo-round-trip", _round_trip(today), None)
+    review.set_suggestions(conn, box.id, "demo-round-trip", _round_trip(today), None, auto=True)
     stored_mail.put(conn, box.id, "demo-round-trip", _message("example-card-travel.example", 3, today, "Your flights are booked: made-up details",
                                                              ("Hello Jane,", "Outbound to Denver: Example Air EX 204, Boston BOS to Denver DEN.",
                                                               "Return to Boston: Example Air EX 205, Denver DEN to Boston BOS.", "Confirmation: DEMO99")), 0.0)

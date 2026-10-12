@@ -177,7 +177,7 @@ class FollowUpTests(FollowUpCase):
         self.assertEqual(result.review, 1)
         [item] = self.items()
         self.assertEqual(set(item), {"id", "address", "owner", "mine", "sender_domain", "known_sender", "holds_bookings", "subject",
-                                     "has_email", "received", "reason", "suggestions", "suggestion_error", "count", "others"})
+                                     "has_email", "received", "reason", "suggestions", "suggestion_error", "auto_read", "count", "others"})
         self.assertEqual(self.read(lambda conn: conn.execute(select(ScannedMessage.segment_id)).scalars()), [None])
         self.assertEqual(self.segments(self.sam)[0]["id"], sam_only)
 
