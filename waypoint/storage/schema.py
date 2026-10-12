@@ -154,7 +154,7 @@ segments = Table(
     Column('longitude', Float),
     Column('geo_precision', Text),
     Column('travelers_from_trip', Boolean, nullable=False, server_default=false(),
-           doc='true: the booking is for everyone on its trip and has no traveller rows of its own; false: its rows are its list, possibly empty'),
+           doc='groundwork, not set by any path yet (the ingest slice turns it on). true: the booking is for everyone on its trip and has no traveller rows of its own; false: its rows are its list, possibly empty'),
     Index('ix_segments_trip_id', 'trip_id'),
     Index('ix_segments_booked_by', 'booked_by'),
     info={'doc': "one flight leg, hotel stay, car rental or train; times are local wall-clock times with the place's IANA zone"},
