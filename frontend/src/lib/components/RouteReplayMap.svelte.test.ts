@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from "@testing-library/svelte";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TripPlaces } from "$lib/api-types";
 import { stopsOf } from "$lib/route-replay";
@@ -265,6 +265,24 @@ describe("RouteReplayMap", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Playback speed 2×" }));
     await fireEvent.click(screen.getByRole("button", { name: "Playback speed 4×" }));
     expect(screen.getByRole("button", { name: "Playback speed 1×" })).toBeTruthy();
+  });
+
+  it("moves the replay faster at 2× and 4× than at 1×", async () => {
+    const slider = () => screen.getByRole("slider", { name: "Position along the route" }) as HTMLInputElement;
+    const pace = async (presses: number) => {
+      render(RouteReplayMap, { stops, year: 2025, still: false });
+      await fireEvent.click(screen.getByRole("button", { name: "Play" }));
+      for (const label of ["1×", "2×", "4×"].slice(0, presses)) await fireEvent.click(screen.getByRole("button", { name: `Playback speed ${label}` }));
+      advance(1500);
+      await Promise.resolve();
+      const at = slider().value;
+      cleanup();
+      return Number(at);
+    };
+    const normal = await pace(0);
+    const double = await pace(1);
+    const quadruple = await pace(2);
+    expect([normal, double, quadruple]).toEqual([1000, 2000, 4000]);
   });
 
   it("plays a 25-stop trip over fifty seconds, with each town's label lit as the path reaches it", async () => {
