@@ -19,7 +19,7 @@ CHECK_IN = time(15, 0)
 CHECK_OUT = time(11, 0)
 HOTEL = re.compile(r"hotel|hôtel|resort|lodging|accommodation|check-in|unterkunft|alojamiento|ホテル|宿泊", re.IGNORECASE)
 ABOUT = {name: labels.about(name) for name in ("cruise", "train", "car")}
-ROUTE = re.compile(r"\s*(?:→|->|⇒|➔|\bto\b|\bvers\b|\bnach\b|\ba\b)\s*", re.IGNORECASE)
+ROUTES = (re.compile(r"\s*(?:→|->|⇒|➔)\s*"), re.compile(r"\s+(?:to|vers|nach)\s+", re.IGNORECASE), re.compile(r"\s+a\s+", re.IGNORECASE))
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,7 @@ class _Stamp:
     day: date
     at: time | None
     zone: str | None
+    utc: bool = False
 
 
 @dataclass(frozen=True)
@@ -76,7 +77,7 @@ def _stamp(params: dict[str, str], value: str) -> _Stamp | None:
         zone = params.get("TZID")
         if zone is not None:
             ZoneInfo(zone)
-        return _Stamp(moment.date(), moment.time(), None if utc else zone)
+        return _Stamp(moment.date(), moment.time(), None if utc else zone, utc)
     except (ValueError, ZoneInfoNotFoundError, OSError):
         return None
 
@@ -148,11 +149,29 @@ def _confirmation(description: str) -> str | None:
     return None
 
 
+def _local(stamp: _Stamp, zone: str) -> _Stamp:
+    if not stamp.utc or stamp.at is None:
+        return stamp
+    moved = datetime.combine(stamp.day, stamp.at, tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(zone))
+    return _Stamp(moved.date(), moved.time(), zone)
+
+
+def _stay_stamps(event: _Event, first: _Stamp, last: _Stamp) -> tuple[_Stamp, _Stamp]:
+    if not (first.utc or last.utc):
+        return first, last
+    zone = next((z for z in (first.zone, last.zone, zone_of(event.location[:300])) if z), None)
+    if zone is None:
+        raise Unreadable("stay's time zone unknown")
+    return _local(first, zone), _local(last, zone)
+
+
 def _instants(event: _Event, kind: Kind) -> tuple[_Stamp, _Stamp, datetime, datetime]:
     if event.start is None or event.end is None:
         raise Unreadable("event has no start and end")
     first, last = event.start, event.end
-    if kind != "hotel":
+    if kind == "hotel":
+        first, last = _stay_stamps(event, first, last)
+    else:
         if first.at is None or last.at is None:
             raise Unreadable("event has no start and end time")
         if first.zone is None:
@@ -198,7 +217,7 @@ def _booking(event: _Event, kind: Kind) -> Booking:
     if kind == "train":
         route = event.location or event.summary
         route = route.rsplit(":", 1)[-1] if ":" in route else route
-        parts = [p.strip() for p in ROUTE.split(route, maxsplit=1)]
+        parts = next(([p.strip() for p in halves] for pattern in ROUTES if len(halves := pattern.split(route, maxsplit=1)) == 2), [route])
         if len(parts) != 2 or not all(parts):
             raise Unreadable("no departure and arrival station found")
         sources |= {"origin": "location" if event.location else "summary", "destination": "location" if event.location else "summary"}

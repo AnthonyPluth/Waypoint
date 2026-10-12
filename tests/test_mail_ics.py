@@ -86,6 +86,22 @@ class CalendarReaderTests(unittest.TestCase):
         b = self.one(event("Hotel Aurora", "DTSTART;VALUE=DATE:20261208", "DTEND;VALUE=DATE:20261210", location="Denver International Airport (DEN)"))
         self.assertEqual((b.start, b.end, dict(b.details)["time_unknown"], b.start_zone), ("2026-12-08T15:00", "2026-12-10T11:00", "yes", "America/Denver"))
 
+    def test_a_utc_stay_is_converted_to_the_properties_own_zone(self):
+        stay = event("Hotel Aurora", "DTSTART:20261208T220000Z", "DTEND:20261210T180000Z", location="Denver International Airport (DEN)")
+        b = self.one(stay)
+        self.assertEqual((b.start, b.end, b.start_zone, b.end_zone), ("2026-12-08T15:00", "2026-12-10T11:00", "America/Denver", "America/Denver"))
+
+    def test_a_utc_stay_converts_into_the_zone_of_the_other_stamp(self):
+        stay = event("Hotel Aurora", "DTSTART:20261208T220000Z", "DTEND;TZID=America/Denver:20261210T110000")
+        b = self.one(stay)
+        self.assertEqual((b.start, b.start_zone), ("2026-12-08T15:00", "America/Denver"))
+
+    def test_a_utc_stay_with_an_unknown_zone_gives_a_reason_and_no_booking(self):
+        for end in ("DTEND:20261210T180000Z", "DTEND;VALUE=DATE:20261210"):
+            with self.subTest(end):
+                parsed, reason = ics.read([calendar(event("Hotel Aurora", "DTSTART:20261208T220000Z", end, location="Somewhere Unknown"))])
+                self.assertEqual((parsed.bookings, reason), ((), "stay's time zone unknown"))
+
     def test_a_rental_event_is_a_rental_at_one_place(self):
         b = self.one(RENTAL)
         self.assertEqual((b.kind, b.confirmation, b.origin, b.destination, b.start, b.end, b.start_zone),
@@ -96,6 +112,14 @@ class CalendarReaderTests(unittest.TestCase):
         b = self.one(TRAIN)
         self.assertEqual((b.kind, b.confirmation, b.origin, b.destination, b.start, b.end, b.start_zone),
                          ("train", "RX90412", "Paris Gare de Lyon", "Lyon Part-Dieu", "2026-11-21T09:12", "2026-11-21T11:14", "Europe/Paris"))
+
+    def test_a_train_route_splits_on_the_unambiguous_separator_first(self):
+        b = self.one(TRAIN.replace("Paris Gare de Lyon to Lyon Part-Dieu", "Gare a Lyon to Paris"))
+        self.assertEqual((b.origin, b.destination), ("Gare a Lyon", "Paris"))
+
+    def test_a_spanish_route_splits_on_a_when_nothing_else_does(self):
+        b = self.one(TRAIN.replace("Paris Gare de Lyon to Lyon Part-Dieu", "Tren: Madrid a Barcelona"))
+        self.assertEqual((b.origin, b.destination), ("Madrid", "Barcelona"))
 
     def test_a_cruise_event_is_a_cruise_from_and_to_its_port(self):
         b = self.one(CRUISE)
