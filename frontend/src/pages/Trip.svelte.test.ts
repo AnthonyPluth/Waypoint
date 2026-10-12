@@ -1371,4 +1371,43 @@ describe("on its own page", () => {
     await u.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(location.hash).toBe("#trip/7"));
   });
+  describe("the gate code of a parking booking", () => {
+    const lot = segment({ id: 5, kind: "parking", provider: "Example Parking", origin: "Example Airport Long-Term Lot", destination: null, confirmation: "PK30417",
+      start_local: "2099-01-10T05:15", start_zone: "America/New_York", end_local: "2099-01-13T03:00", end_zone: "America/New_York", details: {},
+      has_email: true, gate_code: { state: "ready", day: "2098-12-20" }, travelers: [] });
+
+    it("puts Show QR code in the booking’s row of actions, ahead of View email, and Choose another picture after it", async () => {
+      held = trip([lot]);
+      render(TripPage);
+      const group = await screen.findByRole("group", { name: "Actions for Example Airport Long-Term Lot" });
+      expect(Array.from(group.querySelectorAll("a, button"), (el) => el.textContent?.trim())).toEqual(["Show QR code", "Choose another picture", "View email"]);
+    });
+
+    it("offers Choose the code when several pictures qualify, and nothing for a parking booking with no code", async () => {
+      held = trip([{ ...lot, gate_code: { state: "choose", day: "2098-12-20" } }]);
+      const { unmount } = render(TripPage);
+      expect(await screen.findByRole("button", { name: "Choose the code for Example Airport Long-Term Lot" })).toBeInTheDocument();
+      unmount();
+      held = trip([{ ...lot, gate_code: null, has_email: false }]);
+      render(TripPage);
+      await screen.findByRole("list", { name: "Bookings" });
+      expect(screen.queryByRole("button", { name: /QR code|Choose the code/ })).toBeNull();
+    });
+
+    it("shows nothing once the booking’s exit time has passed", async () => {
+      held = trip([{ ...lot, start_local: "2020-01-10T05:15", end_local: "2020-01-13T03:00", gate_code: { state: "ready", day: "2019-12-20" } }]);
+      render(TripPage);
+      await screen.findByRole("list", { name: "Bookings" });
+      expect(screen.queryByRole("button", { name: /QR code/ })).toBeNull();
+    });
+
+    it("opens the chooser from the booking’s Choose the code button", async () => {
+      held = trip([{ ...lot, gate_code: { state: "choose", day: "2098-12-20" } }]);
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/5/emails" ? { emails: [{ subject: "x", sender_domain: "d.example", received: "2098-12-20", text: "", html: null, truncated: false, original: true, images: 0 }] } : answer(path, opts)) as never);
+      render(TripPage);
+      await userEvent.click(await screen.findByRole("button", { name: "Choose the code for Example Airport Long-Term Lot" }));
+      expect(await screen.findByRole("dialog", { name: "Choose the code" })).toBeInTheDocument();
+    });
+  });
 });

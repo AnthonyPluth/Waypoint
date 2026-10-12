@@ -286,6 +286,16 @@ export interface FlightStatusPause {
   reason: "limit" | "rate" | "key";
 }
 
+export interface GateCode {
+  state: "ready" | "choose";
+  day: string | null;
+}
+
+export interface GateCodeBody {
+  email: number;
+  image: number;
+}
+
 export interface GlanceDomain {
   domain: string;
   count: number;
@@ -721,6 +731,7 @@ export interface Segment {
   logo_label: string | null;
   hotel_brand: string | null;
   has_email: boolean;
+  gate_code: GateCode | null;
   price: Price | null;
   links: SegmentLinks;
 }
@@ -1119,6 +1130,7 @@ export interface Endpoints {
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };
   "DELETE /api/segments/{id}": { body: never; reply: Ok };
   "GET /api/segments/{id}/emails": { body: never; reply: SegmentEmails };
+  "POST /api/segments/{id}/code": { body: GateCodeBody; reply: Segment };
   "POST /api/segments/{id}/move": { body: MoveBody; reply: Trip };
   "GET /api/airports/{id}": { body: never; reply: Airport };
   "POST /api/import/preview": { body: never; reply: ImportPreview };
