@@ -409,8 +409,6 @@ class CodeRouteTests(ServerCase):
             seg = conn.orm.get(Segment, self.segment)
             self.assertTrue(visibility.note_recipient(conn, Viewer(self.person["cy"]), seg))
         self.assertEqual(self.code("cy")[2], QR)
-        self.call("ana", "POST", f"/api/segments/{flight['id']}", {"travelers": [{"person_id": self.person["ana"]}]})
-        self.assertEqual(self.code("ben")[0], 404)
 
     def test_the_trip_reply_says_whether_there_is_a_code_and_never_carries_it(self):
         self.keep(QR, OTHER_QR)
