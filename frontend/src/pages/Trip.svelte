@@ -28,7 +28,7 @@
   import TripDestination from "$lib/components/TripDestination.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { appWord, bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, showBookingTravellers, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink } from "$lib/trips";
+  import { appWord, bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, loyaltyNumbers, showBookingTravellers, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
@@ -292,9 +292,11 @@
           {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
           {#snippet footer()}
             <div class="flex flex-col gap-3">
-              {#if showBookingTravellers(s, everyone, loyalty)}
+              {#if showBookingTravellers(s, everyone)}
                 <h3 class="eyebrow">Travellers</h3>
                 {@render travellerList(s)}
+              {:else}
+                {@render membershipList(s)}
               {/if}
               {@render buttons(s, headline(s))}
             </div>
@@ -428,6 +430,18 @@
         {/each}
       </ol>
     </div>
+  {/if}
+{/snippet}
+
+{#snippet membershipList(s: Segment)}
+  {@const numbers = loyaltyNumbers(s, loyalty)}
+  {#if numbers.length}
+    <h3 class="eyebrow">Loyalty</h3>
+    <ul class="flex flex-col gap-1" data-membership>
+      {#each numbers as entry (entry.id)}
+        <li class="text-sm text-muted-foreground">{entry.program} <LoyaltyNumber {entry} /></li>
+      {/each}
+    </ul>
   {/if}
 {/snippet}
 

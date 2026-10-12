@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -488,28 +488,41 @@ describe("trip travellers", () => {
     expect(showTripTravellers([], 1)).toBe(false);
   });
 
-  it("keeps travellers on a flight, hides a non-flight booking with the trip's full set, and shows a smaller one", () => {
+  it("keeps travellers on a flight and never lists them on a hotel, rental car, parking or cruise booking", () => {
     const flight = segment({ id: 1, travelers: [jane, sam] });
     const all = tripTravellers([flight, stay([jane, sam])]);
-    expect(showBookingTravellers(flight, all, [])).toBe(true);
-    expect(showBookingTravellers(segment({ kind: "car", provider: "Local Cars", travelers: [jane, sam] }), all, [])).toBe(false);
-    expect(showBookingTravellers(stay([jane]), all, [])).toBe(true);
-    expect(showBookingTravellers(stay([]), all, [])).toBe(true);
+    expect(showBookingTravellers(flight, all)).toBe(true);
+    for (const kind of ["hotel", "car", "parking", "cruise"] as const) {
+      expect(showBookingTravellers(segment({ kind, provider: "Local", travelers: [jane, sam] }), all)).toBe(false);
+      expect(showBookingTravellers(segment({ kind, provider: "Local", travelers: [jane] }), all)).toBe(false);
+      expect(showBookingTravellers(segment({ kind, provider: "Local", travelers: [] }), all)).toBe(false);
+    }
   });
 
-  it("keeps a seat, and a loyalty line, on a booking of the full set", () => {
-    const all = tripTravellers([segment({ travelers: [jane] })]);
-    expect(showBookingTravellers(segment({ kind: "train", provider: "Local Rail", travelers: [{ ...jane, seat: "12A" }] }), all, [])).toBe(true);
-    expect(showBookingTravellers(segment({ kind: "hotel", provider: "Marriott", booked_by: 1, travelers: [jane] }), all, [])).toBe(true);
-    expect(showBookingTravellers(segment({ kind: "hotel", provider: "Marriott", booked_by: 1, travelers: [jane] }), all, null)).toBe(false);
+  it("keeps a train's rule: hidden for the trip's full set, shown for a smaller one or with a seat", () => {
+    const all = tripTravellers([segment({ travelers: [jane, sam] })]);
+    const train = (travelers: Traveler[]) => segment({ kind: "train", provider: "Local Rail", travelers });
+    expect(showBookingTravellers(train([jane, sam]), all)).toBe(false);
+    expect(showBookingTravellers(train([jane]), all)).toBe(true);
+    expect(showBookingTravellers(train([{ ...jane, seat: "12A" }, sam]), all)).toBe(true);
   });
 
-  it("leaves out someone who is only on a cancelled booking, and still shows that booking's travellers", () => {
+  it("gives each found loyalty number once, with no names, and nothing for a booking without a program", () => {
+    const hotel = segment({ kind: "hotel", provider: "Marriott", booked_by: 1, travelers: [jane, sam] });
+    const mine = membership({ id: 1, person_id: 1, kind: "hotel", program: "Marriott Bonvoy" });
+    const theirs = membership({ id: 2, person_id: 2, kind: "hotel", program: "Marriott Bonvoy" });
+    expect(loyaltyNumbers(hotel, [mine])).toEqual([mine]);
+    expect(loyaltyNumbers(hotel, [mine, theirs])).toEqual([mine, theirs]);
+    expect(loyaltyNumbers(hotel, [])).toEqual([]);
+    expect(loyaltyNumbers(segment({ kind: "parking", travelers: [jane] }), [mine])).toEqual([]);
+  });
+
+  it("leaves out someone who is only on a cancelled booking, and still shows a cancelled train's travellers", () => {
     const live = segment({ id: 1, travelers: [jane] });
     const cancelled = stay([sam], { status: "cancelled" });
     const all = tripTravellers([live, cancelled]);
     expect(all.map((who) => who.name)).toEqual(["Jane Doe"]);
-    expect(showBookingTravellers(cancelled, all, [])).toBe(true);
-    expect(showBookingTravellers(stay([jane]), all, [])).toBe(false);
+    expect(showBookingTravellers(cancelled, all)).toBe(false);
+    expect(showBookingTravellers(segment({ kind: "train", provider: "Local Rail", status: "cancelled", travelers: [sam] }), all)).toBe(true);
   });
 });
