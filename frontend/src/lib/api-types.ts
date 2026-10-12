@@ -91,6 +91,8 @@ export interface AssistantEmail {
   received: string | null;
   text: string;
   truncated: boolean;
+  html: string | null;
+  html_truncated: boolean;
   kept: "original" | "plain text";
 }
 

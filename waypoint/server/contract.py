@@ -933,6 +933,8 @@ class AssistantEmail(TypedDict):
     received: str | None
     text: str
     truncated: bool
+    html: str | None
+    html_truncated: bool
     kept: Literal["original", "plain text"]
 
 

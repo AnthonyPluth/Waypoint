@@ -21,6 +21,7 @@ DEFAULT_PAGE = 20
 MAX_PAGE = 50
 MAX_FIELD = 200
 MAX_TEXT = 20_000
+MAX_HTML = 100_000
 MAX_EMAILS = 5
 SHOWN_DETAILS = tuple(k for k in trips.DETAIL_KEYS if k not in ("notes", trips.TIME_UNKNOWN, "address", "phone"))
 NOT_KEPT = "This message wasn’t kept."
@@ -110,6 +111,8 @@ class EmailOut(TypedDict):
     received: str | None
     text: str
     truncated: bool
+    html: str | None
+    html_truncated: bool
     kept: Literal["original", "plain text"]
 
 
@@ -301,8 +304,10 @@ def detail(conn: db.Connection, owner: str, viewer: Viewer, item_id: int) -> Det
 
 
 def _emailed(kept: stored_mail.Content) -> EmailOut:
+    markup = kept["html"] if kept["original"] else None
     return {"subject": _clip(kept["subject"], MAX_FIELD * 2), "sender_domain": kept["sender_domain"], "received": kept["received"],
             "text": kept["text"][:MAX_TEXT], "truncated": kept["truncated"] or len(kept["text"]) > MAX_TEXT,
+            "html": markup[:MAX_HTML] if markup is not None else None, "html_truncated": markup is not None and len(markup) > MAX_HTML,
             "kept": "original" if kept["original"] else "plain text"}
 
 

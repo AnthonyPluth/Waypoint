@@ -171,7 +171,7 @@ WRITE_RULES = (
     "3) Times are wall-clock times at the place (start_local in start_zone); never convert them. "
     "Mailboxes, AI settings, backups, sign-in and these assistant settings are out of reach.")
 MAIL_RULES = (
-    "This connection may read the text of kept emails (get_segment_email, and the email in get_review_item). That is the household's "
+    "This connection may read the text and kept markup of kept emails (get_segment_email, and the email in get_review_item). That is the household's "
     "private mail: use it only for what the person asked, quote as little as you can, and never repeat it anywhere else.")
 NO_MAIL_RULES = "Email text is off for this connection: the review tools give what Waypoint read, never an email's subject or text."
 ASK = "Ask the person before calling this."
@@ -325,8 +325,9 @@ def _call_endpoint(fetch: Fetch, a: dict) -> Any:
 
 
 MAIL_TOOLS: list[dict[str, Any]] = [
-    {"name": "get_segment_email", "description": "The emails kept with a booking (newest first, at most 5): subject, sender's domain and the text, "
-     "as Waypoint kept it, never HTML. Only when this connection was allowed to read email text.",
+    {"name": "get_segment_email", "description": "The emails kept with a booking (newest first, at most 5): subject, sender's domain, the text and, for a message kept as "
+     "the original, its kept markup (html: cleaned HTML, cut at 100,000 characters, html_truncated says if it was), never images. Only when "
+     "this connection was allowed to read email text.",
      "inputSchema": _schema({"segment_id": _SEGMENT_ID}, ["segment_id"]),
      "run": lambda fetch, a: fetch(f"assistant/segments/{_need(a, 'segment_id')}/email", {}), "needs": (MAIL,)},
 ]

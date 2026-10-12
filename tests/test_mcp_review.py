@@ -201,8 +201,9 @@ class GetTests(ReviewTools):
         self.assertEqual(got["email"]["subject"], SUBJECT)
         self.assertIn(BODY, got["email"]["text"])
         self.assertEqual(got["email"]["kept"], "original")
-        self.assertNotIn("html", got["email"])
-        self.assertNotIn("<p>", json.dumps(got))
+        self.assertEqual(got["email"]["html"], f"<p>{BODY}</p>")
+        self.assertFalse(got["email"]["html_truncated"])
+        self.assertNotIn("images", got["email"])
         with db.session() as conn:
             stored_mail.put(conn, self.jane_box, "m-flight", {**kept(), "original": False}, 6.0)
         self.assertEqual(self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})["email"]["kept"], "plain text")
@@ -220,6 +221,36 @@ class GetTests(ReviewTools):
             stored_mail.put(conn, self.jane_box, "m-flight", kept(text="x" * 50_000), 6.0)
         got = self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})["email"]
         self.assertEqual((len(got["text"]), got["truncated"]), (assist.MAX_TEXT, True))
+
+    def test_the_markup_is_cut_to_a_size_and_says_so(self):
+        with db.session() as conn:
+            stored_mail.put(conn, self.jane_box, "m-flight", {**kept(), "html": "<p>" + "y" * 150_000 + "</p>"}, 6.0)
+            stored_mail.link(conn, self.jane_trip["segment"], self.jane_box, "m-flight")
+        for got in (self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})["email"],
+                    self.tool(MAIL, "get_segment_email", {"segment_id": self.jane_trip["segment"]})["emails"][0]):
+            self.assertEqual((len(got["html"]), got["html_truncated"]), (assist.MAX_HTML, True))
+
+    def test_a_message_kept_as_plain_text_has_no_markup(self):
+        with db.session() as conn:
+            stored_mail.put(conn, self.jane_box, "m-flight", {**kept(), "original": False, "html": None}, 6.0)
+            stored_mail.link(conn, self.jane_trip["segment"], self.jane_box, "m-flight")
+        for got in (self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})["email"],
+                    self.tool(MAIL, "get_segment_email", {"segment_id": self.jane_trip["segment"]})["emails"][0]):
+            self.assertEqual((got["html"], got["html_truncated"], got["kept"]), (None, False, "plain text"))
+        with db.session() as conn:
+            stored_mail.put(conn, self.jane_box, "m-flight", {**kept(), "original": False, "html": "<p>stale</p>"}, 7.0)
+        self.assertIsNone(self.tool(MAIL, "get_review_item", {"item_id": self.flight_item})["email"]["html"])
+
+    def test_the_markup_never_reaches_a_connection_without_the_mail_scope(self):
+        with db.session() as conn:
+            stored_mail.link(conn, self.jane_trip["segment"], self.jane_box, "m-flight")
+        seen = [json.dumps(self.tool(WRITE, "get_review_item", {"item_id": self.flight_item})),
+                json.dumps(self.tool(WRITE, "list_review_items", {})),
+                self.refused(WRITE, "get_segment_email", {"segment_id": self.jane_trip["segment"]}),
+                self.refused(WRITE, "call_endpoint", {"method": "GET", "path": f"/api/assistant/review/{self.flight_item}/email"})]
+        for text in seen:
+            self.assertNotIn("<p>", text)
+            self.assertNotIn(BODY, text)
 
     def test_what_isnt_the_viewers_is_not_found_like_what_doesnt_exist(self):
         for tool_scopes in (READ, MAIL):
@@ -528,8 +559,8 @@ class MailScopeTests(ReviewTools):
         self.assertEqual(len(got["emails"]), 1)
         self.assertEqual(got["emails"][0]["subject"], SUBJECT)
         self.assertIn(BODY, got["emails"][0]["text"])
-        self.assertNotIn("<p>", json.dumps(got))
-        self.assertEqual(set(got["emails"][0]), {"subject", "sender_domain", "received", "text", "truncated", "kept"})
+        self.assertEqual(got["emails"][0]["html"], f"<p>{BODY}</p>")
+        self.assertEqual(set(got["emails"][0]), {"subject", "sender_domain", "received", "text", "truncated", "html", "html_truncated", "kept"})
         self.assertEqual(got["emails"][0]["kept"], "original")
 
     def test_a_booking_with_no_message_has_none(self):

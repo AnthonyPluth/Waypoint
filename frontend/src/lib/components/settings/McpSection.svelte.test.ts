@@ -166,7 +166,7 @@ describe("Settings → AI assistants (MCP)", () => {
     render(McpSection);
     const [first, second] = await screen.findAllByRole("checkbox", { name: /Read email text/ });
     expect(first).not.toBeChecked();
-    expect(screen.getAllByText(/This sends the email’s text to the assistant you connected/)).toHaveLength(2);
+    expect(screen.getAllByText(/This sends the email’s text and markup to the assistant you connected/)).toHaveLength(2);
     await userEvent.click(second);
     await waitFor(() => expect(posts("/api/mcp-settings/connections/2/mail")).toEqual([{ allow: true }]));
     await waitFor(() => expect(second).toBeChecked());

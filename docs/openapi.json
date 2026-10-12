@@ -3221,6 +3221,15 @@
           "truncated": {
             "type": "boolean"
           },
+          "html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "html_truncated": {
+            "type": "boolean"
+          },
           "kept": {
             "enum": [
               "original",
@@ -3234,6 +3243,8 @@
           "received",
           "text",
           "truncated",
+          "html",
+          "html_truncated",
           "kept"
         ],
         "additionalProperties": false
