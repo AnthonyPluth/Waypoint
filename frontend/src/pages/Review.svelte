@@ -370,7 +370,7 @@
         <ul class="list-disc space-y-1 pl-5 text-sm">
           {#each matches as m (m.segment_id)}<li>{what(m)}{m.trip_name ? `, in ${m.trip_name}` : ""}</li>{/each}
         </ul>
-        <p class="text-sm text-muted-foreground">Same code, same {joining.found.every((f) => f?.kind === "flight") ? "flight" : "booking"} and the same time. Add this email to {matches.length > 1 ? "them" : "it"} instead of making another booking? Nothing already there is changed, only what’s missing is filled in.</p>
+        <p class="text-sm text-muted-foreground">The same confirmation code on the same kind of booking, around the same dates. Add this email to {matches.length > 1 ? "them" : "it"} instead of making another booking? Nothing already there is changed, only what’s missing is filled in.</p>
         <div class="flex flex-wrap gap-2">
           <Button type="button" disabled={saving} onclick={() => joinSame(true)}>{saving ? "Adding…" : matches.length > 1 ? "Add the email to those bookings" : "Add the email to that booking"}</Button>
           <Button type="button" variant="outline" disabled={saving} onclick={() => joinSame(false)}>Add as a separate booking</Button>

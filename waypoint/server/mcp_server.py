@@ -298,8 +298,9 @@ WRITE_TOOLS: list[dict[str, Any]] = [
                 {"item_id": _ITEM_ID, "entry": _ENTRY, "segment_id": _SEGMENT_ID, "trip_id": _TRIP_ID}, ["item_id"],
                 route=("POST", "/api/assistant/review/{id}/match")),
     _write_tool("create_segment_from_review_item", "Add a booking from a Review item as a new segment (and a trip when it falls into none), "
-                "with fields to correct or fill in anything (same rules as adding by hand). The item is then removed and its message is kept "
-                "with the booking.", _create_from_item, {"item_id": _ITEM_ID, "entry": _ENTRY, "fields": _SEGMENT_FIELDS}, ["item_id"],
+                "with fields to correct or fill in anything (same rules as adding by hand). When it is a booking you can already see (the same kind "
+                "and confirmation code, around the same dates, nothing contradicting it), no second one is made: the email joins that booking, "
+                "filling only what it lacks, and that booking is returned. The item is then removed and its message is kept with the booking.", _create_from_item, {"item_id": _ITEM_ID, "entry": _ENTRY, "fields": _SEGMENT_FIELDS}, ["item_id"],
                 route=("POST", "/api/assistant/review/{id}/create")),
     _write_tool("dismiss_review_item", "Dismiss a Review item as not a trip. It is removed from the queue and its stored email is deleted "
                 "unless something else keeps it; this cannot be undone. The reason is not kept.",

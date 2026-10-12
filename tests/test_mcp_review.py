@@ -399,6 +399,19 @@ class CreateTests(ReviewTools):
         self.assertNotIn(self.generic_item, self.left())
         self.assertEqual(self.messages(), 5)
 
+    def test_a_booking_already_there_is_joined_not_repeated_and_keeps_what_it_has(self):
+        first = self.tool(WRITE, "create_segment_from_review_item", {"item_id": self.generic_item, "fields": {
+            "confirmation": "JN4121", "start_local": "2041-11-21T15:00", "end_local": "2041-11-25T11:00"}})
+        again = {"kind": "hotel", "provider": "Seaside Inn", "confirmation": "jn 4121", "origin": "Seaside Inn Beachfront",
+                 "start_local": "2041-11-21T00:00", "end_local": "2041-11-25T00:00", "start_zone": "America/New_York", "details": {"room": "204"}}
+        got = self.tool(WRITE, "create_segment_from_review_item", {"item_id": self.unread_item, "fields": again})
+        self.assertEqual(got["id"], first["id"])
+        self.assertEqual((got["origin"], got["start_local"], got["end_local"], got["details"]),
+                         ("Seaside Inn", "2041-11-21T15:00", "2041-11-25T11:00", {"address": "9 Beach Road", "room": "204"}))
+        self.assertNotIn(self.unread_item, self.left())
+        with db.session() as conn:
+            self.assertEqual(len(stored_mail.for_segment(conn, first["id"])), 2)
+
     def test_a_read_booking_becomes_a_segment_in_the_trip_it_falls_into(self):
         got = self.tool(WRITE, "create_segment_from_review_item", {"item_id": self.flight_item, "fields": {"details": {"seat": "22A"}}})
         self.assertEqual((got["kind"], got["confirmation"], got["source"]), ("flight", "ZQ4PXD", "email"))
