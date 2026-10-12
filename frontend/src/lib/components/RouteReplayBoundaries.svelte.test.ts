@@ -31,7 +31,7 @@ describe("RouteReplayMap on the state lines", () => {
     const { container } = render(RouteReplayMap, { stops: [denver, saltLake], year: 2025, roads, boundaries, still: true });
     const layer = container.querySelector("[data-testid='state-lines']")!;
     expect(layer.getAttribute("aria-hidden")).toBe("true");
-    expect(Number(layer.getAttribute("opacity"))).toBeLessThan(1);
+    expect(Number(layer.getAttribute("opacity"))).toBeLessThanOrEqual(0.8);
     expect(drawn(container)).toBe(2);
     expect(layer.compareDocumentPosition(container.querySelector("[data-testid='legs']")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(layer.querySelector("text")).toBeNull();
