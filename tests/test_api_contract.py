@@ -330,6 +330,8 @@ class Replies(DbCase):
         listed = mcp_api.api_mcp_settings(self.c, {}, {})
         self.assertEqual(len(listed["connections"]), 1)
         self.check("GET /api/mcp-settings", listed)
+        self.check("POST /api/mcp-settings/connections/{id}/mail", mcp_api.api_mcp_mail(self.c, {}, {"allow": True}, str(grant)))
+        self.check("GET /api/mcp-settings", mcp_api.api_mcp_settings(self.c, {}, {}))
         self.check("DELETE /api/mcp-settings/connections/{id}", mcp_api.api_mcp_revoke(self.c, {}, {}, str(grant)))
 
     def test_assistant(self):
@@ -358,10 +360,12 @@ class Replies(DbCase):
         ids = {i["reason"]: i["id"] for i in listed["items"]}
         for reason in ("match", "generic", "broken"):
             self.check("GET /api/assistant/review/{id}", assistant_api.api_assistant_review_item(self.c, {}, {}, str(ids[reason])))
+        self.check("GET /api/assistant/review/{id}/email", assistant_api.api_assistant_review_email(self.c, {}, {}, str(ids["match"])))
         self.check("POST /api/assistant/review/{id}/match", assistant_api.api_assistant_review_match(self.c, {}, {"segment_id": seg["id"]}, str(ids["match"])))
         self.check("POST /api/assistant/review/{id}/create", assistant_api.api_assistant_review_create(
             self.c, {}, {"details": {"room": "204"}}, str(ids["generic"])))
         stored_mail.link(self.c, seg["id"], box, "a3")
+        self.check("GET /api/assistant/segments/{id}/email", assistant_api.api_assistant_segment_emails(self.c, {}, {}, str(seg["id"])))
         self.check("POST /api/assistant/review/{id}/dismiss", assistant_api.api_assistant_review_dismiss(self.c, {}, {"reason": "other", "note": "x"}, str(ids["broken"])))
 
     def test_trips(self):
@@ -384,6 +388,7 @@ class Replies(DbCase):
         self.check("GET /api/trips", trips_api.api_trips(self.c, {}, {}))
         self.check("GET /api/trips/{id}", trips_api.api_trip(self.c, {}, {}, str(seg["trip_id"])))
         self.check("POST /api/trips/{id}", trips_api.api_trip_edit(self.c, {}, {"notes": "Skates"}, str(made["id"])))
+        self.check("POST /api/trips/{id}/emails/clear", trips_api.api_trip_emails_clear(self.c, {}, {}, str(seg["trip_id"])))
         self.check("POST /api/trips/{id}/merge", trips_api.api_trip_merge(self.c, {}, {"merge": seg["trip_id"]}, str(made["id"])))
         other = trips_api.api_segment_add(self.c, {}, {"kind": "hotel", "origin": "Harbour Hotel", "start_zone": "Europe/London",
                                                         "end_zone": "Europe/London", "start_local": "2026-06-02T15:00",
@@ -462,7 +467,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/people/{id}", "DELETE /api/people/{id}", "POST /api/people/{id}/claim",
                                      "GET /api/people/claim-suggestions", "POST /api/people/claim-suggestions/dismiss",
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
-                                     "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
+                                     "DELETE /api/trips/{id}", "POST /api/trips/{id}/emails/clear", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
                                      "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
@@ -471,10 +476,11 @@ class Generated(unittest.TestCase):
                                      "POST /api/loyalty/{id}/reveal",
                                      "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",
                                      "DELETE /api/reminders/devices/{id}", "POST /api/feed", "DELETE /api/feed",
-                                     "GET /api/mcp-settings", "POST /api/mcp-settings/writes",
+                                     "GET /api/mcp-settings", "POST /api/mcp-settings/writes", "POST /api/mcp-settings/connections/{id}/mail",
                                      "DELETE /api/mcp-settings/connections/{id}",
-                                     "GET /api/assistant/review", "GET /api/assistant/review/{id}", "POST /api/assistant/review/{id}/match", "POST /api/assistant/review/{id}/create",
-                                     "POST /api/assistant/review/{id}/dismiss"})
+                                     "GET /api/assistant/review", "GET /api/assistant/review/{id}", "GET /api/assistant/review/{id}/email",
+                                     "POST /api/assistant/review/{id}/match", "POST /api/assistant/review/{id}/create",
+                                     "POST /api/assistant/review/{id}/dismiss", "GET /api/assistant/segments/{id}/email"})
         self.assertNotIn("GET /api/backup", covered())
         self.assertNotIn("GET /api/mailboxes/callback", covered())
 

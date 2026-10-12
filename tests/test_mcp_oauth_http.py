@@ -366,7 +366,7 @@ class ConsentTests(OAuthServer):
         self.assertEqual(parsed.open, [])
         self.assertEqual(set(parsed.inside["button"]), {"div"})
         self.assertEqual(parsed.inside["input"].count("label"), 2)
-        self.assertIn("confirmation codes, addresses, phone numbers and traveller names, never the email's own text", form)
+        self.assertIn("confirmation codes, addresses, phone numbers and traveller names", form)
 
     def test_the_write_box_follows_its_switch_and_is_never_ticked_for_you(self):
         c = self.client()
@@ -625,7 +625,7 @@ class McpTests(OAuthServer):
         t = self.tokens(scope="read write", write=True)
         self.assertEqual(t["scope"], "read write")
         token = t["access_token"]
-        offered = {x["name"] for x in mcp_server.ALL_TOOLS}
+        offered = {x["name"] for x in mcp_server.ALL_TOOLS} - {x["name"] for x in mcp_server.MAIL_TOOLS}
         self.assertEqual(self.tool_names(token), offered)
         self.assertIn("create_trip", offered)
         self.assertNotIn("isError", self.call(token, "create_trip", {"fields": self.trip}))

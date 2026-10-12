@@ -551,6 +551,46 @@
         }
       }
     },
+    "/api/trips/{id}/emails/clear": {
+      "post": {
+        "operationId": "api_trip_emails_clear",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_emails_clear",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailsCleared"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/trips/{id}/merge": {
       "post": {
         "operationId": "api_trip_merge",
@@ -2515,6 +2555,56 @@
         }
       }
     },
+    "/api/mcp-settings/connections/{id}/mail": {
+      "post": {
+        "operationId": "api_mcp_mail",
+        "x-handler": "waypoint/server/api/mcp.py:api_mcp_mail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpMailBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpMailBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/mcp-settings/connections/{id}": {
       "delete": {
         "operationId": "api_mcp_revoke",
@@ -2597,6 +2687,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AssistantItemDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/assistant/review/{id}/email": {
+      "get": {
+        "operationId": "api_assistant_review_email",
+        "x-handler": "waypoint/server/api/assistant.py:api_assistant_review_email",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantEmail"
                 }
               }
             }
@@ -2747,6 +2868,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AssistantDismissed"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/assistant/segments/{id}/email": {
+      "get": {
+        "operationId": "api_assistant_segment_emails",
+        "x-handler": "waypoint/server/api/assistant.py:api_assistant_segment_emails",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantSegmentEmails"
                 }
               }
             }
@@ -3182,6 +3334,61 @@
         ],
         "additionalProperties": false
       },
+      "AssistantEmail": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sender_domain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "received": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "html_truncated": {
+            "type": "boolean"
+          },
+          "kept": {
+            "enum": [
+              "original",
+              "plain text"
+            ]
+          }
+        },
+        "required": [
+          "subject",
+          "sender_domain",
+          "received",
+          "text",
+          "truncated",
+          "html",
+          "html_truncated",
+          "kept"
+        ],
+        "additionalProperties": false
+      },
       "AssistantEntry": {
         "type": "object",
         "properties": {
@@ -3590,6 +3797,21 @@
         ],
         "additionalProperties": false
       },
+      "AssistantSegmentEmails": {
+        "type": "object",
+        "properties": {
+          "emails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantEmail"
+            }
+          }
+        },
+        "required": [
+          "emails"
+        ],
+        "additionalProperties": false
+      },
       "Attached": {
         "type": "object",
         "properties": {
@@ -3788,6 +4010,18 @@
         },
         "required": [
           "distance_unit"
+        ],
+        "additionalProperties": false
+      },
+      "EmailsCleared": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "removed"
         ],
         "additionalProperties": false
       },
@@ -4786,6 +5020,18 @@
           "scope",
           "created",
           "last_used"
+        ],
+        "additionalProperties": false
+      },
+      "McpMailBody": {
+        "type": "object",
+        "properties": {
+          "allow": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "allow"
         ],
         "additionalProperties": false
       },
@@ -7064,6 +7310,12 @@
               "null"
             ]
           },
+          "emails": {
+            "type": "integer"
+          },
+          "can_clear_emails": {
+            "type": "boolean"
+          },
           "segments": {
             "type": "array",
             "items": {
@@ -7080,6 +7332,8 @@
           "notes",
           "auto",
           "booked_by",
+          "emails",
+          "can_clear_emails",
           "segments"
         ],
         "additionalProperties": false

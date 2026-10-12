@@ -85,6 +85,17 @@ export interface AssistantDismissed {
   reason: "not_travel" | "duplicate" | "already_added" | "other";
 }
 
+export interface AssistantEmail {
+  subject: string | null;
+  sender_domain: string | null;
+  received: string | null;
+  text: string;
+  truncated: boolean;
+  html: string | null;
+  html_truncated: boolean;
+  kept: "original" | "plain text";
+}
+
 export interface AssistantEntry {
   entry: number;
   booking: AssistantParsed;
@@ -165,6 +176,10 @@ export interface AssistantParsed {
   read: Record<string, string>;
 }
 
+export interface AssistantSegmentEmails {
+  emails: AssistantEmail[];
+}
+
 export interface Attached {
   ok: boolean;
   segment_id: number;
@@ -214,6 +229,10 @@ export interface DistanceUnit {
 
 export interface DistanceUnitBody {
   distance_unit: "mi" | "km";
+}
+
+export interface EmailsCleared {
+  removed: number;
 }
 
 export interface FeedMade {
@@ -439,6 +458,10 @@ export interface McpConnection {
   scope: string[];
   created: string | null;
   last_used: string | null;
+}
+
+export interface McpMailBody {
+  allow: boolean;
 }
 
 export interface McpSettings {
@@ -940,6 +963,8 @@ export interface Trip {
   notes: string | null;
   auto: boolean;
   booked_by: number | null;
+  emails: number;
+  can_clear_emails: boolean;
   segments: Segment[];
 }
 
@@ -994,6 +1019,7 @@ export interface Endpoints {
   "GET /api/trips/{id}": { body: never; reply: Trip };
   "POST /api/trips/{id}": { body: TripBody; reply: Trip };
   "DELETE /api/trips/{id}": { body: never; reply: Ok };
+  "POST /api/trips/{id}/emails/clear": { body: never; reply: EmailsCleared };
   "POST /api/trips/{id}/merge": { body: MergeBody; reply: Trip };
   "POST /api/trips/{id}/split": { body: SplitBody; reply: Trip };
   "POST /api/segments": { body: SegmentBody; reply: Segment };
@@ -1047,12 +1073,15 @@ export interface Endpoints {
   "DELETE /api/review/{id}": { body: never; reply: Ok };
   "GET /api/mcp-settings": { body: never; reply: McpSettings };
   "POST /api/mcp-settings/writes": { body: McpWritesBody; reply: McpWritesBody };
+  "POST /api/mcp-settings/connections/{id}/mail": { body: McpMailBody; reply: McpMailBody };
   "DELETE /api/mcp-settings/connections/{id}": { body: never; reply: Ok };
   "GET /api/assistant/review": { body: never; reply: AssistantItems };
   "GET /api/assistant/review/{id}": { body: never; reply: AssistantItemDetail };
+  "GET /api/assistant/review/{id}/email": { body: never; reply: AssistantEmail };
   "POST /api/assistant/review/{id}/match": { body: AssistantMatchBody; reply: AssistantMatched };
   "POST /api/assistant/review/{id}/create": { body: AssistantCreateBody; reply: Segment };
   "POST /api/assistant/review/{id}/dismiss": { body: AssistantDismissBody; reply: AssistantDismissed };
+  "GET /api/assistant/segments/{id}/email": { body: never; reply: AssistantSegmentEmails };
   "GET /api/state": { body: never; reply: State };
   "GET /api/offline": { body: never; reply: Offline };
 }

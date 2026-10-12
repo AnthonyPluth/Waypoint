@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import Literal, NotRequired, TypedDict
 
 
+class EmailsCleared(TypedDict):
+    removed: int
+
+
 class Ok(TypedDict):
     ok: bool
 
@@ -452,6 +456,8 @@ class Trip(TypedDict):
     notes: str | None
     auto: bool
     booked_by: int | None
+    emails: int
+    can_clear_emails: bool
     segments: list[Segment]
 
 
@@ -847,6 +853,10 @@ class McpConnection(TypedDict):
     last_used: str | None
 
 
+class McpMailBody(TypedDict):
+    allow: bool
+
+
 class McpSettings(TypedDict):
     allow_writes: bool
     oauth: bool
@@ -929,6 +939,21 @@ class AssistantItemDetail(AssistantItem):
     entries: list[AssistantEntry]
     suggestion: AssistantParsed | None
     suggestions: list[AssistantParsed]
+
+
+class AssistantEmail(TypedDict):
+    subject: str | None
+    sender_domain: str | None
+    received: str | None
+    text: str
+    truncated: bool
+    html: str | None
+    html_truncated: bool
+    kept: Literal["original", "plain text"]
+
+
+class AssistantSegmentEmails(TypedDict):
+    emails: list[AssistantEmail]
 
 
 class AssistantMatchBody(TypedDict):

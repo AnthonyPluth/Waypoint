@@ -20,7 +20,11 @@ DISMISS_REASONS = ("not_travel", "duplicate", "already_added", "other")
 DEFAULT_PAGE = 20
 MAX_PAGE = 50
 MAX_FIELD = 200
+MAX_TEXT = 20_000
+MAX_HTML = 100_000
+MAX_EMAILS = 5
 SHOWN_DETAILS = tuple(k for k in trips.DETAIL_KEYS if k not in ("notes", trips.TIME_UNKNOWN, "address", "phone"))
+NOT_KEPT = "This message wasn’t kept."
 
 
 class Verdict(TypedDict):
@@ -99,6 +103,17 @@ class DetailOut(ItemOut):
     entries: list[EntryOut]
     suggestion: ParsedOut | None
     suggestions: list[ParsedOut]
+
+
+class EmailOut(TypedDict):
+    subject: str | None
+    sender_domain: str | None
+    received: str | None
+    text: str
+    truncated: bool
+    html: str | None
+    html_truncated: bool
+    kept: Literal["original", "plain text"]
 
 
 def _same_code(a: str, b: str) -> bool:
@@ -286,6 +301,28 @@ def detail(conn: db.Connection, owner: str, viewer: Viewer, item_id: int) -> Det
     kept = (row["mailbox_id"], row["message_id"]) in stored_mail.held(conn, [row["mailbox_id"]])
     shown = [parsed(x, {}, x["sources"] if isinstance(x.get("sources"), dict) else None) for x in item["suggestion_list"]]
     return {**_summary(item, entries, owner, kept), "entries": entries, "suggestion": shown[0] if shown else None, "suggestions": shown}
+
+
+def _emailed(kept: stored_mail.Content) -> EmailOut:
+    markup = kept["html"] if kept["original"] else None
+    return {"subject": _clip(kept["subject"], MAX_FIELD * 2), "sender_domain": kept["sender_domain"], "received": kept["received"],
+            "text": kept["text"][:MAX_TEXT], "truncated": kept["truncated"] or len(kept["text"]) > MAX_TEXT,
+            "html": markup[:MAX_HTML] if markup is not None else None, "html_truncated": markup is not None and len(markup) > MAX_HTML,
+            "kept": "original" if kept["original"] else "plain text"}
+
+
+def email_of_item(conn: db.Connection, owner: str, item_id: int) -> EmailOut | None:
+    seen, kept = review.stored_email(conn, owner, item_id)
+    if not seen:
+        return None
+    if kept is None:
+        raise trips.Invalid(NOT_KEPT)
+    return _emailed(kept)
+
+
+def emails_of_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> list[EmailOut] | None:
+    found = trips.emails_of(conn, viewer, segment_id)
+    return None if found is None else [_emailed(k) for k in found[:MAX_EMAILS]]
 
 
 def _from_suggestion(suggestion: Mapping[str, Any]) -> trips.SegmentIn:
