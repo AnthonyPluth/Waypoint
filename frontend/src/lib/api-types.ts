@@ -598,6 +598,8 @@ export interface ReviewItem {
   reason: "no_markup" | "incomplete" | "broken" | "generic";
   suggestions: AiSuggestion[];
   suggestion_error: string | null;
+  count: number;
+  others: ReviewOther[];
 }
 
 export interface ReviewMatch {
@@ -608,6 +610,13 @@ export interface ReviewMatch {
   mine: boolean;
   booking: ReviewBooking;
   candidates: ReviewCandidate[];
+}
+
+export interface ReviewOther {
+  id: number;
+  subject: string | null;
+  has_email: boolean;
+  received: string | null;
 }
 
 export interface ScanStarted {
@@ -625,6 +634,8 @@ export interface ScanSummary {
   triaged: number;
   total: number;
   not_travel: number;
+  followups: number;
+  with_facts: number;
 }
 
 export interface Segment {

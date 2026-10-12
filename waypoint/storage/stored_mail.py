@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
+import hmac
 import json
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, TypedDict
@@ -122,6 +124,16 @@ def held(conn: db.Connection, mailbox_ids: Iterable[int]) -> set[tuple[int, str]
         return set()
     return {(int(r["mailbox_id"]), str(r["message_id"])) for r in
             conn.execute(select(StoredMessage.mailbox_id, StoredMessage.message_id).where(StoredMessage.mailbox_id.in_(ids))).fetchall()}
+
+
+def reference_key(code: str) -> str:
+    return hmac.new(secretbox.derived_key("review-reference"), code.encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def senders_for_segment(conn: db.Connection, segment_id: int) -> set[str]:
+    rows = conn.execute(select(StoredMessage.content).join(SegmentMessage, SegmentMessage.stored_message_id == StoredMessage.id)
+                        .where(SegmentMessage.segment_id == segment_id)).scalars()
+    return {c["sender_domain"] for c in (_open(v) for v in rows) if c is not None and c["sender_domain"]}
 
 
 def link(conn: db.Connection, segment_id: int, mailbox_id: int, message_id: str) -> bool:
