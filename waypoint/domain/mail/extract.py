@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import contextlib
 import email
 import email.policy
 import email.utils
@@ -19,7 +20,7 @@ from ... import monitoring
 from ...providers import mailimages
 from ...storage.stored_mail import Content, Image
 from .. import money, seatmaps
-from . import cars, cruises, flights, lodging, parsers, price, references, safe_html, seats, trains, triage, words
+from . import cars, cruises, flights, ics, lodging, parsers, price, references, safe_html, seats, trains, triage, words
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger
@@ -30,6 +31,7 @@ RESERVATIONS: dict[str, Kind] = {"FlightReservation": "flight", "LodgingReservat
                                  "RentalCarReservation": "car", "TrainReservation": "train"}
 MAX_PART = 2_000_000
 GENERIC_READERS: tuple[Callable[[str, str], tuple[Parsed, str | None]], ...] = (lodging.read, flights.read, cars.read, trains.read, cruises.read)
+CALENDAR_TYPES = ("text/calendar", "application/ics")
 MAX_NODES = 200
 IATA = re.compile(r"[A-Z]{3}")
 CLOCK = re.compile(r"(?<![\d:.])(\d{1,2}):(\d{2})(?::\d{2})?(?!\d)(?:\s*([AaPp])\.?[Mm]\.?)?")
@@ -521,8 +523,13 @@ def read(message: Mapping[str, Any]) -> Message:
     nodes: list[dict[str, Any]] = []
     htmls: list[str] = []
     texts: list[str] = []
+    calendars: list[str] = []
     for part in parsed.walk():
         kind = part.get_content_type()
+        if kind in CALENDAR_TYPES or (kind == "application/octet-stream" and str(part.get_filename() or "").lower().endswith(".ics")):
+            with contextlib.suppress(ValueError, LookupError, KeyError):
+                calendars.append(_calendar_text(part))
+            continue
         if kind not in ("text/html", "text/plain"):
             continue
         try:
@@ -568,6 +575,16 @@ def read(message: Mapping[str, Any]) -> Message:
         elif len(text_flights := [x for x in found.bookings if x.kind == "flight"]) > len(flights):
             bookings = [x for x in bookings if x.kind != "flight"] + text_flights
             unread += found.unread
+    if not bookings and not unread and not seen and calendars:
+        try:
+            calendar_found, why = ics.read(calendars)
+        except Exception as e:
+            monitoring.report(e, values=False)
+            calendar_found, why = Parsed(), None
+        if calendar_found.bookings:
+            bookings, unread, seen = list(calendar_found.bookings), calendar_found.unread, True
+        elif why:
+            gaps.append(f"calendar attachment: {why}")
     if not bookings and not unread and not seen:
         for position, generic in enumerate(GENERIC_READERS):
             try:
@@ -597,6 +614,13 @@ def read(message: Mapping[str, Any]) -> Message:
                    revises=bool(triage.CHANGES.search(subject) or words.CANCEL.search(subject) or references.changes(visible)),
                    price=price.read(visible) if not bookings and not unread and not words.CANCEL.search(subject) else None,
                    found=references.read(subject, visible) if not bookings and not unread else references.Found())
+
+
+def _calendar_text(part: Any) -> str:
+    payload = part.get_payload(decode=True)
+    if isinstance(payload, bytes):
+        return payload[:MAX_PART].decode(part.get_content_charset() or "utf-8", "replace")
+    return str(part.get_content())[:MAX_PART]
 
 
 class _Text(HTMLParser):
