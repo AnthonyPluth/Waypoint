@@ -103,8 +103,8 @@
         {#each land as c (c.id)}<path d={c.d} />{/each}
       </g>
       {#if stateLines.length}
-        <g aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" opacity="0.55" data-testid="state-lines">
-          {#each stateLines as l, i (i)}<path d={l.d} class="stroke-map-border" stroke-width="0.75" vector-effect="non-scaling-stroke" />{/each}
+        <g aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" opacity="0.8" data-testid="state-lines">
+          {#each stateLines as l, i (i)}<path d={l.d} class="stroke-map-border" stroke-width="1" vector-effect="non-scaling-stroke" />{/each}
         </g>
       {/if}
       {#if drawn.length}

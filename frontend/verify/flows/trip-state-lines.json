@@ -1,0 +1,14 @@
+{
+  "name": "trip-state-lines",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Denver') >> visible=true" },
+    { "wait_for": "h1:has-text('Denver')" },
+    { "wait_for": "section[aria-label='Route replay'] [data-testid='replay-map']" },
+    { "press": { "selector": "input[aria-label='Position along the route']", "key": "End" } },
+    { "wait_for": "[data-testid='state-lines'] path" },
+    { "expect_text": { "selector": "[aria-label='Map key']", "text": "State line" } },
+    { "screenshot": "state-lines" }
+  ]
+}
