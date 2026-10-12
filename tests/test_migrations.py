@@ -670,12 +670,31 @@ class MigrationTests(unittest.TestCase):
             self.assertAlmostEqual(got[5][1], 37.62, delta=0.05)
             self.assertEqual(got[3][1:], (None, None))
             command.downgrade(db.alembic_config(c), "0027")
-            self.assertEqual(c.execute(select(schema.segments.c.id)).scalars().all(), [1, 2, 3, 4, 5, 6])
+            self.assertEqual(c.execute(select(schema.segments.c.id).order_by(schema.segments.c.id)).scalars().all(), [1, 2, 3, 4, 5, 6])
             self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 1)
             command.upgrade(db.alembic_config(c), "head")
             self.assertEqual(c.execute(select(schema.segments.c.geo_precision).order_by(schema.segments.c.id)).scalars().all(),
                              ["zip", "city", None, None, "airport", None])
         self.assertEqual(drift(self.path), [])
+
+    def test_0029_locates_as_the_live_lookup_did_when_it_was_written(self):
+        import importlib
+        from waypoint.storage import geocode
+        frozen = importlib.import_module("waypoint.storage.migrations.versions.0029_segment_coordinates")
+        data = frozen._data()
+        cases = [("hotel", "Quay Inn", "Boulder", "100 Pearl Street, Boulder, CO 80302"), ("hotel", None, "Boulder", None),
+                 ("hotel", None, "Springfield", None), ("hotel", None, "Springfield, IL", None),
+                 ("hotel", None, "London", "10 High Street, London SW1A 1AA, UK"),
+                 ("hotel", None, "Toronto", "100 King Street West, Toronto, ON M5X 1A9"),
+                 ("hotel", None, None, "5 Rue de Exemple, 75001 Paris, France"), ("car", "SFO airport", None, None),
+                 ("car", "SFO", "SFO", None), ("train", "Boulder", "Denver", None), ("cruise", "Miami, FL", "Nassau", None),
+                 ("parking", "Lot A", None, "12345 Nowhere Rd, Madison, WI"), ("hotel", None, "Nowhereville", None),
+                 ("flight", "JFK", "LHR", None)]
+        for kind, origin, destination, address in cases:
+            with self.subTest(kind=kind, origin=origin, destination=destination, address=address):
+                live = geocode.locate(kind, origin, destination, address)
+                self.assertEqual(frozen._locate(data, kind, origin, destination, address),
+                                 None if live is None else (live.latitude, live.longitude, live.precision))
 
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
