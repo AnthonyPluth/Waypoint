@@ -215,6 +215,7 @@
         "tests/test_mail_scan.py",
         "tests/test_mcp_routes.py",
         "tests/test_routes.py",
+        "tests/test_trip_emails_clear.py",
         "tests/test_trips.py"
       ],
       "docs": [
