@@ -346,6 +346,8 @@ def booking(found: dict[str, Any], sent: str) -> Suggestion:
     for name in FIELDS:
         if name in values and not (kind == "flight" and name in ("start_zone", "end_zone")):
             out[name] = values[name]   # type: ignore[literal-required]
+    if kind == "car" and "destination" not in out:
+        out["destination"] = out["origin"]
     out.update(_details(kind, values, sent))
     if (cost := _total(found, sent)) is not None:
         out["price_minor"], out["price_currency"] = cost.amount_minor, cost.currency

@@ -606,6 +606,27 @@ class RentalZoneTests(Household):
         seg = self.rent(origin="Example Rental", destination=None, details={"address": "1 Ocean Ave, Honolulu, HI 96815"})
         self.assertEqual((seg["start_zone"], seg["end_zone"]), ("Pacific/Honolulu", "Pacific/Honolulu"))
 
+    def test_a_rental_with_no_drop_off_is_dropped_off_where_it_was_picked_up_and_a_stated_one_is_kept(self):
+        for blank in (None, "", "  "):
+            seg = self.rent(origin="Example Rental", destination=blank, start_zone="America/Denver")
+            self.assertEqual(seg["destination"], "Example Rental")
+        seg = self.rent(origin="Example Rental", destination="Example Rental downtown", start_zone="America/Denver")
+        self.assertEqual(seg["destination"], "Example Rental downtown")
+
+    def test_editing_a_rental_to_an_empty_drop_off_makes_it_the_pick_up(self):
+        seg = self.rent(start_zone="America/Denver", origin="Example Rental", destination="Example Rental downtown")
+        edited = trips.edit_segment(self.c, self.jane, seg["id"], {"destination": ""})
+        self.assertEqual(edited["destination"], "Example Rental")
+
+    def test_a_rental_keeps_an_address_that_differs_from_its_pick_up_when_it_is_edited(self):
+        seg = self.rent(origin="Example Rental", details={"address": "1 Ocean Ave, Honolulu, HI 96815"})
+        edited = trips.edit_segment(self.c, self.jane, seg["id"], {"origin": "Example Rental Waikiki"})
+        self.assertEqual(edited["details"]["address"], "1 Ocean Ave, Honolulu, HI 96815")
+
+    def test_a_flight_still_needs_its_destination(self):
+        with self.assertRaises(trips.Invalid):
+            self.add(self.jane, {**OUT, "destination": ""}, None, self.on(self.jane.person_id))
+
     def test_a_given_zone_wins_over_the_airport_and_the_end_follows_the_start_without_an_airport(self):
         seg = self.rent(start_zone="America/Denver", destination="Example Rental downtown")
         self.assertEqual((seg["start_zone"], seg["end_zone"]), ("America/Denver", "America/Denver"))

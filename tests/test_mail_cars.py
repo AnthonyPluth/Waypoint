@@ -105,13 +105,23 @@ class CarReaderTests(unittest.TestCase):
                    + "<p>Late return fees apply from Dec 10, 2026 3:15 PM</p><p>Return policy: vehicles returned after Dec 11, 2026 are charged a full day</p>")[0].bookings
         self.assertEqual((b.start, b.end), ("2026-12-08T12:00", "2026-12-10T15:00"))
 
+    def test_a_missing_drop_off_place_is_the_pick_up_place(self):
+        parsed, why = read("<p>Car rental</p><p>Pick-up location: SFO</p><p>Pick-up date: Dec 8, 2026</p><p>Drop-off date: Dec 10, 2026</p>")
+        self.assertIsNone(why)
+        [b] = parsed.bookings
+        self.assertEqual((b.origin, b.destination, b.end_zone), (b.origin, b.origin, b.start_zone))
+
+    def test_a_stated_drop_off_place_is_kept(self):
+        [b] = read("<p>Car rental</p>" + "<p>Pick-up location: SFO</p><p>Pick-up date: Dec 8, 2026</p>"
+                   "<p>Drop-off location: LAX</p><p>Drop-off date: Dec 10, 2026</p>")[0].bookings
+        self.assertNotEqual(b.origin, b.destination)
+
     def test_what_cannot_be_read_gets_a_reason_and_no_booking(self):
         base = "<p>Car rental</p>"
         pick = "<p>Pick-up location: SFO</p><p>Pick-up date: Dec 8, 2026</p>"
         drop = "<p>Drop-off location: SFO</p><p>Drop-off date: Dec 10, 2026</p>"
         for body, why in (
             (base + "<p>Pick-up date: Dec 8, 2026</p>" + drop, "no pick-up location found"),
-            (base + pick + "<p>Drop-off date: Dec 10, 2026</p>", "no drop-off location found"),
             (base + "<p>Pick-up location: SFO</p>" + drop, "no pick-up date found"),
             (base + pick + "<p>Drop-off location: SFO</p>", "no drop-off date found"),
             (base + "<p>Pick-up location: Somewhere Plaza</p><p>Pick-up date: Dec 8, 2026</p>" + drop, "pick-up location's time zone unknown"),
@@ -165,7 +175,7 @@ class CarOrderTests(unittest.TestCase):
     def test_nothing_readable_leaves_the_reason(self):
         m = extract.read(mail("<p>Car rental</p><p>Pick-up location: SFO</p><p>Pick-up date: Dec 8, 2026</p>"))
         self.assertEqual(m.bookings, ())
-        self.assertIn("generic reader: no drop-off location found", m.gaps)
+        self.assertIn("generic reader: no drop-off date found", m.gaps)
 
     def test_a_complete_rental_beats_an_incomplete_train_and_is_the_one_filed(self):
         m = extract.read(mail(LABELLED + "<p>Train: 1</p><p>From: Zurich HB</p><p>Departure: 21.11.2026 09:02</p>"))

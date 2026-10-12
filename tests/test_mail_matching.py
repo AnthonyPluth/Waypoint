@@ -141,6 +141,29 @@ class StayAddressZoneTests(DbCase):
         self.assertEqual(ingest.explain(self.c, b), "place's time zone unknown")
 
 
+class CarDropOffTests(DbCase):
+
+    def car(self, **kw):
+        base = dict(kind="car", status="confirmed", confirmation="C1", provider="Example Rental", start="2026-11-20T15:00:00",
+                    end="2026-11-22T10:00:00", origin="Example Rental", destination=None, start_zone="Europe/London", end_zone="Europe/London")
+        return extract.Booking(**{**base, **kw})
+
+    def test_a_rental_without_a_drop_off_comes_back_to_its_pick_up(self):
+        found = ingest.fields(self.c, self.car())
+        assert found is not None
+        self.assertEqual(found["destination"], "Example Rental")
+        self.assertEqual(ingest.suggestion(self.c, self.car())["destination"], "Example Rental")
+
+    def test_a_stated_drop_off_is_kept(self):
+        found = ingest.fields(self.c, self.car(destination="Example Rental Station"))
+        assert found is not None
+        self.assertEqual(found["destination"], "Example Rental Station")
+        self.assertEqual(ingest.suggestion(self.c, self.car(destination="Example Rental Station"))["destination"], "Example Rental Station")
+
+    def test_a_hotel_without_a_destination_gets_none(self):
+        self.assertNotIn("destination", ingest.suggestion(self.c, self.car(kind="hotel")))
+
+
 class TimesTests(DbCase):
     booking = ExplainTests.booking
 

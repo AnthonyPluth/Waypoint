@@ -626,14 +626,36 @@ describe("Review: the AI’s suggestion", () => {
     expect(calls.find(([p]) => p === "/api/segments")?.[2]).not.toHaveProperty("details");
   });
 
-  it("takes a rental’s pick-up address and a cruise’s terminal, cabin, ship and deck", async () => {
+  it("asks a rental for one pick-up place, keeps a different address and saves an empty drop-off as the pick-up", async () => {
+    const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "4 Runway Drive, Bristol BS48 3DY" };
+    held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.queryByLabelText(/address/i)).toBeNull();
+    expect(screen.getByPlaceholderText("Same as pick-up")).toHaveValue("");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.find(([p]) => p === "/api/segments")?.[2]).toMatchObject({ destination: "Bristol Airport", details: { address: "4 Runway Drive, Bristol BS48 3DY" } });
+  });
+
+  it("sets a rental’s address from the pick-up when the email gave the same text, and keeps a stated drop-off", async () => {
+    const car = { kind: "car" as const, origin: "Bristol Airport", destination: "Cardiff Station", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "Bristol Airport" };
+    held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.find(([p]) => p === "/api/segments")?.[2]).toMatchObject({ destination: "Cardiff Station", details: { address: "Bristol Airport" } });
+  });
+
+  it("takes a rental’s phone and a cruise’s terminal, cabin, ship and deck", async () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", destination: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00",
       address: "4 Runway Drive, Bristol BS48 3DY" };
     held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
     const first = render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
-    expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
-    expect(screen.getByLabelText(/^Pick-up address/)).toHaveClass("ring-2");
+    expect(screen.queryByLabelText(/^Pick-up address/)).toBeNull();
+    expect(screen.getByLabelText(/^Pick-up\b(?! time)/)).toHaveValue("Bristol Airport");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     first.unmount();

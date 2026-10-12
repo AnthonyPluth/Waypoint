@@ -13,7 +13,7 @@
   import { isMobile } from "$lib/platform";
   import { formatMoney } from "$lib/money";
   import { segmentChips } from "$lib/status";
-  import { appWord, dayLabel, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
+  import { appWord, dayLabel, extraAddress, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
 
   type Props = {
     segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
@@ -42,7 +42,7 @@
   const rows = $derived<[string, string | null | undefined][]>(
     flight ? [["Terminal", s.details.terminal], ["Gate", status?.dep_gate], ["Seat", seat], ["Cabin", s.details.cabin]]
       : s.kind === "hotel" ? [["Address", condensed ? placeOf(s.details.address) : s.details.address], ["Room", s.details.room]]
-        : s.kind === "car" ? [["Car", s.details.car_class], ["Address", condensed ? placeOf(s.details.address) : s.details.address]]
+        : s.kind === "car" ? [["Car", s.details.car_class], ["Address", condensed ? placeOf(extraAddress(s)) : extraAddress(s)]]
           : s.kind === "parking" ? [["Address", condensed ? placeOf(s.details.address) : s.details.address], ["Space", s.details.space_type], ["Vehicle", s.details.vehicle], ["Notes", s.details.notes]]
           : s.kind === "cruise" ? [["Ship", s.details.ship], ["Cabin", s.details.room], ["Deck", s.details.deck]]
             : [["Seat", seat], ["Cabin", s.details.cabin]],

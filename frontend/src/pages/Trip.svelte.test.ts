@@ -890,6 +890,25 @@ describe("Trip", () => {
       expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", stay.links.directions!);
     });
 
+    it("shows no address line for a rental whose address is its pick-up, and never offers Add address for it", async () => {
+      const car = segment({ id: 5, kind: "car", provider: "Local Cars", origin: "Example Rental", destination: "Example Rental", confirmation: "C9", start_local: "2026-11-22T09:00",
+        start_zone: "Europe/London", end_local: "2026-11-25T09:00", end_zone: "Europe/London", details: { address: "Example Rental" } });
+      held = trip([flight, car]);
+      render(TripPage);
+      await screen.findByRole("heading", { name: "Trip to London" });
+      expect(screen.queryByText("Pick-up address")).toBeNull();
+      expect(screen.queryByRole("button", { name: /Add address/ })).toBeNull();
+    });
+
+    it("shows a rental's address line when it differs from its pick-up", async () => {
+      const car = segment({ id: 5, kind: "car", provider: "Local Cars", origin: "Example Rental", destination: "Example Rental", confirmation: "C9", start_local: "2026-11-22T09:00",
+        start_zone: "Europe/London", end_local: "2026-11-25T09:00", end_zone: "Europe/London", details: { address: "1 Rental Way, Bristol BS48 3DY" } });
+      held = trip([flight, car]);
+      render(TripPage);
+      expect(await screen.findByText("Pick-up address")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Copy address 1 Rental Way/ })).toBeInTheDocument();
+    });
+
     it("offers Add address only when there is none, and opens the form at the address field", async () => {
       held = trip([flight, { ...stay, details: {}, links: { app: null, open: null, open_kind: null, directions: "https://maps.apple.com/?q=Harbour%20Hotel", call: null } }]);
       const u = userEvent.setup();

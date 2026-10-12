@@ -18,6 +18,17 @@ const draft = (kind: Kind, extra: Partial<Draft> = {}): Draft => ({
 
 const mount = (initial: Draft, onsaved = vi.fn()) => render(SegmentForm, { props: { initial, people: [], onsaved, oncancel: vi.fn() } });
 
+describe("SegmentForm: a rental car", () => {
+  it("has one pick-up place, no pick-up address, and a drop-off that says it is the same as pick-up", () => {
+    mount(draft("car", { origin: "Example Rental" }));
+    expect(screen.getByLabelText("Pick-up place")).toHaveValue("Example Rental");
+    expect(screen.queryByLabelText(/address/i)).toBeNull();
+    expect(screen.getByLabelText("Drop-off place")).toHaveAttribute("placeholder", "Same as pick-up");
+    expect(screen.getByLabelText("Car class")).toBeInTheDocument();
+    expect(screen.getByLabelText("Phone")).toBeInTheDocument();
+  });
+});
+
 describe("SegmentForm: who is travelling", () => {
   const withPeople = (initial: Draft) => render(SegmentForm, { props: { initial, people: [{ id: 1, display_name: "Jane Doe" }, { id: 2, display_name: "Sam Doe" }] as never, onsaved: vi.fn(), oncancel: vi.fn() } });
 

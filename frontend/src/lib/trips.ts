@@ -264,6 +264,13 @@ export function cityState(address: string | undefined): string {
   return `${city}, ${last}`;
 }
 
+const squash = (v: string | null | undefined): string => (v ?? "").split(/\s+/).filter(Boolean).join(" ").toLowerCase();
+
+export const samePlace = (a: string | null | undefined, b: string | null | undefined): boolean => squash(a) !== "" && squash(a) === squash(b);
+
+export const extraAddress = (s: Pick<Segment, "kind" | "origin" | "details">): string | undefined =>
+  s.kind === "car" && samePlace(s.details.address, s.origin) ? undefined : s.details.address;
+
 export const placeOf = (address: string | undefined): string => cityState(address) || (address ?? "").trim();
 
 export function upcomingTitle(s: Segment): string {
@@ -278,7 +285,7 @@ export function subline(s: Segment, condensed = false): string {
   const d = s.details;
   const parts = s.kind === "flight" ? [[s.provider, d.flight_number].filter(Boolean).join(" "), d.aircraft, d.terminal && `Terminal ${d.terminal}`, d.seat && `Seat ${seatsInOrder(d.seat)}`, condensed ? null : d.cabin]
     : s.kind === "hotel" ? [condensed ? placeOf(d.address) : d.address, d.room]
-      : s.kind === "car" ? [d.car_class, condensed ? placeOf(d.address) : d.address] : s.kind === "parking" ? [d.space_type, condensed ? placeOf(d.address) : d.address] : s.kind === "cruise" ? [s.details.ship ? s.provider : null, d.room && `Cabin ${d.room}`, d.deck && `Deck ${d.deck}`] : [s.provider, d.seat && `Seat ${seatsInOrder(d.seat)}`, d.cabin];
+      : s.kind === "car" ? [d.car_class, condensed ? placeOf(extraAddress(s)) : extraAddress(s)] : s.kind === "parking" ? [d.space_type, condensed ? placeOf(d.address) : d.address] : s.kind === "cruise" ? [s.details.ship ? s.provider : null, d.room && `Cabin ${d.room}`, d.deck && `Deck ${d.deck}`] : [s.provider, d.seat && `Seat ${seatsInOrder(d.seat)}`, d.cabin];
   return parts.filter(Boolean).join(" · ");
 }
 

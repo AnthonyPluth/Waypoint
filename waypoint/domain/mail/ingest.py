@@ -82,7 +82,7 @@ def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
     start, end, guessed = times
     out: trips.SegmentIn = {"kind": b.kind, "status": b.status, "confirmation": b.confirmation, "provider": b.provider,
                             "start_local": start, "start_zone": start_zone, "end_local": end, "end_zone": end_zone,
-                            "origin": b.origin, "destination": b.destination,
+                            "origin": b.origin, "destination": b.destination or (b.origin if b.kind == "car" else None),
                             "details": {k: v for k, v in b.details if k in trips.DETAIL_KEYS}, "manage_url": b.manage_url,
                             "check_times": guessed}
     if b.passengers:
@@ -100,8 +100,8 @@ def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:
         out["provider"] = b.provider
     if b.confirmation:
         out["confirmation"] = b.confirmation
-    if b.destination:
-        out["destination"] = b.destination
+    if b.destination or (b.kind == "car" and b.origin):
+        out["destination"] = b.destination or b.origin or ""
     if address := dict(b.details).get("address"):
         out["address"] = address
     if b.kind == "flight" and (number := dict(b.details).get("flight_number")):
