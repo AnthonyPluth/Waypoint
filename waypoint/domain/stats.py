@@ -10,7 +10,7 @@ from typing import Literal, TypedDict, cast
 
 from sqlalchemy import func, select
 
-from ..storage import db
+from ..storage import db, reference
 from ..storage.models import Airline, Airport
 from . import people, seatmaps, trippeople, trips, visibility
 from .chains import clean, hotel_chain
@@ -629,6 +629,13 @@ def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: in
     return build(seen, known, names, countries, now=now, year=year, city_points=points_of(conn, countries), trip_names=trip_names)
 
 
+SAME_NAME_KM = 100.0
+
+
+def _spread_km(points: Sequence[tuple[float, float]]) -> float:
+    return max((distance_km(a, b) for a in points for b in points), default=0.0)
+
+
 def points_of(conn: db.Connection, countries: Mapping[str, str]) -> dict[str, tuple[float, float]]:
     if not countries:
         return {}
@@ -637,7 +644,14 @@ def points_of(conn: db.Connection, countries: Mapping[str, str]) -> dict[str, tu
                                                 .where(func.lower(Airport.city).in_(sorted(countries)))):
         if countries.get(city) == country:
             found.setdefault(city, []).append((lat, lon))
-    return {c: (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)) for c, pts in found.items()}
+    listed = reference.city_points()
+    out: dict[str, tuple[float, float]] = {}
+    for city, pts in found.items():
+        if _spread_km(pts) <= SAME_NAME_KM:
+            out[city] = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
+        elif (largest := max((c for c in listed.get(reference.place_key(city), ()) if c[0] == countries[city]), key=lambda c: c[4], default=None)):
+            out[city] = (largest[2], largest[3])
+    return out
 
 
 def countries_of(conn: db.Connection, cities: set[str]) -> dict[str, str]:
