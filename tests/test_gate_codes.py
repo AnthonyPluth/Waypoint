@@ -385,7 +385,7 @@ class CodeRouteTests(ServerCase):
             self.assertIn("default-src 'none'; sandbox", headers.get_all("Content-Security-Policy"))
             for who in ("ben", "cy"):
                 status, _, raw = self.code(who)
-                self.assertEqual((status, json.loads(raw)), (404, {"error": "No such code"}))
+                self.assertEqual((status, json.loads(raw)), (404, {"error": "No such image"}))
             self.assertEqual(self.code(None)[0], 401)
             for bad in ("99999", "x", "-1"):
                 self.assertEqual(self.code("ana", bad)[0], 404, bad)

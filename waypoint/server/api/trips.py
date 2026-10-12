@@ -24,7 +24,7 @@ _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {li
 
 NO_TRIP = "No such trip"
 NO_SEGMENT = "No such segment"
-NO_CODE = "No such code"
+NO_CODE = NO_IMAGE
 MAX_PICTURE_POSITION = 999
 NO_AI = "Suggestions need the AI fallback, which is off. Turn it on under Settings, in Mail and AI."
 NO_PLACES = "Add a booking to this trip first, so there are places to describe."
