@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-91 routes; 0 have no test yet.
+94 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -28,7 +28,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/trips` | `trips.py:api_trips` | `lib/early.ts`, `pages/Trip.svelte`, `pages/Trips.svelte`, `pages/Upcoming.svelte` | `test_api_contract.py`, `test_flight_import.py`, `test_gate_codes.py`, `test_mail_scan.py`, `test_mcp_routes.py`, `test_routes.py`, `test_trip_emails_clear.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips` | `trips.py:api_trip_add` | - | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trip_destination.py`, `test_trip_emails_clear.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/trips/{id}` | `trips.py:api_trip` | `pages/Trip.svelte` | `test_api_contract.py`, `test_logos.py`, `test_mcp.py`, `test_monitoring.py`, `test_routes.py`, `test_trip_destination.py`, `test_trip_emails_clear.py`, `test_trip_roads.py`, `test_trip_states.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
-| `GET /api/trips/{id}/places` | `trips.py:api_trip_places` | `lib/components/RouteReplay.svelte` | `test_api_contract.py`, `test_trip_roads.py`, `test_trip_states.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `GET /api/trips/{id}/places` | `trips.py:api_trip_places` | `lib/components/RouteReplay.svelte` | `test_api_contract.py`, `test_home.py`, `test_trip_roads.py`, `test_trip_states.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}` | `trips.py:api_trip_edit` | `lib/components/TripDestination.svelte`, `pages/Trip.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_monitoring.py`, `test_offline.py`, `test_routes.py`, `test_trip_destination.py`, `test_trip_emails_clear.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `DELETE /api/trips/{id}` | `trips.py:api_trip_remove` | `pages/Trip.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_monitoring.py`, `test_trip_destination.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/emails/clear` | `trips.py:api_trip_emails_clear` | `lib/components/TripDone.svelte` | `test_api_contract.py`, `test_mcp_routes.py`, `test_trip_emails_clear.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
@@ -51,6 +51,9 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/stats` | `stats.py:api_stats` | `lib/components/YearInReview.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `GET /api/distance-unit` | `stats.py:api_distance_unit` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `POST /api/distance-unit` | `stats.py:api_distance_unit_save` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
+| `GET /api/home` | `home.py:api_home` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py` | [start/trips](/Waypoint/start/trips/) |
+| `POST /api/home` | `home.py:api_home_save` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py`, `test_trip_destination.py` | [start/trips](/Waypoint/start/trips/) |
+| `DELETE /api/home` | `home.py:api_home_clear` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/flight-status` | `flightstatus.py:api_flight_statuses` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py`, `test_mcp_routes.py` | [start/flight-status](/Waypoint/start/flight-status/) |
 | `POST /api/flight-status/{id}` | `flightstatus.py:api_flight_status_refresh` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py`, `test_mcp.py` | [start/flight-status](/Waypoint/start/flight-status/) |
 | `GET /api/loyalty/{id}/logo` | `logos.py:api_loyalty_logo` | - | `test_loyalty.py` | [start/loyalty](/Waypoint/start/loyalty/) |

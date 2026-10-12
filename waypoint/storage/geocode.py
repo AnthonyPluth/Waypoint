@@ -154,6 +154,10 @@ def locate(kind: str, origin: str | None, destination: str | None, address: str 
     return _city_in(where, country, state) if where else None
 
 
-
 def locate_port(name: str) -> Point | None:
     return _city_in(name.strip(), None, None) if name.strip() else None
+
+
+def locate_home(city: str, state: str, postal: str, country: str) -> Point | None:
+    address = ", ".join(part for part in (city, f"{state} {postal}".strip(), country) if part)
+    return locate("hotel", None, city, address)

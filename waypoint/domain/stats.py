@@ -584,17 +584,22 @@ def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Ai
                 note(stayed, "country", country, s.start_local, s.end_local)
 
     points: dict[tuple[str, str | None], VisitPoint] = {}
+    abroad: dict[tuple[int | None, str], list[Seg]] = {}
     for s in visits_abroad:
         country = (s.destination or "").strip().upper()
-        if not country:
-            continue
+        if country:
+            abroad.setdefault((s.trip_id, country), []).append(s)
+    for (_, country), group in abroad.items():
+        s = min(group, key=lambda g: g.start_local)
         seen(countries, country, s.start_local[:10])
-        note(stayed, "country", country, s.start_local, s.end_local)
-        if s.point is not None:
-            state = (s.details.get(trips.STATE) or None) if country == "US" else None
-            point = points.setdefault((country, state), {"country": country, "state": state, "latitude": s.point[0],
-                                                         "longitude": s.point[1], "trips": []})
-            if (ref := _map_trip(s, trip_names or {})) and ref not in point["trips"]:
+        note(stayed, "country", country, s.start_local, max(g.end_local for g in group))
+        for g in sorted(group, key=lambda g: g.start_local):
+            if g.point is None:
+                continue
+            state = (g.details.get(trips.STATE) or None) if country == "US" else None
+            point = points.setdefault((country, state), {"country": country, "state": state, "latitude": g.point[0],
+                                                         "longitude": g.point[1], "trips": []})
+            if (ref := _map_trip(g, trip_names or {})) and ref not in point["trips"]:
                 point["trips"].append(ref)
 
     def visits(kind: str, name: str) -> int:

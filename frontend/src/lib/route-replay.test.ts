@@ -4,6 +4,7 @@ import { activeStop, cameraAt, canReplay, legProgress, labelLit, legsOf, localRu
 import { segment, trip } from "../test/fixtures";
 
 const places: TripPlaces = {
+  home: null,
   airports: [
     { code: "MSP", city: "Minneapolis", latitude: 44.8848, longitude: -93.2223 },
     { code: "SFO", city: "San Francisco", latitude: 37.6213, longitude: -122.379 },
@@ -139,7 +140,7 @@ describe("whether a trip can be replayed", () => {
     expect(canReplay(past, "2025-12-01", places)).toBe(false);
     expect(canReplay(past, "2026-01-01", null)).toBe(false);
     expect(canReplay(trip([stay]), "2026-01-01", places)).toBe(false);
-    expect(canReplay(trip([out]), "2026-01-01", { airports: [places.airports[0]], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] })).toBe(false);
+    expect(canReplay(trip([out]), "2026-01-01", { home: null, airports: [places.airports[0]], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] })).toBe(false);
   });
 
   it("counts the most stops a trip could have before asking for coordinates", () => {
@@ -278,5 +279,46 @@ describe("the local legs and the camera", () => {
     expect(at((units - 1) / units).w).toBeCloseTo(960);
     expect(held.x).toBeGreaterThanOrEqual(0);
     expect(held.x + held.w).toBeLessThanOrEqual(960);
+  });
+});
+
+describe("a past trip made of countries", () => {
+  const visit = (id: number, destination: string, first: string, last: string) =>
+    segment({ id, kind: "visit", origin: null, destination, start_local: `${first}T00:00`, start_zone: "America/Guayaquil", end_local: `${last}T00:00`, end_zone: "America/Guayaquil" });
+  const located: TripPlaces = {
+    ...places,
+    stays: [
+      { segment_id: 11, latitude: -1.4, longitude: -78.5, precision: "city" },
+      { segment_id: 12, latitude: -9.2, longitude: -75.0, precision: "city" },
+      { segment_id: 13, latitude: -1.4, longitude: -78.5, precision: "city" },
+    ],
+  };
+  const ecuador = visit(11, "EC", "2005-03-01", "2005-03-10");
+  const peru = visit(12, "PE", "2005-03-11", "2005-03-20");
+  const again = visit(13, "EC", "2005-03-21", "2005-03-25");
+
+  it("has one stop per country in date order, and one that comes back is marked as back", () => {
+    const stops = stopsOf(trip([again, peru, ecuador]), located);
+    expect(names(stops)).toEqual(["Ecuador", "Peru", "Ecuador"]);
+    expect(stops.map((s) => [s.from.slice(0, 10), s.to.slice(0, 10)])).toEqual([["2005-03-01", "2005-03-10"], ["2005-03-11", "2005-03-20"], ["2005-03-21", "2005-03-25"]]);
+    expect(stops.map((s) => s.back)).toEqual([false, false, true]);
+  });
+
+  it("is offered at two or more located countries and not at one", () => {
+    const past = trip([ecuador, peru], { end_date: "2005-03-20" });
+    expect(maxStops(past)).toBe(2);
+    expect(worthLocating(past, "2026-01-01")).toBe(true);
+    expect(canReplay(past, "2026-01-01", located)).toBe(true);
+    expect(canReplay(past, "2026-01-01", { ...located, stays: [located.stays[0]] })).toBe(false);
+    const single = trip([ecuador], { end_date: "2005-03-10" });
+    expect(maxStops(single)).toBe(1);
+    expect(worthLocating(single, "2026-01-01")).toBe(false);
+    expect(canReplay(single, "2026-01-01", located)).toBe(false);
+  });
+
+  it("leaves out a cancelled country, and leaves a visit out of a trip that has other bookings", () => {
+    expect(names(stopsOf(trip([ecuador, { ...peru, status: "cancelled" }]), located))).toEqual(["Ecuador"]);
+    expect(names(stopsOf(trip([out, stay, ecuador]), located))).toEqual(["Minneapolis", "San Francisco", "Bayview Inn"]);
+    expect(maxStops(trip([out, ecuador]))).toBe(2);
   });
 });

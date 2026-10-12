@@ -557,7 +557,14 @@ class TripStateLine(TypedDict):
     points: list[list[float]]
 
 
+class TripHome(TypedDict):
+    city: str
+    latitude: float
+    longitude: float
+
+
 class TripPlaces(TypedDict):
+    home: TripHome | None
     airports: list[TripAirportPoint]
     cities: list[TripCityPoint]
     stays: list[TripStayPoint]
@@ -928,6 +935,22 @@ class DistanceUnit(TypedDict):
 
 class DistanceUnitBody(TypedDict):
     distance_unit: Literal["mi", "km"]
+
+
+class Home(TypedDict):
+    city: str
+    state: str
+    zip: str
+    country: str
+    saved: bool
+    placed: bool
+
+
+class HomeBody(TypedDict):
+    city: str
+    state: NotRequired[str]
+    zip: NotRequired[str]
+    country: NotRequired[str]
 
 
 class Stats(TypedDict):

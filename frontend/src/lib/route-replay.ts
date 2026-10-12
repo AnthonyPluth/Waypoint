@@ -1,10 +1,11 @@
 import { geoBounds, geoDistance, geoEqualEarth, type GeoProjection } from "d3-geo";
 import type { Geometry } from "geojson";
 import type { Segment, Trip, TripPlaces } from "./api-types";
+import { countryName } from "./stats";
 import { instant, isPast } from "./trips";
 
 export type Kind = Segment["kind"];
-export type StopKind = "airport" | "stay" | "place";
+export type StopKind = "airport" | "stay" | "place" | "home";
 export type Stop = { name: string; city: string; code: string | null; kind: StopKind; latitude: number; longitude: number; from: string; to: string; via: Kind | null; back: boolean };
 export type Spot = { x: number; y: number };
 export type Vehicle = "plane" | "car" | "boat";
@@ -71,21 +72,35 @@ function finder(places: TripPlaces) {
   return { airport, city, stay };
 }
 
+const liveOf = (trip: Trip): Segment[] => trip.segments.filter((s) => s.status !== "cancelled");
+
+const byCountries = (trip: Trip): boolean => {
+  const live = liveOf(trip).filter((s) => s.kind !== "parking");
+  return live.length > 0 && live.every((s) => s.kind === "visit");
+};
+
+const dateOrder = (a: Segment, b: Segment): number => a.start_local.localeCompare(b.start_local) || a.end_local.localeCompare(b.end_local) || a.id - b.id;
+
 export function maxStops(trip: Trip): number {
-  return trip.segments.filter((s) => s.status !== "cancelled").reduce((n, s) => {
-    if (s.kind === "parking" || s.kind === "visit") return n;
+  const countries = byCountries(trip);
+  return liveOf(trip).reduce((n, s) => {
+    if (s.kind === "visit") return countries ? n + 1 : n;
+    if (s.kind === "parking") return n;
     if (s.kind === "flight" || s.kind === "train") return n + 2;
     if (s.kind === "cruise") return n + 2 + s.itinerary.length;
     return n + 1;
   }, 0);
 }
 
+export const isRoadTrip = (trip: Trip): boolean => !trip.segments.some((s) => s.status !== "cancelled" && (s.kind === "flight" || s.kind === "train" || s.kind === "cruise"));
+
 export const worthLocating = (trip: Trip, today: string): boolean => isPast(trip, today) && maxStops(trip) >= 2;
 
 function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
   const { airport, city, stay } = finder(places);
-  const live = trip.segments.filter((s) => s.status !== "cancelled" && s.kind !== "parking" && s.kind !== "visit")
-    .sort((a, b) => instant(a.start_local, a.start_zone) - instant(b.start_local, b.start_zone) || a.id - b.id);
+  const countries = byCountries(trip);
+  const live = liveOf(trip).filter((s) => s.kind !== "parking" && (s.kind !== "visit" || countries))
+    .sort((a, b) => (countries ? dateOrder(a, b) : instant(a.start_local, a.start_zone) - instant(b.start_local, b.start_zone) || a.id - b.id));
   const out: Visit[] = [];
   const add = (p: Point | null, from: string, to: string, via: Kind | null) => {
     if (p) out.push({ ...p, city: p.city ?? p.name, code: p.code ?? null, kind: p.kind ?? "place", from, to, via });
@@ -94,6 +109,8 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
     if (s.kind === "flight") {
       add(airport(s.origin), s.start_local, s.start_local, null);
       add(airport(s.destination), s.end_local, s.end_local, "flight");
+    } else if (s.kind === "visit") {
+      add(stay(s, countryName(s.destination ?? "")), s.start_local, s.end_local, null);
     } else if (s.kind === "hotel") {
       const found = stay(s, s.destination) ?? city(s.destination);
       add(found && { ...found, kind: "stay", city: found.name, name: head(s.origin ?? "") || found.name }, s.start_local, s.end_local, null);
@@ -120,6 +137,15 @@ const sameStop = (a: Visit, b: Visit): boolean => {
   return false;
 };
 
+function wrapAtHome(merged: Visit[], trip: Trip, places: TripPlaces): void {
+  const first = merged[0], last = merged.at(-1);
+  if (!places.home || !first || !last || !isRoadTrip(trip)) return;
+  const { city, latitude, longitude } = places.home;
+  const at: Visit = { name: city, city, code: null, kind: "home", latitude, longitude, from: "", to: "", via: null };
+  if (!samePlace(at, first)) merged.unshift({ ...at, from: first.from, to: first.from });
+  if (!samePlace(at, last)) merged.push({ ...at, from: last.to, to: last.to });
+}
+
 export function stopsOf(trip: Trip, places: TripPlaces): Stop[] {
   const merged: Visit[] = [];
   for (const v of visitsOf(trip, places)) {
@@ -133,6 +159,7 @@ export function stopsOf(trip: Trip, places: TripPlaces): Stop[] {
       last.via = via ?? v.via;
     } else merged.push({ ...v });
   }
+  wrapAtHome(merged, trip, places);
   return merged.map((v, i) => ({ ...v, back: i > 0 && merged.slice(0, i).some((e) => e.kind === v.kind && sameStop(e, v)) }));
 }
 
@@ -151,6 +178,7 @@ export function stopDates(stop: Stop, year: number): string {
 
 export function stopTitle(stop: Stop): string {
   if (stop.kind === "airport") return `${stop.name} (${stop.code})`;
+  if (stop.kind === "home") return stop.name;
   if (stop.kind === "stay") return key(stop.city) === key(stop.name) ? `Stay in ${stop.name}` : `Stay: ${stop.name}, ${stop.city}`;
   return stop.name;
 }
