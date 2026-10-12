@@ -10,7 +10,7 @@ sidebar:
 ## Choosing where it runs
 
 - **Off.** Email never goes to an AI.
-- **Local (Ollama).** An [Ollama](https://ollama.com) server on your own network: enter its address and a model. The email text never leaves your network.
+- **Local (Ollama).** An [Ollama](https://ollama.com) server on your own network: enter its address and a model. The email text goes to that server exactly as it was written, with nothing cut or replaced (see What is sent), and never leaves your network.
 - **OpenRouter.** [OpenRouter](https://openrouter.ai) with a model and your key. Every request sets `provider.data_collection: "deny"` and `provider.zdr: true`, so only providers that keep no prompts and don’t train on them can answer. If none can for your model, nothing is sent and the item says so: choose another model.
 
 The OpenRouter key is saved encrypted with `WAYPOINT_SECRET_KEY` (and encrypted in backups), or read from the `OPENROUTER_API_KEY` environment variable, which wins. It never shows again once saved, and is never logged.
@@ -19,7 +19,11 @@ The OpenRouter key is saved encrypted with `WAYPOINT_SECRET_KEY` (and encrypted 
 
 The setting is the household’s: any member can change it, and once it’s on, new “Couldn’t read” mail from every connected mailbox is offered, not just the mailbox of whoever turned it on. Whoever sets the Ollama address chooses where that mail goes, so use a server you trust.
 
-Only the message’s plain text, and only for an item in “Couldn’t read” (when a scan queues it, or when you choose **Ask AI** on it). Before it goes, Waypoint cuts quoted replies, everything under a reply header or a `-- ` signature, and footer lines (unsubscribe, privacy notices), and replaces every email address (including the ones in a forwarded message’s From, To and Cc lines, in `<angle brackets>` and in `mailto:` links) with `[email]`, before anything else, and replaces numbers that are labelled as a loyalty, Known Traveler, account or card number, long digit runs, letter-prefixed IDs of eight or more characters (such as `TT12345678`), plus every number saved under [Loyalty](/Waypoint/start/loyalty/), wherever it’s written. The sender and the subject are not sent, and no email address is, wherever it is written in the body. Names and anything else written in the body are, so a traveller’s name in the email goes to the model. Prompts and replies are never logged. Only `domain/mail/ai.py` sends email text anywhere, and a lint rule keeps AI addresses out of the rest of the code.
+Only the message’s plain text, and only for an item in “Couldn’t read” (when a scan queues it, or when you choose **Ask AI** on it).
+
+**With Local (Ollama), the text goes to your Ollama server unredacted and untrimmed**: quoted replies, signatures and footers stay, and email addresses, loyalty, Known Traveler, account and card numbers, long digit runs and the numbers saved under [Loyalty](/Waypoint/start/loyalty/) are sent as written. This is the household’s choice, because the model runs on your own network; it means those numbers do reach that server, so use one you trust and don’t point it at a hosted address. The sender and the subject are still not sent, and prompts and replies are never logged.
+
+**With OpenRouter, the text is redacted first.** Before it goes, Waypoint cuts quoted replies, everything under a reply header or a `-- ` signature, and footer lines (unsubscribe, privacy notices), and replaces every email address (including the ones in a forwarded message’s From, To and Cc lines, in `<angle brackets>` and in `mailto:` links) with `[email]`, before anything else, and replaces numbers that are labelled as a loyalty, Known Traveler, account or card number, long digit runs, letter-prefixed IDs of eight or more characters (such as `TT12345678`), plus every number saved under [Loyalty](/Waypoint/start/loyalty/), wherever it’s written. The sender and the subject are not sent, and no email address is, wherever it is written in the body. Names and anything else written in the body are, so a traveller’s name in the email goes to the model. Prompts and replies are never logged. The redaction is the OpenRouter rule only; the Local rule is above. Only `domain/mail/ai.py` sends email text anywhere, and a lint rule keeps AI addresses out of the rest of the code.
 
 ### Who can ask
 

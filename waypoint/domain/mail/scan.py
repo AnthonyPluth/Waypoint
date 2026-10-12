@@ -14,7 +14,7 @@ from sqlalchemy import delete, select, update
 
 from ... import dates, monitoring
 from ...providers import gmail, mailimages
-from ...storage import db, stored_mail
+from ...storage import db, gate_codes, stored_mail
 from ...storage.models import Mailbox, ScannedMessage
 from ...storage.stored_mail import Content
 from .. import loyalty, people
@@ -210,6 +210,24 @@ def _keep_quietly(mailbox_id: int, message_id: str, raw: dict[str, Any], segment
         monitoring.report(e, values=False)
 
 
+def keep_code(mailbox_id: int, segment_id: int, raw: dict[str, Any], now: float) -> None:
+    with db.session() as conn:
+        if not gate_codes.is_parking(conn, segment_id):
+            return
+    content, images = extract.keep(raw, mailimages.Fetcher())
+    with db.session() as conn:
+        gate_codes.offer(conn, segment_id, mailbox_id, images, content["received"], now)
+
+
+def _keep_code_quietly(mailbox_id: int, segment_id: int, raw: dict[str, Any], now: float) -> None:
+    try:
+        keep_code(mailbox_id, segment_id, raw, now)
+    except Exception as e:
+        if db.is_busy(e):
+            raise
+        monitoring.report(e, values=False)
+
+
 def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str, message: extract.Message,
           ignored: list[str], now: float, why: Counter[str] | None = None, again: bool = False,
           backfill: bool = False, strong: bool = True, follow: list[followup.Followed] | None = None,
@@ -248,9 +266,9 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     usable = len(message.bookings) - failed
     queued = 0
     if failed or message.unread or not usable:
-        if not strong and not message.bookings and not message.unread and not message.markup:
-            return made, 0, None, SKIPPED
         attached = followup.attach(conn, viewer, message)
+        if attached is None and not strong and not message.bookings and not message.unread and not message.markup:
+            return made, 0, None, SKIPPED
         if attached is not None:
             if follow is not None:
                 follow.append(attached)
@@ -472,6 +490,8 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 a, b, wanted, outcome = 0, 1, [], UNREADABLE
             if wanted is not None:
                 _keep_quietly(mailbox_id, message_id, raw, wanted, now)
+            if followed:
+                _keep_code_quietly(mailbox_id, followed[0].segment_id, raw, now)
             if outcome is not None:
                 with db.session() as conn:
                     _record(conn, mailbox_id, message_id, outcome, now, segment_id=followed[0].segment_id if followed else None)

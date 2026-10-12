@@ -212,6 +212,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_flight_import.py",
+        "tests/test_gate_codes.py",
         "tests/test_mail_scan.py",
         "tests/test_mcp_routes.py",
         "tests/test_routes.py",
@@ -395,6 +396,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_gate_codes.py",
         "tests/test_mail_scan.py",
         "tests/test_mcp_routes.py",
         "tests/test_offline.py",
@@ -413,6 +415,7 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_gate_codes.py",
         "tests/test_logos.py",
         "tests/test_mail_scan.py",
         "tests/test_mcp.py",
@@ -442,6 +445,7 @@
       "path": "/api/segments/{id}/emails",
       "handler": "waypoint/server/api/trips.py:api_segment_emails",
       "web": [
+        "frontend/src/lib/components/GateCode.svelte",
         "frontend/src/pages/Trip.svelte"
       ],
       "tests": [
@@ -468,6 +472,38 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/segments/{id}/code",
+      "handler": "waypoint/server/api/trips.py:api_segment_code",
+      "web": [],
+      "tests": [
+        "tests/test_mcp.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/segments/{id}/code",
+      "handler": "waypoint/server/api/trips.py:api_segment_code_choose",
+      "web": [
+        "frontend/src/lib/components/GateCode.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_gate_codes.py",
+        "tests/test_mcp.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/segments/{id}",
       "handler": "waypoint/server/api/trips.py:api_segment_edit",
@@ -476,6 +512,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_gate_codes.py",
         "tests/test_logos.py",
         "tests/test_mail_scan.py",
         "tests/test_mcp.py",

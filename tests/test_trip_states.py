@@ -2,13 +2,20 @@ import unittest
 
 from tests.privacy import no_leaks
 from tests.test_trip_roads import DENVER, SALT_LAKE
-from tests.test_trips import HOTEL, RouteCase
+from tests.test_trips import HOTEL, OUT, RouteCase
 from waypoint.domain import tripmap
+from waypoint.storage import states
+
+
+FLY = {**OUT, "start_local": "2026-06-02T08:00", "end_local": "2026-06-02T14:00"}
 
 
 class TripStateLinesTests(RouteCase):
     def places(self, trip, who="ana"):
         return self.ok(who, "GET", f"/api/trips/{trip}/places")
+
+    def steps(self, lines):
+        return sum(len(line["points"]) - 1 for line in lines)
 
     def test_a_stay_in_the_united_states_gets_the_state_lines_around_it(self):
         first = self.book("ana", DENVER)
@@ -17,16 +24,48 @@ class TripStateLinesTests(RouteCase):
         for line in got:
             self.assertEqual(sorted(line), ["points"])
             self.assertGreaterEqual(len(line["points"]), 2)
-            self.assertTrue(all(len(p) == 2 and 25 < p[0] < 50 and -125 < p[1] < -85 for p in line["points"]))
+            self.assertTrue(all(len(p) == 2 and 24 < p[0] < 50 and -130 < p[1] < -75 for p in line["points"]))
         self.assertTrue(any(abs(p[1] + 109.05) < 0.1 for line in got for p in line["points"]))
 
     def test_a_drive_between_two_stays_gets_the_lines_along_the_whole_road(self):
         first = self.book("ana", DENVER)
-        single = self.places(first["trip_id"])["boundaries"]
         self.book("ana", SALT_LAKE, trip_id=first["trip_id"])
         both = self.places(first["trip_id"])["boundaries"]
-        self.assertGreater(sum(len(line["points"]) for line in both), sum(len(line["points"]) for line in single))
-        self.assertTrue(any(p[1] < -112 for line in both for p in line["points"]))
+        points = [p for line in both for p in line["points"]]
+        self.assertTrue(any(p[1] < -112 for p in points))
+        self.assertTrue(any(abs(p[1] + 109.05) < 0.1 for p in points))
+        self.assertTrue(any(abs(p[1] + 111.05) < 0.1 for p in points))
+
+    def test_a_long_flight_gets_the_borders_between_its_two_ends(self):
+        first = self.book("ana", {**FLY, "origin": "SEA", "destination": "MIA"})
+        got = self.places(first["trip_id"])["boundaries"]
+        points = [p for line in got for p in line["points"]]
+        for lon in (-110.0, -100.0, -90.0, -85.0):
+            self.assertTrue(any(abs(p[1] - lon) < 1.0 and 28 < p[0] < 46 for p in points), lon)
+        self.assertTrue(any(30.0 < p[0] < 31.2 and -88 < p[1] < -81 for p in points))
+        self.assertTrue(any(33.5 < p[0] < 35.2 and -85 < p[1] < -75 for p in points))
+        self.assertLessEqual(self.steps(got), 1500)
+
+    def test_a_flight_with_a_stop_gets_the_borders_under_each_leg(self):
+        first = self.book("ana", {**FLY, "origin": "MSP", "destination": "ATL"})
+        self.book("ana", {**FLY, "origin": "ATL", "destination": "FLL", "start_local": "2026-06-02T09:00", "end_local": "2026-06-02T11:00"}, trip_id=first["trip_id"])
+        points = [p for line in self.places(first["trip_id"])["boundaries"] for p in line["points"]]
+        self.assertTrue(any(33.5 < p[0] < 35.2 and -86 < p[1] < -82 for p in points))
+        self.assertTrue(any(30.0 < p[0] < 31.2 and -88 < p[1] < -81 for p in points))
+
+    def test_a_trip_in_one_state_stays_small_and_leaves_out_the_far_coasts(self):
+        first = self.book("ana", DENVER)
+        got = self.places(first["trip_id"])["boundaries"]
+        self.assertLess(self.steps(got), 1400)
+        self.assertLess(len(repr(got)), 32_000)
+        points = [p for line in got for p in line["points"]]
+        self.assertFalse(any(p[1] > -80 for p in points))
+        self.assertFalse(any(p[0] < 27 for p in points))
+
+    def test_a_cross_country_trip_is_smaller_than_the_whole_file(self):
+        first = self.book("ana", {**FLY, "origin": "SEA", "destination": "MIA"})
+        got = self.places(first["trip_id"])["boundaries"]
+        self.assertLess(len(repr(got)), 45_000)
 
     def test_the_lines_are_capped(self):
         first = self.book("ana", DENVER)
@@ -66,6 +105,48 @@ class TripStateLinesTests(RouteCase):
 class StateLineRuleTests(unittest.TestCase):
     def test_nothing_to_look_near_gives_nothing(self):
         self.assertEqual(tripmap.state_lines([], []), [])
+
+    def test_the_extent_covers_a_flight_s_great_circle_and_the_view_around_it(self):
+        sea, mia = (47.45, -122.31), (25.79, -80.29)
+        south, west, north, east = tripmap.map_extent([sea, mia], [], [(sea, mia)])
+        self.assertLessEqual(south, 25.79)
+        self.assertGreaterEqual(north, 47.45)
+        self.assertLessEqual(west, -122.31)
+        self.assertGreaterEqual(east, -80.29)
+        bulge = tripmap.map_extent([sea, mia], [], [(sea, mia)])
+        self.assertEqual(bulge, tripmap.map_extent([sea, mia], [], [(mia, sea)]))
+
+    def test_a_flight_over_the_pole_side_bulges_the_extent_beyond_its_ends(self):
+        a, b = (40.0, -120.0), (40.0, -60.0)
+        flat = tripmap.map_extent([a, b], [], [])
+        arced = tripmap.map_extent([a, b], [], [(a, b)])
+        self.assertGreater(arced[2], flat[2])
+
+    def test_a_small_trip_still_gets_the_view_around_it(self):
+        south, west, north, east = tripmap.map_extent([(39.74, -104.99)], [], [])
+        self.assertGreater(north - south, 10)
+        self.assertGreater(east - west, 10)
+        self.assertLess(east - west, 60)
+
+    def test_the_extent_stays_on_the_globe(self):
+        south, west, north, east = tripmap.map_extent([(-84.0, 179.0), (84.0, -179.0)], [], [((-84.0, 179.0), (84.0, -179.0))])
+        self.assertTrue(south >= -85 and north <= 85 and west >= -180 and east <= 180)
+
+    def test_a_flight_between_the_same_place_or_opposite_places_does_not_break_the_arc(self):
+        here = (39.74, -104.99)
+        self.assertEqual(tripmap._arc(here, here), [here, here])
+        self.assertEqual(len(tripmap._arc((10.0, 0.0), (-10.0, 180.0))), tripmap.ARC_STEPS + 1)
+        self.assertEqual(tripmap._arc((0.0, 0.0), (0.0, 180.0)), [(0.0, 0.0), (0.0, 180.0)])
+
+    def test_a_long_flight_s_extent_gives_the_borders_between_its_ends(self):
+        sea, mia = (47.45, -122.31), (25.79, -80.29)
+        lines = tripmap.state_lines([sea, mia], [], [(sea, mia)])
+        self.assertTrue(any(abs(p[1] + 100) < 1 for line in lines for p in line["points"]))
+        self.assertEqual([line for line in tripmap.state_lines([sea, mia], [])], tripmap.state_lines([sea, mia], []))
+
+    def test_the_lines_stay_inside_the_step_budget(self):
+        lines = tripmap.state_lines([(47.45, -122.31), (25.79, -80.29)], [], [((47.45, -122.31), (25.79, -80.29))])
+        self.assertLessEqual(sum(len(line["points"]) - 1 for line in lines), states.BUDGET)
 
     def test_the_points_are_rounded_to_about_a_hundred_metres(self):
         lines = tripmap.state_lines([(39.74, -104.99)], [])
