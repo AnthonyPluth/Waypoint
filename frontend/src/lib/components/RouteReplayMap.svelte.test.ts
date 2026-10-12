@@ -130,6 +130,15 @@ describe("RouteReplayMap", () => {
     expect(label.textContent).toContain("Dec 5");
   });
 
+  it("pins every stop label in the top-left corner of the map", () => {
+    const { container } = render(RouteReplayMap, { stops, year: 2025, still: true });
+    const pins = new Set([...container.querySelectorAll("[data-label]")].map((l) => l.parentElement));
+    expect(pins.size).toBe(1);
+    const pin = [...pins][0]!;
+    expect(pin.classList.contains("left-2") && pin.classList.contains("top-2")).toBe(true);
+    expect(pin.hasAttribute("style")).toBe(false);
+  });
+
   it("flies a plane along each flight, there and back, hidden from assistive technology", async () => {
     const { container } = render(RouteReplayMap, { stops, year: 2025, still: false });
     expect(container.querySelector("[data-plane]")).toBeNull();
