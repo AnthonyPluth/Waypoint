@@ -1,5 +1,6 @@
 import gzip
 import unittest
+from unittest import mock
 from pathlib import Path
 from datetime import UTC, datetime
 
@@ -99,6 +100,22 @@ class HistoricalVisitTests(StatsCase):
         for bad in (None, "", "ZZ", "Japan"):
             with self.assertRaises(trips.Invalid):
                 self.add(self.jane, {**VISIT_JP, "destination": bad})
+
+
+class SameNamePlaceTests(StatsCase):
+    def test_a_city_sharing_its_name_with_a_far_away_airport_is_placed_at_the_larger_city(self):
+        got = stats.points_of(self.c, {"juneau": "US"})
+        self.assertAlmostEqual(got["juneau"][0], 58.30, delta=0.1)
+        self.assertAlmostEqual(got["juneau"][1], -134.42, delta=0.1)
+
+    def test_a_city_with_one_airport_is_placed_at_it(self):
+        got = stats.points_of(self.c, {"skagway": "US"})
+        self.assertAlmostEqual(got["skagway"][0], 59.46, delta=0.01)
+
+    def test_same_named_airports_far_apart_with_no_larger_city_listed_are_left_unplaced(self):
+        with mock.patch.object(stats.reference, "city_points", return_value={}):
+            got = stats.points_of(self.c, {"juneau": "US"})
+        self.assertNotIn("juneau", got)
 
 
 class FlightTests(StatsCase):
