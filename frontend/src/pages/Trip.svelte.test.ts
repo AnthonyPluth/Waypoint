@@ -936,6 +936,25 @@ describe("Trip", () => {
       expect(screen.getByText("Embarks")).toBeInTheDocument();
     });
 
+    it("shows the traveller's cruise-line membership number masked on the cruise card", async () => {
+      loyalty = [membership({ id: 31, person_id: 1, kind: "cruise", program: "Disney Castaway Club", masked: "••••0042" })];
+      held = trip([{ ...ship, provider: "Disney Cruise Line", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] }]);
+      render(TripPage);
+      await screen.findByRole("heading", { name: "Example Voyager · Miami" });
+      const line = document.querySelector("[data-membership]")!;
+      expect(line).toHaveTextContent("Disney Castaway Club");
+      expect(line).toHaveTextContent("••••0042");
+      expect(within(line as HTMLElement).getByRole("button", { name: /Show/ })).toBeInTheDocument();
+    });
+
+    it("shows no membership on a cruise from a line with no program saved for the traveller", async () => {
+      loyalty = [membership({ id: 31, person_id: 1, kind: "cruise", program: "Disney Castaway Club", masked: "••••0042" })];
+      held = trip([{ ...ship, provider: "Carnival Cruise Line", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] }]);
+      render(TripPage);
+      await screen.findByRole("heading", { name: "Example Voyager · Miami" });
+      expect(document.querySelector("[data-membership]")).toBeNull();
+    });
+
     it("shows no ports section for a cruise without any", async () => {
       held = trip([{ ...ship, itinerary: [], days: [] }]);
       render(TripPage);

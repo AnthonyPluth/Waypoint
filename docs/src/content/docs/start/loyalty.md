@@ -1,6 +1,6 @@
 ---
 title: Loyalty and Known Traveler numbers
-description: Where the household keeps frequent-flyer, hotel, car, TSA PreCheck and Global Entry numbers, and how Waypoint protects them.
+description: Where the household keeps frequent-flyer, hotel, car, cruise, TSA PreCheck and Global Entry numbers, and how Waypoint protects them.
 sidebar:
   order: 4
 ---
@@ -9,9 +9,10 @@ Each person on the [People](/Waypoint/start/people/) page, member or guest, has 
 
 ## What you can keep
 
-A membership has a **kind**, a **program**, a **number**, and optionally notes. Known Traveler and redress numbers can also have an expiry date; an airline, hotel or car program’s number doesn’t expire, so those have none.
+A membership has a **kind**, a **program**, a **number**, and optionally notes. Known Traveler and redress numbers can also have an expiry date; an airline, hotel, car or cruise program’s number doesn’t expire, so those have none.
 
 - **Airline**, **hotel** and **car** programs, such as American AAdvantage, Marriott Bonvoy or Hertz Gold Plus Rewards.
+- **Cruise**: a cruise line's club, such as Disney Castaway Club, Royal Caribbean Crown & Anchor Society, Celebrity Captain's Club, Norwegian Latitudes Rewards, Princess Captain's Circle, Holland America Mariner Society, MSC Voyagers Club, Virgin Voyages Sailing Club, Cunard World Club, Oceania Club or Carnival Rewards (the program that replaced the VIFP Club). The number is kept as you type it; Waypoint doesn't check its format. On a cruise booking from that line, the trip page shows the traveller's number, masked, under **Loyalty**.
 - **Known Traveler**: TSA PreCheck, Global Entry, NEXUS or SENTRI.
 - **Redress**: a DHS TRIP number.
 

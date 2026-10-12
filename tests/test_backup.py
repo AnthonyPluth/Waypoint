@@ -182,6 +182,20 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(backup.unreadable_secrets(dst), [])
         src.close(); dst.close()
 
+    def test_a_cruise_membership_comes_back_exact_and_encrypted(self):
+        src = db.connect(self.a)
+        src.execute(insert(Person).values(id=41, display_name="Zoë"))
+        src.execute(insert(LoyaltyId).values(person_id=41, kind="cruise", program="Disney Castaway Club",
+                                             number=secretbox.encrypt("CRUISE-BACKUP-0042"), expiry=None, notes=None))
+        src.commit()
+        raw = backup.dump(src)
+        self.assertNotIn(b"CRUISE-BACKUP-0042", raw)
+        dst = db.connect(self.b)
+        backup.restore(dst, backup.load(raw))
+        dst.commit()
+        self.assertEqual(self.loyalty_rows(dst), [(41, "cruise", "Disney Castaway Club", "CRUISE-BACKUP-0042", None, None)])
+        src.close(); dst.close()
+
     def test_restoring_under_another_key_names_the_loyalty_numbers(self):
         src = db.connect(self.a)
         pid = 40
