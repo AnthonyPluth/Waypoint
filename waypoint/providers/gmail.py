@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 import base64
 import contextlib
+import functools
 import hashlib
 import json
 import os
@@ -346,16 +347,25 @@ def labels(token: str, counts: bool = True) -> list[dict[str, Any]]:
     return sorted(out, key=lambda x: x["name"].casefold())
 
 
+def search_pages(token: Callable[[], str], query: str, label: str | None = None) -> Iterator[list[str]]:
+    page: str | None = None
+    while True:
+        params = {**({"labelIds": label} if label else {"q": query}), "maxResults": str(SEARCH_PAGE), **({"pageToken": page} if page else {})}
+        found = _retrying(functools.partial(_api, "/messages", token(), params))
+        listed = found.get("messages")
+        ids = [str(m["id"]) for m in listed or [] if isinstance(m, dict) and m.get("id")]
+        if ids:
+            yield ids
+        page = found.get("nextPageToken")
+        if not page:
+            return
+
+
 def search(token: str, query: str, label: str | None = None) -> list[str]:
     ids: list[str] = []
-    page: str | None = None
-    while len(ids) < MAX_FOUND:
-        params = {**({"labelIds": label} if label else {"q": query}), "maxResults": str(SEARCH_PAGE), **({"pageToken": page} if page else {})}
-        found = _api("/messages", token, params)
-        listed = found.get("messages") if isinstance(found, dict) else None
-        ids += [str(m["id"]) for m in listed or [] if isinstance(m, dict) and m.get("id")]
-        page = found.get("nextPageToken") if isinstance(found, dict) else None
-        if not page:
+    for page in search_pages(lambda: token, query, label):
+        ids += page
+        if len(ids) >= MAX_FOUND:
             break
     return ids[:MAX_FOUND]
 

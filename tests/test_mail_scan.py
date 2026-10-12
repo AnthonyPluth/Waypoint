@@ -8,6 +8,7 @@ import threading
 import time
 import unittest
 import urllib.parse
+from collections import Counter
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest import mock
@@ -99,6 +100,9 @@ class FakeGmail(FakeGoogle):
             page = int(q.get("pageToken") or 0)
             ids = g.matches[page * g.page:(page + 1) * g.page]
             out = {"messages": [{"id": i, "threadId": i} for i in ids]} if ids else {"resultSizeEstimate": 0}
+            if g.list_rate_limited > 0:
+                g.list_rate_limited -= 1
+                return self.reply({"error": "rateLimitExceeded"}, 429)
             if (page + 1) * g.page < len(g.matches):
                 out["nextPageToken"] = str(page + 1)
             return self.reply(out)
@@ -139,7 +143,7 @@ def reset(g) -> None:
     g.grants.clear(); g.live.clear(); g.revoked.clear(); g.calls.clear(); g.owners.clear(); g.emails.clear()
     g.refresh_fails, g.revoke_status = None, 200
     g.mail, g.matches, g.added, g.queries, g.fetched, g.history_calls = {}, [], [], [], [], []
-    g.rate_limited = 0
+    g.rate_limited = g.list_rate_limited = 0
     g.fail_on, g.history_gone, g.history_id, g.page = None, False, "200", 100
     g.heads, g.snippets, g.labels = [], {}, {}
     g.mailbox_labels, g.label_mail, g.label_queries = [], {}, []
@@ -235,6 +239,14 @@ class SearchTests(ScanCase):
         self.assertEqual(self.scan().state, "done")
         [q] = self.google.queries
         self.assertEqual(q, "-in:spam -in:trash after:2025/03/23")
+
+    def test_a_search_for_a_look_back_has_no_date_and_the_others_keep_theirs(self):
+        self.assertEqual(query.build(None), "-in:spam -in:trash")
+        self.assertEqual(query.build(None, ["b.example", "a.example"]), "-in:spam -in:trash -from:a.example -from:b.example")
+        self.assertEqual(self.scan().state, "done")
+        self.assertEqual(self.scan(now=NOW + 4 * 3600).state, "done")
+        self.assertEqual(self.scan(now=NOW + 8 * 3600, backfill=True).state, "done")
+        self.assertEqual(self.google.queries, ["-in:spam -in:trash after:2025/03/23", "-in:spam -in:trash after:2026/09/19", "-in:spam -in:trash"])
 
     def test_the_search_covers_booking_agencies_travel_portals_and_cruise_lines(self):
         senders = set(query.SENDERS)
@@ -1553,7 +1565,7 @@ class LaterScanTests(ScanCase):
         self.assertEqual((result.state, result.messages), ("done", 1))
         self.assertEqual(self.google.fetched, ["msg-hotel_jsonld"])
         self.assertEqual(len(self.google.history_calls), calls)
-        self.assertTrue(self.google.queries[-1].endswith("after:2025/03/23"), self.google.queries[-1])
+        self.assertEqual(self.google.queries[-1], "-in:spam -in:trash")
         self.assertEqual(len(self.segments()), 2)
         self.assertEqual({k: self.row()[k] for k in ("last_scan", "history_id", "scan_error")},
                          {k: before[k] for k in ("last_scan", "history_id", "scan_error")})
@@ -1630,6 +1642,102 @@ class LaterScanTests(ScanCase):
         self.scan()
         self.assertEqual(len(self.google.history_calls), 0)
         self.assertTrue(all(q.endswith("after:2025/03/23") for q in self.google.queries))
+
+
+class WholeInboxLookBackTests(ScanCase):
+    NAMES = ("flight_jsonld", "hotel_jsonld", "car_jsonld", "train_jsonld")
+
+    def years(self, count):
+        for n in range(count):
+            self.add_mail(f"old{n}", plain_mail(LOOKALIKES[0][0], f"Your verification code {n}", "Your code is 482913. Use it to sign in."))
+
+    def test_a_look_back_goes_on_over_follow_up_scans_through_every_page_of_the_inbox_and_reads_each_message_once(self):
+        self.google.page = 2
+        self.put(*self.NAMES)
+        self.years(5)
+        with no_leaks(self, *CANARIES, database=self.path), mock.patch.object(scan, "BUDGET", -1):
+            last = scan.run(self.mailbox, TODAY, backfill=True)
+        self.assertEqual((last.state, last.capped), ("done", False))
+        self.assertEqual(set(self.google.queries), {"-in:spam -in:trash"})
+        self.assertEqual(len(self.scanned()), 9)
+        self.assertEqual(sorted(self.google.fetched), sorted(f"msg-{n}" for n in self.NAMES))
+        self.assertEqual(len(self.segments()), 4)
+        self.assertEqual(self.google.heads, [m for m in self.google.matches])
+        self.assertIsNone(self.row()["last_scan"])
+        self.assertEqual(self.row()["history_id"], "100")
+
+    def test_each_page_is_listed_only_when_the_scan_reaches_it(self):
+        self.google.page = 2
+        self.years(6)
+        with mock.patch.object(scan, "BUDGET", -1):
+            first = self.scan(backfill=True)
+        self.assertEqual((first.capped, len(self.google.queries), len(self.google.heads)), (True, 1, 1))
+        self.assertEqual(len(self.scanned()), 1)
+
+    def test_a_follow_up_passes_what_is_already_read_without_asking_google_about_it_again(self):
+        self.google.page = 2
+        self.years(6)
+        with mock.patch.object(scan, "BUDGET", -1), mock.patch.object(scan, "MAX_CHAIN", 1):
+            self.assertTrue(scan.run(self.mailbox, TODAY, backfill=True).capped)
+        done = set(self.scanned())
+        self.assertEqual(len(done), 2)
+        self.google.heads.clear()
+        self.assertFalse(self.scan(now=NOW + 60, backfill=True).capped)
+        self.assertEqual(self.google.heads, [m for m in self.google.matches if m not in done])
+        self.assertEqual(len(self.scanned()), 6)
+
+    def test_a_look_back_is_not_cut_off_at_the_most_a_dated_search_lists(self):
+        self.google.page = 2
+        self.years(7)
+        with mock.patch.object(gmail, "MAX_FOUND", 3):
+            self.scan(backfill=True)
+        self.assertEqual(len(self.scanned()), 7)
+
+    def test_the_dated_search_still_stops_at_the_most_it_lists(self):
+        self.google.page = 2
+        self.years(7)
+        self.google.owners["tok"] = ADDRESS
+        with mock.patch.object(gmail, "MAX_FOUND", 3):
+            self.assertEqual(gmail.search("tok", "q"), self.google.matches[:3])
+        self.assertEqual(len(list(gmail.search_pages(lambda: "tok", "q"))), 4)
+
+    def test_google_slowing_the_listing_down_is_waited_out_during_a_look_back(self):
+        self.years(2)
+        self.google.list_rate_limited = 2
+        with mock.patch("waypoint.providers.gmail.time.sleep") as slept:
+            result = self.scan(backfill=True)
+        self.assertEqual((result.state, len(self.scanned())), ("done", 2))
+        self.assertEqual([c.args[0] for c in slept.call_args_list], [1, 2])
+
+    def test_a_look_back_that_cannot_list_stops_and_keeps_what_it_read(self):
+        self.google.page = 1
+        self.years(3)
+        self.google.list_rate_limited = 100
+        with mock.patch("waypoint.providers.gmail.time.sleep"):
+            result = self.scan(backfill=True)
+        self.assertEqual(result.state, "failed")
+        self.assertIn("slow down", result.error)
+        self.assertEqual(self.scanned(), {})
+
+    def test_the_already_read_check_asks_the_database_in_pieces_and_keeps_the_order(self):
+        ids = [f"id{n:05d}" for n in range(40000)]
+        with db.session() as conn:
+            for mid in ids[:700]:
+                scan._record(conn, self.mailbox, mid, "skipped", NOW)
+        tally: Counter[str] = Counter()
+        fresh = list(scan._unread(self.mailbox, [ids[:35000], ids[35000:]], True, tally))
+        self.assertEqual(fresh, ids[700:])
+        self.assertEqual((tally["found"], tally["pending"]), (40000, 39300))
+        self.assertEqual(list(scan._unread(self.mailbox, [ids[:10]], False, Counter())), ids[:10])
+
+    def test_a_look_back_after_the_first_scan_leaves_the_scan_state_and_summary_alone(self):
+        self.put("flight_jsonld")
+        self.scan()
+        before = self.row()
+        self.years(3)
+        self.scan(now=NOW + 60, backfill=True)
+        after = self.row()
+        self.assertEqual({k: after[k] for k in ("last_scan", "history_id", "scan_summary")}, {k: before[k] for k in ("last_scan", "history_id", "scan_summary")})
 
 
 class FailureTests(ScanCase):
