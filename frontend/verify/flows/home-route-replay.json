@@ -1,0 +1,29 @@
+{
+  "name": "home-route-replay",
+  "page": "settings",
+  "steps": [
+    { "goto": "#settings/travel" },
+    { "wait_for": "#home-title" },
+    { "fill": { "selector": "label:has-text('City') input", "text": "Kansas City" } },
+    { "fill": { "selector": "label:has-text('State or region') input", "text": "MO" } },
+    { "click": "button:has-text('Save') >> visible=true" },
+    { "wait_for": "button:has-text('Clear'):not([disabled])" },
+    { "goto": "#trips" },
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Denver') >> visible=true" },
+    { "wait_for": "h1:has-text('Denver')" },
+    { "wait_for": "section[aria-label='Route replay'] [data-testid='replay-map']" },
+    { "wait_for": "label:has-text('Start and end at home')" },
+    { "expect_text": { "selector": "[data-testid='stop-list']", "text": "Kansas City" } },
+    { "press": { "selector": "input[aria-label='Position along the route']", "key": "Home" } },
+    { "wait_for": "[data-label='Kansas City'][data-visible='true']" },
+    { "screenshot": "start" },
+    { "press": { "selector": "input[aria-label='Position along the route']", "key": "End" } },
+    { "expect_text": { "selector": "[data-testid='stop-list']", "text": "Back in Kansas City" } },
+    { "screenshot": "end" },
+    { "goto": "#settings/travel" },
+    { "wait_for": "button:has-text('Clear'):not([disabled])" },
+    { "click": "button:has-text('Clear') >> visible=true" },
+    { "wait_for": "button:has-text('Clear')[disabled]" }
+  ]
+}
