@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from sqlalchemy import select
 
 from ..storage import db
-from ..storage.models import Airport
+from ..storage.geocode import Precision
+from ..storage.models import Airport, Segment
 from . import stats, trips
 from .visibility import Viewer
 
@@ -23,9 +24,17 @@ class CityPoint(TypedDict):
     longitude: float
 
 
+class StayPoint(TypedDict):
+    segment_id: int
+    latitude: float
+    longitude: float
+    precision: Precision
+
+
 class Places(TypedDict):
     airports: list[AirportPoint]
     cities: list[CityPoint]
+    stays: list[StayPoint]
 
 
 def _names(segment: trips.SegmentOut) -> set[str]:
@@ -45,8 +54,12 @@ def places(conn: db.Connection, viewer: Viewer, trip_id: int) -> Places | None:
         if s["kind"] in ("hotel", "car", "train", "cruise"):
             cities |= _names(s)
     found = conn.orm.scalars(select(Airport).where(Airport.code.in_(sorted(codes)))).all()
+    stored = conn.orm.scalars(select(Segment).where(Segment.id.in_([s["id"] for s in live if s["kind"] != "flight"]),
+                                                    Segment.latitude.is_not(None), Segment.longitude.is_not(None)).order_by(Segment.id)).all()
     points = stats.points_of(conn, stats.countries_of(conn, cities))
     return {
         "airports": [{"code": a.code, "city": a.city, "latitude": a.latitude, "longitude": a.longitude} for a in sorted(found, key=lambda a: a.code)],
         "cities": [{"city": c, "latitude": points[c][0], "longitude": points[c][1]} for c in sorted(points)],
+        "stays": [{"segment_id": g.id, "latitude": g.latitude, "longitude": g.longitude, "precision": cast(Precision, g.geo_precision or "city")}
+                  for g in stored if g.latitude is not None and g.longitude is not None],
     }

@@ -1003,6 +1003,14 @@ export interface TripList {
 export interface TripPlaces {
   airports: TripAirportPoint[];
   cities: TripCityPoint[];
+  stays: TripStayPoint[];
+}
+
+export interface TripStayPoint {
+  segment_id: number;
+  latitude: number;
+  longitude: number;
+  precision: "airport" | "zip" | "city";
 }
 
 export interface UnignoreBody {

@@ -1196,6 +1196,33 @@ class TripPlacesRouteTests(RouteCase):
         self.assertEqual([c["city"] for c in got["cities"]], ["london"])
         self.assertAlmostEqual(got["cities"][0]["latitude"], 51.5, delta=1.5)
 
+    def test_stored_points_of_the_non_flight_bookings_without_anything_about_people(self):
+        canary_name, canary_code = "Quentin Marlowe-Zzyx", "ZQXW7413"
+        with no_leaks(self, canary_name, canary_code):
+            flight = self.book("ana")
+            trip = flight["trip_id"]
+            stay = self.book("ana", {**HOTEL, "destination": "Boulder", "confirmation": canary_code,
+                                     "details": {"address": "100 Pearl Street, Boulder, CO 80302"},
+                                     "travelers": [{"person_id": None, "name": canary_name}]}, trip_id=trip)
+            car = self.book("ana", {**HOTEL, "kind": "car", "origin": "SFO airport", "destination": "SFO airport", "start_zone": "America/Los_Angeles",
+                                    "end_zone": "America/Los_Angeles"}, trip_id=trip)
+            self.book("ana", {**HOTEL, "origin": "Nowhere Inn", "destination": "Nowhereville"}, trip_id=trip)
+            cancelled = self.book("ana", {**HOTEL, "destination": "Boulder", "status": "cancelled"}, trip_id=trip)
+            got = self.ok("ana", "GET", f"/api/trips/{trip}/places")
+            by = {s["segment_id"]: s for s in got["stays"]}
+            self.assertEqual(set(by), {stay["id"], car["id"]})
+            self.assertNotIn(cancelled["id"], by)
+            self.assertEqual(by[stay["id"]]["precision"], "zip")
+            self.assertEqual(by[car["id"]]["precision"], "airport")
+            self.assertEqual(sorted(by[stay["id"]]), ["latitude", "longitude", "precision", "segment_id"])
+            self.assertAlmostEqual(by[stay["id"]]["latitude"], 40.0, delta=0.15)
+            self.assertNotIn(canary_name, repr(got))
+            self.assertNotIn(canary_code, repr(got))
+
+    def test_a_trip_you_cannot_see_gives_no_stored_points(self):
+        stay = self.book("ana", {**HOTEL, "destination": "Boulder"})
+        self.assertEqual(self.call("ben", "GET", f"/api/trips/{stay['trip_id']}/places")[0], 404)
+
     def test_a_cancelled_segment_adds_no_place(self):
         seg = self.book("ana")
         self.book("ana", {**HOTEL, "destination": "Paris", "status": "cancelled"}, trip_id=seg["trip_id"])
