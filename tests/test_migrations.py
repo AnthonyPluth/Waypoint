@@ -638,6 +638,42 @@ class MigrationTests(unittest.TestCase):
             self.assertIsNone(c.execute(select(schema.review_items.c.reference)).scalar())
         self.assertEqual(drift(self.path), [])
 
+    def test_0028_marks_the_destinations_a_person_wrote_and_leaves_the_ones_waypoint_made_automatic(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            self.assertIn("destination_manual", {col["name"] for col in sa.inspect(c).get_columns("trips")})
+            command.downgrade(db.alembic_config(c), "0027")
+            self.assertNotIn("destination_manual", {col["name"] for col in sa.inspect(c).get_columns("trips")})
+            made = {1: "Denver", 2: "Colorado & Texas", 3: None, 4: "", 5: "Paris", 6: "Harbour Hotel", 7: "Lake", 8: "Seattle, WA", 9: "Orlando"}
+            for trip_id, destination in made.items():
+                c.execute(insert(schema.trips).values(id=trip_id, name=f"trip {trip_id}", auto=trip_id != 7, destination=destination))
+
+            def add(seg_id, trip_id, kind, origin, destination):
+                c.execute(insert(schema.segments).values(
+                    id=seg_id, trip_id=trip_id, kind=kind, status="confirmed", origin=origin, destination=destination,
+                    start_local="2026-11-01T15:00", start_zone="Europe/London", end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual"))
+            add(1, 1, "flight", "JFK", "DEN")
+            add(2, 2, "flight", "JFK", "DEN")
+            add(3, 3, "flight", "JFK", "DEN")
+            add(4, 4, "flight", "JFK", "DEN")
+            add(5, 5, "hotel", "Hôtel du Parc", "Paris")
+            add(6, 6, "hotel", "Harbour Hotel", None)
+            add(8, 8, "flight", "JFK", "SEA")
+            add(9, 9, "flight", "JFK", "MCO")
+            add(10, 9, "flight", "MCO", "JFK")
+            add(11, 1, "flight", "DEN", "DFW")
+            command.upgrade(db.alembic_config(c), "head")
+            flags = dict(c.execute(select(schema.trips.c.id, schema.trips.c.destination_manual)).all())
+            self.assertEqual({k: bool(v) for k, v in flags.items()},
+                             {1: False, 2: True, 3: False, 4: False, 5: False, 6: False, 7: True, 8: True, 9: False})
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 10)
+            self.assertEqual(dict(c.execute(select(schema.trips.c.id, schema.trips.c.destination)).all()), {**made, 4: ""})
+            command.downgrade(db.alembic_config(c), "0027")
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 10)
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:

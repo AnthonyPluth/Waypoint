@@ -4,7 +4,7 @@ import os
 from datetime import UTC, datetime
 
 from ...domain import trips
-from ...domain.mail import review
+from ...domain.mail import ai, review
 from ...storage import db
 from ...storage import settings_keys as sk
 from ..common import _current
@@ -22,6 +22,7 @@ def api_state(conn, _q, _b) -> State:
         "last_backup": with_offset(db.get_setting(conn, sk.LAST_BACKUP)),
         "review_count": review.count(conn, owner()) + trips.unmatched_count(conn, viewer(conn)),
         "person_id": viewer(conn).person_id,
+        "ai": ai.config(conn) is not None,
     }
 
 

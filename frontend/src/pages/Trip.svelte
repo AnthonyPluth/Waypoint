@@ -25,6 +25,7 @@
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import RouteReplay from "$lib/components/RouteReplay.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
+  import TripDestination from "$lib/components/TripDestination.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
   import { appWord, bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, showBookingTravellers, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink } from "$lib/trips";
@@ -239,7 +240,7 @@
           <Button variant="ghost" size="icon" class="mt-1 shrink-0" aria-label="Rename trip" onclick={() => { renaming = t.name; renameError = ""; }}><Pencil /></Button>
         </div>
       {/if}
-      <p class="text-muted-foreground">{dates(t)}{t.destination ? ` · ${t.destination}` : ""}</p>
+      <TripDestination trip={t} dates={dates(t)} onsaved={(next) => { trip = next; onchanged?.(); }} />
       {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
         <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
       {/if}

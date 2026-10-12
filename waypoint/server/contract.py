@@ -25,6 +25,7 @@ class State(TypedDict):
     last_backup: str | None
     review_count: int
     person_id: int | None
+    ai: bool
 
 
 class BackupContents(TypedDict):
@@ -453,6 +454,7 @@ class Trip(TypedDict):
     start_date: str | None
     end_date: str | None
     destination: str | None
+    destination_manual: bool
     notes: str | None
     auto: bool
     booked_by: int | None
@@ -489,6 +491,10 @@ class TripBody(TypedDict):
     notes: NotRequired[str | None]
     start_date: NotRequired[str | None]
     end_date: NotRequired[str | None]
+
+
+class DestinationSuggestion(TypedDict):
+    suggestion: str
 
 
 class MergeBody(TypedDict):

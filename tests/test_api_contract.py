@@ -395,6 +395,11 @@ class Replies(DbCase):
                                                         "end_zone": "Europe/London", "start_local": "2026-06-02T15:00",
                                                         "end_local": "2026-06-08T10:00", "trip_id": made["id"]})
         self.check("POST /api/trips/{id}/split", trips_api.api_trip_split(self.c, {}, {"segment_ids": [other["id"]]}, str(made["id"])))
+        for key, value in ((sk.AI_MODE, "local"), (sk.AI_OLLAMA_URL, "http://ollama.example:1234"), (sk.AI_OLLAMA_MODEL, "llama3")):
+            db.set_setting(self.c, key, value)
+        self.c.commit()
+        with mock.patch.object(trips_api.ai, "destination", return_value="Colorado & Texas"):
+            self.check("POST /api/trips/{id}/destination/suggest", trips_api.api_trip_destination_suggest(None, {}, {}, str(made["id"])))
         self.check("POST /api/segments/{id}/move", trips_api.api_segment_move(self.c, {}, {"trip_id": made["id"]}, str(other["id"])))
         self.check("DELETE /api/segments/{id}", trips_api.api_segment_remove(self.c, {}, {}, str(other["id"])))
         self.check("DELETE /api/trips/{id}", trips_api.api_trip_remove(self.c, {}, {}, str(made["id"])))
@@ -439,7 +444,7 @@ class Mismatches(unittest.TestCase):
 
     def test_a_renamed_field_a_wrong_type_and_a_missing_one(self):
         st = {"version": "dev", "database": "sqlite", "user": {"name": None, "email": None, "local": True},
-              "last_backup": None, "review_count": 0, "person_id": None}
+              "last_backup": None, "review_count": 0, "person_id": None, "ai": False}
         schema = reply_schema("GET /api/state")
         self.assertEqual(problems(st, schema), [])
         renamed = {("backed_up" if k == "last_backup" else k): v for k, v in st.items()}
@@ -468,7 +473,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/people/{id}", "DELETE /api/people/{id}", "POST /api/people/{id}/claim",
                                      "GET /api/people/claim-suggestions", "POST /api/people/claim-suggestions/dismiss",
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
-                                     "DELETE /api/trips/{id}", "POST /api/trips/{id}/emails/clear", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
+                                     "DELETE /api/trips/{id}", "POST /api/trips/{id}/emails/clear", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split", "POST /api/trips/{id}/destination/suggest",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
                                      "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",

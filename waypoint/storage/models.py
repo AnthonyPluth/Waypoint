@@ -90,6 +90,7 @@ class Trip(Base):
     start_date: Mapped[str | None]
     end_date: Mapped[str | None]
     destination: Mapped[str | None]
+    destination_manual: Mapped[bool]
     notes: Mapped[str | None]
     auto: Mapped[bool]
     booked_by: Mapped[int | None]

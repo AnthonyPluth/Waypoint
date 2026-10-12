@@ -6,10 +6,12 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from ... import monitoring, validate
-from ...domain import airports, people, tripmap, trips
+from ...domain import airports, loyalty, people, tripmap, trips
+from ...domain.mail import ai
 from ...domain.visibility import Viewer
-from ..common import NO_IMAGE, ApiError, Response, _current, image_response, position, row_id
-from ..contract import (Airport, EmailsCleared, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
+from ...storage import db
+from ..common import NO_IMAGE, ApiError, Response, _current, image_response, own_session, position, row_id
+from ..contract import (Airport, DestinationSuggestion, EmailsCleared, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
                         TripList, TripPlaces)
 
 NAME_LIMIT = 100
@@ -21,6 +23,8 @@ _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {li
 
 NO_TRIP = "No such trip"
 NO_SEGMENT = "No such segment"
+NO_AI = "Suggestions need the AI fallback, which is off. Turn it on under Settings, in Mail and AI."
+NO_PLACES = "Add a booking to this trip first, so there are places to describe."
 TEXTS = {"confirmation": ("confirmation code", 50), "provider": ("provider", 100), "origin": ("origin", 100),
          "destination": ("destination", 100), "start_zone": ("start time zone", 64), "end_zone": ("end time zone", 64)}
 
@@ -183,6 +187,25 @@ def api_trip_split(conn, _q, body: SplitBody, trip_id) -> Trip:
         raise ApiError('Send "segment_ids" as a list of segments')
     ids = [_id(i, "Choose segments of this trip to move to a new trip") for i in raw]
     return _trip(_run(lambda: trips.split(conn, who, this, ids), NO_TRIP))
+
+
+@own_session
+def api_trip_destination_suggest(_conn, _q, _b, trip_id) -> DestinationSuggestion:
+    this = row_id(trip_id, NO_TRIP)
+    with db.session() as conn:
+        facts = trips.destination_facts(conn, viewer(conn), this)
+        cfg = ai.config(conn)
+        known = tuple(loyalty.known_numbers(conn)) if cfg else ()
+    if facts is None:
+        raise ApiError(NO_TRIP, 404)
+    if cfg is None:
+        raise ApiError(NO_AI)
+    if not facts["stops"]:
+        raise ApiError(NO_PLACES)
+    try:
+        return {"suggestion": ai.destination(cfg, facts, known)}
+    except ai.AiError as e:
+        raise ApiError(str(e), 502) from e
 
 
 def api_segment_add(conn, _q, body: SegmentBody) -> Segment:

@@ -212,6 +212,10 @@ export interface CruiseStop {
   recorded: boolean;
 }
 
+export interface DestinationSuggestion {
+  suggestion: string;
+}
+
 export interface DeviceBody {
   endpoint: string;
   p256dh: string;
@@ -772,6 +776,7 @@ export interface State {
   last_backup: string | null;
   review_count: number;
   person_id: number | null;
+  ai: boolean;
 }
 
 export interface Stats {
@@ -960,6 +965,7 @@ export interface Trip {
   start_date: string | null;
   end_date: string | null;
   destination: string | null;
+  destination_manual: boolean;
   notes: string | null;
   auto: boolean;
   booked_by: number | null;
@@ -1041,6 +1047,7 @@ export interface Endpoints {
   "POST /api/trips/{id}/emails/clear": { body: never; reply: EmailsCleared };
   "POST /api/trips/{id}/merge": { body: MergeBody; reply: Trip };
   "POST /api/trips/{id}/split": { body: SplitBody; reply: Trip };
+  "POST /api/trips/{id}/destination/suggest": { body: never; reply: DestinationSuggestion };
   "POST /api/segments": { body: SegmentBody; reply: Segment };
   "GET /api/segments/{id}": { body: never; reply: Segment };
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };

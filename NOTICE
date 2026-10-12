@@ -8,4 +8,4 @@ License, https://opendatacommons.org/licenses/dbcl/1-0/. The derived file is sha
 
 Airports: waypoint/storage/airports.tsv.gz is derived from OurAirports' public-domain data
 (https://ourairports.com/data/), through the airportsdata package (https://pypi.org/project/airportsdata/), which adds
-time zones.
+time zones. waypoint/storage/regions.tsv.gz (each US airport's state, and country names) is derived from the same data.
