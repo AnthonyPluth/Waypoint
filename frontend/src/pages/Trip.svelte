@@ -1,6 +1,6 @@
 <script lang="ts">
   import { act, errMsg } from "$lib/act";
-  import { route } from "$lib/app.svelte";
+  import { app, route } from "$lib/app.svelte";
   import { tick } from "svelte";
   import { apiCall } from "$lib/contract";
   import type { LoyaltyEntry, Person, Segment, StoredEmail, Trip } from "$lib/api-types";
@@ -26,7 +26,7 @@
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { appWord, bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, START_WORD, untimed, vendorLink } from "$lib/trips";
+  import { appWord, bookingCards, dateLabel, dayLabel, END_WORD, headline, membershipFor, showBookingTravellers, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
@@ -117,6 +117,7 @@
   });
 
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
+  const everyone = $derived(trip ? tripTravellers(trip.segments) : []);
   const eyebrowOf = (s: Segment) => `${kindName(s)} · ${dayLabel(s.start_local)}`;
   const kindName = (s: Segment) => KINDS.find(([k]) => k === s.kind)?.[1] ?? s.kind;
   const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
@@ -238,6 +239,9 @@
         </div>
       {/if}
       <p class="text-muted-foreground">{dates(t)}{t.destination ? ` · ${t.destination}` : ""}</p>
+      {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
+        <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
+      {/if}
       {#if t.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
     </div>
     {#if !form}
@@ -266,8 +270,10 @@
           {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
           {#snippet footer()}
             <div class="flex flex-col gap-3">
-              <h3 class="eyebrow">Travellers</h3>
-              {@render travellerList(s)}
+              {#if showBookingTravellers(s, everyone, loyalty)}
+                <h3 class="eyebrow">Travellers</h3>
+                {@render travellerList(s)}
+              {/if}
               {@render buttons(s, headline(s))}
             </div>
           {/snippet}
