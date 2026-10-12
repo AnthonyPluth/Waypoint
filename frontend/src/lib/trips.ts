@@ -38,7 +38,11 @@ export function dayIn(ms: number, zone: string): string {
 const asUtc = (local: string) => new Date(utcOf(local));
 
 export const clock = (local: string): string => asUtc(local).toLocaleTimeString(locale(), { timeZone: "UTC", hour: "numeric", minute: "2-digit" });
-export const dayLabel = (local: string): string => asUtc(local).toLocaleDateString(locale(), { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
+const yearOf = (local: string): number => Number(local.slice(0, 4));
+export const dayLabel = (local: string, withYear = yearOf(local) !== new Date().getFullYear()): string =>
+  asUtc(local).toLocaleDateString(locale(), { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", ...(withYear && { year: "numeric" }) });
+export const dayOf = (s: Pick<Segment, "kind">, local: string): string => dayLabel(local, s.kind === "visit" || undefined);
+export const sameDay = (s: Pick<Segment, "start_local" | "end_local">): boolean => s.start_local.slice(0, 10) === s.end_local.slice(0, 10);
 export const dateLabel = (day: string): string => asUtc(`${day}T00:00`).toLocaleDateString(locale(), { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
 
 export function until(ms: number): string {

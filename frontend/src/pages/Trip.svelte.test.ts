@@ -396,6 +396,19 @@ describe("Trip", () => {
     expect(within(card).queryByTestId("flight-status")).toBeNull();
   });
 
+  it("shows an untimed hotel’s end day beside time not recorded, and a past trip’s dates with their year and no time not recorded", async () => {
+    held = trip([
+      segment({ id: 1, kind: "hotel", origin: "Harbour Hotel", destination: null, start_local: "2026-03-08T00:00", end_local: "2026-03-10T00:00", details: { time_unknown: "yes" } }),
+      segment({ id: 2, kind: "visit", provider: null, origin: null, destination: "JP", start_local: "2005-03-10T00:00", end_local: "2005-03-29T00:00", details: { time_unknown: "yes" } }),
+    ]);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+    expect(cards[0]).toHaveTextContent(/Check-out\s*Tue, Mar 10, time not recorded/);
+    expect(cards[1]).toHaveTextContent(/From\s*Thu, Mar 10, 2005\s*To\s*Tue, Mar 29, 2005/);
+    expect(cards[1]).not.toHaveTextContent("time not recorded");
+    expect(cards[1]).not.toHaveTextContent("Time not recorded");
+  });
+
   it("offers each booking’s actions, and no Wallet", async () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
