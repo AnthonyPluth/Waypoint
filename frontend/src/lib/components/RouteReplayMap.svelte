@@ -3,7 +3,7 @@
   import { Button } from "$lib/components/ui/button";
   import { loadCountries, type Country } from "$lib/map";
   import { viewport } from "$lib/phone.svelte";
-  import { activeStop, boundariesShown, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, roadShapes, roadsShown, shieldsOf, STATIC_MOVER_PX, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Roads, type Stop } from "$lib/route-replay";
+  import { activeStop, boundariesShown, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, roadShapes, roadsShown, SCRUB_STEPS, shieldsOf, STATIC_MOVER_PX, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Roads, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
@@ -36,6 +36,9 @@
   let progress = $state(0);
   let playing = $state(false);
   let tail = $state(0);
+  const SPEEDS = [1, 2, 4];
+  let speed = $state(1);
+  const nextSpeed = () => { speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]; };
   $effect(() => { if (calm) { progress = 1; playing = false; } });
   let started = false;
   $effect(() => {
@@ -52,8 +55,9 @@
     let frame = 0;
     let last = performance.now();
     const step = (at: number) => {
-      if (progress < 1) progress = Math.min(1, progress + (at - last) / duration);
-      else tail += at - last;
+      const elapsed = (at - last) * speed;
+      if (progress < 1) progress = Math.min(1, progress + elapsed / duration);
+      else tail += elapsed;
       last = at;
       if (progress >= 1 && tail >= LABEL_HOLD_MS + 500) { playing = false; return; }
       frame = requestAnimationFrame(step);
@@ -65,7 +69,7 @@
   function toggle() {
     if (progress >= 1) { progress = 0; tail = 0; playing = true; } else playing = !playing;
   }
-  const scrub = (e: Event) => { playing = false; tail = 0; progress = Number((e.currentTarget as HTMLInputElement).value) / 1000; };
+  const scrub = (e: Event) => { playing = false; tail = 0; progress = Number((e.currentTarget as HTMLInputElement).value) / SCRUB_STEPS; };
 
   const showing = (i: number) => calm || reached(i, stops.length, progress);
   const crowd = $derived(spots.map((p, i) => spots.slice(0, i).filter((q) => Math.hypot(p.x - q.x, p.y - q.y) / zoom < 40).length));
@@ -186,7 +190,8 @@
       <Button variant="outline" onclick={toggle}>
         {#if progress >= 1}<RotateCcw />{:else if playing}<Pause />{:else}<Play />{/if}{buttonLabel}
       </Button>
-      <input type="range" min="0" max="1000" step="1" value={Math.round(progress * 1000)} oninput={scrub} aria-label="Position along the route"
+      <Button variant="outline" size="sm" onclick={nextSpeed} aria-label="Playback speed {speed}×" class="tabular-nums">{speed}×</Button>
+      <input type="range" min="0" max={SCRUB_STEPS} step="1" value={Math.round(progress * SCRUB_STEPS)} oninput={scrub} aria-label="Position along the route"
         aria-valuetext={stopLine(stops[now], year)} class="h-11 min-w-0 flex-1 accent-primary" />
     </div>
   {/if}

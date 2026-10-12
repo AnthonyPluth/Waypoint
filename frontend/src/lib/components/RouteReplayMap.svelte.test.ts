@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from "@testing-library/svelte";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TripPlaces } from "$lib/api-types";
 import { stopsOf } from "$lib/route-replay";
@@ -94,7 +94,7 @@ describe("RouteReplayMap", () => {
     expect(frames).toHaveLength(0);
     expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy();
     const slider = screen.getByRole("slider", { name: "Position along the route" }) as HTMLInputElement;
-    await fireEvent.input(slider, { target: { value: "1000" } });
+    await fireEvent.input(slider, { target: { value: "4000" } });
     expect(labels(container)).toHaveLength(0);
     expect(slider.getAttribute("aria-valuetext")).toBe("Back in Minneapolis (MSP), Dec 11");
     await fireEvent.click(screen.getByRole("button", { name: "Replay" }));
@@ -223,11 +223,11 @@ describe("RouteReplayMap", () => {
   it("returns to the whole map when scrubbed to the start or the end", async () => {
     const { container } = render(RouteReplayMap, { stops: hotelStops, year: 2025, still: false });
     const slider = screen.getByRole("slider", { name: "Position along the route" });
-    await fireEvent.input(slider, { target: { value: "375" } });
+    await fireEvent.input(slider, { target: { value: "1500" } });
     expect(viewBox(container)[2]).toBeLessThan(960);
     await fireEvent.input(slider, { target: { value: "0" } });
     expect(viewBox(container)).toEqual([0, 0, 960, 520]);
-    await fireEvent.input(slider, { target: { value: "1000" } });
+    await fireEvent.input(slider, { target: { value: "4000" } });
     expect(viewBox(container)).toEqual([0, 0, 960, 520]);
   });
 
@@ -253,4 +253,54 @@ describe("RouteReplayMap", () => {
     expect(container.querySelector("[data-plane]")!.getAttribute("data-flying")).toBe("false");
     expect(container.querySelector(".animate-ping")).toBeNull();
   });
+
+  it("speeds the replay up with the speed button, cycling 1×, 2×, 4× and back", async () => {
+    render(RouteReplayMap, { stops, year: 2025, still: false });
+    const slider = screen.getByRole("slider", { name: "Position along the route" }) as HTMLInputElement;
+    await fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Playback speed 1×" }));
+    advance(1500);
+    await Promise.resolve();
+    expect(slider.value).toBe("2000");
+    await fireEvent.click(screen.getByRole("button", { name: "Playback speed 2×" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Playback speed 4×" }));
+    expect(screen.getByRole("button", { name: "Playback speed 1×" })).toBeTruthy();
+  });
+
+  it("moves the replay faster at 2× and 4× than at 1×", async () => {
+    const slider = () => screen.getByRole("slider", { name: "Position along the route" }) as HTMLInputElement;
+    const pace = async (presses: number) => {
+      render(RouteReplayMap, { stops, year: 2025, still: false });
+      await fireEvent.click(screen.getByRole("button", { name: "Play" }));
+      for (const label of ["1×", "2×", "4×"].slice(0, presses)) await fireEvent.click(screen.getByRole("button", { name: `Playback speed ${label}` }));
+      advance(1500);
+      await Promise.resolve();
+      const at = slider().value;
+      cleanup();
+      return Number(at);
+    };
+    const normal = await pace(0);
+    const double = await pace(1);
+    const quadruple = await pace(2);
+    expect([normal, double, quadruple]).toEqual([1000, 2000, 4000]);
+  });
+
+  it("plays a 25-stop trip over fifty seconds, with each town's label lit as the path reaches it", async () => {
+    const towns = Array.from({ length: 25 }, (_, i) => ({ name: `Town ${i}`, city: `Town ${i}`, code: null, kind: "place" as const, latitude: 30 + i * 0.6, longitude: -100 + i * 0.9, from: "2025-12-05", to: "2025-12-05", via: i === 0 ? null : ("car" as const), back: false }));
+    const { container } = render(RouteReplayMap, { stops: towns, year: 2025, still: false });
+    await fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    advance(25000);
+    await Promise.resolve();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
+    expect(labels(container)).toEqual(["Town 12"]);
+    advance(24000);
+    await Promise.resolve();
+    expect(labels(container)).toEqual(["Town 23"]);
+    advance(1000);
+    await Promise.resolve();
+    advance(2500);
+    await Promise.resolve();
+    expect(screen.getByRole("button", { name: "Replay" })).toBeTruthy();
+  });
 });
+
