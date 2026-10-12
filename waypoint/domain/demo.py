@@ -34,7 +34,9 @@ MEMBERSHIPS = [
 ]
 
 
-DEMO_LOGO_COLORS = {"American Airlines": (30, 110, 190), "United Airlines": (20, 60, 160), "Delta Air Lines": (190, 40, 60)}
+DEMO_LOGO_COLORS = {"American Airlines": (30, 110, 190), "United Airlines": (20, 60, 160), "Delta Air Lines": (190, 40, 60),
+                    "Marriott": (150, 30, 70), "Disney Cruise Line": (20, 40, 110), "Hertz": (240, 190, 20),
+                    "Transportation Security Administration": (40, 90, 60)}
 
 
 def _png_chunk(kind: bytes, data: bytes) -> bytes:

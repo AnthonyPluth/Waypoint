@@ -252,9 +252,9 @@ def note(conn: db.Connection) -> int:
     for r, n in zip(rows, numbers, strict=True):
         for brand in _candidates(r[0], r[1], n, r[3], airlines):
             found.setdefault(key(brand), brand)
-    for (program,) in conn.execute(select(LoyaltyId.program).where(LoyaltyId.kind == "airline").distinct()).fetchall():
-        if airline := loyalty.logo_brand("airline", program):
-            found.setdefault(key(airline), airline)
+    for kind, program in conn.execute(select(LoyaltyId.kind, LoyaltyId.program).distinct()).fetchall():
+        if program_brand := loyalty.logo_brand(kind, program):
+            found.setdefault(key(program_brand), program_brand)
     if not found:
         return 0
     known = {k for (k,) in conn.execute(select(BrandLogo.key).where(BrandLogo.key.in_(sorted(found)))).fetchall()}

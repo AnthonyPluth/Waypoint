@@ -1,4 +1,6 @@
+import inspect
 import os
+from datetime import UTC, datetime
 from unittest import mock
 
 from sqlalchemy import select
@@ -7,7 +9,9 @@ from waypoint import oidc
 from waypoint.domain import demo, logos, loyalty, people
 from waypoint.server.api import loyalty as api
 from waypoint.server.common import ApiError
+from waypoint.providers import logodev, wikimedia
 from waypoint.storage import db, secretbox
+from waypoint.storage import settings_keys as sk
 from waypoint.storage.models import BrandLogo, LoyaltyId
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase, fetch
@@ -176,26 +180,93 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"made-up image bytes"
 
 
 class LogoBrandTests(DbCase):
-    def test_every_airline_program_but_other_maps_to_a_brand(self):
-        for program in loyalty.PROGRAMS["airline"]:
+    def test_every_program_but_other_has_an_entry_and_other_has_none(self):
+        every = {program for programs in loyalty.PROGRAMS.values() for program in programs} - {loyalty.OTHER}
+        self.assertEqual(set(loyalty.PROGRAM_BRANDS), every)
+        self.assertNotIn(loyalty.OTHER, loyalty.PROGRAM_BRANDS)
+        for kind, programs in loyalty.PROGRAMS.items():
+            for program in programs:
+                with self.subTest(kind=kind, program=program):
+                    self.assertEqual(loyalty.logo_brand(kind, program), loyalty.PROGRAM_BRANDS.get(program))
+
+    def test_a_program_without_a_logo_is_none_only_with_a_comment(self):
+        source = inspect.getsource(loyalty).split("PROGRAM_BRANDS", 1)[1].split("MASK =", 1)[0]
+        for number, line in enumerate(source.splitlines()):
+            if ": None" in line:
+                self.assertIn("#", line, f"line {number} of PROGRAM_BRANDS leaves a program without a logo and without a reason")
+
+    def test_every_brand_is_a_name_the_logo_store_can_look_up(self):
+        for program, brand in loyalty.PROGRAM_BRANDS.items():
+            if brand is None:
+                continue
             with self.subTest(program=program):
-                brand = loyalty.logo_brand("airline", program)
-                self.assertEqual(brand is None, program == loyalty.OTHER)
-        self.assertEqual(set(loyalty.AIRLINE_BRANDS), set(loyalty.PROGRAMS["airline"]) - {loyalty.OTHER})
+                self.assertTrue(logos.key(brand))
+                self.assertEqual(logos.key(brand), logos.key(f"  {brand.upper()} "))
+                self.assertGreaterEqual(len(brand), 2)
+                self.assertLessEqual(len(brand), 100)
 
-    def test_only_airline_programs_have_a_brand(self):
-        for kind in ("hotel", "car", "cruise", "known_traveler", "redress"):
-            for program in loyalty.PROGRAMS[kind]:
-                self.assertIsNone(loyalty.logo_brand(kind, program))
+    def test_a_program_belongs_to_its_own_kind_only(self):
         self.assertIsNone(loyalty.logo_brand("hotel", "Delta SkyMiles"))
+        self.assertIsNone(loyalty.logo_brand("airline", "Hilton Honors"))
+        self.assertIsNone(loyalty.logo_brand("car", loyalty.OTHER))
+        self.assertIsNone(loyalty.logo_brand("nonsense", "Hilton Honors"))
 
-    def test_airline_memberships_queue_their_brands_for_fetching(self):
+    def test_the_brands_follow_the_issue(self):
+        for kind, program, brand in (("hotel", "Hilton Honors", "Hilton"), ("hotel", "Marriott Bonvoy", "Marriott"),
+                                     ("car", "Hertz Gold Plus Rewards", "Hertz"), ("cruise", "Disney Castaway Club", "Disney Cruise Line"),
+                                     ("known_traveler", "TSA PreCheck", "Transportation Security Administration"),
+                                     ("known_traveler", "Global Entry", "U.S. Customs and Border Protection"),
+                                     ("redress", "DHS TRIP", "U.S. Department of Homeland Security")):
+            with self.subTest(program=program):
+                self.assertEqual(loyalty.logo_brand(kind, program), brand)
+
+    def test_memberships_of_every_kind_queue_their_brands_for_fetching(self):
+        who = guest(self.c)
+        for kind, programs in loyalty.PROGRAMS.items():
+            for program in programs:
+                loyalty.add(self.c, membership(who, kind=kind, program=program))
+        wanted = {logos.key(b) for b in loyalty.PROGRAM_BRANDS.values() if b}
+        self.assertEqual(logos.note(self.c), len(wanted))
+        self.assertEqual({k for (k,) in self.c.execute(select(BrandLogo.key)).fetchall()}, wanted)
+        self.assertEqual(logos.note(self.c), 0)
+
+    def test_other_is_not_queued(self):
         who = guest(self.c)
         loyalty.add(self.c, membership(who, program="Delta SkyMiles"))
         loyalty.add(self.c, membership(who, kind="hotel", program="Hilton Honors"))
         loyalty.add(self.c, membership(who, program=loyalty.OTHER))
-        self.assertEqual(logos.note(self.c), 1)
-        self.assertEqual([k for (k,) in self.c.execute(select(BrandLogo.key)).fetchall()], ["delta air lines"])
+        self.assertEqual(logos.note(self.c), 2)
+        self.assertEqual(sorted(k for (k,) in self.c.execute(select(BrandLogo.key)).fetchall()), ["delta air lines", "hilton"])
+
+    def test_a_logo_request_carries_only_a_brand_name(self):
+        who = guest(self.c, "Canary Q. Traveller")
+        for kind, programs in loyalty.PROGRAMS.items():
+            for program in programs:
+                loyalty.add(self.c, membership(who, kind=kind, program=program, number=CANARY, notes=CANARY))
+        db.set_setting(self.c, sk.LOGODEV_TOKEN, "pk_demo")
+        db.set_setting(self.c, sk.LOGODEV_SECRET, "sk_demo")
+        asked = []
+
+        def search(secret, name):
+            asked.append(("search", secret, name))
+            return []
+
+        def fetch_logo(token, **kw):
+            asked.append(("fetch", token, kw))
+            return None
+
+        with mock.patch.object(logodev, "search", side_effect=search), mock.patch.object(logodev, "fetch", side_effect=fetch_logo), \
+                mock.patch.object(wikimedia, "find_logo", side_effect=lambda name: asked.append(("wikimedia", name))):
+            logos.fetch_due(self.c, datetime(2026, 10, 12, 12, 0, tzinfo=UTC), limit=100)
+        self.assertTrue(asked)
+        brands = {b for b in loyalty.PROGRAM_BRANDS.values() if b}
+        names = {entry[2] for entry in asked if entry[0] == "search"}
+        self.assertLessEqual(names, brands)
+        for entry in asked:
+            self.assertNotIn(CANARY, str(entry))
+            self.assertNotIn("Canary", str(entry))
+            self.assertNotIn("Traveller", str(entry))
+            self.assertNotIn("@", str(entry))
 
 
 class RouteTests(ServerCase):
