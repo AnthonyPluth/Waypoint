@@ -138,11 +138,13 @@ export function showPictures(root: ParentNode, pictures: Record<number, string>)
 }
 
 const SHEET = [
-  ".email{box-sizing:border-box;width:100%;min-width:min-content;padding:12px;background:var(--muted);color:var(--foreground);font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;overflow-wrap:anywhere}",
+  ":host{all:initial;display:block;color-scheme:light}",
+  ".email{box-sizing:border-box;width:100%;min-width:min-content;padding:12px;background:#ffffff;color:#1f1f1f;font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;"
+    + "text-align:left;direction:ltr;letter-spacing:normal;word-spacing:normal;text-transform:none;text-indent:0;white-space:normal;visibility:visible;cursor:auto;overflow-wrap:anywhere}",
   ".legacy{line-height:1.6}",
   ".email img{max-width:100%;height:auto;border:0}",
-  ".email a{color:var(--primary)}",
-  ".legacy blockquote{border-left:2px solid var(--muted-foreground);margin:8px 0;padding-left:12px}",
+  ".email a{color:#0b57d0}",
+  ".legacy blockquote{border-left:2px solid #747775;margin:8px 0;padding-left:12px}",
   ".legacy td,.legacy th{padding:4px;vertical-align:top}",
   ".legacy p{margin:8px 0}",
 ].join("");
