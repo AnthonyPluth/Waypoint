@@ -1,11 +1,11 @@
 ---
 title: Data sources
-description: Where the airport, airline, place and interstate data Waypoint ships with come from, and their licences.
+description: Where the airport, airline, place, interstate and state-line data Waypoint ships with come from, and their licences.
 sidebar:
   order: 2
 ---
 
-Waypoint ships with four reference lists. The airports and airlines are loaded into the database by its migrations; the places list and the interstates are read from their files. They are the same for every Waypoint, and aren’t part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine).
+Waypoint ships with five reference lists. The airports and airlines are loaded into the database by its migrations; the places list, the interstates and the state lines are read from their files. They are the same for every Waypoint, and aren’t part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine).
 
 ## Airports
 
@@ -34,3 +34,15 @@ The interstates let a road trip’s route follow the real highway network instea
 - Each piece is simplified to within 0.001 degrees (about 100 metres) and its coordinates are rounded to four decimals, written as the first point and the steps from each point to the next.
 
 The file has one row per piece: the route, its two junction numbers and its points. The app loads it once, the first time a trip’s map needs it, and keeps it in memory; finding a route is a shortest-path search over about 30,000 pieces that takes a fraction of a second. What the trip map receives is only the roads: the points and names of the interstates a drive follows and of the ones near it (coarsened again to about a kilometre), never anything about who travels or what was booked. Because the network is the interstates only and is coarse, a route can be a few miles off the road, can skip a short link that is not an interstate, and does not know about closures, tolls or traffic.
+
+## State lines
+
+The state lines are the faint dashed borders between US states that the route replay draws behind the route and the interstates once the map is close enough to read them ([Replaying a past trip’s route](/Waypoint/start/trips/#replaying-a-past-trips-route)), without asking any outside service or fetching map tiles. They come from the US Census Bureau’s 2024 Cartographic Boundary File for States and Equivalent Entities at 1:5,000,000 (`cb_2024_us_state_5m.zip`, about 1.1 MB, from the [Cartographic Boundary Files](https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html) page, not fetched by the app). It is US government data, and its metadata gives “Access constraints: None”: it is in the public domain, with no licence terms or required credit.
+
+`tools/states.py` writes `waypoint/storage/states.tsv.gz` (about 9 KB, about 2,100 points) from that download; run it with the path of the zip and commit the result. Its steps are the same every time, so the output is reproducible:
+
+- Only the lines between two states are kept: an edge of a state’s outline that another state’s outline also has. The 50 states and the District of Columbia border each other this way; Puerto Rico has no neighbour, so it has no line.
+- The coast, the Great Lakes shores and the borders with Canada and Mexico are left out. The map’s land layer already draws them, and a second, differently simplified copy of the same shore would sit a little off the first.
+- The edges between each pair of states are joined into lines that run from tripoint to tripoint (or to the coast), then each is simplified to within 0.012 degrees (about a kilometre) and its coordinates are rounded to four decimals, written as the first point and the steps from each point to the next.
+
+The file has one row per line: the two states’ postal codes and its points. The app loads it once, the first time a trip’s map needs it, and keeps it in memory. What the trip map receives is only coordinates: the pieces of those lines within about five degrees (a few hundred miles) of the trip’s places and drives, at most 1,500 steps and rounded to about a hundred metres, never a state’s name, anything about who travels or what was booked. A trip with no place in the United States gets none. The lines are coarse: a state line looks right at the replay’s zoom but is not a survey, and a river border can be off by a mile or so.

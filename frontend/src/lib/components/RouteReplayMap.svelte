@@ -3,12 +3,12 @@
   import { Button } from "$lib/components/ui/button";
   import { loadCountries, type Country } from "$lib/map";
   import { viewport } from "$lib/phone.svelte";
-  import { activeStop, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_ROADS, roadShapes, roadsShown, shieldsOf, STATIC_MOVER_PX, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Roads, type Stop } from "$lib/route-replay";
+  import { activeStop, boundariesShown, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, roadShapes, roadsShown, shieldsOf, STATIC_MOVER_PX, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Roads, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
-  let { stops, year, roads = NO_ROADS, still = null, autoplay = false }: { stops: Stop[]; year: number; roads?: Roads; still?: boolean | null; autoplay?: boolean } = $props();
+  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false }: { stops: Stop[]; year: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean } = $props();
 
   const query = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
   let observed = $state(query?.matches ?? false);
@@ -26,6 +26,7 @@
   const path = $derived(geoPath(projection));
   const legs = $derived(legsOf(stops, projection, roads));
   const shapes = $derived(roadShapes(roads.interstates, projection));
+  const lines = $derived(boundaryShapes(boundaries, projection));
   const spots = $derived(positions(stops, projection));
   const sphere = $derived(path({ type: "Sphere" }) ?? "");
   let countries = $state<Country[]>([]);
@@ -78,6 +79,7 @@
   const box = $derived(calm ? { x: 0, y: 0, w: width, h: height } : cameraAt(stops, spots, width, height, progress, legs));
   const zoom = $derived(box.w / width);
   const drawn = $derived(roadsShown(projection, zoom) ? shapes.filter((r) => inView(r, box)) : []);
+  const stateLines = $derived(boundariesShown(projection, zoom) ? lines.filter((l) => inView(l, box)) : []);
   const shields = $derived(shieldsOf(drawn, box, zoom));
   const via = (i: number) => (i > 0 && legs[i - 1].refs.length ? ` (via ${legs[i - 1].refs.join(", ")})` : "");
   const zoomed = $derived(box.w < width - 0.5);
@@ -100,6 +102,11 @@
       <g class="fill-map-land stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke">
         {#each land as c (c.id)}<path d={c.d} />{/each}
       </g>
+      {#if stateLines.length}
+        <g aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" opacity="0.8" data-testid="state-lines">
+          {#each stateLines as l, i (i)}<path d={l.d} class="stroke-map-border" stroke-width="1" vector-effect="non-scaling-stroke" />{/each}
+        </g>
+      {/if}
       {#if drawn.length}
         <g aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" data-testid="interstates">
           {#each drawn as r, i (i)}<path d={r.d} data-road={r.ref} class="stroke-map-border" stroke-width={1.6 * zoom} />{/each}
@@ -170,6 +177,7 @@
     {#if stops.some((s) => s.kind === "stay")}<li class="flex items-center gap-2"><span class="size-2.5 rotate-45 rounded-[2px] bg-map-stay" aria-hidden="true"></span>Stay</li>{/if}
     {#if stops.some((s) => s.kind === "place")}<li class="flex items-center gap-2"><span class="size-2 rounded-full bg-map-visited" aria-hidden="true"></span>Other stop</li>{/if}
     <li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Flight</li>
+    {#if stateLines.length}<li class="flex items-center gap-2"><span class="w-4 border-t border-dashed border-map-border" aria-hidden="true"></span>State line</li>{/if}
     {#if roads.interstates.length}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-border" aria-hidden="true"></span>Interstate</li>{/if}
     {#if legs.some((l) => !l.flight)}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
   </ul>

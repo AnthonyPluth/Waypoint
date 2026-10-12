@@ -7703,13 +7703,20 @@
           },
           "roads": {
             "$ref": "#/components/schemas/TripRoads"
+          },
+          "boundaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripStateLine"
+            }
           }
         },
         "required": [
           "airports",
           "cities",
           "stays",
-          "roads"
+          "roads",
+          "boundaries"
         ],
         "additionalProperties": false
       },
@@ -7787,6 +7794,24 @@
         "required": [
           "legs",
           "interstates"
+        ],
+        "additionalProperties": false
+      },
+      "TripStateLine": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "required": [
+          "points"
         ],
         "additionalProperties": false
       },

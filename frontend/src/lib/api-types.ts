@@ -1039,6 +1039,7 @@ export interface TripPlaces {
   cities: TripCityPoint[];
   stays: TripStayPoint[];
   roads: TripRoads;
+  boundaries: TripStateLine[];
 }
 
 export interface TripRoadLeg {
@@ -1056,6 +1057,10 @@ export interface TripRoadLine {
 export interface TripRoads {
   legs: TripRoadLeg[];
   interstates: TripRoadLine[];
+}
+
+export interface TripStateLine {
+  points: number[][];
 }
 
 export interface TripStayPoint {

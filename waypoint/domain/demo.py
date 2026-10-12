@@ -64,6 +64,16 @@ def _family_past(today: date) -> list[trips.SegmentIn]:
     ]
 
 
+def _family_road_trip(today: date) -> list[trips.SegmentIn]:
+    mountain = "America/Denver"
+    return [
+        {"kind": "hotel", "origin": "Mile High Inn", "destination": "Denver", "start_local": _at(today, -120, "15:00"), "end_local": _at(today, -117, "11:00"),
+         "start_zone": mountain, "end_zone": mountain, "confirmation": "H31550", "provider": "Example Stays", "details": {"room": "Two queens"}},
+        {"kind": "hotel", "origin": "Salt Flat Inn", "destination": "Salt Lake City", "start_local": _at(today, -117, "15:00"), "end_local": _at(today, -114, "11:00"),
+         "start_zone": mountain, "end_zone": mountain, "confirmation": "H31551", "provider": "Example Stays", "details": {"room": "Two queens"}},
+    ]
+
+
 def _family_now(today: date) -> list[trips.SegmentIn]:
     return [
         {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": _at(today, -2, "19:00"), "end_local": _at(today, -1, "07:10"),
@@ -267,6 +277,8 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     if done_trip is not None:
         conn.execute(update(Trip).where(Trip.id == done_trip).values(done_at=datetime.now(UTC).timestamp()))
     for fields in _cruises(today):
+        trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id)})
+    for fields in _family_road_trip(today):
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id)})
     for fields in _joan(today):
         trips.add_segment(conn, jane, {**fields, "travelers": _on(guests[1])}, now_trip)

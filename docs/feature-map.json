@@ -255,6 +255,7 @@
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
         "tests/test_trip_roads.py",
+        "tests/test_trip_states.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -271,6 +272,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_trip_roads.py",
+        "tests/test_trip_states.py",
         "tests/test_trips.py"
       ],
       "docs": [
