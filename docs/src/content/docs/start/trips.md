@@ -65,6 +65,18 @@ A segment’s times are the wall-clock times at its places, stored with the plac
 
 A trip’s dates are the local dates of its first and last segments.
 
+## Where a booking is on the map
+
+When a stay, car, train, cruise or parking booking is saved (added by hand, from an email or an import, edited, or updated by a later email), Waypoint works out roughly where it is and stores that point with the booking, so the [Stats map](/Waypoint/start/stats/#the-map) can show it. Nothing is looked up when a page is opened, and nothing is sent anywhere: the address and place names are read on your server against lists that ship with Waypoint ([Data sources](/Waypoint/reference/data-sources/)), with no map or geocoding service.
+
+The point is never a street address. It is, in order of preference:
+
+- **ZIP or postal code**: the centre of the ZIP code (US) or postal code area (the first part of a Canadian or British postcode) in the booking’s address.
+- **Airport**: for a car or train, the airport named by its pick-up or arrival place (“SFO” or “SFO airport”).
+- **City**: the city the booking names, or the one in its address, when it is clear which one is meant: a name shared by several places (Springfield) needs a state or country in the address, or the place is left off the map rather than guessed.
+
+Flights have no stored point (their airports already have coordinates). A booking whose place can’t be read has no point and isn’t drawn. Editing a booking’s address or place works the point out again; moving a booking to another trip, merging and splitting leave it as it is. The point is kept in a [backup](#in-a-backup), is not shown on a booking’s card or in the API’s booking replies, and bookings that were saved before this existed were located once when Waypoint was updated, from the same lists.
+
 ## How segments are grouped
 
 Without a trip named, a new segment joins an existing grouped trip when it is within two days of it, the trip hasn’t already got back to where it began before the segment starts, and everyone the segment involves (its travellers and whoever booked it) is already on the trip. Otherwise it starts a trip of its own, so one person’s solo trip never takes in another person’s booking. You can **rename** a trip, **merge** two of yours into one and **split** some segments off into a new one; a trip you merged or split is yours from then on, and grouping leaves it alone. A merge is refused unless the same people are on both trips, so nobody is shown a segment of a trip they aren’t on.
@@ -99,7 +111,7 @@ With reduced motion turned on in your system, nothing animates: the map shows th
 
 ## In a backup
 
-Trips, segments and their travellers are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list isn’t: every Waypoint has it already.
+Trips, segments and their travellers are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list and the lists used to place bookings on the map aren’t: every Waypoint has them already.
 
 ## Open in app, or the vendor's website
 

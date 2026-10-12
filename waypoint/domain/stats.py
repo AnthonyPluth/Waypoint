@@ -38,6 +38,7 @@ class Seg:
     ports: Sequence[trips.PortIn] = ()
     seats: Sequence[str] = ()
     trip_id: int | None = None
+    point: tuple[float, float, str] | None = None
 
 
 class Named(TypedDict):
@@ -359,11 +360,20 @@ def _stay_pins(stays: Sequence[Seg], year: int | None, city_countries: Mapping[s
     found: dict[str, StayPin] = {}
     for s in stays:
         spent = {d for d in _nights(s) if _in(d, year)}
-        key = (s.destination or "").strip().lower()
-        if not spent or key not in city_points:
+        city = (s.destination or "").strip()
+        name = city.lower()
+        if s.point is not None and s.point[2] == "zip":
+            at, key = (s.point[0], s.point[1]), f"{name}|{s.point[0]:.3f},{s.point[1]:.3f}"
+        elif name in city_points:
+            at, key = city_points[name], name
+        elif s.point is not None:
+            at, key = (s.point[0], s.point[1]), name or f"{s.point[0]:.3f},{s.point[1]:.3f}"
+        else:
             continue
-        pin = found.setdefault(key, {"city": (s.destination or "").strip(), "country": city_countries.get(key),
-                                     "latitude": city_points[key][0], "longitude": city_points[key][1], "stays": 0, "nights": 0, "trips": []})
+        if not spent:
+            continue
+        pin = found.setdefault(key, {"city": city or (s.origin or "").strip(), "country": city_countries.get(name),
+                                     "latitude": at[0], "longitude": at[1], "stays": 0, "nights": 0, "trips": []})
         pin["stays"] += 1
         pin["nights"] += len(spent)
         if (ref := _map_trip(s, trip_names)):
@@ -585,7 +595,9 @@ def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: in
             seats_of.setdefault(t.segment_id, []).append(t.seat)
     ports = trips.ports_of(conn, [s.id for s in segments if s.kind == "cruise"])
     seen = [Seg(s.kind, s.start_local, s.start_zone, s.end_local, s.end_zone, s.origin, s.destination, s.provider,
-                trips.decode_details(s.details), ports.get(s.id, []), seats_of.get(s.id, []), s.trip_id) for s in segments]
+                trips.decode_details(s.details), ports.get(s.id, []), seats_of.get(s.id, []), s.trip_id,
+                (s.latitude, s.longitude, s.geo_precision or "city") if s.latitude is not None and s.longitude is not None else None)
+           for s in segments]
     codes = {(p or "").upper() for s in seen if s.kind == "flight" for p in (s.origin, s.destination)}
     known = {a.code: a for a in conn.orm.scalars(select(Airport).where(Airport.code.in_(sorted(codes)))).all()}
     prefixes = {c for s in seen if s.kind == "flight" and (c := _airline_code(s))}

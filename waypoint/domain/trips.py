@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import delete, select, update
 
 from .. import dates
-from ..storage import db, stored_mail
+from ..storage import db, geocode, stored_mail
 from ..storage.models import Segment, SegmentPort, SegmentTraveler, Trip
 from . import airports, links, logos, people, place_zones, regions, visibility
 from .visibility import Viewer
@@ -358,6 +358,12 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
             "manage_url": fields.get("manage_url")}
 
 
+def located(values: Mapping[str, str | None]) -> dict[str, float | str | None]:
+    point = geocode.locate(values["kind"] or "", values["origin"], values["destination"], decode_details(values["details"]).get("address"))
+    return {"latitude": point.latitude if point else None, "longitude": point.longitude if point else None,
+            "geo_precision": point.precision if point else None}
+
+
 def _span(values: Mapping[str, str | None], end: Literal["start", "end"]) -> tuple[str, str]:
     return (values[f"{end}_local"] or "", values[f"{end}_zone"] or "")
 
@@ -693,7 +699,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
                         booked_by=viewer.person_id)
             conn.orm.add(trip)
             conn.orm.flush()
-    seg = Segment(**values, trip_id=trip.id, source=source, booked_by=viewer.person_id, locked_fields=None,
+    seg = Segment(**values, **located(values), trip_id=trip.id, source=source, booked_by=viewer.person_id, locked_fields=None,
                   check_times=bool(fields.get("check_times")))
     conn.orm.add(seg)
     conn.orm.flush()
@@ -746,7 +752,7 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         changed.append("travelers")
     if ports != ports_before:
         changed.append("itinerary")
-    for k, v in values.items():
+    for k, v in {**values, **located(values)}.items():
         setattr(seg, k, v)
     if "itinerary" in changed:
         _set_ports(conn, seg.id, ports)
@@ -914,6 +920,8 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
             new_ports = None
     for f in changed:
         setattr(seg, f, changed_values[f])
+    for f, v in located(changed_values).items():
+        setattr(seg, f, v)
     if new_ports:
         _set_ports(conn, seg.id, new_ports)
         changed.append("itinerary")

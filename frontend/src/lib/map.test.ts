@@ -136,6 +136,12 @@ describe("where you stayed", () => {
     expect(pin.x).toBeGreaterThan(0);
   });
 
+  it("keeps two pins in one city apart, each with its own key", () => {
+    const got = pins([stay("Boulder", 40.0251, -105.3487, 2), stay("Boulder", 40.0402, -105.2514, 1)], projection);
+    expect(got.map((p) => p.label)).toEqual(["Boulder: 1 stay, 2 nights", "Boulder: 1 stay, 1 night"]);
+    expect(new Set(got.map((p) => p.key)).size).toBe(2);
+  });
+
   it("counts a stay's city among the places you've been, beside the airports", () => {
     expect(visitedPoints([airport("JFK", 1, ...JFK), airport("XYZ", 1, null, null)], [stay("London", ...LONDON)])).toEqual([[JFK[1], JFK[0]], [LONDON[1], LONDON[0]]]);
   });

@@ -70,6 +70,10 @@ Only the plain text goes out, with every email address (the sender’s, the reci
 
 The same setting powers one small button that doesn’t involve email at all: the sparkle beside a trip’s destination, which asks the model for a short subtitle such as “Colorado & Texas”. It sends only the trip’s name (without its dates) and the cities, states and countries of its bookings, in order, with the kind of booking: no email text, confirmation code, name, email address, street address or loyalty number, and only when you press it. See [AI suggestions](/Waypoint/start/ai/#the-destination-button-on-a-trip).
 
+## Addresses are looked up on your server
+
+A booking’s address or place is turned into a rough point on the map (the centre of its ZIP or postal code, an airport or a city) when the booking is saved, so the Stats map can show where you stayed. This is done entirely on your server from lists that ship with Waypoint ([Data sources](/Waypoint/reference/data-sources/)): no geocoding or map service is asked, no request is made, and the address is not sent anywhere. See [Where a booking is on the map](/Waypoint/start/trips/#where-a-booking-is-on-the-map).
+
 ## What this means for the rest of the setup
 
 - The Google OAuth client’s ID and secret are set in `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`); each connected mailbox’s refresh token is stored encrypted with `WAYPOINT_SECRET_KEY`, and backups hold it encrypted too ([Configuration](/Waypoint/reference/configuration/)).
