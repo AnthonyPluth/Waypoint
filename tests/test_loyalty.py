@@ -124,6 +124,25 @@ class StorageTests(DbCase):
 
 
 class PrivacyTests(DbCase):
+    def test_a_saved_cruise_number_is_known_and_never_reaches_an_ai_prompt(self):
+        from waypoint.domain.mail import ai
+        who = guest(self.c)
+        loyalty.add(self.c, membership(who, kind="cruise", program="Disney Castaway Club", number=CANARY))
+        self.assertIn(CANARY, loyalty.known_numbers(self.c))
+        with no_leaks(self, CANARY):
+            out = ai.redact(f"Your Castaway Club member {CANARY} sails soon", known=tuple(loyalty.known_numbers(self.c)))
+        self.assertNotIn(CANARY, out)
+
+    def test_a_cruise_number_is_never_logged_or_replied_with_unasked(self):
+        who = guest(self.c)
+        with no_leaks(self, CANARY, database=self.path):
+            added = api.api_loyalty_add(self.c, {}, membership(who, kind="cruise", program="Disney Castaway Club", number=CANARY))
+            self.c.commit()
+            replies = [added, api.api_loyalty(self.c, {}, {})]
+            self.assertEqual(api.api_loyalty_reveal(self.c, {}, {}, str(added["id"])), {"number": CANARY})
+        self.assertNotIn(CANARY, str(replies))
+        self.assertEqual(added["masked"], "••••" + CANARY[-4:])
+
 
     def test_the_number_is_never_logged_replied_with_or_stored_in_the_clear(self):
         who = guest(self.c)
@@ -156,7 +175,7 @@ class LogoBrandTests(DbCase):
         self.assertEqual(set(loyalty.AIRLINE_BRANDS), set(loyalty.PROGRAMS["airline"]) - {loyalty.OTHER})
 
     def test_only_airline_programs_have_a_brand(self):
-        for kind in ("hotel", "car", "known_traveler", "redress"):
+        for kind in ("hotel", "car", "cruise", "known_traveler", "redress"):
             for program in loyalty.PROGRAMS[kind]:
                 self.assertIsNone(loyalty.logo_brand(kind, program))
         self.assertIsNone(loyalty.logo_brand("hotel", "Delta SkyMiles"))
@@ -300,6 +319,20 @@ class FieldTests(DbCase):
         self.assertIsNone(api.fields(body, need_number=False)["number"])
         with self.assertRaises(ApiError):
             api.fields(body, need_number=True)
+
+    def test_cruise_is_a_kind_with_its_lines_programs(self):
+        self.assertIn("cruise", loyalty.KINDS)
+        self.assertIn("Disney Castaway Club", loyalty.PROGRAMS["cruise"])
+        self.assertIn("Royal Caribbean Crown & Anchor Society", loyalty.PROGRAMS["cruise"])
+        self.assertEqual(len(set(loyalty.PROGRAMS["cruise"])), len(loyalty.PROGRAMS["cruise"]))
+        body = {"person_id": 1, "kind": "cruise", "program": "Disney Castaway Club", "number": "1"}
+        self.assertEqual(api.fields(body, need_number=True)["kind"], "cruise")
+        with self.assertRaises(ApiError):
+            api.fields({**body, "program": "Marriott Bonvoy"}, need_number=True)
+        with self.assertRaises(ApiError):
+            api.fields({**body, "kind": "boat"}, need_number=True)
+        with self.assertRaises(ApiError):
+            api.fields({**body, "expiry": "2029-03-31"}, need_number=True)
 
     def test_every_kind_has_programs_ending_in_other(self):
         self.assertEqual(set(loyalty.PROGRAMS), set(loyalty.KINDS))
