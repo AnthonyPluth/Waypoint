@@ -174,7 +174,7 @@ describe("a seat for each traveller", () => {
 });
 
 describe("the fields each kind shows", () => {
-  it("has the address, phone and room for a hotel, the phone and class for a car, with no separate pick-up address, and terminal, seat and cabin for a flight", () => {
+  it("has the address, phone and room for a hotel, the pick-up address, phone and class for a car, and terminal, seat and cabin for a flight", () => {
     const names = (k: Kind) => DETAILS[k].map(([, label]) => label);
     expect(names("hotel")).toEqual(["Address", "Room", "Phone"]);
     expect(names("car")).toEqual(["Car class", "Phone"]);

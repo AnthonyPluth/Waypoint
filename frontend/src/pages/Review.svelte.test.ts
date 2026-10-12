@@ -648,7 +648,7 @@ describe("Review: the AI’s suggestion", () => {
     expect(calls.find(([p]) => p === "/api/segments")?.[2]).toMatchObject({ destination: "Cardiff Station", details: { address: "Bristol Airport" } });
   });
 
-  it("takes a rental’s phone and a cruise’s terminal, cabin, ship and deck", async () => {
+  it("takes a rental’s pick-up address and a cruise’s terminal, cabin, ship and deck", async () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", destination: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00",
       address: "4 Runway Drive, Bristol BS48 3DY" };
     held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
