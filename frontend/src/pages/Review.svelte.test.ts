@@ -593,6 +593,16 @@ describe("Review: the AI’s suggestion", () => {
     expect(body).toMatchObject({ price: { amount_minor: 124000, currency: "USD" } });
   });
 
+  it("refuses a cost it can't read and posts nothing", async () => {
+    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.type(screen.getByLabelText("Cost amount"), "abc");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    expect(await screen.findByText("Enter the cost as an amount like 1240.00 and a three-letter currency code like USD")).toBeInTheDocument();
+    expect(calls.some(([p]) => p === "/api/segments" || p.endsWith("/same"))).toBe(false);
+  });
+
   it("sends no cost when the suggestion has none and none is typed", async () => {
     held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
     render(ReviewPage);
