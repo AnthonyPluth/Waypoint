@@ -411,4 +411,22 @@ describe("the reads started before the page opened", () => {
     expect(await screen.findByText("Request failed (500)")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
+  it("puts Show QR code on the Next up card of a parking booking with a code, and on nothing else", async () => {
+    const lot = segment({ id: 9, kind: "parking", provider: "Example Parking", origin: "Example Airport Long-Term Lot", destination: null, confirmation: "PK30417",
+      start_local: "2099-01-10T05:15", start_zone: NY, end_local: "2099-01-13T03:00", end_zone: NY, details: {}, gate_code: { state: "ready", day: "2098-12-20" }, travelers: [] });
+    at("2099-01-09T09:00:00-05:00");
+    serve([trip([lot])]);
+    render(Upcoming);
+    const card = (await screen.findByText("Next up")).closest("section")!;
+    expect(within(card).getByRole("button", { name: "Show the QR code for Example Airport Long-Term Lot" })).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: /Open / })).toBeInTheDocument();
+  });
+
+  it("shows no QR code button on the Next up card of a flight", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
+    expect(within(card).queryByRole("button", { name: /QR code/ })).toBeNull();
+  });
 });

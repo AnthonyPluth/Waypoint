@@ -142,6 +142,8 @@ def link(conn: db.Connection, segment_id: int, mailbox_id: int, message_id: str)
     if stored is None:
         return False
     db.insert_ignore(conn, SegmentMessage, {"segment_id": segment_id, "stored_message_id": stored}, key=["segment_id", "stored_message_id"])
+    from . import gate_codes
+    gate_codes.offer_stored(conn, segment_id, int(stored))
     return True
 
 

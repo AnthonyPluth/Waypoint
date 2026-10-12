@@ -9,14 +9,15 @@ from sqlalchemy import delete, func, select
 
 from tests.privacy import no_leaks
 from tests.shared import ServerCase, freeze_today
+from tests.test_gate_codes import png
 from waypoint import oidc
 from waypoint.domain import loyalty, people, trips
 from waypoint.domain.visibility import Viewer
 from waypoint.server import mcp_access, mcp_http, mcp_oauth, mcp_server
 from waypoint.server.api import trips as trips_api
 from waypoint.server.common import ApiError, _current
-from waypoint.storage import db
-from waypoint.storage.models import OAuthGrant, Segment, Trip
+from waypoint.storage import db, gate_codes
+from waypoint.storage.models import Mailbox, OAuthGrant, Segment, Trip
 
 VERIFIER = "v" * 50
 CALLBACK = "http://127.0.0.1:1/cb"
@@ -472,6 +473,49 @@ class WriteTests(Assistants):
             self.assertFalse(marked[name]["destructive"], name)
         for t in marked.values():
             self.assertIn("Ask the person", t["description"])
+
+
+class GateCodeTests(Assistants):
+    PICTURE = b"\x89PNG\r\n\x1a\n" + b"CANARY-GATE-MCP-5H7V" + bytes(8)
+
+    def setUp(self):
+        super().setUp()
+        self.switch(True)
+        with db.session() as conn:
+            seg = trips.add_segment(conn, self.jane, {"kind": "parking", "origin": "Example Airport Lot", "start_local": "2026-10-01T05:00",
+                                                      "end_local": "2026-10-04T03:00", "start_zone": "America/New_York", "end_zone": "America/New_York",
+                                                      "travelers": [{"person_id": self.jane.person_id, "name": None}]}, self.jane_trip["id"])
+            assert seg is not None
+            self.parking = seg["id"]
+            box = int(conn.execute(Mailbox.__table__.insert().values(owner_sub="u-jane", address="jane@gmail.example", token="t", status="connected",
+                                                                     created=1.0)).lastrowid)
+            gate_codes.offer(conn, self.parking, box, [{"type": "image/png", "data": png(290, 290, self.PICTURE)}], "2026-09-20", 1.0)
+        self.addCleanup(self.forget_parking)
+
+    def forget_parking(self):
+        with db.session() as conn:
+            conn.execute(delete(Segment).where(Segment.id == self.parking))
+            conn.execute(delete(Mailbox))
+
+    def test_an_assistant_reads_the_booking_with_no_sign_of_a_code_and_cannot_reach_it_by_any_route(self):
+        self.assertTrue(self.stored())
+        with no_leaks(self, "CANARY-GATE-MCP-5H7V", base64.b64encode(self.PICTURE).decode()[:24]):
+            reads = [self.tool(ALL, "get_trip", {"trip_id": self.jane_trip["id"]}), self.tool(ALL, "upcoming", {"days": 365}), self.tool(ALL, "list_trips"),
+                     self.tool(ALL, "call_endpoint", {"method": "GET", "path": f"/api/segments/{self.parking}"})]
+            for text in map(json.dumps, reads):
+                self.assertNotIn("gate_code", text)
+                self.assertNotIn("CANARY-GATE-MCP-5H7V", text)
+            self.assertIn("Example Airport Lot", json.dumps(reads[0]))
+            self.assertIn("Example Airport Lot", json.dumps(reads[3]))
+            for method, body in (("GET", None), ("POST", {"email": 0, "image": 0})):
+                with self.subTest(method=method):
+                    self.assertIn("can't reach", self.refused(ALL, "call_endpoint", {"method": method, "path": f"/api/segments/{self.parking}/code", "body": body or {}}))
+                    with self.assertRaises(mcp_server.ToolError):
+                        mcp_http.local_fetch(f"segments/{self.parking}/code", {}, body, self.access(ALL), method)
+
+    def stored(self) -> bool:
+        with db.session() as conn:
+            return gate_codes.image_for(conn, self.parking) is not None
 
 
 class LapseTests(Assistants):
