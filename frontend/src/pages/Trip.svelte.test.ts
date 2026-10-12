@@ -615,10 +615,12 @@ describe("Trip", () => {
       trip_id: 1, kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London", travelers: [{ person_id: 2 }] }) }));
   });
 
-  it("says which time zone a stay's times are in, so one worked out from its address can be checked", async () => {
+  it("doesn't show a stay's time zone on its card", async () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
-    expect(screen.getByTestId("stay-zone")).toHaveTextContent("Europe/London");
+    expect(screen.queryByTestId("stay-zone")).toBeNull();
+    expect(screen.queryByText("Time zone")).toBeNull();
+    expect(screen.queryByText(/Europe\/London|Europe London/)).toBeNull();
   });
 
   it("asks a stay for one time zone, and says it can be worked out from the address", async () => {
@@ -667,7 +669,7 @@ describe("Trip", () => {
       expect(within(card).getByText("Covered")).toBeInTheDocument();
       expect(within(card).getByText("Blue hatchback")).toBeInTheDocument();
       expect(screen.getByText("Address")).toBeInTheDocument();
-      expect(screen.getByTestId("stay-zone")).toHaveTextContent("America/New York");
+      expect(screen.queryByTestId("stay-zone")).toBeNull();
       expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", lot.links.directions!);
     });
 

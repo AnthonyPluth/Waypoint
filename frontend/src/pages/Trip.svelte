@@ -358,9 +358,6 @@
     <dd class="mt-1 text-base font-medium">{dayLabel(s.start_local)}, {#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} />{/if}</dd></div>
   <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
     <dd class="mt-1 text-base font-medium">{#if untimed(s)}<span class="text-muted-foreground">time not recorded</span>{:else}{dayLabel(s.end_local)}, <PlaceTime local={s.end_local} />{/if}</dd></div>
-  {#if (s.kind === "hotel" || s.kind === "parking") && !untimed(s)}
-    <div><dt class="eyebrow">Time zone</dt><dd class="mt-1 text-sm text-muted-foreground" data-testid="stay-zone">{s.start_zone.replaceAll("_", " ")}</dd></div>
-  {/if}
 {/snippet}
 
 {#snippet links(s: Segment)}
@@ -453,9 +450,7 @@
       <li class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
         <span class="break-words font-medium">{who.name}{#if who.seat}{" "}<span class="font-normal text-muted-foreground">· Seat {who.seat}</span>{/if}</span>
         <span class="text-muted-foreground">
-          {#if m?.state === "found"}{m.entry.program} <LoyaltyNumber entry={m.entry} />
-          {:else if m?.state === "none"}No {m.program} number yet · <a class="underline" href="#people">add one in People</a>
-          {:else if m?.state === "unmatched"}Not matched to a person in <a class="underline" href="#people">People</a>{/if}
+          {#if m?.state === "unmatched"}Not matched to a person in <a class="underline" href="#people">People</a>{/if}
         </span>
       </li>
     {/each}
