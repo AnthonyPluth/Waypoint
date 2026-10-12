@@ -11,6 +11,7 @@ import { segment, trip } from "../../test/fixtures";
 import RouteReplay from "./RouteReplay.svelte";
 
 const places: TripPlaces = {
+  home: null,
   airports: [
     { code: "MSP", city: "Minneapolis", latitude: 44.8848, longitude: -93.2223 },
     { code: "SFO", city: "San Francisco", latitude: 37.6213, longitude: -122.379 },

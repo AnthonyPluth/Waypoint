@@ -23,6 +23,7 @@ from waypoint.server import jobs
 from waypoint.server.api import ai as ai_api
 from waypoint.server.api import logos as logos_api
 from waypoint.server.api import backups, flight_import as flight_import_api, flightstatus as flightstatus_api, mailboxes, people, state, stats as stats_api
+from waypoint.server.api import home as home_api
 from waypoint.server.api import mcp as mcp_api
 from waypoint.server.api import review as review_api
 from waypoint.server.api import assistant as assistant_api
@@ -424,6 +425,10 @@ class Replies(DbCase):
         self.check("GET /api/stats", stats_api.api_stats(self.c, {"person": ["all"], "year": ["2026"]}, {}))
         self.check("GET /api/distance-unit", stats_api.api_distance_unit(self.c, {}, {}))
         self.check("POST /api/distance-unit", stats_api.api_distance_unit_save(self.c, {}, {"distance_unit": "km"}))
+        self.check("GET /api/home", home_api.api_home(self.c, {}, {}))
+        self.check("POST /api/home", home_api.api_home_save(self.c, {}, {"city": "Springfield", "state": "IL", "zip": "62701", "country": "US"}))
+        self.check("GET /api/home", home_api.api_home(self.c, {}, {}))
+        self.check("DELETE /api/home", home_api.api_home_clear(self.c, {}, {}))
 
     def test_flight_status(self):
         _current.user = {"name": None, "email": None, "local": True}
@@ -483,7 +488,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}", "POST /api/segments/{id}/code",
                                      "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
-                                     "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/flight-status", "POST /api/flight-status/{id}",
+                                     "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/home", "POST /api/home", "DELETE /api/home", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
                                      "POST /api/loyalty/{id}/reveal",
                                      "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",

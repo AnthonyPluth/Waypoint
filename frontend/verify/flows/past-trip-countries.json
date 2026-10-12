@@ -1,0 +1,28 @@
+{
+  "name": "past-trip-countries",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "button:has-text('Add a past trip')" },
+    { "wait_for": "label:has(> span:text-is('Country')) select" },
+    { "select": { "selector": "label:has(> span:text-is('Country')) select", "index": 62 } },
+    { "fill": { "selector": "label:has(> span:text-is('First day')) input", "text": "2005-03-01" } },
+    { "fill": { "selector": "label:has(> span:text-is('Last day')) input", "text": "2005-03-10" } },
+    { "click": "button:has-text('Add another country')" },
+    { "select": { "selector": "label:has(> span:text-is('Country 2')) select", "index": 166 } },
+    { "fill": { "selector": "label:has(> span:text-is('Last day 2')) input", "text": "2005-03-20" } },
+    { "click": "button:has-text('Add another country')" },
+    { "select": { "selector": "label:has(> span:text-is('Country 3')) select", "index": 25 } },
+    { "fill": { "selector": "label:has(> span:text-is('Last day 3')) input", "text": "2005-03-28" } },
+    { "click": "form[data-editor] fieldset input[type=checkbox]" },
+    { "scroll_to": "form[data-editor]" },
+    { "screenshot": "form" },
+    { "click": "form[data-editor] button[type=submit]" },
+    { "wait_for": "text=Trip to Ecuador, Peru and Bolivia" },
+    { "screenshot": "trip" },
+    { "goto": "#stats" },
+    { "expect_text": { "selector": "h1", "text": "Stats" } },
+    { "wait_for": "text=Countries visited" },
+    { "screenshot": "stats" }
+  ]
+}

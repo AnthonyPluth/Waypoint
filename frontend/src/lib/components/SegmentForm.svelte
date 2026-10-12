@@ -8,7 +8,7 @@
   import FlightLength from "$lib/components/FlightLength.svelte";
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
   import { countryChoices } from "$lib/countries";
-  import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, SEAT_LIMIT, SEATED, FOR_EVERYONE, SAME_AS_PICKUP, seatKey, type Draft } from "$lib/segment-form";
+  import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, MAX_VISITS, nextVisitRow, problem, visitBodies, visitRows, type VisitRow, SEAT_LIMIT, SEATED, FOR_EVERYONE, SAME_AS_PICKUP, seatKey, type Draft } from "$lib/segment-form";
 
   let { initial, people, onsaved, oncancel, focus = "", titled = true }: { initial: Draft; people: Person[]; onsaved: (s: Segment) => void; oncancel: () => void; focus?: string; titled?: boolean } = $props();
   // svelte-ignore state_referenced_locally
@@ -24,6 +24,19 @@
   };
   onMount(() => { if (focus) document.getElementById(focus)?.focus(); });
 
+  const rows = $derived(visitRows(d));
+  const setRow = (i: number, patch: Partial<VisitRow>) => {
+    if (i === 0) Object.assign(d, patch);
+    else d.more = (d.more ?? []).map((r, n) => (n === i - 1 ? { ...r, ...patch } : r));
+  };
+  const addCountry = () => (d.more = [...(d.more ?? []), nextVisitRow(rows.at(-1) as VisitRow)]);
+  const dropCountry = (i: number) => {
+    const left = rows.filter((_, n) => n !== i);
+    Object.assign(d, left[0]);
+    d.more = left.slice(1);
+  };
+  const localDay = (value: string) => (value ? `${value}T00:00` : "");
+
   const flight = $derived(d.kind === "flight");
   const editing = $derived(d.id !== null);
   const visit = $derived(d.kind === "visit");
@@ -37,11 +50,35 @@
     const msg = problem(d);
     if (msg) { error = msg; return; }
     error = "";
+    if (visit && !editing) { await saveVisits(); return; }
     const saved = await actGet(() => d.id === null
       ? apiCall<"POST /api/segments">("/api/segments", { method: "POST", body: { ...body(d), trip_id: d.tripId } })
       : apiCall<"POST /api/segments/{id}">(`/api/segments/${d.id}`, { method: "POST", body: body(d) }),
     { busy: (on) => (saving = on), onError: (m) => (error = m) });
     if (saved) onsaved(saved);
+  }
+
+  async function saveVisits() {
+    const bodies = visitBodies(d);
+    let first: Segment | null = null;
+    saving = true;
+    try {
+      for (const [i, one] of bodies.entries()) {
+        const saved = await actGet(() => apiCall<"POST /api/segments">("/api/segments", { method: "POST", body: { ...one, trip_id: first?.trip_id ?? d.tripId } }),
+          { onError: (m) => (error = bodies.length > 1 ? `Country ${i + 1}: ${m}${first ? " The countries before it were saved." : ""}` : m) });
+        if (!saved) {
+          if (first) {
+            const left = rows.slice(i);
+            d.tripId = first.trip_id;
+            Object.assign(d, left[0]);
+            d.more = left.slice(1);
+          }
+          return;
+        }
+        first ??= saved;
+      }
+    } finally { saving = false; }
+    if (first) onsaved(first);
   }
 
   const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
@@ -59,17 +96,28 @@
         </select></label>
       {#if visit}
         <p class="text-sm text-muted-foreground">For a trip you remember only by country and dates. Add flights or hotels to it later if you find them.</p>
-        <label class={label}><span class="font-medium">Country</span>
-          <select bind:value={d.destination} class={selectClass}>
-            <option value="">Choose a country</option>
-            {#each countries as [code, name] (code)}<option value={code}>{name}</option>{/each}
-          </select></label>
-        <div class="grid grid-cols-2 gap-3">
-          <label class={label}><span class="font-medium">First day</span>
-            <Input type="date" value={day(d.start_local)} oninput={(e) => { d.start_local = e.currentTarget.value ? `${e.currentTarget.value}T00:00` : ""; }} autocomplete="off" /></label>
-          <label class={label}><span class="font-medium">Last day</span>
-            <Input type="date" value={day(d.end_local)} oninput={(e) => { d.end_local = e.currentTarget.value ? `${e.currentTarget.value}T00:00` : ""; }} autocomplete="off" /></label>
-        </div>
+        {#each rows as row, i (i)}
+          {@const named = rows.length > 1 ? ` ${i + 1}` : ""}
+          <div class="flex flex-col gap-3" class:rounded-xl={rows.length > 1} class:border={rows.length > 1} class:border-border={rows.length > 1} class:p-3={rows.length > 1} data-country>
+            <label class={label}><span class="font-medium">Country{named}</span>
+              <select value={row.destination} onchange={(e) => setRow(i, { destination: e.currentTarget.value })} class={selectClass}>
+                <option value="">Choose a country</option>
+                {#each countries as [code, name] (code)}<option value={code}>{name}</option>{/each}
+              </select></label>
+            <div class="grid grid-cols-2 gap-3">
+              <label class={label}><span class="font-medium">First day{named}</span>
+                <Input type="date" value={day(row.start_local)} oninput={(e) => setRow(i, { start_local: localDay(e.currentTarget.value) })} autocomplete="off" /></label>
+              <label class={label}><span class="font-medium">Last day{named}</span>
+                <Input type="date" value={day(row.end_local)} oninput={(e) => setRow(i, { end_local: localDay(e.currentTarget.value) })} autocomplete="off" /></label>
+            </div>
+            {#if rows.length > 1}
+              <div><Button type="button" variant="outline" size="sm" aria-label={`Remove country ${i + 1}`} onclick={() => dropCountry(i)}>Remove</Button></div>
+            {/if}
+          </div>
+        {/each}
+        {#if !editing}
+          <div><Button type="button" variant="outline" size="sm" disabled={rows.length >= MAX_VISITS} onclick={addCountry}>Add another country</Button></div>
+        {/if}
       {:else}
       <label class={label}><span class="font-medium">Status</span>
         <select bind:value={d.status} class={selectClass}>

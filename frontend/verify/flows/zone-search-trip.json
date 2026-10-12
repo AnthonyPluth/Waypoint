@@ -1,0 +1,20 @@
+{
+  "name": "zone-search-trip",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('London') >> visible=true" },
+    { "wait_for": "text=Add address" },
+    { "click": "button:has-text('Add address') >> visible=true" },
+    { "wait_for": "#segment-address" },
+    { "scroll_to": "label:has-text('Time zone') input" },
+    { "screenshot": "closed" },
+    { "click": "label:has-text('Time zone') input" },
+    { "fill": { "selector": "label:has-text('Time zone') input", "text": "chicago" } },
+    { "wait_for": "[role='option']:has-text('America/Chicago')" },
+    { "screenshot": "matches" },
+    { "fill": { "selector": "label:has-text('Time zone') input", "text": "qqqqzzzz" } },
+    { "wait_for": "text=No matching time zone" },
+    { "screenshot": "no-matches" }
+  ]
+}

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { chooseZone } from "../test/zone";
 import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -396,6 +397,19 @@ describe("Trip", () => {
     expect(within(card).queryByTestId("flight-status")).toBeNull();
   });
 
+  it("shows an untimed hotel’s end day beside time not recorded, and a past trip’s dates with their year and no time not recorded", async () => {
+    held = trip([
+      segment({ id: 1, kind: "hotel", origin: "Harbour Hotel", destination: null, start_local: "2026-03-08T00:00", end_local: "2026-03-10T00:00", details: { time_unknown: "yes" } }),
+      segment({ id: 2, kind: "visit", provider: null, origin: null, destination: "JP", start_local: "2005-03-10T00:00", end_local: "2005-03-29T00:00", details: { time_unknown: "yes" } }),
+    ]);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+    expect(cards[0]).toHaveTextContent(/Check-out\s*Tue, Mar 10, time not recorded/);
+    expect(cards[1]).toHaveTextContent(/From\s*Thu, Mar 10, 2005\s*To\s*Tue, Mar 29, 2005/);
+    expect(cards[1]).not.toHaveTextContent("time not recorded");
+    expect(cards[1]).not.toHaveTextContent("Time not recorded");
+  });
+
   it("offers each booking’s actions, and no Wallet", async () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
@@ -651,7 +665,7 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Hotel name"), "Harbour Hotel");
     await u.type(screen.getByLabelText(/^Check-in/), "2026-11-21T15:00");
     await u.type(screen.getByLabelText(/^Check-out/), "2026-11-27T10:00");
-    await u.selectOptions(screen.getByLabelText(/^Time zone/), "Europe/London");
+    await chooseZone(screen.getByLabelText(/^Time zone/), "Europe/London");
     expect(screen.queryByLabelText("Sam Doe")).toBeNull();
     await u.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({
@@ -688,7 +702,7 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Lot name"), "Example Long-Term Lot");
     await u.type(screen.getByLabelText(/^Entry/), "2026-11-20T16:00");
     await u.type(screen.getByLabelText(/^Exit/), "2026-11-27T21:00");
-    await u.selectOptions(screen.getByLabelText(/^Time zone/), "America/New_York");
+    await chooseZone(screen.getByLabelText(/^Time zone/), "America/New_York");
     await u.type(screen.getByLabelText("Space type (covered, economy, valet)"), "Covered");
     await u.type(screen.getByLabelText("Vehicle (make and colour)"), "Blue hatchback");
     expect(screen.queryByLabelText("Sam Doe")).toBeNull();

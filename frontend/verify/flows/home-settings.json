@@ -1,0 +1,26 @@
+{
+  "name": "home-settings",
+  "page": "settings",
+  "allow_console": ["status of 400"],
+  "steps": [
+    { "goto": "#settings/travel" },
+    { "wait_for": "#home-title" },
+    { "scroll_to": "#home-title" },
+    { "screenshot": "empty" },
+    { "fill": { "selector": "label:has-text('City') input", "text": "12 Main Street" } },
+    { "click": "button:has-text('Save') >> visible=true" },
+    { "wait_for": "#home-problem [role='alert']" },
+    { "screenshot": "error" },
+    { "fill": { "selector": "label:has-text('City') input", "text": "Nowhereville" } },
+    { "click": "button:has-text('Save') >> visible=true" },
+    { "expect_text": { "selector": "#home-problem", "text": "can’t place this on the map" } },
+    { "screenshot": "cannot-place" },
+    { "fill": { "selector": "label:has-text('City') input", "text": "Kansas City" } },
+    { "fill": { "selector": "label:has-text('State or region') input", "text": "MO" } },
+    { "click": "button:has-text('Save') >> visible=true" },
+    { "wait_for": "button:has-text('Clear'):not([disabled])" },
+    { "screenshot": "saved" },
+    { "click": "button:has-text('Clear') >> visible=true" },
+    { "wait_for": "button:has-text('Clear')[disabled]" }
+  ]
+}

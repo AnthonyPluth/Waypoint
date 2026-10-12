@@ -4,6 +4,7 @@
   import AirportCode from "$lib/components/AirportCode.svelte";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
+  import DayTime from "$lib/components/DayTime.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import RouteLine from "$lib/components/RouteLine.svelte";
   import StatusChip from "$lib/components/StatusChip.svelte";
@@ -26,6 +27,7 @@
   const flight = $derived(s.kind === "flight");
   const cancelled = $derived(s.status === "cancelled");
   const unknown = $derived(untimed(s));
+  const noHeadline = $derived(s.kind === "visit" && unknown && !cancelled);
   const status = $derived(flight && !cancelled && flightStatus.list?.enabled ? statusFor(s.id) : undefined);
   const chips = $derived(segmentChips(s.status, status, !!flightStatus.list?.enabled));
   const codes = $derived(bookings.filter((b) => b.confirmation));
@@ -54,7 +56,7 @@
 <svelte:element this={tag} {id} class={`pass scroll-mt-20 ${cls}`} class:ring-2={highlight} class:ring-ring={highlight} class:opacity-80={cancelled} aria-label={label ?? (tag === "section" ? headline(s) : undefined)} data-kind={s.kind} data-progress={flight ? progress : undefined}>
   <div class="flex flex-col gap-4 p-6 md:p-8">
     {#if eyebrow}<p class="eyebrow flex items-center gap-2">{#if pulse}<span class="size-2 animate-pulse rounded-full bg-primary motion-reduce:animate-none" aria-hidden="true"></span>{/if}{eyebrow}</p>{/if}
-    {#key passHeadline(s, now)}<p class="countdown text-heading font-semibold" class:text-primary={!cancelled} class:text-destructive={cancelled} data-headline data-countdown>{passHeadline(s, now)}</p>{/key}
+    {#if !noHeadline}{#key passHeadline(s, now)}<p class="countdown text-heading font-semibold" class:text-primary={!cancelled} class:text-destructive={cancelled} data-headline data-countdown>{passHeadline(s, now)}</p>{/key}{/if}
     {#if flight}<svelte:element this={`h${level}`} class="sr-only">{headline(s)}</svelte:element>{/if}
 
     {#if showCode && codes.length}
@@ -100,8 +102,8 @@
           </div>
         {:else}
         <div class="col-span-3 flex flex-wrap justify-between gap-x-4 text-sm">
-          <p>{#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} />{/if}</p>
-          <p class="text-right">{#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.end_local} />{/if}</p>
+          <p><DayTime segment={s} /></p>
+          <p class="text-right"><DayTime segment={s} end /></p>
         </div>
         {/if}
       </div>
@@ -111,9 +113,9 @@
     {:else}
       <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
         <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
-          <dd class="mt-1 font-medium">{dayLabel(s.start_local)}, {#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.start_local} />{/if}</dd></div>
+          <dd class="mt-1 font-medium"><DayTime segment={s} dated /></dd></div>
         <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
-          <dd class="mt-1 font-medium">{dayLabel(s.end_local)}, {#if unknown}<span class="text-muted-foreground">time not recorded</span>{:else}<PlaceTime local={s.end_local} />{/if}</dd></div>
+          <dd class="mt-1 font-medium"><DayTime segment={s} end dated /></dd></div>
       </dl>
     {/if}
     {#if details}{@render details()}{/if}

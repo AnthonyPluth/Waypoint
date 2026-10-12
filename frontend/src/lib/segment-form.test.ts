@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blank, body, DETAILS, draftOf, longFlightWarning, problem, type Draft, type Kind } from "./segment-form";
+import { blank, body, DETAILS, draftOf, longFlightWarning, MAX_VISITS, nextVisitRow, problem, visitBodies, visitRows, type Draft, type Kind, type VisitRow } from "./segment-form";
 import { segment } from "../test/fixtures";
 
 const flight = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), origin: "JFK", destination: "LHR", start_local: "2026-11-20T19:00", end_local: "2026-11-21T07:10", people: [1], ...extra });
@@ -250,6 +250,37 @@ describe("a past visit", () => {
     const sent = body(visit());
     expect(sent).toMatchObject({ kind: "visit", origin: null, destination: "JP", travelers: [{ person_id: 1 }] });
     expect(sent).not.toHaveProperty("start_zone");
+  });
+});
+
+describe("a past trip of several countries", () => {
+  const many = (more: VisitRow[]): Draft => ({ ...blank(), kind: "visit", destination: "ec", start_local: "2005-03-01T00:00", end_local: "2005-03-10T00:00", people: [1], more });
+  const row = (destination: string, first: string, last: string): VisitRow => ({ destination, start_local: `${first}T00:00`, end_local: `${last}T00:00` });
+
+  it("starts a new row on the previous row's last day, with no country", () => {
+    expect(nextVisitRow(row("ec", "2005-03-01", "2005-03-10"))).toEqual({ destination: "", start_local: "2005-03-10T00:00", end_local: "2005-03-10T00:00" });
+  });
+  it("lists the first row and then the others", () => {
+    expect(visitRows(many([row("pe", "2005-03-10", "2005-03-20")])).map((r) => r.destination)).toEqual(["ec", "pe"]);
+    expect(visitRows({ ...many([]), more: undefined })).toHaveLength(1);
+  });
+  it("sends one booking for each row, each with its own country and days and the same travellers", () => {
+    const sent = visitBodies(many([row("pe", "2005-03-10", "2005-03-20")]));
+    expect(sent.map((b) => [b.destination, b.start_local, b.end_local])).toEqual([["EC", "2005-03-01T00:00", "2005-03-10T00:00"], ["PE", "2005-03-10T00:00", "2005-03-20T00:00"]]);
+    expect(sent.every((b) => b.kind === "visit" && b.travelers?.[0]?.person_id === 1)).toBe(true);
+  });
+  it("names the row a problem is in, and keeps the single-country wording when there is one row", () => {
+    expect(problem(many([row("pe", "2005-03-10", "2005-03-20")]))).toBeNull();
+    expect(problem(many([row("", "2005-03-10", "2005-03-20")]))).toBe("Country 2: Choose the country");
+    expect(problem(many([row("pe", "2005-03-10", "2005-03-09")]))).toBe("Country 2: The last day can’t be before the first");
+    expect(problem({ ...many([row("pe", "2005-03-10", "2005-03-20")]), destination: "" })).toBe("Country 1: Choose the country");
+    expect(problem(many([]))).toBeNull();
+    expect(problem({ ...many([]), destination: "" })).toBe("Choose the country");
+  });
+  it("allows the same country twice and overlapping days, up to 20 rows", () => {
+    expect(problem(many([row("ec", "2005-03-05", "2005-03-20"), row("pe", "2005-03-06", "2005-03-07")]))).toBeNull();
+    expect(problem(many(Array.from({ length: MAX_VISITS - 1 }, () => row("pe", "2005-03-10", "2005-03-20"))))).toBeNull();
+    expect(problem(many(Array.from({ length: MAX_VISITS }, () => row("pe", "2005-03-10", "2005-03-20"))))).toBe(`Add at most ${MAX_VISITS} countries`);
   });
 });
 

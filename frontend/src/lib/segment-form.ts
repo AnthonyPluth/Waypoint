@@ -28,6 +28,10 @@ export const FOR_EVERYONE: Kind[] = ["hotel", "car", "parking"];
 
 export const seatKey = (who: number | string): string => (typeof who === "number" ? `p${who}` : `n${who}`);
 
+export const MAX_VISITS = 20;
+
+export type VisitRow = { destination: string; start_local: string; end_local: string };
+
 export type PortDraft = { name: string; zone: string; arrive: string; depart: string };
 
 export type Draft = {
@@ -55,7 +59,12 @@ export type Draft = {
   untimed?: [string, string];
   pickup?: string;
   addressField?: boolean;
+  more?: VisitRow[];
 };
+
+export const visitRows = (d: Draft): VisitRow[] => [{ destination: d.destination, start_local: d.start_local, end_local: d.end_local }, ...(d.more ?? [])];
+
+export const nextVisitRow = (previous: VisitRow): VisitRow => ({ destination: "", start_local: previous.end_local, end_local: previous.end_local });
 
 export const blank = (tripId: number | null = null, currency = DEFAULT_CURRENCY): Draft => ({
   id: null, tripId, kind: "flight", status: "confirmed", provider: "", confirmation: "", origin: "", destination: "", start_local: "", end_local: "",
@@ -81,6 +90,14 @@ export const draftOf = (s: Segment, currency = DEFAULT_CURRENCY): Draft => ({
 const AIRPORT = /^[A-Za-z]{3}$/;
 const LOCAL = /^\d{4}-\d\d-\d\dT\d\d:\d\d/;
 
+export function visitProblem(row: VisitRow): string | null {
+  if (!/^[A-Za-z]{2}$/.test(row.destination.trim())) return "Choose the country";
+  if (!LOCAL.test(row.start_local)) return "Enter the first day you were there";
+  if (!LOCAL.test(row.end_local)) return "Enter the last day you were there";
+  if (row.end_local < row.start_local) return "The last day can’t be before the first";
+  return null;
+}
+
 export const MAX_FLIGHT_HOURS = 30;
 
 export function longFlightWarning(start: string, end: string, startZone: string | null, endZone: string | null): string | null {
@@ -97,10 +114,12 @@ function knownZone(zone: string): boolean {
 
 export function problem(d: Draft): string | null {
   if (d.kind === "visit") {
-    if (!/^[A-Za-z]{2}$/.test(d.destination.trim())) return "Choose the country";
-    if (!LOCAL.test(d.start_local)) return "Enter the first day you were there";
-    if (!LOCAL.test(d.end_local)) return "Enter the last day you were there";
-    if (d.end_local < d.start_local) return "The last day can’t be before the first";
+    const rows = visitRows(d);
+    if (rows.length > MAX_VISITS) return `Add at most ${MAX_VISITS} countries`;
+    for (const [i, row] of rows.entries()) {
+      const found = visitProblem(row);
+      if (found) return rows.length > 1 ? `Country ${i + 1}: ${found}` : found;
+    }
     return d.people.length + d.printed.length === 0 ? "Choose who’s travelling" : null;
   }
   const flight = d.kind === "flight";
@@ -164,6 +183,9 @@ export function priceOf(d: Pick<Draft, "cost" | "currency">): { amount_minor: nu
   const amount = d.cost.trim() ? toMinor(d.cost, currency) : null;
   return amount === null ? null : { amount_minor: amount, currency };
 }
+
+export const visitBodies = (d: Draft): (SegmentBody & SegmentEdit)[] =>
+  visitRows(d).map((row) => body({ ...d, ...row, more: [] }));
 
 export function body(d: Draft): SegmentBody & SegmentEdit {
   const flight = d.kind === "flight";
