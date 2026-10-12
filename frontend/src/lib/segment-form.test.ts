@@ -258,6 +258,11 @@ describe("a past visit", () => {
     expect(problem(visit({ destination: "US", details: {} }))).toBeNull();
     expect(problem(visit({ destination: "US", details: { state: "ZZ" } }))).toBe("Choose one of the states, or leave the state blank");
   });
+  it("keeps a state per country row, and refuses one that is not a state", () => {
+    const rows = visit({ destination: "us", details: { state: "AK" }, more: [{ destination: "CA", start_local: "2006-04-12T00:00", end_local: "2006-04-14T00:00" }, { destination: "US", start_local: "2006-04-14T00:00", end_local: "2006-04-16T00:00", state: "HI" }] });
+    expect(visitBodies(rows).map((b) => b.details)).toEqual([{ state: "AK" }, {}, { state: "HI" }]);
+    expect(problem(visit({ more: [{ destination: "US", start_local: "2006-04-12T00:00", end_local: "2006-04-14T00:00", state: "ZZ" }] }))).toBe("Country 2: Choose one of the states, or leave the state blank");
+  });
   it("drops the state when the country is not the US, and keeps an existing visit's as it was", () => {
     expect(body(visit({ destination: "ca", details: { state: "AK" } })).details).toEqual({});
     expect(problem(visit({ destination: "ca", details: { state: "AK" } }))).toBeNull();
