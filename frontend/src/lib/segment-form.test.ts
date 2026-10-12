@@ -177,7 +177,7 @@ describe("the fields each kind shows", () => {
   it("has the address, phone and room for a hotel, the pick-up address, phone and class for a car, and terminal, seat and cabin for a flight", () => {
     const names = (k: Kind) => DETAILS[k].map(([, label]) => label);
     expect(names("hotel")).toEqual(["Address", "Room", "Phone"]);
-    expect(names("car")).toEqual(["Pick-up address", "Car class", "Phone"]);
+    expect(names("car")).toEqual(["Car class", "Phone"]);
     expect(names("cruise")).toEqual(["Ship", "Cabin", "Deck", "Terminal address", "Phone"]);
     expect(names("flight")).toEqual(["Flight number", "Terminal", "Cabin"]);
     expect(names("parking")).toEqual(["Address", "Space type (covered, economy, valet)", "Vehicle (make and colour)", "Notes"]);
@@ -233,5 +233,47 @@ describe("the cost", () => {
     expect(problem(priced({ cost: "abc" }))).toBe("Enter the cost as an amount like 1240.00");
     expect(problem(priced({ currency: "dollars" }))).toBe("Enter the cost’s currency as a three-letter code like USD");
     expect(problem(priced({ cost: "", currency: "x" }))).toBeNull();
+  });
+});
+
+describe("a rental car's draft", () => {
+  it("offers the address field only when the stored address differs from the pick-up", () => {
+    const stored = (address: string | undefined) => segment({ kind: "car", origin: "Example Rental", details: address === undefined ? {} : { address } });
+    expect(draftOf(stored("1 Rental Way")).addressField).toBe(true);
+    expect(draftOf(stored(" example  rental ")).addressField).toBe(false);
+    expect(draftOf(stored(undefined)).addressField).toBe(false);
+  });
+});
+
+describe("a rental car's one pick-up field", () => {
+  it("saves the pick-up text as the address of a new car", () => {
+    expect(body(car({ origin: " Example Rental, 1 Rental Way " })).details).toEqual({ address: "Example Rental, 1 Rental Way" });
+  });
+
+  it("follows the pick-up text when the address was the old pick-up text", () => {
+    expect(body(car({ origin: "New Branch", pickup: "Example Rental", details: { address: "Example Rental" } })).details?.address).toBe("New Branch");
+  });
+
+  it("fills an empty address of an existing car from the pick-up text", () => {
+    expect(body(car({ origin: "Example Rental", pickup: "Example Rental", details: {} })).details?.address).toBe("Example Rental");
+  });
+
+  it("keeps an address that differs from the pick-up text, even when the pick-up changes", () => {
+    const kept = { address: "1 Rental Way, Bristol BS48 3DY" };
+    expect(body(car({ origin: "Example Rental", pickup: "Example Rental", details: kept })).details?.address).toBe(kept.address);
+    expect(body(car({ origin: "New Branch", pickup: "Example Rental", details: kept })).details?.address).toBe(kept.address);
+  });
+
+  it("saves an empty drop-off as the pick-up text and keeps a stated one", () => {
+    expect(body(car({ destination: "" })).destination).toBe("Example Rental");
+    expect(body(car({ destination: "  " })).destination).toBe("Example Rental");
+    expect(body(car({ destination: "Other Branch" })).destination).toBe("Other Branch");
+    expect(body({ ...car({ destination: "" }), kind: "train" }).destination).toBeNull();
+  });
+
+  it("lets a kept address be edited, and a cleared one follows the pick-up again", () => {
+    const stored = { address: "1 Rental Way, Bristol BS48 3DY" };
+    expect(body(car({ pickup: "Example Rental", details: { address: "2 Depot Road" } })).details?.address).toBe("2 Depot Road");
+    expect(body(car({ pickup: "Example Rental", details: { ...stored, address: "" } })).details?.address).toBe("Example Rental");
   });
 });

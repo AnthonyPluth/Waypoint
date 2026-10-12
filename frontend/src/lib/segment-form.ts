@@ -12,7 +12,7 @@ export const ADDRESS_LIMIT = 300;
 export const DETAILS: Record<Kind, [string, string][]> = {
   flight: [["flight_number", "Flight number"], ["terminal", "Terminal"], ["cabin", "Cabin"]],
   hotel: [["address", "Address"], ["room", "Room"], ["phone", "Phone"]],
-  car: [["address", "Pick-up address"], ["car_class", "Car class"], ["phone", "Phone"]],
+  car: [["car_class", "Car class"], ["phone", "Phone"]],
   train: [["cabin", "Class"], ["address", "Station address"]],
   cruise: [["ship", "Ship"], ["room", "Cabin"], ["deck", "Deck"], ["address", "Terminal address"], ["phone", "Phone"]],
   parking: [["address", "Address"], ["space_type", "Space type (covered, economy, valet)"], ["vehicle", "Vehicle (make and colour)"], ["notes", "Notes"]],
@@ -52,6 +52,8 @@ export type Draft = {
   currency: string;
   costSource: "email" | "manual" | null;
   untimed?: [string, string];
+  pickup?: string;
+  addressField?: boolean;
 };
 
 export const blank = (tripId: number | null = null, currency = DEFAULT_CURRENCY): Draft => ({
@@ -72,6 +74,7 @@ export const draftOf = (s: Segment, currency = DEFAULT_CURRENCY): Draft => ({
   printed: s.travelers.flatMap((t) => (t.person_id === null ? [t.name] : [])),
   cost: s.price ? amountText(s.price.amount_minor, s.price.currency) : "", currency: s.price?.currency ?? currency, costSource: s.price?.source ?? null,
   ...(untimed(s) && { untimed: [s.start_local, s.end_local] as [string, string] }),
+  ...(s.kind === "car" && { pickup: s.origin ?? "", addressField: differs(s.details.address, s.origin) }),
 });
 
 const AIRPORT = /^[A-Za-z]{3}$/;
@@ -134,6 +137,18 @@ export function problem(d: Draft): string | null {
   return null;
 }
 
+export const differs = (address: string | undefined, origin: string | null | undefined): boolean =>
+  !!address?.trim() && address.trim().split(/\s+/).join(" ").toLowerCase() !== (origin ?? "").trim().split(/\s+/).join(" ").toLowerCase();
+
+export const SAME_AS_PICKUP = "Same as pick-up";
+
+export function carAddress(address: string | undefined, origin: string, previous: string | undefined): string | null {
+  const kept = (address ?? "").trim();
+  const place = origin.trim();
+  if (kept && (previous === undefined || kept !== previous.trim())) return kept;
+  return place || null;
+}
+
 const text = (v: string): string | null => v.trim() || null;
 
 export function priceOf(d: Pick<Draft, "cost" | "currency">): { amount_minor: number; currency: string } | null {
@@ -147,6 +162,11 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
   const shown = new Set(DETAILS[d.kind].map(([key]) => key));
   const details: Record<string, string> = Object.fromEntries(Object.entries(d.details).filter(([key]) => !shown.has(key)));
   for (const [key] of DETAILS[d.kind]) if (d.details[key]?.trim()) details[key] = d.details[key].trim();
+  if (d.kind === "car") {
+    const address = carAddress(d.details.address, d.origin, d.pickup);
+    if (address) details.address = address;
+    else delete details.address;
+  }
   if (d.untimed && d.untimed[0] === d.start_local && d.untimed[1] === d.end_local) details.time_unknown = "yes";
   else delete details.time_unknown;
   const startZone = d.start_zone.trim(), endZone = d.end_zone.trim() || startZone;
@@ -155,7 +175,7 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
   const seat = (who: number | string) => (seated ? { seat: d.seats[seatKey(who)]?.trim() || null } : {});
   return {
     kind: d.kind, status: d.status, provider: text(d.provider), confirmation: text(d.confirmation),
-    origin: flight ? d.origin.trim().toUpperCase() : text(d.origin), destination: flight ? d.destination.trim().toUpperCase() : text(d.destination),
+    origin: flight ? d.origin.trim().toUpperCase() : text(d.origin), destination: flight ? d.destination.trim().toUpperCase() : text(d.destination) ?? (d.kind === "car" ? text(d.origin) : null),
     start_local: d.start_local, end_local: d.end_local,
     ...(flight || d.kind === "car" || d.kind === "train" ? { ...(startZone && { start_zone: startZone }), ...(d.end_zone.trim() && { end_zone: d.end_zone.trim() }) }
       : d.kind === "hotel" || d.kind === "parking" ? { start_zone: startZone || null }

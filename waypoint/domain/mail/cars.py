@@ -4,7 +4,7 @@ from datetime import time, timedelta
 
 from . import fields, labels, when
 from .booking import Booking, Parsed
-from .fields import Place, Unreadable
+from .fields import Unreadable
 
 MAX_DAYS = 90
 PICK_UP = time(12, 0)
@@ -12,7 +12,6 @@ DROP_OFF = time(12, 0)
 TABLE = fields.Table(labels.table("car"))
 ABOUT = labels.about("car")
 CORE = ("start", "start_place", "start_date", "start_time", "end", "end_place", "end_date", "end_time", "location")
-NONE = Place(None, "", False, None)
 
 
 def _booking(section: fields.Section, rows: list[fields.Row]) -> Booking:
@@ -21,9 +20,7 @@ def _booking(section: fields.Section, rows: list[fields.Row]) -> Booking:
     start = pick_up.place if pick_up.place.name else shared
     if start.name is None:
         raise Unreadable("no pick-up location found")
-    end = drop_off.place if drop_off.place.name else start if drop_off.place.same or shared.name else NONE
-    if end.name is None:
-        raise Unreadable("no drop-off location found")
+    end = drop_off.place if drop_off.place.name else start
     if pick_up.day is None:
         raise Unreadable("no pick-up date found")
     if drop_off.day is None:

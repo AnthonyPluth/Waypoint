@@ -30,7 +30,7 @@
   import TripDone from "$lib/components/TripDone.svelte";
   import { countNote, formatMoney, formatTotals } from "$lib/money";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { appWord, bookingCards, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
+  import { appWord, bookingCards, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, samePlace, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
@@ -394,10 +394,10 @@
 {#snippet links(s: Segment)}
   {#if s.check_times}<p class="text-sm text-signal-ink" role="note">Check the times: the email gave them in UTC and Waypoint couldn’t tell which clock they mean. Edit the booking to correct or confirm them.</p>{/if}
   {#if s.kind === "hotel" || s.kind === "car" || s.kind === "cruise" || s.kind === "parking"}
-    {#if s.details.address}
+    {#if s.details.address && !(s.kind === "car" && samePlace(s.details.address, s.origin))}
       <div class="mt-2 text-sm"><p class="eyebrow">{s.kind === "car" ? "Pick-up address" : s.kind === "cruise" ? "Terminal address" : "Address"}</p>
         <CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" /></div>
-    {:else if s.status !== "cancelled" && !over}
+    {:else if s.kind !== "car" && !s.details.address && s.status !== "cancelled" && !over}
       <p class="mt-2 text-sm"><button type="button" class="underline underline-offset-2 phone:min-h-11" onclick={() => edit(s, "segment-address")}
         aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
     {/if}

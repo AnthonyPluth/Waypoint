@@ -377,6 +377,8 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
     if status not in STATUSES:
         raise Invalid(f"The status must be one of {', '.join(STATUSES)}")
     origin, destination = fields.get("origin"), fields.get("destination")
+    if kind == "car" and origin and not (destination or "").strip():
+        destination = origin
     if kind == "flight":
         for label, code in (("origin", origin), ("destination", destination)):
             if not code or not IATA.fullmatch(code):
@@ -387,7 +389,7 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
         if kind == "parking" and fields.get("end_zone"):
             end_zone = _zone(fields["end_zone"], "exit")
     else:
-        address = (fields.get("details") or {}).get("address")
+        address = (fields.get("details") or {}).get("address") or (origin if kind == "car" else None)
         start_zone = _place_zone(conn, kind, origin, fields.get("start_zone"), "start", address)
         end_zone = _place_zone(conn, kind, destination, fields.get("end_zone") or (start_zone if kind in ("car", "train") and not _airport(conn, destination) else None), "end")
     start, end = _local(fields.get("start_local"), "start"), _local(fields.get("end_local"), "end")

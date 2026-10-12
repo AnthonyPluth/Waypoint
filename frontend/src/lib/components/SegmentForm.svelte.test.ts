@@ -18,6 +18,42 @@ const draft = (kind: Kind, extra: Partial<Draft> = {}): Draft => ({
 
 const mount = (initial: Draft, onsaved = vi.fn()) => render(SegmentForm, { props: { initial, people: [], onsaved, oncancel: vi.fn() } });
 
+describe("SegmentForm: a rental car", () => {
+  it("has one pick-up place, no pick-up address, and a drop-off that says it is the same as pick-up", () => {
+    mount(draft("car", { origin: "Example Rental" }));
+    expect(screen.getByLabelText("Pick-up place")).toHaveValue("Example Rental");
+    expect(screen.queryByLabelText(/address/i)).toBeNull();
+    expect(screen.getByLabelText("Drop-off place")).toHaveAttribute("placeholder", "Same as pick-up");
+    expect(screen.getByLabelText("Car class")).toBeInTheDocument();
+    expect(screen.getByLabelText("Phone")).toBeInTheDocument();
+  });
+});
+
+describe("SegmentForm: a rental car's kept address", () => {
+  const kept = "1 Rental Way, Bristol BS48 3DY";
+
+  it("shows a Pick-up address field only for a car whose address differs from its pick-up", () => {
+    mount({ ...draft("car", { origin: "Example Rental", details: { address: kept } }), addressField: true });
+    expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue(kept);
+  });
+
+  it("shows no address field for a new car, or one whose address equals its pick-up", () => {
+    mount(draft("car", { origin: "Example Rental", details: { address: "Example Rental" } }));
+    expect(screen.queryByLabelText(/address/i)).toBeNull();
+  });
+
+  it("lets the address be edited and cleared, and a cleared one follows the pick-up again", async () => {
+    const initial = { ...draft("car", { origin: "Example Rental", pickup: "Example Rental", details: { address: kept } }), addressField: true };
+    mount(initial);
+    const field = screen.getByLabelText(/^Pick-up address/);
+    await userEvent.clear(field);
+    await userEvent.type(field, "2 Depot Road");
+    expect(field).toHaveValue("2 Depot Road");
+    await userEvent.clear(field);
+    expect(field).toHaveValue("");
+  });
+});
+
 describe("SegmentForm: who is travelling", () => {
   const withPeople = (initial: Draft) => render(SegmentForm, { props: { initial, people: [{ id: 1, display_name: "Jane Doe" }, { id: 2, display_name: "Sam Doe" }] as never, onsaved: vi.fn(), oncancel: vi.fn() } });
 
