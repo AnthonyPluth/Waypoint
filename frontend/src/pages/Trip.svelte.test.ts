@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { chooseZone } from "../test/zone";
 import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -651,7 +652,7 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Hotel name"), "Harbour Hotel");
     await u.type(screen.getByLabelText(/^Check-in/), "2026-11-21T15:00");
     await u.type(screen.getByLabelText(/^Check-out/), "2026-11-27T10:00");
-    await u.selectOptions(screen.getByLabelText(/^Time zone/), "Europe/London");
+    await chooseZone(screen.getByLabelText(/^Time zone/), "Europe/London");
     expect(screen.queryByLabelText("Sam Doe")).toBeNull();
     await u.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({
@@ -688,7 +689,7 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Lot name"), "Example Long-Term Lot");
     await u.type(screen.getByLabelText(/^Entry/), "2026-11-20T16:00");
     await u.type(screen.getByLabelText(/^Exit/), "2026-11-27T21:00");
-    await u.selectOptions(screen.getByLabelText(/^Time zone/), "America/New_York");
+    await chooseZone(screen.getByLabelText(/^Time zone/), "America/New_York");
     await u.type(screen.getByLabelText("Space type (covered, economy, valet)"), "Covered");
     await u.type(screen.getByLabelText("Vehicle (make and colour)"), "Blue hatchback");
     expect(screen.queryByLabelText("Sam Doe")).toBeNull();
