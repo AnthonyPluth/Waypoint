@@ -133,7 +133,7 @@ class BackupTests(unittest.TestCase):
         data["revision"] = "0029"
         data["tables"].pop("trip_people")
         seg = data["tables"]["segments"]
-        keep = [i for i, name in enumerate(seg["columns"]) if name != "travelers_from_trip"]
+        keep = [i for i, name in enumerate(seg["columns"]) if name not in ("travelers_from_trip", "price_minor", "price_currency", "price_source")]
         seg["columns"] = [seg["columns"][i] for i in keep]
         seg["rows"] = [[row[i] for i in keep] for row in seg["rows"]]
         dst = db.connect(self.b)
@@ -141,6 +141,29 @@ class BackupTests(unittest.TestCase):
             backup.restore(dst, data)
         dst.commit()
         self.assertEqual([(t.trip_id, t.person_id) for t in dst.orm.scalars(select(TripPerson))], [(5, 11)])
+        src.close(); dst.close()
+
+    def test_a_trips_costs_come_back_with_it_and_a_backup_from_before_costs_restores_with_none(self):
+        src = db.connect(self.a)
+        self.trip_with_people(src)
+        src.execute(update(Segment).where(Segment.id == 9).values(price_minor=124000, price_currency="EUR", price_source="manual"))
+        src.commit()
+        dst = db.connect(self.b)
+        backup.restore(dst, backup.load(backup.dump(src)))
+        dst.commit()
+        self.assertEqual([tuple(r) for r in dst.execute(select(Segment.price_minor, Segment.price_currency, Segment.price_source))],
+                         [(124000, "EUR", "manual")])
+        data = backup.load(backup.dump(src))
+        data["revision"] = "0030"
+        seg = data["tables"]["segments"]
+        keep = [i for i, name in enumerate(seg["columns"]) if name not in ("price_minor", "price_currency", "price_source")]
+        seg["columns"] = [seg["columns"][i] for i in keep]
+        seg["rows"] = [[row[i] for i in keep] for row in seg["rows"]]
+        with mock.patch.object(backup, "head", return_value="not-this-one"):
+            backup.restore(dst, data)
+        dst.commit()
+        self.assertEqual([tuple(r) for r in dst.execute(select(Segment.id, Segment.price_minor, Segment.price_currency, Segment.price_source))],
+                         [(9, None, None, None)])
         src.close(); dst.close()
 
     def test_people_come_back_exactly_with_their_links(self):

@@ -31,6 +31,8 @@ export interface AiSuggestion {
   deck?: string;
   flight_number?: string;
   cabin?: string;
+  price_minor?: number;
+  price_currency?: string;
   sources?: Record<string, string>;
 }
 
@@ -72,6 +74,7 @@ export interface AssistantCreateBody {
   manage_url?: string | null;
   travelers?: TravelerBody[];
   itinerary?: Port[];
+  price?: PriceBody | null;
   entry?: number | null;
 }
 
@@ -195,6 +198,11 @@ export interface BackupContents {
 
 export interface ClaimSuggestions {
   guests: Person[];
+}
+
+export interface CostTotal {
+  currency: string;
+  amount_minor: number;
 }
 
 export interface CruiseDay {
@@ -546,6 +554,17 @@ export interface Preview {
   images: number;
 }
 
+export interface Price {
+  amount_minor: number;
+  currency: string;
+  source: "email" | "manual";
+}
+
+export interface PriceBody {
+  amount_minor: number;
+  currency: string;
+}
+
 export interface ReminderDevice {
   id: number;
   service: string;
@@ -701,6 +720,7 @@ export interface Segment {
   logo_label: string | null;
   hotel_brand: string | null;
   has_email: boolean;
+  price: Price | null;
   links: SegmentLinks;
 }
 
@@ -720,6 +740,7 @@ export interface SegmentBody {
   manage_url?: string | null;
   travelers?: TravelerBody[];
   itinerary?: Port[];
+  price?: PriceBody | null;
 }
 
 export interface SegmentEdit {
@@ -737,6 +758,7 @@ export interface SegmentEdit {
   manage_url?: string | null;
   travelers?: TravelerBody[];
   itinerary?: Port[];
+  price?: PriceBody | null;
 }
 
 export interface SegmentEmails {
@@ -973,6 +995,7 @@ export interface Trip {
   emails: number;
   can_clear_emails: boolean;
   people: number[];
+  costs: TripCosts;
   segments: Segment[];
 }
 
@@ -997,6 +1020,12 @@ export interface TripCityPoint {
   city: string;
   latitude: number;
   longitude: number;
+}
+
+export interface TripCosts {
+  totals: CostTotal[];
+  priced: number;
+  bookings: number;
 }
 
 export interface TripList {

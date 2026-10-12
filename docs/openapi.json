@@ -3147,6 +3147,12 @@
           "cabin": {
             "type": "string"
           },
+          "price_minor": {
+            "type": "integer"
+          },
+          "price_currency": {
+            "type": "string"
+          },
           "sources": {
             "type": "object",
             "additionalProperties": {
@@ -3350,6 +3356,16 @@
             "items": {
               "$ref": "#/components/schemas/Port"
             }
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "entry": {
             "type": [
@@ -3954,6 +3970,22 @@
         },
         "required": [
           "guests"
+        ],
+        "additionalProperties": false
+      },
+      "CostTotal": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "amount_minor": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "currency",
+          "amount_minor"
         ],
         "additionalProperties": false
       },
@@ -5435,6 +5467,45 @@
         ],
         "additionalProperties": false
       },
+      "Price": {
+        "type": "object",
+        "properties": {
+          "amount_minor": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "email",
+              "manual"
+            ]
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "source"
+        ],
+        "additionalProperties": false
+      },
+      "PriceBody": {
+        "type": "object",
+        "properties": {
+          "amount_minor": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
       "ReminderDevice": {
         "type": "object",
         "properties": {
@@ -6142,6 +6213,16 @@
           "has_email": {
             "type": "boolean"
           },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Price"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "links": {
             "$ref": "#/components/schemas/SegmentLinks"
           }
@@ -6172,6 +6253,7 @@
           "logo_label",
           "hotel_brand",
           "has_email",
+          "price",
           "links"
         ],
         "additionalProperties": false
@@ -6267,6 +6349,16 @@
             "items": {
               "$ref": "#/components/schemas/Port"
             }
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -6361,6 +6453,16 @@
             "items": {
               "$ref": "#/components/schemas/Port"
             }
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [],
@@ -7415,6 +7517,9 @@
               "type": "integer"
             }
           },
+          "costs": {
+            "$ref": "#/components/schemas/TripCosts"
+          },
           "segments": {
             "type": "array",
             "items": {
@@ -7435,6 +7540,7 @@
           "emails",
           "can_clear_emails",
           "people",
+          "costs",
           "segments"
         ],
         "additionalProperties": false
@@ -7523,6 +7629,29 @@
           "city",
           "latitude",
           "longitude"
+        ],
+        "additionalProperties": false
+      },
+      "TripCosts": {
+        "type": "object",
+        "properties": {
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CostTotal"
+            }
+          },
+          "priced": {
+            "type": "integer"
+          },
+          "bookings": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "totals",
+          "priced",
+          "bookings"
         ],
         "additionalProperties": false
       },

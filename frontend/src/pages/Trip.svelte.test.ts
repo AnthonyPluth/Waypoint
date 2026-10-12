@@ -1139,6 +1139,74 @@ describe("on its own page", () => {
     await waitFor(() => expect(location.hash).toBe("#trips"));
   });
 
+  describe("costs", () => {
+    const costs = { totals: [{ currency: "USD", amount_minor: 124000 }, { currency: "EUR", amount_minor: 31000 }], priced: 2, bookings: 3 };
+    const paid = (s: ReturnType<typeof segment>, amount_minor: number, currency: string, source: "email" | "manual" = "email") => ({ ...s, price: { amount_minor, currency, source } });
+
+    it("shows the trip's total per currency under its header, with how many bookings it counts when some have no cost", async () => {
+      held = trip([paid(flight, 124000, "USD"), paid(stay, 31000, "EUR"), segment({ id: 3, kind: "car", provider: "Local Cars", confirmation: "C1", start_local: "2026-11-22T09:00",
+        end_local: "2026-11-25T09:00", end_zone: "Europe/London", start_zone: "Europe/London", origin: "LHR", destination: null })], { costs });
+      render(TripPage);
+      await screen.findByRole("heading", { name: "Trip to London" });
+      const line = document.querySelector("[data-trip-total]")!;
+      expect(line).toHaveTextContent(/Total\s*\$1,240\.00 \+ €310\.00\s*·\s*2 of 3 bookings/);
+    });
+
+    it("says nothing about the count when every booking has a cost, and shows no total when none does", async () => {
+      held = trip([paid(flight, 124000, "USD")], { costs: { totals: [{ currency: "USD", amount_minor: 124000 }], priced: 1, bookings: 1 } });
+      const view = render(TripPage);
+      await screen.findByRole("heading", { name: "Trip to London" });
+      expect(document.querySelector("[data-trip-total]")).toHaveTextContent(/^Total\s*\$1,240\.00$/);
+      view.unmount();
+      held = trip([flight]);
+      render(TripPage);
+      await screen.findByRole("heading", { name: "Trip to London" });
+      expect(document.querySelector("[data-trip-total]")).toBeNull();
+    });
+
+    it("shows a booking's cost on its card, and a cancelled one's struck through", async () => {
+      held = trip([paid(flight, 124000, "USD"), { ...paid(stay, 31000, "EUR"), status: "cancelled" }], { costs: { ...costs, totals: [costs.totals[0]], priced: 1, bookings: 1 } });
+      render(TripPage);
+      const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+      expect(within(cards[0]).getByText(/\$1,240\.00/)).not.toHaveClass("line-through");
+      expect(within(cards[1]).getByText(/€310\.00/)).toHaveClass("line-through");
+      expect(within(cards[1]).getByText("Cancelled, so not in the trip’s total")).toBeInTheDocument();
+    });
+
+    it("shows each booking's cost when several share one card", async () => {
+      const twin = segment({ id: 5, confirmation: "ZZ9ZZ9", details: flight.details });
+      held = trip([paid(flight, 124000, "USD"), paid(twin, 5000, "USD")], { costs: { totals: [{ currency: "USD", amount_minor: 129000 }], priced: 2, bookings: 2 } });
+      render(TripPage);
+      await screen.findByRole("list", { name: /Bookings of/ });
+      const shown = [...document.querySelectorAll("[data-booking] [data-cost]")].map((el) => el.textContent?.replace(/\s+/g, " ").trim());
+      expect(shown).toEqual(["Cost $1,240.00", "Cost $50.00"]);
+    });
+
+    it("saves the cost typed in the edit form, in the smallest unit", async () => {
+      held = trip([paid(flight, 124000, "USD")], { costs: { totals: [{ currency: "USD", amount_minor: 124000 }], priced: 1, bookings: 1 } });
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+      const amount = screen.getByLabelText("Cost amount");
+      expect(amount).toHaveValue("1240.00");
+      await u.clear(amount);
+      await u.type(amount, "1,300.50");
+      await u.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", expect.objectContaining({
+        method: "POST", body: expect.objectContaining({ price: { amount_minor: 130050, currency: "USD" } }) })));
+    });
+
+    it("clears the cost when the amount is emptied", async () => {
+      held = trip([paid(flight, 124000, "USD")], { costs: { totals: [{ currency: "USD", amount_minor: 124000 }], priced: 1, bookings: 1 } });
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+      await u.clear(screen.getByLabelText("Cost amount"));
+      await u.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", expect.objectContaining({ body: expect.objectContaining({ price: null }) })));
+    });
+  });
+
   it("opens the trip a saved booking moved to", async () => {
     render(TripPage);
     const u = userEvent.setup();

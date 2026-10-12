@@ -209,7 +209,7 @@ def _change(template: str, id_arg: str | None = None, fields: bool = False, extr
 
 
 SEGMENT_KEYS = ("kind", "status", "confirmation", "provider", "origin", "destination", "start_local", "end_local", "start_zone", "end_zone",
-                "details", "itinerary", "manage_url", "travelers")
+                "details", "itinerary", "manage_url", "travelers", "price")
 
 
 def _known_fields(a: dict) -> dict:
@@ -264,7 +264,9 @@ _SEGMENT_FIELDS = _fields("kind (flight, hotel, car, train, cruise or parking), 
                           "destination (a flight's airport codes; a stay's, a rental's or a parking lot's place), start_zone and end_zone (IANA; a "
                           "flight's come from its airports), details (flight_number, terminal, seat, cabin, room, car_class, "
                           "address, phone, ship, deck, space_type, vehicle, notes: texts), itinerary (a cruise's ports of call in order: [{name, zone, arrive_local, depart_local}], "
-                          "times local to the port or null), manage_url and travelers ([{person_id}] or [{name}], the person asking when left out).")
+                          "times local to the port or null), manage_url, travelers ([{person_id}] or [{name}], the person asking when left out) and price "
+                          "({amount_minor, currency}: the booking's total in the currency's smallest unit, never converted, like {\"amount_minor\": 124000, "
+                          "\"currency\": \"USD\"} for $1,240.00; null removes it; a cost set this way counts as entered by hand, so an email never replaces it).")
 _TRIP_FIELDS = _fields("name, and optionally destination, notes; start_date and end_date (YYYY-MM-DD) for a trip with no segments yet; "
                        "people, the list of person ids who are on the trip (replaces the whole list; taking someone off removes them from its stays and "
                        "rentals, and is refused while they are on one of its flights; adding someone who can't see the trip yet needs the person to do it in the app).")

@@ -803,6 +803,33 @@ class MigrationTests(unittest.TestCase):
             seen = {pid: [t.id for t in visibility.visible_trips(conn, visibility.Viewer(pid))] for pid in (1, 2, 3)}
         self.assertEqual(seen, {1: [1, 2], 2: [1], 3: [2]})
 
+    def test_0031_adds_an_empty_cost_to_every_booking_and_takes_it_away_leaving_the_rows_and_their_travellers(self):
+        from alembic import command
+        db.init(self.path)
+        stay = dict(kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="Europe/London",
+                    end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual")
+        columns = ("price_minor", "price_currency", "price_source")
+        with db.engine(self.path).begin() as c:
+            names = lambda: {col["name"] for col in sa.inspect(c).get_columns("segments")}
+            self.assertTrue(set(columns) <= names())
+            command.downgrade(db.alembic_config(c), "0030")
+            self.assertFalse(set(columns) & names())
+            c.execute(insert(schema.people).values(id=1, display_name="Person 1"))
+            c.execute(insert(schema.trips).values(id=1, name="trip", auto=False))
+            c.execute(insert(schema.segments), [dict(id=1, trip_id=1, **stay), dict(id=2, trip_id=1, **stay)])
+            c.execute(insert(schema.segment_travelers), [dict(segment_id=1, person_id=1), dict(segment_id=2, person_id=None, name="PRINTED/NAME MR")])
+            command.upgrade(db.alembic_config(c), "head")
+            self.assertTrue(set(columns) <= names())
+            rows = c.execute(select(*(schema.segments.c[n] for n in columns)).order_by(schema.segments.c.id)).all()
+            self.assertEqual([tuple(r) for r in rows], [(None, None, None), (None, None, None)])
+            c.execute(sa.update(schema.segments).where(schema.segments.c.id == 1).values(price_minor=124000, price_currency="EUR", price_source="manual"))
+            command.downgrade(db.alembic_config(c), "0030")
+            self.assertFalse(set(columns) & names())
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 2)
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 2)
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:

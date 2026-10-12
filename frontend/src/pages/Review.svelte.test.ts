@@ -551,6 +551,30 @@ describe("Review: the AI’s suggestion", () => {
     expect(body).toMatchObject({ kind: "hotel", details: { address: "1 Quay Road, Bristol BS1 4AA, UK", phone: "+44 117 555 0100" } });
   });
 
+  it("shows the total the AI read as a cost to check, and sends it in the smallest unit when added", async () => {
+    held = { matches: [], items: [item({ suggestions: [{ ...suggestion, price_minor: 124000, price_currency: "USD" }] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText("Cost amount")).toHaveValue("1240.00");
+    expect(screen.getByLabelText("Cost amount")).toHaveClass("ring-2");
+    expect(screen.getByLabelText("Cost currency")).toHaveValue("USD");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    const [, , body] = calls.find(([p]) => p === "/api/segments")!;
+    expect(body).toMatchObject({ price: { amount_minor: 124000, currency: "USD" } });
+  });
+
+  it("sends no cost when the suggestion has none and none is typed", async () => {
+    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText("Cost amount")).toHaveValue("");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    const [, , body] = calls.find(([p]) => p === "/api/segments")!;
+    expect(body).not.toHaveProperty("price");
+  });
+
   it("leaves the address empty and unoutlined when the AI found none", async () => {
     const stay = { kind: "hotel" as const, origin: "Harbour Hotel", start_local: "2026-12-02T15:00", end_local: "2026-12-05T11:00", start_zone: "Europe/London" };
     held = { matches: [], items: [item({ suggestions: [stay] })], who: [], ai: false };

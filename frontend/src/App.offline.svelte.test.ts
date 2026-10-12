@@ -71,6 +71,29 @@ describe("opening the app with no connection", () => {
     expect(screen.queryByText(/as of/)).not.toBeInTheDocument();
   });
 
+  it("shows the saved bookings' costs and the trip's total, and copes with a copy saved before costs existed", async () => {
+    const savedAt = Date.now() - 2 * 3_600_000;
+    const copy = copyOf(savedAt);
+    const priced = { ...copy.trip!, costs: { totals: [{ currency: "USD", amount_minor: 124000 }, { currency: "EUR", amount_minor: 31000 }], priced: 2, bookings: 3 },
+      segments: [{ ...flight, price: { amount_minor: 124000, currency: "USD" as const, source: "email" as const } },
+        { ...hotel, price: { amount_minor: 31000, currency: "EUR" as const, source: "manual" as const } }] };
+    await saveCopy(savedAt, { ...copy, trip: priced });
+    render(App);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Unlock" }));
+    expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
+    expect(document.querySelector("[data-trip-total]")).toHaveTextContent(/Total\s*\$1,240\.00 \+ €310\.00\s*·\s*2 of 3 bookings/);
+    expect(screen.getAllByText("Cost")).toHaveLength(2);
+  });
+
+  it("shows no total for a copy saved before costs existed", async () => {
+    const savedAt = Date.now() - 2 * 3_600_000;
+    await saveCopy(savedAt, { ...copyOf(savedAt), trip: { ...copyOf(savedAt).trip!, costs: undefined as never } });
+    render(App);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Unlock" }));
+    expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
+    expect(document.querySelector("[data-trip-total]")).toBeNull();
+  });
+
   it("shows the booking's stored message when asked", async () => {
     await saveCopy();
     render(App);

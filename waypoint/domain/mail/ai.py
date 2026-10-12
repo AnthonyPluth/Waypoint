@@ -14,7 +14,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from ... import tls
 from ...storage import db, reference
 from ...storage import settings_keys as sk
-from .. import regions
+from .. import money, regions
+from . import price
 from .flights import MAX_HOURS
 
 Mode = Literal["off", "local", "openrouter"]
@@ -62,6 +63,8 @@ class Suggestion(TypedDict, total=False):
     deck: str
     flight_number: str
     cabin: str
+    price_minor: int
+    price_currency: str
     sources: dict[str, str]
 
 
@@ -172,6 +175,9 @@ SYSTEM = (
     'property or pick-up place, never the address of the guest, the booker, the cardholder or a billing address, so never copy one from '
     'a block labelled booker, guest or billing). For a hotel, car or cruise only, also "phone" (the property\'s or company\'s phone number as '
     'printed, never the booker\'s). For a cruise only, also "room" (the cabin), "ship" and "deck". Never give an address, phone, room, ship or deck for a flight. '
+    'For any booking, also "total" (the total amount charged for the booking, as printed, such as "1,240.00") and "currency" (its 3-letter ISO 4217 code, '
+    'such as USD), only when the email labels that amount as the total, grand total, amount charged or amount paid: never a deposit, a tax, a fee, a '
+    'nightly rate, a refund or points. When one total covers several bookings in the email, give it on the first of them only. '
     'Leave out a key you can\'t find; never guess. If the email holds no booking, reply {"bookings": []}.')
 
 
@@ -341,7 +347,19 @@ def booking(found: dict[str, Any], sent: str) -> Suggestion:
         if name in values and not (kind == "flight" and name in ("start_zone", "end_zone")):
             out[name] = values[name]   # type: ignore[literal-required]
     out.update(_details(kind, values, sent))
+    if (cost := _total(found, sent)) is not None:
+        out["price_minor"], out["price_currency"] = cost.amount_minor, cost.currency
     return out
+
+
+def _total(found: dict[str, Any], sent: str) -> money.Price | None:
+    amount, code = found.get("total"), found.get("currency")
+    if isinstance(amount, (int, float)) and not isinstance(amount, bool):
+        amount = str(amount)
+    if not isinstance(amount, str) or not isinstance(code, str):
+        return None
+    cost = price.structured(amount, code)
+    return cost if cost is not None and price.printed(sent, cost) else None
 
 
 def _left_out(kept: int, total: int, first: AiError) -> str:
@@ -371,6 +389,9 @@ def parse(content: Any, sent: str) -> Reading:
         except AiError as e:
             dropped.append(e)
             continue
+        if "price_minor" in one and any(k.get("confirmation") == one.get("confirmation") and k.get("price_minor") == one["price_minor"]
+                                        and k.get("price_currency") == one.get("price_currency") for k in kept):
+            one = {k: v for k, v in one.items() if k not in ("price_minor", "price_currency")}   # type: ignore[assignment]
         if one not in kept:
             kept.append(one)
     if not kept:

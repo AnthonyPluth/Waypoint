@@ -31,7 +31,8 @@
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
   import { Input } from "$lib/components/ui/input";
   import { Sheet } from "$lib/components/ui/sheet";
-  import { DETAILS, type Kind } from "$lib/segment-form";
+  import { amountText } from "$lib/money";
+  import { DEFAULT_CURRENCY, DETAILS, priceOf, type Kind } from "$lib/segment-form";
   import { apiCall } from "$lib/contract";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import { toast } from "svelte-sonner";
@@ -69,13 +70,14 @@
 
   const SHOWN: Record<string, string[]> = { flight: ["flight_number", "cabin"], hotel: ["address", "phone"], car: ["address", "phone"], train: ["address"], parking: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
   const detailLabel = (kind: string, key: string) => DETAILS[kind as Kind].find(([k]) => k === key)?.[1] ?? key;
-  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string> };
+  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string>; cost: string; currency: string };
   const detailsOf = (s: ReviewItem["suggestions"][number]): Record<string, string> => ({ address: s.address ?? "", phone: s.phone ?? "", room: s.room ?? "", ship: s.ship ?? "", deck: s.deck ?? "", flight_number: s.flight_number ?? "", cabin: s.cabin ?? "" });
   const suggestedDraft = (item: ReviewItem, s: ReviewItem["suggestions"][number], pick: number): Draft => ({
     item, pick, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
     destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", details: detailsOf(s),
-    read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), sources: s.sources ?? {} });
-  const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {} });
+    read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), sources: s.sources ?? {},
+    cost: s.price_minor && s.price_currency ? amountText(s.price_minor, s.price_currency) : "", currency: s.price_currency ?? DEFAULT_CURRENCY });
+  const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {}, cost: "", currency: DEFAULT_CURRENCY });
   let drafts = $state<Draft[]>([]);
   let joining = $state<{ legs: Draft[]; bodies: SegmentBody[]; found: (ReviewCandidate | null)[] } | null>(null);
   const draft = $derived(drafts[0] ?? null);
@@ -86,7 +88,7 @@
   let addedIds: number[] = [];
   let addedPicks: number[] = [];
   const fingerprint = (d: Draft) => JSON.stringify([d.kind, d.provider, d.confirmation, d.origin, d.destination, d.start, d.end, d.startZone, d.endZone,
-    Object.entries(d.details).filter(([, v]) => v.trim()).sort(([a], [b]) => a.localeCompare(b))]);
+    Object.entries(d.details).filter(([, v]) => v.trim()).sort(([a], [b]) => a.localeCompare(b)), d.cost, d.currency]);
   const fingerprints = () => JSON.stringify(drafts.map(fingerprint));
   const dirty = $derived(drafts.length > 0 && fingerprints() !== baseline);
   const startAdd = (item: ReviewItem, use = false) => {
@@ -174,9 +176,10 @@
     const flight = d.kind === "flight";
     const details = Object.fromEntries((SHOWN[d.kind] ?? []).map((key) => [key, (d.details[key] ?? "").trim()] as const).filter(([, v]) => v));
     const stay = d.kind === "hotel" || d.kind === "parking";
+    if (d.cost.trim() && (!/^[A-Za-z]{3}$/.test(d.currency.trim()) || priceOf(d) === null)) return "Enter the cost as an amount like 1240.00 and a three-letter currency code like USD";
     if (stay && !d.startZone.trim() && !details["address"]) return `Enter the ${d.kind === "hotel" ? "hotel" : "lot"}’s time zone (for example America/New_York), or its address to work it out from`;
     return { kind: d.kind as "flight" | "hotel" | "car" | "train" | "cruise" | "parking", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
-      destination: d.destination, ...(Object.keys(details).length && { details }), ...(flight ? {} : stay ? { start_zone: d.startZone.trim() || null } : d.kind === "cruise" ? { start_zone: d.startZone, end_zone: d.endZone || d.startZone } : { ...(d.startZone && { start_zone: d.startZone }), ...(d.endZone && { end_zone: d.endZone }) }) };
+      destination: d.destination, ...(Object.keys(details).length && { details }), ...(priceOf(d) && { price: priceOf(d) }), ...(flight ? {} : stay ? { start_zone: d.startZone.trim() || null } : d.kind === "cruise" ? { start_zone: d.startZone, end_zone: d.endZone || d.startZone } : { ...(d.startZone && { start_zone: d.startZone }), ...(d.endZone && { end_zone: d.endZone }) }) };
   }
 
   async function add(e: SubmitEvent) {
@@ -321,6 +324,11 @@
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">{d.kind === "hotel" ? "Check-out" : d.kind === "parking" ? "Exit" : d.kind === "car" ? "Drop-off time" : "Arrives"} {#if d.sources["end_local"]}<span class="font-normal text-muted-foreground">from “{d.sources["end_local"]}”</span>{/if}</span>
     <Input type="datetime-local" class={d.sources["end_local"] ? "ring-2 ring-primary" : ""} bind:value={d.end} required /></label>
   {#if d.kind === "flight"}<FlightLength origin={d.origin} destination={d.destination} start={d.start} end={d.end} />{/if}
+  <div class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Cost</span>
+    <div class="flex gap-3">
+      <Input class={`min-w-0 flex-1 ${d.cost ? "ring-2 ring-primary" : ""}`} bind:value={d.cost} inputmode="decimal" autocomplete="off" spellcheck={false} placeholder="1,240.00" aria-label="Cost amount" />
+      <Input class="w-24 uppercase" bind:value={d.currency} maxlength={3} autocomplete="off" spellcheck={false} placeholder="USD" aria-label="Cost currency" />
+    </div></div>
   {#if d.kind === "hotel" || d.kind === "parking"}
     {@render detailField(d, "address")}
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Time zone</span>

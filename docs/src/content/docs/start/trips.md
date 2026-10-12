@@ -40,6 +40,16 @@ Each segment has a kind (flight, hotel, car, train, cruise or parking), a status
 
 A segment is added to a trip you name, or without one: Waypoint puts it in the trip it belongs to (see below) or makes a new trip. Flights from before Waypoint can be [imported from another app’s CSV export](/Waypoint/start/import/).
 
+## Cost
+
+A booking can carry its **cost**: the total for that booking, as a whole amount in the currency’s smallest unit with the currency’s three-letter code (`USD`, `EUR`, `JPY`). Waypoint never converts between currencies and makes no outside call to do it, so a trip’s total is shown per currency, such as **Total $1,240.00 + €310.00**, beneath the trip’s dates. When some of a trip’s bookings have no cost the total says so (**3 of 5 bookings**); the count treats one confirmation code as one booking, so a round trip whose total is on its outbound flight counts as priced.
+
+- **From an email.** When Waypoint reads a confirmation or receipt it also looks for the total. It takes an amount only when its line is labelled as the total: *Total*, *Grand total*, *Total charged*, *Total paid*, *Total due*, *Amount charged*, *Amount paid*, *Order total* or *Estimated total* (in English), with a currency symbol or code beside it (`$1,234.56` and `1.234,56 €` both read). Subtotals, taxes and fees on their own, deposits, nightly or per-person rates, points and miles, refunds and negative amounts are never taken, and an amount with no currency is left alone. When an email has two different totals, or the amount is unclear, the cost is left empty rather than guessed. A booking’s schema.org markup (`totalPrice` with `priceCurrency`) is read the same way. A total that covers a round trip or several bookings under one confirmation code goes on the first of them; an email with bookings under different codes gives none of them a cost. A cancelled booking gets no cost from the email.
+- **By hand.** The booking’s edit form has a **Cost** field (the amount and the currency). Change it and the cost is yours: a later email never replaces it. Clear the amount to remove the cost. A cost you leave alone stays as it was read.
+- **Later emails.** A receipt or other follow-up about a booking fills a missing cost and never changes one that is already there. A second confirmation for the same booking attaches to it the same way (it only fills). An email that changes the booking (its times or places moved) also updates a cost that was read from an email, to the new total; one you entered by hand is never touched, and an email with no total never clears a cost.
+- **Cancelled bookings** keep their cost on the card, struck through and marked as not counted, and are left out of the trip’s total.
+- **Who sees it.** A cost is part of its booking: everyone who can see the booking and its trip sees it, and no one else does. It is part of the [offline copy](/Waypoint/start/offline/) of a current trip.
+
 ## Seats
 
 On a flight or train, each traveller has a seat of their own: tick them in the booking’s edit form and a **Seat** field appears under their name (up to 10 characters, as it reads on the boarding pass). The card shows it beside their name, and the calendar event lists the seats by traveller. A seat counts as an edit of the travellers, so a later email won’t change it. Leaving a seat out when changing who is on a booking keeps it. A seat entered on a booking before this (one for all of them) stays on the booking, and moves to the traveller when the booking has only one and is edited.
@@ -115,7 +125,7 @@ With reduced motion turned on in your system, nothing animates: the map shows th
 
 ## In a backup
 
-Trips, segments and their travellers are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list and the lists used to place bookings on the map aren’t: every Waypoint has them already.
+Trips, segments, their costs and their travellers are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list and the lists used to place bookings on the map aren’t: every Waypoint has them already.
 
 ## Open in app, or the vendor's website
 
