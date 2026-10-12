@@ -57,7 +57,7 @@
 </script>
 
 <div class={fill ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-2"}>
-  <div bind:this={viewport} class={`${fill ? "min-h-0 flex-1" : "max-h-[30rem]"} overflow-auto rounded-lg bg-muted`} data-testid="preview-viewport">
+  <div bind:this={viewport} class={`${fill ? "min-h-0 flex-1" : "max-h-[30rem]"} overflow-auto rounded-lg border border-border bg-white`} data-testid="preview-viewport">
     <div class="overflow-hidden" style={sized ? `width:${layout.width * scale}px;height:${layout.height * scale}px` : ""} data-testid="preview-sizer">
       <div style={box.width > 0 ? `width:${box.width}px` : "width:100%"}>
         <div bind:this={host} role="article" aria-label={title} aria-busy={busy} data-testid="preview-html"
