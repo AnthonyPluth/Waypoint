@@ -2,7 +2,7 @@ from sqlalchemy import select, update
 
 from waypoint.domain import people, trippeople, trips, visibility
 from waypoint.domain.visibility import Viewer
-from waypoint.storage.models import Segment, SegmentTraveler, Trip, TripPerson
+from waypoint.storage.models import Segment, SegmentRecipient, SegmentTraveler, Trip, TripPerson
 from tests.privacy import no_leaks
 from tests.test_trips import BACK, HOTEL, OUT, Household, guest
 
@@ -281,6 +281,61 @@ class WhoSeesATrip(TripPeopleCase):
             trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
         trips.move_segment(self.c, self.jane, a["id"], b["trip_id"], True)
         self.assertIsNotNone(trips.get_segment(self.c, self.sam, a["id"]))
+
+    def receive(self, segment_id, person_id):
+        self.c.orm.add(SegmentRecipient(segment_id=segment_id, person_id=person_id))
+        self.c.orm.flush()
+
+    def asked_to_move(self, segment_id, trip_id):
+        with self.assertRaises(trips.NeedsConfirmation) as asked:
+            trips.move_segment(self.c, self.jane, segment_id, trip_id)
+        return asked.exception
+
+    def test_moving_a_booking_does_not_name_someone_who_already_sees_the_trip_through_their_mailbox(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jid, self.sid))
+        b = self.add(self.jane, FAR, None, self.on(self.jid))
+        self.receive(b["id"], self.sid)
+        trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        self.assertEqual(self.c.orm.get(Segment, a["id"]).trip_id, b["trip_id"])
+
+    def test_moving_a_booking_does_not_name_someone_who_already_sees_the_booking_through_their_mailbox(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jid))
+        self.receive(a["id"], self.sid)
+        b = self.add(self.jane, FAR, None, self.on(self.jid))
+        self.receive(b["id"], self.sid)
+        trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        self.assertEqual(self.c.orm.get(Segment, a["id"]).trip_id, b["trip_id"])
+
+    def test_moving_a_booking_names_someone_who_only_got_its_confirmation_and_would_gain_the_trip(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jid))
+        self.receive(a["id"], self.sid)
+        b = self.add(self.jane, FAR, None, self.on(self.jid))
+        asked = self.asked_to_move(a["id"], b["trip_id"])
+        self.assertEqual([p["id"] for p in asked.see_trip], [self.sid])
+        self.assertEqual(asked.see_booking, [])
+
+    def test_moving_a_booking_names_someone_who_would_gain_the_booking_even_when_others_see_it_by_mailbox(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jid, self.sid))
+        b = self.add(self.jane, FAR, None, self.on(self.jid, self.mia))
+        self.receive(b["id"], self.sid)
+        asked = self.asked_to_move(a["id"], b["trip_id"])
+        self.assertEqual([p["id"] for p in asked.see_booking], [self.mia])
+        self.assertEqual(asked.see_trip, [])
+
+    def test_a_stranger_still_sees_nothing_after_a_booking_moves_with_a_mailbox_recipient(self):
+        canary = "Zebulon Canarystone"
+        who = people.add_guest(self.c, guest(canary))["id"]
+        a = self.add(self.jane, {**OUT, "confirmation": "CANARY77XQ"}, None, self.on(self.jid))
+        self.receive(a["id"], who)
+        b = self.add(self.jane, FAR, None, self.on(self.jid))
+        self.assertEqual([p["id"] for p in self.asked_to_move(a["id"], b["trip_id"]).see_trip], [who])
+        trips.move_segment(self.c, self.jane, a["id"], b["trip_id"], True)
+        with no_leaks(self, canary, "CANARY77XQ"):
+            stranger = self.stranger()
+            self.assertIsNone(trips.get(self.c, stranger, b["trip_id"]))
+            self.assertIsNone(trips.get_segment(self.c, stranger, a["id"]))
+            self.assertEqual(trips.listing(self.c, stranger), [])
+            self.assertIsNone(trips.move_segment(self.c, stranger, a["id"], b["trip_id"], True))
 
     def test_merging_gives_each_trips_people_the_other_trips_bookings_and_a_stranger_nothing(self):
         a = self.add(self.jane, OUT, None, self.on(self.jid, self.sid))

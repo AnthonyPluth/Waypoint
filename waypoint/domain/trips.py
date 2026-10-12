@@ -1391,10 +1391,10 @@ def _named(conn: db.Connection, ids: set[int]) -> list[NamedPerson]:
 
 
 def _needs_confirmation(conn: db.Connection, seg: Segment, target: Trip) -> None:
-    _, who = _involved(conn, [target.id])
+    received = conn.orm.scalars(select(SegmentRecipient.person_id).where(SegmentRecipient.segment_id == seg.id)).all()
     moving = {t["person_id"] for t in effective_travelers(conn, seg) if t["person_id"] is not None} \
-        | ({seg.booked_by} if seg.booked_by is not None else set())
-    there = who[target.id] | ({target.booked_by} if target.booked_by is not None else set())
+        | ({seg.booked_by} if seg.booked_by is not None else set()) | set(received)
+    there = _seeing(conn, target)
     see_booking, see_trip = _named(conn, there - moving), _named(conn, moving - there)
     if not see_booking and not see_trip:
         return
