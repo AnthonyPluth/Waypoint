@@ -29,7 +29,6 @@ export const BOW = 0.22;
 export const LOCAL_BOW = 0.1;
 export const ZOOM_UNITS = 0.35;
 export const MIN_ZOOM_SHARE = 0.25;
-export const STATIC_MOVER_PX = 16;
 export const MIN_MS = 6000;
 export const MAX_MS = 60000;
 export const PER_STOP_MS = 2000;
