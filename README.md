@@ -9,6 +9,9 @@ A self-hosted travel app for a household. Waypoint shows everyone the trips they
   <img src="docs/public/screenshots/upcoming-desktop.png" alt="Upcoming: the next check-in, with its confirmation number, on a desktop" width="62%">
   <img src="docs/public/screenshots/upcoming-phone.png" alt="Upcoming on a phone" width="22%">
 </p>
+<p>
+  <img src="docs/public/screenshots/review-desktop.png" alt="Review: booking emails Waypoint couldn’t read, with what you can do with each" width="62%">
+</p>
 
 ## Features
 
@@ -20,10 +23,6 @@ A self-hosted travel app for a household. Waypoint shows everyone the trips they
 - **Stats.** Flights, distance, airlines, hotel nights, rental days, cruises, parking days and places, with a map.
 - **AI assistants (MCP).** Connect Claude or another assistant to read your trips and, if you allow it, change them. It sees what the member who approved it sees, never email text or loyalty numbers.
 - **Backups and sign-in.** OpenID Connect sign-in with your own provider (Authentik, Keycloak, Google, …); downloadable, restorable backups; SQLite or Postgres.
-
-<p>
-  <img src="docs/public/screenshots/review-desktop.png" alt="Review: booking emails Waypoint couldn’t read, with what you can do with each" width="62%">
-</p>
 
 ## Quick start
 
