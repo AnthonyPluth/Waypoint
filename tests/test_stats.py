@@ -87,6 +87,14 @@ class HistoricalVisitTests(StatsCase):
         self.assertEqual((edited["kind"], edited["origin"], edited["destination"], edited["start_zone"], edited["end_zone"]),
                          ("visit", None, "GB", "Europe/London", "Europe/London"))
 
+    def test_the_countries_the_form_offers_are_exactly_the_ones_the_server_accepts(self):
+        import re
+        from waypoint.storage import reference
+        text = (Path(__file__).resolve().parent.parent / "frontend" / "src" / "lib" / "countries.ts").read_text(encoding="utf-8")
+        offered = set(re.search(r'const CODES = "([A-Z ]+)"', text).group(1).split())
+        self.assertEqual(offered - set(reference.country_zones()), set())
+        self.assertEqual({c for c in reference.country_zones() if c in reference.country_names()} - offered, set())
+
     def test_an_unknown_country_is_refused(self):
         for bad in (None, "", "ZZ", "Japan"):
             with self.assertRaises(trips.Invalid):
