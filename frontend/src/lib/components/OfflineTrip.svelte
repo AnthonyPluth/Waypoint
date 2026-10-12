@@ -6,7 +6,7 @@
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import { Button } from "$lib/components/ui/button";
   import { ago, type SavedCopy } from "$lib/offline";
-  import { bookingCards, dateLabel, dayLabel, headline } from "$lib/trips";
+  import { bookingCards, dateLabel, dayLabel, headline, showBookingTravellers, showTripTravellers, tripTravellers } from "$lib/trips";
   import WifiOff from "@lucide/svelte/icons/wifi-off";
 
   let { copy }: { copy: SavedCopy } = $props();
@@ -19,6 +19,7 @@
 
   const trip = $derived(copy.trip!);
   const cards = $derived(bookingCards(trip.segments));
+  const everyone = $derived(tripTravellers(trip.segments));
   const dates = $derived(trip.start_date && trip.end_date
     ? (trip.start_date === trip.end_date ? dateLabel(trip.start_date) : `${dateLabel(trip.start_date)} – ${dateLabel(trip.end_date)}`) : "No dates yet");
   const emailsOf = (s: Segment) => copy.messages.find((m) => m.segment_id === s.id)?.emails ?? [];
@@ -36,6 +37,9 @@
 <div class="mb-6 space-y-1">
   <h1 class="break-words text-display">{trip.name}</h1>
   <p class="text-muted-foreground">{dates}{trip.destination ? ` · ${trip.destination}` : ""}</p>
+  {#if showTripTravellers(everyone, null)}
+    <p class="text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
+  {/if}
   {#if trip.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{trip.notes}</p>{/if}
 </div>
 
@@ -71,7 +75,7 @@
             <div class="flex flex-col gap-2" data-booking>
               {#if card.segments.length > 1 && b.confirmation}<p class="text-lg"><CopyCode code={b.confirmation} /></p>{/if}
               {#if b.details.phone}<p class="text-sm"><span class="eyebrow">Phone</span> <a class="underline underline-offset-2" href={b.links.call ?? `tel:${b.details.phone}`}>{b.details.phone}</a></p>{/if}
-              {#if b.travelers.length}
+              {#if b.travelers.length && showBookingTravellers(b, everyone, null)}
                 <h3 class="eyebrow">Travellers</h3>
                 <ul class="flex flex-col gap-1">
                   {#each b.travelers as who (who.id)}
