@@ -377,7 +377,7 @@ class TriageScanTests(ScanCase):
         self.scan()
         self.assertEqual(scan.summary(self.mailbox), scan.Summary(3, 2, 1, 1, 1, False, 0, 3, 3))
         self.assertEqual(scan.decode(self.row()["scan_summary"]), scan.summary(self.mailbox))
-        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "found", "labels_dropped", "not_travel", "read", "review", "skipped", "total", "triaged"])
+        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "followups", "found", "labels_dropped", "not_travel", "read", "review", "skipped", "total", "triaged", "with_facts"])
 
     def test_a_reply_or_an_offer_looking_subject_from_a_travel_sender_is_still_read(self):
         for subject in ("Re: Your reservation", "Autumn sale: your hotel booking is confirmed", "Your deal is booked: hotel reservation H77"):
@@ -1100,7 +1100,7 @@ class ReviewTests(ScanCase):
         self.assertEqual({(i["reason"], i["sender_domain"], i["received"]) for i in items},
                          {("no_markup", "example-air.example", "2026-10-17"), ("incomplete", "example-air.example", "2026-10-18")})
         nomarkup = next(i for i in items if i["reason"] == "no_markup")
-        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "known_sender", "holds_bookings", "subject", "has_email", "received", "reason", "suggestions", "suggestion_error"}))
+        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "known_sender", "holds_bookings", "subject", "has_email", "received", "reason", "suggestions", "suggestion_error", "count", "others"}))
         self.assertEqual((nomarkup["subject"], nomarkup["has_email"]), ("Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F", True))
         self.assertEqual((nomarkup["owner"], nomarkup["mine"]), ("Jane Doe", True))
         self.assertNotIn("gmail_url", nomarkup)
@@ -1113,7 +1113,7 @@ class ReviewTests(ScanCase):
         with no_leaks(self, "CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-NOMARKUP-6H9C", database=self.path):
             self.scan()
         stored = self.read(lambda conn: dict(conn.execute(select(ReviewItem)).fetchone()))
-        self.assertEqual(sorted(stored), ["created", "gap", "id", "mailbox_id", "matches", "message_id", "reason", "received", "sender_domain", "suggestion", "suggestion_error"])
+        self.assertEqual(sorted(stored), ["created", "gap", "id", "mailbox_id", "matches", "message_id", "reason", "received", "reference", "sender_domain", "suggestion", "suggestion_error"])
         self.assertEqual((stored["sender_domain"], stored["received"]), ("example-air.example", "2026-10-17"))
         sealed = self.read(lambda conn: conn.execute(select(StoredMessage.content)).scalar())
         self.assertTrue(secretbox.is_encrypted(sealed))

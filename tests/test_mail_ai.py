@@ -634,7 +634,7 @@ class ScanTests(ScanAiCase):
         self.fake.on_request = lambda n: self.turn_off() if n == 1 else None
         self.assertEqual(self.scan().review, 3)
         self.assertEqual(len(self.fake.requests), 1)
-        notes = sorted(bool(i["suggestions"]) for i in self.items())
+        notes = sorted(self.read(lambda conn: [r is not None for r in conn.execute(select(ReviewItem.suggestion)).scalars()]))
         self.assertEqual(notes, [False, False, True])
 
     def test_an_item_keeps_nothing_of_the_email_but_its_suggestion(self):
@@ -758,6 +758,31 @@ class AiApiTests(RouteCase):
         [item] = self.ok("ana", "GET", "/api/review")["items"]
         self.assertEqual((item["suggestions"], item["suggestion_error"]), ([GOOD], None))
         self.assertEqual(self.ok("ben", "GET", "/api/review")["items"], [])
+        with db.session() as conn:
+            conn.execute(Mailbox.__table__.delete())
+
+    def test_suggestions_already_added_can_be_dropped_one_by_one_by_their_owner_alone(self):
+        from waypoint.storage.models import Mailbox
+        back = {**GOOD, "origin": "DEN", "destination": "BOS", "start_local": "2026-12-09T16:20", "end_local": "2026-12-09T21:50"}
+        with db.session() as conn:
+            conn.execute(Mailbox.__table__.delete())
+            conn.execute(Mailbox.__table__.insert().values(owner_sub="sub-ana", address="ana@gmail.example", token="enc:v1:x",
+                                                           status="connected", created=1.0))
+            box = conn.execute(select(Mailbox.id)).scalar()
+            review.add(conn, box, "m1", "example-air.example", "2026-10-18", "no_markup", 1.0)
+            review.set_suggestions(conn, box, "m1", [GOOD, back], None)   # type: ignore[list-item]
+        [item] = self.ok("ana", "GET", "/api/review")["items"]
+        path = f"/api/review/{item['id']}"
+        self.assertEqual(self.call("ben", "DELETE", f"{path}?suggestion=1")[0], 404)
+        self.assertEqual(self.call("ana", "DELETE", f"{path}?suggestion=3")[0], 404)
+        self.assertEqual(self.call("ana", "DELETE", f"{path}?suggestion=x")[0], 400)
+        self.assertEqual(len(self.ok("ana", "GET", "/api/review")["items"][0]["suggestions"]), 2)
+        self.assertEqual(self.ok("ana", "DELETE", f"{path}?suggestion=1"), {"ok": True})
+        [item] = self.ok("ana", "GET", "/api/review")["items"]
+        self.assertEqual(item["suggestions"], [back])
+        self.assertEqual(self.ok("ana", "DELETE", f"{path}?suggestion=1"), {"ok": True})
+        [item] = self.ok("ana", "GET", "/api/review")["items"]
+        self.assertEqual(item["suggestions"], [])
         with db.session() as conn:
             conn.execute(Mailbox.__table__.delete())
 

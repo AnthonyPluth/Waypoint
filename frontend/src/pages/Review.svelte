@@ -69,13 +69,13 @@
 
   const SHOWN: Record<string, string[]> = { flight: ["flight_number", "cabin"], hotel: ["address", "phone"], car: ["address", "phone"], train: ["address"], parking: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
   const detailLabel = (kind: string, key: string) => DETAILS[kind as Kind].find(([k]) => k === key)?.[1] ?? key;
-  type Draft = { item: ReviewItem; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string> };
+  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string> };
   const detailsOf = (s: ReviewItem["suggestions"][number]): Record<string, string> => ({ address: s.address ?? "", phone: s.phone ?? "", room: s.room ?? "", ship: s.ship ?? "", deck: s.deck ?? "", flight_number: s.flight_number ?? "", cabin: s.cabin ?? "" });
-  const suggestedDraft = (item: ReviewItem, s: ReviewItem["suggestions"][number]): Draft => ({
-    item, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
+  const suggestedDraft = (item: ReviewItem, s: ReviewItem["suggestions"][number], pick: number): Draft => ({
+    item, pick, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
     destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", details: detailsOf(s),
     read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), sources: s.sources ?? {} });
-  const handDraft = (item: ReviewItem): Draft => ({ item, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {} });
+  const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {} });
   let drafts = $state<Draft[]>([]);
   const draft = $derived(drafts[0] ?? null);
   let formError = $state("");
@@ -83,6 +83,7 @@
   let emailOpen = $state(true);
   let baseline = "";
   let addedIds: number[] = [];
+  let addedPicks: number[] = [];
   const fingerprint = (d: Draft) => JSON.stringify([d.kind, d.provider, d.confirmation, d.origin, d.destination, d.start, d.end, d.startZone, d.endZone,
     Object.entries(d.details).filter(([, v]) => v.trim()).sort(([a], [b]) => a.localeCompare(b))]);
   const fingerprints = () => JSON.stringify(drafts.map(fingerprint));
@@ -91,7 +92,8 @@
     if (draft && draft.item.id !== item.id) delete peeks[draft.item.id];
     emailOpen = true;
     addedIds = [];
-    drafts = use && item.suggestions.length ? item.suggestions.map((s) => suggestedDraft(item, s)) : [handDraft(item)];
+    addedPicks = [];
+    drafts = use && item.suggestions.length ? item.suggestions.map((s, n) => suggestedDraft(item, s, n + 1)) : [handDraft(item)];
     baseline = fingerprints();
     formError = "";
     void peek(item);
@@ -142,8 +144,15 @@
   const placeLabels = (kind: string) => kind === "flight" ? ["From (airport code)", "To (airport code)"] : kind === "hotel" ? ["Hotel", ""] : kind === "parking" ? ["Lot", ""] : kind === "car" ? ["Pick-up", "Drop-off"] : kind === "cruise" ? ["Embarkation port", "Disembarkation port"] : ["From (station)", "To (station)"];
 
   const closeForm = () => {
-    if (draft && viewing !== draft.item.id) delete peeks[draft.item.id];
+    const open = draft;
+    const picks = addedPicks;
+    addedPicks = [];
+    if (open && viewing !== open.item.id) delete peeks[open.item.id];
     drafts = [];
+    if (open && picks.length) void act(async () => {
+      await apiCall<"DELETE /api/review/{id}">(`/api/review/${open.item.id}?${picks.map((n) => `suggestion=${n}`).join("&")}`, { method: "DELETE" });
+      await settle();
+    });
   };
   let discarding = $state(false);
   const requestClose = () => {
@@ -185,12 +194,18 @@
       for (const [n, body] of bodies.entries()) {
         const made = await apiCall<"POST /api/segments">("/api/segments", { method: "POST", body });
         added.push(made.id);
-        drafts = drafts.filter((d) => d !== legs[n]);
+        const leg = legs[n];
+        if (leg?.pick) addedPicks.push(leg.pick);
+        if (n < bodies.length - 1) drafts = drafts.filter((d) => d !== leg);
       }
       listed = true;
       await apiCall<"DELETE /api/review/{id}">(`/api/review/${first.item.id}?${added.map((id) => `segment=${id}`).join("&")}`, { method: "DELETE" });
-    }, { busy: (on) => (saving = on), onError: (m) => (formError = listed ? `Added, but couldn’t take it off this list: ${m}` : added.length ? `Added ${added.length} of ${before + bodies.length}, but couldn’t add the rest: ${m}` : m) });
+    }, { busy: (on) => (saving = on), onError: (m) => {
+      if (listed) toast.error(`Added, but couldn’t take it off this list: ${m}`);
+      else formError = added.length ? `Added ${added.length} of ${before + bodies.length}, but couldn’t add the rest: ${m}` : m;
+    } });
     if (!ok) { if (listed) { closeForm(); await settle(); } else if (added.length) await settle(); return; }
+    addedPicks = [];
     closeForm();
     toast.success(added.length > 1 ? `Added ${plural(added.length, legs)} to your trips` : "Added to your trips");
     await settle();
@@ -198,13 +213,13 @@
 
   const dismiss = (i: ReviewItem) => act(async () => {
     await apiCall<"DELETE /api/review/{id}">(`/api/review/${i.id}`, { method: "DELETE" });
-    toast.success("Dismissed");
+    toast.success(i.count > 1 ? `Dismissed ${i.count} emails` : "Dismissed");
     await settle();
   });
 
   let ignoring = $state<ReviewItem | null>(null);
   let asking = $state(false);
-  const goingCount = $derived(ignoring && review ? review.items.filter((i) => i.address === ignoring?.address && i.sender_domain === ignoring?.sender_domain && !i.holds_bookings).length : 0);
+  const goingCount = $derived(ignoring && review ? review.items.filter((i) => i.address === ignoring?.address && i.sender_domain === ignoring?.sender_domain && !i.holds_bookings).reduce((n, i) => n + i.count, 0) : 0);
   const UNDO_MS = 8000;
   const undoIgnore = (mailboxId: number, domain: string) => act(async () => {
     await apiCall<"POST /api/mailboxes/{id}/unignore">(`/api/mailboxes/${mailboxId}/unignore`, { method: "POST", body: { domain }, failed: "Couldn’t undo that" });
@@ -361,6 +376,16 @@
                 <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, item.mine ? `to ${item.address}` : `in ${item.owner}’s mailbox, shared with the household`].filter(Boolean).join(" · ")}</p>
                 <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">AI suggestion</Badge>{/if}</p>
                 {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
+                {#if item.count > 1}
+                  <details class="mt-2 text-sm" data-testid="same-reservation">
+                    <summary class="cursor-pointer text-muted-foreground">{item.count} emails about the same reservation</summary>
+                    <ul class="mt-1 space-y-1 pl-4" aria-label="The other emails about it">
+                      {#each item.others as other (other.id)}
+                        <li class="break-words">{other.subject ?? `Mail from ${sender(item)}${other.received ? ` on ${other.received}` : ""}`}{other.subject && other.received ? ` · ${other.received}` : ""}</li>
+                      {/each}
+                    </ul>
+                  </details>
+                {/if}
               </div>
               <div class="flex basis-full flex-wrap gap-2">
                 <Button variant="outline" size="sm" aria-expanded={viewing === item.id} onclick={() => toggleView(item)} aria-label={`View email “${subject(item)}”`}>View email</Button>
@@ -368,7 +393,7 @@
                 {#if item.suggestions.length}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : item.suggestions.length > 1 ? `Check the AI’s ${item.suggestions.length} suggestions for “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>{item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
                 {#if item.sender_domain && item.mine}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Not travel: ignore ${item.sender_domain}`}>Not travel: ignore this sender</Button>{/if}
-                <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={`Dismiss “${subject(item)}”`}>Dismiss</Button>
+                <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={item.count > 1 ? `Dismiss all ${item.count} emails about “${subject(item)}”` : `Dismiss “${subject(item)}”`}>{item.count > 1 ? "Dismiss all" : "Dismiss"}</Button>
               </div>
             </li>
             {#if viewing === item.id && peeks[item.id]}

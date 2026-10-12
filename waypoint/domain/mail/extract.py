@@ -8,7 +8,7 @@ import email.utils
 import json
 import re
 from collections.abc import Callable, Iterator, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from typing import Any, Literal
@@ -19,7 +19,7 @@ from ... import monitoring
 from ...providers import mailimages
 from ...storage.stored_mail import Content, Image
 from .. import seatmaps
-from . import cars, cruises, flights, lodging, parsers, safe_html, seats, trains, triage
+from . import cars, cruises, flights, lodging, parsers, references, safe_html, seats, trains, triage, words
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger
@@ -48,6 +48,8 @@ class Message:
     gaps: tuple[str, ...] = ()
     other_markup: bool = False
     forwarded_by: str | None = None
+    revises: bool = False
+    found: references.Found = field(default=references.Found(), repr=False, compare=False)
 
 
 FORWARD_MARK = re.compile(r"^[\s>]*(?:-{2,}\s*forwarded message\s*-{2,}|begin forwarded message\s*:?)\s*$", re.IGNORECASE | re.MULTILINE)
@@ -538,11 +540,13 @@ def read(message: Mapping[str, Any]) -> Message:
             nodes.extend(_jsonld_nodes(ld))
         nodes.extend(scanner.items)
     forwarded_by: str | None = None
-    wrapped = unwrap(_visible(htmls, texts))
-    if wrapped is not None or FORWARD_SUBJECT.match(" ".join(str(parsed.get("Subject") or "").split())):
+    visible = _visible(htmls, texts)
+    subject = " ".join(str(parsed.get("Subject") or "").split())[:SUBJECT_LIMIT]
+    wrapped = unwrap(visible)
+    if wrapped is not None or FORWARD_SUBJECT.match(subject):
         if wrapped is None or wrapped.sender_domain is None or not wrapped.subject:
             return Message(sender, received, unread=1, gaps=(NO_ORIGINAL,), forwarded_by=sender)
-        forwarded_by, sender = sender, wrapped.sender_domain
+        forwarded_by, sender, subject, visible = sender, wrapped.sender_domain, wrapped.subject, wrapped.rest
     bookings, unread, seen, gaps = _bookings(nodes)
     other = bool(nodes) and not seen
     parse = parsers.for_sender(sender)
@@ -585,7 +589,9 @@ def read(message: Mapping[str, Any]) -> Message:
     if any(utc_marked(t) for b in bookings for t in (b.start, b.end)):
         shown = clock_times(_visible(htmls, texts))
         bookings = [replace(b, clock_times=shown) if utc_marked(b.start) or utc_marked(b.end) else b for b in bookings]
-    return Message(sender, received, tuple(bookings), unread, markup=seen, gaps=tuple(gaps), other_markup=other, forwarded_by=forwarded_by)
+    return Message(sender, received, tuple(bookings), unread, markup=seen, gaps=tuple(gaps), other_markup=other, forwarded_by=forwarded_by,
+                   revises=bool(triage.CHANGES.search(subject) or words.CANCEL.search(subject) or references.changes(visible)),
+                   found=references.read(subject, visible) if not bookings and not unread else references.Found())
 
 
 class _Text(HTMLParser):

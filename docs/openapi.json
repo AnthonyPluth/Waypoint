@@ -5370,6 +5370,15 @@
               "string",
               "null"
             ]
+          },
+          "count": {
+            "type": "integer"
+          },
+          "others": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewOther"
+            }
           }
         },
         "required": [
@@ -5385,7 +5394,9 @@
           "received",
           "reason",
           "suggestions",
-          "suggestion_error"
+          "suggestion_error",
+          "count",
+          "others"
         ],
         "additionalProperties": false
       },
@@ -5434,6 +5445,36 @@
         ],
         "additionalProperties": false
       },
+      "ReviewOther": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_email": {
+            "type": "boolean"
+          },
+          "received": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "subject",
+          "has_email",
+          "received"
+        ],
+        "additionalProperties": false
+      },
       "ScanStarted": {
         "type": "object",
         "properties": {
@@ -5478,6 +5519,12 @@
           },
           "not_travel": {
             "type": "integer"
+          },
+          "followups": {
+            "type": "integer"
+          },
+          "with_facts": {
+            "type": "integer"
           }
         },
         "required": [
@@ -5490,7 +5537,9 @@
           "labels_dropped",
           "triaged",
           "total",
-          "not_travel"
+          "not_travel",
+          "followups",
+          "with_facts"
         ],
         "additionalProperties": false
       },
