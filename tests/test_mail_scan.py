@@ -1100,10 +1100,11 @@ class ReviewTests(ScanCase):
         self.assertEqual({(i["reason"], i["sender_domain"], i["received"]) for i in items},
                          {("no_markup", "example-air.example", "2026-10-17"), ("incomplete", "example-air.example", "2026-10-18")})
         nomarkup = next(i for i in items if i["reason"] == "no_markup")
-        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "known_sender", "holds_bookings", "subject", "has_email", "received", "reason", "gmail_url", "suggestions", "suggestion_error"}))
+        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "known_sender", "holds_bookings", "subject", "has_email", "received", "reason", "suggestions", "suggestion_error"}))
         self.assertEqual((nomarkup["subject"], nomarkup["has_email"]), ("Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F", True))
         self.assertEqual((nomarkup["owner"], nomarkup["mine"]), ("Jane Doe", True))
-        self.assertEqual(nomarkup["gmail_url"], "https://mail.google.com/mail/?authuser=jane%40gmail.example#all/msg-no_markup")
+        self.assertNotIn("gmail_url", nomarkup)
+        self.assertNotIn("mail.google", repr(self.items()))
         self.assertEqual(self.items("u-sam"), [])
         self.assertEqual(self.scanned(), {"msg-no_markup": "unreadable", "msg-incomplete": "unreadable", "msg-flight_jsonld": "booking"})
 
@@ -2479,8 +2480,9 @@ class MailScanApiTests(GoogleCase):
         self.assertTrue(self.mailboxes()[0]["share_review"])
         seen = self.call("ben", "GET", "/api/review")[1]["items"]
         self.assertEqual(sorted(i["reason"] for i in seen), ["incomplete", "no_markup"])
-        self.assertEqual({(i["address"], i["owner"], i["mine"], i["gmail_url"]) for i in seen}, {("ana@gmail.example", "Ana", False, None)})
-        self.assertTrue(all(i["mine"] and i["gmail_url"] for i in self.call("ana", "GET", "/api/review")[1]["items"]))
+        self.assertEqual({(i["address"], i["owner"], i["mine"]) for i in seen}, {("ana@gmail.example", "Ana", False)})
+        self.assertTrue(all(i["mine"] and "gmail_url" not in i for i in self.call("ana", "GET", "/api/review")[1]["items"]))
+        self.assertNotIn("mail.google", repr(self.call("ben", "GET", "/api/review")[1]))
         self.assertEqual(self.call("ben", "GET", "/api/state")[1]["review_count"], 2)
         self.assertEqual(self.share(on=False)[0], 200)
         self.assertEqual(self.call("ben", "GET", "/api/review")[1]["items"], [])

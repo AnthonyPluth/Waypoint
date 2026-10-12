@@ -145,14 +145,13 @@ describe("fitting and zooming the email", () => {
     expect(sizerOf().style.width).toBe("1250px");
   });
 
-  it("has no zoom controls in the plain-text view or for a message kept before originals could be shown", async () => {
+  it("has no zoom controls for a message kept before originals could be shown or one with no markup", async () => {
     const old = render(MessageView, { text: "Gate B12", html: "<p>Gate B12</p>", original: false });
     expect(screen.queryByRole("button", { name: "Zoom in" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Larger view/ })).toBeNull();
     expect(screen.getByTestId("message-old")).toBeInTheDocument();
     old.unmount();
-    render(MessageView, { text: "Gate B12", html: FIXED });
-    await userEvent.click(screen.getByRole("button", { name: "Show as plain text" }));
+    render(MessageView, { text: "Gate B12" });
     expect(screen.queryByRole("button", { name: "Zoom in" })).toBeNull();
     expect(screen.queryByTestId("zoom-level")).toBeNull();
     expect(screen.getByText("Gate B12")).toBeInTheDocument();
