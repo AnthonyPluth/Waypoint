@@ -92,7 +92,7 @@ describe("RouteReplayMap on the interstates", () => {
     await Promise.resolve();
     expect(container.querySelector("[data-car='0']")!.getAttribute("transform")).not.toBe(before);
     const slider = screen.getByRole("slider", { name: "Position along the route" });
-    await fireEvent.input(slider, { target: { value: "1000" } });
+    await fireEvent.input(slider, { target: { value: "4000" } });
     expect(slider.getAttribute("aria-valuetext")).toContain("Salt Lake City");
     expect(screen.getByRole("button", { name: "Replay" })).toBeTruthy();
     expect(list()).toHaveLength(2);
@@ -106,7 +106,7 @@ describe("RouteReplayMap on the interstates", () => {
     const drawn = () => [...container.querySelectorAll("[data-road]")].map((p) => p.getAttribute("data-road"));
     expect(drawn()).toContain("I-95");
     const slider = screen.getByRole("slider", { name: "Position along the route" });
-    await fireEvent.input(slider, { target: { value: "667" } });
+    await fireEvent.input(slider, { target: { value: "2667" } });
     expect(container.querySelector("svg")!.getAttribute("data-zoomed")).toBe("true");
     expect(drawn()).not.toContain("I-95");
     expect(drawn()).toContain("I-25");
