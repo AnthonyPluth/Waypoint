@@ -3,7 +3,7 @@
   import { Button } from "$lib/components/ui/button";
   import { loadCountries, type Country } from "$lib/map";
   import { viewport } from "$lib/phone.svelte";
-  import { activeStop, cameraAt, labelLit, STATIC_MOVER_PX, legProgress, legsOf, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Stop } from "$lib/route-replay";
+  import { activeStop, cameraAt, labelLit, LABEL_HOLD_MS, STATIC_MOVER_PX, legProgress, legsOf, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
@@ -33,6 +33,7 @@
 
   let progress = $state(0);
   let playing = $state(false);
+  let tail = $state(0);
   $effect(() => { if (calm) { progress = 1; playing = false; } });
   let started = false;
   $effect(() => {
@@ -49,9 +50,10 @@
     let frame = 0;
     let last = performance.now();
     const step = (at: number) => {
-      progress = Math.min(1, progress + (at - last) / duration);
+      if (progress < 1) progress = Math.min(1, progress + (at - last) / duration);
+      else tail += at - last;
       last = at;
-      if (progress >= 1) { playing = false; return; }
+      if (progress >= 1 && tail >= LABEL_HOLD_MS + 500) { playing = false; return; }
       frame = requestAnimationFrame(step);
     };
     frame = requestAnimationFrame(step);
@@ -59,9 +61,9 @@
   });
 
   function toggle() {
-    if (progress >= 1) { progress = 0; playing = true; } else playing = !playing;
+    if (progress >= 1) { progress = 0; tail = 0; playing = true; } else playing = !playing;
   }
-  const scrub = (e: Event) => { playing = false; progress = Number((e.currentTarget as HTMLInputElement).value) / 1000; };
+  const scrub = (e: Event) => { playing = false; tail = 0; progress = Number((e.currentTarget as HTMLInputElement).value) / 1000; };
 
   const showing = (i: number) => calm || reached(i, stops.length, progress);
   const crowd = $derived(spots.map((p, i) => spots.slice(0, i).filter((q) => Math.hypot(p.x - q.x, p.y - q.y) / zoom < 40).length));
@@ -71,7 +73,7 @@
   };
   const shift = (i: number) => 12 + Math.floor(crowd[i] / 2) * 40;
   const edge = (x: number) => (fx(x) < 0.22 ? "0%" : fx(x) > 0.78 ? "-100%" : "-50%");
-  const lit = (i: number) => calm || labelLit(i, stops.length, progress, !playing);
+  const lit = (i: number) => calm || (i === stops.length - 1 ? progress >= 1 && playing && tail < LABEL_HOLD_MS : labelLit(i, stops.length, progress, !playing));
   const box = $derived(calm ? { x: 0, y: 0, w: width, h: height } : cameraAt(stops, spots, width, height, progress));
   const zoom = $derived(box.w / width);
   const zoomed = $derived(box.w < width - 0.5);

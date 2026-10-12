@@ -208,12 +208,13 @@ describe("the camera and the timeline", () => {
     expect(Math.sign(heading(planeAt(there, 0.5).angle))).not.toBe(Math.sign(heading(planeAt(home, 0.5).angle)));
   });
 
-  it("lights a stop's label as the path reaches it, holds it, then lets it go, keeping the last one", () => {
+  it("lights a stop's label as the path reaches it, holds it, then lets every one go, the last included", () => {
     expect([0, 0.05, 0.3, 0.6].map((p) => labelLit(0, 3, p, false))).toEqual([true, true, false, false]);
     expect([0.2, 0.5, 0.6, 0.9].map((p) => labelLit(1, 3, p, false))).toEqual([false, true, true, false]);
     expect(labelLit(1, 3, 0.9, false)).toBe(false);
     expect(labelLit(1, 3, 0.9, true)).toBe(true);
-    expect([0.5, 1].map((p) => labelLit(2, 3, p, false))).toEqual([false, true]);
+    expect([0.5, 1].map((p) => labelLit(2, 3, p, false))).toEqual([false, false]);
+    expect(labelLit(2, 3, 1, true)).toBe(false);
   });
 
   it("spreads the legs evenly over the playback", () => {

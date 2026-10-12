@@ -201,9 +201,8 @@ export const reached = (stop: number, stops: number, progress: number): boolean 
 export const activeStop = (stops: number, progress: number): number => Math.min(stops - 1, Math.max(0, Math.floor(progress * (stops - 1) + 1e-9)));
 
 export function labelLit(stop: number, stops: number, progress: number, held: boolean): boolean {
-  if (!reached(stop, stops, progress)) return false;
-  if (stop === stops - 1) return true;
-  if (held && stop === activeStop(stops, progress)) return true;
+  if (stop === stops - 1 || !reached(stop, stops, progress)) return false;
+  if (held && progress < 1 && stop === activeStop(stops, progress)) return true;
   const hold = Math.min(0.85, LABEL_HOLD_MS / (replayMs(stops) / (stops - 1)));
   return progress * (stops - 1) - stop < hold;
 }

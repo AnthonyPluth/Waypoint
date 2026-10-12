@@ -71,8 +71,17 @@ describe("RouteReplayMap", () => {
     await Promise.resolve();
     expect(labels(container)).toEqual(["Minneapolis"]);
     expect(screen.getByRole("button", { name: "Replay" })).toBeTruthy();
+    advance(1000);
+    await Promise.resolve();
+    advance(1000);
+    await Promise.resolve();
+    expect(labels(container)).toEqual([]);
+    advance(1000);
+    await Promise.resolve();
     expect(container.querySelector(".animate-ping")).toBeNull();
     expect(frames).toHaveLength(0);
+    expect(container.querySelectorAll("[data-plane]").length).toBeGreaterThan(0);
+    expect(list()).toHaveLength(3);
   });
 
   it("pauses, resumes, scrubs by keyboard-operable range and replays from the start", async () => {
@@ -84,7 +93,7 @@ describe("RouteReplayMap", () => {
     expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy();
     const slider = screen.getByRole("slider", { name: "Position along the route" }) as HTMLInputElement;
     await fireEvent.input(slider, { target: { value: "1000" } });
-    expect(labels(container)).toHaveLength(1);
+    expect(labels(container)).toHaveLength(0);
     expect(slider.getAttribute("aria-valuetext")).toBe("Back in Minneapolis (MSP), Dec 11");
     await fireEvent.click(screen.getByRole("button", { name: "Replay" }));
     expect(labels(container)).toEqual(["Minneapolis"]);
@@ -139,7 +148,7 @@ describe("RouteReplayMap", () => {
     expect(Math.abs(Math.cos((angle(0) * Math.PI) / 180) - Math.cos((angle(1) * Math.PI) / 180))).toBeGreaterThan(0.5);
   });
 
-  it("fades a label out after its hold and fades the next one in, keeping the last stop", async () => {
+  it("fades a label out after its hold and fades the next one in", async () => {
     const { container } = render(RouteReplayMap, { stops, year: 2025, still: false });
     expect(labels(container)).toEqual(["Minneapolis"]);
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
@@ -161,6 +170,8 @@ describe("RouteReplayMap", () => {
     advance(7000);
     await Promise.resolve();
     expect(screen.getByRole("button", { name: "Replay" })).toBeTruthy();
+    advance(3000);
+    await Promise.resolve();
     expect(frames).toHaveLength(0);
     await fireEvent.click(screen.getByRole("button", { name: "Replay" }));
     expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
