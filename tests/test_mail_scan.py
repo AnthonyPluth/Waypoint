@@ -20,13 +20,14 @@ from tests.shared import TODAY, DbCase, fetch
 from tests.test_gmail import CLIENT_ID, CLIENT_SECRET, FakeGoogle, Google, GoogleCase
 from waypoint import oidc
 from waypoint.domain import loyalty, people, trips
-from waypoint.domain.mail import extract, ingest, query, review, scan, triage
+from waypoint.domain.mail import ai, extract, ingest, query, review, scan, triage
 from waypoint.domain.visibility import Viewer
 from waypoint.providers import gmail
 from waypoint.server.api import mailboxes as mailboxes_api
 from waypoint.server.common import ApiError
 from waypoint.server import jobs
 from waypoint.storage import db, secretbox, stored_mail
+from waypoint.storage import settings_keys as sk
 from waypoint.storage.models import (IgnoredSender, Mailbox, ReviewItem, ScannedMessage, Segment, SegmentMessage, SegmentTraveler, StoredMessage,
                                      TrustedSender)
 
@@ -2621,7 +2622,7 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(self.call("ana", "POST", f"/api/mailboxes/{self.ana_box}/share", {"share": "false"})[0], 200)
         self.assertFalse(self.mailboxes()[0]["share_review"])
 
-    def test_the_household_can_dismiss_a_shared_item_but_nothing_that_reads_the_owners_gmail(self):
+    def test_the_household_can_dismiss_a_shared_item_but_not_ignore_its_sender_or_read_the_owners_gmail(self):
         self.put("no_markup", "incomplete")
         self.scan_now()
         first, second = self.call("ana", "GET", "/api/review")[1]["items"]
@@ -2629,7 +2630,6 @@ class MailScanApiTests(GoogleCase):
         self.share()
         fetched = len(self.google.fetched)
         self.assertEqual(self.call("ben", "GET", f"/api/review/{first['id']}/preview")[0], 200)
-        self.assertEqual(self.call("ben", "POST", f"/api/review/{first['id']}/suggest", {})[0], 404)
         self.assertEqual(self.call("ben", "POST", f"/api/review/{first['id']}/ignore", {})[0], 404)
         self.assertEqual(len(self.google.fetched), fetched)
         self.assertEqual(self.call("ben", "DELETE", f"/api/review/{first['id']}"), (200, {"ok": True}))
@@ -2870,7 +2870,7 @@ class MailScanApiTests(GoogleCase):
         status, body = self.call("ana", "GET", f"/api/review/{item['id']}/preview")
         self.assertEqual((status, body["error"]), (404, "That message is no longer in Gmail."))
 
-    def test_asking_the_ai_needs_it_on_and_is_the_owners_alone(self):
+    def test_asking_the_ai_needs_it_on_and_is_for_whoever_can_see_the_item(self):
         self.put("no_markup")
         self.scan_now()
         [item] = self.call("ana", "GET", "/api/review")[1]["items"]
@@ -2879,6 +2879,88 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual((status, body["error"]), (400, "Turn on AI suggestions in Settings first."))
         self.assertEqual(self.call("ben", "POST", f"/api/review/{item['id']}/suggest", {})[0], 404)
         self.assertEqual(self.call("ana", "POST", "/api/review/9999/suggest", {})[0], 404)
+        self.share()
+        status, body = self.call("ben", "POST", f"/api/review/{item['id']}/suggest", {})
+        self.assertEqual((status, body["error"]), (400, "Turn on AI suggestions in Settings first."))
+
+    SUGGESTED = {"kind": "flight", "provider": "Example Air", "confirmation": "QW4R7T", "origin": "BOS", "destination": "DEN",
+                 "start_local": "2026-12-02T07:15", "end_local": "2026-12-02T10:05"}
+
+    def ai_on(self):
+        with db.session() as conn:
+            db.set_setting(conn, sk.AI_MODE, "local")
+            db.set_setting(conn, sk.AI_OLLAMA_URL, "http://ollama.example:11434")
+            db.set_setting(conn, sk.AI_OLLAMA_MODEL, "llama3")
+        self.addCleanup(self.ai_off)
+
+    def ai_off(self):
+        with db.session() as conn:
+            db.set_setting(conn, sk.AI_MODE, "off")
+
+    def asked(self, who, item_id):
+        with mock.patch.object(scan.ai, "suggest", return_value=ai.Reading([self.SUGGESTED])) as asked:
+            result = self.call(who, "POST", f"/api/review/{item_id}/suggest", {})
+        return result, asked
+
+    def test_a_member_can_ask_the_ai_about_a_shared_item_from_its_kept_text_without_touching_gmail(self):
+        self.put("no_markup")
+        self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        self.ai_on()
+        self.share()
+        fetched = len(self.google.fetched)
+        with no_leaks(self, "CANARY-SUBJECT-NOMARKUP-8B3F"):
+            (status, body), asked = self.asked("ben", item["id"])
+        self.assertEqual((status, body), (200, {"ok": True}))
+        [call] = asked.call_args_list
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", call.args[1])
+        self.assertNotIn("CANARY-SUBJECT-NOMARKUP-8B3F", call.args[1])
+        self.assertEqual(len(self.google.fetched), fetched)
+        for who in ("ana", "ben"):
+            [seen] = self.call(who, "GET", "/api/review")[1]["items"]
+            self.assertEqual(seen["suggestions"], [self.SUGGESTED])
+
+    def test_a_shared_item_whose_message_was_not_kept_is_read_through_the_mailboxs_own_connection(self):
+        self.put("no_markup")
+        self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        with db.session() as conn:
+            conn.execute(StoredMessage.__table__.delete())
+        self.ai_on()
+        self.share()
+        (status, body), asked = self.asked("ben", item["id"])
+        self.assertEqual((status, body), (200, {"ok": True}))
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", asked.call_args.args[1])
+        self.assertEqual(self.call("ben", "GET", "/api/review")[1]["items"][0]["suggestions"], [self.SUGGESTED])
+        del self.google.mail["m-no_markup"]
+        (status, body), _ = self.asked("ben", item["id"])
+        self.assertEqual((status, body["error"]), (404, "That message is no longer in Gmail."))
+
+    def test_a_member_who_cannot_see_the_item_gets_a_404_and_nothing_is_sent(self):
+        self.put("no_markup")
+        self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        self.ai_on()
+        (status, body), asked = self.asked("ben", item["id"])
+        self.assertEqual((status, body), (404, {"error": "No such item"}))
+        asked.assert_not_called()
+        self.share()
+        self.share(on=False)
+        (status, _), asked = self.asked("ben", item["id"])
+        self.assertEqual(status, 404)
+        asked.assert_not_called()
+        self.assertEqual(self.call("ana", "GET", "/api/review")[1]["items"][0]["suggestions"], [])
+
+    def test_the_owner_still_asks_about_their_own_item_by_fetching_it_from_gmail(self):
+        self.put("no_markup")
+        self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        self.ai_on()
+        fetched = len(self.google.fetched)
+        (status, body), asked = self.asked("ana", item["id"])
+        self.assertEqual((status, body), (200, {"ok": True}))
+        self.assertEqual(len(self.google.fetched), fetched + 1)
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", asked.call_args.args[1])
 
     def test_who_is_this_can_add_a_guest(self):
         self.put("flight_microdata")

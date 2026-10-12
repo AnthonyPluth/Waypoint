@@ -105,7 +105,7 @@ describe("Review", () => {
     expect(screen.getAllByRole("button", { name: /ignore/i })).toHaveLength(1);
   });
 
-  it("shows an item shared by another member with whose mailbox it is, and only View email, Add by hand and Dismiss", async () => {
+  it("shows an item shared by another member with whose mailbox it is, and View email, Add by hand, Ask AI and Dismiss", async () => {
     held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe", address: "sam@gmail.example" })], who: [], ai: true };
     render(ReviewPage);
     const row = await screen.findByTestId("review-item");
@@ -114,9 +114,16 @@ describe("Review", () => {
     expect(within(row).getByRole("button", { name: /View email .Mail from example-air.example.* on 2026-10-17/ })).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: /Add .Mail from example-air.example.* by hand/ })).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: /Dismiss/ })).toBeInTheDocument();
-    for (const name of [/Ask AI about/, /ignore example-air.example/i]) expect(within(row).queryByRole("button", { name })).toBeNull();
+    expect(within(row).getByRole("button", { name: /Ask AI about/ })).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: /ignore example-air.example/i })).toBeNull();
     expect(within(row).queryByRole("link")).toBeNull();
-    expect(screen.queryByRole("button", { name: /Ask AI about all/ })).toBeNull();
+  });
+
+  it("offers no Ask AI on a shared item while the AI is off", async () => {
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" })], who: [], ai: false };
+    render(ReviewPage);
+    const row = await screen.findByTestId("review-item");
+    expect(within(row).queryByRole("button", { name: /Ask AI about/ })).toBeNull();
   });
 
   it("opens a shared item's message beside the form like any other, and dismisses it", async () => {
@@ -851,6 +858,14 @@ describe("Review: Ask AI", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 3" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 3 messages"));
     expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest", "/api/review/2/suggest", "/api/review/3/suggest"]);
+  });
+
+  it("asks about shared items too, alone and in bulk", async () => {
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" }), item({ id: 5, mine: true })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 2 messages"));
+    expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/4/suggest", "/api/review/5/suggest"]);
   });
 
   it("stops the bulk ask at the first failure and says how far it got", async () => {

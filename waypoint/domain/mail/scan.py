@@ -301,20 +301,31 @@ def preview(owner: str, item_id: int) -> Content:
 
 def suggest_now(owner: str, item_id: int, now: float) -> None:
     with db.session() as conn:
-        found = review.locate(conn, owner, item_id)
+        found = review.seen_message(conn, owner, item_id)
         if found is None:
             raise KeyError(item_id)
-        if review.is_match(conn, *found):
+        mailbox_id, message_id, mine = found
+        if review.is_match(conn, mailbox_id, message_id):
             raise NotAskable(HOLDS_BOOKINGS)
-        if review.is_generic(conn, *found):
+        if review.is_generic(conn, mailbox_id, message_id):
             raise NotAskable(READ_ALREADY)
         if ai.config(conn) is None:
             raise NoAi(NO_AI)
-    mailbox_id, message_id, raw = _again(owner, item_id)
-    _suggest(mailbox_id, message_id, raw, now)
+        kept = None if mine else stored_mail.get(conn, mailbox_id, message_id)
+        token = None if mine or kept is not None else gmail.access_token(conn, mailbox_id, time.time())
+    if kept is not None:
+        _ask(mailbox_id, message_id, kept["text"], now)
+    elif token is not None:
+        _suggest(mailbox_id, message_id, gmail.fetch(token, message_id), now)
+    else:
+        _suggest(mailbox_id, message_id, _again(owner, item_id)[2], now)
 
 
 def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) -> None:
+    _ask(mailbox_id, message_id, extract.plain_text(raw), now)
+
+
+def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> None:
     with db.session() as conn:
         cfg = ai.config(conn)
         known = tuple(loyalty.known_numbers(conn)) if cfg else ()
@@ -324,7 +335,7 @@ def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) 
     suggestions: list[ai.Suggestion] = []
     error: str | None = None
     try:
-        reading = ai.suggest(cfg, extract.plain_text(raw), known)
+        reading = ai.suggest(cfg, text, known)
         suggestions, error = reading.bookings, reading.error
     except ai.AiError as e:
         error = str(e)
