@@ -18,7 +18,7 @@ const settled = () => waitFor(() => { expect(screen.queryByRole("dialog")).toBeN
 
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
   id: 1, address: "ana@gmail.example", owner: "Ana Doe", mine: true, sender_domain: "example-air.example", known_sender: false, holds_bookings: false, subject: null, has_email: true, received: "2026-10-17",
-  reason: "no_markup", suggestions: [], suggestion_error: null, count: 1, others: [], ...extra });
+  reason: "no_markup", suggestions: [], suggestion_error: null, auto_read: false, count: 1, others: [], ...extra });
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
   start_local: "2026-12-08T08:00", start_zone: "America/New_York", ...extra });
@@ -1049,6 +1049,14 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     fail(new Error("Couldn’t add it"));
     expect(await within(sheet).findByRole("alert")).toHaveTextContent("Couldn’t add it");
     expect(within(sheet).getByLabelText("From (airport code)")).toHaveValue("JFK");
+  });
+
+  it("marks a suggestion the scan asked for on its own as read automatically, and one asked for by hand not", async () => {
+    const hotel = { kind: "hotel" as const, provider: "Seaside Inn", origin: "Seaside Inn", start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London" };
+    held = { matches: [], items: [item({ id: 1, suggestions: [hotel], auto_read: true }), item({ id: 2, suggestions: [hotel] }), item({ id: 3 })], who: [], ai: true };
+    render(ReviewPage);
+    expect(await screen.findAllByText("AI suggestion")).toHaveLength(2);
+    expect(screen.getAllByText("read automatically")).toHaveLength(1);
   });
 
   it("shows a booking Waypoint read itself with its source fields outlined, and not as an AI suggestion", async () => {

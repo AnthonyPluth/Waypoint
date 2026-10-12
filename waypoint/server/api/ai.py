@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ... import validate
-from ...domain.mail import ai
+from ...domain.mail import ai, autoask
 from ...storage import db
 from ...storage import settings_keys as sk
 from ..common import ApiError
@@ -14,7 +14,8 @@ def _settings(conn) -> AiSettings:
     key_source = ai.saved_key(conn)[1]
     stored = db.get_settings(conn, [sk.AI_OLLAMA_URL, sk.AI_OLLAMA_MODEL, sk.AI_OPENROUTER_MODEL])
     return {"mode": ai.mode(conn), "ollama_url": stored[sk.AI_OLLAMA_URL] or "", "ollama_model": stored[sk.AI_OLLAMA_MODEL] or "",
-            "openrouter_model": stored[sk.AI_OPENROUTER_MODEL] or "", "key": key_source}
+            "openrouter_model": stored[sk.AI_OPENROUTER_MODEL] or "", "key": key_source,
+            "auto": ai.mode(conn) != ai.OFF and autoask.chosen(conn)}
 
 
 def api_ai(conn, _q, _b) -> AiSettings:
@@ -59,6 +60,10 @@ def api_ai_save(conn, _q, body: AiBody) -> AiSettings:
         if not (key or (key is None and ai.saved_key(conn)[0])):
             raise ApiError(f"Enter an OpenRouter key (or set {ai.KEY_ENV} where Waypoint runs)")
     db.set_setting(conn, sk.AI_MODE, mode)
+    if mode == ai.OFF:
+        autoask.save_choice(conn, False)
+    elif "auto" in body:
+        autoask.save_choice(conn, validate.on(body["auto"]))
     for setting, value in ((sk.AI_OLLAMA_URL, url), (sk.AI_OLLAMA_MODEL, model_l), (sk.AI_OPENROUTER_MODEL, model_o),
                            (sk.AI_OPENROUTER_KEY, key)):
         if value is not None:

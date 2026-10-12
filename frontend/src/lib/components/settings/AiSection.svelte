@@ -15,10 +15,11 @@
   let ollamaModel = $state("");
   let routerModel = $state("");
   let key = $state("");
+  let auto = $state(false);
   let formError = $state("");
   let saving = $state(false);
 
-  const adopt = (s: AiSettings) => { saved = s; mode = s.mode; url = s.ollama_url; ollamaModel = s.ollama_model; routerModel = s.openrouter_model; key = ""; };
+  const adopt = (s: AiSettings) => { saved = s; mode = s.mode; url = s.ollama_url; ollamaModel = s.ollama_model; routerModel = s.openrouter_model; key = ""; auto = s.auto; };
 
   async function load() {
     try { adopt(await apiCall<"GET /api/ai">("/api/ai")); problem = ""; }
@@ -35,7 +36,7 @@
   async function save(e: SubmitEvent) {
     e.preventDefault();
     formError = "";
-    const body = { mode, ollama_url: url, ollama_model: ollamaModel, openrouter_model: routerModel, ...(key ? { openrouter_key: key } : {}) };
+    const body = { mode, ollama_url: url, ollama_model: ollamaModel, openrouter_model: routerModel, auto: mode !== "off" && auto, ...(key ? { openrouter_key: key } : {}) };
     await act(async () => {
       adopt(await apiCall<"POST /api/ai">("/api/ai", { method: "POST", body }));
       toast.success(mode === "off" ? "AI is off" : "AI settings saved");
@@ -50,7 +51,7 @@
 
 <section aria-labelledby="ai-title" class="space-y-2">
   <h2 id="ai-title" class="eyebrow px-1">AI</h2>
-  <p class="px-1 text-sm text-muted-foreground">Optional. When it’s on, Waypoint offers mail it couldn’t read (new items on the Review page’s “Couldn’t read” list, not ones already there) to an AI, which suggests the booking. You confirm or edit it; nothing is saved without you. The setting is the household’s, so it covers every member’s connected mailbox. Quoted replies, footers and numbers that look like loyalty, Known Traveler or card numbers are removed first, and a booking Waypoint could read is never sent.</p>
+  <p class="px-1 text-sm text-muted-foreground">Optional. When it’s on, you can ask an AI about mail Waypoint couldn’t read (an item on the Review page’s “Couldn’t read” list) and it suggests the booking. You confirm or edit it; nothing is saved without you. The setting is the household’s, so it covers every member’s connected mailbox. Nothing is sent until someone chooses Ask AI, unless you also choose to read unreadable mail automatically. With OpenRouter, quoted replies, footers and numbers that look like loyalty, Known Traveler or card numbers are removed first; with Local they are sent as written. A booking Waypoint could read is never sent.</p>
   <div class="rows">
     {#if problem}
       <div class="row"><p class="text-sm text-signal-ink" role="status">{problem}</p><Button variant="outline" onclick={load}>Try again</Button></div>
@@ -82,6 +83,17 @@
               <Input type="password" aria-label="OpenRouter key" bind:value={key} maxlength={200} autocomplete="off" spellcheck={false}
                 placeholder={saved.key === "saved" ? "Saved. Type a new one to replace it" : "sk-or-…"} />
               <span class="text-muted-foreground">Stored encrypted. It never shows again.</span>
+            {/if}
+          </div>
+        {/if}
+        {#if mode !== "off"}
+          <div class="space-y-2">
+            <label class="flex items-start gap-3 text-sm">
+              <input type="checkbox" bind:checked={auto} class="mt-1" />
+              <span><span class="font-medium">Read unreadable mail with AI automatically</span><span class="block text-muted-foreground">Off by default. “Ask AI” on a Review item works either way.</span></span>
+            </label>
+            {#if auto}
+              <p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="note">Waypoint will send the text of travel emails it couldn’t read to the AI you chose, without asking each time.</p>
             {/if}
           </div>
         {/if}

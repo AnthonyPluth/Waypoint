@@ -59,6 +59,7 @@ class ScanSummary(TypedDict):
     followups: int
     with_facts: int
     attached: int
+    ai_asked: int
 
 
 class Mailbox(TypedDict):
@@ -203,6 +204,7 @@ class ReviewItem(TypedDict):
     reason: Literal["no_markup", "incomplete", "broken", "generic"]
     suggestions: list[AiSuggestion]
     suggestion_error: str | None
+    auto_read: bool
     count: int
     others: list[ReviewOther]
 
@@ -323,6 +325,7 @@ class AiSettings(TypedDict):
     ollama_model: str
     openrouter_model: str
     key: Literal["env", "saved"] | None
+    auto: bool
 
 
 class LogoDevStatus(TypedDict):
@@ -351,6 +354,7 @@ class AiBody(TypedDict):
     ollama_model: NotRequired[str]
     openrouter_model: NotRequired[str]
     openrouter_key: NotRequired[str]
+    auto: NotRequired[bool]
 
 
 class Person(TypedDict):
