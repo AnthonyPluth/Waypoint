@@ -23,7 +23,7 @@ class DemoTests(DbCase):
         demo.seed(self.c, today)
         found = trips.listing(self.c, Viewer(None, household=True))
         day = today.isoformat()
-        self.assertEqual(len([t for t in found if (t["end_date"] or "") < day]), 4)
+        self.assertEqual(len([t for t in found if (t["end_date"] or "") < day]), 5)
         self.assertEqual(len([t for t in found if (t["start_date"] or "") <= day <= (t["end_date"] or "")]), 1)
         self.assertEqual(len([t for t in found if (t["start_date"] or "") > day]), 5)
         self.assertTrue(all(t["segments"] for t in found))

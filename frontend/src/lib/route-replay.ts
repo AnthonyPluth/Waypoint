@@ -9,9 +9,12 @@ export type Stop = { name: string; city: string; code: string | null; kind: Stop
 export type Spot = { x: number; y: number };
 export type Vehicle = "plane" | "car" | "boat";
 export type Roads = TripPlaces["roads"];
+export type Boundaries = TripPlaces["boundaries"];
 export type Track = { points: Spot[]; along: number[] };
 export type Leg = { d: string; flight: boolean; vehicle: Vehicle; from: Spot; control: Spot; to: Spot; road: Track | null; refs: string[] };
 export type RoadShape = { ref: string; d: string; left: number; top: number; right: number; bottom: number; length: number; mid: Spot };
+export type Extent = { left: number; top: number; right: number; bottom: number };
+export type BoundaryShape = Extent & { d: string };
 export type Shield = { ref: string; x: number; y: number };
 export type Box = { x: number; y: number; w: number; h: number };
 type Visit = Omit<Stop, "back"> & { exact?: boolean };
@@ -33,6 +36,8 @@ export const LABEL_HOLD_MS = 1750;
 export const NO_ROADS: Roads = { legs: [], interstates: [] };
 export const ROAD_MATCH_KM = 90;
 export const ROAD_MIN_SCALE = 800;
+export const NO_BOUNDARIES: Boundaries = [];
+export const BOUNDARY_MIN_SCALE = 500;
 export const SHIELD_GAP = 150;
 export const MAX_SHIELDS = 8;
 export const HEADING_UNITS = 6;
@@ -310,9 +315,26 @@ export function roadShapes(lines: Roads["interstates"], projection: GeoProjectio
   return out;
 }
 
+export function boundaryShapes(lines: Boundaries, projection: GeoProjection): BoundaryShape[] {
+  const out: BoundaryShape[] = [];
+  for (const line of lines) {
+    const points: Spot[] = [];
+    for (const [lat, lon] of line.points) {
+      const at = projection([lon, lat]);
+      if (at) points.push({ x: at[0], y: at[1] });
+    }
+    if (points.length < 2) continue;
+    const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
+    out.push({ d: polyline(points), left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) });
+  }
+  return out;
+}
+
+export const boundariesShown = (projection: GeoProjection, zoom: number): boolean => projection.scale() / zoom >= BOUNDARY_MIN_SCALE;
+
 export const roadsShown = (projection: GeoProjection, zoom: number): boolean => projection.scale() / zoom >= ROAD_MIN_SCALE;
 
-export const inView = (shape: RoadShape, box: Box): boolean => shape.right >= box.x && shape.left <= box.x + box.w && shape.bottom >= box.y && shape.top <= box.y + box.h;
+export const inView = (shape: Extent, box: Box): boolean => shape.right >= box.x && shape.left <= box.x + box.w && shape.bottom >= box.y && shape.top <= box.y + box.h;
 
 export function shieldsOf(shapes: RoadShape[], box: Box, zoom: number): Shield[] {
   const gap = SHIELD_GAP * zoom;
