@@ -17,7 +17,7 @@ from sqlalchemy import func, insert, select, update
 from waypoint.storage import backup, db, secretbox
 from waypoint import server
 from waypoint.storage import settings_keys as sk
-from waypoint.storage.models import AuthSession, LoyaltyId, Person, Segment, SegmentTraveler, Setting, Trip, TripPerson, User
+from waypoint.storage.models import AuthSession, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentTraveler, Setting, Trip, TripPerson, User
 from tests.shared import add_database, fetch, own_database, serve
 
 db_session = db.session
@@ -113,6 +113,10 @@ class BackupTests(unittest.TestCase):
                                          end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual"))
         c.execute(insert(SegmentTraveler).values(segment_id=9, person_id=11))
 
+    def without_ai_counters(self, data):
+        self.without(data, "mailboxes", "ai_day", "ai_day_count")
+        self.without(data, "review_items", "auto_state", "auto_tries")
+
     def without(self, data, table, *names):
         part = data["tables"][table]
         keep = [i for i, name in enumerate(part["columns"]) if name not in names]
@@ -140,6 +144,7 @@ class BackupTests(unittest.TestCase):
         data["tables"].pop("trip_people")
         self.without(data, "segments", "travelers_from_trip", "price_minor", "price_currency", "price_source")
         self.without(data, "trips", "done_at")
+        self.without_ai_counters(data)
         dst = db.connect(self.b)
         with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)
@@ -161,6 +166,7 @@ class BackupTests(unittest.TestCase):
         data["revision"] = "0030"
         self.without(data, "segments", "price_minor", "price_currency", "price_source")
         self.without(data, "trips", "done_at")
+        self.without_ai_counters(data)
         with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)
         dst.commit()
@@ -180,10 +186,32 @@ class BackupTests(unittest.TestCase):
         data = backup.load(backup.dump(src))
         data["revision"] = "0031"
         self.without(data, "trips", "done_at")
+        self.without_ai_counters(data)
         with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)
         dst.commit()
         self.assertEqual([(t.id, t.done_at) for t in dst.orm.scalars(select(Trip))], [(5, None)])
+        src.close(); dst.close()
+
+    def test_the_automatic_ai_counters_come_back_and_a_backup_from_before_restores_with_none(self):
+        src = db.connect(self.a)
+        src.execute(insert(Mailbox).values(id=3, owner_sub="u", address="a@x.example", token="t", status="connected", ai_day="2026-10-12", ai_day_count=7))
+        src.execute(insert(ReviewItem).values(id=4, mailbox_id=3, message_id="m", sender_domain="x.example", reason="no_markup", created=1.0,
+                                              auto_state="waiting", auto_tries=2))
+        src.commit()
+        dst = db.connect(self.b)
+        backup.restore(dst, backup.load(backup.dump(src)))
+        dst.commit()
+        self.assertEqual([tuple(r) for r in dst.execute(select(Mailbox.ai_day, Mailbox.ai_day_count))], [("2026-10-12", 7)])
+        self.assertEqual([tuple(r) for r in dst.execute(select(ReviewItem.auto_state, ReviewItem.auto_tries))], [("waiting", 2)])
+        data = backup.load(backup.dump(src))
+        data["revision"] = "0032"
+        self.without_ai_counters(data)
+        with mock.patch.object(backup, "head", return_value="not-this-one"):
+            backup.restore(dst, data)
+        dst.commit()
+        self.assertEqual([tuple(r) for r in dst.execute(select(Mailbox.ai_day, Mailbox.ai_day_count))], [(None, 0)])
+        self.assertEqual([tuple(r) for r in dst.execute(select(ReviewItem.auto_state, ReviewItem.auto_tries))], [(None, 0)])
         src.close(); dst.close()
 
     def test_people_come_back_exactly_with_their_links(self):
