@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from ..storage import reference
 from .trips import PortIn, SegmentOut, TripOut, flight_groups, untimed
 
 PRODID = "-//Waypoint//Trips//EN"
@@ -93,7 +94,8 @@ def _title(seg: SegmentOut) -> str:
     if seg["kind"] == "hotel":
         return f"Hotel: {seg['origin']}" if seg["origin"] else "Hotel"
     if seg["kind"] == "visit":
-        return f"Visit: {seg['destination']}" if seg["destination"] else "Visit"
+        country = reference.country_names().get(seg["destination"] or "", seg["destination"])
+        return f"Visit: {country}" if country else "Visit"
     if seg["kind"] == "parking":
         return f"Parking: {seg['origin']}" if seg["origin"] else "Parking"
     if seg["kind"] == "car":

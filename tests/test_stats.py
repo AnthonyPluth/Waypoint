@@ -74,6 +74,19 @@ class HistoricalVisitTests(StatsCase):
         self.assertEqual(self.stats(self.jane, person=self.sam.person_id)["places"]["countries"], [])
         self.assertEqual(len(self.stats(self.jane, person=self.jane.person_id)["places"]["countries"]), 1)
 
+    def test_the_calendar_names_the_country_and_a_stranger_cannot_see_the_trip(self):
+        from waypoint.domain import calendar, visibility
+        got = self.add(self.jane, VISIT_JP, travelers=self.on(self.jane.person_id))
+        self.assertIn("SUMMARY:Visit: Japan", calendar.feed(trips.listing(self.c, self.jane), NOW))
+        self.assertIsNone(visibility.visible_trip(self.c, self.sam, got["trip_id"]))
+        self.assertEqual(self.stats(self.sam)["places"]["countries"], [])
+
+    def test_editing_a_flight_into_a_visit_drops_its_airports_and_takes_the_countrys_zone(self):
+        flight = self.add(self.jane, JFK_LHR, travelers=self.on(self.jane.person_id))
+        edited = trips.edit_segment(self.c, self.jane, flight["id"], {"kind": "visit", "destination": "gb"})
+        self.assertEqual((edited["kind"], edited["origin"], edited["destination"], edited["start_zone"], edited["end_zone"]),
+                         ("visit", None, "GB", "Europe/London", "Europe/London"))
+
     def test_an_unknown_country_is_refused(self):
         for bad in (None, "", "ZZ", "Japan"):
             with self.assertRaises(trips.Invalid):

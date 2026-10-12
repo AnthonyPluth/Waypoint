@@ -347,6 +347,14 @@ class SendingTests(Reminders):
         self.assertEqual(self.due(LATER, hour=9), 0)
         self.assertEqual(len(self.sent), 1)
 
+    def test_a_past_visit_is_never_in_the_day_of_summary(self):
+        self.device()
+        self.add(self.jane, {"kind": "visit", "destination": "GB", "start_local": "2026-11-20T00:00", "end_local": "2026-11-22T00:00"},
+                 self.out["trip_id"], travelers=self.on(self.jane.person_id))
+        self.due(LATER, hour=8)
+        (_id, message), = self.sent
+        self.assertEqual(message["body"].split("\n"), ["19:00 Flight EX 101 JFK → LHR"])
+
     def test_a_long_day_names_five_bookings_and_counts_the_rest(self):
         self.device()
         for i in range(7):

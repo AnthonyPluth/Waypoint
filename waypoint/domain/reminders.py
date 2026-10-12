@@ -264,7 +264,7 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
                         sent += 1
         day = today.isoformat()
         if chosen["day_of"] and hour >= DAY_OF_HOUR and not _sent(conn, owner, "day_of", day):
-            starting = [(s, t) for t in mine for s in _live(t["segments"]) if s["start_local"][:10] == day]
+            starting = [(s, t) for t in mine for s in _live(t["segments"]) if s["kind"] != "visit" and s["start_local"][:10] == day]
             if starting and _deliver(conn, owner, day_of_message(starting, day), send):
                 _record(conn, owner, "day_of", day, stamp)
                 sent += 1
