@@ -29,6 +29,8 @@ export interface AiSuggestion {
   room?: string;
   ship?: string;
   deck?: string;
+  flight_number?: string;
+  cabin?: string;
   sources?: Record<string, string>;
 }
 
@@ -126,6 +128,7 @@ export interface AssistantItemDetail {
   match: AssistantMatch | null;
   entries: AssistantEntry[];
   suggestion: AssistantParsed | null;
+  suggestions: AssistantParsed[];
 }
 
 export interface AssistantItems {
@@ -258,6 +261,30 @@ export interface FlightStatusList {
 export interface FlightStatusPause {
   until: string;
   reason: "limit" | "rate" | "key";
+}
+
+export interface GlanceDomain {
+  domain: string;
+  count: number;
+  reason: "no_markup" | "incomplete" | "broken" | "match" | "generic";
+  item_id: number | null;
+  known_sender: boolean;
+}
+
+export interface GlanceGap {
+  label: string;
+  count: number;
+}
+
+export interface GlanceReason {
+  reason: "no_markup" | "incomplete" | "broken" | "match" | "generic";
+  waiting: number;
+  recent: number;
+}
+
+export interface GlanceScan {
+  at: string;
+  added: number;
 }
 
 export interface IgnoredSenders {
@@ -565,6 +592,15 @@ export interface ReviewCandidate {
   end_local: string;
 }
 
+export interface ReviewGlance {
+  waiting: number;
+  days: number;
+  reasons: GlanceReason[];
+  gaps: GlanceGap[];
+  domains: GlanceDomain[];
+  scans: GlanceScan[];
+}
+
 export interface ReviewItem {
   id: number;
   address: string;
@@ -577,9 +613,10 @@ export interface ReviewItem {
   has_email: boolean;
   received: string | null;
   reason: "no_markup" | "incomplete" | "broken" | "generic";
-  gmail_url: string | null;
-  suggestion: AiSuggestion | null;
+  suggestions: AiSuggestion[];
   suggestion_error: string | null;
+  count: number;
+  others: ReviewOther[];
 }
 
 export interface ReviewMatch {
@@ -590,6 +627,13 @@ export interface ReviewMatch {
   mine: boolean;
   booking: ReviewBooking;
   candidates: ReviewCandidate[];
+}
+
+export interface ReviewOther {
+  id: number;
+  subject: string | null;
+  has_email: boolean;
+  received: string | null;
 }
 
 export interface ScanStarted {
@@ -607,6 +651,8 @@ export interface ScanSummary {
   triaged: number;
   total: number;
   not_travel: number;
+  followups: number;
+  with_facts: number;
 }
 
 export interface Segment {
@@ -991,6 +1037,7 @@ export interface Endpoints {
   "POST /api/mailboxes/{id}/reread": { body: never; reply: ScanStarted };
   "POST /api/mailboxes/{id}/backfill": { body: never; reply: ScanStarted };
   "GET /api/mailboxes/{id}/ignored": { body: never; reply: IgnoredSenders };
+  "GET /api/mailboxes/{id}/review-glance": { body: never; reply: ReviewGlance };
   "POST /api/mailboxes/{id}/unignore": { body: UnignoreBody; reply: ScanStarted };
   "GET /api/reminders": { body: never; reply: Reminders };
   "POST /api/reminders": { body: RemindersBody; reply: Reminders };

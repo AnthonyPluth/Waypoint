@@ -1794,6 +1794,37 @@
         }
       }
     },
+    "/api/mailboxes/{id}/review-glance": {
+      "get": {
+        "operationId": "api_mailbox_review_glance",
+        "x-handler": "waypoint/server/api/mailboxes.py:api_mailbox_review_glance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewGlance"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/mailboxes/{id}/unignore": {
       "post": {
         "operationId": "api_mailbox_unignore",
@@ -2899,6 +2930,12 @@
           "deck": {
             "type": "string"
           },
+          "flight_number": {
+            "type": "string"
+          },
+          "cabin": {
+            "type": "string"
+          },
           "sources": {
             "type": "object",
             "additionalProperties": {
@@ -3371,6 +3408,12 @@
                 "type": "null"
               }
             ]
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantParsed"
+            }
           }
         },
         "required": [
@@ -3386,7 +3429,8 @@
           "bookings",
           "match",
           "entries",
-          "suggestion"
+          "suggestion",
+          "suggestions"
         ],
         "additionalProperties": false
       },
@@ -3999,6 +4043,101 @@
         "required": [
           "until",
           "reason"
+        ],
+        "additionalProperties": false
+      },
+      "GlanceDomain": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "reason": {
+            "enum": [
+              "no_markup",
+              "incomplete",
+              "broken",
+              "match",
+              "generic"
+            ]
+          },
+          "item_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "known_sender": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "domain",
+          "count",
+          "reason",
+          "item_id",
+          "known_sender"
+        ],
+        "additionalProperties": false
+      },
+      "GlanceGap": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "GlanceReason": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "enum": [
+              "no_markup",
+              "incomplete",
+              "broken",
+              "match",
+              "generic"
+            ]
+          },
+          "waiting": {
+            "type": "integer"
+          },
+          "recent": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reason",
+          "waiting",
+          "recent"
+        ],
+        "additionalProperties": false
+      },
+      "GlanceScan": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "added": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "added"
         ],
         "additionalProperties": false
       },
@@ -5312,6 +5451,50 @@
         ],
         "additionalProperties": false
       },
+      "ReviewGlance": {
+        "type": "object",
+        "properties": {
+          "waiting": {
+            "type": "integer"
+          },
+          "days": {
+            "type": "integer"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlanceReason"
+            }
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlanceGap"
+            }
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlanceDomain"
+            }
+          },
+          "scans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlanceScan"
+            }
+          }
+        },
+        "required": [
+          "waiting",
+          "days",
+          "reasons",
+          "gaps",
+          "domains",
+          "scans"
+        ],
+        "additionalProperties": false
+      },
       "ReviewItem": {
         "type": "object",
         "properties": {
@@ -5359,27 +5542,26 @@
               "generic"
             ]
           },
-          "gmail_url": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "suggestion": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AiSuggestion"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiSuggestion"
+            }
           },
           "suggestion_error": {
             "type": [
               "string",
               "null"
             ]
+          },
+          "count": {
+            "type": "integer"
+          },
+          "others": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewOther"
+            }
           }
         },
         "required": [
@@ -5394,9 +5576,10 @@
           "has_email",
           "received",
           "reason",
-          "gmail_url",
-          "suggestion",
-          "suggestion_error"
+          "suggestions",
+          "suggestion_error",
+          "count",
+          "others"
         ],
         "additionalProperties": false
       },
@@ -5445,6 +5628,36 @@
         ],
         "additionalProperties": false
       },
+      "ReviewOther": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_email": {
+            "type": "boolean"
+          },
+          "received": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "subject",
+          "has_email",
+          "received"
+        ],
+        "additionalProperties": false
+      },
       "ScanStarted": {
         "type": "object",
         "properties": {
@@ -5489,6 +5702,12 @@
           },
           "not_travel": {
             "type": "integer"
+          },
+          "followups": {
+            "type": "integer"
+          },
+          "with_facts": {
+            "type": "integer"
           }
         },
         "required": [
@@ -5501,7 +5720,9 @@
           "labels_dropped",
           "triaged",
           "total",
-          "not_travel"
+          "not_travel",
+          "followups",
+          "with_facts"
         ],
         "additionalProperties": false
       },

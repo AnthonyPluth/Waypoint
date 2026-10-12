@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 
 from ... import oidc, validate
-from ...domain.mail import review, scan
+from ...domain.mail import glance, review, scan
 from ...providers import gmail
 from .. import jobs
 from ..common import ApiError, Response, _current, row_id
-from ..contract import Disconnected, IgnoredSenders, LabelsBody, MailboxLabels, MailboxList, Ok, ScanStarted, ScanSummary, ShareBody, Started, UnignoreBody
+from ..contract import Disconnected, IgnoredSenders, LabelsBody, MailboxLabels, MailboxList, Ok, ReviewGlance, ScanStarted, ScanSummary, ShareBody, Started, UnignoreBody
 
 BACK = {gmail.Declined: "denied", gmail.Refused: "refused", gmail.WrongScope: "scope"}
 
@@ -37,7 +38,8 @@ def _summary(text: str | None) -> ScanSummary | None:
     found = scan.decode(text)
     return None if found is None else {"found": found.found, "read": found.read, "bookings": found.bookings, "review": found.review,
                                       "skipped": found.skipped, "capped": found.capped, "labels_dropped": found.labels_dropped,
-                                      "triaged": found.triaged, "total": found.total, "not_travel": found.not_travel}
+                                      "triaged": found.triaged, "total": found.total, "not_travel": found.not_travel,
+                                      "followups": found.followups, "with_facts": found.with_facts}
 
 
 def api_mailboxes(conn, _q, _b) -> MailboxList:
@@ -113,6 +115,13 @@ def api_mailbox_backfill(conn, _q, _b, mailbox_id: str) -> ScanStarted:
 def api_mailbox_ignored(conn, _q, _b, mailbox_id: str) -> IgnoredSenders:
     n = _owned(conn, mailbox_id)
     return {"domains": [d for d in review.ignored(conn, n) if d != review.UNKNOWN_SENDER]}
+
+
+def api_mailbox_review_glance(conn, _q, _b, mailbox_id: str) -> ReviewGlance:
+    found = glance.glance(conn, owner(), row_id(mailbox_id), time.time())
+    if found is None:
+        raise ApiError("Not found", 404)
+    return found
 
 
 def api_mailbox_unignore(conn, _q, body: UnignoreBody, mailbox_id: str) -> ScanStarted:

@@ -15,6 +15,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
+  import ReviewGlance from "./ReviewGlance.svelte";
   import { apiCall } from "$lib/contract";
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
@@ -149,7 +150,7 @@
 
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const summary = (c: NonNullable<Mailbox["scan_summary"]>) =>
-    `${plural(c.found, "new message", "new messages")} found, ${c.read} read, ${plural(c.bookings, "booking", "bookings")} added or changed, ${c.review} couldn’t be read, ${c.skipped} skipped${c.not_travel ? ` (${c.not_travel} as not travel)` : ""}.${c.capped ? ` Looked at ${c.triaged} of ${c.total} messages so far; the scan carries on by itself.` : ""}${c.labels_dropped ? ` ${plural(c.labels_dropped, "label you picked was", "labels you picked were")} deleted in Gmail and ${c.labels_dropped === 1 ? "was" : "were"} dropped.` : ""}`;
+    `${plural(c.found, "new message", "new messages")} found, ${c.read} read, ${plural(c.bookings, "booking", "bookings")} added or changed, ${c.review} couldn’t be read, ${c.followups ? `${plural(c.followups, "follow-up", "follow-ups")} attached${c.with_facts ? ` (${c.with_facts} with details not applied)` : ""}, ` : ""}${c.skipped} skipped${c.not_travel ? ` (${c.not_travel} as not travel)` : ""}.${c.capped ? ` Looked at ${c.triaged} of ${c.total} messages so far; the scan carries on by itself.` : ""}${c.labels_dropped ? ` ${plural(c.labels_dropped, "label you picked was", "labels you picked were")} deleted in Gmail and ${c.labels_dropped === 1 ? "was" : "were"} dropped.` : ""}`;
   const scanned = (m: Mailbox) => (m.last_scan ? new Date(m.last_scan).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : null);
 
   const label = (m: Mailbox) => (m.status === "connected" ? "Connected" : m.status === "reconnect" ? "Reconnect" : "Couldn’t reach Google");
@@ -230,6 +231,7 @@
                 {/if}
               </div>
             {/if}
+            {#if m.status === "connected"}<ReviewGlance mailbox={m} onchange={load} />{/if}
             {#if m.scan_notice && !m.scanning && m.status !== "reconnect"}<p class="text-sm text-muted-foreground" role="status">The scan couldn’t start: {m.scan_notice}</p>{/if}
             {#if m.scan_error}<p class="text-sm text-signal-ink" role="status">The last scan stopped: {m.scan_error} What it had read is kept, and the next scan carries on.</p>{/if}
           </div>

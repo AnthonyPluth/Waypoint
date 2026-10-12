@@ -26,7 +26,8 @@ from waypoint.server.api import mailboxes as mailboxes_api
 from waypoint.server.common import ApiError
 from waypoint.server import jobs
 from waypoint.storage import db, secretbox, stored_mail
-from waypoint.storage.models import IgnoredSender, Mailbox, ReviewItem, ScannedMessage, Segment, SegmentMessage, SegmentTraveler, StoredMessage
+from waypoint.storage.models import (IgnoredSender, Mailbox, ReviewItem, ScannedMessage, Segment, SegmentMessage, SegmentTraveler, StoredMessage,
+                                     TrustedSender)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "mail"
 NOW = 1_790_000_000.0
@@ -376,7 +377,7 @@ class TriageScanTests(ScanCase):
         self.scan()
         self.assertEqual(scan.summary(self.mailbox), scan.Summary(3, 2, 1, 1, 1, False, 0, 3, 3))
         self.assertEqual(scan.decode(self.row()["scan_summary"]), scan.summary(self.mailbox))
-        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "found", "labels_dropped", "not_travel", "read", "review", "skipped", "total", "triaged"])
+        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["bookings", "capped", "followups", "found", "labels_dropped", "not_travel", "read", "review", "skipped", "total", "triaged", "with_facts"])
 
     def test_a_reply_or_an_offer_looking_subject_from_a_travel_sender_is_still_read(self):
         for subject in ("Re: Your reservation", "Autumn sale: your hotel booking is confirmed", "Your deal is booked: hotel reservation H77"):
@@ -686,7 +687,7 @@ class GenericReaderScanTests(ScanCase):
         self.assertEqual(self.segments(), [])
         [item] = self.items()
         self.assertEqual((item["reason"], item["sender_domain"]), ("generic", "seaside-stays.example"))
-        s = item["suggestion"]
+        s = item["suggestions"][0]
         self.assertEqual((s["kind"], s["origin"], s["confirmation"], s["start_local"], s["end_local"], s["address"]),
                          ("hotel", "Seaside Inn", "SS48213", "2026-11-21T15:00", "2026-11-25T11:00", "12 Beach Road, Brighton, UK"))
         self.assertEqual(s["start_zone"], "Europe/London")
@@ -709,7 +710,7 @@ class GenericReaderScanTests(ScanCase):
             "kind": "hotel", "status": "confirmed", "confirmation": "SS48213", "provider": "Seaside Inn", "start_local": "2026-11-21T15:00",
             "start_zone": "Europe/London", "end_local": "2026-11-25T11:00", "end_zone": "Europe/London", "origin": "Seaside Inn",
             "destination": None, "details": {}, "manage_url": None}))
-        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, seg["id"]))))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, [seg["id"]]))))
         self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, "seaside-stays.example")))
         self.add_mail("second", self.second())
         result = self.scan(now=NOW + 60)
@@ -720,7 +721,7 @@ class GenericReaderScanTests(ScanCase):
         self.put("lodging_ja")
         self.scan()
         [item] = self.items()
-        self.assertEqual((item["suggestion"]["origin"], item["suggestion"]["start_local"], item["suggestion"]["start_zone"]),
+        self.assertEqual((item["suggestions"][0]["origin"], item["suggestions"][0]["start_local"], item["suggestions"][0]["start_zone"]),
                          ("テスト温泉ホテル", "2026-11-21T15:00", "Asia/Tokyo"))
 
     def test_the_lodging_mail_and_forwarded_headers_stay_on_the_server(self):
@@ -751,7 +752,7 @@ class GenericFlightScanTests(ScanCase):
         self.assertEqual(self.segments(), [])
         [item] = self.items()
         self.assertEqual((item["reason"], item["sender_domain"]), ("generic", "skyline-air.example"))
-        s = item["suggestion"]
+        s = item["suggestions"][0]
         self.assertEqual((s["kind"], s["origin"], s["destination"], s["confirmation"], s["start_local"], s["end_local"], s["start_zone"]),
                          ("flight", "JFK", "LHR", "ZK4R9T", "2026-11-21T19:00", "2026-11-22T07:10", "America/New_York"))
         self.assertEqual(s["sources"], {"origin": "airport code", "destination": "airport code", "start_local": "departs", "end_local": "arrives",
@@ -773,7 +774,7 @@ class GenericFlightScanTests(ScanCase):
             "kind": "flight", "status": "confirmed", "confirmation": "ZK4R9T", "provider": "British Airways", "start_local": "2026-11-21T19:00",
             "start_zone": "America/New_York", "end_local": "2026-11-22T07:10", "end_zone": "Europe/London", "origin": "JFK",
             "destination": "LHR", "details": {"flight_number": "BA 9871"}, "manage_url": None}))
-        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, seg["id"]))))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, [seg["id"]]))))
         self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, "skyline-air.example")))
         self.add_mail("second", self.second())
         with no_leaks(self, *self.CANARIES, database=self.path):
@@ -788,7 +789,7 @@ class GenericFlightScanTests(ScanCase):
         with no_leaks(self, *self.CANARIES, database=self.path):
             self.scan()
         [item] = self.items()
-        s = item["suggestion"]
+        s = item["suggestions"][0]
         self.assertEqual((s["origin"], s["destination"], s["start_local"], s["end_local"], s["start_zone"], s["confirmation"]),
                          ("FRA", "JFK", "2026-11-21T15:05", "2026-11-21T18:20", "Europe/Berlin", "NL3X8Q"))
 
@@ -801,6 +802,78 @@ class GenericFlightScanTests(ScanCase):
         [item] = self.items()
         self.assertEqual(item["reason"], "no_markup")
         self.assertNotIn("CANARY", json.dumps(item))
+
+
+class RoundTripScanTests(ScanCase):
+    CANARIES = ("CANARY-BODY-ROUND-TRIP-3H8N",)
+    LEGS = [("BOS", "DEN", "2026-12-05T07:15", "2026-12-05T10:05", "DL 1204"), ("DEN", "BOS", "2026-12-11T16:20", "2026-12-11T21:50", "DL 1377")]
+
+    def trust(self):
+        self.read(lambda conn: db.insert_ignore(conn, TrustedSender, {"mailbox_id": self.mailbox, "domain": "rewards-travel.example"},
+                                                key=["mailbox_id", "domain"]))
+
+    def test_a_new_sender_gets_one_suggestion_per_leg_in_one_item(self):
+        self.put("flight_round_trip_card_site")
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.bookings, result.review), (0, 1))
+        self.assertEqual(self.segments(), [])
+        [item] = self.items()
+        self.assertEqual((item["reason"], item["suggestion_error"]), ("generic", None))
+        self.assertEqual([(s["origin"], s["destination"], s["start_local"], s["end_local"], s["flight_number"]) for s in item["suggestions"]], self.LEGS)
+        self.assertEqual([(s["start_zone"], s["confirmation"]) for s in item["suggestions"]], [("America/New_York", "Q7M2KD"), ("America/Denver", "Q7M2KD")])
+        self.assertNotIn("CANARY", json.dumps(item))
+
+    def test_a_trusted_sender_files_both_legs_into_one_trip_at_their_airports_zones(self):
+        self.trust()
+        self.put("flight_round_trip_card_site")
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.bookings, result.review), (2, 0))
+        found = self.segments()
+        self.assertEqual(len({s["trip_id"] for s in found}), 1)
+        self.assertEqual(sorted((s["origin"], s["destination"], s["start_local"], s["start_zone"], s["end_local"], s["end_zone"], s["details"]["flight_number"])
+                                for s in found),
+                         [("BOS", "DEN", "2026-12-05T07:15", "America/New_York", "2026-12-05T10:05", "America/Denver", "DL 1204"),
+                          ("DEN", "BOS", "2026-12-11T16:20", "America/Denver", "2026-12-11T21:50", "America/New_York", "DL 1377")])
+        self.assertEqual({s["confirmation"] for s in found}, {"Q7M2KD"})
+
+    def test_a_leg_with_no_time_waits_in_review_while_the_other_is_filed(self):
+        self.trust()
+        raw = eml("flight_round_trip_card_site").replace(b"Denver DEN 4:20 PM", b"Denver DEN").replace(b"Boston BOS 9:50 PM", b"Boston BOS")
+        self.add_mail("half", raw)
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            result = self.scan()
+        self.assertEqual((result.bookings, result.review), (1, 1))
+        [only] = self.segments()
+        self.assertEqual((only["origin"], only["destination"]), ("BOS", "DEN"))
+        [item] = self.items()
+        self.assertEqual((item["reason"], item["suggestions"]), ("incomplete", []))
+
+    def test_an_untrusted_sender_with_a_leg_that_cant_be_read_says_so_on_the_suggestions(self):
+        raw = eml("flight_round_trip_card_site").replace(b"Denver DEN 4:20 PM", b"Denver DEN").replace(b"Boston BOS 9:50 PM", b"Boston BOS")
+        self.add_mail("half", raw)
+        with no_leaks(self, *self.CANARIES, database=self.path):
+            self.scan()
+        [item] = self.items()
+        self.assertEqual(([s["origin"] for s in item["suggestions"]], item["suggestion_error"]), (["BOS"], scan.UNREAD_WITH_SUGGESTION))
+
+    def test_adding_both_legs_from_the_item_keeps_the_message_for_both_and_trusts_the_sender(self):
+        self.put("flight_round_trip_card_site")
+        self.scan()
+        [item] = self.items()
+        made = [self.read(lambda conn, leg=leg: trips.add_segment(conn, self.jane, {
+            "kind": "flight", "status": "confirmed", "confirmation": "Q7M2KD", "provider": "Delta Air Lines", "start_local": leg[2], "end_local": leg[3],
+            "origin": leg[0], "destination": leg[1], "details": {"flight_number": leg[4]}, "manage_url": None})) for leg in self.LEGS]
+        ids = [m["id"] for m in made if m]
+        self.assertEqual(len(ids), 2)
+        self.assertEqual(len({m["trip_id"] for m in made if m}), 1)
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, ids))))
+        self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, "rewards-travel.example")))
+        for each in ids:
+            emails = self.read(lambda conn, each=each: trips.emails_of(conn, self.jane, each))
+            assert emails
+            self.assertEqual(len(emails), 1)
 
 
 class FirstScanTests(ScanCase):
@@ -1027,10 +1100,11 @@ class ReviewTests(ScanCase):
         self.assertEqual({(i["reason"], i["sender_domain"], i["received"]) for i in items},
                          {("no_markup", "example-air.example", "2026-10-17"), ("incomplete", "example-air.example", "2026-10-18")})
         nomarkup = next(i for i in items if i["reason"] == "no_markup")
-        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "known_sender", "holds_bookings", "subject", "has_email", "received", "reason", "gmail_url", "suggestion", "suggestion_error"}))
+        self.assertEqual((nomarkup["address"], set(nomarkup)), (ADDRESS, {"id", "address", "owner", "mine", "sender_domain", "known_sender", "holds_bookings", "subject", "has_email", "received", "reason", "suggestions", "suggestion_error", "count", "others"}))
         self.assertEqual((nomarkup["subject"], nomarkup["has_email"]), ("Your itinerary: CANARY-SUBJECT-NOMARKUP-8B3F", True))
         self.assertEqual((nomarkup["owner"], nomarkup["mine"]), ("Jane Doe", True))
-        self.assertEqual(nomarkup["gmail_url"], "https://mail.google.com/mail/?authuser=jane%40gmail.example#all/msg-no_markup")
+        self.assertNotIn("gmail_url", nomarkup)
+        self.assertNotIn("mail.google", repr(self.items()))
         self.assertEqual(self.items("u-sam"), [])
         self.assertEqual(self.scanned(), {"msg-no_markup": "unreadable", "msg-incomplete": "unreadable", "msg-flight_jsonld": "booking"})
 
@@ -1039,7 +1113,7 @@ class ReviewTests(ScanCase):
         with no_leaks(self, "CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-NOMARKUP-6H9C", database=self.path):
             self.scan()
         stored = self.read(lambda conn: dict(conn.execute(select(ReviewItem)).fetchone()))
-        self.assertEqual(sorted(stored), ["created", "id", "mailbox_id", "matches", "message_id", "reason", "received", "sender_domain", "suggestion", "suggestion_error"])
+        self.assertEqual(sorted(stored), ["created", "gap", "id", "mailbox_id", "matches", "message_id", "reason", "received", "reference", "sender_domain", "suggestion", "suggestion_error"])
         self.assertEqual((stored["sender_domain"], stored["received"]), ("example-air.example", "2026-10-17"))
         sealed = self.read(lambda conn: conn.execute(select(StoredMessage.content)).scalar())
         self.assertTrue(secretbox.is_encrypted(sealed))
@@ -1954,7 +2028,7 @@ class KeptMessageTests(ScanCase):
         self.put("no_markup")
         self.scan()
         item, seg = self.item_id(), self.by_hand()
-        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item, (self.jane, seg))))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item, (self.jane, [seg]))))
         self.assertEqual(self.kept(), {"msg-no_markup"})
         emails = self.read(lambda conn: trips.emails_of(conn, self.jane, seg))
         assert emails
@@ -1969,7 +2043,7 @@ class KeptMessageTests(ScanCase):
         theirs = self.read(lambda conn: trips.add_segment(conn, self.sam, {"kind": "flight", "origin": "JFK", "destination": "SFO",
                                                                            "start_local": "2026-12-09T08:00", "end_local": "2026-12-09T11:20"}))
         assert theirs
-        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item, (self.jane, theirs["id"]))))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item, (self.jane, [theirs["id"]]))))
         self.assertEqual(self.kept(), set())
 
     def test_deleting_a_trip_deletes_the_messages_only_its_bookings_held(self):
@@ -2201,6 +2275,25 @@ class MailScanApiTests(GoogleCase):
             conn.execute(insert(IgnoredSender).values(mailbox_id=self.ana_box, domain=""))
         self.assertEqual(self.call("ana", "GET", f"/api/mailboxes/{self.ana_box}/ignored")[1], {"domains": ["example-air.example"]})
 
+    def test_review_at_a_glance_is_counts_and_domains_for_the_mailboxs_owner_alone(self):
+        self.put("no_markup", "incomplete")
+        self.scan_now()
+        with no_leaks(self, *CANARIES):
+            status, body = self.call("ana", "GET", f"/api/mailboxes/{self.ana_box}/review-glance")
+            self.assertEqual(status, 200, body)
+            self.assertEqual(self.call("ben", "GET", f"/api/mailboxes/{self.ana_box}/review-glance"), (404, {"error": "Not found"}))
+            self.assertEqual(self.call("ana", "GET", "/api/mailboxes/abc/review-glance")[0], 404)
+            self.assertEqual(self.call("ana", "GET", "/api/mailboxes/9999/review-glance")[0], 404)
+        self.assertEqual((body["waiting"], body["days"]), (2, 30))
+        self.assertEqual({r["reason"]: r["waiting"] for r in body["reasons"]}, {"no_markup": 1, "incomplete": 1})
+        self.assertEqual(body["gaps"], [{"label": "no place", "count": 1}])
+        [domain] = body["domains"]
+        self.assertEqual((domain["domain"], domain["count"], domain["known_sender"]), ("example-air.example", 2, False))
+        self.assertEqual([s["added"] for s in body["scans"]], [2])
+        self.assertNotIn("CANARY", json.dumps(body))
+        self.assertEqual(self.call("ana", "POST", f"/api/review/{domain['item_id']}/ignore", {})[0], 200)
+        self.assertEqual(self.call("ana", "GET", f"/api/mailboxes/{self.ana_box}/review-glance")[1]["domains"], [])
+
     def test_stopping_an_ignored_sender_starts_a_scan_that_reads_its_mail_again(self):
         self.put("no_markup", "incomplete")
         self.scan_now()
@@ -2387,8 +2480,9 @@ class MailScanApiTests(GoogleCase):
         self.assertTrue(self.mailboxes()[0]["share_review"])
         seen = self.call("ben", "GET", "/api/review")[1]["items"]
         self.assertEqual(sorted(i["reason"] for i in seen), ["incomplete", "no_markup"])
-        self.assertEqual({(i["address"], i["owner"], i["mine"], i["gmail_url"]) for i in seen}, {("ana@gmail.example", "Ana", False, None)})
-        self.assertTrue(all(i["mine"] and i["gmail_url"] for i in self.call("ana", "GET", "/api/review")[1]["items"]))
+        self.assertEqual({(i["address"], i["owner"], i["mine"]) for i in seen}, {("ana@gmail.example", "Ana", False)})
+        self.assertTrue(all(i["mine"] and "gmail_url" not in i for i in self.call("ana", "GET", "/api/review")[1]["items"]))
+        self.assertNotIn("mail.google", repr(self.call("ben", "GET", "/api/review")[1]))
         self.assertEqual(self.call("ben", "GET", "/api/state")[1]["review_count"], 2)
         self.assertEqual(self.share(on=False)[0], 200)
         self.assertEqual(self.call("ben", "GET", "/api/review")[1]["items"], [])
@@ -2477,6 +2571,23 @@ class MailScanApiTests(GoogleCase):
         with db.session() as conn:
             self.assertEqual(len(conn.execute(__import__("sqlalchemy").select(StoredMessage.id)).fetchall()), 1)
         self.assertEqual(self.call("ana", "DELETE", f"/api/review/{second['id']}?segment=zz")[0], 400)
+
+    def test_a_round_trip_item_adds_as_two_flights_in_one_trip_and_both_keep_the_message(self):
+        self.put("flight_round_trip_card_site")
+        with no_leaks(self, "CANARY-BODY-ROUND-TRIP-3H8N"):
+            self.scan_now()
+        [item] = self.call("ana", "GET", "/api/review")[1]["items"]
+        self.assertEqual([(s["origin"], s["destination"], s["flight_number"]) for s in item["suggestions"]],
+                         [("BOS", "DEN", "DL 1204"), ("DEN", "BOS", "DL 1377")])
+        made = [self.call("ana", "POST", "/api/segments", {
+            "kind": "flight", "origin": s["origin"], "destination": s["destination"], "start_local": s["start_local"], "end_local": s["end_local"],
+            "confirmation": s["confirmation"], "provider": s["provider"], "details": {"flight_number": s["flight_number"]}})[1]
+            for s in item["suggestions"]]
+        self.assertEqual(len({m["trip_id"] for m in made}), 1)
+        self.assertEqual(self.call("ana", "DELETE", f"/api/review/{item['id']}?segment={made[0]['id']}&segment={made[1]['id']}"), (200, {"ok": True}))
+        for m in made:
+            self.assertEqual(len(self.call("ana", "GET", f"/api/segments/{m['id']}/emails")[1]["emails"]), 1)
+        self.assertEqual(self.call("ana", "GET", "/api/review")[1]["items"], [])
 
     def test_a_booking_that_isnt_the_askers_is_never_given_the_message(self):
         self.put("no_markup")

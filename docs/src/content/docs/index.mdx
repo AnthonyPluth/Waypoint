@@ -18,48 +18,38 @@ hero:
 
 import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Status: early, Phase 0">
-Waypoint is just getting started. Today it signs you in (OpenID Connect), keeps settings and makes backups. The travel features below are planned and arrive in phases; nothing here promises a date.
-</Aside>
-
 ## What Waypoint is for
 
 Planning a family trip means a dozen confirmation emails, and the one you need at the airport is never the one you can find. Waypoint gathers them for the household: who is flying where and when, in which seat, which hotel and which rental car, and the confirmation numbers for each. It also remembers everyone’s frequent-flyer, hotel-loyalty and TSA PreCheck (Known Traveler) numbers, so anyone in the family can book for anyone else.
 
-You see only the trips you’re on or that you booked. Bookings are meant to arrive by [scanning Gmail privately](/Waypoint/privacy/email-scanning/): read-only, searched on the server, never stored.
+You see only the trips you’re on or that you booked. Bookings arrive by [scanning Gmail privately](/Waypoint/privacy/email-scanning/): read-only, searched on the server, a message is kept, encrypted, only while a review item or a booking needs it.
 
-## Roadmap
+## What it does
 
 <CardGrid>
-  <Card title="Now: Phase 0" icon="rocket">
-    Sign-in with your own identity provider, settings, and backups you can download and restore.
-  </Card>
-  <Card title="People and loyalty IDs" icon="open-book">
-    Household members and their frequent-flyer, hotel and Known Traveler numbers.
-  </Card>
-  <Card title="Trips and manual entry" icon="pencil">
-    Trips with flights, hotels and rental cars, entered by hand.
+  <Card title="Trips" icon="rocket">
+    Flights, stays, rental cars, trains, cruises and parking, with confirmation numbers, travellers and times where they happen.
   </Card>
   <Card title="Gmail scanning" icon="envelope">
-    Read-only, private scanning of booking emails, with a review queue for what couldn’t be read.
+    Read-only, private scanning of booking emails, with a Review queue for what couldn’t be read.
   </Card>
-  <Card title="Vendor parsers" icon="setting">
-    Parsers for individual airlines, hotels and rental companies, after schema.org markup.
+  <Card title="Optional AI" icon="star">
+    Off by default; a local Ollama, or OpenRouter with zero data retention, suggests a booking you then confirm.
   </Card>
-  <Card title="Deep links and reminders" icon="external">
-    Jump to an airline’s or hotel’s page for a booking, and get reminded before you go.
+  <Card title="People and loyalty IDs" icon="open-book">
+    Household members, guests and their loyalty and Known Traveler numbers, encrypted and masked.
   </Card>
-  <Card title="Optional AI suggestions" icon="star">
-    Off by default; a local Ollama, or OpenRouter with zero data retention.
+  <Card title="Reminders and offline" icon="random">
+    Live flight status, push reminders, a calendar feed, and your current trip available offline.
   </Card>
-  <Card title="Later" icon="random">
-    Travel stats and a map of where you’ve been.
+  <Card title="Stats and assistants" icon="setting">
+    Travel stats with a map, and AI assistants (MCP) that read your trips and, if you allow it, change them.
   </Card>
 </CardGrid>
 
 ## Where to go next
 
 <LinkCard title="Install with Docker" description="Register Waypoint with your sign-in provider, start it, and put it on the internet safely." href="/Waypoint/start/docker/" />
-<LinkCard title="Email scanning and privacy" description="What Waypoint will and won’t do with your mailbox (planned)." href="/Waypoint/privacy/email-scanning/" />
+<LinkCard title="Email scanning and privacy" description="What Waypoint will and won’t do with your mailbox." href="/Waypoint/privacy/email-scanning/" />
 <LinkCard title="Configuration" description="Every environment variable Waypoint reads." href="/Waypoint/reference/configuration/" />
 <LinkCard title="Contributing" description="Set up a checkout, run the checks and find your way around the code." href="/Waypoint/contributing/development/" />

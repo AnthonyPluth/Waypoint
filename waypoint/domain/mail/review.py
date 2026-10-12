@@ -3,9 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any, Literal, TypedDict
 
-from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import and_, delete, or_, select, update
 
-from ...providers import gmail
 from ...storage import db, stored_mail
 from ...storage.models import IgnoredSender, Mailbox, Person, ReviewItem, ScannedMessage, TrustedSender
 from .. import trips, visibility
@@ -15,6 +14,14 @@ from . import ai, query, triage
 Reason = Literal["no_markup", "incomplete", "broken", "match", "generic"]
 UNKNOWN_SENDER = ""
 IGNORED = "ignored"
+GROUPED: tuple[Reason, ...] = ("no_markup", "incomplete", "broken")
+
+
+class OtherOut(TypedDict):
+    id: int
+    subject: str | None
+    has_email: bool
+    received: str | None
 
 
 class ItemOut(TypedDict):
@@ -29,17 +36,20 @@ class ItemOut(TypedDict):
     has_email: bool
     received: str | None
     reason: Reason
-    gmail_url: str | None
-    suggestion: ai.Suggestion | None
+    suggestions: list[ai.Suggestion]
     suggestion_error: str | None
+    count: int
+    others: list[OtherOut]
 
 
 def add(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: str | None, received: str | None,
-        reason: Reason, now: float, held: list[tuple[trips.SegmentIn, list[int]]] | None = None) -> None:
+        reason: Reason, now: float, held: list[tuple[trips.SegmentIn, list[int]]] | None = None, gap: str | None = None,
+        reference: str | None = None) -> None:
     matches = json.dumps([{"id": n, "booking": b, "candidates": c} for n, (b, c) in enumerate(held, 1)], separators=(",", ":")) if held else None
     db.insert_ignore(conn, ReviewItem, {"mailbox_id": mailbox_id, "message_id": message_id,
                                         "sender_domain": sender_domain or UNKNOWN_SENDER,
-                                        "received": received, "reason": reason, "created": now, "matches": matches},
+                                        "received": received, "reason": reason, "created": now, "matches": matches, "gap": gap,
+                                        "reference": stored_mail.reference_key(reference) if reference and reason in GROUPED and not held else None},
                      key=["mailbox_id", "message_id"])
 
 
@@ -53,31 +63,49 @@ def is_generic(conn: db.Connection, mailbox_id: int, message_id: str) -> bool:
     return bool(reason == "generic")
 
 
-def set_suggestion(conn: db.Connection, mailbox_id: int, message_id: str, suggestion: ai.Suggestion | None,
-                   error: str | None) -> None:
+def set_suggestions(conn: db.Connection, mailbox_id: int, message_id: str, suggestions: list[ai.Suggestion],
+                    error: str | None) -> None:
     conn.execute(update(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)
-                 .values(suggestion=json.dumps(suggestion) if suggestion else None, suggestion_error=error))
+                 .values(suggestion=json.dumps(suggestions) if suggestions else None, suggestion_error=error))
+
+
+def suggestions_of(stored: str | None) -> list[ai.Suggestion]:
+    if not stored:
+        return []
+    found = json.loads(stored)
+    return found if isinstance(found, list) else [found]
 
 
 def _seen_by(owner: str) -> Any:
     return or_(Mailbox.owner_sub == owner, Mailbox.share_review.is_(True))
 
 
+def _group_key(row: Any, alone: int) -> tuple[Any, ...]:
+    if row["reference"] is None or row["reason"] not in GROUPED or row["matches"] is not None:
+        return ("alone", alone)
+    return (row["mailbox_id"], row["sender_domain"], row["reference"])
+
+
 def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
     rows = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.sender_domain,
                                ReviewItem.received, ReviewItem.reason, Mailbox.address, Mailbox.owner_sub, Person.display_name,
-                               ReviewItem.suggestion, ReviewItem.suggestion_error, ReviewItem.matches)
+                               ReviewItem.suggestion, ReviewItem.suggestion_error, ReviewItem.matches, ReviewItem.reference)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .outerjoin(Person, Person.user_sub == Mailbox.owner_sub).where(_seen_by(owner), ReviewItem.reason != "match")
                         .order_by(ReviewItem.received.is_(None), ReviewItem.received.desc(), ReviewItem.id.desc())).fetchall()
     subjects = stored_mail.subjects(conn, (r["mailbox_id"] for r in rows))
+    groups: dict[tuple[Any, ...], list[Any]] = {}
+    for n, r in enumerate(rows):
+        groups.setdefault(_group_key(r, n), []).append(r)
     return [{"id": r["id"], "address": r["address"], "owner": r["display_name"] or r["address"], "mine": r["owner_sub"] == owner,
              "sender_domain": r["sender_domain"], "known_sender": triage.sender_in(r["sender_domain"], query.SENDERS), "holds_bookings": r["matches"] is not None, "subject": subjects.get((r["mailbox_id"], r["message_id"])),
              "has_email": (r["mailbox_id"], r["message_id"]) in subjects,
              "received": r["received"], "reason": r["reason"],
-             "gmail_url": gmail.open_url(r["address"], r["message_id"]) if r["owner_sub"] == owner else None,
-             "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None, "suggestion_error": r["suggestion_error"]}
-            for r in rows]
+             "suggestions": suggestions_of(r["suggestion"]), "suggestion_error": r["suggestion_error"],
+             "count": len(members),
+             "others": [{"id": o["id"], "subject": subjects.get((o["mailbox_id"], o["message_id"])),
+                         "has_email": (o["mailbox_id"], o["message_id"]) in subjects, "received": o["received"]} for o in members[1:]]}
+            for members in groups.values() for r in members[:1]]
 
 
 def pending(conn: db.Connection, owner: str) -> list[Any]:
@@ -88,13 +116,14 @@ def pending(conn: db.Connection, owner: str) -> list[Any]:
 
 def visible(conn: db.Connection, owner: str, item_id: int) -> Any:
     return conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.sender_domain, ReviewItem.received,
-                               ReviewItem.reason, ReviewItem.suggestion, ReviewItem.matches, Mailbox.owner_sub)
+                               ReviewItem.reason, ReviewItem.suggestion, ReviewItem.suggestion_error, ReviewItem.matches, Mailbox.owner_sub)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
 
 
 def count(conn: db.Connection, owner: str) -> int:
-    return int(conn.execute(select(func.count()).select_from(ReviewItem).join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
-                            .where(_seen_by(owner))).scalar() or 0)
+    rows = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.sender_domain, ReviewItem.reference, ReviewItem.reason, ReviewItem.matches)
+                        .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(_seen_by(owner))).fetchall()
+    return len({_group_key(r, n) for n, r in enumerate(rows)})
 
 
 def _mine(conn: db.Connection, owner: str, item_id: int) -> dict[str, Any] | None:
@@ -126,18 +155,35 @@ def stored_image(conn: db.Connection, owner: str, item_id: int, index: int) -> s
     return None if found is None else stored_mail.image_of(conn, *found, index)
 
 
-def dismiss(conn: db.Connection, owner: str, item_id: int, booking: tuple[Viewer, int] | None = None) -> bool:
-    seen = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.sender_domain)
+def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewer, list[int]] | None = None) -> bool:
+    seen = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.sender_domain,
+                               ReviewItem.reference, ReviewItem.matches)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
     if seen is None:
         return False
-    if booking is not None and visibility.visible_segment(conn, booking[0], booking[1]) is not None:
-        stored_mail.link(conn, booking[1], int(seen["mailbox_id"]), str(seen["message_id"]))
-        if seen["reason"] == "generic" and seen["sender_domain"] != UNKNOWN_SENDER:
-            db.insert_ignore(conn, TrustedSender, {"mailbox_id": seen["mailbox_id"], "domain": seen["sender_domain"]}, key=["mailbox_id", "domain"])
-    conn.execute(delete(ReviewItem).where(ReviewItem.id == item_id))
+    made = [n for n in bookings[1] if visibility.visible_segment(conn, bookings[0], n) is not None] if bookings is not None else []
+    for n in made:
+        stored_mail.link(conn, n, int(seen["mailbox_id"]), str(seen["message_id"]))
+    if made and seen["reason"] == "generic" and seen["sender_domain"] != UNKNOWN_SENDER:
+        db.insert_ignore(conn, TrustedSender, {"mailbox_id": seen["mailbox_id"], "domain": seen["sender_domain"]}, key=["mailbox_id", "domain"])
+    same = [ReviewItem.id == item_id]
+    if _group_key(seen, 0)[0] != "alone":
+        same.append(and_(ReviewItem.mailbox_id == seen["mailbox_id"], ReviewItem.sender_domain == seen["sender_domain"],
+                         ReviewItem.reference == seen["reference"], ReviewItem.reason.in_(GROUPED), ReviewItem.matches.is_(None)))
+    conn.execute(delete(ReviewItem).where(or_(*same)))
     stored_mail.prune(conn)
+    return True
+
+
+def drop_suggestions(conn: db.Connection, owner: str, item_id: int, picks: list[int]) -> bool:
+    row = visible(conn, owner, item_id)
+    if row is None:
+        return False
+    stored = suggestions_of(row["suggestion"])
+    if not all(1 <= n <= len(stored) for n in picks):
+        return False
+    set_suggestions(conn, int(row["mailbox_id"]), str(row["message_id"]), [x for n, x in enumerate(stored, 1) if n not in picks], row["suggestion_error"])
     return True
 
 
@@ -188,9 +234,9 @@ def asked(conn: db.Connection, mailbox_id: int, domain: str | None) -> bool:
 
 
 def add_generic(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: str | None, received: str | None,
-                suggestion: ai.Suggestion, now: float) -> None:
+                suggestions: list[ai.Suggestion], now: float, error: str | None = None) -> None:
     add(conn, mailbox_id, message_id, sender_domain, received, "generic", now)
-    set_suggestion(conn, mailbox_id, message_id, suggestion, None)
+    set_suggestions(conn, mailbox_id, message_id, suggestions, error)
 
 
 def ignored(conn: db.Connection, mailbox_id: int) -> list[str]:

@@ -1,0 +1,21 @@
+From: Rail Exemple <billets@rail-exemple.example>
+To: traveller@gmail.example
+Subject: Vos billets de train
+Date: Wed, 14 Oct 2026 12:00:00 +0200
+Message-ID: <fx-train-generic-fr@rail-exemple.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>CANARY-BODY-TRAIN-FR-9B5T Merci pour votre réservation de train.</p>
+<p>Annulation gratuite jusqu'au 10 novembre 2026.</p>
+<table>
+<tr><td>Numéro de réservation</td><td>: RX90412</td></tr>
+<tr><td>Transporteur</td><td>: Rail Exemple</td></tr>
+<tr><td>Numéro de train</td><td>: 6601</td></tr>
+<tr><td>Gare de départ</td><td>: Paris Gare de Lyon</td></tr>
+<tr><td>Date et heure de départ</td><td>: 21 novembre 2026 à 09h12</td></tr>
+<tr><td>Gare d'arrivée</td><td>: Lyon Part-Dieu</td></tr>
+<tr><td>Date et heure d'arrivée</td><td>: 21 novembre 2026 à 11h14</td></tr>
+</table>
+</body></html>

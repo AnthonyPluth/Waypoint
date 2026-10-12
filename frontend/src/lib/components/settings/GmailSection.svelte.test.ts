@@ -7,14 +7,18 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }) }));
 
 import { api } from "$lib/api";
-import type { Mailbox, MailboxList } from "$lib/api-types";
+import type { Mailbox, MailboxList, ReviewGlance } from "$lib/api-types";
 import { toast } from "svelte-sonner";
 import GmailSection from "./GmailSection.svelte";
 
 const box = (extra: Partial<Mailbox> = {}): Mailbox => ({ id: 1, address: "ana@gmail.example", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: false, scan_notice: null, scan_summary: null, reading_again: null, share_review: false, labels_picked: 0, ...extra });
 const list = (mailboxes: Mailbox[] = [], configured = true): MailboxList => ({ configured, mailboxes });
+const NOTHING_WAITING: ReviewGlance = { waiting: 0, days: 30, reasons: [], gaps: [], domains: [], scans: [] };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockApi = (reply: (...args: any[]) => unknown) =>
+  vi.mocked(api).mockImplementation((async (path: string, ...rest: unknown[]) => (/\/review-glance$/.test(path) ? NOTHING_WAITING : reply(path, ...rest))) as never);
 const serve = (reply: MailboxList, others: (path: string) => unknown = () => ({}), ignored: Record<number, string[]> = {}) =>
-  vi.mocked(api).mockImplementation(async (path: string) => {
+  mockApi(async (path: string) => {
     if (path === "/api/mailboxes") return reply as never;
     const listed = /^\/api\/mailboxes\/(\d+)\/ignored$/.exec(path);
     if (listed) return { domains: ignored[Number(listed[1])] ?? [] } as never;
@@ -54,7 +58,7 @@ describe("Settings → Gmail → Ignored senders", () => {
   });
 
   it("says when the list couldn’t be loaded", async () => {
-    vi.mocked(api).mockImplementation((async (path: string) => {
+    mockApi((async (path: string) => {
       if (path === "/api/mailboxes") return list([box()]);
       throw new Error("Nope.");
     }) as never);
@@ -64,7 +68,7 @@ describe("Settings → Gmail → Ignored senders", () => {
 
   it("asks before it stops ignoring, then removes the row and shows the scan starting", async () => {
     let gone = false;
-    vi.mocked(api).mockImplementation((async (path: string) => {
+    mockApi((async (path: string) => {
       if (path === "/api/mailboxes") return list([box({ scanning: gone, reading_again: gone ? "example-air.example" : null })]);
       if (path === "/api/mailboxes/1/ignored") return { domains: gone ? [] : ["example-air.example"] };
       if (path === "/api/mailboxes/1/unignore") { gone = true; return { started: true }; }
@@ -93,7 +97,7 @@ describe("Settings → Gmail → Ignored senders", () => {
   });
 
   it("says a running scan will need a look-back when one is already going", async () => {
-    vi.mocked(api).mockImplementation((async (path: string) => {
+    mockApi((async (path: string) => {
       if (path === "/api/mailboxes") return list([box()]);
       if (path === "/api/mailboxes/1/ignored") return { domains: ["example-air.example"] };
       if (path === "/api/mailboxes/1/unignore") return { started: false };
@@ -108,13 +112,25 @@ describe("Settings → Gmail → Ignored senders", () => {
 
 describe("Settings → Gmail", () => {
   it("says in one line what the last scan found, read, filed, couldn't read and skipped, and nothing else", async () => {
-    serve(list([box({ last_scan: "2026-10-05T10:00:00+00:00", scan_summary: { found: 24, read: 6, bookings: 3, review: 2, skipped: 15, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 9 } })]));
+    serve(list([box({ last_scan: "2026-10-05T10:00:00+00:00", scan_summary: { found: 24, read: 6, bookings: 3, review: 2, skipped: 15, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 9, followups: 0, with_facts: 0 } })]));
     render(GmailSection);
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("24 new messages found, 6 read, 3 bookings added or changed, 2 couldn’t be read, 15 skipped (9 as not travel).");
   });
 
+  it("counts the follow-ups attached to bookings, and those with details it did not apply", async () => {
+    serve(list([box({ scan_summary: { found: 9, read: 8, bookings: 1, review: 0, skipped: 0, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 4, with_facts: 1 } })]));
+    render(GmailSection);
+    expect(await screen.findByTestId("scan-summary")).toHaveTextContent("0 couldn’t be read, 4 follow-ups attached (1 with details not applied), 0 skipped.");
+  });
+
+  it("leaves the follow-up figure out when there were none", async () => {
+    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 1, with_facts: 0 } })]));
+    render(GmailSection);
+    expect(await screen.findByTestId("scan-summary")).toHaveTextContent("1 follow-up attached, 0 skipped.");
+  });
+
   it("says when more messages are waiting after the cap", async () => {
-    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: true, labels_dropped: 0, triaged: 40, total: 900, not_travel: 0 } })]));
+    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: true, labels_dropped: 0, triaged: 40, total: 900, not_travel: 0, followups: 0, with_facts: 0 } })]));
     render(GmailSection);
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("1 new message found, 1 read, 1 booking added or changed, 0 couldn’t be read, 0 skipped. Looked at 40 of 900 messages so far; the scan carries on by itself.");
   });
@@ -156,7 +172,7 @@ describe("Settings → Gmail", () => {
 
   it("shares a mailbox's unread mail with the household only when its owner ticks the box, and the box follows what the server kept", async () => {
     let shared = false;
-    vi.mocked(api).mockImplementation((async (path: string, opts?: { method?: string; body?: { share: boolean } }) => {
+    mockApi((async (path: string, opts?: { method?: string; body?: { share: boolean } }) => {
       if (path === "/api/mailboxes") return list([box({ share_review: shared })]);
       if (path === "/api/mailboxes/1/share") { shared = opts!.body!.share; return { ok: true }; }
       return {};
@@ -173,7 +189,7 @@ describe("Settings → Gmail", () => {
   });
 
   it("puts the box back, and says so, when the server refuses to change it", async () => {
-    vi.mocked(api).mockImplementation((async (path: string) => {
+    mockApi((async (path: string) => {
       if (path === "/api/mailboxes") return list([box()]);
       throw new Error("Refused.");
     }) as never);
@@ -206,7 +222,7 @@ describe("Settings → Gmail", () => {
 
   it("disconnects after asking, then lists again", async () => {
     let mailboxes = [box()];
-    vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string }) => {
+    mockApi(async (path: string, opts?: { method?: string }) => {
       if (opts?.method === "DELETE") { mailboxes = []; return { ok: true, revoked: true } as never; }
       return list(mailboxes) as never;
     });
@@ -222,7 +238,7 @@ describe("Settings → Gmail", () => {
 
   it("says when a connection was removed without being able to tell Google", async () => {
     let mailboxes = [box()];
-    vi.mocked(api).mockImplementation(async (_path: string, opts?: { method?: string }) => {
+    mockApi(async (_path: string, opts?: { method?: string }) => {
       if (opts?.method === "DELETE") { mailboxes = []; return { ok: true, revoked: false } as never; }
       return list(mailboxes) as never;
     });
@@ -234,7 +250,7 @@ describe("Settings → Gmail", () => {
   });
 
   it("keeps the connection on screen when disconnecting fails", async () => {
-    vi.mocked(api).mockImplementation(async (_path: string, opts?: { method?: string }) => {
+    mockApi(async (_path: string, opts?: { method?: string }) => {
       if (opts?.method === "DELETE") throw new Error("Couldn’t reach Google to revoke Waypoint’s access, so the mailbox is still connected.");
       return list([box()]) as never;
     });
@@ -277,7 +293,7 @@ describe("Settings → Gmail", () => {
 
   it("scans now, and says when one is already running", async () => {
     let started = true;
-    vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string }) =>
+    mockApi(async (path: string, opts?: { method?: string }) =>
       (opts?.method === "POST" ? { started } : list([box()])) as never);
     render(GmailSection);
     await userEvent.click(await screen.findByRole("button", { name: "Scan now" }));
@@ -298,7 +314,7 @@ describe("Settings → Gmail", () => {
 
   it("says what stopped a look-back that started, and that nothing was lost", async () => {
     let stopped = false;
-    vi.mocked(api).mockImplementation(async (_path: string, opts?: { method?: string }) =>
+    mockApi(async (_path: string, opts?: { method?: string }) =>
       (opts?.method === "POST" ? { started: true } : list([box({ scan_error: stopped ? "Couldn’t reach Google while reading the mailbox." : null })])) as never);
     render(GmailSection);
     await userEvent.click(await screen.findByRole("button", { name: "Look back 18 months" }));
@@ -312,7 +328,7 @@ describe("Settings → Gmail", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       let scanning = true;
-      vi.mocked(api).mockImplementation(async () => list([box({ scanning, last_scan: scanning ? null : "2026-09-30T07:02:00+00:00" })]) as never);
+      mockApi(async () => list([box({ scanning, last_scan: scanning ? null : "2026-09-30T07:02:00+00:00" })]) as never);
       render(GmailSection);
       expect(await screen.findByText("Scanning for bookings…")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Scanning…" })).toBeDisabled();
@@ -343,7 +359,7 @@ describe("Settings → Gmail", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       let notice: string | null = null;
-      vi.mocked(api).mockImplementation(async (_path: string, opts?: { method?: string }) =>
+      mockApi(async (_path: string, opts?: { method?: string }) =>
         (opts?.method === "POST" ? { started: true } : list([box({ scan_notice: notice })])) as never);
       render(GmailSection);
       await userEvent.click(await screen.findByRole("button", { name: "Scan now" }));
@@ -374,7 +390,7 @@ describe("Settings → Gmail", () => {
 
   it("says when the list can’t be loaded, and tries again", async () => {
     let up = false;
-    vi.mocked(api).mockImplementation(async () => {
+    mockApi(async () => {
       if (!up) throw new Error("Waypoint is restarting or unreachable.");
       return list([box()]) as never;
     });
@@ -413,7 +429,7 @@ describe("Settings → Gmail", () => {
     });
 
     it("says how many are picked and notes labels deleted in Gmail", async () => {
-      serve(list([box({ labels_picked: 2, scan_summary: { found: 1, read: 1, bookings: 0, review: 0, skipped: 0, capped: false, labels_dropped: 1, triaged: 0, total: 0, not_travel: 0 } })]));
+      serve(list([box({ labels_picked: 2, scan_summary: { found: 1, read: 1, bookings: 0, review: 0, skipped: 0, capped: false, labels_dropped: 1, triaged: 0, total: 0, not_travel: 0, followups: 0, with_facts: 0 } })]));
       render(GmailSection);
       expect(await screen.findByText(/Reading everything in 2 labels you picked/)).toBeInTheDocument();
       expect(screen.getByTestId("scan-summary")).toHaveTextContent("1 label you picked was deleted in Gmail and was dropped.");

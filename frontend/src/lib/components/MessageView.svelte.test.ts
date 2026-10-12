@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/svelte";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/api", () => ({ apiImage: vi.fn() }));
@@ -37,13 +36,10 @@ describe("MessageView", () => {
     expect(screen.queryByTestId("message-old")).toBeNull();
   });
 
-  it("shows markup formatted, with a switch to its plain text and back", async () => {
+  it("shows markup formatted and offers no switch to plain text", async () => {
     render(MessageView, { text: "Gate B12", html: "<p>Gate <b>B12</b></p>" });
-    await userEvent.click(screen.getByRole("button", { name: "Show as plain text" }));
-    expect(screen.queryByTestId("preview-html")).toBeNull();
-    expect(screen.getByText("Gate B12")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Show as formatted" }));
     expect(screen.getByTestId("preview-html")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show as/ })).toBeNull();
   });
 
   it("fetches each kept picture through the app’s own route and puts it in the page as data, never as an address", async () => {

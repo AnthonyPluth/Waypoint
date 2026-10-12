@@ -117,7 +117,7 @@ api-contract-check:
 
 # Pushes make verify's `*-top.png` screenshots to the pr-screenshots branch (pr-$(PR)/) and prints the markdown for the
 # PR's comment (tools/pr_screenshots.py). `make pr-screenshots PR=12 FILES="artifacts/verify/upcoming-phone-top.png …"` picks
-# files; trailers for the commit go in $PR_SCREENSHOTS_TRAILERS. Demo data only: the repository is public.
+# files; trailers for the commit go in $PR_SCREENSHOTS_TRAILERS and its git settings (such as a signing program) in $PR_SCREENSHOTS_GIT_CONFIG, one KEY=VALUE per line (the script reads it from the environment). Demo data only: the repository is public.
 pr-screenshots:
 	@test -n "$(PR)" || { echo "usage: make pr-screenshots PR=<pull request number> [FILES=\"…\"]" >&2; exit 2; }
 	@$(PYTHON) tools/pr_screenshots.py $(PR) $(FILES)

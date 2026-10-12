@@ -172,7 +172,7 @@ class Replies(DbCase):
                                                   last_scan=1790000000.0, created=1.0,
                                                   scan_summary='{"found":3,"read":2,"bookings":1,"review":1,"skipped":1,"capped":false}' if status == "connected" else None))
         reply = mailboxes.api_mailboxes(self.c, {}, {})
-        self.assertEqual(reply["mailboxes"][0]["scan_summary"], {"found": 3, "read": 2, "bookings": 1, "review": 1, "skipped": 1, "capped": False, "labels_dropped": 0, "triaged": 0, "total": 0, "not_travel": 0})
+        self.assertEqual(reply["mailboxes"][0]["scan_summary"], {"found": 3, "read": 2, "bookings": 1, "review": 1, "skipped": 1, "capped": False, "labels_dropped": 0, "triaged": 0, "total": 0, "not_travel": 0, "followups": 0, "with_facts": 0})
         self.assertIsNone(reply["mailboxes"][1]["scan_summary"])
         self.assertEqual([m["status"] for m in reply["mailboxes"]], ["connected", "reconnect", "error"])
         self.check("GET /api/mailboxes", reply)
@@ -184,6 +184,8 @@ class Replies(DbCase):
         first = reply["mailboxes"][0]["id"]
         self.c.execute(insert(IgnoredSender).values(mailbox_id=first, domain="example-air.example"))
         self.check("GET /api/mailboxes/{id}/ignored", mailboxes.api_mailbox_ignored(self.c, {}, {}, str(first)))
+        review.add(self.c, first, "m1", "example-air.example", "2026-10-01", "incomplete", 1.0, None, "no place")
+        self.check("GET /api/mailboxes/{id}/review-glance", mailboxes.api_mailbox_review_glance(self.c, {}, {}, str(first)))
         with mock.patch.object(jobs, "scan_now", return_value=True):
             self.check("POST /api/mailboxes/{id}/unignore", mailboxes.api_mailbox_unignore(self.c, {}, {"domain": "example-air.example"}, str(first)))
         live = [{"id": "Label_1", "name": "Japan 2026", "count": 12}]
@@ -202,11 +204,13 @@ class Replies(DbCase):
                                                     status="connected", created=1.0)).lastrowid
         for n, reason in enumerate(("no_markup", "incomplete", "broken", "generic")):
             review.add(self.c, box, f"m{n}", f"air{n}.example", "2026-10-17" if reason != "generic" else "2026-01-01", reason, 1.0)   # type: ignore[arg-type]
-        review.set_suggestion(self.c, box, "m0", {"kind": "flight", "origin": "BOS", "destination": "DEN", "start_local": "2026-12-02T07:15",
-                                                  "end_local": "2026-12-02T10:05"}, None)
-        review.set_suggestion(self.c, box, "m3", {"kind": "hotel", "origin": "Seaside Inn", "start_local": "2026-11-21T15:00", "end_local": "2026-11-25T11:00",
-                                                  "address": "12 Beach Road, Brighton, UK", "sources": {"origin": "property", "start_local": "check-in"}}, None)
-        review.set_suggestion(self.c, box, "m1", None, "The AI didn’t find a booking in this message.")
+        review.set_suggestions(self.c, box, "m0", [{"kind": "flight", "origin": "BOS", "destination": "DEN", "start_local": "2026-12-02T07:15",
+                                                   "end_local": "2026-12-02T10:05", "flight_number": "EX 204", "cabin": "Economy"},
+                                                  {"kind": "flight", "origin": "DEN", "destination": "BOS", "start_local": "2026-12-08T16:20",
+                                                   "end_local": "2026-12-08T21:50", "flight_number": "EX 205"}], None)
+        review.set_suggestions(self.c, box, "m3", [{"kind": "hotel", "origin": "Seaside Inn", "start_local": "2026-11-21T15:00", "end_local": "2026-11-25T11:00",
+                                                   "address": "12 Beach Road, Brighton, UK", "sources": {"origin": "property", "start_local": "check-in"}}], None)
+        review.set_suggestions(self.c, box, "m1", [], "The AI didn’t find a booking in this message.")
         me = Viewer(people_domain.person_for_sub(self.c, "u1"))
         trips.add_segment(self.c, me, {"kind": "flight", "origin": "JFK", "destination": "SFO", "start_local": "2026-12-08T08:00",
                                        "end_local": "2026-12-08T11:20", "travelers": [{"person_id": None, "name": "DOE/MIA MISS"}]}, source="email")
@@ -334,8 +338,8 @@ class Replies(DbCase):
         assert seg is not None
         review.add(self.c, box, "a1", "hotel.example", "2026-10-18", "match", 1.0, [({**stay, "confirmation": "H88231", "provider": "Example Hotels"}, [seg["id"]])])
         review.add(self.c, box, "a2", "inn.example", "2026-10-17", "generic", 1.0)
-        review.set_suggestion(self.c, box, "a2", {"kind": "hotel", "origin": "Seaside Inn", "start_local": "2026-12-21T15:00", "end_local": "2026-12-25T11:00",
-                                                  "start_zone": "America/New_York", "address": "12 Beach Road", "sources": {"origin": "property"}}, None)
+        review.set_suggestions(self.c, box, "a2", [{"kind": "hotel", "origin": "Seaside Inn", "start_local": "2026-12-21T15:00", "end_local": "2026-12-25T11:00",
+                                                  "start_zone": "America/New_York", "address": "12 Beach Road", "sources": {"origin": "property"}}], None)
         review.add(self.c, box, "a3", "air.example", "2026-10-16", "broken", 1.0)
         review.add(self.c, box, "a4", "tour.example", "2026-10-15", "broken", 1.0)
         for message in ("a1", "a2", "a3"):
@@ -445,7 +449,7 @@ class Generated(unittest.TestCase):
 
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
         self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
-                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels", "GET /api/mailboxes/{id}/ignored", "POST /api/mailboxes/{id}/unignore",
+                                     "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels", "GET /api/mailboxes/{id}/ignored", "GET /api/mailboxes/{id}/review-glance", "POST /api/mailboxes/{id}/unignore",
                                      "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/share",
                                      "GET /api/ai", "POST /api/ai", "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "DELETE /api/review/{id}",
