@@ -177,12 +177,26 @@ def message_ids(conn: db.Connection, segment_ids: Iterable[int]) -> dict[int, se
     return found
 
 
-def deletable_for_segments(conn: db.Connection, segment_ids: Iterable[int]) -> set[int]:
-    ids = sorted(set(segment_ids))
-    linked = {m for kept in message_ids(conn, ids).values() for m in kept}
+def deletable_by_group(conn: db.Connection, groups: Mapping[int, Sequence[int]]) -> dict[int, set[int]]:
+    every = sorted({s for ids in groups.values() for s in ids})
+    kept = message_ids(conn, every)
+    linked = sorted({m for found in kept.values() for m in found})
     if not linked:
-        return set()
-    return set(conn.execute(select(StoredMessage.id).where(StoredMessage.id.in_(sorted(linked)), *_needed(ids))).scalars())
+        return {g: set() for g in groups}
+    free = set(conn.execute(select(StoredMessage.id).where(StoredMessage.id.in_(linked), _needed()[0])).scalars())
+    linkers: dict[int, set[int]] = {}
+    for r in conn.execute(select(SegmentMessage.stored_message_id, SegmentMessage.segment_id)
+                          .where(SegmentMessage.stored_message_id.in_(sorted(free)))).fetchall():
+        linkers.setdefault(int(r["stored_message_id"]), set()).add(int(r["segment_id"]))
+    out: dict[int, set[int]] = {}
+    for g, ids in groups.items():
+        own = set(ids)
+        out[g] = {m for s in own for m in kept.get(s, ()) if m in free and linkers.get(m, set()) <= own}
+    return out
+
+
+def deletable_for_segments(conn: db.Connection, segment_ids: Iterable[int]) -> set[int]:
+    return deletable_by_group(conn, {0: sorted(set(segment_ids))})[0]
 
 
 def clear_for_segments(conn: db.Connection, segment_ids: Iterable[int]) -> int:
@@ -193,4 +207,4 @@ def clear_for_segments(conn: db.Connection, segment_ids: Iterable[int]) -> int:
     conn.execute(delete(SegmentMessage).where(SegmentMessage.segment_id.in_(ids)))
     if not gone:
         return 0
-    return int(conn.execute(delete(StoredMessage).where(StoredMessage.id.in_(sorted(gone)))).rowcount)
+    return int(conn.execute(delete(StoredMessage).where(StoredMessage.id.in_(sorted(gone)), *_needed())).rowcount)

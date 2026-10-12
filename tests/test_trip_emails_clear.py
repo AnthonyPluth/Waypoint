@@ -2,8 +2,9 @@ import json
 import secrets
 import time
 from datetime import date, timedelta
+from unittest import mock
 
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, event, insert, select
 
 from waypoint import oidc
 from waypoint.domain import offline, people, trips
@@ -139,6 +140,49 @@ class ClearEmailsTests(ServerCase):
         self.keep("both", mine["id"], theirs["id"])
         got = self.trip("ana", mine["trip_id"])
         self.assertEqual((got["emails"], got["can_clear_emails"]), (0, False))
+
+    def test_a_message_that_became_needed_before_the_delete_is_kept(self):
+        seg = self.book(days(-20), days(-19))
+        self.keep("late", seg["id"])
+        with db.session() as conn:
+            real = stored_mail.deletable_for_segments(conn, [seg["id"]])
+            self.assertEqual(len(real), 1)
+            conn.execute(insert(ReviewItem).values(mailbox_id=self.box, message_id="late", sender_domain="air.example",
+                                                   reason="no_markup", created=1.0))
+            with mock.patch.object(stored_mail, "deletable_for_segments", return_value=real):
+                self.assertEqual(stored_mail.clear_for_segments(conn, [seg["id"]]), 0)
+        self.assertEqual(self.kept(), {"late"})
+
+    def test_listing_counts_each_trip_on_its_own_with_a_fixed_number_of_queries(self):
+        def build(count: int) -> list[int]:
+            with db.session() as conn:
+                conn.execute(delete(StoredMessage))
+                conn.execute(delete(Trip))
+            made = [self.book(days(-100 + 30 * n), days(-99 + 30 * n), confirmation=f"LIST{n}X") for n in range(count)]
+            for n, seg in enumerate(made):
+                for k in range(n + 1):
+                    self.keep(f"t{n}-{k}", seg["id"])
+            self.keep("shared", made[0]["id"], made[-1]["id"])
+            return [m["trip_id"] for m in made]
+
+        def listed(count: int) -> tuple[dict[int, int], int]:
+            build(count)
+            seen: list[str] = []
+            engine = db.engine()
+            hook = lambda *a: seen.append("q")
+            event.listen(engine, "before_cursor_execute", hook)
+            try:
+                status, got = self.call("ana", "GET", "/api/trips")
+            finally:
+                event.remove(engine, "before_cursor_execute", hook)
+            self.assertEqual(status, 200)
+            return {t["id"]: t["emails"] for t in got["trips"]}, len(seen)
+
+        counts, small = listed(2)
+        self.assertEqual(list(counts.values()), [1, 2])
+        counts, large = listed(4)
+        self.assertEqual(sorted(counts.values()), [1, 2, 3, 4])
+        self.assertEqual(small, large)
 
     def test_images_go_with_the_message(self):
         seg = self.book(days(-20), days(-19))

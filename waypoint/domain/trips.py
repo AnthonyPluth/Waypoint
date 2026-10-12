@@ -494,8 +494,12 @@ def _trip_outs(conn: db.Connection, viewer: Viewer, trips: Sequence[Trip], today
     outs = _segment_outs(conn, segs, travs, viewer)
     aboard = trippeople.of(conn, [t.id for t in trips])
     day = today or date.today()
+    by_trip: dict[int, list[int]] = {t.id: [] for t in trips}
+    for s in segs:
+        by_trip[s.trip_id].append(s.id)
+    removable = stored_mail.deletable_by_group(conn, by_trip)
     def emails_of_trip(trip: Trip) -> int:
-        return len(stored_mail.deletable_for_segments(conn, [s.id for s in segs if s.trip_id == trip.id]))
+        return len(removable[trip.id])
     return [{"id": t.id, "name": t.name, "start_date": t.start_date, "end_date": t.end_date,
              "destination": t.destination, "destination_manual": t.destination_manual, "notes": t.notes, "auto": t.auto, "booked_by": t.booked_by,
              "emails": (n := emails_of_trip(t)), "can_clear_emails": n > 0 and emails_clearable(t, day),
