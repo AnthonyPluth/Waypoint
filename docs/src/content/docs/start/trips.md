@@ -77,6 +77,14 @@ With a RapidAPI key set, a flight’s card also shows its live status (delays, g
 
 With a Logo.dev key saved in Settings, each booking also shows its airline’s, hotel’s, rental company’s or cruise line’s logo. See [Brand logos](/Waypoint/start/logos/).
 
+## Replaying a past trip's route
+
+A trip that has ended and has at least two stops with a known place shows **Replay the route**. It opens a map that draws the path in time order: flights run between their airports, and a stay, a car, a train or a cruise's ports count when Waypoint knows the place. Each stop shows its city and the days you were there, as the dates read at the place, and the map fits the whole route. Nothing plays until you press **Play**; **Pause** and the slider (which the arrow keys move) let you stop or jump to any point.
+
+A stop's coordinates come from Waypoint's own airport list: a flight uses its airports, and a stay or a train, car or cruise stop uses the city it names when an airport in the list is in a city of that name. A booking with no city, or one the list doesn't know, is left out of the route rather than guessed; a trip with fewer than two located stops shows no button. The map is drawn from outlines that ship with the app, so no map service is contacted.
+
+With reduced motion turned on in your system, nothing animates: the map shows the whole path with every stop labelled. Either way, the stops are listed in order under the map as text.
+
 ## In a backup
 
 Trips, segments and their travellers are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list isn’t: every Waypoint has it already.

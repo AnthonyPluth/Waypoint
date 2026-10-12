@@ -5,11 +5,11 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from ... import validate
-from ...domain import airports, people, trips
+from ...domain import airports, people, tripmap, trips
 from ...domain.visibility import Viewer
 from ..common import NO_IMAGE, ApiError, Response, _current, image_response, position, row_id
 from ..contract import (Airport, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
-                        TripList)
+                        TripList, TripPlaces)
 
 NAME_LIMIT = 100
 NOTES_LIMIT = 4000
@@ -143,6 +143,11 @@ def api_trip_add(conn, _q, body: TripBody) -> Trip:
 def api_trip(conn, _q, _b, trip_id) -> Trip:
     who = viewer(conn)
     return _trip(_run(lambda: trips.get(conn, who, row_id(trip_id, NO_TRIP)), NO_TRIP))
+
+
+def api_trip_places(conn, _q, _b, trip_id) -> TripPlaces:
+    who = viewer(conn)
+    return _run(lambda: tripmap.places(conn, who, row_id(trip_id, NO_TRIP)), NO_TRIP)
 
 
 def api_trip_edit(conn, _q, body: TripBody, trip_id) -> Trip:

@@ -933,6 +933,13 @@ export interface Trip {
   segments: Segment[];
 }
 
+export interface TripAirportPoint {
+  code: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface TripBody {
   name?: string;
   destination?: string | null;
@@ -941,8 +948,19 @@ export interface TripBody {
   end_date?: string | null;
 }
 
+export interface TripCityPoint {
+  city: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface TripList {
   trips: Trip[];
+}
+
+export interface TripPlaces {
+  airports: TripAirportPoint[];
+  cities: TripCityPoint[];
 }
 
 export interface UnignoreBody {
@@ -984,6 +1002,7 @@ export interface Endpoints {
   "GET /api/trips/{id}": { body: never; reply: Trip };
   "POST /api/trips/{id}": { body: TripBody; reply: Trip };
   "DELETE /api/trips/{id}": { body: never; reply: Ok };
+  "GET /api/trips/{id}/places": { body: never; reply: TripPlaces };
   "POST /api/trips/{id}/merge": { body: MergeBody; reply: Trip };
   "POST /api/trips/{id}/split": { body: SplitBody; reply: Trip };
   "POST /api/segments": { body: SegmentBody; reply: Segment };
