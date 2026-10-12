@@ -217,10 +217,14 @@ def api_segment_move(conn, _q, body: MoveBody, segment_id) -> Trip:
     who, this = viewer(conn), row_id(segment_id, NO_SEGMENT)
     target = body.get("trip_id")
     into = None if target is None else _id(target, "Choose the trip to move this into")
-    confirmed = validate.on(body.get("confirm"))
+    assistant = bool(getattr(_current, "assistant", False))
+    confirmed = validate.on(body.get("confirm")) and not assistant
     try:
         return _trip(_run(lambda: trips.move_segment(conn, who, this, into, confirmed), NO_SEGMENT))
     except trips.NeedsConfirmation as e:
+        if assistant:
+            raise ApiError("This needs the person to do it in the app: moving a booking into a trip with different people changes who "
+                           "sees what, and only they can confirm it.", 403) from None
         raise ApiError(str(e), 409, {"see_booking": e.see_booking, "see_trip": e.see_trip}) from None
 
 

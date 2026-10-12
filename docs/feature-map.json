@@ -450,6 +450,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp.py",
         "tests/test_trips.py"
       ],
       "docs": [

@@ -410,6 +410,7 @@ class Handler(BaseHTTPRequestHandler):
         q = urllib.parse.parse_qs(url.query)
         _current.user = getattr(self, "user", None)
         _current.host = self.headers.get("Host")
+        _current.assistant = False
         try:
             result = routes.dispatch(hit, q, body)
         except ApiError as e:

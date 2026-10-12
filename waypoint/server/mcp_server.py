@@ -162,8 +162,8 @@ WRITE_RULES = (
     "destructive) also needs the person to confirm what will be lost, separately from any other yes. Ask for each change on its own, "
     "never under one blanket yes for several. "
     "3) Times are wall-clock times at the place (start_local in start_zone); never convert them. "
-    "4) Moving a booking into a trip with different people (POST /api/segments/{id}/move) is refused until the person has said yes to who "
-    "would newly see what; tell them, and only after their yes repeat the call with confirm set to true. Never set confirm on your own. "
+    "4) Moving a booking into a trip with different people is refused for assistants: tell the person to do it in the app. "
+    "Moves between trips of the same people are fine. "
     "Mailboxes, AI settings, backups, sign-in and these assistant settings are out of reach.")
 ASK = "Ask the person before calling this."
 DESTRUCTIVE = "Destructive: tell the person exactly what will be removed or merged and get a clear yes first."
@@ -320,8 +320,8 @@ ANY_TOOLS: list[dict[str, Any]] = [
      "inputSchema": _schema(), "run": lambda fetch, _a: fetch("endpoints", {}), "needs": (WRITE,), "reads": True},
     {"name": "call_endpoint", "description": "Last resort, for what no other tool does (splitting a trip, claiming a guest, the "
      "distance unit): call one of Waypoint's endpoints (list_endpoints) as its web app does. body is what the web app's form sends. "
-     "Moving a booking into a trip with different people is refused (409) with who would newly see what: tell the person and, only "
-     f"after their explicit yes, repeat it with confirm true in the body. Anything it can't reach is refused. {ASK} {DESTRUCTIVE}",
+     "Moving a booking into a trip with different people is refused here (the person must do it in the app). "
+     f"Anything it can't reach is refused. {ASK} {DESTRUCTIVE}",
      "inputSchema": _schema({"method": {"type": "string", "enum": ["GET", "POST", "DELETE"]},
                              "path": {"type": "string", "description": "Like /api/trips/12/split."},
                              "body": {"type": "object"}, "query": {"type": "object"}}, ["method", "path"]),

@@ -13,6 +13,8 @@ from waypoint import oidc
 from waypoint.domain import loyalty, people, trips
 from waypoint.domain.visibility import Viewer
 from waypoint.server import mcp_access, mcp_http, mcp_oauth, mcp_server
+from waypoint.server.api import trips as trips_api
+from waypoint.server.common import ApiError, _current
 from waypoint.storage import db
 from waypoint.storage.models import OAuthGrant, Segment, Trip
 
@@ -193,21 +195,38 @@ class VisibilityTests(Assistants):
                 self.assertRegex(self.refused(ALL, name, args), "No such|Choose")
         self.assertEqual(self.sams(), before)
 
-    def test_an_assistant_can_only_move_a_booking_among_different_people_with_an_explicit_confirm(self):
+    def test_an_assistant_can_never_confirm_a_move_among_different_people(self):
+        with db.session() as conn:
+            solo = self.book(conn, self.jane, {**OUT, "start_local": "2026-11-01T19:00", "end_local": "2026-11-02T07:10"}, "Solo", self.jane.person_id)
+            shared = self.book(conn, self.jane, {**OUT, "start_local": "2026-12-01T19:00", "end_local": "2026-12-02T07:10"}, "Shared", self.jane.person_id)
+            added = trips.add_segment(conn, self.jane, {**HOTEL, "travelers": [{"person_id": self.sam.person_id, "name": None}]}, shared["id"])
+            assert added is not None
+            same = self.book(conn, self.jane, {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"}, "Same", self.jane.person_id)
+        self.addCleanup(self.drop, solo["id"], shared["id"], same["id"])
+        path = f"/api/segments/{solo['segment']}/move"
+        for body in ({"trip_id": shared["id"]}, {"trip_id": shared["id"], "confirm": True}):
+            with self.subTest(body=body):
+                self.assertIn("in the app", self.refused(ALL, "call_endpoint", {"method": "POST", "path": path, "body": body}))
+        self.assertEqual(self.tool(ALL, "get_trip", {"trip_id": solo["id"]})["id"], solo["id"])
+        moved = self.tool(ALL, "call_endpoint", {"method": "POST", "path": path, "body": {"trip_id": same["id"]}})
+        self.assertEqual(moved["id"], same["id"])
+        self.assertIn("do it in the app", mcp_server.WRITE_RULES)
+
+    def test_the_person_in_the_app_can_confirm_that_move(self):
         with db.session() as conn:
             solo = self.book(conn, self.jane, {**OUT, "start_local": "2026-11-01T19:00", "end_local": "2026-11-02T07:10"}, "Solo", self.jane.person_id)
             shared = self.book(conn, self.jane, {**OUT, "start_local": "2026-12-01T19:00", "end_local": "2026-12-02T07:10"}, "Shared", self.jane.person_id)
             added = trips.add_segment(conn, self.jane, {**HOTEL, "travelers": [{"person_id": self.sam.person_id, "name": None}]}, shared["id"])
             assert added is not None
         self.addCleanup(self.drop, solo["id"], shared["id"])
-        path = f"/api/segments/{solo['segment']}/move"
-        asked = self.refused(ALL, "call_endpoint", {"method": "POST", "path": path, "body": {"trip_id": shared["id"]}})
-        self.assertIn("Sam Doe", asked)
-        still = self.tool(ALL, "get_trip", {"trip_id": solo["id"]})
-        self.assertEqual(still["id"], solo["id"])
-        moved = self.tool(ALL, "call_endpoint", {"method": "POST", "path": path, "body": {"trip_id": shared["id"], "confirm": True}})
-        self.assertEqual(moved["id"], shared["id"])
-        self.assertIn("confirm set to true", mcp_server.WRITE_RULES)
+        self.addCleanup(setattr, _current, "user", None)
+        _current.user = {"sub": "u-jane", "name": "Jane Doe", "email": "jane@example.com"}
+        with db.session() as conn:
+            with self.assertRaises(ApiError) as asked:
+                trips_api.api_segment_move(conn, {}, {"trip_id": shared["id"]}, str(solo["segment"]))
+            self.assertEqual((asked.exception.status, asked.exception.data["see_booking"][0]["name"]), (409, "Sam Doe"))
+            moved = trips_api.api_segment_move(conn, {}, {"trip_id": shared["id"], "confirm": True}, str(solo["segment"]))
+            self.assertEqual(moved["id"], shared["id"])
 
     def drop(self, *trip_ids):
         with db.session() as conn:
