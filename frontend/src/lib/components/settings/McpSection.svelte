@@ -115,7 +115,7 @@
               <input type="checkbox" class="mt-1 size-5 shrink-0" aria-describedby={`mcp-mail-help-${c.id}`} checked={c.scope.includes("mail")} disabled={savingMail === c.id} onchange={(e) => chooseMail(c, e)} />
               <span class="min-w-0">
                 <span class="block font-medium">Read email text</span>
-                <span id={`mcp-mail-help-${c.id}`} class="block text-sm text-muted-foreground">This sends the email’s text to the assistant you connected: the subject and text of the emails Waypoint keeps for the Review queue and for bookings. Off unless you turn it on. Never mailboxes or other mail.</span>
+                <span id={`mcp-mail-help-${c.id}`} class="block text-sm text-muted-foreground">This sends the email’s text to the assistant you connected: the subject and text of the emails Waypoint keeps for the Review queue and for bookings, of the member who connected it. Only that member can switch this on or off. Off unless you turn it on. Never mailboxes or other mail.</span>
               </span>
             </label>
           </div>

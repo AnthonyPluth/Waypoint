@@ -34,6 +34,7 @@ def api_mcp_revoke(conn, _q, _b, grant_id) -> Ok:
 
 def api_mcp_mail(conn, _q, body: McpMailBody, grant_id) -> McpMailBody:
     allow = validate.on(body.get("allow"))
-    if not mcp_oauth.set_scope(conn, row_id(grant_id), mcp_access.MAIL, allow):
+    me = (getattr(_current, "user", None) or {}).get("sub")
+    if not mcp_oauth.set_scope(conn, row_id(grant_id), mcp_access.MAIL, allow, me):
         raise ApiError("That connection isn't there any more.", 404)
     return {"allow": allow}

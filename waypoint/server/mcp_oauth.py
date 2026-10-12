@@ -494,8 +494,9 @@ def revoke_grant(conn, grant_id: int, reason: str, now: float | None = None) -> 
     return done
 
 
-def set_scope(conn, grant_id: int, scope: str, on: bool) -> bool:
-    row = conn.execute(select(OAuthGrant.scope).where(OAuthGrant.id == grant_id, OAuthGrant.revoked.is_(None))).fetchone()
+def set_scope(conn, grant_id: int, scope: str, on: bool, approver: str | None) -> bool:
+    theirs = OAuthGrant.sub.is_(None) if approver is None else OAuthGrant.sub == approver
+    row = conn.execute(select(OAuthGrant.scope).where(OAuthGrant.id == grant_id, OAuthGrant.revoked.is_(None), theirs)).fetchone()
     if row is None:
         return False
     have = set(row["scope"].split())

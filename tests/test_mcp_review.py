@@ -661,13 +661,38 @@ class RouteTests(ReviewTools):
         with self.assertRaisesRegex(ApiError, "wasn’t kept"):
             self.call(assistant_api.api_assistant_review_email, {}, {}, str(self.flight_item))
 
+    def mail(self, conn, body, grant, sub="u-jane"):
+        _current.user = {"sub": sub}
+        try:
+            return mcp_api.api_mcp_mail(conn, {}, body, grant)
+        finally:
+            _current.user = None
+
+    def test_only_the_member_who_connected_it_switches_email_on_or_off(self):
+        token = self.make_token("read", sub="u-jane")
+        with db.session() as conn:
+            grant = int(conn.execute(select(OAuthGrant.id)).scalar())
+        for body in ({"allow": True}, {"allow": False}):
+            with db.session() as conn, self.assertRaisesRegex(ApiError, "isn't there"):
+                self.mail(conn, body, str(grant), sub="u-sam")
+        with db.session() as conn:
+            self.assertEqual(conn.execute(select(OAuthGrant.scope)).scalar(), "read")
+            self.mail(conn, {"allow": True}, str(grant))
+        with db.session() as conn, self.assertRaisesRegex(ApiError, "isn't there"):
+            self.mail(conn, {"allow": False}, str(grant), sub="u-sam")
+        with db.session() as conn, self.assertRaisesRegex(ApiError, "isn't there"):
+            self.mail(conn, {"allow": False}, str(grant), sub=None)
+        with db.session() as conn:
+            self.assertEqual(conn.execute(select(OAuthGrant.scope)).scalar(), "read mail")
+            self.assertTrue(mcp_http.authorized(conn, f"Bearer {token}", self.base + "/mcp").has("mail"))
+
     def test_the_settings_switch_for_email_follows_the_connection_at_once(self):
         token = self.make_token("read", sub="u-jane")
         with db.session() as conn:
             grant = int(conn.execute(select(OAuthGrant.id)).scalar())
             self.assertFalse(mcp_http.authorized(conn, f"Bearer {token}", self.base + "/mcp").has("mail"))
         with db.session() as conn:
-            self.assertEqual(mcp_api.api_mcp_mail(conn, {}, {"allow": True}, str(grant)), {"allow": True})
+            self.assertEqual(self.mail(conn, {"allow": True}, str(grant)), {"allow": True})
         with db.session() as conn:
             access = mcp_http.authorized(conn, f"Bearer {token}", self.base + "/mcp")
             self.assertEqual(sorted(access.scopes), ["mail", "read"])
@@ -675,14 +700,14 @@ class RouteTests(ReviewTools):
             listed = mcp_api.api_mcp_settings(conn, {}, {})
             self.assertEqual(listed["connections"][0]["scope"], ["read", "mail"])
         with db.session() as conn:
-            mcp_api.api_mcp_mail(conn, {}, {"allow": False}, str(grant))
+            self.mail(conn, {"allow": False}, str(grant))
             self.assertEqual(conn.execute(select(OAuthGrant.scope)).scalar(), "read")
             self.assertFalse(mcp_http.authorized(conn, f"Bearer {token}", self.base + "/mcp").has("mail"))
             mcp_oauth.revoke_grant(conn, grant, "revoked_in_settings")
         with db.session() as conn, self.assertRaisesRegex(ApiError, "isn't there"):
-            mcp_api.api_mcp_mail(conn, {}, {"allow": True}, str(grant))
+            self.mail(conn, {"allow": True}, str(grant))
         with db.session() as conn, self.assertRaisesRegex(ApiError, "isn't there"):
-            mcp_api.api_mcp_mail(conn, {}, {"allow": True}, "987654")
+            self.mail(conn, {"allow": True}, "987654")
 
     def test_a_client_cannot_ask_for_the_mail_scope_itself(self):
         with self.assertRaises(mcp_oauth.OAuthError):
