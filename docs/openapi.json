@@ -551,6 +551,46 @@
         }
       }
     },
+    "/api/trips/{id}/emails/clear": {
+      "post": {
+        "operationId": "api_trip_emails_clear",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_emails_clear",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailsCleared"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/trips/{id}/merge": {
       "post": {
         "operationId": "api_trip_merge",
@@ -3857,6 +3897,18 @@
         ],
         "additionalProperties": false
       },
+      "EmailsCleared": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "removed"
+        ],
+        "additionalProperties": false
+      },
       "FeedMade": {
         "type": "object",
         "properties": {
@@ -7119,6 +7171,12 @@
               "null"
             ]
           },
+          "emails": {
+            "type": "integer"
+          },
+          "can_clear_emails": {
+            "type": "boolean"
+          },
           "segments": {
             "type": "array",
             "items": {
@@ -7135,6 +7193,8 @@
           "notes",
           "auto",
           "booked_by",
+          "emails",
+          "can_clear_emails",
           "segments"
         ],
         "additionalProperties": false

@@ -380,6 +380,7 @@ class Replies(DbCase):
         self.check("GET /api/trips", trips_api.api_trips(self.c, {}, {}))
         self.check("GET /api/trips/{id}", trips_api.api_trip(self.c, {}, {}, str(seg["trip_id"])))
         self.check("POST /api/trips/{id}", trips_api.api_trip_edit(self.c, {}, {"notes": "Skates"}, str(made["id"])))
+        self.check("POST /api/trips/{id}/emails/clear", trips_api.api_trip_emails_clear(self.c, {}, {}, str(seg["trip_id"])))
         self.check("POST /api/trips/{id}/merge", trips_api.api_trip_merge(self.c, {}, {"merge": seg["trip_id"]}, str(made["id"])))
         other = trips_api.api_segment_add(self.c, {}, {"kind": "hotel", "origin": "Harbour Hotel", "start_zone": "Europe/London",
                                                         "end_zone": "Europe/London", "start_local": "2026-06-02T15:00",
@@ -458,7 +459,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/people/{id}", "DELETE /api/people/{id}", "POST /api/people/{id}/claim",
                                      "GET /api/people/claim-suggestions", "POST /api/people/claim-suggestions/dismiss",
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
-                                     "DELETE /api/trips/{id}", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
+                                     "DELETE /api/trips/{id}", "POST /api/trips/{id}/emails/clear", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
                                      "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",

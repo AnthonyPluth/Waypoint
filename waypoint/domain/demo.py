@@ -250,9 +250,13 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     guests = [people.add_guest(conn, guest)["id"] for guest in GUESTS]
     jane, sam = (Viewer(people.person_for_sub(conn, sub)) for sub in ("demo-jane", "demo-sam"))
     now_trip = None
-    for fields in (*_family_two_years_ago(today), *_family_last_year(today), *_family_past(today), *_family_now(today)):
+    past = _family_past(today)
+    past_stay = past[1]
+    past_stay_id = None
+    for fields in (*_family_two_years_ago(today), *_family_last_year(today), *past, *_family_now(today)):
         seats = FAMILY_SEATS.get((fields.get("details") or {}).get("flight_number", ""), ())
         added = trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0], seats=seats)})
+        past_stay_id = added["id"] if added and fields is past_stay else past_stay_id
         now_trip = added["trip_id"] if added and (fields.get("details") or {}).get("flight_number") == "AA 102" else now_trip
     for fields in _cruises(today):
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id)})
@@ -302,6 +306,10 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
                                                       ("Hello,", "Your flight EX 410 leaves New York (JFK) at 7:00 am.", "Confirmation: CH3K5P"))
         stored_mail.put(conn, box.id, "demo-read-from-email", itinerary, 0.0, itinerary_images)
         stored_mail.link(conn, from_email["id"], box.id, "demo-read-from-email")
+    if past_stay_id is not None:
+        stored_mail.put(conn, box.id, "demo-past-stay", _message("example-stays.example", 41, today, "Your reservation: Lakeside Resort",
+                                                                 ("Hello Jane,", "Your stay at Lakeside Resort is booked.", "Confirmation: H41207")), 0.0)
+        stored_mail.link(conn, past_stay_id, box.id, "demo-past-stay")
     conn.orm.add(Mailbox(owner_sub="local", address=DEMO_EMPTY_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
                          status="connected", created=0.0, last_scan=None))
     shared = Mailbox(owner_sub="demo-sam", address=DEMO_SHARED_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",

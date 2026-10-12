@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import Literal, NotRequired, TypedDict
 
 
+class EmailsCleared(TypedDict):
+    removed: int
+
+
 class Ok(TypedDict):
     ok: bool
 
@@ -442,6 +446,8 @@ class Trip(TypedDict):
     notes: str | None
     auto: bool
     booked_by: int | None
+    emails: int
+    can_clear_emails: bool
     segments: list[Segment]
 
 
