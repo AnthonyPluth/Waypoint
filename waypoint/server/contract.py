@@ -855,6 +855,10 @@ class McpConnection(TypedDict):
     last_used: str | None
 
 
+class McpMailBody(TypedDict):
+    allow: bool
+
+
 class McpSettings(TypedDict):
     allow_writes: bool
     oauth: bool
@@ -937,6 +941,21 @@ class AssistantItemDetail(AssistantItem):
     entries: list[AssistantEntry]
     suggestion: AssistantParsed | None
     suggestions: list[AssistantParsed]
+
+
+class AssistantEmail(TypedDict):
+    subject: str | None
+    sender_domain: str | None
+    received: str | None
+    text: str
+    truncated: bool
+    html: str | None
+    html_truncated: bool
+    kept: Literal["original", "plain text"]
+
+
+class AssistantSegmentEmails(TypedDict):
+    emails: list[AssistantEmail]
 
 
 class AssistantMatchBody(TypedDict):

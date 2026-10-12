@@ -1149,7 +1149,8 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_mcp_protocol.py"
+        "tests/test_mcp_protocol.py",
+        "tests/test_mcp_review.py"
       ],
       "docs": [
         "start/mcp"
@@ -1165,6 +1166,21 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_protocol.py"
+      ],
+      "docs": [
+        "start/mcp"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/mcp-settings/connections/{id}/mail",
+      "handler": "waypoint/server/api/mcp.py:api_mcp_mail",
+      "web": [
+        "frontend/src/lib/components/settings/McpSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_review.py"
       ],
       "docs": [
         "start/mcp"
@@ -1212,6 +1228,19 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/assistant/review/{id}/email",
+      "handler": "waypoint/server/api/assistant.py:api_assistant_review_email",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_review.py"
+      ],
+      "docs": [
+        "start/mcp"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/assistant/review/{id}/match",
       "handler": "waypoint/server/api/assistant.py:api_assistant_review_match",
@@ -1248,6 +1277,19 @@
         "tests/test_api_contract.py",
         "tests/test_mcp_review.py",
         "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/mcp"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/assistant/segments/{id}/email",
+      "handler": "waypoint/server/api/assistant.py:api_assistant_segment_emails",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_review.py"
       ],
       "docs": [
         "start/mcp"
