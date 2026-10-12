@@ -14,6 +14,7 @@ const places: TripPlaces = {
     { code: "SFO", city: "San Francisco", latitude: 37.6213, longitude: -122.379 },
   ],
   cities: [],
+  stays: [],
 };
 const flights = [
   segment({ id: 1, origin: "MSP", destination: "SFO", start_local: "2025-12-05T08:00", start_zone: "America/Chicago", end_local: "2025-12-05T10:30", end_zone: "America/Los_Angeles" }),

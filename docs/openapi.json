@@ -7536,11 +7536,46 @@
             "items": {
               "$ref": "#/components/schemas/TripCityPoint"
             }
+          },
+          "stays": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripStayPoint"
+            }
           }
         },
         "required": [
           "airports",
-          "cities"
+          "cities",
+          "stays"
+        ],
+        "additionalProperties": false
+      },
+      "TripStayPoint": {
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "integer"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "precision": {
+            "enum": [
+              "airport",
+              "zip",
+              "city"
+            ]
+          }
+        },
+        "required": [
+          "segment_id",
+          "latitude",
+          "longitude",
+          "precision"
         ],
         "additionalProperties": false
       },

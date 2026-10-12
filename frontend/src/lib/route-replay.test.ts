@@ -13,6 +13,7 @@ const places: TripPlaces = {
     { city: "san francisco", latitude: 37.6213, longitude: -122.379 },
     { city: "napa", latitude: 38.2975, longitude: -122.2869 },
   ],
+  stays: [],
 };
 const out = segment({ id: 1, origin: "MSP", destination: "SFO", start_local: "2025-12-05T08:00", start_zone: "America/Chicago", end_local: "2025-12-05T10:30", end_zone: "America/Los_Angeles" });
 const stay = segment({ id: 2, kind: "hotel", origin: "Bayview Inn", destination: "San Francisco", start_local: "2025-12-05T15:00", start_zone: "America/Los_Angeles", end_local: "2025-12-11T11:00", end_zone: "America/Los_Angeles" });
@@ -53,6 +54,30 @@ describe("stopsOf", () => {
     expect(all[3].via).toBe("train");
   });
 
+  it("places a stay in a town with no airport at its stored point", () => {
+    const town = segment({ id: 4, kind: "hotel", origin: "Mill Inn", destination: "Longmont", start_local: "2025-12-06T15:00", start_zone: "America/Denver", end_local: "2025-12-08T11:00", end_zone: "America/Denver" });
+    expect(names(stopsOf(trip([out, town]), places))).toEqual(["Minneapolis", "San Francisco"]);
+    const stops = stopsOf(trip([out, town]), { ...places, stays: [{ segment_id: 4, latitude: 40.1672, longitude: -105.1019, precision: "city" }] });
+    expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Longmont"]);
+    expect([stops[2].latitude, stops[2].longitude]).toEqual([40.1672, -105.1019]);
+  });
+
+  it("keeps two stays in one city as two stops when their stored points are far apart, and as one when they are near", () => {
+    const first = segment({ id: 4, kind: "hotel", origin: "North Inn", destination: "Boulder", start_local: "2025-12-06T15:00", start_zone: "America/Denver", end_local: "2025-12-07T11:00", end_zone: "America/Denver" });
+    const second = segment({ id: 5, kind: "hotel", origin: "South Inn", destination: "Boulder", start_local: "2025-12-07T15:00", start_zone: "America/Denver", end_local: "2025-12-08T11:00", end_zone: "America/Denver" });
+    const far = { ...places, stays: [{ segment_id: 4, latitude: 40.0251, longitude: -105.3487, precision: "zip" as const }, { segment_id: 5, latitude: 39.5, longitude: -104.9, precision: "zip" as const }] };
+    expect(names(stopsOf(trip([first, second]), far))).toEqual(["Boulder", "Boulder"]);
+    const near = { ...places, stays: [{ segment_id: 4, latitude: 40.0251, longitude: -105.3487, precision: "zip" as const }, { segment_id: 5, latitude: 40.0402, longitude: -105.2514, precision: "zip" as const }] };
+    expect(names(stopsOf(trip([first, second]), near))).toEqual(["Boulder"]);
+  });
+
+  it("uses a stored point before the city lookup, and the city lookup when there is none", () => {
+    const napa = segment({ id: 4, kind: "hotel", origin: "Vine Inn", destination: "Napa, CA", start_local: "2025-12-06T15:00", start_zone: "America/Los_Angeles", end_local: "2025-12-08T11:00", end_zone: "America/Los_Angeles" });
+    const withPoint = { ...places, stays: [{ segment_id: 4, latitude: 38.5, longitude: -122.5, precision: "zip" as const }] };
+    expect(stopsOf(trip([out, napa]), withPoint).at(-1)?.latitude).toBe(38.5);
+    expect(stopsOf(trip([out, napa]), places).at(-1)?.latitude).toBe(38.2975);
+  });
+
   it("reads a cruise's ports in order", () => {
     const cruise = segment({ id: 4, kind: "cruise", origin: "San Francisco", destination: "San Francisco", start_local: "2025-12-06T16:00", start_zone: "America/Los_Angeles", end_local: "2025-12-13T07:00", end_zone: "America/Los_Angeles",
       itinerary: [{ name: "Napa", zone: "America/Los_Angeles", arrive_local: "2025-12-08T08:00", depart_local: "2025-12-08T17:00" }, { name: "Nowhere", zone: "UTC", arrive_local: "2025-12-09T08:00", depart_local: null }] });
@@ -87,7 +112,7 @@ describe("whether a trip can be replayed", () => {
     expect(canReplay(past, "2025-12-01", places)).toBe(false);
     expect(canReplay(past, "2026-01-01", null)).toBe(false);
     expect(canReplay(trip([stay]), "2026-01-01", places)).toBe(false);
-    expect(canReplay(trip([out]), "2026-01-01", { airports: [places.airports[0]], cities: [] })).toBe(false);
+    expect(canReplay(trip([out]), "2026-01-01", { airports: [places.airports[0]], cities: [], stays: [] })).toBe(false);
   });
 
   it("counts the most stops a trip could have before asking for coordinates", () => {

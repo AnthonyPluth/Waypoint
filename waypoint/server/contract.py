@@ -480,9 +480,17 @@ class TripCityPoint(TypedDict):
     longitude: float
 
 
+class TripStayPoint(TypedDict):
+    segment_id: int
+    latitude: float
+    longitude: float
+    precision: Literal["airport", "zip", "city"]
+
+
 class TripPlaces(TypedDict):
     airports: list[TripAirportPoint]
     cities: list[TripCityPoint]
+    stays: list[TripStayPoint]
 
 
 class TripBody(TypedDict):

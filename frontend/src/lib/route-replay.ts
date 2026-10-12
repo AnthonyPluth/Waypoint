@@ -6,8 +6,8 @@ import { instant, isPast } from "./trips";
 export type Kind = Segment["kind"];
 export type Stop = { name: string; latitude: number; longitude: number; from: string; to: string; via: Kind | null; back: boolean };
 export type Leg = { d: string; flight: boolean };
-type Visit = Omit<Stop, "back">;
-type Point = { name: string; latitude: number; longitude: number };
+type Visit = Omit<Stop, "back"> & { exact?: boolean };
+type Point = { name: string; latitude: number; longitude: number; exact?: boolean };
 
 export const MIN_SPAN_DEGREES = 10;
 export const SAME_PLACE_KM = 30;
@@ -34,7 +34,12 @@ function finder(places: TripPlaces) {
     const found = cities.get(key(text)) ?? cities.get(key(head(text ?? "")));
     return found && text ? { name: head(text), latitude: found.latitude, longitude: found.longitude } : null;
   };
-  return { airport, city };
+  const stored = new Map(places.stays.map((p) => [p.segment_id, p]));
+  const stay = (s: Segment, text: string | null): Point | null => {
+    const found = stored.get(s.id);
+    return found ? { name: head(text ?? "") || head(s.origin ?? "") || "Stay", latitude: found.latitude, longitude: found.longitude, exact: true } : null;
+  };
+  return { airport, city, stay };
 }
 
 export function maxStops(trip: Trip): number {
@@ -49,7 +54,7 @@ export function maxStops(trip: Trip): number {
 export const worthLocating = (trip: Trip, today: string): boolean => isPast(trip, today) && maxStops(trip) >= 2;
 
 function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
-  const { airport, city } = finder(places);
+  const { airport, city, stay } = finder(places);
   const live = trip.segments.filter((s) => s.status !== "cancelled" && s.kind !== "parking")
     .sort((a, b) => instant(a.start_local, a.start_zone) - instant(b.start_local, b.start_zone) || a.id - b.id);
   const out: Visit[] = [];
@@ -59,14 +64,14 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
       add(airport(s.origin), s.start_local, s.start_local, null);
       add(airport(s.destination), s.end_local, s.end_local, "flight");
     } else if (s.kind === "hotel") {
-      add(city(s.destination), s.start_local, s.end_local, null);
+      add(stay(s, s.destination) ?? city(s.destination), s.start_local, s.end_local, null);
     } else if (s.kind === "car") {
-      add(city(s.destination) ?? city(s.origin), s.start_local, s.end_local, null);
+      add(stay(s, s.destination ?? s.origin) ?? city(s.destination) ?? city(s.origin), s.start_local, s.end_local, null);
     } else if (s.kind === "train") {
       add(city(s.origin), s.start_local, s.start_local, null);
-      add(city(s.destination), s.end_local, s.end_local, "train");
+      add(stay(s, s.destination) ?? city(s.destination), s.end_local, s.end_local, "train");
     } else {
-      add(city(s.origin), s.start_local, s.start_local, null);
+      add(stay(s, s.origin) ?? city(s.origin), s.start_local, s.start_local, null);
       for (const port of s.itinerary) add(city(port.name), port.arrive_local ?? s.start_local, port.depart_local ?? port.arrive_local ?? s.end_local, "cruise");
       add(city(s.destination), s.end_local, s.end_local, "cruise");
     }
@@ -74,7 +79,8 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
   return out;
 }
 
-const samePlace = (a: Point, b: Point): boolean => key(a.name) === key(b.name) || distanceKm(a, b) < SAME_PLACE_KM;
+const samePlace = (a: Point, b: Point): boolean =>
+  a.exact && b.exact ? distanceKm(a, b) < SAME_PLACE_KM : key(a.name) === key(b.name) || distanceKm(a, b) < SAME_PLACE_KM;
 
 export function stopsOf(trip: Trip, places: TripPlaces): Stop[] {
   const merged: Visit[] = [];
