@@ -4,14 +4,15 @@
   import Building from "@lucide/svelte/icons/building";
   import Car from "@lucide/svelte/icons/car";
   import ParkingSquare from "@lucide/svelte/icons/square-parking";
+  import Globe from "@lucide/svelte/icons/globe";
   import Plane from "@lucide/svelte/icons/plane";
   import Ship from "@lucide/svelte/icons/ship";
   import TrainFront from "@lucide/svelte/icons/train-front";
 
   let { trip }: { trip: Trip } = $props();
   const kinds = $derived(tripKinds(trip));
-  const ICONS = { flight: Plane, hotel: Building, car: Car, train: TrainFront, cruise: Ship, parking: ParkingSquare } as const;
-  const NAMES = { flight: "flight", hotel: "stay", car: "rental car", train: "train", cruise: "cruise", parking: "parking" } as const;
+  const ICONS = { flight: Plane, hotel: Building, car: Car, train: TrainFront, cruise: Ship, parking: ParkingSquare, visit: Globe } as const;
+  const NAMES = { flight: "flight", hotel: "stay", car: "rental car", train: "train", cruise: "cruise", parking: "parking", visit: "past visit" } as const;
 </script>
 
 {#if kinds.length}

@@ -144,6 +144,7 @@ describe("where you stayed", () => {
 
   it("counts a stay's city among the places you've been, beside the airports", () => {
     expect(visitedPoints([airport("JFK", 1, ...JFK), airport("XYZ", 1, null, null)], [stay("London", ...LONDON)])).toEqual([[JFK[1], JFK[0]], [LONDON[1], LONDON[0]]]);
+    expect(visitedPoints([], [], [{ latitude: NRT[0], longitude: NRT[1] }])).toEqual([[NRT[1], NRT[0]]]);
   });
 
   it("frames the stays too, and a trip with only stays", () => {

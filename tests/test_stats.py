@@ -44,6 +44,63 @@ class StatsCase(Household):
             self.add(who, f, travelers=self.on(who.person_id), **extra)
 
 
+VISIT_JP = {"kind": "visit", "destination": "jp", "start_local": "2006-04-02T00:00", "end_local": "2006-04-12T00:00"}
+
+
+class HistoricalVisitTests(StatsCase):
+    def test_a_visit_with_only_a_country_counts_that_country_and_shades_the_map(self):
+        got = self.add(self.jane, VISIT_JP, travelers=self.on(self.jane.person_id))
+        self.assertEqual((got["destination"], got["origin"], got["start_zone"]), ("JP", None, "Asia/Tokyo"))
+        self.assertEqual(got["details"], {"time_unknown": "yes"})
+        places = self.stats(self.jane)["places"]
+        self.assertEqual([(c["name"], c["first_visit"], c["visits"]) for c in places["countries"]], [("JP", "2006-04-02", 1)])
+        self.assertEqual([v["country"] for v in places["visits"]], ["JP"])
+        self.assertEqual(self.stats(self.jane)["years"], [2006])
+        self.assertEqual(self.stats(self.jane, year=2007)["places"]["countries"], [])
+        flights = self.stats(self.jane)
+        self.assertEqual((flights["flights"]["count"], flights["stays"]["nights"]), (0, 0))
+
+    def test_a_flight_or_stay_found_later_joins_the_visit_without_double_counting(self):
+        first = self.add(self.jane, VISIT_JP, travelers=self.on(self.jane.person_id))
+        self.add(self.jane, {**HOTEL, "destination": "Tokyo", "origin": "Old Inn", "start_zone": "Asia/Tokyo",
+                             "end_zone": "Asia/Tokyo", "start_local": "2006-04-03T15:00", "end_local": "2006-04-06T10:00"},
+                 trip_id=first["trip_id"], travelers=self.on(self.jane.person_id))
+        stats_now = self.stats(self.jane)
+        self.assertEqual([(c["name"], c["visits"]) for c in stats_now["places"]["countries"]], [("JP", 1)])
+        self.assertEqual(stats_now["stays"]["nights"], 3)
+
+    def test_who_filter_follows_the_visits_travellers(self):
+        self.add(self.jane, VISIT_JP, travelers=self.on(self.jane.person_id))
+        self.assertEqual(self.stats(self.jane, person=self.sam.person_id)["places"]["countries"], [])
+        self.assertEqual(len(self.stats(self.jane, person=self.jane.person_id)["places"]["countries"]), 1)
+
+    def test_the_calendar_names_the_country_and_a_stranger_cannot_see_the_trip(self):
+        from waypoint.domain import calendar, visibility
+        got = self.add(self.jane, VISIT_JP, travelers=self.on(self.jane.person_id))
+        self.assertIn("SUMMARY:Visit: Japan", calendar.feed(trips.listing(self.c, self.jane), NOW))
+        self.assertIsNone(visibility.visible_trip(self.c, self.sam, got["trip_id"]))
+        self.assertEqual(self.stats(self.sam)["places"]["countries"], [])
+
+    def test_editing_a_flight_into_a_visit_drops_its_airports_and_takes_the_countrys_zone(self):
+        flight = self.add(self.jane, JFK_LHR, travelers=self.on(self.jane.person_id))
+        edited = trips.edit_segment(self.c, self.jane, flight["id"], {"kind": "visit", "destination": "gb"})
+        self.assertEqual((edited["kind"], edited["origin"], edited["destination"], edited["start_zone"], edited["end_zone"]),
+                         ("visit", None, "GB", "Europe/London", "Europe/London"))
+
+    def test_the_countries_the_form_offers_are_exactly_the_ones_the_server_accepts(self):
+        import re
+        from waypoint.storage import reference
+        text = (Path(__file__).resolve().parent.parent / "frontend" / "src" / "lib" / "countries.ts").read_text(encoding="utf-8")
+        offered = set(re.search(r'const CODES = "([A-Z ]+)"', text).group(1).split())
+        self.assertEqual(offered - set(reference.country_zones()), set())
+        self.assertEqual({c for c in reference.country_zones() if c in reference.country_names()} - offered, set())
+
+    def test_an_unknown_country_is_refused(self):
+        for bad in (None, "", "ZZ", "Japan"):
+            with self.assertRaises(trips.Invalid):
+                self.add(self.jane, {**VISIT_JP, "destination": bad})
+
+
 class FlightTests(StatsCase):
     def test_a_flight_across_the_date_line_and_an_overnight_one_are_timed_at_their_own_zones(self):
         self.mine(AKL_LAX, JFK_LHR)
@@ -137,7 +194,7 @@ class FlightTests(StatsCase):
         s = self.stats(self.jane)
         self.assertEqual((s["flights"]["count"], s["flights"]["distance_km"], s["flights"]["longest"], s["flights"]["top_seat"],
                           s["flights"]["busiest_month"], s["flights"]["most_visited_airport"]), (0, 0.0, None, None, None, None))
-        self.assertEqual((s["stays"]["nights"], s["cars"]["days"], s["places"]), (0, 0, {"countries": [], "cities": []}))
+        self.assertEqual((s["stays"]["nights"], s["cars"]["days"], s["places"]), (0, 0, {"countries": [], "cities": [], "visits": []}))
 
     def test_a_route_is_one_route_either_way_round(self):
         self.mine(JFK_LHR, LHR_JFK)

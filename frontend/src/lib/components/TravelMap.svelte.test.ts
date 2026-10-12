@@ -47,6 +47,13 @@ describe("TravelMap", () => {
     expect([...container.querySelectorAll("path[data-visited]:not([data-state]) title")].map((t) => t.textContent).sort()).toEqual(["Japan", "United Kingdom"]);
   });
 
+  it("shades a country only remembered by a past visit, and no US state for one", async () => {
+    const { container } = render(TravelMap, { flights: noFlights, visits: [{ country: "JP", latitude: 35.77, longitude: 140.39 }, { country: "US", latitude: 39.05, longitude: -95.67 }] });
+    await waitFor(() => expect(container.querySelectorAll("path[data-state]").length).toBeGreaterThan(50), { timeout: 8000 });
+    expect([...container.querySelectorAll("path[data-visited]:not([data-state]) title")].map((t) => t.textContent)).toEqual(["Japan"]);
+    expect(container.querySelectorAll("path[data-state][data-visited]").length).toBe(0);
+  });
+
   it("shades the US as one country while the states haven't loaded", async () => {
     const { container } = render(TravelMap, { flights });
     expect(container.querySelectorAll("path[data-state]").length).toBe(0);

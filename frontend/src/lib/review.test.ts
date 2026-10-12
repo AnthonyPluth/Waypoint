@@ -21,9 +21,9 @@ const stats = (year: number | null = 2026): Stats => ({
   },
   stays: { nights: 9, chains: [{ name: "Hotel Canarios", count: 2 }], cities: [{ name: "Canario Suites", count: 1 }], countries: [], count: 0, average_nights: 0, hotels: [], cities_by_nights: [], longest: null, most_visited_hotel: null, most_visited_city: null, busiest_month: null, pins: [] },
   cars: { days: 0, companies: [] }, cruises: { count: 0, nights: 0, sea_days: 0, ports: 0, lines: [] }, parking: { days: 0, bookings: 0, lots: [] },
-  places: { countries: [{ name: "US", first_visit: "2026-01-02", visits: 3 }, { name: "GB", first_visit: "2026-03-14", visits: 1 }], cities: [] },
+  places: { countries: [{ name: "US", first_visit: "2026-01-02", visits: 3 }, { name: "GB", first_visit: "2026-03-14", visits: 1 }], cities: [], visits: [] },
 });
-const allTime = (): Stats => ({ ...stats(null), places: { countries: [{ name: "US", first_visit: "2019-05-01", visits: 9 }, { name: "GB", first_visit: "2026-03-14", visits: 1 }], cities: [] } });
+const allTime = (): Stats => ({ ...stats(null), places: { countries: [{ name: "US", first_visit: "2019-05-01", visits: 9 }, { name: "GB", first_visit: "2026-03-14", visits: 1 }], cities: [], visits: [] } });
 
 const textOf = (svg: string) => [...svg.matchAll(/>([^<]+)</g)].map((m) => m[1]).join("\n");
 

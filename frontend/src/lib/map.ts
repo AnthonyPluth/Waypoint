@@ -106,8 +106,8 @@ export function visitedFeatureIds<F extends { id?: string | number }>(
   return out;
 }
 
-export function visitedPoints(airports: StatsAirport[], pins: StatsStayPin[]): [number, number][] {
-  return [...airports.filter(placed).map((a): [number, number] => [a.longitude, a.latitude]), ...pins.map((p): [number, number] => [p.longitude, p.latitude])];
+export function visitedPoints(airports: StatsAirport[], pins: StatsStayPin[], visits: { latitude: number; longitude: number }[] = []): [number, number][] {
+  return [...visits.map((v): [number, number] => [v.longitude, v.latitude]), ...airports.filter(placed).map((a): [number, number] => [a.longitude, a.latitude]), ...pins.map((p): [number, number] => [p.longitude, p.latitude])];
 }
 
 export type Pin = { key: string; city: string; stays: number; nights: number; x: number; y: number; label: string; trips: StatsMapTrip[] };

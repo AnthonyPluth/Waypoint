@@ -35,7 +35,7 @@
     apiCall<"GET /api/people">("/api/people").then((p) => { people = p.people; }).catch(() => { people = []; });
   });
 
-  let TravelMap = $state<Component<{ flights: Stats["flights"]; stays: Stats["stays"]["pins"] }> | null>(null);
+  let TravelMap = $state<Component<{ flights: Stats["flights"]; stays: Stats["stays"]["pins"]; visits: Stats["places"]["visits"] }> | null>(null);
   let mapError = $state("");
   async function loadMap() {
     mapError = "";
@@ -54,7 +54,7 @@
   const reviewable = $derived(reviewOffered(sel.year, new Date()));
 
   const f = $derived(current?.flights);
-  const empty = $derived(!!current && current.flights.count === 0 && current.stays.nights === 0 && current.cars.days === 0 && current.cruises.count === 0 && current.parking.bookings === 0);
+  const empty = $derived(!!current && current.flights.count === 0 && current.stays.nights === 0 && current.cars.days === 0 && current.cruises.count === 0 && current.parking.bookings === 0 && current.places.countries.length === 0);
   const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
   type Tile = { label: string; value: string; note?: string[] };
   const flightTiles = $derived<Tile[]>(current && f && f.count ? [
@@ -224,7 +224,7 @@
       <h2 id="places-title" class="text-2xl font-bold tracking-tight">Where you’ve been</h2>
       {@render tileGrid([{ label: "Countries", value: count(current.places.countries.length) }])}
       {#if TravelMap}
-        <TravelMap flights={f} stays={current?.stays.pins ?? []} />
+        <TravelMap flights={f} stays={current?.stays.pins ?? []} visits={current?.places.visits ?? []} />
       {:else if mapError}
         <p class="text-sm text-muted-foreground">The map couldn’t load: {mapError} <Button variant="outline" size="sm" onclick={loadMap}>Try again</Button></p>
       {:else}

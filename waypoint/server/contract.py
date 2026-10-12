@@ -220,7 +220,7 @@ class WhoIsThis(TypedDict):
     name: str
     segment_id: int
     trip_id: int
-    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking", "visit"]
     provider: str | None
     origin: str | None
     destination: str | None
@@ -466,7 +466,7 @@ class GateCodeBody(TypedDict):
 class Segment(TypedDict):
     id: int
     trip_id: int
-    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking", "visit"]
     status: Literal["confirmed", "changed", "cancelled"]
     confirmation: str | None
     provider: str | None
@@ -600,7 +600,7 @@ class TravelerBody(TypedDict):
 
 
 class SegmentBody(TypedDict):
-    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
+    kind: Literal["flight", "hotel", "car", "train", "cruise", "parking", "visit"]
     start_local: str
     end_local: str
     trip_id: NotRequired[int | None]
@@ -619,7 +619,7 @@ class SegmentBody(TypedDict):
 
 
 class SegmentEdit(TypedDict):
-    kind: NotRequired[Literal["flight", "hotel", "car", "train", "cruise", "parking"]]
+    kind: NotRequired[Literal["flight", "hotel", "car", "train", "cruise", "parking", "visit"]]
     status: NotRequired[Literal["confirmed", "changed", "cancelled"]]
     confirmation: NotRequired[str | None]
     provider: NotRequired[str | None]
@@ -899,9 +899,16 @@ class StatsParking(TypedDict):
     lots: list[StatsNamed]
 
 
+class StatsVisit(TypedDict):
+    country: str
+    latitude: float
+    longitude: float
+
+
 class StatsPlaces(TypedDict):
     countries: list[StatsPlace]
     cities: list[StatsPlace]
+    visits: list[StatsVisit]
 
 
 class DistanceUnit(TypedDict):

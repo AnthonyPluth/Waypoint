@@ -17,7 +17,7 @@
   let trips = $state<Trip[] | null>(null);
   let people = $state<Person[]>([]);
   let loadError = $state("");
-  let adding = $state(false);
+  let adding = $state<"booking" | "past" | null>(null);
 
   let latest = 0;
   async function load() {
@@ -50,11 +50,11 @@
 
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
   <h1 class="text-4xl font-bold tracking-tight">Trips</h1>
-  {#if trips && !adding}<Button onclick={() => (adding = true)}><Plus /> Add a booking</Button>{/if}
+  {#if trips && !adding}<div class="flex flex-wrap gap-2"><Button onclick={() => (adding = "booking")}><Plus /> Add a booking</Button><Button variant="outline" onclick={() => (adding = "past")}>Add a past trip</Button></div>{/if}
 </div>
 
 {#if adding}
-  <SegmentForm initial={blank()} {people} oncancel={() => (adding = false)} onsaved={(s) => { adding = false; location.hash = `#trip/${s.trip_id}`; }} />
+  <SegmentForm initial={adding === "past" ? { ...blank(), kind: "visit" } : blank()} {people} oncancel={() => (adding = null)} onsaved={(s) => { adding = null; location.hash = `#trip/${s.trip_id}`; }} />
 {/if}
 
 {#if loadError}

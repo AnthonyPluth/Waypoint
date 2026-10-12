@@ -70,7 +70,7 @@
     await refreshState().catch(ignoreFailure);
   };
 
-  const KINDS: [string, string][] = FORM_KINDS.map(([key, name]) => [key, key === "hotel" ? "Hotel stay" : name]);
+  const KINDS: [string, string][] = FORM_KINDS.filter(([key]) => key !== "visit").map(([key, name]) => [key, key === "hotel" ? "Hotel stay" : name]);
   const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
   const only = $derived.by(() => {

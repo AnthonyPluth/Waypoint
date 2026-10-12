@@ -49,6 +49,35 @@ def airport_points() -> dict[str, tuple[float, float]]:
     return {row[0]: (float(row[5]), float(row[6])) for row in _rows("airports.tsv.gz") if len(row) >= 7 and row[5] and row[6]}
 
 
+def _by_country() -> dict[str, list[list[str]]]:
+    found: dict[str, list[list[str]]] = {}
+    for row in _rows("airports.tsv.gz"):
+        if len(row) >= 7 and row[3] and row[4] and row[5] and row[6]:
+            found.setdefault(row[3], []).append(row)
+    return found
+
+
+@cache
+def country_points() -> dict[str, tuple[float, float]]:
+    out: dict[str, tuple[float, float]] = {}
+    for country, rows in _by_country().items():
+        lat, lon = (sum(float(r[i]) for r in rows) / len(rows) for i in (5, 6))
+        nearest = min(rows, key=lambda r: ((float(r[5]) - lat) ** 2 + (float(r[6]) - lon) ** 2, r[0]))
+        out[country] = (float(nearest[5]), float(nearest[6]))
+    return out
+
+
+@cache
+def country_zones() -> dict[str, str]:
+    out: dict[str, str] = {}
+    for country, rows in _by_country().items():
+        counts: dict[str, int] = {}
+        for r in rows:
+            counts[r[4]] = counts.get(r[4], 0) + 1
+        out[country] = min(counts, key=lambda z: (-counts[z], z))
+    return out
+
+
 @cache
 def postal_points() -> dict[tuple[str, str], tuple[float, float]]:
     return {(row[1], row[2]): (float(row[3]), float(row[4])) for row in _rows("places.tsv.gz") if row[0] == "Z" and len(row) >= 5}

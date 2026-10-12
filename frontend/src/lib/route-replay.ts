@@ -72,7 +72,7 @@ function finder(places: TripPlaces) {
 
 export function maxStops(trip: Trip): number {
   return trip.segments.filter((s) => s.status !== "cancelled").reduce((n, s) => {
-    if (s.kind === "parking") return n;
+    if (s.kind === "parking" || s.kind === "visit") return n;
     if (s.kind === "flight" || s.kind === "train") return n + 2;
     if (s.kind === "cruise") return n + 2 + s.itinerary.length;
     return n + 1;
@@ -83,7 +83,7 @@ export const worthLocating = (trip: Trip, today: string): boolean => isPast(trip
 
 function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
   const { airport, city, stay } = finder(places);
-  const live = trip.segments.filter((s) => s.status !== "cancelled" && s.kind !== "parking")
+  const live = trip.segments.filter((s) => s.status !== "cancelled" && s.kind !== "parking" && s.kind !== "visit")
     .sort((a, b) => instant(a.start_local, a.start_zone) - instant(b.start_local, b.start_zone) || a.id - b.id);
   const out: Visit[] = [];
   const add = (p: Point | null, from: string, to: string, via: Kind | null) => {
