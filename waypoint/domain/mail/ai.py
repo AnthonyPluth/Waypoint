@@ -290,13 +290,27 @@ def _detail(value: str, limit: int, sent: str) -> str | None:
     return one if one and len(one) <= limit and _in(sent, one) else None
 
 
-def _name_in(sent: str, name: str) -> bool:
+SEAT_TOKEN = re.compile(r"(?<![A-Za-z0-9])(\d{1,3})\s?([A-Za-z])(?![A-Za-z0-9])")
+SEAT_REACH = 60
+
+
+def _seats_near(sent: str, name: str) -> list[set[str]]:
     pattern = r"(?<!\w)" + r"\s+".join(re.escape(w) for w in name.split()) + r"(?!\w)"
-    return re.search(pattern, sent, re.IGNORECASE) is not None
-
-
-def _seat_in(sent: str, seat: re.Match[str]) -> bool:
-    return re.search(rf"(?<![A-Za-z0-9]){seat[1]}\s?{seat[2]}(?![A-Za-z0-9])", sent, re.IGNORECASE) is not None
+    found: list[set[str]] = []
+    for hit in re.finditer(pattern, sent, re.IGNORECASE):
+        line_start = sent.rfind("\n", 0, hit.start()) + 1
+        line_end = sent.find("\n", hit.end())
+        line_end = len(sent) if line_end < 0 else line_end
+        after = SEAT_TOKEN.search(sent[hit.end():min(line_end, hit.end() + SEAT_REACH)])
+        before = list(SEAT_TOKEN.finditer(sent[max(line_start, hit.start() - SEAT_REACH // 2):hit.start()]))
+        nearest = after or (before[-1] if before else None)
+        same = {f"{nearest[1]}{nearest[2].upper()}"} if nearest else set()
+        if not same and line_end < len(sent):
+            next_end = sent.find("\n", line_end + 1)
+            first = SEAT_TOKEN.search(sent[line_end + 1:len(sent) if next_end < 0 else next_end][:SEAT_REACH])
+            same = {f"{first[1]}{first[2].upper()}"} if first else set()
+        found.append(same)
+    return found
 
 
 def _travelers(listed: Any, sent: str) -> list[SuggestedTraveler]:
@@ -307,7 +321,7 @@ def _travelers(listed: Any, sent: str) -> list[SuggestedTraveler]:
         if not isinstance(each, dict) or not isinstance(each.get("name"), str) or not isinstance(each.get("seat"), str):
             continue
         name, seat = " ".join(each["name"].split()), SEAT.fullmatch(each["seat"].strip())
-        if name and len(name) <= NAME_LIMIT and "@" not in name and seat is not None and _name_in(sent, name) and _seat_in(sent, seat):
+        if name and len(name) <= NAME_LIMIT and "@" not in name and seat is not None and f"{seat[1]}{seat[2].upper()}" in set().union(*_seats_near(sent, name)):
             named.append({"name": name, "seat": f"{seat[1]}{seat[2].upper()}"})
     names = [t["name"].casefold() for t in named]
     single = [t for t in named if names.count(t["name"].casefold()) == 1]

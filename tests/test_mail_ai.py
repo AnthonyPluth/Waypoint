@@ -972,10 +972,29 @@ class SeatTests(unittest.TestCase):
         self.assertEqual(self.read([{"name": "Ada Example", "seat": "23A"}], sent=SEAT_SENT.replace("23A", "23AB")), GOOD)
 
     def test_duplicate_or_ambiguous_names_and_shared_seats_are_dropped(self):
-        found = self.read([{"name": "Ada Example", "seat": "23A"}, {"name": "ADA  example", "seat": "23B"}, {"name": "Ben Sample", "seat": "23B"}])
+        found = self.read([{"name": "Ada Example", "seat": "23A"}, {"name": "ADA  example", "seat": "23A"}, {"name": "Ben Sample", "seat": "23B"}])
         self.assertEqual(found["travelers"], [{"name": "Ben Sample", "seat": "23B"}])
-        found = self.read([{"name": "Ada Example", "seat": "23A"}, {"name": "Ben Sample", "seat": "23A"}])
+        found = self.read([{"name": "Ada Example", "seat": "23A"}, {"name": "Ben Sample", "seat": "23A"}], sent="Confirmation code: QW4R7T Flight BOS to DEN Ada Example Ben Sample Seat 23A")
         self.assertNotIn("travelers", found)
+
+    def test_swapped_seats_between_two_passengers_are_dropped(self):
+        found = self.read([{"name": "Ada Example", "seat": "23B"}, {"name": "Ben Sample", "seat": "23A"}])
+        self.assertNotIn("travelers", found)
+        self.assertEqual(found, GOOD)
+
+    def test_a_seat_beside_its_name_is_kept_on_the_same_line_the_next_line_or_in_a_table(self):
+        both = [{"name": "Ada Example", "seat": "23A"}, {"name": "Ben Sample", "seat": "23B"}]
+        for layout in ("Ada Example Seat 23A Ben Sample Seat 23B", "Ada Example\n23A\nBen Sample\n23B\n", "Passenger  Seat\nAda Example  23A\nBen Sample  23B\n",
+                       "23A Ada Example\n23B Ben Sample\n"):
+            found = self.read(both, sent="Confirmation code: QW4R7T\nFlight BOS to DEN\n" + layout)
+            self.assertEqual(found["travelers"], both, layout)
+
+    def test_a_seat_far_from_its_name_is_dropped_and_the_rest_kept(self):
+        sent = "Confirmation code: QW4R7T\nFlight BOS to DEN\nAda Example\n\nBaggage and check-in information for every passenger.\nSeat 23A"
+        found = self.read([{"name": "Ada Example", "seat": "23A"}], sent=sent)
+        self.assertEqual(found, GOOD)
+        sent = "Confirmation code: QW4R7T\nFlight BOS to DEN\nAda Example " + "x" * 80 + " Seat 23A"
+        self.assertEqual(self.read([{"name": "Ada Example", "seat": "23A"}], sent=sent), GOOD)
 
     def test_too_many_travellers_is_no_seats(self):
         sent = SEAT_SENT + "".join(f"Person{n} Name{n} Seat {n}C\n" for n in range(1, 14))
