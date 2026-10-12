@@ -274,7 +274,7 @@ class MergingSplittingMoving(TripPeopleCase):
         stay = self.add(self.jane, HOTEL, out["trip_id"], self.on(self.jid, self.joan))
         new = trips.split(self.c, self.jane, out["trip_id"], [stay["id"]])
         self.assertEqual(new["people"], [self.jid, self.joan])
-        self.assertEqual(self.aboard(out["trip_id"]), [self.jid, self.mia, self.joan])
+        self.assertEqual(self.aboard(out["trip_id"]), [self.jid, self.mia])
 
     def test_splitting_off_a_booking_for_everyone_takes_the_whole_group_with_it(self):
         trip_id, stay_id = self.hotel_for_everyone(self.jid, self.mia)
@@ -290,7 +290,7 @@ class MergingSplittingMoving(TripPeopleCase):
         self.assertEqual(new["people"], [self.jid, self.mia, self.joan])
         self.assertTrue(self.c.orm.get(Segment, stay_id).travelers_from_trip)
         self.assertEqual([t["person_id"] for t in trips.get_segment(self.c, self.jane, stay_id)["travelers"]], [self.jid, self.mia, self.joan])
-        self.assertEqual(self.aboard(trip_id), [self.jid, self.mia, self.joan])
+        self.assertEqual(self.aboard(trip_id), [self.jid, self.mia])
 
     def test_moving_a_booking_puts_its_travellers_on_the_target_trip(self):
         a = self.add(self.jane, OUT, None, self.on(self.jid))
