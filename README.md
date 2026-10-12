@@ -15,7 +15,7 @@ A self-hosted travel app for a household. Waypoint shows everyone the trips they
 
 ## Features
 
-- **Trips.** Flights, stays, rental cars, trains, cruises and parking reservations, with confirmation numbers, travellers and links to manage each booking. Times are shown where they happen, in the airport’s or hotel’s own zone. Past flights can be imported from a CSV (Flighty, myFlightRadar24, OpenFlights, App in the Air).
+- **Trips.** Flights, stays, rental cars, trains, cruises and parking reservations, with confirmation numbers, travellers, what each cost (read from the email or entered by hand, totalled per currency and never converted) and links to manage each booking. Times are shown where they happen, in the airport’s or hotel’s own zone. Past flights can be imported from a CSV (Flighty, myFlightRadar24, OpenFlights, App in the Air).
 - **Gmail scanning.** Each member can connect a Gmail read-only. Waypoint finds booking emails, reads them in memory and adds the bookings. What it couldn’t read goes to a **Review** queue, where you add the booking by hand, match names to people, ignore a sender or dismiss it.
 - **Optional AI fallback.** Off by default. For mail Waypoint couldn’t read, a local Ollama or OpenRouter with zero data retention can suggest the booking; you always confirm it.
 - **People and loyalty IDs.** Household members and guests, with frequent-flyer, hotel, car, TSA PreCheck and Global Entry numbers, encrypted and masked until asked for.
