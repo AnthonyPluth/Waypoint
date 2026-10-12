@@ -79,8 +79,6 @@
   const stateLines = $derived(boundariesShown(projection, zoom) ? lines.filter((l) => inView(l, box)) : []);
   const shields = $derived(shieldsOf(drawn, box, zoom));
   const zoomed = $derived(box.w < width - 0.5);
-  const fx = (x: number) => (x - box.x) / box.w;
-  const fy = (y: number) => (y - box.y) / box.h;
   const movers = $derived(legs.flatMap((leg, i) => {
     const done = calm ? 1 : legProgress(i, stops.length, progress);
     if (done <= 0 || done >= 1) return [];
