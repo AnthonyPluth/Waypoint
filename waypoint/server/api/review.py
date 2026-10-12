@@ -10,7 +10,7 @@ import time
 from ...domain.mail import ai, review, scan
 from ...providers import gmail
 from ...storage import db
-from ..common import NO_IMAGE, ApiError, Response, design_width_of, image_response, own_session, position, row_id
+from ..common import NO_IMAGE, ApiError, Response, image_response, own_session, position, row_id
 from ..contract import Ignoring, Matched, MatchBody, Ok, Preview, Review, ReviewItem, ReviewMatch, WhoBody
 from .mailboxes import owner
 from .trips import viewer
@@ -108,7 +108,7 @@ NOT_KEPT = "This message wasn’t kept. Its owner can open it in Gmail."
 
 def _preview(kept: Mapping[str, Any]) -> Preview:
     return {"subject": kept["subject"], "text": kept["text"], "html": kept["html"], "truncated": kept["truncated"],
-            "original": kept["original"], "images": kept["images"], "width": design_width_of(kept)}
+            "original": kept["original"], "images": kept["images"]}
 
 
 @own_session

@@ -183,7 +183,7 @@ describe("Trip", () => {
     const region = await screen.findByRole("region", { name: /The email for/ });
     expect(await within(region).findByTestId("message-subject")).toHaveTextContent("Your itinerary: EX 410");
     expect(region).toHaveTextContent("example-air.example · sent 2026-10-17");
-    expect(within(region).getByTestId("preview-html").getAttribute("srcdoc")).toContain("<b>B12</b>");
+    expect(within(region).getByTestId("preview-html").shadowRoot?.innerHTML).toContain("<b>B12</b>");
     expect(vi.mocked(api)).toHaveBeenCalledWith("/api/segments/1/emails");
     await userEvent.click(screen.getByRole("button", { name: /Hide the email for/ }));
     expect(screen.queryByRole("region", { name: /The email for/ })).toBeNull();
