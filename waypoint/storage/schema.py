@@ -120,6 +120,16 @@ trips = Table(
     info={'doc': 'a journey: its segments, grouped by Waypoint (auto) or made by hand; its dates are its local dates; its destination is worked out from its bookings unless destination_manual says a person set it'},
 )
 
+trip_people = Table(
+    'trip_people', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('trip_id', Integer, refers('trip_people', 'trip_id', 'trips.id', 'CASCADE'), nullable=False),
+    Column('person_id', Integer, refers('trip_people', 'person_id', 'people.id', 'CASCADE'), nullable=False),
+    UniqueConstraint('trip_id', 'person_id', name='uq_trip_people_trip_person'),
+    Index('ix_trip_people_person_id', 'person_id'),
+    info={'doc': "who a trip is for, as chosen: always everyone named on any of its bookings' own lists, and it may hold more; people only, never a name as printed"},
+)
+
 segments = Table(
     'segments', metadata,
     Column('id', Integer, primary_key=True, autoincrement=True),
@@ -143,6 +153,8 @@ segments = Table(
     Column('latitude', Float),
     Column('longitude', Float),
     Column('geo_precision', Text),
+    Column('travelers_from_trip', Boolean, nullable=False, server_default=false(),
+           doc='true: the booking is for everyone on its trip and has no traveller rows of its own; false: its rows are its list, possibly empty'),
     Index('ix_segments_trip_id', 'trip_id'),
     Index('ix_segments_booked_by', 'booked_by'),
     info={'doc': "one flight leg, hotel stay, car rental or train; times are local wall-clock times with the place's IANA zone"},

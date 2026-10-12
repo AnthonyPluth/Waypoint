@@ -732,6 +732,77 @@ class MigrationTests(unittest.TestCase):
                 self.assertEqual(frozen._locate(data, kind, origin, destination, address),
                                  None if live is None else (live.latitude, live.longitude, live.precision))
 
+    def test_0030_lists_each_trips_people_from_its_bookings_and_takes_the_table_and_flag_away_leaving_every_traveller(self):
+        from alembic import command
+        db.init(self.path)
+        stay = dict(kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="Europe/London",
+                    end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual")
+        with db.engine(self.path).begin() as c:
+            self.assertIn("trip_people", sa.inspect(c).get_table_names())
+            self.assertIn("travelers_from_trip", {col["name"] for col in sa.inspect(c).get_columns("segments")})
+            command.downgrade(db.alembic_config(c), "0029")
+            self.assertNotIn("trip_people", sa.inspect(c).get_table_names())
+            self.assertNotIn("travelers_from_trip", {col["name"] for col in sa.inspect(c).get_columns("segments")})
+            for pid in (1, 2, 3, 4):
+                c.execute(insert(schema.people).values(id=pid, display_name=f"Person {pid}"))
+            for trip_id in (1, 2, 3, 4):
+                c.execute(insert(schema.trips).values(id=trip_id, name=f"trip {trip_id}", auto=False, booked_by=4 if trip_id == 4 else None))
+            c.execute(insert(schema.segments), [dict(id=1, trip_id=1, **stay), dict(id=2, trip_id=1, **stay),
+                                                dict(id=3, trip_id=1, **{**stay, "status": "cancelled"}), dict(id=4, trip_id=2, **stay),
+                                                dict(id=5, trip_id=3, **stay), dict(id=6, trip_id=4, **stay)])
+            c.execute(insert(schema.segment_travelers), [
+                dict(segment_id=1, person_id=2, name=None, seat="12A"), dict(segment_id=1, person_id=1, name=None, seat=None),
+                dict(segment_id=2, person_id=1, name=None, seat=None), dict(segment_id=2, person_id=None, name="PRINTED/NAME MR", seat=None),
+                dict(segment_id=3, person_id=3, name=None, seat=None), dict(segment_id=4, person_id=None, name="ONLY/PRINTED MS", seat=None),
+                dict(segment_id=6, person_id=2, name=None, seat=None)])
+            c.execute(insert(schema.segment_recipients).values(segment_id=5, person_id=4))
+            command.upgrade(db.alembic_config(c), "head")
+            listed = c.execute(select(schema.trip_people.c.trip_id, schema.trip_people.c.person_id)
+                               .order_by(schema.trip_people.c.trip_id, schema.trip_people.c.person_id)).all()
+            self.assertEqual([tuple(r) for r in listed], [(1, 1), (1, 2), (1, 3), (4, 2)])
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments).where(schema.segments.c.travelers_from_trip.is_(True))).scalar(), 0)
+            before = [tuple(r) for r in c.execute(select(schema.segment_travelers.c.segment_id, schema.segment_travelers.c.person_id,
+                                                         schema.segment_travelers.c.name, schema.segment_travelers.c.seat)
+                                                  .order_by(schema.segment_travelers.c.id))]
+            self.assertEqual(len(before), 7)
+            with self.assertRaises(sa.exc.IntegrityError), c.begin_nested():
+                c.execute(insert(schema.trip_people).values(trip_id=1, person_id=1))
+        with db.engine(self.path).begin() as c:
+            c.execute(sa.update(schema.segments).where(schema.segments.c.id == 4).values(travelers_from_trip=True))
+            c.execute(sa.delete(schema.segment_travelers).where(schema.segment_travelers.c.segment_id == 4))
+            c.execute(sa.update(schema.segments).where(schema.segments.c.id == 6).values(travelers_from_trip=True))
+            c.execute(sa.delete(schema.segment_travelers).where(schema.segment_travelers.c.segment_id == 6))
+            command.downgrade(db.alembic_config(c), "0029")
+            rows = [tuple(r) for r in c.execute(select(schema.segment_travelers.c.segment_id, schema.segment_travelers.c.person_id,
+                                                       schema.segment_travelers.c.name, schema.segment_travelers.c.seat)
+                                                .order_by(schema.segment_travelers.c.segment_id, schema.segment_travelers.c.id))]
+            self.assertEqual([r for r in rows if r[0] not in (4, 6)], sorted(
+                [r for r in before if r[0] not in (4, 6)], key=lambda r: r[0]))
+            self.assertEqual([r for r in rows if r[0] == 6], [(6, 2, None, None)])
+            self.assertEqual([r for r in rows if r[0] == 4], [])
+            command.upgrade(db.alembic_config(c), "head")
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.trip_people)).scalar(), 4)
+        self.assertEqual(drift(self.path), [])
+
+    def test_0030_leaves_who_sees_which_trip_exactly_as_it_was(self):
+        from alembic import command
+        from waypoint.domain import visibility
+        db.init(self.path)
+        stay = dict(kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="Europe/London",
+                    end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual")
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0029")
+            for pid in (1, 2, 3):
+                c.execute(insert(schema.people).values(id=pid, display_name=f"Person {pid}"))
+            c.execute(insert(schema.trips), [dict(id=1, name="a", auto=False, booked_by=None), dict(id=2, name="b", auto=False, booked_by=3)])
+            c.execute(insert(schema.segments), [dict(id=1, trip_id=1, **stay), dict(id=2, trip_id=2, **stay)])
+            c.execute(insert(schema.segment_travelers), [dict(segment_id=1, person_id=1), dict(segment_id=1, person_id=2)])
+            c.execute(insert(schema.segment_recipients).values(segment_id=2, person_id=1))
+            command.upgrade(db.alembic_config(c), "head")
+        with db.session(self.path) as conn:
+            seen = {pid: [t.id for t in visibility.visible_trips(conn, visibility.Viewer(pid))] for pid in (1, 2, 3)}
+        self.assertEqual(seen, {1: [1, 2], 2: [1], 3: [2]})
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:

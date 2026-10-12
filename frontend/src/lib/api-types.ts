@@ -972,6 +972,7 @@ export interface Trip {
   booked_by: number | null;
   emails: number;
   can_clear_emails: boolean;
+  people: number[];
   segments: Segment[];
 }
 
@@ -988,6 +989,8 @@ export interface TripBody {
   notes?: string | null;
   start_date?: string | null;
   end_date?: string | null;
+  people?: number[];
+  confirm?: boolean;
 }
 
 export interface TripCityPoint {
