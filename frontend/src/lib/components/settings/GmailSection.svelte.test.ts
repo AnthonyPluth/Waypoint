@@ -112,31 +112,37 @@ describe("Settings → Gmail → Ignored senders", () => {
 
 describe("Settings → Gmail", () => {
   it("says in one line what the last scan found, read, filed, couldn't read and skipped, and nothing else", async () => {
-    serve(list([box({ last_scan: "2026-10-05T10:00:00+00:00", scan_summary: { found: 24, read: 6, bookings: 3, review: 2, skipped: 15, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 9, followups: 0, with_facts: 0, attached: 0 } })]));
+    serve(list([box({ last_scan: "2026-10-05T10:00:00+00:00", scan_summary: { found: 24, read: 6, bookings: 3, review: 2, skipped: 15, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 9, followups: 0, with_facts: 0, attached: 0, ai_asked: 0, ai_today: 0, ai_waiting: 0 } })]));
     render(GmailSection);
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("24 new messages found, 6 read, 3 bookings added or changed, 2 couldn’t be read, 15 skipped (9 as not travel).");
   });
 
+  it("counts, and only counts, what the AI was asked on its own: this scan, today and those waiting", async () => {
+    serve(list([box({ scan_summary: { found: 30, read: 25, bookings: 2, review: 23, skipped: 5, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 0, with_facts: 0, attached: 0, ai_asked: 20, ai_today: 45, ai_waiting: 3 } })]));
+    render(GmailSection);
+    expect(await screen.findByTestId("scan-summary")).toHaveTextContent("5 skipped. AI asked about 20 (45 today), 3 waiting for the next scan.");
+  });
+
   it("counts the follow-ups attached to bookings, and those with details it did not apply", async () => {
-    serve(list([box({ scan_summary: { found: 9, read: 8, bookings: 1, review: 0, skipped: 0, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 4, with_facts: 1, attached: 0 } })]));
+    serve(list([box({ scan_summary: { found: 9, read: 8, bookings: 1, review: 0, skipped: 0, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 4, with_facts: 1, attached: 0, ai_asked: 0, ai_today: 0, ai_waiting: 0 } })]));
     render(GmailSection);
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("0 couldn’t be read, 4 follow-ups attached (1 with details not applied), 0 skipped.");
   });
 
   it("leaves the follow-up figure out when there were none", async () => {
-    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 1, with_facts: 0, attached: 0 } })]));
+    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 1, with_facts: 0, attached: 0, ai_asked: 0, ai_today: 0, ai_waiting: 0 } })]));
     render(GmailSection);
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("1 follow-up attached, 0 skipped.");
   });
 
   it("counts the emails attached to a booking Waypoint already had, as a number only", async () => {
-    serve(list([box({ scan_summary: { found: 5, read: 5, bookings: 1, review: 0, skipped: 0, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 0, with_facts: 0, attached: 3 } })]));
+    serve(list([box({ scan_summary: { found: 5, read: 5, bookings: 1, review: 0, skipped: 0, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 0, with_facts: 0, attached: 3, ai_asked: 0, ai_today: 0, ai_waiting: 0 } })]));
     render(GmailSection);
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("0 couldn’t be read, 3 emails attached to an existing booking, 0 skipped.");
   });
 
   it("says when more messages are waiting after the cap", async () => {
-    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: true, labels_dropped: 0, triaged: 40, total: 900, not_travel: 0, followups: 0, with_facts: 0, attached: 0 } })]));
+    serve(list([box({ scan_summary: { found: 1, read: 1, bookings: 1, review: 0, skipped: 0, capped: true, labels_dropped: 0, triaged: 40, total: 900, not_travel: 0, followups: 0, with_facts: 0, attached: 0, ai_asked: 0, ai_today: 0, ai_waiting: 0 } })]));
     render(GmailSection);
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("1 new message found, 1 read, 1 booking added or changed, 0 couldn’t be read, 0 skipped. Looked at 40 of 900 messages so far; the scan carries on by itself.");
   });
@@ -449,7 +455,7 @@ describe("Settings → Gmail", () => {
     });
 
     it("says how many are picked and notes labels deleted in Gmail", async () => {
-      serve(list([box({ labels_picked: 2, scan_summary: { found: 1, read: 1, bookings: 0, review: 0, skipped: 0, capped: false, labels_dropped: 1, triaged: 0, total: 0, not_travel: 0, followups: 0, with_facts: 0, attached: 0 } })]));
+      serve(list([box({ labels_picked: 2, scan_summary: { found: 1, read: 1, bookings: 0, review: 0, skipped: 0, capped: false, labels_dropped: 1, triaged: 0, total: 0, not_travel: 0, followups: 0, with_facts: 0, attached: 0, ai_asked: 0, ai_today: 0, ai_waiting: 0 } })]));
       render(GmailSection);
       expect(await screen.findByText(/Reading everything in 2 labels you picked/)).toBeInTheDocument();
       expect(screen.getByTestId("scan-summary")).toHaveTextContent("1 label you picked was deleted in Gmail and was dropped.");

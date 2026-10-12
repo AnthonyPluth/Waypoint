@@ -257,6 +257,8 @@ mailboxes = Table(
     Column('scan_summary', Text),
     Column('scan_labels', Text),
     Column('share_review', Boolean, nullable=False, server_default=false()),
+    Column('ai_day', Text, doc='the day (YYYY-MM-DD) ai_day_count counts, so the automatic AI requests are capped per day'),
+    Column('ai_day_count', Integer, nullable=False, server_default='0', doc='how many automatic AI requests this mailbox made on ai_day; a number, nothing of any message'),
     UniqueConstraint('owner_sub', 'address', name='uq_mailboxes_owner_address'),
     info={'doc': "Gmail accounts members connected (read-only); each belongs to the member who connected it, its refresh token is kept encrypted; scan_summary is the counts of its last scan (found, read, bookings, review, skipped, capped) and nothing of any message; scan_labels is the list of Gmail label ids its owner chose to scan in full"},
 )
@@ -297,6 +299,8 @@ review_items = Table(
     Column('gap', Text, doc='for an "incomplete" item: the commonest missing piece, one of a few fixed labels (waypoint/domain/mail/glance.py), never text from the message'),
     Column('matches', Text, doc='for a "match" item: the bookings in the message that could be more than one of the segments added by hand (JSON, a list of {booking, candidates}), for the person to settle'),
     Column('reference', Text, doc="a keyed hash of the reservation code the message names, so items about one reservation show as one row; never the code itself; empty when the message names none or several"),
+    Column('auto_state', Text, doc='"waiting" while the scan has yet to ask the AI about this item on its own, "read" once its suggestion was made that way; empty otherwise'),
+    Column('auto_tries', Integer, nullable=False, server_default='0', doc='how many times asking the AI on its own failed for this item'),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_review_items_mailbox_message'),
     info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner (and the household, when they share it); the message itself is in stored_messages; `suggestion` is the booking's fields (JSON) the optional AI read from it, for the person to confirm or edit, and `suggestion_error` why it couldn't (fixed text)"},
 )

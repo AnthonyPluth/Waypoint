@@ -4,6 +4,7 @@ export interface AiBody {
   ollama_model?: string;
   openrouter_model?: string;
   openrouter_key?: string;
+  auto?: boolean;
 }
 
 export interface AiSettings {
@@ -12,6 +13,7 @@ export interface AiSettings {
   ollama_model: string;
   openrouter_model: string;
   key: "env" | "saved" | null;
+  auto: boolean;
 }
 
 export interface AiSuggestion {
@@ -649,6 +651,7 @@ export interface ReviewItem {
   reason: "no_markup" | "incomplete" | "broken" | "generic";
   suggestions: AiSuggestion[];
   suggestion_error: string | null;
+  auto_read: boolean;
   count: number;
   others: ReviewOther[];
 }
@@ -692,6 +695,9 @@ export interface ScanSummary {
   followups: number;
   with_facts: number;
   attached: number;
+  ai_asked: number;
+  ai_today: number;
+  ai_waiting: number;
 }
 
 export interface Segment {

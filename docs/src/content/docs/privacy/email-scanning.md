@@ -65,7 +65,7 @@ For flights that means the words for departure and arrival, booking and confirma
 
 ## Optional AI suggestions
 
-Off by default (Settings → Mail and AI → AI; see [AI suggestions](/Waypoint/start/ai/)). If you turn it on, Waypoint can ask a model to suggest the fields of an email that newly lands in the “Couldn’t read” queue, and you confirm or correct the suggestion there.
+Off by default (Settings → Mail and AI → AI; see [AI suggestions](/Waypoint/start/ai/)). If you turn it on, you can ask a model to suggest the fields of an email in the “Couldn’t read” queue (**Ask AI**), and you confirm or correct the suggestion there. Email text goes to the model only when you press **Ask AI**, unless you also turn on the second, separate switch, **Read unreadable mail with AI automatically** (off by default, with a warning when you turn it on): then a scan also sends the text of travel mail no reader could read, never shopping, codes, newsletters, replies or follow-ups of a booking you can see, at most 20 messages a scan and 100 a day for each mailbox, through the same module and with the same redaction and provider settings (see [Reading unreadable mail automatically](/Waypoint/start/ai/#reading-unreadable-mail-automatically)). With either switch off, a scan sends no email text anywhere.
 
 - **Local:** an [Ollama](https://ollama.com) on your own network. The email text never leaves it.
 - **Hosted:** [OpenRouter](https://openrouter.ai), restricted to providers with zero data retention (every request denies data collection and requires zero retention).

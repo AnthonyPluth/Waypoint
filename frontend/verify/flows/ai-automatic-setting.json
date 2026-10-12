@@ -1,0 +1,13 @@
+{
+  "name": "ai-automatic-setting",
+  "page": "settings",
+  "steps": [
+    { "goto": "#settings/mail" },
+    { "wait_for": "#ai-title" },
+    { "click": "label:has-text('Local (Ollama)')" },
+    { "click": "label:has-text('Read unreadable mail with AI automatically')" },
+    { "expect_text": { "selector": "body", "text": "without asking each time" } },
+    { "scroll_to": "label:has-text('Read unreadable mail with AI automatically')" },
+    { "screenshot": "setting-with-warning" }
+  ]
+}

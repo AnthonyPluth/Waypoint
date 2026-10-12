@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-**Settings → Mail and AI → AI** is off until you turn it on. When it’s on, mail that lands in [Review](/Waypoint/start/review/)’s “Couldn’t read” list from then on is also offered to an AI, which suggests the booking in it. Items already in the list when you turn it on are not offered. A booking Waypoint could already read is never sent.
+**Settings → Mail and AI → AI** is off until you turn it on. When it’s on, you can choose **Ask AI** on an item in [Review](/Waypoint/start/review/)’s “Couldn’t read” list, and an AI suggests the booking. A booking Waypoint could already read is never sent. Nothing is sent until someone chooses **Ask AI**, unless you also turn on the second switch below.
 
 ## Choosing where it runs
 
@@ -15,11 +15,25 @@ sidebar:
 
 The OpenRouter key is saved encrypted with `WAYPOINT_SECRET_KEY` (and encrypted in backups), or read from the `OPENROUTER_API_KEY` environment variable, which wins. It never shows again once saved, and is never logged.
 
+## Reading unreadable mail automatically
+
+Below the choice of where the AI runs, **Read unreadable mail with AI automatically** is a second, separate switch. It is off until you turn it on, and it is offered only while the AI is set to Local or OpenRouter. Turning it on shows a warning: “Waypoint will send the text of travel emails it couldn’t read to the AI you chose, without asking each time.” Choosing **Off** for the AI turns this switch off with it.
+
+Both switches are needed. With the AI off, or with this switch off, a scan sends no email text anywhere; **Ask AI** on an item still works either way. With both on, a scan asks the AI about a message by itself only when all of these hold:
+
+- It passed Waypoint’s check for travel mail with a strong travel signal: it is from a travel sender Waypoint knows, or it is in a label you picked, or it carries structured booking data, or its subject and snippet have two or more travel words. Shopping, codes, newsletters and replies are never sent.
+- No reader made a booking from it.
+- It isn’t a follow-up of a booking you can see (a receipt, a check-in notice or a reminder that Waypoint attaches to the booking).
+
+A scan asks about at most 20 messages, and a mailbox at most 100 a day, newest first. A message that misses the cap waits and is asked about on the next scan. A request that fails leaves the item as it was, with a note that the AI couldn’t be asked, and is tried again on the next scans, at most twice more. Each mailbox’s last-scan line in Settings gives the counts: how many the AI was asked about, how many today, and how many are waiting. Counts only, never a subject, a sender or any text.
+
+What is sent, how it is redacted and where it goes are exactly the same as for **Ask AI**. The item in Review shows the suggestion as it does any AI suggestion, with a **read automatically** label so you can tell it wasn’t asked for. You still check and confirm every suggestion; nothing is added to your trips without you.
+
 ## What is sent
 
-The setting is the household’s: any member can change it, and once it’s on, new “Couldn’t read” mail from every connected mailbox is offered, not just the mailbox of whoever turned it on. Whoever sets the Ollama address chooses where that mail goes, so use a server you trust.
+The setting is the household’s: any member can change it, and once the automatic switch is on, qualifying mail from every connected mailbox is sent, not just the mailbox of whoever turned it on. Whoever sets the Ollama address chooses where that mail goes, so use a server you trust.
 
-Only the message’s plain text, and only for an item in “Couldn’t read” (when a scan queues it, or when you choose **Ask AI** on it). Before it goes, Waypoint cuts quoted replies, everything under a reply header or a `-- ` signature, and footer lines (unsubscribe, privacy notices), and replaces every email address (including the ones in a forwarded message’s From, To and Cc lines, in `<angle brackets>` and in `mailto:` links) with `[email]`, before anything else, and replaces numbers that are labelled as a loyalty, Known Traveler, account or card number, long digit runs, letter-prefixed IDs of eight or more characters (such as `TT12345678`), plus every number saved under [Loyalty](/Waypoint/start/loyalty/), wherever it’s written. The sender and the subject are not sent, and no email address is, wherever it is written in the body. Names and anything else written in the body are, so a traveller’s name in the email goes to the model. Prompts and replies are never logged. Only `domain/mail/ai.py` sends email text anywhere, and a lint rule keeps AI addresses out of the rest of the code.
+Only the message’s plain text, and only for an item in “Couldn’t read” (when you choose **Ask AI** on it, or, with the automatic switch on, when a scan reads it by itself as above). Before it goes, Waypoint cuts quoted replies, everything under a reply header or a `-- ` signature, and footer lines (unsubscribe, privacy notices), and replaces every email address (including the ones in a forwarded message’s From, To and Cc lines, in `<angle brackets>` and in `mailto:` links) with `[email]`, before anything else, and replaces numbers that are labelled as a loyalty, Known Traveler, account or card number, long digit runs, letter-prefixed IDs of eight or more characters (such as `TT12345678`), plus every number saved under [Loyalty](/Waypoint/start/loyalty/), wherever it’s written. The sender and the subject are not sent, and no email address is, wherever it is written in the body. Names and anything else written in the body are, so a traveller’s name in the email goes to the model. Prompts and replies are never logged. Only `domain/mail/ai.py` sends email text anywhere, and a lint rule keeps AI addresses out of the rest of the code.
 
 ### The destination button on a trip
 
@@ -41,4 +55,4 @@ Several flights in one email become several suggestions. The model replies with 
 
 ## Turning it off
 
-Choosing **Off** stops the sending at once, including a scan that’s under way: the setting is read again before each message.
+Choosing **Off**, or turning the automatic switch off, stops the sending at once, including a scan that’s under way: the settings are read again before each message.

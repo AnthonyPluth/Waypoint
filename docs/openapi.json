@@ -3046,6 +3046,9 @@
           },
           "openrouter_key": {
             "type": "string"
+          },
+          "auto": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -3078,6 +3081,9 @@
               "saved",
               null
             ]
+          },
+          "auto": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -3085,7 +3091,8 @@
           "ollama_url",
           "ollama_model",
           "openrouter_model",
-          "key"
+          "key",
+          "auto"
         ],
         "additionalProperties": false
       },
@@ -5883,6 +5890,9 @@
               "null"
             ]
           },
+          "auto_read": {
+            "type": "boolean"
+          },
           "count": {
             "type": "integer"
           },
@@ -5907,6 +5917,7 @@
           "reason",
           "suggestions",
           "suggestion_error",
+          "auto_read",
           "count",
           "others"
         ],
@@ -6059,6 +6070,15 @@
           },
           "attached": {
             "type": "integer"
+          },
+          "ai_asked": {
+            "type": "integer"
+          },
+          "ai_today": {
+            "type": "integer"
+          },
+          "ai_waiting": {
+            "type": "integer"
           }
         },
         "required": [
@@ -6074,7 +6094,10 @@
           "not_travel",
           "followups",
           "with_facts",
-          "attached"
+          "attached",
+          "ai_asked",
+          "ai_today",
+          "ai_waiting"
         ],
         "additionalProperties": false
       },

@@ -1,0 +1,11 @@
+{
+  "name": "review-read-automatically",
+  "page": "review",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Review" } },
+    { "wait_for": "[data-testid='review-item']" },
+    { "expect_text": { "selector": "body", "text": "read automatically" } },
+    { "scroll_to": "text=read automatically" },
+    { "screenshot": "prefilled-item" }
+  ]
+}

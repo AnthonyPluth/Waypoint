@@ -590,11 +590,12 @@ class ScanAiCase(ScanCase):
         os.environ.pop(ai.KEY_ENV, None)
         self.addCleanup(env.stop)
 
-    def turn_on(self, mode="local"):
+    def turn_on(self, mode="local", auto=True):
         with db.session() as conn:
             db.set_setting(conn, sk.AI_MODE, mode)
             db.set_setting(conn, sk.AI_OLLAMA_URL, self.fake.url)
             db.set_setting(conn, sk.AI_OLLAMA_MODEL, "llama3")
+            db.set_setting(conn, sk.AI_AUTO, "1" if auto else None)
 
     def turn_off(self):
         with db.session() as conn:
@@ -756,7 +757,7 @@ class AiApiTests(RouteCase):
     def setUp(self):
         super().setUp()
         with db.session() as conn:
-            for key in (sk.AI_MODE, sk.AI_OLLAMA_URL, sk.AI_OLLAMA_MODEL, sk.AI_OPENROUTER_MODEL, sk.AI_OPENROUTER_KEY):
+            for key in (sk.AI_MODE, sk.AI_OLLAMA_URL, sk.AI_OLLAMA_MODEL, sk.AI_OPENROUTER_MODEL, sk.AI_OPENROUTER_KEY, sk.AI_AUTO):
                 db.set_setting(conn, key, None)
         env = mock.patch.dict(os.environ)
         env.start()
@@ -764,7 +765,7 @@ class AiApiTests(RouteCase):
         self.addCleanup(env.stop)
 
     def test_it_starts_off(self):
-        self.assertEqual(self.ok("ana", "GET", "/api/ai"), {"mode": "off", "ollama_url": "", "ollama_model": "", "openrouter_model": "", "key": None})
+        self.assertEqual(self.ok("ana", "GET", "/api/ai"), {"mode": "off", "ollama_url": "", "ollama_model": "", "openrouter_model": "", "key": None, "auto": False})
 
     def test_choosing_local_needs_an_address_and_a_model(self):
         status, body = self.call("ana", "POST", "/api/ai", {"mode": "local"})
@@ -790,6 +791,17 @@ class AiApiTests(RouteCase):
         self.assertEqual(self.call("ana", "POST", "/api/ai", {"mode": "openrouter", "openrouter_key": ""})[0], 400)
         os.environ[ai.KEY_ENV] = "env-key-0123456789"
         self.assertEqual(self.ok("ana", "GET", "/api/ai")["key"], "env")
+
+    def test_the_automatic_switch_is_off_until_chosen_needs_the_fallback_on_and_goes_off_with_it(self):
+        local = {"mode": "local", "ollama_url": "http://ollama.example:11434", "ollama_model": "llama3"}
+        self.assertFalse(self.ok("ana", "POST", "/api/ai", local)["auto"])
+        self.assertTrue(self.ok("ana", "POST", "/api/ai", {**local, "auto": True})["auto"])
+        self.assertTrue(self.ok("ben", "GET", "/api/ai")["auto"])
+        self.assertTrue(self.ok("ana", "POST", "/api/ai", local)["auto"])
+        self.assertFalse(self.ok("ana", "POST", "/api/ai", {**local, "auto": False})["auto"])
+        self.assertTrue(self.ok("ana", "POST", "/api/ai", {**local, "auto": True})["auto"])
+        self.assertFalse(self.ok("ana", "POST", "/api/ai", {"mode": "off", "auto": True})["auto"])
+        self.assertFalse(self.ok("ana", "POST", "/api/ai", local)["auto"])
 
     def test_what_isnt_valid_is_refused_and_changes_nothing(self):
         for body in ({"mode": "cloud"}, {}, {"mode": "local", "ollama_url": "ftp://x.example", "ollama_model": "m"},

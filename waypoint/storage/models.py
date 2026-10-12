@@ -215,6 +215,8 @@ class Mailbox(Base):
     scan_summary: Mapped[str | None]
     scan_labels: Mapped[str | None]
     share_review: Mapped[bool]
+    ai_day: Mapped[str | None]
+    ai_day_count: Mapped[int]
 
 
 class MailboxPending(Base):
@@ -250,6 +252,8 @@ class ReviewItem(Base):
     gap: Mapped[str | None]
     matches: Mapped[str | None]
     reference: Mapped[str | None]
+    auto_state: Mapped[str | None]
+    auto_tries: Mapped[int]
 
 
 class StoredMessage(Base):

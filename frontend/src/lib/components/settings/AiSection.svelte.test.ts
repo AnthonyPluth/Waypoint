@@ -11,7 +11,7 @@ import type { AiSettings } from "$lib/api-types";
 import { toast } from "svelte-sonner";
 import AiSection from "./AiSection.svelte";
 
-const off: AiSettings = { mode: "off", ollama_url: "", ollama_model: "", openrouter_model: "", key: null };
+const off: AiSettings = { mode: "off", ollama_url: "", ollama_model: "", openrouter_model: "", key: null, auto: false };
 
 beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); });
 
@@ -32,6 +32,36 @@ describe("Settings → AI", () => {
     expect(screen.queryByLabelText("OpenRouter key")).toBeNull();
   });
 
+  it("offers reading unreadable mail automatically only while the AI is on, warns when it is chosen, and saves it", async () => {
+    serve(off, (b) => ({ ...off, mode: b.mode, ollama_url: b.ollama_url, ollama_model: b.ollama_model, auto: b.auto }) as unknown as AiSettings);
+    render(AiSection);
+    await screen.findByRole("radio", { name: /Off/ });
+    expect(screen.queryByRole("checkbox", { name: /automatically/ })).toBeNull();
+    await userEvent.click(screen.getByRole("radio", { name: /Local/ }));
+    const box = screen.getByRole("checkbox", { name: /Read unreadable mail with AI automatically/ });
+    expect(box).not.toBeChecked();
+    expect(screen.queryByText(/without asking each time/)).toBeNull();
+    await userEvent.click(box);
+    expect(screen.getByRole("note")).toHaveTextContent("Waypoint will send the text of travel emails it couldn’t read to the AI you chose, without asking each time.");
+    await userEvent.type(screen.getByLabelText("Ollama address"), "http://ollama.example:11434");
+    await userEvent.type(screen.getByLabelText("Model"), "llama3.1");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("AI settings saved"));
+    expect(vi.mocked(api).mock.calls.at(-1)?.[1]).toMatchObject({ body: { mode: "local", auto: true } });
+    expect(screen.getByRole("checkbox", { name: /automatically/ })).toBeChecked();
+  });
+
+  it("does not send the automatic choice on when the AI is turned off", async () => {
+    serve({ ...off, mode: "local", ollama_url: "http://ollama.example:11434", ollama_model: "llama3.1", auto: true });
+    render(AiSection);
+    expect(await screen.findByRole("checkbox", { name: /automatically/ })).toBeChecked();
+    await userEvent.click(screen.getByRole("radio", { name: /Off/ }));
+    expect(screen.queryByRole("checkbox", { name: /automatically/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("AI is off"));
+    expect(vi.mocked(api).mock.calls.at(-1)?.[1]).toMatchObject({ body: { mode: "off", auto: false } });
+  });
+
   it("saves a local server and model", async () => {
     serve(off);
     render(AiSection);
@@ -40,7 +70,7 @@ describe("Settings → AI", () => {
     await userEvent.type(screen.getByLabelText("Model"), "llama3.1");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("AI settings saved"));
-    expect(api).toHaveBeenCalledWith("/api/ai", { method: "POST", body: { mode: "local", ollama_url: "http://ollama.example:11434", ollama_model: "llama3.1", openrouter_model: "" } });
+    expect(api).toHaveBeenCalledWith("/api/ai", { method: "POST", body: { mode: "local", ollama_url: "http://ollama.example:11434", ollama_model: "llama3.1", openrouter_model: "", auto: false } });
   });
 
   it("sends an OpenRouter key once and then never has it: it shows only that one is saved", async () => {
