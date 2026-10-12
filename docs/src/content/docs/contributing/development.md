@@ -15,20 +15,24 @@ poetry run python run.py                               # run Waypoint at http://
 poetry run python -m unittest discover tests           # the test suite (SQLite)
 DATABASE_URL=postgresql://... poetry run python -m unittest discover tests   # the same tests against Postgres
 poetry run coverage run -m unittest discover tests && poetry run coverage report   # how much they cover
-poetry run unittest-parallel -t . -s tests -j 4   # the same suite across 4 processes (what CI does): about 3x faster; `make test-parallel`
+poetry run unittest-parallel -t . -s tests -j 4   # the same suite across 4 processes (what CI does on SQLite): about 3x faster; `make test-parallel`
 poetry run mypy                                        # type-check the Python (settings in pyproject.toml)
 poetry add <package>                                   # add a dependency (updates pyproject.toml and poetry.lock)
 ```
 
-To run the tests on Postgres as CI does (in parallel, where tests that share the database can trip over each other), start a throwaway one; Docker's default 64 MB of shared memory isn't enough for the schemas the tests make:
+To run the tests on Postgres as CI does (in parallel, where tests that share the database can trip over each other), start a throwaway one. The data directory is in memory and nothing is flushed to disk, which is what makes the tests fast; a crash loses the database, so use these settings only for a database that lives for one test run, never for a real one. Docker's default 64 MB of shared memory isn't enough for the schemas the tests make:
 
 ```bash
-docker run -d --rm --name waypoint-test-pg --shm-size=1g -p 5432:5432 -e POSTGRES_USER=waypoint -e POSTGRES_PASSWORD=waypoint -e POSTGRES_DB=waypoint postgres:16
-DATABASE_URL=postgresql://waypoint:waypoint@127.0.0.1:5432/waypoint poetry run unittest-parallel -t . -s tests -j 4
+docker run -d --rm --name waypoint-test-pg --shm-size=1g --tmpfs /var/lib/postgresql/data -p 5432:5432 -e POSTGRES_USER=waypoint -e POSTGRES_PASSWORD=waypoint -e POSTGRES_DB=waypoint postgres:16 -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c shared_buffers=512MB -c max_connections=300
+DATABASE_URL=postgresql://waypoint:waypoint@127.0.0.1:5432/waypoint make test-pg
 docker stop waypoint-test-pg
 ```
 
-`make test-pg` runs the suite against the Postgres at `$DATABASE_URL` (the command above, with a check that the variable is set). Whatever Postgres you use must be UTF-8: a cluster you make yourself needs `initdb -E UTF8 --locale=C.UTF-8` (the `postgres` Docker image already is). Each test that writes settings or goes through the server makes and drops its own schema, so running the suite twice on the same database gives the same result.
+`make test-pg` runs the suite against the Postgres at `$DATABASE_URL`, with one test process per CPU (at least 4, at most 16: `tools/test_jobs.sh`; `PG_JOBS=8 make test-pg` sets it), after checking that the variable is set. `max_connections` needs 30 for each process plus 100, so 300 serves the cap of 16. Whatever Postgres you use must be UTF-8: a cluster you make yourself needs `initdb -E UTF8 --locale=C.UTF-8` (the `postgres` Docker image already is). A test that needs a database of its own (`tests/shared.py`'s `own_database`) borrows one of a few schemas each test process keeps, built once from the schema and emptied (`TRUNCATE`, with the airport and airline reference rows restored) when the test is done; a schema a test still holds a connection to is freed by ending that connection. Schemas are named `p_<process id>_<n>` and a later run drops the ones left by a process that no longer exists, so running the suite twice on the same database gives the same result.
+
+To see where the time goes, `make test-timings` prints the slowest tests and classes and the time spent making and emptying databases (on Postgres when `DATABASE_URL` is set), and the "Docker image" workflow prints the same in its run summary when started by hand with "timings" ticked. Neither is part of `make check`.
+
+A new database, for the tests and for a first start, is built in one step: the tables from `waypoint/storage/schema.py`, the airport and airline rows, and the stamp for the newest migration (`db.create_fresh`), with no migration replayed. A database that already has tables and a version is upgraded by `upgrade head` as before. `tests/test_migrations.py` builds one database each way and compares them.
 
 `make check` runs the checks to run before you push, each tool once: ruff, mypy and import-linter, Waypoint’s own Semgrep rules, the fleet checks (see [Merging](#merging)), the feature map and API contract checks, the Python tests (on SQLite, in parallel as CI runs them), and the web app's type-check, ESLint, Vitest tests and build, and the docs site's build. `make lint`, `make test` (serial, for a clearer failure), `make test-parallel` and `make frontend-check` run one part. The security scans run only in CI, each on the pull requests it can affect (see `.github/workflows/security.yml`): Semgrep, Trivy, zizmor, pip-audit, npm audit and CodeQL. So do the Postgres tests (see above to run them yourself). For the quick checks on every commit (ruff, trailing whitespace, YAML/TOML syntax, merge-conflict markers, large files), install [pre-commit](https://pre-commit.com) and run `pre-commit install` once.
 

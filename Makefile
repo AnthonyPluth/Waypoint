@@ -11,7 +11,11 @@ NPM ?= npm
 RUFF ?= poetry run ruff
 MYPY ?= poetry run mypy
 LINT_IMPORTS ?= poetry run lint-imports
-UNITTEST_PARALLEL ?= poetry run unittest-parallel -t . -s tests -j 4
+UNITTEST_PARALLEL_BASE ?= poetry run unittest-parallel -t . -s tests
+UNITTEST_PARALLEL ?= $(UNITTEST_PARALLEL_BASE) -j 4
+# The Postgres run uses as many processes as the machine has CPUs, between 4 and 16 (tools/test_jobs.sh); a throwaway Postgres
+# for it needs max_connections of at least 30 per process plus 100 (docs/src/content/docs/contributing/development.md).
+PG_JOBS ?= $(shell tools/test_jobs.sh)
 # Waypoint's own Semgrep rules (.semgrep/waypoint.yml), at the version .github/workflows/security.yml pins (change both
 # together). Semgrep isn't in the Poetry environment: it pins dependencies of its own and doesn't run on Python 3.14,
 # so it goes through pipx, on pipx's own Python.
@@ -53,7 +57,7 @@ test-parallel:
 # The same, against the Postgres at $$DATABASE_URL (an empty database is fine; see docs/src/content/docs/contributing/development.md).
 test-pg:
 	@test -n "$$DATABASE_URL" || { echo "Set DATABASE_URL, e.g. postgresql://waypoint:waypoint@127.0.0.1:5432/waypoint" >&2; exit 1; }
-	$(UNITTEST_PARALLEL)
+	$(UNITTEST_PARALLEL_BASE) -j $(PG_JOBS)
 
 # The same tests (on SQLite, or on Postgres when $$DATABASE_URL is set), printing where the time goes: the slowest tests and
 # classes, and the time spent making and dropping databases. Not part of `make check`.
