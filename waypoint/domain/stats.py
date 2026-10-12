@@ -647,11 +647,10 @@ def points_of(conn: db.Connection, countries: Mapping[str, str]) -> dict[str, tu
     listed = reference.city_points()
     out: dict[str, tuple[float, float]] = {}
     for city, pts in found.items():
-        largest = max((c for c in listed.get(reference.place_key(city), ()) if c[0] == countries[city]), key=lambda c: c[4], default=None)
-        if largest is not None:
-            out[city] = (largest[2], largest[3])
-        elif _spread_km(pts) <= SAME_NAME_KM:
+        if _spread_km(pts) <= SAME_NAME_KM:
             out[city] = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
+        elif (largest := max((c for c in listed.get(reference.place_key(city), ()) if c[0] == countries[city]), key=lambda c: c[4], default=None)):
+            out[city] = (largest[2], largest[3])
     return out
 
 
