@@ -4,12 +4,25 @@ import os
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
 import uuid
+from contextlib import contextmanager
 from datetime import date
 from unittest import mock
+
+PHASES: dict[str, float] = {}
+
+
+@contextmanager
+def phase(name):
+    started = time.perf_counter()
+    try:
+        yield
+    finally:
+        PHASES[name] = PHASES.get(name, 0.0) + time.perf_counter() - started
 
 
 def tag() -> str:
@@ -23,7 +36,7 @@ def drop_schema(path) -> None:
     import psycopg
     from psycopg import sql
     name = "t_" + hashlib.sha256(path.encode()).hexdigest()[:12]
-    with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as conn:
+    with phase("teardown"), psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as conn:
         conn.execute(sql.SQL("SELECT pg_terminate_backend(l.pid) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation "
                              "JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = {} AND l.pid <> pg_backend_pid()"
                              ).format(sql.Literal(name)))
@@ -32,7 +45,8 @@ def drop_schema(path) -> None:
 
 def add_database(case, path) -> str:
     from waypoint.storage import db
-    db.init(path)
+    with phase("schema"):
+        db.init(path)
     (case.addClassCleanup if isinstance(case, type) else case.addCleanup)(drop_schema, path)
     return path
 

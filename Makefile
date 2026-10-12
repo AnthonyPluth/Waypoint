@@ -17,7 +17,7 @@ UNITTEST_PARALLEL ?= poetry run unittest-parallel -t . -s tests -j 4
 # so it goes through pipx, on pipx's own Python.
 SEMGREP ?= pipx run semgrep==1.146.0
 
-.PHONY: check lint python-lint frontend-lint semgrep test test-parallel test-pg fix \
+.PHONY: check lint python-lint frontend-lint semgrep test test-parallel test-pg test-timings fix \
 	frontend-check frontend-typecheck frontend-test frontend-build docs docs-build verify feature-map feature-map-check \
 	fleet-checks api-contract api-contract-check pr-screenshots
 
@@ -54,6 +54,13 @@ test-parallel:
 test-pg:
 	@test -n "$$DATABASE_URL" || { echo "Set DATABASE_URL, e.g. postgresql://waypoint:waypoint@127.0.0.1:5432/waypoint" >&2; exit 1; }
 	$(UNITTEST_PARALLEL)
+
+# The same tests (on SQLite, or on Postgres when $$DATABASE_URL is set), printing where the time goes: the slowest tests and
+# classes, and the time spent making and dropping databases. Not part of `make check`.
+test-timings:
+	rm -rf .timings
+	TIMINGS_DIR=.timings PYTHONPATH=. $(UNITTEST_PARALLEL) --result tests.timing_result.TimingResult || status=$$?; \
+	$(PYTHON) tools/test_timings.py .timings; exit $${status:-0}
 
 # Applies ruff's safe fixes (unused imports and the like); review the diff before committing.
 fix:
