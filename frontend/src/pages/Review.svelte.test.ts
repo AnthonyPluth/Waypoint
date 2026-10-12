@@ -18,7 +18,7 @@ const settled = () => waitFor(() => { expect(screen.queryByRole("dialog")).toBeN
 
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
   id: 1, address: "ana@gmail.example", owner: "Ana Doe", mine: true, sender_domain: "example-air.example", known_sender: false, holds_bookings: false, subject: null, has_email: true, received: "2026-10-17",
-  reason: "no_markup", suggestions: [], suggestion_error: null, ...extra });
+  reason: "no_markup", suggestions: [], suggestion_error: null, count: 1, others: [], ...extra });
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
   start_local: "2026-12-08T08:00", start_zone: "America/New_York", ...extra });
@@ -40,6 +40,8 @@ let suggestFails = "";
 let suggestGate: Promise<void> | null = null;
 let segmentsMade = 0;
 let secondSegmentFails = "";
+let takeOffGate: Promise<void> | null = null;
+let takeOffFails = "";
 const ZONES: Record<string, string> = { BOS: "America/New_York", DEN: "America/Denver" };
 let truncated = false;
 let held: Review;
@@ -57,6 +59,8 @@ function serve(failOn?: string) {
     if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestions: [SUGGESTION] })) }; return { ok: true } as never; }
     if (path.endsWith("/unignore")) return { started: true } as never;
     if (path.endsWith("/ignore")) { const id = Number(path.split("/")[3]); const domain = held.items.find((i) => i.id === id)?.sender_domain ?? ""; held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true, mailbox_id: 5, domain } as never; }
+    if (opts?.method === "DELETE" && path.includes("?suggestion=")) { const id = Number(path.split("/")[3]?.split("?")[0]); const gone = path.split("?")[1]?.split("&").map((q) => Number(q.split("=")[1])) ?? []; held = { ...held, items: held.items.map((i) => (i.id === id ? { ...i, suggestions: i.suggestions.filter((_, n) => !gone.includes(n + 1)) } : i)) }; return { ok: true } as never; }
+    if (opts?.method === "DELETE" && path.includes("?segment=")) { if (takeOffGate) await takeOffGate; if (takeOffFails) throw new Error(takeOffFails); }
     if (opts?.method === "DELETE") { const id = Number(path.split("/")[3]?.split("?")[0]); held = { ...held, items: held.items.filter((i) => i.id !== id), matches: held.matches.filter((m) => m.item_id !== id) }; return { ok: true } as never; }
     if (path.endsWith("/match")) { const id = Number(path.split("/")[3]); held = { ...held, matches: held.matches.filter((m) => m.item_id !== id) }; return { ok: true } as never; }
     if (path.startsWith("/api/review/who/")) { const id = Number(path.split("/")[4]); held = { ...held, who: held.who.filter((w) => w.id !== id) }; return { ok: true, matched: 2 } as never; }
@@ -65,7 +69,7 @@ function serve(failOn?: string) {
 }
 
 afterEach(() => { setQuery(""); });
-beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
+beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
@@ -129,6 +133,62 @@ describe("Review", () => {
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
     expect(toast.success).toHaveBeenCalledWith("Dismissed");
     await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+  });
+
+  it("shows items about one reservation as one row with a count, the newest first, and the others behind a disclosure", async () => {
+    held = { ...held, who: [], items: [item({ subject: "Online check-in is open", count: 3, others: [
+      { id: 2, subject: "Your payment receipt", has_email: true, received: "2026-10-12" },
+      { id: 3, subject: null, has_email: false, received: "2026-10-10" }] })] };
+    render(ReviewPage);
+    const rows = await screen.findAllByTestId("review-item");
+    expect(rows).toHaveLength(1);
+    expect(within(rows[0]!).getByText("Online check-in is open")).toBeInTheDocument();
+    const disclosure = within(rows[0]!).getByTestId("same-reservation");
+    expect(within(disclosure).getByText("3 emails about the same reservation")).toBeInTheDocument();
+    expect(disclosure).not.toHaveAttribute("open");
+    await userEvent.click(within(disclosure).getByText("3 emails about the same reservation"));
+    expect(disclosure).toHaveAttribute("open");
+    const others = within(disclosure).getByRole("list", { name: "The other emails about it" });
+    expect(within(others).getByText("Your payment receipt · 2026-10-12")).toBeInTheDocument();
+    expect(within(others).getByText("Mail from example-air.example on 2026-10-10")).toBeInTheDocument();
+  });
+
+  it("shows no disclosure for a single email", async () => {
+    render(ReviewPage);
+    await screen.findByTestId("review-item");
+    expect(screen.queryByTestId("same-reservation")).toBeNull();
+  });
+
+  it("dismisses the whole group from its row and says how many went", async () => {
+    held = { ...held, who: [], items: [item({ subject: "Online check-in is open", count: 3, others: [
+      { id: 2, subject: "Your payment receipt", has_email: true, received: "2026-10-12" },
+      { id: 3, subject: "Your reminder", has_email: true, received: "2026-10-10" }] })] };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Dismiss all 3 emails about “Online check-in is open”" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
+    expect(toast.success).toHaveBeenCalledWith("Dismissed 3 emails");
+    await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+  });
+
+  it("adds a booking from a grouped row through the newest item alone", async () => {
+    held = { ...held, who: [], items: [item({ subject: "Online check-in is open", count: 2, others: [{ id: 2, subject: "Your payment receipt", has_email: true, received: "2026-10-12" }] })] };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Add “Online check-in is open” by hand" }));
+    await userEvent.type(screen.getByLabelText("From (airport code)"), "BOS");
+    await userEvent.type(screen.getByLabelText("To (airport code)"), "DEN");
+    await userEvent.type(screen.getByLabelText("Departs"), "2027-01-02T07:15");
+    await userEvent.type(screen.getByLabelText("Arrives"), "2027-01-02T09:40");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42", "DELETE", undefined]));
+    expect(calls.filter(([path]) => path.startsWith("/api/review/2"))).toEqual([]);
+  });
+
+  it("counts every email of a group in the ignore question", async () => {
+    held = { ...held, who: [], items: [item({ count: 3, others: [
+      { id: 2, subject: null, has_email: true, received: null }, { id: 3, subject: null, has_email: true, received: null }] }), item({ id: 4 })] };
+    render(ReviewPage);
+    await userEvent.click((await screen.findAllByRole("button", { name: "Not travel: ignore example-air.example" }))[0]!);
+    expect(await screen.findByText(/4 items from them \(this one included\) leave this list/)).toBeInTheDocument();
   });
 
   it("ignores a sender only after asking", async () => {
@@ -1016,6 +1076,58 @@ describe("Review: a booking email with several flights", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
     expect(calls.filter(([p, m]) => m === "DELETE" && p.startsWith("/api/review/")).map(([p]) => p)).toEqual(["/api/review/1?segment=42&segment=43"]);
+  });
+
+  it("keeps the last leg in the form until the item is off the list, then reports a failed take-off and clears the email preview", async () => {
+    let release: () => void = () => {};
+    takeOffGate = new Promise<void>((resolve) => { release = resolve; });
+    takeOffFails = "The list is busy.";
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Add 2 flights" }));
+    await waitFor(() => expect(calls.filter(([p]) => p === "/api/segments")).toHaveLength(2));
+    await waitFor(() => expect(calls.some(([p, m]) => m === "DELETE" && p.includes("?segment="))).toBe(true));
+    expect(screen.getByLabelText("From (airport code)")).toHaveValue("DEN");
+    release();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Added, but couldn’t take it off this list: The list is busy."));
+    expect(toast.success).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByLabelText("From (airport code)")).toBeNull());
+    const previews = () => calls.filter(([p]) => p.endsWith("/preview")).length;
+    expect(previews()).toBe(1);
+    await settled();
+    expect(calls).toContainEqual(["/api/review/1?suggestion=1&suggestion=2", "DELETE", undefined]);
+    await userEvent.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await waitFor(() => expect(previews()).toBe(2));
+  });
+
+  it("does the same for an item with a single suggestion", async () => {
+    takeOffFails = "The list is busy.";
+    held = { matches: [], items: [item({ suggestions: [outbound] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Added, but couldn’t take it off this list: The list is busy."));
+    expect(toast.success).not.toHaveBeenCalled();
+    await settled();
+    await userEvent.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await waitFor(() => expect(calls.filter(([p]) => p.endsWith("/preview"))).toHaveLength(2));
+  });
+
+  it("takes the leg that was added off the item's suggestions when the rest is cancelled, so it is not offered again", async () => {
+    secondSegmentFails = "The flight was refused.";
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Add 2 flights" }));
+    await screen.findByRole("alert");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Discard" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?suggestion=1", "DELETE", undefined]));
+    expect(calls.some(([p, m]) => m === "DELETE" && p.includes("?segment="))).toBe(false);
+    secondSegmentFails = "";
+    await settled();
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText("From (airport code)")).toHaveValue("DEN");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.filter(([p]) => p === "/api/segments").map(([, , b]) => (b as { origin: string }).origin)).toEqual(["BOS", "DEN", "DEN"]);
   });
 
   it("closes without adding anything on Cancel", async () => {

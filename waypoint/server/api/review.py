@@ -36,6 +36,11 @@ def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
         if not review.drop(conn, owner(), row_id(item_id, NO_ITEM), row_id(held, "No such booking", 400)):
             raise ApiError(NO_ITEM, 404)
         return {"ok": True}
+    made = [a for a in _q.get("suggestion") or [] if a]
+    if made:
+        if not review.drop_suggestions(conn, owner(), row_id(item_id, NO_ITEM), [row_id(a, "No such suggestion", 400) for a in made]):
+            raise ApiError(NO_ITEM, 404)
+        return {"ok": True}
     added = [a for a in _q.get("segment") or [] if a]
     bookings = (viewer(conn), [row_id(a, "No such segment", 400) for a in added]) if added else None
     if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), bookings):
