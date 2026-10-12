@@ -15,9 +15,24 @@
     const name = labels.length >= 3 && SECOND_LEVEL.has(labels.at(-2) ?? "") ? labels.at(-3) : labels.at(-2) ?? labels[0] ?? "";
     return (name ?? "").split(/[-_]/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
   }
+
+  const TITLES = new Set(["mr", "mrs", "ms", "miss", "mstr", "master", "mx", "dr", "prof", "sir", "lady"]);
+
+  export function nameKey(name: string): string {
+    const lower = name.toLowerCase();
+    const [last, first] = lower.includes("/") ? lower.split("/", 2) : [null, lower];
+    return `${first ?? ""} ${last ?? ""}`.split(/\W+/).filter((t) => t && !TITLES.has(t)).join(" ");
+  }
+
+  export function personFor(people: { id: number; display_name: string; legal_name: string | null; aliases: string[] }[], name: string): number | null {
+    const wanted = nameKey(name);
+    const found = wanted ? people.filter((p) => [p.display_name, p.legal_name ?? "", ...p.aliases].some((n) => n && nameKey(n) === wanted)) : [];
+    return found.length === 1 ? found[0].id : null;
+  }
 </script>
 
 <script lang="ts">
+  import { tick } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
   import { act, errMsg, ignoreFailure } from "$lib/act";
   import type { Person, Review, ReviewCandidate, ReviewMatch, SegmentBody, WhoIsThis } from "$lib/api-types";
@@ -32,7 +47,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Sheet } from "$lib/components/ui/sheet";
   import { amountText } from "$lib/money";
-  import { carAddress, differs, DEFAULT_CURRENCY, DETAILS, KINDS as FORM_KINDS, priceOf, SAME_AS_PICKUP, type Kind } from "$lib/segment-form";
+  import { carAddress, differs, DEFAULT_CURRENCY, DETAILS, KINDS as FORM_KINDS, priceOf, SAME_AS_PICKUP, SEAT_LIMIT, type Kind } from "$lib/segment-form";
   import { apiCall } from "$lib/contract";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import { toast } from "svelte-sonner";
@@ -70,15 +85,15 @@
 
   const SHOWN: Record<string, string[]> = { flight: ["flight_number", "cabin"], hotel: ["address", "phone"], car: ["phone"], train: ["address"], parking: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
   const detailLabel = (kind: string, key: string) => DETAILS[kind as Kind].find(([k]) => k === key)?.[1] ?? key;
-  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; sources: Record<string, string>; cost: string; currency: string; addressField: boolean };
+  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; travelers: { name: string; seat: string }[]; sources: Record<string, string>; cost: string; currency: string; addressField: boolean };
   const detailsOf = (s: ReviewItem["suggestions"][number]): Record<string, string> => ({ address: s.address ?? "", phone: s.phone ?? "", room: s.room ?? "", ship: s.ship ?? "", deck: s.deck ?? "", flight_number: s.flight_number ?? "", cabin: s.cabin ?? "" });
   const suggestedDraft = (item: ReviewItem, s: ReviewItem["suggestions"][number], pick: number): Draft => ({
     item, pick, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
     destination: s.destination ?? "", start: s.start_local.slice(0, 16), end: s.end_local.slice(0, 16), startZone: s.start_zone ?? "", endZone: s.end_zone ?? "", details: s.kind === "car" && s.address?.trim() === s.origin.trim() ? { ...detailsOf(s), address: "" } : detailsOf(s),
-    read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), sources: s.sources ?? {},
+    read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), travelers: (s.travelers ?? []).map((t) => ({ ...t })), sources: s.sources ?? {},
     cost: s.price_minor && s.price_currency ? amountText(s.price_minor, s.price_currency) : "", currency: s.price_currency ?? DEFAULT_CURRENCY,
     addressField: s.kind === "car" && differs(s.address, s.origin) });
-  const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], sources: {}, cost: "", currency: DEFAULT_CURRENCY, addressField: false });
+  const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], travelers: [], sources: {}, cost: "", currency: DEFAULT_CURRENCY, addressField: false });
   let drafts = $state<Draft[]>([]);
   let joining = $state<{ legs: Draft[]; bodies: SegmentBody[]; found: (ReviewCandidate | null)[] } | null>(null);
   const draft = $derived(drafts[0] ?? null);
@@ -89,7 +104,7 @@
   let addedIds: number[] = [];
   let addedPicks: number[] = [];
   const fingerprint = (d: Draft) => JSON.stringify([d.kind, d.provider, d.confirmation, d.origin, d.destination, d.start, d.end, d.startZone, d.endZone,
-    Object.entries(d.details).filter(([, v]) => v.trim()).sort(([a], [b]) => a.localeCompare(b)), d.cost, d.currency]);
+    Object.entries(d.details).filter(([, v]) => v.trim()).sort(([a], [b]) => a.localeCompare(b)), d.travelers.map((t) => [t.name, t.seat.trim()]), d.cost, d.currency]);
   const fingerprints = () => JSON.stringify(drafts.map(fingerprint));
   const dirty = $derived(drafts.length > 0 && fingerprints() !== baseline);
   const startAdd = (item: ReviewItem, use = false) => {
@@ -104,6 +119,20 @@
     void peek(item);
   };
   const dropLeg = (leg: Draft) => { drafts = drafts.filter((d) => d !== leg); };
+  const addedLegs = new WeakSet<Draft>();
+  const addLeg = async () => {
+    const last = drafts.at(-1);
+    if (!last) return;
+    drafts = [...drafts, { ...handDraft(last.item), kind: last.kind, provider: last.provider, confirmation: last.confirmation, origin: last.kind === "flight" ? last.destination : "" }];
+    const made = drafts.at(-1);
+    if (made) addedLegs.add(made);
+    await tick();
+    document.querySelector<HTMLElement>("[data-slot='sheet'] fieldset[data-testid='leg']:last-of-type select")?.focus();
+  };
+  const kindChanged = (leg: Draft, kind: string) => {
+    if (!addedLegs.has(leg) || kind === leg.kind) return;
+    Object.assign(leg, { kind, origin: "", destination: "", startZone: "", endZone: "", details: {}, read: [], sources: {}, addressField: false });
+  };
   const plural = (n: number, ds: Draft[]) => (ds.every((d) => d.kind === "flight") ? `${n} flights` : `${n} bookings`);
   const legTitle = (leg: Draft, n: number) => `${leg.kind === "flight" ? "Flight" : "Booking"} ${n + 1} of ${drafts.length}${leg.origin && leg.destination ? `: ${leg.origin.toUpperCase()} → ${leg.destination.toUpperCase()}` : ""}`;
   type Peek = { state: "loading" } | { state: "ready"; subject: string | null; text: string; html: string | null; truncated: boolean; original: boolean; images: number } | { state: "error"; message: string };
@@ -182,7 +211,9 @@
     if (d.cost.trim() && (!/^[A-Za-z]{3}$/.test(d.currency.trim()) || priceOf(d) === null)) return "Enter the cost as an amount like 1240.00 and a three-letter currency code like USD";
     if (stay && !d.startZone.trim() && !details["address"]) return `Enter the ${d.kind === "hotel" ? "hotel" : "lot"}’s time zone (for example America/New_York), or its address to work it out from`;
     return { kind: d.kind as "flight" | "hotel" | "car" | "train" | "cruise" | "parking", start_local: d.start, end_local: d.end, provider: d.provider, confirmation: d.confirmation, origin: d.origin,
-      destination: d.kind === "car" && !d.destination.trim() ? d.origin : d.destination, ...(Object.keys(details).length && { details }), ...(priceOf(d) && { price: priceOf(d) }), ...(flight ? {} : stay ? { start_zone: d.startZone.trim() || null } : d.kind === "cruise" ? { start_zone: d.startZone, end_zone: d.endZone || d.startZone } : { ...(d.startZone && { start_zone: d.startZone }), ...(d.endZone && { end_zone: d.endZone }) }) };
+      destination: d.kind === "car" && !d.destination.trim() ? d.origin : d.destination, ...(Object.keys(details).length && { details }), ...(priceOf(d) && { price: priceOf(d) }),
+      ...(flight && d.travelers.length && { travelers: d.travelers.map((t) => { const id = personFor(people, t.name); return { ...(id === null ? { person_id: null, name: t.name } : { person_id: id }), seat: t.seat.trim() || null }; }) }),
+      ...(flight ? {} : stay ? { start_zone: d.startZone.trim() || null } : d.kind === "cruise" ? { start_zone: d.startZone, end_zone: d.endZone || d.startZone } : { ...(d.startZone && { start_zone: d.startZone }), ...(d.endZone && { end_zone: d.endZone }) }) };
   }
 
   async function add(e: SubmitEvent) {
@@ -311,7 +342,7 @@
 {#snippet legFields(d: Draft)}
   {@const labels = placeLabels(d.kind)}
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">What is it?</span>
-    <select bind:value={d.kind} class={selectClass}>{#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}</select></label>
+    <select value={d.kind} onchange={(e) => { kindChanged(d, e.currentTarget.value); d.kind = e.currentTarget.value; }} class={selectClass}>{#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}</select></label>
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Provider</span>
     <Input bind:value={d.provider} maxlength={100} autocomplete="off" /></label>
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Confirmation code {#if d.sources["confirmation"]}<span class="font-normal text-muted-foreground">from “{d.sources["confirmation"]}”</span>{/if}</span>
@@ -349,6 +380,14 @@
     {#each SHOWN[d.kind] ?? [] as key (key)}{@render detailField(d, key)}{/each}
   {:else}
     {#each SHOWN.flight as key (key)}{#if d.read.includes(key)}{@render detailField(d, key)}{/if}{/each}
+    {#if d.travelers.length}
+      <div class="flex flex-col gap-1.5 text-sm" role="group" aria-label="Seats"><span class="font-medium">Seats <span class="font-normal text-muted-foreground">as the email prints them</span></span>
+        {#each d.travelers as t (t.name)}
+          <label class="flex items-center gap-3"><span class="min-w-0 flex-1 break-words">{t.name}</span>
+            <Input class="w-24 ring-2 ring-primary" bind:value={t.seat} maxlength={SEAT_LIMIT} autocomplete="off" spellcheck={false} aria-label={`Seat for ${t.name}`} /></label>
+        {/each}
+      </div>
+    {/if}
   {/if}
 {/snippet}
 
@@ -368,6 +407,9 @@
       {/each}
     {:else if lead}
       {@render legFields(lead)}
+    {/if}
+    {#if !joining}
+      <div><Button type="button" variant="outline" size="sm" disabled={saving} onclick={addLeg}>Add another leg or booking</Button></div>
     {/if}
     {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
     {#if joining}
@@ -433,7 +475,7 @@
               <div class="min-w-0 basis-full">
                 <p class="break-words font-medium">{subject(item)}</p>
                 <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, item.mine ? `to ${item.address}` : `in ${item.owner}’s mailbox, shared with the household`].filter(Boolean).join(" · ")}</p>
-                <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">AI suggestion</Badge>{/if}</p>
+                <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">AI suggestion</Badge>{/if}{#if item.auto_read && item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">read automatically</Badge>{/if}</p>
                 {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
                 {#if item.count > 1}
                   <details class="mt-2 text-sm" data-testid="same-reservation">

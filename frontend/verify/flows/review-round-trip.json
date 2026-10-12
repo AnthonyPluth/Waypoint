@@ -9,6 +9,9 @@
     { "expect_text": { "selector": "body", "text": "Flight 2 of 2: DEN → BOS" } },
     { "scroll_to": "[data-testid='leg'] >> nth=0" },
     { "screenshot": "two-flights" },
+    { "expect_text": { "selector": "body", "text": "as the email prints them" } },
+    { "scroll_to": "[role='group'][aria-label='Seats']" },
+    { "screenshot": "seats" },
     { "scroll_to": "button:has-text('Add 2 flights')" },
     { "screenshot": "add-two-flights" }
   ]

@@ -250,6 +250,8 @@ class ReviewItem(Base):
     gap: Mapped[str | None]
     matches: Mapped[str | None]
     reference: Mapped[str | None]
+    auto_state: Mapped[str | None]
+    auto_tries: Mapped[int]
 
 
 class StoredMessage(Base):

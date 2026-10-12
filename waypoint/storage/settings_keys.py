@@ -13,6 +13,7 @@ AI_OLLAMA_URL = "ai_ollama_url"
 AI_OLLAMA_MODEL = "ai_ollama_model"
 AI_OPENROUTER_MODEL = "ai_openrouter_model"
 AI_OPENROUTER_KEY = "ai_openrouter_key"
+AI_AUTO = "ai_auto"
 
 MCP_ALLOW_WRITES = "mcp_allow_writes"
 

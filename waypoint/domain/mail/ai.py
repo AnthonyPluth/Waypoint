@@ -46,6 +46,11 @@ class AiError(Exception):
     pass
 
 
+class SuggestedTraveler(TypedDict):
+    name: str
+    seat: str
+
+
 class Suggestion(TypedDict, total=False):
     kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
     provider: str
@@ -63,6 +68,7 @@ class Suggestion(TypedDict, total=False):
     deck: str
     flight_number: str
     cabin: str
+    travelers: list[SuggestedTraveler]
     price_minor: int
     price_currency: str
     sources: dict[str, str]
@@ -181,6 +187,16 @@ SYSTEM = (
     'Leave out a key you can\'t find; never guess. If the email holds no booking, reply {"bookings": []}.')
 
 
+SYSTEM_SEATS = (
+    ' For a flight only, also "travelers": a list holding one object {"name", "seat"} for each passenger whose name and whose own seat on that flight '
+    'the email both print, with the name and the seat as printed (such as "23A"). Copy a seat only when the email states it for that passenger on that '
+    'flight: never choose, guess, assign or suggest a seat, and leave out a passenger with no printed seat. Leave out "travelers" when the email prints none.')
+
+
+def system_for(cfg: Config) -> str:
+    return SYSTEM + SYSTEM_SEATS if cfg.mode == LOCAL else SYSTEM
+
+
 def request(cfg: Config, text: str, system: str = SYSTEM) -> tuple[str, dict[str, str], dict[str, Any], bool]:
     messages = [{"role": "system", "content": system}, {"role": "user", "content": text}]
     if cfg.mode == LOCAL:
@@ -211,6 +227,9 @@ ADDRESS_LIMIT = 200
 ADDRESS_KINDS = ("hotel", "car", "train", "cruise", "parking")
 PHONE_KINDS = ("hotel", "car", "cruise")
 CRUISE_DETAILS = {"room": 50, "ship": 100, "deck": 50}
+MAX_TRAVELERS = 12
+NAME_LIMIT = 100
+SEAT = re.compile(r"(\d{1,3})\s?([A-Za-z])")
 OPTIONAL = ("address", "phone", "room", "ship", "deck", "flight_number", "cabin")
 PHONE_RUN = re.compile(r"\+?\(?\d[\d ().-]{5,28}\d")
 PHONE_SHAPE = re.compile(r"\+?[\d\s().-]{7,30}")
@@ -271,6 +290,45 @@ def _detail(value: str, limit: int, sent: str) -> str | None:
     return one if one and len(one) <= limit and _in(sent, one) else None
 
 
+SEAT_TOKEN = re.compile(r"(?<![A-Za-z0-9])(\d{1,3})\s?([A-Za-z])(?![A-Za-z0-9])")
+SEAT_REACH = 60
+
+
+def _seats_near(sent: str, name: str) -> list[set[str]]:
+    pattern = r"(?<!\w)" + r"\s+".join(re.escape(w) for w in name.split()) + r"(?!\w)"
+    found: list[set[str]] = []
+    for hit in re.finditer(pattern, sent, re.IGNORECASE):
+        line_start = sent.rfind("\n", 0, hit.start()) + 1
+        line_end = sent.find("\n", hit.end())
+        line_end = len(sent) if line_end < 0 else line_end
+        after = SEAT_TOKEN.search(sent[hit.end():min(line_end, hit.end() + SEAT_REACH)])
+        before = list(SEAT_TOKEN.finditer(sent[max(line_start, hit.start() - SEAT_REACH // 2):hit.start()]))
+        nearest = after or (before[-1] if before else None)
+        same = {f"{nearest[1]}{nearest[2].upper()}"} if nearest else set()
+        if not same and line_end < len(sent):
+            next_end = sent.find("\n", line_end + 1)
+            first = SEAT_TOKEN.search(sent[line_end + 1:len(sent) if next_end < 0 else next_end][:SEAT_REACH])
+            same = {f"{first[1]}{first[2].upper()}"} if first else set()
+        found.append(same)
+    return found
+
+
+def _travelers(listed: Any, sent: str) -> list[SuggestedTraveler]:
+    if not isinstance(listed, list) or len(listed) > MAX_TRAVELERS:
+        return []
+    named: list[SuggestedTraveler] = []
+    for each in listed:
+        if not isinstance(each, dict) or not isinstance(each.get("name"), str) or not isinstance(each.get("seat"), str):
+            continue
+        name, seat = " ".join(each["name"].split()), SEAT.fullmatch(each["seat"].strip())
+        if name and len(name) <= NAME_LIMIT and "@" not in name and seat is not None and f"{seat[1]}{seat[2].upper()}" in set().union(*_seats_near(sent, name)):
+            named.append({"name": name, "seat": f"{seat[1]}{seat[2].upper()}"})
+    names = [t["name"].casefold() for t in named]
+    single = [t for t in named if names.count(t["name"].casefold()) == 1]
+    seats = [t["seat"] for t in single]
+    return [t for t in single if seats.count(t["seat"]) == 1]
+
+
 def _details(kind: str, values: dict[str, str], sent: str) -> Suggestion:
     out: Suggestion = {}
     if kind == "flight":
@@ -309,7 +367,7 @@ def _flight_hours(start: str, end: str, origin: str, destination: str) -> float:
     return (ended - began) / timedelta(hours=1)
 
 
-def booking(found: dict[str, Any], sent: str) -> Suggestion:
+def booking(found: dict[str, Any], sent: str, seats: bool = False) -> Suggestion:
     if not found:
         raise AiError(NO_BOOKING)
     if any(k in FIELDS and not isinstance(v, str) for k, v in found.items()):
@@ -349,6 +407,8 @@ def booking(found: dict[str, Any], sent: str) -> Suggestion:
     if kind == "car" and "destination" not in out:
         out["destination"] = out["origin"]
     out.update(_details(kind, values, sent))
+    if seats and kind == "flight" and (travelers := _travelers(found.get("travelers"), sent)):
+        out["travelers"] = travelers
     if (cost := _total(found, sent)) is not None:
         out["price_minor"], out["price_currency"] = cost.amount_minor, cost.currency
     return out
@@ -368,7 +428,7 @@ def _left_out(kept: int, total: int, first: AiError) -> str:
     return f"Only {kept} of the AI’s {total} bookings could be used. {first}"
 
 
-def parse(content: Any, sent: str) -> Reading:
+def parse(content: Any, sent: str, seats: bool = False) -> Reading:
     if not isinstance(content, str):
         raise AiError(BAD_REPLY)
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip())
@@ -387,7 +447,7 @@ def parse(content: Any, sent: str) -> Reading:
     dropped: list[AiError] = []
     for each in listed:
         try:
-            one = booking(each, sent)
+            one = booking(each, sent, seats)
         except AiError as e:
             dropped.append(e)
             continue
@@ -444,7 +504,7 @@ def suggest(cfg: Config, text: str, known: tuple[str, ...] = ()) -> Reading:
     sent = prepare(cfg, text, known)
     if not sent.strip():
         raise AiError(NO_BOOKING)
-    return parse(_ask(cfg, sent, SYSTEM), sent)
+    return parse(_ask(cfg, sent, system_for(cfg)), sent, cfg.mode == LOCAL)
 
 
 SYSTEM_DESTINATION = (

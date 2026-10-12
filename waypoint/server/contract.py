@@ -59,6 +59,7 @@ class ScanSummary(TypedDict):
     followups: int
     with_facts: int
     attached: int
+    ai_asked: int
 
 
 class Mailbox(TypedDict):
@@ -160,6 +161,11 @@ class Disconnected(TypedDict):
     revoked: bool
 
 
+class AiTraveler(TypedDict):
+    name: str
+    seat: str
+
+
 class AiSuggestion(TypedDict):
     kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
     origin: str
@@ -177,6 +183,7 @@ class AiSuggestion(TypedDict):
     deck: NotRequired[str]
     flight_number: NotRequired[str]
     cabin: NotRequired[str]
+    travelers: NotRequired[list[AiTraveler]]
     price_minor: NotRequired[int]
     price_currency: NotRequired[str]
     sources: NotRequired[dict[str, str]]
@@ -203,6 +210,7 @@ class ReviewItem(TypedDict):
     reason: Literal["no_markup", "incomplete", "broken", "generic"]
     suggestions: list[AiSuggestion]
     suggestion_error: str | None
+    auto_read: bool
     count: int
     others: list[ReviewOther]
 
@@ -323,6 +331,7 @@ class AiSettings(TypedDict):
     ollama_model: str
     openrouter_model: str
     key: Literal["env", "saved"] | None
+    auto: bool
 
 
 class LogoDevStatus(TypedDict):
@@ -351,6 +360,7 @@ class AiBody(TypedDict):
     ollama_model: NotRequired[str]
     openrouter_model: NotRequired[str]
     openrouter_key: NotRequired[str]
+    auto: NotRequired[bool]
 
 
 class Person(TypedDict):
