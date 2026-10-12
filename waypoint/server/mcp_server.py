@@ -264,7 +264,7 @@ _SEGMENT_FIELDS = _fields("kind (flight, hotel, car, train, cruise or parking), 
                           "destination (a flight's airport codes; a stay's, a rental's or a parking lot's place), start_zone and end_zone (IANA; a "
                           "flight's come from its airports), details (flight_number, terminal, seat, cabin, room, car_class, "
                           "address, phone, ship, deck, space_type, vehicle, notes: texts), itinerary (a cruise's ports of call in order: [{name, zone, arrive_local, depart_local}], "
-                          "times local to the port or null), manage_url, travelers ([{person_id}] or [{name}], the person asking when left out) and price "
+                          "times local to the port or null), manage_url, travelers ([{person_id}] or [{name}], the person asking when left out; a stay, rental or parking spot is for everyone on its trip and ignores travelers) and price "
                           "({amount_minor, currency}: the booking's total in the currency's smallest unit, never converted, like {\"amount_minor\": 124000, "
                           "\"currency\": \"USD\"} for $1,240.00; null removes it; a cost set this way counts as entered by hand, so an email never replaces it).")
 _TRIP_FIELDS = _fields("name, and optionally destination, notes; start_date and end_date (YYYY-MM-DD) for a trip with no segments yet; "

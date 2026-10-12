@@ -199,7 +199,8 @@ class VisibilityTests(Assistants):
         with db.session() as conn:
             solo = self.book(conn, self.jane, {**OUT, "start_local": "2026-11-01T19:00", "end_local": "2026-11-02T07:10"}, "Solo", self.jane.person_id)
             shared = self.book(conn, self.jane, {**OUT, "start_local": "2026-12-01T19:00", "end_local": "2026-12-02T07:10"}, "Shared", self.jane.person_id)
-            added = trips.add_segment(conn, self.jane, {**HOTEL, "travelers": [{"person_id": self.sam.person_id, "name": None}]}, shared["id"])
+            added = trips.add_segment(conn, self.jane, {**OUT, "start_local": "2026-12-03T19:00", "end_local": "2026-12-04T07:10",
+                                                       "travelers": [{"person_id": self.sam.person_id, "name": None}]}, shared["id"])
             assert added is not None
             same = self.book(conn, self.jane, {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"}, "Same", self.jane.person_id)
         self.addCleanup(self.drop, solo["id"], shared["id"], same["id"])
@@ -216,7 +217,8 @@ class VisibilityTests(Assistants):
         with db.session() as conn:
             solo = self.book(conn, self.jane, {**OUT, "start_local": "2026-11-01T19:00", "end_local": "2026-11-02T07:10"}, "Solo", self.jane.person_id)
             shared = self.book(conn, self.jane, {**OUT, "start_local": "2026-12-01T19:00", "end_local": "2026-12-02T07:10"}, "Shared", self.jane.person_id)
-            added = trips.add_segment(conn, self.jane, {**HOTEL, "travelers": [{"person_id": self.sam.person_id, "name": None}]}, shared["id"])
+            added = trips.add_segment(conn, self.jane, {**OUT, "start_local": "2026-12-03T19:00", "end_local": "2026-12-04T07:10",
+                                                       "travelers": [{"person_id": self.sam.person_id, "name": None}]}, shared["id"])
             assert added is not None
         self.addCleanup(self.drop, solo["id"], shared["id"])
         self.addCleanup(setattr, _current, "user", None)
@@ -272,6 +274,29 @@ class VisibilityTests(Assistants):
             self.assertEqual(bad.exception.status, 400)
         self.assertEqual(self.tool(ALL, "update_trip", {"trip_id": trip, "fields": {"people": [self.jane.person_id]}})["people"],
                          [self.jane.person_id])
+
+    def test_a_stay_an_assistant_adds_or_edits_is_for_everyone_and_the_travellers_it_sends_are_ignored(self):
+        trip = self.jane_trip["id"]
+        got = self.tool(ALL, "add_segment", {"trip_id": trip, "fields": {**HOTEL, "travelers": [{"person_id": self.sam.person_id}]}})
+        self.addCleanup(self.tool, ALL, "remove_segment", {"segment_id": got["id"]})
+        self.assertEqual([t["person_id"] for t in got["travelers"]], [self.jane.person_id])
+        edited = self.tool(ALL, "update_segment", {"segment_id": got["id"], "fields": {"travelers": [{"person_id": self.guest}]}})
+        self.assertEqual([t["person_id"] for t in edited["travelers"]], [self.jane.person_id])
+        with db.session() as conn:
+            self.assertTrue(conn.orm.get(Segment, got["id"]).travelers_from_trip)
+            self.assertIsNone(trips.get(conn, self.sam, trip))
+
+    def test_an_assistant_turning_a_flight_into_a_stay_makes_it_for_everyone(self):
+        trip = self.jane_trip["id"]
+        flight = self.tool(ALL, "add_segment", {"trip_id": trip, "fields": {**OUT, "start_local": "2026-10-05T19:00", "end_local": "2026-10-06T07:10",
+                                                                          "confirmation": "TOSTAY"}})
+        self.addCleanup(self.tool, ALL, "remove_segment", {"segment_id": flight["id"]})
+        self.assertEqual([t["person_id"] for t in flight["travelers"]], [self.jane.person_id])
+        stay = self.tool(ALL, "update_segment", {"segment_id": flight["id"], "fields": {
+            "kind": "hotel", "origin": "Harbour Hotel", "destination": "", "start_zone": "Europe/London", "end_zone": "Europe/London"}})
+        self.assertEqual([t["person_id"] for t in stay["travelers"]], [self.jane.person_id])
+        with db.session() as conn:
+            self.assertTrue(conn.orm.get(Segment, flight["id"]).travelers_from_trip)
 
     def set_people(self, trip_id, ids):
         with db.session() as conn:

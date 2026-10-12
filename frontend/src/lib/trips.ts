@@ -214,10 +214,10 @@ export function tripTravellers(segments: Segment[]): TripTraveller[] {
 export const showTripTravellers = (everyone: TripTraveller[], viewer: number | null): boolean =>
   everyone.length > 1 || (everyone.length === 1 && (viewer === null || everyone[0].key !== `person:${viewer}`));
 
-const LISTS_NO_TRAVELLERS: Segment["kind"][] = ["hotel", "car", "parking", "cruise"];
+const LISTS_NO_TRAVELLERS: Segment["kind"][] = ["hotel", "car", "parking"];
 
 export function showBookingTravellers(s: Segment, everyone: TripTraveller[]): boolean {
-  if (s.kind === "flight") return true;
+  if (s.kind === "flight" || s.kind === "cruise") return true;
   if (LISTS_NO_TRAVELLERS.includes(s.kind)) return false;
   if (s.status === "cancelled" || s.travelers.some((who) => who.seat)) return true;
   const here = new Set(s.travelers.map(travellerKey));

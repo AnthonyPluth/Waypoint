@@ -1,0 +1,20 @@
+{
+  "name": "booking-travellers",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Seattle') >> visible=true" },
+    { "wait_for": "[data-itinerary]" },
+    { "scroll_to": "[data-itinerary]" },
+    { "screenshot": "cruise-card" },
+    { "click": "button:has-text('Add a booking') >> visible=true" },
+    { "wait_for": "label:has-text('What is it') select" },
+    { "select": { "selector": "label:has-text('What is it') select", "index": 1 } },
+    { "scroll_to": "label:has-text('Time zone')" },
+    { "screenshot": "hotel-form-no-picker" },
+    { "select": { "selector": "label:has-text('What is it') select", "index": 4 } },
+    { "wait_for": "legend:has-text('Who’s travelling')" },
+    { "scroll_to": "label:has-text('Manage link')" },
+    { "screenshot": "cruise-form-picker" }
+  ]
+}
