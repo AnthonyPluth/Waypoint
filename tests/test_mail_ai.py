@@ -509,7 +509,7 @@ class SuggestTests(unittest.TestCase):
         address = "canary.traveller+5k2m@canary-mail.example.com"
         text = (f"From: Example Air <{address}>\nTo: {address.upper()}\nConfirmation code: QW4R7T flight BOS DEN\n"
                 f"Questions: mailto:{address}")
-        for cfg in (self.local, self.router):
+        for cfg in (self.router,):
             self.fake.reset()
             with no_leaks(self, address, address.upper(), "canary-mail"):
                 reading = ai.suggest(cfg, text)
@@ -519,12 +519,43 @@ class SuggestTests(unittest.TestCase):
             self.assertIn(ai.EMAIL_REMOVED, sent)
             self.assertEqual(reading.bookings, [GOOD])
 
-    def test_what_is_sent_is_the_redacted_text_only(self):
-        ai.suggest(self.local, f"Confirmation code: QW4R7T BOS DEN\nKnown Traveler Number: TT87654321\n> {QUOTED}")
+    def test_what_is_sent_hosted_is_the_redacted_text_only(self):
+        ai.suggest(self.router, f"Confirmation code: QW4R7T BOS DEN\nKnown Traveler Number: TT87654321\n> {QUOTED}")
         sent = json.dumps(self.fake.requests[0][2])
         self.assertIn("QW4R7T", sent)
         self.assertNotIn("TT87654321", sent)
         self.assertNotIn(QUOTED, sent)
+
+    def test_a_local_request_carries_the_text_verbatim(self):
+        address = "canary.traveller+5k2m@canary-mail.example.com"
+        text = (f"From: Example Air <{address}>\nConfirmation code: QW4R7T flight BOS DEN\nKnown Traveler Number: TT87654321\n"
+                f"Member FX LOY-44 00123 and 4111222233334444\n> {QUOTED}\nOn Mon, 5 Oct 2026, Jane Doe wrote:\nearlier\n-- \n"
+                "Unsubscribe here\nSaved fxloy4400123\n")
+        reading = ai.suggest(self.local, text, known=("FXLOY-4400123",))
+        sent = self.fake.requests[0][2]["messages"][1]["content"]
+        self.assertEqual(sent, text)
+        self.assertEqual(reading.bookings, [GOOD])
+        for gone in ("TT87654321", "FX LOY-44 00123", "fxloy4400123", "4111222233334444", address, QUOTED, "Unsubscribe", "earlier"):
+            self.assertIn(gone, sent)
+        self.assertNotIn(ai.REMOVED, sent)
+        self.assertNotIn(ai.EMAIL_REMOVED, sent)
+
+    def test_a_long_local_text_is_not_cut(self):
+        text = "Confirmation code: QW4R7T BOS DEN\n" + "word " * 10_000
+        ai.suggest(self.local, text)
+        self.assertEqual(self.fake.requests[0][2]["messages"][1]["content"], text)
+
+    def test_a_blank_local_text_is_not_sent(self):
+        with self.assertRaises(ai.AiError) as caught:
+            ai.suggest(self.local, "  \n ")
+        self.assertEqual((str(caught.exception), self.fake.requests), (ai.NO_BOOKING, []))
+
+    def test_hosted_still_removes_what_local_keeps(self):
+        text = "Confirmation code: QW4R7T BOS DEN\nKnown Traveler Number: TT87654321\nSaved fxloy4400123 mail a@b.example"
+        ai.suggest(self.router, text, known=("FXLOY-4400123",))
+        sent = self.fake.requests[0][2]["messages"][1]["content"]
+        for gone in ("TT87654321", "fxloy4400123", "a@b.example"):
+            self.assertNotIn(gone, sent)
 
     def test_a_service_that_refuses_or_fails_is_a_fixed_message(self):
         for status, text in ((401, ai.REFUSED), (403, ai.REFUSED), (429, ai.LIMITED), (500, ai.FAILED)):
@@ -624,16 +655,33 @@ class ScanTests(ScanAiCase):
         self.assertEqual(self.scan().bookings, 2)
         self.assertEqual(self.fake.requests, [])
 
-    def test_the_request_carries_the_body_but_none_of_the_ids_and_nothing_else_leaks(self):
-        self.turn_on()
+    def test_the_hosted_request_carries_the_body_but_none_of_the_ids_and_nothing_else_leaks(self):
+        os.environ[ai.KEY_ENV] = KEY
+        self.turn_on("openrouter")
+        with db.session() as conn:
+            db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "some/model")
         self.put("no_markup_ids")
-        with no_leaks(self, *IDS, QUOTED, FOOTER, database=self.path):
-            with no_leaks(self, BODY, database=self.path, sent_ok=True):
-                self.scan()
+        with mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True)):
+            with no_leaks(self, *IDS, QUOTED, FOOTER, database=self.path):
+                with no_leaks(self, BODY, database=self.path, sent_ok=True):
+                    self.scan()
         sent = json.dumps(self.fake.requests[0][2])
         self.assertIn(BODY, sent)
         for private in (*IDS, QUOTED, FOOTER, "CANARY-SUBJECT", "Your trip is booked"):
             self.assertNotIn(private, sent)
+
+    def test_the_local_request_carries_the_whole_text_and_nothing_else_leaks(self):
+        self.turn_on()
+        self.put("no_markup_ids")
+        with no_leaks(self, *IDS, QUOTED, FOOTER, database=self.path, sent_ok=True):
+            with no_leaks(self, BODY, database=self.path, sent_ok=True):
+                result = self.scan()
+        sent = self.fake.requests[0][2]["messages"][1]["content"]
+        for kept in (BODY, *IDS, QUOTED, FOOTER):
+            self.assertIn(kept, sent)
+        self.assertNotIn("CANARY-SUBJECT", sent)
+        self.assertNotIn(ai.REMOVED, sent)
+        self.assertEqual(result.state, "done")
 
     def test_openrouter_is_asked_with_zero_data_retention_and_its_key(self):
         os.environ[ai.KEY_ENV] = KEY
