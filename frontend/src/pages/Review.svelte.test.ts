@@ -18,7 +18,7 @@ const settled = () => waitFor(() => { expect(screen.queryByRole("dialog")).toBeN
 
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
   id: 1, address: "ana@gmail.example", owner: "Ana Doe", mine: true, sender_domain: "example-air.example", known_sender: false, holds_bookings: false, subject: null, has_email: true, received: "2026-10-17",
-  reason: "no_markup", gmail_url: "https://mail.google.com/mail/?authuser=ana%40gmail.example#all/abc", suggestions: [], suggestion_error: null, count: 1, others: [], ...extra });
+  reason: "no_markup", suggestions: [], suggestion_error: null, count: 1, others: [], ...extra });
 const who = (extra: Partial<WhoIsThis> = {}): WhoIsThis => ({
   id: 7, name: "DOE/MIA MISS", segment_id: 3, trip_id: 2, kind: "flight", provider: "Example Air", origin: "JFK", destination: "SFO",
   start_local: "2026-12-08T08:00", start_zone: "America/New_York", ...extra });
@@ -74,10 +74,8 @@ describe("Review", () => {
     expect(within(list).getByText("Mail from example-air.example on 2026-10-17")).toBeInTheDocument();
     expect(within(list).getByText("Sent 2026-10-17 · to ana@gmail.example")).toBeInTheDocument();
     expect(within(list).getByText(REASONS.no_markup)).toBeInTheDocument();
-    const open = within(list).getByRole("link", { name: /Open .Mail from example-air.example on 2026-10-17. in Gmail/ });
-    expect(open).toHaveAttribute("href", "https://mail.google.com/mail/?authuser=ana%40gmail.example#all/abc");
-    expect(open).toHaveAttribute("rel", "noopener noreferrer");
-    expect(open).toHaveAttribute("target", "_blank");
+    expect(within(list).queryByRole("link")).toBeNull();
+    expect(within(list).getByRole("button", { name: /View email .Mail from example-air.example on 2026-10-17./ })).toBeInTheDocument();
   });
 
   it("names an item by its message's subject, and says who it came from beside it", async () => {
@@ -98,20 +96,22 @@ describe("Review", () => {
     expect(screen.getAllByRole("button", { name: /ignore/i })).toHaveLength(1);
   });
 
-  it("shows an item shared by another member with whose mailbox it is, and only Add by hand and Dismiss", async () => {
-    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe", gmail_url: null, address: "sam@gmail.example" })], who: [], ai: true };
+  it("shows an item shared by another member with whose mailbox it is, and only View email, Add by hand and Dismiss", async () => {
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe", address: "sam@gmail.example" })], who: [], ai: true };
     render(ReviewPage);
     const row = await screen.findByTestId("review-item");
     expect(row).toHaveTextContent("in Sam Doe’s mailbox, shared with the household");
     expect(row).not.toHaveTextContent("sam@gmail.example");
+    expect(within(row).getByRole("button", { name: /View email .Mail from example-air.example.* on 2026-10-17/ })).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: /Add .Mail from example-air.example.* by hand/ })).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: /Dismiss/ })).toBeInTheDocument();
-    for (const name of [/Open .* in Gmail/, /Ask AI about/, /ignore example-air.example/i]) expect(within(row).queryByRole("button", { name }) ?? within(row).queryByRole("link", { name })).toBeNull();
+    for (const name of [/Ask AI about/, /ignore example-air.example/i]) expect(within(row).queryByRole("button", { name })).toBeNull();
+    expect(within(row).queryByRole("link")).toBeNull();
     expect(screen.queryByRole("button", { name: /Ask AI about all/ })).toBeNull();
   });
 
   it("opens a shared item's message beside the form like any other, and dismisses it", async () => {
-    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe", gmail_url: null }), item({ id: 5, mine: true })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" }), item({ id: 5, mine: true })], who: [], ai: false };
     render(ReviewPage);
     const row = (await screen.findAllByTestId("review-item"))[0];
     await userEvent.click(within(row).getByRole("button", { name: /by hand/ }));
@@ -633,7 +633,7 @@ describe("Review: the message beside the form", () => {
     expect(region.querySelector("img, script")).toBeNull();
   });
 
-  it("shows a message's HTML as formatted text, with a switch to its plain text and back", async () => {
+  it("shows a message's HTML as formatted text, with no switch to plain text", async () => {
     vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview")
       ? { text: "Gate B12", html: "<p>Gate <b>B12</b></p><table><tr><td>Seat</td><td>12A</td></tr></table>", truncated: false }
       : path === "/api/people" ? { people: [] } : held) as never);
@@ -642,11 +642,7 @@ describe("Review: the message beside the form", () => {
     const formatted = await screen.findByTestId("preview-html");
     expect(formatted.getAttribute("srcdoc")).toContain("<b>B12</b>");
     expect(formatted.getAttribute("srcdoc")).toContain("<td>Seat</td>");
-    await userEvent.click(screen.getByRole("button", { name: "Show as plain text" }));
-    expect(screen.queryByTestId("preview-html")).toBeNull();
-    expect(screen.getByTestId("preview")).toHaveTextContent("Gate B12");
-    await userEvent.click(screen.getByRole("button", { name: "Show as formatted" }));
-    expect(await screen.findByTestId("preview-html")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show as/ })).toBeNull();
   });
 
   it("offers no switch for a message with no HTML part", async () => {
@@ -689,6 +685,39 @@ describe("Review: the message beside the form", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
     expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
     expect(screen.getByLabelText("Provider")).toBeInTheDocument();
+  });
+
+  it("opens the message from View email without starting the form, and closes it again", async () => {
+    render(ReviewPage);
+    const view = await screen.findByRole("button", { name: /View email .Mail from example-air.example on 2026-10-17./ });
+    expect(view).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(view);
+    expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
+    expect(view).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByLabelText("Provider")).toBeNull();
+    expect(calls).toContainEqual(["/api/review/1/preview", undefined, undefined]);
+    await userEvent.click(view);
+    expect(screen.queryByTestId("preview")).toBeNull();
+    expect(view).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("shows a shared item's message from View email, and the same message as Add by hand", async () => {
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /View email/ }));
+    const viewed = await screen.findByTestId("preview");
+    const viewedText = viewed.textContent;
+    await userEvent.click(screen.getByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    expect(within(await screen.findByRole("dialog")).getByTestId("preview").textContent).toBe(viewedText);
+    expect(screen.getByLabelText("Provider")).toBeInTheDocument();
+  });
+
+  it("keeps the message open when Add by hand is cancelled, if View email opened it", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /View email/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
   });
 
   it("keeps the message nowhere but the page", async () => {
@@ -765,6 +794,13 @@ describe("Review: Ask AI", () => {
 describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as const)("Review on %s", (_name, phone, side) => {
   beforeEach(() => { viewport.phone = phone; });
   afterEach(() => { viewport.phone = false; });
+
+  it("opens View email's message on the page, not in a sheet", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /View email/ }));
+    expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 
   it("opens Add by hand in a sheet with the message above the form, and Cancel closes it", async () => {
     render(ReviewPage);

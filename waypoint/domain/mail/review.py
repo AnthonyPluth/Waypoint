@@ -5,7 +5,6 @@ from typing import Any, Literal, TypedDict
 
 from sqlalchemy import and_, delete, or_, select, update
 
-from ...providers import gmail
 from ...storage import db, stored_mail
 from ...storage.models import IgnoredSender, Mailbox, Person, ReviewItem, ScannedMessage, TrustedSender
 from .. import trips, visibility
@@ -37,7 +36,6 @@ class ItemOut(TypedDict):
     has_email: bool
     received: str | None
     reason: Reason
-    gmail_url: str | None
     suggestions: list[ai.Suggestion]
     suggestion_error: str | None
     count: int
@@ -103,7 +101,6 @@ def listing(conn: db.Connection, owner: str) -> list[ItemOut]:
              "sender_domain": r["sender_domain"], "known_sender": triage.sender_in(r["sender_domain"], query.SENDERS), "holds_bookings": r["matches"] is not None, "subject": subjects.get((r["mailbox_id"], r["message_id"])),
              "has_email": (r["mailbox_id"], r["message_id"]) in subjects,
              "received": r["received"], "reason": r["reason"],
-             "gmail_url": gmail.open_url(r["address"], r["message_id"]) if r["owner_sub"] == owner else None,
              "suggestions": suggestions_of(r["suggestion"]), "suggestion_error": r["suggestion_error"],
              "count": len(members),
              "others": [{"id": o["id"], "subject": subjects.get((o["mailbox_id"], o["message_id"])),

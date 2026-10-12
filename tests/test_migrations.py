@@ -612,6 +612,7 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(c.execute(select(schema.review_items.c.reason)).scalars().all(), ["incomplete"])
             command.upgrade(db.alembic_config(c), "head")
             self.assertIsNone(c.execute(select(schema.review_items.c.gap)).scalar())
+        self.assertEqual(drift(self.path), [])
 
     def test_0027_adds_the_reference_to_review_items_and_the_booking_to_seen_messages_and_takes_them_away_leaving_the_rows(self):
         from alembic import command

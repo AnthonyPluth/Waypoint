@@ -596,7 +596,6 @@ export interface ReviewItem {
   has_email: boolean;
   received: string | null;
   reason: "no_markup" | "incomplete" | "broken" | "generic";
-  gmail_url: string | null;
   suggestions: AiSuggestion[];
   suggestion_error: string | null;
   count: number;
