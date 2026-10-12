@@ -158,7 +158,7 @@
   }, { busy: (on) => (on ? asking_ai.add(item.id) : asking_ai.delete(item.id)) });
 
   let asking_all = $state(false);
-  const unasked = $derived(review?.ai ? review.items.filter((i) => i.mine && !i.suggestions.length && !asking_ai.has(i.id)) : []);
+  const unasked = $derived(review?.ai ? review.items.filter((i) => !i.suggestions.length && !asking_ai.has(i.id)) : []);
   const askAll = (items: ReviewItem[]) => act(async () => {
     let done = 0;
     try {
@@ -483,7 +483,7 @@
               </div>
               <div class="flex basis-full flex-wrap gap-2">
                 <Button variant="outline" size="sm" aria-expanded={viewing === item.id} onclick={() => toggleView(item)} aria-label={`View email “${subject(item)}”`}>View email</Button>
-                {#if review.ai && item.mine && item.reason !== "generic"}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestions.length ? "Ask again" : "Ask AI"}</Button>{/if}
+                {#if review.ai && item.reason !== "generic"}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestions.length ? "Ask again" : "Ask AI"}</Button>{/if}
                 {#if item.suggestions.length}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : item.suggestions.length > 1 ? `Check the AI’s ${item.suggestions.length} suggestions for “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>{item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
                 {#if item.sender_domain && item.mine}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Not travel: ignore ${item.sender_domain}`}>Not travel: ignore this sender</Button>{/if}
