@@ -4,6 +4,8 @@ LAST_BACKUP = "last_backup"
 
 DISTANCE_UNIT = "distance_unit"
 
+HOME = "home"
+
 FLIGHT_STATUS_MONTH = "flight_status_month"
 FLIGHT_STATUS_CALLS = "flight_status_calls"
 FLIGHT_STATUS_PAUSED = "flight_status_paused"

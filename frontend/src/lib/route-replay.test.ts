@@ -4,6 +4,7 @@ import { activeStop, cameraAt, canReplay, legProgress, labelLit, legsOf, localRu
 import { segment, trip } from "../test/fixtures";
 
 const places: TripPlaces = {
+  home: null,
   airports: [
     { code: "MSP", city: "Minneapolis", latitude: 44.8848, longitude: -93.2223 },
     { code: "SFO", city: "San Francisco", latitude: 37.6213, longitude: -122.379 },
@@ -139,7 +140,7 @@ describe("whether a trip can be replayed", () => {
     expect(canReplay(past, "2025-12-01", places)).toBe(false);
     expect(canReplay(past, "2026-01-01", null)).toBe(false);
     expect(canReplay(trip([stay]), "2026-01-01", places)).toBe(false);
-    expect(canReplay(trip([out]), "2026-01-01", { airports: [places.airports[0]], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] })).toBe(false);
+    expect(canReplay(trip([out]), "2026-01-01", { home: null, airports: [places.airports[0]], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] })).toBe(false);
   });
 
   it("counts the most stops a trip could have before asking for coordinates", () => {

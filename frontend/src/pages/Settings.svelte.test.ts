@@ -117,7 +117,7 @@ describe("Settings tabs", () => {
     expect(heading("Account")).toBeNull();
     view.unmount();
     view = onTab("travel");
-    for (const name of ["Reminders and calendar", "Distances", "Brand logos", "Import past flights"]) expect(heading(name)).not.toBeNull();
+    for (const name of ["Reminders and calendar", "Home", "Distances", "Brand logos", "Import past flights"]) expect(heading(name)).not.toBeNull();
     expect(heading("Gmail")).toBeNull();
     view.unmount();
     view = onTab("data");

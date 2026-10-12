@@ -8,7 +8,7 @@ from sqlalchemy import select
 from ..storage import db, roads, states
 from ..storage.geocode import Precision
 from ..storage.models import Airport, Segment
-from . import stats, trips
+from . import home, stats, trips
 from .visibility import Viewer
 
 
@@ -54,6 +54,7 @@ class StateLine(TypedDict):
 
 
 class Places(TypedDict):
+    home: home.HomePoint | None
     airports: list[AirportPoint]
     cities: list[CityPoint]
     stays: list[StayPoint]
@@ -196,8 +197,13 @@ def places(conn: db.Connection, viewer: Viewer, trip_id: int) -> Places | None:
     airport_at = {a.code: (a.latitude, a.longitude) for a in found}
     flights = [(airport_at[o], airport_at[d]) for s in live if s["kind"] == "flight"
                for o, d in [((s["origin"] or "").strip().upper(), (s["destination"] or "").strip().upper())] if o in airport_at and d in airport_at]
+    at_home = home.point(conn)
+    road_trip = not any(s["kind"] in BREAKING_KINDS for s in live)
     waypoints = [(a.latitude, a.longitude) for a in found] + list(points.values()) + list(located.values())
+    if at_home and road_trip:
+        waypoints.append((at_home["latitude"], at_home["longitude"]))
     return {
+        "home": at_home,
         "airports": [{"code": a.code, "city": a.city, "latitude": a.latitude, "longitude": a.longitude} for a in sorted(found, key=lambda a: a.code)],
         "cities": [{"city": c, "latitude": points[c][0], "longitude": points[c][1]} for c in sorted(points)],
         "stays": [{"segment_id": g.id, "latitude": g.latitude, "longitude": g.longitude, "precision": cast(Precision, g.geo_precision or "city")}

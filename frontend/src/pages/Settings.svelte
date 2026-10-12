@@ -7,6 +7,7 @@
   import AiSection from "$lib/components/settings/AiSection.svelte";
   import DistanceSection from "$lib/components/settings/DistanceSection.svelte";
   import DataSection from "$lib/components/settings/DataSection.svelte";
+  import HomeSection from "$lib/components/settings/HomeSection.svelte";
   import GmailSection from "$lib/components/settings/GmailSection.svelte";
   import LogosSection from "$lib/components/settings/LogosSection.svelte";
   import ImportSection from "$lib/components/settings/ImportSection.svelte";
@@ -94,6 +95,8 @@
     <AiSection />
   {:else if tab === "travel"}
     <RemindersSection />
+
+    <HomeSection />
 
     <DistanceSection />
 

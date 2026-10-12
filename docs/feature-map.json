@@ -272,6 +272,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_home.py",
         "tests/test_trip_roads.py",
         "tests/test_trip_states.py",
         "tests/test_trips.py"
@@ -651,6 +652,55 @@
       ],
       "docs": [
         "start/stats"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/home",
+      "handler": "waypoint/server/api/home.py:api_home",
+      "web": [
+        "frontend/src/lib/components/settings/HomeSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_home.py",
+        "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/home",
+      "handler": "waypoint/server/api/home.py:api_home_save",
+      "web": [
+        "frontend/src/lib/components/settings/HomeSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_home.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_trip_destination.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/home",
+      "handler": "waypoint/server/api/home.py:api_home_clear",
+      "web": [
+        "frontend/src/lib/components/settings/HomeSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_home.py",
+        "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/trips"
       ]
     },
     {
