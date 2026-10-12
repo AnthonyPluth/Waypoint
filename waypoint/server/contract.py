@@ -160,6 +160,11 @@ class Disconnected(TypedDict):
     revoked: bool
 
 
+class AiTraveler(TypedDict):
+    name: str
+    seat: str
+
+
 class AiSuggestion(TypedDict):
     kind: Literal["flight", "hotel", "car", "train", "cruise", "parking"]
     origin: str
@@ -177,6 +182,7 @@ class AiSuggestion(TypedDict):
     deck: NotRequired[str]
     flight_number: NotRequired[str]
     cabin: NotRequired[str]
+    travelers: NotRequired[list[AiTraveler]]
     price_minor: NotRequired[int]
     price_currency: NotRequired[str]
     sources: NotRequired[dict[str, str]]

@@ -563,6 +563,31 @@ describe("Review: the AI’s suggestion", () => {
     expect(body).toMatchObject({ kind: "flight", confirmation: "QW4R7U", origin: "BOS", destination: "DEN", start_local: "2026-12-02T07:15" });
   });
 
+  it("shows each traveller’s seat outlined, matches a known person, and sends the seats when added", async () => {
+    const seated = { ...suggestion, travelers: [{ name: "Doe/Jane", seat: "23A" }, { name: "Sam Printed", seat: "23B" }] };
+    held = { matches: [], items: [item({ suggestions: [seated as never] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText("Seat for Doe/Jane")).toHaveValue("23A");
+    expect(screen.getByLabelText("Seat for Sam Printed")).toHaveClass("ring-primary");
+    await userEvent.clear(screen.getByLabelText("Seat for Sam Printed"));
+    await userEvent.type(screen.getByLabelText("Seat for Sam Printed"), "24C");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    const [, , body] = calls.find(([p]) => p === "/api/segments")!;
+    expect((body as { travelers: unknown }).travelers).toEqual([{ person_id: 1, seat: "23A" }, { person_id: null, name: "Sam Printed", seat: "24C" }]);
+  });
+
+  it("sends no travellers for a suggestion that read no seats", async () => {
+    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.queryByRole("group", { name: "Seats" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
+    expect(calls.find(([p]) => p === "/api/segments")![2]).not.toHaveProperty("travelers");
+  });
+
   it("shows the AI’s address and phone outlined, and sends them when added", async () => {
     const stay = { kind: "hotel" as const, provider: "Example Stays", confirmation: "QW4R7T", origin: "Harbour Hotel", start_local: "2026-12-02T15:00",
       end_local: "2026-12-05T11:00", start_zone: "Europe/London", address: "1 Quay Road, Bristol BS1 4AA, UK", phone: "+44 117 555 0100" };

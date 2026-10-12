@@ -31,9 +31,15 @@ export interface AiSuggestion {
   deck?: string;
   flight_number?: string;
   cabin?: string;
+  travelers?: AiTraveler[];
   price_minor?: number;
   price_currency?: string;
   sources?: Record<string, string>;
+}
+
+export interface AiTraveler {
+  name: string;
+  seat: string;
 }
 
 export interface Airport {
