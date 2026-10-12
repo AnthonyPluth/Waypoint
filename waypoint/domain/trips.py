@@ -49,6 +49,18 @@ class Invalid(ValueError):
     pass
 
 
+class NamedPerson(TypedDict):
+    id: int
+    name: str
+
+
+class NeedsConfirmation(Invalid):
+    def __init__(self, message: str, see_booking: list[NamedPerson], see_trip: list[NamedPerson]):
+        super().__init__(message)
+        self.see_booking = see_booking
+        self.see_trip = see_trip
+
+
 class TravelerIn(TypedDict):
     person_id: int | None
     name: str | None
@@ -1071,7 +1083,29 @@ def split(conn: db.Connection, viewer: Viewer, trip_id: int, segment_ids: Sequen
     return _trip_outs(conn, viewer, [new])[0]
 
 
-def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: int | None) -> TripOut | None:
+def _named(conn: db.Connection, ids: set[int]) -> list[NamedPerson]:
+    names = people.existing(conn, sorted(ids))
+    return sorted(({"id": i, "name": names[i]} for i in ids if i in names), key=lambda p: (p["name"], p["id"]))
+
+
+def _needs_confirmation(conn: db.Connection, seg: Segment, target: Trip) -> None:
+    _, who = _involved(conn, [target.id])
+    moving = {t.person_id for t in conn.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id)).all()
+              if t.person_id is not None} | ({seg.booked_by} if seg.booked_by is not None else set())
+    there = who[target.id] | ({target.booked_by} if target.booked_by is not None else set())
+    see_booking, see_trip = _named(conn, there - moving), _named(conn, moving - there)
+    if not see_booking and not see_trip:
+        return
+    parts = []
+    if see_booking:
+        parts.append("could newly see this booking: " + ", ".join(p["name"] for p in see_booking))
+    if see_trip:
+        parts.append("could newly see that trip: " + ", ".join(p["name"] for p in see_trip))
+    said = "; ".join(parts)
+    raise NeedsConfirmation(f"Moving this changes who sees what. {said[0].upper()}{said[1:]}. Confirm to move it anyway.", see_booking, see_trip)
+
+
+def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: int | None, confirmed: bool = False) -> TripOut | None:
     seg = visibility.visible_segment(conn, viewer, segment_id)
     if seg is None:
         return None
@@ -1090,14 +1124,8 @@ def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: 
         target = visibility.visible_trip(conn, viewer, trip_id)
         if target is None:
             return None
-        if not viewer.household:
-            _, who = _involved(conn, [seg.trip_id, target.id])
-            moving = {t.person_id for t in conn.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id)).all()
-                      if t.person_id is not None} | ({seg.booked_by} if seg.booked_by is not None else set())
-            there = who[target.id] | ({target.booked_by} if target.booked_by is not None else set())
-            if moving != there:
-                raise Invalid("That trip involves different people, and moving this there would show it to people who aren’t "
-                              "on it, or show them that trip. Add the missing travellers to the booking first.")
+        if not viewer.household and not confirmed:
+            _needs_confirmation(conn, seg, target)
         target.auto = False
     conn.execute(update(Segment).where(Segment.id == seg.id).values(trip_id=target.id))
     conn.orm.flush()

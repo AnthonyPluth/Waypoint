@@ -58,6 +58,11 @@
   let moveOpen = $state(false);
   let moving = $state<Segment | null>(null);
   let moveTo = $state("");
+  let confirmMoveOpen = $state(false);
+  let newlySeeBooking = $state<string[]>([]);
+  let newlySeeTrip = $state<string[]>([]);
+  const moveChoices = $derived([...others].sort((a, b) => (b.start_date ?? "").localeCompare(a.start_date ?? "") || b.id - a.id));
+  const namesOf = (v: unknown): string[] => (Array.isArray(v) ? v.map((p) => String((p as { name?: unknown }).name ?? "")).filter(Boolean) : []);
 
   const pick = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
   const isTrip = (v: unknown): v is Trip => !!v && typeof v === "object" && Array.isArray((v as Trip).segments) && typeof (v as Trip).name === "string";
@@ -174,10 +179,23 @@
     onchanged?.();
   });
 
-  const move = () => act(async () => {
+  const move = (confirm = false) => act(async () => {
     const s = moving;
     if (!s || !moveTo) return;
-    const into = await apiCall<"POST /api/segments/{id}/move">(`/api/segments/${s.id}/move`, { method: "POST", body: { trip_id: moveTo === "new" ? null : Number(moveTo) } });
+    const body = { trip_id: moveTo === "new" ? null : Number(moveTo), ...(confirm ? { confirm: true } : {}) };
+    let into: Trip;
+    try {
+      into = await apiCall<"POST /api/segments/{id}/move">(`/api/segments/${s.id}/move`, { method: "POST", body });
+    } catch (e) {
+      const said = e as { status?: number; data?: { see_booking?: unknown; see_trip?: unknown } };
+      if (said.status === 409 && Array.isArray(said.data?.see_booking)) {
+        newlySeeBooking = namesOf(said.data.see_booking);
+        newlySeeTrip = namesOf(said.data.see_trip);
+        confirmMoveOpen = true;
+        return;
+      }
+      throw e;
+    }
     toast.success("Moved");
     if (onchanged) onchanged(into.id); else location.hash = `#trip/${into.id}`;
   });
@@ -461,8 +479,17 @@
       <select bind:value={moveTo} class={pick}>
         <option value="">Choose a trip</option>
         {#if (trip?.segments.length ?? 0) > 1}<option value="new">A new trip of its own</option>{/if}
-        {#each others as o (o.id)}<option value={String(o.id)}>{o.name} · {dates(o)}</option>{/each}
+        {#each moveChoices as o (o.id)}<option value={String(o.id)}>{o.name} · {dates(o)}</option>{/each}
       </select></label>
+  {/snippet}
+</ConfirmDialog>
+
+<ConfirmDialog bind:open={confirmMoveOpen} title="Move it anyway?" confirmLabel="Move anyway" busyLabel="Moving…"
+  onconfirm={async () => await move(true)}>
+  {#snippet description()}
+    <p>That trip involves different people, so this changes who sees what.</p>
+    {#if newlySeeBooking.length}<p><strong class="text-foreground">Will newly see this booking:</strong> {newlySeeBooking.join(", ")}</p>{/if}
+    {#if newlySeeTrip.length}<p><strong class="text-foreground">Will newly see that trip:</strong> {newlySeeTrip.join(", ")}</p>{/if}
   {/snippet}
 </ConfirmDialog>
 

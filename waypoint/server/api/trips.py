@@ -127,6 +127,8 @@ def _trip(t: trips.TripOut) -> Trip:
 def _run[T](make: Callable[[], T | None], missing: str) -> T:
     try:
         found = make()
+    except trips.NeedsConfirmation:
+        raise
     except trips.Invalid as e:
         raise ApiError(str(e)) from None
     if found is None:
@@ -251,7 +253,15 @@ def api_segment_move(conn, _q, body: MoveBody, segment_id) -> Trip:
     who, this = viewer(conn), row_id(segment_id, NO_SEGMENT)
     target = body.get("trip_id")
     into = None if target is None else _id(target, "Choose the trip to move this into")
-    return _trip(_run(lambda: trips.move_segment(conn, who, this, into), NO_SEGMENT))
+    assistant = bool(getattr(_current, "assistant", True))
+    confirmed = validate.on(body.get("confirm")) and not assistant
+    try:
+        return _trip(_run(lambda: trips.move_segment(conn, who, this, into, confirmed), NO_SEGMENT))
+    except trips.NeedsConfirmation as e:
+        if assistant:
+            raise ApiError("This needs the person to do it in the app: moving a booking into a trip with different people changes who "
+                           "sees what, and only they can confirm it.", 403) from None
+        raise ApiError(str(e), 409, {"see_booking": e.see_booking, "see_trip": e.see_trip}) from None
 
 
 def api_airport(conn, _q, _b, code) -> Airport:

@@ -14,9 +14,10 @@ from .. import monitoring, validate
 
 
 class ApiError(Exception):
-    def __init__(self, message: str, status: int = 400):
+    def __init__(self, message: str, status: int = 400, data: dict | None = None):
         super().__init__(message)
         self.status = status
+        self.data = data or {}
 
 
 def server_error(e: BaseException, method: str, route: str) -> ApiError:

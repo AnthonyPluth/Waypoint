@@ -169,6 +169,8 @@ WRITE_RULES = (
     "destructive) also needs the person to confirm what will be lost, separately from any other yes. Ask for each change on its own, "
     "never under one blanket yes for several. "
     "3) Times are wall-clock times at the place (start_local in start_zone); never convert them. "
+    "4) Moving a booking into a trip with different people is refused for assistants: tell the person to do it in the app. "
+    "Moves between trips of the same people are fine. "
     "Mailboxes, AI settings, backups, sign-in and these assistant settings are out of reach.")
 MAIL_RULES = (
     "This connection may read the text and kept markup of kept emails (get_segment_email, and the email in get_review_item). That is the household's "
@@ -337,6 +339,7 @@ ANY_TOOLS: list[dict[str, Any]] = [
      "inputSchema": _schema(), "run": lambda fetch, _a: fetch("endpoints", {}), "needs": (WRITE,), "reads": True},
     {"name": "call_endpoint", "description": "Last resort, for what no other tool does (splitting a trip, claiming a guest, the "
      "distance unit): call one of Waypoint's endpoints (list_endpoints) as its web app does. body is what the web app's form sends. "
+     "Moving a booking into a trip with different people is refused here (the person must do it in the app). "
      f"Anything it can't reach is refused. {ASK} {DESTRUCTIVE}",
      "inputSchema": _schema({"method": {"type": "string", "enum": ["GET", "POST", "DELETE"]},
                              "path": {"type": "string", "description": "Like /api/trips/12/split."},

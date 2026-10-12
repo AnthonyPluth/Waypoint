@@ -117,12 +117,14 @@ def local_fetch(path: str, params: dict[str, Any], body: dict | None, access: mc
     query = {k: [str(v)] for k, v in params.items() if v not in (None, "")}
     _current.user = _acting_as(access)
     _current.host = None
+    _current.assistant = True
     try:
         result = routes.dispatch(found, query, body or {})
     except ApiError as e:
         raise ToolError(str(e)) from None
     finally:
         _current.user = None
+        _current.assistant = True
     if isinstance(result, Response):
         raise ToolError("Not found")
     return result
