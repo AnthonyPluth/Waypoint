@@ -5169,12 +5169,6 @@
           },
           "images": {
             "type": "integer"
-          },
-          "width": {
-            "type": [
-              "integer",
-              "null"
-            ]
           }
         },
         "required": [
@@ -5183,8 +5177,7 @@
           "html",
           "truncated",
           "original",
-          "images",
-          "width"
+          "images"
         ],
         "additionalProperties": false
       },
@@ -7015,12 +7008,6 @@
           },
           "images": {
             "type": "integer"
-          },
-          "width": {
-            "type": [
-              "integer",
-              "null"
-            ]
           }
         },
         "required": [
@@ -7031,8 +7018,7 @@
           "html",
           "truncated",
           "original",
-          "images",
-          "width"
+          "images"
         ],
         "additionalProperties": false
       },

@@ -20,7 +20,7 @@ Waypoint’s main way of learning about a booking is to read the confirmation em
 
 ## What the sender can learn
 
-Opening an email in Waypoint never contacts the sender: the email is shown in a sandboxed frame that can run no script and may load only images Waypoint itself gives it, so a tracking pixel in a message can’t tell anyone that you looked.
+Opening an email in Waypoint never contacts the sender: the email is shown inline in the page, inside an isolated container that can run no script and may load only images Waypoint itself gives it (the page’s own security policy allows no script from an email and no remote image), so a tracking pixel in a message can’t tell anyone that you looked.
 
 The one thing that changes is when the message is kept (a booking was made from it, or it went to Review). Then your Waypoint server downloads the images the message names, once, so they are there when you open it and still there if the sender removes them. To the sender that is a request from your server’s address for each image address in the message, which may carry whatever the sender put in that address, such as a code that identifies the message. The request has no cookies and nothing about you or Waypoint beyond a generic browser name, and it happens once, not each time someone opens the email. Images attached to the message itself need no download.
 
