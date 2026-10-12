@@ -30,7 +30,7 @@ A segment’s time is always shown as it is at the place, and nothing is convert
 
 ## Who sees a trip
 
-You see a trip when you are on it (its people list, which always includes everyone named on any of its bookings: see [The people on a trip](#the-people-on-a-trip)), when you booked it (the trip, or any of its segments), or when the confirmation of one of its bookings came to your own connected mailbox (see [One booking, one segment](#one-booking-one-segment)). Nobody else sees it, however they ask: its address answers “not found”, the same as a trip that doesn’t exist. A solo work trip stays its traveller’s. If you book a trip for a guest (a child, a grandparent), you see it because you booked it. Add someone to a trip, or as a traveller on a segment, and the whole trip is shared with them.
+You see a trip when you are on it (its people list, which always includes everyone named on any of its bookings: see [The people on a trip](#the-people-on-a-trip)), when you booked it (the trip, or any of its segments), or when the confirmation of one of its bookings came to your own connected mailbox (see [One booking, one segment](#one-booking-one-segment)). Nobody else sees it, however they ask: its address answers “not found”, the same as a trip that doesn’t exist. A solo work trip stays its traveller’s. If you book a trip for a guest (a child, a grandparent), you see it because you booked it. Add someone to a trip, or as a traveller on a segment, and the whole trip is shared with them. Someone’s access to a trip ends only when they are taken off the trip’s people, not when they are taken off a booking.
 
 Without sign-in, on your own machine, everyone is the one local household, which sees every trip.
 
