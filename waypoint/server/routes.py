@@ -24,8 +24,8 @@ from .api.logos import api_logodev, api_logodev_fetch, api_logodev_save, api_loy
 from .api.mailboxes import api_mailbox_backfill, api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_ignored, api_mailbox_labels, api_mailbox_labels_save, api_mailbox_reread, api_mailbox_review_glance, api_mailbox_scan, api_mailbox_share, api_mailbox_unignore, api_mailboxes
 from .api.reminders import (api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
                             api_reminders_set)
-from .api.review import (api_review, api_review_dismiss, api_review_ignore, api_review_image, api_review_match, api_review_preview,
-                         api_review_suggest, api_review_who)
+from .api.review import (api_review, api_review_attach, api_review_dismiss, api_review_ignore, api_review_image, api_review_match, api_review_preview,
+                         api_review_same, api_review_suggest, api_review_who)
 from .api.offline import api_offline
 from .api.state import api_state
 from .api.stats import api_distance_unit, api_distance_unit_save, api_stats
@@ -99,6 +99,8 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/review/who/{id}", api_review_who),
     ("POST", "/api/review/{id}/ignore", api_review_ignore),
     ("POST", "/api/review/{id}/match", api_review_match),
+    ("POST", "/api/review/{id}/same", api_review_same),
+    ("POST", "/api/review/{id}/attach", api_review_attach),
     ("GET", "/api/review/{id}/preview", api_review_preview),
     ("GET", "/api/review/{id}/images/{id}", api_review_image),
     ("POST", "/api/review/{id}/suggest", api_review_suggest),

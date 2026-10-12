@@ -165,6 +165,11 @@ export interface AssistantParsed {
   read: Record<string, string>;
 }
 
+export interface Attached {
+  ok: boolean;
+  segment_id: number;
+}
+
 export interface BackupContents {
   created: string | null;
   source: string | null;
@@ -618,6 +623,10 @@ export interface ReviewOther {
   received: string | null;
 }
 
+export interface SameBooking {
+  booking: ReviewCandidate | null;
+}
+
 export interface ScanStarted {
   started: boolean;
 }
@@ -635,6 +644,7 @@ export interface ScanSummary {
   not_travel: number;
   followups: number;
   with_facts: number;
+  attached: number;
 }
 
 export interface Segment {
@@ -1030,6 +1040,8 @@ export interface Endpoints {
   "POST /api/review/who/{id}": { body: WhoBody; reply: Matched };
   "POST /api/review/{id}/ignore": { body: never; reply: Ignoring };
   "POST /api/review/{id}/match": { body: MatchBody; reply: Ok };
+  "POST /api/review/{id}/same": { body: SegmentBody; reply: SameBooking };
+  "POST /api/review/{id}/attach": { body: SegmentBody; reply: Attached };
   "GET /api/review/{id}/preview": { body: never; reply: Preview };
   "POST /api/review/{id}/suggest": { body: never; reply: Ok };
   "DELETE /api/review/{id}": { body: never; reply: Ok };
