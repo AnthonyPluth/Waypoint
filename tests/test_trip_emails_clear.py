@@ -229,6 +229,17 @@ class ClearEmailsTests(ServerCase):
         self.assertEqual(self.clear("cy", seg["trip_id"])[0], 404)
         self.assertIsNone(self.trip("ana", seg["trip_id"])["done_at"])
 
+    def test_done_on_an_ended_trip_with_no_emails_removes_none_and_marks_it_once(self):
+        seg = self.book(days(-20), days(-19))
+        self.assertEqual(self.trip("ana", seg["trip_id"])["emails"], 0)
+        self.assertIsNone(self.trip("ana", seg["trip_id"])["done_at"])
+        self.assertEqual(self.clear("ana", seg["trip_id"]), (200, {"removed": 0}))
+        first = self.trip("ana", seg["trip_id"])["done_at"]
+        self.assertIsNotNone(first)
+        with mock.patch("waypoint.server.api.trips.time.time", return_value=first + 500):
+            self.assertEqual(self.clear("ana", seg["trip_id"]), (200, {"removed": 0}))
+        self.assertEqual(self.trip("ana", seg["trip_id"])["done_at"], first)
+
     def test_a_trip_that_has_no_messages_removes_none(self):
         seg = self.book(days(-20), days(-19))
         self.assertEqual(self.trip("ana", seg["trip_id"])["can_clear_emails"], False)

@@ -35,7 +35,7 @@ describe("TripDone", () => {
     render(TripDone, { trip: eligible, ondone: vi.fn() });
     await user.click(screen.getByRole("button", { name: /remove the emails/i }));
     const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveTextContent("The saved emails for this trip will be deleted. The bookings stay. This can’t be undone.");
+    expect(dialog).toHaveTextContent("The saved emails for this trip will be deleted, and its booking cards will no longer show Edit, Move or Remove. The bookings stay. This can’t be undone.");
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(api).not.toHaveBeenCalled();

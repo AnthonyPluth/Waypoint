@@ -25,5 +25,5 @@
 {/if}
 
 <ConfirmDialog bind:open={asking} title="Remove the saved emails for this trip?" confirmLabel="Remove emails" busyLabel="Removing…" destructive
-  description="The saved emails for this trip will be deleted. The bookings stay. This can’t be undone."
+  description="The saved emails for this trip will be deleted, and its booking cards will no longer show Edit, Move or Remove. The bookings stay. This can’t be undone."
   onconfirm={async () => await clear()} />
