@@ -7,7 +7,7 @@ from sqlalchemy import delete, select, update
 from ..storage import db, secretbox
 from ..storage.models import LoyaltyId, Person
 
-KINDS = ("airline", "hotel", "car", "cruise", "known_traveler", "redress")
+KINDS = ("airline", "hotel", "car", "known_traveler", "redress")
 OTHER = "Other"
 EXPIRES = ("known_traveler", "redress")
 PROGRAMS: dict[str, tuple[str, ...]] = {
@@ -15,9 +15,6 @@ PROGRAMS: dict[str, tuple[str, ...]] = {
                 "United MileagePlus", OTHER),
     "hotel": ("Hilton Honors", "Hyatt World of Hyatt", "IHG One Rewards", "Marriott Bonvoy", "Wyndham Rewards", OTHER),
     "car": ("Avis Preferred", "Enterprise Plus", "Hertz Gold Plus Rewards", "National Emerald Club", OTHER),
-    "cruise": ("Carnival Rewards (formerly VIFP Club)", "Celebrity Captain's Club", "Cunard World Club", "Disney Castaway Club",
-               "Holland America Mariner Society", "MSC Voyagers Club", "Norwegian Latitudes Rewards", "Oceania Club",
-               "Princess Captain's Circle", "Royal Caribbean Crown & Anchor Society", "Virgin Voyages Sailing Club", OTHER),
     "known_traveler": ("Global Entry", "NEXUS", "SENTRI", "TSA PreCheck", OTHER),
     "redress": ("DHS TRIP", OTHER),
 }

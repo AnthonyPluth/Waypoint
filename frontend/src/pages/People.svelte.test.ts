@@ -16,7 +16,7 @@ import People from "./People.svelte";
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
 const mia: Person = { id: 2, display_name: "Mia Doe", first_name: "Mia", legal_name: "Mia Rose Doe", aliases: ["DOE/MIA MISS"], member: false, links: [] };
 
-const PROGRAMS = { airline: ["American AAdvantage", "Other"], hotel: ["Marriott Bonvoy", "Other"], car: ["Other"], cruise: ["Disney Castaway Club", "Other"], known_traveler: ["TSA PreCheck", "Other"], redress: ["DHS TRIP", "Other"] };
+const PROGRAMS = { airline: ["American AAdvantage", "Other"], hotel: ["Marriott Bonvoy", "Other"], car: ["Other"], known_traveler: ["TSA PreCheck", "Other"], redress: ["DHS TRIP", "Other"] };
 const aa: LoyaltyEntry = { id: 11, person_id: 1, kind: "airline", program: "American AAdvantage", masked: "••••4567", readable: true, expiry: null, notes: null, logo: null };
 const tsa: LoyaltyEntry = { id: 12, person_id: 1, kind: "known_traveler", program: "TSA PreCheck", masked: "••••2345", readable: true, expiry: "2029-03-31", notes: null, logo: null };
 
@@ -290,17 +290,6 @@ describe("People", () => {
     expect(api).toHaveBeenCalledWith("/api/loyalty", { method: "POST", body: { person_id: 2, kind: "hotel", program: "Marriott Bonvoy", number: "DEMO55501234", expiry: "", notes: "" } });
     expect(await screen.findByRole("region", { name: "Mia Doe’s Hotel memberships" })).toBeInTheDocument();
     expect(screen.queryByRole("form")).toBeNull();
-  });
-
-  it("adds a cruise membership, choosing the cruise line's program", async () => {
-    render(People);
-    await userEvent.click(await screen.findByRole("button", { name: "Add a membership for Mia Doe" }));
-    await userEvent.selectOptions(screen.getByLabelText("Kind"), "cruise");
-    expect(screen.getByLabelText("Program")).toHaveValue("Disney Castaway Club");
-    await userEvent.type(screen.getByLabelText("Number"), "DEMOCC0042");
-    await userEvent.click(screen.getByRole("button", { name: "Add" }));
-    expect(api).toHaveBeenCalledWith("/api/loyalty", { method: "POST", body: { person_id: 2, kind: "cruise", program: "Disney Castaway Club", number: "DEMOCC0042", expiry: "", notes: "" } });
-    expect(await screen.findByRole("region", { name: "Mia Doe’s Cruise memberships" })).toBeInTheDocument();
   });
 
   it("doesn't offer a program the person already has, keeps Other, and keeps a membership's own program when editing it", async () => {

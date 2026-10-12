@@ -797,6 +797,9 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         values["details"] = json.dumps(kept_details, ensure_ascii=False) if kept_details else None
     changed = [f for f in FIELDS if f in values and (decode_details(values[f]) != decode_details(seg.details) if f == "details"
                                                     else values[f] != getattr(seg, f))]
+    owner = conn.orm.get(Trip, seg.trip_id)
+    becomes_shared = (owner is not None and not seg.travelers_from_trip and seg.kind not in SHARED_KINDS and values["kind"] in SHARED_KINDS
+                      and {t["person_id"] for t in old if t["person_id"] is not None} <= _seen_by_bookings(conn, owner, seg.id))
     if sorted(map(_key, travelers)) != sorted(map(_key, old)) or (seg.travelers_from_trip and values["kind"] not in SHARED_KINDS):
         changed.append("travelers")
     if ports != ports_before:
@@ -805,8 +808,9 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         setattr(seg, k, v)
     if "itinerary" in changed:
         _set_ports(conn, seg.id, ports)
-    if "travelers" in changed:
-        _set_travelers(conn, seg.id, travelers)
+    if "travelers" in changed or becomes_shared:
+        _set_travelers(conn, seg.id, [] if becomes_shared else travelers)
+        seg.travelers_from_trip = becomes_shared
         trippeople.keep_lists_inside(conn, seg.trip_id)
     if any(f in changes for f in TIME_FIELDS):
         if seg.check_times:
@@ -1039,8 +1043,8 @@ def _known_people(conn: db.Connection, given: Sequence[int]) -> list[int]:
     return wanted
 
 
-def _seen_by_bookings(conn: db.Connection, trip: Trip) -> set[int]:
-    own = select(Segment.id).where(Segment.trip_id == trip.id)
+def _seen_by_bookings(conn: db.Connection, trip: Trip, apart_from: int | None = None) -> set[int]:
+    own = select(Segment.id).where(Segment.trip_id == trip.id, Segment.id != (apart_from or 0))
     listed = set(conn.orm.scalars(select(SegmentTraveler.person_id).where(SegmentTraveler.segment_id.in_(own),
                                                                           SegmentTraveler.person_id.is_not(None))).all())
     booked = {p for p in conn.orm.scalars(select(Segment.booked_by).where(Segment.trip_id == trip.id)).all() if p is not None}

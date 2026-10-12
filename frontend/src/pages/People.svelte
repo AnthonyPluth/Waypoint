@@ -80,7 +80,7 @@
     await load();
   });
 
-  const KINDS: [string, string][] = [["airline", "Airline"], ["hotel", "Hotel"], ["car", "Car rental"], ["cruise", "Cruise"], ["known_traveler", "Known Traveler"], ["redress", "Redress"]];
+  const KINDS: [string, string][] = [["airline", "Airline"], ["hotel", "Hotel"], ["car", "Car rental"], ["known_traveler", "Known Traveler"], ["redress", "Redress"]];
   type IdDraft = { id: number | null; person_id: number; kind: string; program: string; number: string; expiry: string; notes: string; masked: string };
   let idDraft = $state<IdDraft | null>(null);
   let idError = $state("");

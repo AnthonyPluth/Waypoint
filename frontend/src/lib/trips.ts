@@ -164,10 +164,6 @@ const BRANDS: [string, RegExp, string][] = [
   ["flight", /\bjetblue\b/i, "JetBlue TrueBlue"], ["flight", /\bsouthwest\b/i, "Southwest Rapid Rewards"], ["flight", /\bunited\b/i, "United MileagePlus"],
   ["hotel", /\bhilton\b/i, "Hilton Honors"], ["hotel", /\bhyatt\b/i, "Hyatt World of Hyatt"], ["hotel", /\b(ihg|holiday inn|intercontinental|crowne plaza)\b/i, "IHG One Rewards"],
   ["hotel", /\b(marriott|bonvoy|sheraton|westin|ritz)\b/i, "Marriott Bonvoy"], ["hotel", /\bwyndham\b/i, "Wyndham Rewards"],
-  ["cruise", /\bcarnival\b/i, "Carnival Rewards (formerly VIFP Club)"], ["cruise", /\bcelebrity\b/i, "Celebrity Captain's Club"], ["cruise", /\bcunard\b/i, "Cunard World Club"],
-  ["cruise", /\bdisney\b/i, "Disney Castaway Club"], ["cruise", /\bholland america\b/i, "Holland America Mariner Society"], ["cruise", /\bmsc\b/i, "MSC Voyagers Club"],
-  ["cruise", /\bnorwegian\b|\bncl\b/i, "Norwegian Latitudes Rewards"], ["cruise", /\boceania\b/i, "Oceania Club"], ["cruise", /\bprincess\b/i, "Princess Captain's Circle"],
-  ["cruise", /\broyal caribbean\b|\brcl\b|\brcci\b/i, "Royal Caribbean Crown & Anchor Society"], ["cruise", /\bvirgin voyages\b/i, "Virgin Voyages Sailing Club"],
   ["car", /\bavis\b/i, "Avis Preferred"], ["car", /\benterprise\b/i, "Enterprise Plus"], ["car", /\bhertz\b/i, "Hertz Gold Plus Rewards"], ["car", /\bnational\b/i, "National Emerald Club"],
 ];
 

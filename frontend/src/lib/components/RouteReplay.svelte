@@ -2,7 +2,7 @@
   import type { Trip, TripPlaces } from "$lib/api-types";
   import { apiCall } from "$lib/contract";
   import RouteReplayMap from "$lib/components/RouteReplayMap.svelte";
-  import { NO_ROADS, stopsOf, worthLocating } from "$lib/route-replay";
+  import { stopsOf, worthLocating } from "$lib/route-replay";
   import { dayIn, viewerZone } from "$lib/trips";
 
   let { trip, now }: { trip: Trip; now: number } = $props();
@@ -32,6 +32,6 @@
 
 {#if stops.length >= 2}
   <section class="mb-6" aria-label="Route replay">
-    {#key trip.id}<RouteReplayMap {stops} {year} roads={places?.roads ?? NO_ROADS} autoplay />{/key}
+    {#key trip.id}<RouteReplayMap {stops} {year} autoplay />{/key}
   </section>
 {/if}

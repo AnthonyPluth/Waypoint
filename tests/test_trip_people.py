@@ -387,6 +387,25 @@ class AddedByHand(TripPeopleCase):
         self.assertFalse(self.c.orm.get(Segment, stay["id"]).travelers_from_trip)
         self.assertEqual([t["person_id"] for t in changed["travelers"]], [self.jid, self.mia])
 
+    def test_a_flight_edited_into_a_hotel_becomes_for_everyone_when_everyone_on_it_still_sees_the_trip(self):
+        flight = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
+        other = self.add(self.jane, BACK, flight["trip_id"], self.on(self.jid, self.mia))
+        changed = trips.edit_segment(self.c, self.jane, other["id"], {"kind": "hotel", "origin": "Harbour Hotel", "destination": None,
+                                                                    "start_zone": "Europe/London", "end_zone": "Europe/London"})
+        seg = self.c.orm.get(Segment, other["id"])
+        self.assertTrue(seg.travelers_from_trip)
+        self.assertEqual(self.c.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.segment_id == other["id"])).all(), [])
+        self.assertEqual([t["person_id"] for t in changed["travelers"]], [self.jid, self.mia])
+        self.assertEqual(self.aboard(flight["trip_id"]), [self.jid, self.mia])
+
+    def test_a_flight_edited_into_a_hotel_keeps_its_list_when_someone_on_it_would_lose_the_trip(self):
+        flight = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
+        changed = trips.edit_segment(self.c, self.jane, flight["id"], {"kind": "hotel", "origin": "Harbour Hotel", "destination": None,
+                                                                     "start_zone": "Europe/London", "end_zone": "Europe/London"})
+        self.assertFalse(self.c.orm.get(Segment, flight["id"]).travelers_from_trip)
+        self.assertEqual([t["person_id"] for t in changed["travelers"]], [self.jid, self.mia])
+        self.assertIsNotNone(trips.get(self.c, Viewer(self.mia), flight["trip_id"]))
+
     def test_an_existing_hotel_with_its_own_travellers_is_left_as_it_is(self):
         flight = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
         seg = Segment(trip_id=flight["trip_id"], kind="hotel", status="confirmed", source="manual", booked_by=self.jid, origin="Old Hotel",

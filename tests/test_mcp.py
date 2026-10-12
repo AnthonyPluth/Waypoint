@@ -286,6 +286,18 @@ class VisibilityTests(Assistants):
             self.assertTrue(conn.orm.get(Segment, got["id"]).travelers_from_trip)
             self.assertIsNone(trips.get(conn, self.sam, trip))
 
+    def test_an_assistant_turning_a_flight_into_a_stay_makes_it_for_everyone(self):
+        trip = self.jane_trip["id"]
+        flight = self.tool(ALL, "add_segment", {"trip_id": trip, "fields": {**OUT, "start_local": "2026-10-05T19:00", "end_local": "2026-10-06T07:10",
+                                                                          "confirmation": "TOSTAY"}})
+        self.addCleanup(self.tool, ALL, "remove_segment", {"segment_id": flight["id"]})
+        self.assertEqual([t["person_id"] for t in flight["travelers"]], [self.jane.person_id])
+        stay = self.tool(ALL, "update_segment", {"segment_id": flight["id"], "fields": {
+            "kind": "hotel", "origin": "Harbour Hotel", "destination": "", "start_zone": "Europe/London", "end_zone": "Europe/London"}})
+        self.assertEqual([t["person_id"] for t in stay["travelers"]], [self.jane.person_id])
+        with db.session() as conn:
+            self.assertTrue(conn.orm.get(Segment, flight["id"]).travelers_from_trip)
+
     def set_people(self, trip_id, ids):
         with db.session() as conn:
             trips.edit_trip(conn, Viewer(self.jane.person_id, household=True), trip_id, {"people": ids})

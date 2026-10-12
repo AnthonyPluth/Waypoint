@@ -3,12 +3,12 @@
   import { Button } from "$lib/components/ui/button";
   import { loadCountries, type Country } from "$lib/map";
   import { viewport } from "$lib/phone.svelte";
-  import { activeStop, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_ROADS, roadShapes, roadsShown, shieldsOf, STATIC_MOVER_PX, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Roads, type Stop } from "$lib/route-replay";
+  import { activeStop, cameraAt, labelLit, LABEL_HOLD_MS, STATIC_MOVER_PX, legProgress, legsOf, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
-  let { stops, year, roads = NO_ROADS, still = null, autoplay = false }: { stops: Stop[]; year: number; roads?: Roads; still?: boolean | null; autoplay?: boolean } = $props();
+  let { stops, year, still = null, autoplay = false }: { stops: Stop[]; year: number; still?: boolean | null; autoplay?: boolean } = $props();
 
   const query = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
   let observed = $state(query?.matches ?? false);
@@ -22,10 +22,9 @@
 
   const width = $derived(viewport.phone ? 600 : 960);
   const height = $derived(viewport.phone ? 640 : 520);
-  const projection = $derived(routeProjection(stops, width, height, undefined, roads));
+  const projection = $derived(routeProjection(stops, width, height));
   const path = $derived(geoPath(projection));
-  const legs = $derived(legsOf(stops, projection, roads));
-  const shapes = $derived(roadShapes(roads.interstates, projection));
+  const legs = $derived(legsOf(stops, projection));
   const spots = $derived(positions(stops, projection));
   const sphere = $derived(path({ type: "Sphere" }) ?? "");
   let countries = $state<Country[]>([]);
@@ -75,11 +74,8 @@
   const shift = (i: number) => 12 + Math.floor(crowd[i] / 2) * 40;
   const edge = (x: number) => (fx(x) < 0.22 ? "0%" : fx(x) > 0.78 ? "-100%" : "-50%");
   const lit = (i: number) => calm || (i === stops.length - 1 ? progress >= 1 && playing && tail < LABEL_HOLD_MS : labelLit(i, stops.length, progress, !playing));
-  const box = $derived(calm ? { x: 0, y: 0, w: width, h: height } : cameraAt(stops, spots, width, height, progress, legs));
+  const box = $derived(calm ? { x: 0, y: 0, w: width, h: height } : cameraAt(stops, spots, width, height, progress));
   const zoom = $derived(box.w / width);
-  const drawn = $derived(roadsShown(projection, zoom) ? shapes.filter((r) => inView(r, box)) : []);
-  const shields = $derived(shieldsOf(drawn, box, zoom));
-  const via = (i: number) => (i > 0 && legs[i - 1].refs.length ? ` (via ${legs[i - 1].refs.join(", ")})` : "");
   const zoomed = $derived(box.w < width - 0.5);
   const fx = (x: number) => (x - box.x) / box.w;
   const fy = (y: number) => (y - box.y) / box.h;
@@ -88,7 +84,7 @@
     if (done <= 0) return [];
     const moving = !calm && done < 1;
     if (!moving && Math.hypot(leg.to.x - leg.from.x, leg.to.y - leg.from.y) < STATIC_MOVER_PX) return [];
-    return [{ i, moving, vehicle: leg.vehicle, ...moverAt(leg, moving ? done : 0.5) }];
+    return [{ i, moving, vehicle: leg.vehicle, ...planeAt(leg, moving ? done : 0.5) }];
   }));
   const buttonLabel = $derived(progress >= 1 ? "Replay" : playing ? "Pause" : progress > 0 ? "Resume" : "Play");
 </script>
@@ -100,17 +96,12 @@
       <g class="fill-map-land stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke">
         {#each land as c (c.id)}<path d={c.d} />{/each}
       </g>
-      {#if drawn.length}
-        <g aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" data-testid="interstates">
-          {#each drawn as r, i (i)}<path d={r.d} data-road={r.ref} class="stroke-map-border" stroke-width={1.6 * zoom} />{/each}
-        </g>
-      {/if}
-      <g fill="none" stroke-linecap="round" stroke-linejoin="round" data-testid="legs">
+      <g fill="none" stroke-linecap="round" data-testid="legs">
         {#each legs as leg, i (i)}
           {@const done = calm ? 1 : legProgress(i, stops.length, progress)}
           {#if done > 0}
             <path d={leg.d} pathLength="1" stroke-dasharray="1" stroke-dashoffset={1 - done} stroke-width={(leg.flight ? 2.5 : 2) * zoom}
-              class={leg.flight ? "stroke-map-route" : "stroke-map-stay"} data-leg={leg.flight ? "flight" : "ground"} data-road-leg={leg.road ? leg.refs.join(" ") : undefined} />
+              class={leg.flight ? "stroke-map-route" : "stroke-map-stay"} data-leg={leg.flight ? "flight" : "ground"} />
           {/if}
         {/each}
       </g>
@@ -130,16 +121,6 @@
           {/if}
         {/each}
       </g>
-      {#if shields.length}
-        <g aria-hidden="true" data-testid="shields">
-          {#each shields as sh (sh.ref + sh.x)}
-            <g data-shield={sh.ref} transform="translate({sh.x.toFixed(1)} {sh.y.toFixed(1)}) scale({zoom})">
-              <rect x={-(sh.ref.length * 3 + 4)} y="-8" width={sh.ref.length * 6 + 8} height="16" rx="4" class="fill-card stroke-map-border" stroke-width="1" />
-              <text text-anchor="middle" dy="3.5" font-size="10" font-weight="600" class="fill-muted-foreground">{sh.ref}</text>
-            </g>
-          {/each}
-        </g>
-      {/if}
       <g data-testid="movers" aria-hidden="true">
         {#each movers as m (m.i)}
           <g data-mover={m.i} data-vehicle={m.vehicle} data-plane={m.vehicle === "plane" ? m.i : undefined} data-car={m.vehicle === "car" ? m.i : undefined} data-boat={m.vehicle === "boat" ? m.i : undefined}
@@ -170,7 +151,6 @@
     {#if stops.some((s) => s.kind === "stay")}<li class="flex items-center gap-2"><span class="size-2.5 rotate-45 rounded-[2px] bg-map-stay" aria-hidden="true"></span>Stay</li>{/if}
     {#if stops.some((s) => s.kind === "place")}<li class="flex items-center gap-2"><span class="size-2 rounded-full bg-map-visited" aria-hidden="true"></span>Other stop</li>{/if}
     <li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Flight</li>
-    {#if roads.interstates.length}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-border" aria-hidden="true"></span>Interstate</li>{/if}
     {#if legs.some((l) => !l.flight)}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
   </ul>
   {#if !calm}
@@ -184,7 +164,7 @@
   {/if}
   <ol class="space-y-1 text-sm" aria-label="Stops in order" data-testid="stop-list">
     {#each stops as s, i (i)}
-      <li class="flex gap-2"><span class="w-5 shrink-0 text-right text-muted-foreground" aria-hidden="true">{i + 1}.</span><span class="min-w-0 break-words">{stopLine(s, year)}{via(i)}</span></li>
+      <li class="flex gap-2"><span class="w-5 shrink-0 text-right text-muted-foreground" aria-hidden="true">{i + 1}.</span><span class="min-w-0 break-words">{stopLine(s, year)}</span></li>
     {/each}
   </ol>
 </div>

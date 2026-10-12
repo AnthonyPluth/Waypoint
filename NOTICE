@@ -16,11 +16,3 @@ and Canadian and British postal-code areas and the cities of 15,000 people or mo
 (https://www.geonames.org/, files GB.zip, CA.zip and cities15000.zip), which is licensed under Creative Commons
 Attribution 4.0, https://creativecommons.org/licenses/by/4.0/. The names and coordinates were rounded and combined; the
 file is shared here under the same licence.
-
-Interstates: waypoint/storage/roads.tsv.gz is derived from the National Highway System shapefile (version 2025-08-08,
-nhs_2025-08-08.zip) published by the Federal Highway Administration, U.S. Department of Transportation
-(https://www.fhwa.dot.gov/planning/national_highway_system/nhs_maps/), keeping the features signed and classed as
-Interstate routes. This is US government data; its metadata states "Access Constraints: None" and that the NHS database,
-or any portion of it, can be freely distributed as long as its metadata entry is included. The file combines the pieces
-of each route into a network of junctions, simplifies their shapes to about 100 metres and rounds the coordinates; the
-FHWA gives no warranty for it, and neither does Waypoint.
