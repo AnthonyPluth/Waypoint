@@ -3,12 +3,12 @@
   import { Button } from "$lib/components/ui/button";
   import { loadCountries, type Country } from "$lib/map";
   import { viewport } from "$lib/phone.svelte";
-  import { activeStop, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, type Stop } from "$lib/route-replay";
+  import { activeStop, labelLit, legProgress, legsOf, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
-  let { stops, year, still = null }: { stops: Stop[]; year: number; still?: boolean | null } = $props();
+  let { stops, year, still = null, autoplay = false }: { stops: Stop[]; year: number; still?: boolean | null; autoplay?: boolean } = $props();
 
   const query = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
   let observed = $state(query?.matches ?? false);
@@ -34,6 +34,13 @@
   let progress = $state(0);
   let playing = $state(false);
   $effect(() => { if (calm) { progress = 1; playing = false; } });
+  let started = false;
+  $effect(() => {
+    if (!autoplay || calm || started) return;
+    started = true;
+    progress = 0;
+    playing = true;
+  });
   const duration = $derived(replayMs(stops.length));
   const now = $derived(calm ? stops.length - 1 : activeStop(stops.length, progress));
 
@@ -57,9 +64,22 @@
   const scrub = (e: Event) => { playing = false; progress = Number((e.currentTarget as HTMLInputElement).value) / 1000; };
 
   const showing = (i: number) => calm || reached(i, stops.length, progress);
-  const alone = $derived(spots.map((p, i) => spots.slice(0, i).every((q) => Math.hypot(p.x - q.x, p.y - q.y) > 40)));
-  const above = (i: number) => (spots[i].y > height * 0.72 ? true : spots[i].y < height * 0.28 ? false : i % 2 === 0);
+  const crowd = $derived(spots.map((p, i) => spots.slice(0, i).filter((q) => Math.hypot(p.x - q.x, p.y - q.y) < 40).length));
+  const above = (i: number) => {
+    const base = spots[i].y > height * 0.72 ? true : spots[i].y < height * 0.28 ? false : i % 2 === 0;
+    return crowd[i] % 2 === 0 ? base : !base;
+  };
+  const shift = (i: number) => 12 + Math.floor(crowd[i] / 2) * 40;
   const edge = (x: number) => (x < width * 0.22 ? "0%" : x > width * 0.78 ? "-100%" : "-50%");
+  const lit = (i: number) => calm || labelLit(i, stops.length, progress, !playing);
+  const planeSize = 1.1;
+  const planes = $derived(legs.flatMap((leg, i) => {
+    if (!leg.flight) return [];
+    const done = calm ? 1 : legProgress(i, stops.length, progress);
+    if (done <= 0) return [];
+    const flying = !calm && done < 1;
+    return [{ i, flying, ...planeAt(leg, flying ? done : 0.5) }];
+  }));
   const buttonLabel = $derived(progress >= 1 ? "Replay" : playing ? "Pause" : progress > 0 ? "Resume" : "Play");
 </script>
 
@@ -82,27 +102,40 @@
       <g data-testid="stops">
         {#each stops as s, i (i)}
           {#if showing(i)}
-            <g data-stop={s.name}>
-              {#if !calm && playing && i === now}<circle cx={spots[i].x} cy={spots[i].y} r="9" class="animate-ping fill-map-airport/60" style="transform-box: fill-box; transform-origin: center" />{/if}
-              <circle cx={spots[i].x} cy={spots[i].y} r="6" class="fill-map-airport stroke-map-sea" stroke-width="2" />
+            <g data-stop={s.name} data-kind={s.kind}>
+              {#if !calm && playing && i === now}<circle cx={spots[i].x} cy={spots[i].y} r="10" class="animate-ping fill-map-airport/60" style="transform-box: fill-box; transform-origin: center" />{/if}
+              {#if s.kind === "stay"}
+                <rect x={spots[i].x - 6} y={spots[i].y - 6} width="12" height="12" rx="2" transform="rotate(45 {spots[i].x} {spots[i].y})" class="fill-map-stay stroke-map-sea" stroke-width="2" />
+              {:else if s.kind === "airport"}
+                <circle cx={spots[i].x} cy={spots[i].y} r="6" class="fill-map-airport stroke-map-sea" stroke-width="2" />
+              {:else}
+                <circle cx={spots[i].x} cy={spots[i].y} r="4.5" class="fill-map-visited stroke-map-sea" stroke-width="2" />
+              {/if}
             </g>
           {/if}
         {/each}
       </g>
+      <g data-testid="planes" aria-hidden="true">
+        {#each planes as p (p.i)}
+          <g data-plane={p.i} data-flying={p.flying} transform="translate({p.x.toFixed(1)} {p.y.toFixed(1)}) rotate({p.angle.toFixed(1)}) scale({planeSize})">
+            <path d="M12 0 L3 -2.5 L-2 -10 L-5 -10 L-3 -1.5 L-8 -1.5 L-10 -4 L-12.5 -4 L-10.5 0 L-12.5 4 L-10 4 L-8 1.5 L-3 1.5 L-5 10 L-2 10 L3 2.5 Z" class="fill-map-route stroke-map-sea" stroke-width="1.2" stroke-linejoin="round" />
+          </g>
+        {/each}
+      </g>
     </svg>
     {#each stops as s, i (i)}
-      {#if showing(i) && alone[i]}
-        <div class="pointer-events-none absolute w-max max-w-[11rem] rounded-lg border border-border bg-card px-2 py-1 text-xs leading-tight shadow-elevation-1"
-          style="left: {(spots[i].x / width) * 100}%; top: {(spots[i].y / height) * 100}%; transform: translate({edge(spots[i].x)}, {above(i) ? 'calc(-100% - 12px)' : '12px'})"
-          data-label={s.name}>
-          <p class="break-words font-semibold text-foreground">{s.name}</p>
+      <div aria-hidden="true" class="pointer-events-none absolute w-max max-w-[11rem] rounded-lg transition-opacity duration-500 motion-reduce:transition-none border border-border bg-card px-2 py-1 text-xs leading-tight shadow-elevation-1"
+          style="left: {(spots[i].x / width) * 100}%; top: {(spots[i].y / height) * 100}%; transform: translate({edge(spots[i].x)}, {above(i) ? `calc(-100% - ${shift(i)}px)` : `${shift(i)}px`})"
+          class:opacity-0={!lit(i)} data-visible={lit(i)} data-label={s.name}>
+          <p class="break-words font-semibold text-foreground">{s.back ? "Back in " : ""}{stopTitle(s)}</p>
           <p class="text-muted-foreground">{stopDates(s, year)}</p>
         </div>
-      {/if}
     {/each}
   </div>
   <ul class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground" aria-label="Map key">
-    <li class="flex items-center gap-2"><span class="size-2.5 rounded-full bg-map-airport" aria-hidden="true"></span>Stop</li>
+    <li class="flex items-center gap-2"><span class="size-2.5 rounded-full bg-map-airport" aria-hidden="true"></span>Airport</li>
+    {#if stops.some((s) => s.kind === "stay")}<li class="flex items-center gap-2"><span class="size-2.5 rotate-45 rounded-[2px] bg-map-stay" aria-hidden="true"></span>Stay</li>{/if}
+    {#if stops.some((s) => s.kind === "place")}<li class="flex items-center gap-2"><span class="size-2 rounded-full bg-map-visited" aria-hidden="true"></span>Other stop</li>{/if}
     <li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Flight</li>
     {#if legs.some((l) => !l.flight)}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
   </ul>

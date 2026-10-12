@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TripPlaces } from "./api-types";
-import { activeStop, canReplay, legProgress, legsOf, maxStops, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopsOf, worthLocating, type Stop } from "./route-replay";
+import { activeStop, canReplay, legProgress, labelLit, legsOf, maxStops, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopsOf, worthLocating, type Stop } from "./route-replay";
 import { segment, trip } from "../test/fixtures";
 
 const places: TripPlaces = {
@@ -21,12 +21,20 @@ const back = segment({ id: 3, origin: "SFO", destination: "MSP", start_local: "2
 const names = (stops: Stop[]) => stops.map((s) => s.name);
 
 describe("stopsOf", () => {
-  it("puts the stops in time order and merges a stay into the airport city it follows", () => {
+  it("puts the stops in time order and keeps the hotel and the return flight as stops of their own", () => {
     const stops = stopsOf(trip([back, stay, out]), places);
-    expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Minneapolis"]);
-    expect(stops.map((s) => [s.from.slice(0, 10), s.to.slice(0, 10)])).toEqual([["2025-12-05", "2025-12-05"], ["2025-12-05", "2025-12-11"], ["2025-12-11", "2025-12-11"]]);
-    expect(stops.map((s) => s.back)).toEqual([false, false, true]);
-    expect(stops.map((s) => s.via)).toEqual([null, "flight", "flight"]);
+    expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Bayview Inn", "San Francisco", "Minneapolis"]);
+    expect(stops.map((s) => s.kind)).toEqual(["airport", "airport", "stay", "airport", "airport"]);
+    expect(stops.map((s) => [s.from.slice(0, 10), s.to.slice(0, 10)])).toEqual([["2025-12-05", "2025-12-05"], ["2025-12-05", "2025-12-05"], ["2025-12-05", "2025-12-11"], ["2025-12-11", "2025-12-11"], ["2025-12-11", "2025-12-11"]]);
+    expect(stops.map((s) => s.back)).toEqual([false, false, false, true, true]);
+    expect(stops.map((s) => s.via)).toEqual([null, "flight", null, null, "flight"]);
+  });
+
+  it("merges only consecutive duplicates: a connection's airport once, a hotel never into an airport", () => {
+    const hop = segment({ id: 4, origin: "SFO", destination: "OAK", start_local: "2025-12-05T12:00", start_zone: "America/Los_Angeles", end_local: "2025-12-05T13:00", end_zone: "America/Los_Angeles" });
+    expect(names(stopsOf(trip([out, hop]), places))).toEqual(["Minneapolis", "San Francisco", "Oakland"]);
+    const kinds = stopsOf(trip([out, stay]), places).map((s) => s.kind);
+    expect(kinds).toEqual(["airport", "airport", "stay"]);
   });
 
   it("skips stops with no coordinates and keeps the rest in order", () => {
@@ -34,7 +42,7 @@ describe("stopsOf", () => {
     const noWhere = segment({ id: 5, kind: "hotel", origin: "Quay Lodge", destination: null, start_local: "2025-12-07T15:00", start_zone: "America/Los_Angeles", end_local: "2025-12-08T11:00", end_zone: "America/Los_Angeles" });
     const rental = segment({ id: 6, kind: "car", origin: "SFO airport", destination: "SFO airport", start_local: "2025-12-05T12:00", start_zone: "America/Los_Angeles", end_local: "2025-12-11T12:00", end_zone: "America/Los_Angeles" });
     const lost = segment({ id: 7, origin: "ZZZ", destination: "SFO", start_local: "2025-12-12T08:00", start_zone: "America/Los_Angeles", end_local: "2025-12-12T09:00", end_zone: "America/Los_Angeles" });
-    expect(names(stopsOf(trip([out, unknown, noWhere, rental, stay, lost]), places))).toEqual(["Minneapolis", "San Francisco"]);
+    expect(names(stopsOf(trip([out, unknown, noWhere, rental, stay, lost]), places))).toEqual(["Minneapolis", "San Francisco", "Bayview Inn", "San Francisco"]);
   });
 
   it("leaves out cancelled bookings and parking", () => {
@@ -46,11 +54,11 @@ describe("stopsOf", () => {
   it("treats a stay in a nearby city as a separate stop and a train as other travel", () => {
     const napa = segment({ id: 4, kind: "hotel", origin: "Vine Inn", destination: "Napa, CA", start_local: "2025-12-06T15:00", start_zone: "America/Los_Angeles", end_local: "2025-12-08T11:00", end_zone: "America/Los_Angeles" });
     const stops = stopsOf(trip([out, napa]), places);
-    expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Napa"]);
+    expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Vine Inn"]);
     expect(stops[2].via).toBeNull();
     const ride = segment({ id: 5, kind: "train", origin: "Napa", destination: "San Francisco", start_local: "2025-12-08T12:00", start_zone: "America/Los_Angeles", end_local: "2025-12-08T14:00", end_zone: "America/Los_Angeles" });
     const all = stopsOf(trip([out, napa, ride]), places);
-    expect(names(all)).toEqual(["Minneapolis", "San Francisco", "Napa", "San Francisco"]);
+    expect(names(all)).toEqual(["Minneapolis", "San Francisco", "Vine Inn", "San Francisco"]);
     expect(all[3].via).toBe("train");
   });
 
@@ -58,7 +66,7 @@ describe("stopsOf", () => {
     const town = segment({ id: 4, kind: "hotel", origin: "Mill Inn", destination: "Longmont", start_local: "2025-12-06T15:00", start_zone: "America/Denver", end_local: "2025-12-08T11:00", end_zone: "America/Denver" });
     expect(names(stopsOf(trip([out, town]), places))).toEqual(["Minneapolis", "San Francisco"]);
     const stops = stopsOf(trip([out, town]), { ...places, stays: [{ segment_id: 4, latitude: 40.1672, longitude: -105.1019, precision: "city" }] });
-    expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Longmont"]);
+    expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Mill Inn"]);
     expect([stops[2].latitude, stops[2].longitude]).toEqual([40.1672, -105.1019]);
   });
 
@@ -66,9 +74,9 @@ describe("stopsOf", () => {
     const first = segment({ id: 4, kind: "hotel", origin: "North Inn", destination: "Boulder", start_local: "2025-12-06T15:00", start_zone: "America/Denver", end_local: "2025-12-07T11:00", end_zone: "America/Denver" });
     const second = segment({ id: 5, kind: "hotel", origin: "South Inn", destination: "Boulder", start_local: "2025-12-07T15:00", start_zone: "America/Denver", end_local: "2025-12-08T11:00", end_zone: "America/Denver" });
     const far = { ...places, stays: [{ segment_id: 4, latitude: 40.0251, longitude: -105.3487, precision: "zip" as const }, { segment_id: 5, latitude: 39.5, longitude: -104.9, precision: "zip" as const }] };
-    expect(names(stopsOf(trip([first, second]), far))).toEqual(["Boulder", "Boulder"]);
+    expect(names(stopsOf(trip([first, second]), far))).toEqual(["North Inn", "South Inn"]);
     const near = { ...places, stays: [{ segment_id: 4, latitude: 40.0251, longitude: -105.3487, precision: "zip" as const }, { segment_id: 5, latitude: 40.0402, longitude: -105.2514, precision: "zip" as const }] };
-    expect(names(stopsOf(trip([first, second]), near))).toEqual(["Boulder"]);
+    expect(names(stopsOf(trip([first, second]), near))).toEqual(["North Inn"]);
   });
 
   it("uses a stored point before the city lookup, and the city lookup when there is none", () => {
@@ -108,9 +116,9 @@ describe("the text of a stop", () => {
   const stops = stopsOf(trip([out, stay, back]), places);
 
   it("names the city and the dates there, in the place's own days", () => {
-    expect(stopLine(stops[0], 2025)).toBe("Minneapolis, Dec 5");
-    expect(stopLine(stops[1], 2025)).toMatch(/^San Francisco, Dec 5\s*[–-]\s*11$/);
-    expect(stopLine(stops[2], 2025)).toBe("Back in Minneapolis, Dec 11");
+    expect(stopLine(stops[0], 2025)).toBe("Minneapolis (MSP), Dec 5");
+    expect(stopLine(stops[2], 2025)).toMatch(/^Stay: Bayview Inn, San Francisco, Dec 5\s*[–-]\s*11$/);
+    expect(stopLine(stops[4], 2025)).toBe("Back in Minneapolis (MSP), Dec 11");
   });
 
   it("adds the year only when it is not the current one", () => {
@@ -170,6 +178,42 @@ describe("the camera and the timeline", () => {
     const legs = legsOf(set, routeProjection(set, 960, 520));
     expect(legs.map((l) => l.flight)).toEqual([true, false]);
     expect(legs.every((l) => l.d.startsWith("M"))).toBe(true);
+  });
+
+  it("draws the return flight as its own arc, bowed away from the way out, with a stay marker beside the airport", () => {
+    const set = stopsOf(trip([out, stay, back]), places);
+    const projection = routeProjection(set, 960, 520);
+    const legs = legsOf(set, projection);
+    expect(legs).toHaveLength(4);
+    expect(legs.map((l) => l.flight)).toEqual([true, false, false, true]);
+    const there = legs[0], home = legs[3];
+    expect(home.d).not.toBe(there.d);
+    const axis = (c: { x: number; y: number }) => Math.sign((there.to.x - there.from.x) * (c.y - there.from.y) - (there.to.y - there.from.y) * (c.x - there.from.x));
+    expect(axis(there.control)).toBe(-axis(home.control));
+    const spots = positions(set, projection);
+    expect(Math.hypot(spots[2].x - spots[1].x, spots[2].y - spots[1].y)).toBeGreaterThan(5);
+  });
+
+  it("moves a plane along a flight arc, pointing the way it flies", () => {
+    const set = stopsOf(trip([out, back]), places);
+    const [there, home] = legsOf(set, routeProjection(set, 960, 520));
+    const start = planeAt(there, 0), end = planeAt(there, 1), mid = planeAt(there, 0.5);
+    expect([start.x, start.y]).toEqual([there.from.x, there.from.y]);
+    expect(end.x).toBeCloseTo(there.to.x);
+    expect(end.y).toBeCloseTo(there.to.y);
+    expect(mid.x).toBeCloseTo((there.from.x + 2 * there.control.x + there.to.x) / 4);
+    const heading = (a: number) => Math.cos((a * Math.PI) / 180);
+    expect(Math.sign(heading(planeAt(there, 0.5).angle))).toBe(Math.sign(there.to.x - there.from.x));
+    expect(Math.sign(heading(planeAt(home, 0.5).angle))).toBe(Math.sign(home.to.x - home.from.x));
+    expect(Math.sign(heading(planeAt(there, 0.5).angle))).not.toBe(Math.sign(heading(planeAt(home, 0.5).angle)));
+  });
+
+  it("lights a stop's label as the path reaches it, holds it, then lets it go, keeping the last one", () => {
+    expect([0, 0.05, 0.3, 0.6].map((p) => labelLit(0, 3, p, false))).toEqual([true, true, false, false]);
+    expect([0.2, 0.5, 0.6, 0.9].map((p) => labelLit(1, 3, p, false))).toEqual([false, true, true, false]);
+    expect(labelLit(1, 3, 0.9, false)).toBe(false);
+    expect(labelLit(1, 3, 0.9, true)).toBe(true);
+    expect([0.5, 1].map((p) => labelLit(2, 3, p, false))).toEqual([false, true]);
   });
 
   it("spreads the legs evenly over the playback", () => {
