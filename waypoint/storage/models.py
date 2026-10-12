@@ -215,8 +215,6 @@ class Mailbox(Base):
     scan_summary: Mapped[str | None]
     scan_labels: Mapped[str | None]
     share_review: Mapped[bool]
-    ai_day: Mapped[str | None]
-    ai_day_count: Mapped[int]
 
 
 class MailboxPending(Base):

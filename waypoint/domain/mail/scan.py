@@ -63,8 +63,6 @@ class Summary:
     with_facts: int = 0
     attached: int = 0
     ai_asked: int = 0
-    ai_today: int = 0
-    ai_waiting: int = 0
 
 
 _running: set[int] = set()
@@ -115,7 +113,7 @@ def encode(found: Summary) -> str:
                        "skipped": found.skipped, "capped": found.capped, "labels_dropped": found.labels_dropped,
                        "triaged": found.triaged, "total": found.total, "not_travel": found.not_travel,
                        "followups": found.followups, "with_facts": found.with_facts, "attached": found.attached,
-                       "ai_asked": found.ai_asked, "ai_today": found.ai_today, "ai_waiting": found.ai_waiting}, separators=(",", ":"))
+                       "ai_asked": found.ai_asked}, separators=(",", ":"))
 
 
 def decode(text: str | None) -> Summary | None:
@@ -127,7 +125,7 @@ def decode(text: str | None) -> Summary | None:
     if not isinstance(raw, dict) or not all(isinstance(raw.get(k), int) and not isinstance(raw.get(k), bool) for k in counts) \
             or not isinstance(raw.get("capped"), bool):
         return None
-    extra = [raw.get(k, 0) for k in ("labels_dropped", "triaged", "total", "not_travel", "followups", "with_facts", "attached", "ai_asked", "ai_today", "ai_waiting")]
+    extra = [raw.get(k, 0) for k in ("labels_dropped", "triaged", "total", "not_travel", "followups", "with_facts", "attached", "ai_asked")]
     return Summary(raw["found"], raw["read"], raw["bookings"], raw["review"], raw["skipped"], raw["capped"],
                    *(n if isinstance(n, int) and not isinstance(n, bool) else 0 for n in extra))
 
@@ -343,13 +341,13 @@ def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) 
         review.set_suggestions(conn, mailbox_id, message_id, suggestions, error, auto=False)
 
 
-def _ask_waiting(mailbox_id: int, today: date, token: Callable[[], str]) -> int:
+def _ask_waiting(mailbox_id: int, token: Callable[[], str]) -> int:
     asked = 0
     passed: set[str] = set()
     while True:
         with db.session() as conn:
             cfg = ai.config(conn)
-            if cfg is None or not autoask.chosen(conn) or not autoask.room(conn, mailbox_id, today, asked):
+            if cfg is None or not autoask.chosen(conn):
                 return asked
             message_id = autoask.next_waiting(conn, mailbox_id, passed)
             known = tuple(loyalty.known_numbers(conn))
@@ -364,8 +362,6 @@ def _ask_waiting(mailbox_id: int, today: date, token: Callable[[], str]) -> int:
             continue
         except gmail.GmailError:
             continue
-        with db.session() as conn:
-            autoask.count_request(conn, mailbox_id, today)
         asked += 1
         suggestions, error, failed = _read(cfg, raw, known)
         with db.session() as conn:
@@ -508,7 +504,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             attached += bool(joined) and not a
             read, made, queued, handled = read + 1, made + a, queued + b, handled + 1
         if not capped:
-            asked_by_ai = _ask_waiting(mailbox_id, today, current)
+            asked_by_ai = _ask_waiting(mailbox_id, current)
         if not again and not backfill:
             with db.session() as conn:
                 conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(
@@ -519,10 +515,8 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
         monitoring.report(e, values=False)
         return _fail(mailbox_id, FAILED_GENERALLY, (read, made, queued))
     if not again and not backfill:
-        with db.session() as conn:
-            ai_today, ai_waiting = autoask.asked_today(conn, mailbox_id, today), autoask.waiting(conn, mailbox_id)
         remember(mailbox_id, Summary(tally["pending"], read, made, queued, skipped, capped, dropped, tally["found"] - tally["pending"] + handled, tally["found"], not_travel, followups, with_facts, attached,
-                                     asked_by_ai, ai_today, ai_waiting))
+                                     asked_by_ai))
     monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {tally['pending']} message(s) found, "
                    f"{read} read, {made} booking(s) added or changed, {queued} to review, {f'{followups} follow-up(s) attached ({with_facts} with details not applied), ' if followups else ''}{f'{attached} email(s) attached to an existing booking, ' if attached else ''}{f'{asked_by_ai} sent to the AI, ' if asked_by_ai else ''}{skipped} skipped ({not_travel} as not travel){', more waiting' if capped else ''}.")
     if why:

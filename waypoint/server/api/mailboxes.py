@@ -40,7 +40,7 @@ def _summary(text: str | None) -> ScanSummary | None:
                                       "skipped": found.skipped, "capped": found.capped, "labels_dropped": found.labels_dropped,
                                       "triaged": found.triaged, "total": found.total, "not_travel": found.not_travel,
                                       "followups": found.followups, "with_facts": found.with_facts, "attached": found.attached,
-                                      "ai_asked": found.ai_asked, "ai_today": found.ai_today, "ai_waiting": found.ai_waiting}
+                                      "ai_asked": found.ai_asked}
 
 
 def api_mailboxes(conn, _q, _b) -> MailboxList:

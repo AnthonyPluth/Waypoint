@@ -93,7 +93,7 @@
               <span><span class="font-medium">Read unreadable mail with AI automatically</span><span class="block text-muted-foreground">Off by default. “Ask AI” on a Review item works either way.</span></span>
             </label>
             {#if auto}
-              <p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="note">Waypoint will send the text of travel emails it couldn’t read to the AI you chose, without asking each time. At most 20 a scan and 100 a day for each mailbox, newest first.</p>
+              <p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="note">Waypoint will send the text of travel emails it couldn’t read to the AI you chose, without asking each time.</p>
             {/if}
           </div>
         {/if}

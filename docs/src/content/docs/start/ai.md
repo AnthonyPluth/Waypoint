@@ -25,7 +25,7 @@ Both switches are needed. With the AI off, or with this switch off, a scan sends
 - No reader made a booking from it.
 - It isn’t a follow-up of a booking you can see (a receipt, a check-in notice or a reminder that Waypoint attaches to the booking).
 
-A scan asks about at most 20 messages, and a mailbox at most 100 a day, newest first. A message that misses the cap waits and is asked about on the next scan. A request that fails leaves the item as it was, with a note that the AI couldn’t be asked, and is tried again on the next scans, at most twice more. Each mailbox’s last-scan line in Settings gives the counts: how many the AI was asked about, how many today, and how many are waiting. Counts only, never a subject, a sender or any text.
+There is no limit on how many messages a scan asks about. A request that fails leaves the item as it was, with a note that the AI couldn’t be asked, and is tried again on the next scans, at most twice more. Each mailbox’s last-scan line in Settings says how many messages the AI was asked about. A count only, never a subject, a sender or any text.
 
 What is sent, how it is redacted and where it goes are exactly the same as for **Ask AI**. The item in Review shows the suggestion as it does any AI suggestion, with a **read automatically** label so you can tell it wasn’t asked for. You still check and confirm every suggestion; nothing is added to your trips without you.
 

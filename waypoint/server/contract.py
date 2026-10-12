@@ -60,8 +60,6 @@ class ScanSummary(TypedDict):
     with_facts: int
     attached: int
     ai_asked: int
-    ai_today: int
-    ai_waiting: int
 
 
 class Mailbox(TypedDict):

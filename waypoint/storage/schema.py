@@ -257,8 +257,6 @@ mailboxes = Table(
     Column('scan_summary', Text),
     Column('scan_labels', Text),
     Column('share_review', Boolean, nullable=False, server_default=false()),
-    Column('ai_day', Text, doc='the day (YYYY-MM-DD) ai_day_count counts, so the automatic AI requests are capped per day'),
-    Column('ai_day_count', Integer, nullable=False, server_default='0', doc='how many automatic AI requests this mailbox made on ai_day; a number, nothing of any message'),
     UniqueConstraint('owner_sub', 'address', name='uq_mailboxes_owner_address'),
     info={'doc': "Gmail accounts members connected (read-only); each belongs to the member who connected it, its refresh token is kept encrypted; scan_summary is the counts of its last scan (found, read, bookings, review, skipped, capped) and nothing of any message; scan_labels is the list of Gmail label ids its owner chose to scan in full"},
 )

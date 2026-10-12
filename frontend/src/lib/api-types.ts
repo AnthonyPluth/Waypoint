@@ -697,8 +697,6 @@ export interface ScanSummary {
   with_facts: number;
   attached: number;
   ai_asked: number;
-  ai_today: number;
-  ai_waiting: number;
 }
 
 export interface Segment {

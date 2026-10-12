@@ -114,7 +114,6 @@ class BackupTests(unittest.TestCase):
         c.execute(insert(SegmentTraveler).values(segment_id=9, person_id=11))
 
     def without_ai_counters(self, data):
-        self.without(data, "mailboxes", "ai_day", "ai_day_count")
         self.without(data, "review_items", "auto_state", "auto_tries")
 
     def without(self, data, table, *names):
@@ -193,16 +192,15 @@ class BackupTests(unittest.TestCase):
         self.assertEqual([(t.id, t.done_at) for t in dst.orm.scalars(select(Trip))], [(5, None)])
         src.close(); dst.close()
 
-    def test_the_automatic_ai_counters_come_back_and_a_backup_from_before_restores_with_none(self):
+    def test_the_automatic_ai_state_comes_back_and_a_backup_from_before_restores_with_none(self):
         src = db.connect(self.a)
-        src.execute(insert(Mailbox).values(id=3, owner_sub="u", address="a@x.example", token="t", status="connected", ai_day="2026-10-12", ai_day_count=7))
+        src.execute(insert(Mailbox).values(id=3, owner_sub="u", address="a@x.example", token="t", status="connected"))
         src.execute(insert(ReviewItem).values(id=4, mailbox_id=3, message_id="m", sender_domain="x.example", reason="no_markup", created=1.0,
                                               auto_state="waiting", auto_tries=2))
         src.commit()
         dst = db.connect(self.b)
         backup.restore(dst, backup.load(backup.dump(src)))
         dst.commit()
-        self.assertEqual([tuple(r) for r in dst.execute(select(Mailbox.ai_day, Mailbox.ai_day_count))], [("2026-10-12", 7)])
         self.assertEqual([tuple(r) for r in dst.execute(select(ReviewItem.auto_state, ReviewItem.auto_tries))], [("waiting", 2)])
         data = backup.load(backup.dump(src))
         data["revision"] = "0032"
@@ -210,7 +208,6 @@ class BackupTests(unittest.TestCase):
         with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)
         dst.commit()
-        self.assertEqual([tuple(r) for r in dst.execute(select(Mailbox.ai_day, Mailbox.ai_day_count))], [(None, 0)])
         self.assertEqual([tuple(r) for r in dst.execute(select(ReviewItem.auto_state, ReviewItem.auto_tries))], [(None, 0)])
         src.close(); dst.close()
 

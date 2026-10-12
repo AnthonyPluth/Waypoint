@@ -1,13 +1,11 @@
 import json
 import sys
 import unittest
-from datetime import timedelta
 from unittest import mock
 
 from sqlalchemy import select
 
 from tests.privacy import no_leaks
-from tests.shared import TODAY
 from tests.test_mail_ai import BODY, FOOTER, GOOD, IDS, QUOTED, REPLY_CANARY, ScanAiCase
 from tests.test_mail_followup import CODE, STAYS, follow
 from tests.test_mail_scan import NOW, eml, plain_mail
@@ -177,38 +175,17 @@ class WhoIsAskedTests(AutoCase):
         self.assertEqual(len(self.fake.requests), 1)
 
 
-class CapTests(AutoCase):
-    def test_a_scan_asks_at_most_its_cap_newest_first_and_the_rest_wait_for_the_next(self):
+class EveryMessageTests(AutoCase):
+    def test_every_qualifying_message_is_asked_in_one_scan_with_no_cap(self):
         self.turn_on()
-        self.dated("old", "new", "mid")
-        with mock.patch.object(autoask, "PER_SCAN", 2):
-            self.assertEqual(self.scan().review, 3)
-            self.assertEqual(self.suggested(), ["msg-mid", "msg-new"])
-            self.assertEqual(self.waiting(), ["msg-old"])
-            found = scan.summary(self.mailbox)
-            self.assertEqual((found.ai_asked, found.ai_today, found.ai_waiting), (2, 2, 1))
-            self.scan(now=NOW + 60)
-        self.assertEqual(self.suggested(), ["msg-mid", "msg-new", "msg-old"])
-        self.assertEqual(self.waiting(), [])
-        self.assertEqual(len(self.fake.requests), 3)
-        found = scan.summary(self.mailbox)
-        self.assertEqual((found.ai_asked, found.ai_today, found.ai_waiting), (1, 3, 0))
+        for n in range(25):
+            self.add_mail(f"msg-{n}", eml("no_markup_ids"))
+        self.assertEqual(self.scan().review, 25)
+        self.assertEqual((len(self.fake.requests), len(self.suggested()), self.waiting()), (25, 25, []))
+        self.assertEqual(scan.summary(self.mailbox).ai_asked, 25)
 
-    def test_a_day_asks_at_most_its_cap_and_the_next_day_carries_on(self):
-        self.turn_on()
-        self.dated("new", "mid", "old")
-        with mock.patch.object(autoask, "PER_DAY", 2):
-            self.scan()
-            self.scan(now=NOW + 60)
-            self.assertEqual(self.suggested(), ["msg-mid", "msg-new"])
-            self.assertEqual(self.waiting(), ["msg-old"])
-            self.assertEqual(len(self.fake.requests), 2)
-            self.scan(now=NOW + 86400, today=TODAY + timedelta(days=1))
-        self.assertEqual(self.suggested(), ["msg-mid", "msg-new", "msg-old"])
-        self.assertEqual(self.read(lambda conn: conn.execute(select(Mailbox.ai_day_count)).scalar()), 1)
-
-    def test_the_caps_are_20_a_scan_and_100_a_day_in_one_place(self):
-        self.assertEqual((autoask.PER_SCAN, autoask.PER_DAY, autoask.TRIES), (20, 100, 3))
+    def test_the_most_a_failing_item_is_asked_is_three_times(self):
+        self.assertEqual(autoask.TRIES, 3)
 
     def test_an_item_that_was_already_waiting_when_the_switch_was_off_is_not_asked(self):
         self.turn_on(auto=False)
@@ -272,11 +249,12 @@ class FailureTests(AutoCase):
 
     def test_a_message_deleted_in_gmail_stops_waiting(self):
         self.turn_on()
-        self.dated("new", "old")
-        with mock.patch.object(autoask, "PER_SCAN", 1):
-            self.scan()
-            del self.google.mail["msg-old"]
-            self.scan(now=NOW + 60)
+        self.fake.status = 500
+        self.put("no_markup_ids")
+        self.scan()
+        self.assertEqual(self.waiting(), ["msg-no_markup_ids"])
+        del self.google.mail["msg-no_markup_ids"]
+        self.scan(now=NOW + 60)
         self.assertEqual((len(self.fake.requests), self.waiting()), (1, []))
 
     def test_a_person_asking_by_hand_takes_the_item_out_of_the_automatic_queue(self):

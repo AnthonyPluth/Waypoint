@@ -290,7 +290,7 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     held_ids = [added["id"] for added in (trips.add_segment(conn, jane, {**_held_stay(today), "travelers": _on(jane.person_id)}) for _ in range(2)) if added]
     box = Mailbox(owner_sub="local", address=DEMO_MAILBOX, token=secretbox.encrypt("demo-not-a-token") or "", history_id="1",
                   status="connected", created=0.0, last_scan=datetime.now(UTC).timestamp() - 3600,
-                  scan_summary=scan.encode(scan.Summary(found=2140, read=18, bookings=3, review=2, skipped=312, capped=True, triaged=1260, total=3400, not_travel=47, followups=6, with_facts=1, ai_asked=1, ai_today=4, ai_waiting=0)))
+                  scan_summary=scan.encode(scan.Summary(found=2140, read=18, bookings=3, review=2, skipped=312, capped=True, triaged=1260, total=3400, not_travel=47, followups=6, with_facts=1, ai_asked=1)))
     conn.orm.add(box)
     conn.orm.flush()
     scanned = datetime.now(UTC).timestamp()
