@@ -2,7 +2,7 @@ from sqlalchemy import select, update
 
 from waypoint.domain import people, trippeople, trips, visibility
 from waypoint.domain.visibility import Viewer
-from waypoint.storage.models import Segment, SegmentTraveler, Trip, TripPerson
+from waypoint.storage.models import Segment, SegmentRecipient, SegmentTraveler, Trip, TripPerson
 from tests.privacy import no_leaks
 from tests.test_trips import BACK, HOTEL, OUT, Household, guest
 
@@ -164,13 +164,6 @@ class CreatingAndEditingPeople(TripPeopleCase):
         got = trips.edit_trip(self.c, self.jane, seg["trip_id"], {"people": [self.jid, self.mia, self.joan]}, True)
         self.assertEqual(got["people"], [self.jid, self.mia, self.joan])
 
-    def test_adding_people_to_a_trip_does_not_yet_change_who_can_see_it(self):
-        seg = self.add(self.jane, OUT, None, self.on(self.jid))
-        trips.edit_trip(self.c, self.jane, seg["trip_id"], {"people": [self.jid, self.sid]}, True)
-        self.assertIsNone(trips.get(self.c, self.sam, seg["trip_id"]))
-        self.assertEqual(trips.listing(self.c, self.sam), [])
-        self.assertEqual([t.id for t in visibility.visible_trips(self.c, self.sam)], [])
-
     def test_a_trip_someone_cannot_see_does_not_give_up_its_people(self):
         seg = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
         self.assertIsNone(trips.edit_trip(self.c, self.sam, seg["trip_id"], {"people": []}))
@@ -220,6 +213,142 @@ class CreatingAndEditingPeople(TripPeopleCase):
                 trips.edit_trip(self.c, self.jane, seg["trip_id"], {"people": [self.jid, who]})
             trips.edit_trip(self.c, self.jane, seg["trip_id"], {"people": [self.jid, who]}, True)
             trips.edit_trip(self.c, self.jane, seg["trip_id"], {"people": [self.jid]})
+
+
+class WhoSeesATrip(TripPeopleCase):
+    def stranger(self):
+        return Viewer(self.joan)
+
+    def test_someone_added_to_a_trips_people_sees_the_trip_its_bookings_and_travellers(self):
+        seg = self.add(self.jane, OUT, None, self.on(self.jid))
+        stay = self.add(self.jane, HOTEL, seg["trip_id"])
+        self.assertIsNone(trips.get(self.c, self.sam, seg["trip_id"]))
+        trips.edit_trip(self.c, self.jane, seg["trip_id"], {"people": [self.jid, self.sid]}, True)
+        seen = trips.get(self.c, self.sam, seg["trip_id"])
+        assert seen
+        self.assertEqual(sorted(s["id"] for s in seen["segments"]), sorted([seg["id"], stay["id"]]))
+        self.assertEqual([t.id for t in visibility.visible_trips(self.c, self.sam)], [seg["trip_id"]])
+        self.assertEqual(len(trips.listing(self.c, self.sam)), 1)
+        self.assertIsNotNone(trips.get_segment(self.c, self.sam, stay["id"]))
+        self.assertEqual([s.id for s in visibility.visible_segments(self.c, self.sam)], [seg["id"], stay["id"]])
+        self.assertEqual([t.person_id for t in visibility.visible_travelers(self.c, self.sam, [seg["id"]])], [self.jid])
+
+    def test_a_person_on_a_booking_for_everyone_sees_the_trip_without_a_row_on_any_booking(self):
+        trip_id, stay_id = self.hotel_for_everyone(self.jid, self.sid)
+        self.c.execute(SegmentTraveler.__table__.delete())
+        self.c.orm.expire_all()
+        self.assertEqual(self.aboard(trip_id), [self.jid, self.sid])
+        self.assertIsNotNone(trips.get(self.c, self.sam, trip_id))
+        self.assertIsNotNone(trips.get_segment(self.c, self.sam, stay_id))
+
+    def test_taking_someone_off_the_trip_ends_their_access_and_a_stranger_never_gains_any(self):
+        seg = self.add(self.jane, OUT, None, self.on(self.jid))
+        trips.edit_trip(self.c, self.jane, seg["trip_id"], {"people": [self.jid, self.sid]}, True)
+        self.assertIsNotNone(trips.get(self.c, self.sam, seg["trip_id"]))
+        trips.edit_trip(self.c, self.jane, seg["trip_id"], {"people": [self.jid]})
+        self.assertIsNone(trips.get(self.c, self.sam, seg["trip_id"]))
+        self.assertIsNone(trips.get_segment(self.c, self.sam, seg["id"]))
+        self.assertEqual(trips.listing(self.c, self.sam), [])
+
+    def test_a_stranger_sees_nothing_of_a_trip_with_a_people_list(self):
+        canary = "Zebulon Canarystone"
+        who = people.add_guest(self.c, guest(canary))["id"]
+        seg = self.add(self.jane, {**OUT, "confirmation": "CANARY77XQ"}, None, self.on(self.jid, who))
+        trips.edit_trip(self.c, self.jane, seg["trip_id"], {"people": [self.jid, who, self.sid]}, True)
+        with no_leaks(self, canary, "CANARY77XQ"):
+            stranger = self.stranger()
+            self.assertIsNone(trips.get(self.c, stranger, seg["trip_id"]))
+            self.assertIsNone(trips.get_segment(self.c, stranger, seg["id"]))
+            self.assertEqual(trips.listing(self.c, stranger), [])
+            self.assertEqual(visibility.visible_segments(self.c, stranger), [])
+            self.assertEqual(visibility.visible_travelers(self.c, stranger, [seg["id"]]), [])
+            self.assertEqual(trips.unmatched_count(self.c, stranger), 0)
+            self.assertIsNone(trips.merge(self.c, stranger, seg["trip_id"], seg["trip_id"] + 1000))
+            self.assertIsNone(trips.edit_trip(self.c, stranger, seg["trip_id"], {"people": [self.joan]}, True))
+            self.assertEqual(self.aboard(seg["trip_id"]), [self.jid, who, self.sid])
+
+    def test_someone_who_only_sees_a_trip_through_its_people_cannot_change_who_else_is_on_it_without_asking(self):
+        seg = self.add(self.jane, OUT, None, self.on(self.jid))
+        trips.edit_trip(self.c, self.jane, seg["trip_id"], {"people": [self.jid, self.sid]}, True)
+        with self.assertRaises(trips.NeedsConfirmation):
+            trips.edit_trip(self.c, self.sam, seg["trip_id"], {"people": [self.jid, self.sid, self.mia]})
+        self.assertEqual(self.aboard(seg["trip_id"]), [self.jid, self.sid])
+
+    def test_moving_a_booking_into_a_trip_gives_its_travellers_the_trip_and_the_trips_people_the_booking(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jid))
+        b = self.add(self.jane, FAR, None, self.on(self.jid, self.sid))
+        with self.assertRaises(trips.NeedsConfirmation):
+            trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        trips.move_segment(self.c, self.jane, a["id"], b["trip_id"], True)
+        self.assertIsNotNone(trips.get_segment(self.c, self.sam, a["id"]))
+
+    def receive(self, segment_id, person_id):
+        self.c.orm.add(SegmentRecipient(segment_id=segment_id, person_id=person_id))
+        self.c.orm.flush()
+
+    def asked_to_move(self, segment_id, trip_id):
+        with self.assertRaises(trips.NeedsConfirmation) as asked:
+            trips.move_segment(self.c, self.jane, segment_id, trip_id)
+        return asked.exception
+
+    def test_moving_a_booking_does_not_name_someone_who_already_sees_the_trip_through_their_mailbox(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jid, self.sid))
+        b = self.add(self.jane, FAR, None, self.on(self.jid))
+        self.receive(b["id"], self.sid)
+        trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        self.assertEqual(self.c.orm.get(Segment, a["id"]).trip_id, b["trip_id"])
+
+    def test_moving_a_booking_does_not_name_someone_who_already_sees_the_booking_through_their_mailbox(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jid))
+        self.receive(a["id"], self.sid)
+        b = self.add(self.jane, FAR, None, self.on(self.jid))
+        self.receive(b["id"], self.sid)
+        trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        self.assertEqual(self.c.orm.get(Segment, a["id"]).trip_id, b["trip_id"])
+
+    def test_moving_a_booking_names_someone_who_only_got_its_confirmation_and_would_gain_the_trip(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jid))
+        self.receive(a["id"], self.sid)
+        b = self.add(self.jane, FAR, None, self.on(self.jid))
+        asked = self.asked_to_move(a["id"], b["trip_id"])
+        self.assertEqual([p["id"] for p in asked.see_trip], [self.sid])
+        self.assertEqual(asked.see_booking, [])
+
+    def test_moving_a_booking_names_someone_who_would_gain_the_booking_even_when_others_see_it_by_mailbox(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jid, self.sid))
+        b = self.add(self.jane, FAR, None, self.on(self.jid, self.mia))
+        self.receive(b["id"], self.sid)
+        asked = self.asked_to_move(a["id"], b["trip_id"])
+        self.assertEqual([p["id"] for p in asked.see_booking], [self.mia])
+        self.assertEqual(asked.see_trip, [])
+
+    def test_a_stranger_still_sees_nothing_after_a_booking_moves_with_a_mailbox_recipient(self):
+        canary = "Zebulon Canarystone"
+        who = people.add_guest(self.c, guest(canary))["id"]
+        a = self.add(self.jane, {**OUT, "confirmation": "CANARY77XQ"}, None, self.on(self.jid))
+        self.receive(a["id"], who)
+        b = self.add(self.jane, FAR, None, self.on(self.jid))
+        self.assertEqual([p["id"] for p in self.asked_to_move(a["id"], b["trip_id"]).see_trip], [who])
+        trips.move_segment(self.c, self.jane, a["id"], b["trip_id"], True)
+        with no_leaks(self, canary, "CANARY77XQ"):
+            stranger = self.stranger()
+            self.assertIsNone(trips.get(self.c, stranger, b["trip_id"]))
+            self.assertIsNone(trips.get_segment(self.c, stranger, a["id"]))
+            self.assertEqual(trips.listing(self.c, stranger), [])
+            self.assertIsNone(trips.move_segment(self.c, stranger, a["id"], b["trip_id"], True))
+
+    def test_merging_gives_each_trips_people_the_other_trips_bookings_and_a_stranger_nothing(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jid, self.sid))
+        b = self.add(self.jane, FAR, None, self.on(self.jid, self.mia))
+        with self.assertRaises(trips.NeedsConfirmation) as asked:
+            trips.merge(self.c, self.jane, a["trip_id"], b["trip_id"])
+        self.assertEqual([p["id"] for p in asked.exception.see_booking], [self.mia])
+        self.assertEqual([p["id"] for p in asked.exception.see_trip], [self.sid])
+        trips.merge(self.c, self.jane, a["trip_id"], b["trip_id"], True)
+        self.assertEqual(sorted(self.aboard(a["trip_id"])), sorted([self.jid, self.sid, self.mia]))
+        self.assertIsNotNone(trips.get_segment(self.c, self.sam, b["id"]))
+        self.assertIsNone(trips.get_segment(self.c, self.stranger(), b["id"]))
+        self.assertIsNone(trips.get(self.c, self.stranger(), a["trip_id"]))
 
 
 class GuestsClaimed(TripPeopleCase):

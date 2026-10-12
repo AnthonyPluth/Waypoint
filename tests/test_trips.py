@@ -146,7 +146,10 @@ class VisibilityTests(Household):
         self.assertIsNotNone(trips.get_segment(self.c, self.sam, seg["id"]))
         self.assertEqual(len(trips.listing(self.c, self.sam)), 1)
         trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": self.on(self.mia)})
+        self.assertEqual(len(trips.listing(self.c, self.sam)), 1)
+        trips.edit_trip(self.c, self.jane, seg["trip_id"], {"people": [self.mia]})
         self.assertEqual(trips.listing(self.c, self.sam), [])
+        self.assertIsNone(trips.get_segment(self.c, self.sam, seg["id"]))
 
     def test_the_local_household_sees_every_trip(self):
         self.add(self.jane, OUT)
@@ -803,17 +806,39 @@ class TripTests(Household):
             trips.merge(self.c, self.jane, a["trip_id"], a["trip_id"])
         self.assertIsNone(trips.merge(self.c, self.jane, a["trip_id"], 9999))
 
-    def test_merging_trips_with_different_people_is_refused(self):
+    def test_merging_trips_with_different_people_asks_first_and_names_who_would_newly_see_what(self):
+        a = self.add(self.jane, OUT, travelers=self.on(self.jane.person_id, self.sam.person_id))
+        b = self.add(self.jane, {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"},
+                     travelers=self.on(self.jane.person_id, self.mia))
+        with self.assertRaises(trips.NeedsConfirmation) as asked:
+            trips.merge(self.c, self.jane, a["trip_id"], b["trip_id"])
+        self.assertEqual(asked.exception.see_booking, [{"id": self.mia, "name": "Mia Doe"}])
+        self.assertEqual(asked.exception.see_trip, [{"id": self.sam.person_id, "name": "Sam Doe"}])
+        self.assertEqual(len(trips.listing(self.c, self.jane)), 2)
+        self.assertEqual(len(trips.listing(self.c, self.sam)), 1)
+        merged = trips.merge(self.c, self.jane, a["trip_id"], b["trip_id"], True)
+        assert merged
+        self.assertEqual((merged["id"], len(merged["segments"]), sorted(merged["people"])),
+                         (a["trip_id"], 2, sorted([self.jane.person_id, self.sam.person_id, self.mia])))
+        self.assertEqual(len(trips.get(self.c, self.sam, a["trip_id"])["segments"]), 2)
+
+    def test_merging_the_other_way_asks_the_same_question(self):
         a = self.add(self.jane, OUT, travelers=self.on(self.jane.person_id, self.sam.person_id))
         b = self.add(self.jane, {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"},
                      travelers=self.on(self.jane.person_id))
-        with self.assertRaisesRegex(trips.Invalid, "different people"):
-            trips.merge(self.c, self.jane, a["trip_id"], b["trip_id"])
-        with self.assertRaisesRegex(trips.Invalid, "different people"):
+        with self.assertRaises(trips.NeedsConfirmation) as asked:
             trips.merge(self.c, self.jane, b["trip_id"], a["trip_id"])
-        self.assertEqual(trips.listing(self.c, self.sam)[0]["id"], a["trip_id"])
-        self.assertEqual(len(trips.listing(self.c, self.sam)), 1)
+        self.assertEqual([p["name"] for p in asked.exception.see_booking], ["Sam Doe"])
+        self.assertEqual(asked.exception.see_trip, [])
         self.assertEqual(len(trips.listing(self.c, self.jane)), 2)
+
+    def test_merging_trips_of_the_same_people_and_the_household_view_need_no_confirmation(self):
+        a = self.add(self.jane, OUT, travelers=self.on(self.jane.person_id, self.sam.person_id))
+        b = self.add(self.jane, {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"},
+                     travelers=self.on(self.sam.person_id, self.jane.person_id))
+        self.assertIsNotNone(trips.merge(self.c, self.jane, a["trip_id"], b["trip_id"]))
+        c = self.add(self.jane, {**OUT, "start_local": "2026-11-01T19:00", "end_local": "2026-11-02T07:10"}, travelers=self.on(self.mia))
+        self.assertIsNotNone(trips.merge(self.c, Viewer(None, household=True), a["trip_id"], c["trip_id"]))
 
     def test_adding_without_a_person_is_refused(self):
         for make in (lambda: trips.create_trip(self.c, Viewer(None), {"name": "x"}), lambda: trips.add_segment(self.c, Viewer(None), OUT)):

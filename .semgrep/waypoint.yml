@@ -246,8 +246,8 @@ rules:
   - id: waypoint-trip-visibility
     message: >-
       Trips and segments are read for a request only through the visibility helper (waypoint/domain/visibility.py), so
-      nobody sees a trip they aren't on and didn't book (AGENTS.md, "You see the trips you're on"). A trip or segment
-      id that isn't visible answers 404.
+      nobody sees a trip they aren't on (the trip's people list, trip_people), didn't book and didn't get a booking's
+      confirmation for (AGENTS.md, "You see the trips you're on"). A trip or segment id that isn't visible answers 404.
     severity: ERROR
     languages: [python]
     pattern-either:

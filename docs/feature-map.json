@@ -291,6 +291,7 @@
         "tests/test_api_contract.py",
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
+        "tests/test_offline.py",
         "tests/test_routes.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
@@ -345,6 +346,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_trips.py"
       ],
