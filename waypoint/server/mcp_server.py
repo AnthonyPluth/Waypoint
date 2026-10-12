@@ -170,7 +170,7 @@ WRITE_RULES = (
     "never under one blanket yes for several. "
     "3) Times are wall-clock times at the place (start_local in start_zone); never convert them. "
     "4) Moving a booking into a trip with different people is refused for assistants: tell the person to do it in the app. "
-    "Moves between trips of the same people are fine. "
+    "Moves between trips of the same people are fine. Adding someone to a trip who can't see it yet is refused the same way; taking someone off a trip is fine. "
     "Mailboxes, AI settings, backups, sign-in and these assistant settings are out of reach.")
 MAIL_RULES = (
     "This connection may read the text and kept markup of kept emails (get_segment_email, and the email in get_review_item). That is the household's "
@@ -265,7 +265,9 @@ _SEGMENT_FIELDS = _fields("kind (flight, hotel, car, train, cruise or parking), 
                           "flight's come from its airports), details (flight_number, terminal, seat, cabin, room, car_class, "
                           "address, phone, ship, deck, space_type, vehicle, notes: texts), itinerary (a cruise's ports of call in order: [{name, zone, arrive_local, depart_local}], "
                           "times local to the port or null), manage_url and travelers ([{person_id}] or [{name}], the person asking when left out).")
-_TRIP_FIELDS = _fields("name, and optionally destination, notes; start_date and end_date (YYYY-MM-DD) for a trip with no segments yet.")
+_TRIP_FIELDS = _fields("name, and optionally destination, notes; start_date and end_date (YYYY-MM-DD) for a trip with no segments yet; "
+                       "people, the list of person ids who are on the trip (replaces the whole list; taking someone off removes them from its stays and "
+                       "rentals, and is refused while they are on one of its flights; adding someone who can't see the trip yet needs the person to do it in the app).")
 _PERSON_FIELDS = _fields("display_name, and optionally first_name, legal_name (as on an ID) and aliases (a list of how airlines print the "
                          "name). Changing replaces all of them: send every name to keep.")
 

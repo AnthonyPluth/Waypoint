@@ -257,6 +257,8 @@ rules:
       - pattern: select(..., Segment.$C, ...)
       - pattern: select(..., SegmentTraveler, ...)
       - pattern: select(..., SegmentTraveler.$C, ...)
+      - pattern: select(..., TripPerson, ...)
+      - pattern: select(..., TripPerson.$C, ...)
       - pattern: $CONN.orm.get(Trip, ...)
       - pattern: $CONN.orm.get(Segment, ...)
       - pattern: update(Trip)
@@ -266,6 +268,7 @@ rules:
       - pattern: $Q.join(Trip, ...)
       - pattern: $Q.join(Segment, ...)
       - pattern: $Q.join(SegmentTraveler, ...)
+      - pattern: $Q.join(TripPerson, ...)
       - pattern: $Q.outerjoin(Trip, ...)
       - pattern: $Q.outerjoin(Segment, ...)
       - pattern: $Q.join_from(..., Trip, ...)
@@ -276,7 +279,8 @@ rules:
       - pattern: schema.trips
       - pattern: schema.segments
       - pattern: schema.segment_travelers
-      - pattern-regex: (?i)\b(from|join|update|into)\s+"?(trips|segments|segment_travelers)\b
+      - pattern: schema.trip_people
+      - pattern-regex: (?i)\b(from|join|update|into)\s+"?(trips|segments|segment_travelers|trip_people)\b
     paths:
       include: ["/waypoint/server/"]
 

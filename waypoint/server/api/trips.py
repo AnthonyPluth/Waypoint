@@ -86,6 +86,14 @@ def _travelers(raw: Any) -> list[trips.TravelerIn]:
     return found
 
 
+def _people(raw: Any) -> list[int]:
+    if not isinstance(raw, list):
+        raise ApiError('Send "people" as a list of people')
+    if len(raw) > MAX_TRAVELERS:
+        raise ApiError(f"Add at most {MAX_TRAVELERS} people")
+    return [_id(p, "Choose people from People") for p in raw]
+
+
 def segment_fields(body: Mapping[str, Any]) -> trips.SegmentIn:
     out: trips.SegmentIn = {}
     for key in ("kind", "status", "start_local", "end_local"):
@@ -117,6 +125,8 @@ def trip_fields(body: Mapping[str, Any], creating: bool) -> trips.TripIn:
     for key in ("start_date", "end_date"):
         if key in body:
             out[key] = _v.day(body[key], key.replace("_", " "))   # type: ignore[literal-required]
+    if "people" in body:
+        out["people"] = _people(body["people"])
     return out
 
 
@@ -140,9 +150,23 @@ def api_trips(conn, _q, _b) -> TripList:
     return {"trips": [_trip(t) for t in trips.listing(conn, viewer(conn))]}
 
 
+def _needs_the_person(e: trips.NeedsConfirmation, assistant: bool) -> ApiError:
+    if assistant:
+        return ApiError("This needs the person to do it in the app: adding someone to a trip changes who sees what, and only they can "
+                        "confirm it.", 403)
+    return ApiError(str(e), 409, {"see_booking": e.see_booking, "see_trip": e.see_trip})
+
+
+def _assistant() -> bool:
+    return bool(getattr(_current, "assistant", True))
+
+
 def api_trip_add(conn, _q, body: TripBody) -> Trip:
+    assistant = _assistant()
     try:
-        return _trip(trips.create_trip(conn, viewer(conn), trip_fields(body, creating=True)))
+        return _trip(trips.create_trip(conn, viewer(conn), trip_fields(body, creating=True), validate.on(body.get("confirm")) and not assistant))
+    except trips.NeedsConfirmation as e:
+        raise _needs_the_person(e, assistant) from None
     except trips.Invalid as e:
         raise ApiError(str(e)) from None
 
@@ -158,8 +182,12 @@ def api_trip_places(conn, _q, _b, trip_id) -> TripPlaces:
 
 
 def api_trip_edit(conn, _q, body: TripBody, trip_id) -> Trip:
-    who, fields = viewer(conn), trip_fields(body, creating=False)
-    return _trip(_run(lambda: trips.edit_trip(conn, who, row_id(trip_id, NO_TRIP), fields), NO_TRIP))
+    who, fields, assistant = viewer(conn), trip_fields(body, creating=False), _assistant()
+    confirmed = validate.on(body.get("confirm")) and not assistant
+    try:
+        return _trip(_run(lambda: trips.edit_trip(conn, who, row_id(trip_id, NO_TRIP), fields, confirmed), NO_TRIP))
+    except trips.NeedsConfirmation as e:
+        raise _needs_the_person(e, assistant) from None
 
 
 def api_trip_remove(conn, _q, _b, trip_id) -> Ok:
@@ -253,7 +281,7 @@ def api_segment_move(conn, _q, body: MoveBody, segment_id) -> Trip:
     who, this = viewer(conn), row_id(segment_id, NO_SEGMENT)
     target = body.get("trip_id")
     into = None if target is None else _id(target, "Choose the trip to move this into")
-    assistant = bool(getattr(_current, "assistant", True))
+    assistant = _assistant()
     confirmed = validate.on(body.get("confirm")) and not assistant
     try:
         return _trip(_run(lambda: trips.move_segment(conn, who, this, into, confirmed), NO_SEGMENT))

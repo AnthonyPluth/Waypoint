@@ -235,6 +235,48 @@ class VisibilityTests(Assistants):
             moved = trips_api.api_segment_move(conn, {}, {"trip_id": shared["id"], "confirm": True}, str(solo["segment"]))
             self.assertEqual(moved["id"], shared["id"])
 
+    def test_an_assistant_can_take_people_off_a_trip_but_never_confirm_adding_someone_who_cannot_see_it(self):
+        trip = self.jane_trip["id"]
+        self.addCleanup(self.set_people, trip, [self.jane.person_id])
+        before = self.tool(READ, "get_trip", {"trip_id": trip})["people"]
+        self.assertEqual(before, [self.jane.person_id])
+        for fields in ({"people": [self.jane.person_id, self.sam.person_id]}, {"people": [self.jane.person_id, self.guest]}):
+            with self.subTest(fields=fields):
+                self.assertIn("in the app", self.refused(ALL, "update_trip", {"trip_id": trip, "fields": fields}))
+                self.assertEqual(self.tool(READ, "get_trip", {"trip_id": trip})["people"], before)
+        self.assertIn("in the app", self.refused(ALL, "call_endpoint", {"method": "POST", "path": f"/api/trips/{trip}",
+                                                                          "body": {"people": [self.jane.person_id, self.sam.person_id], "confirm": True}}))
+        self.assertIn("in the app", self.refused(ALL, "create_trip", {"fields": {"name": "Road trip", "people": [self.guest]}}))
+        self.assertEqual(self.tool(ALL, "update_trip", {"trip_id": trip, "fields": {"people": [self.jane.person_id]}})["people"], before)
+        self.assertIn("people", mcp_server.WRITE_RULES + str(mcp_server.WRITE_TOOLS))
+
+    def test_the_web_path_asks_then_adds_people_and_an_assistant_can_then_take_them_off(self):
+        trip = self.jane_trip["id"]
+        self.addCleanup(self.set_people, trip, [self.jane.person_id])
+        self.addCleanup(setattr, _current, "user", None)
+        self.addCleanup(vars(_current).pop, "assistant", None)
+        _current.user = {"sub": "u-jane", "name": "Jane Doe", "email": "jane@example.com"}
+        _current.assistant = False
+        both = {"people": [self.jane.person_id, self.guest]}
+        with db.session() as conn:
+            with self.assertRaises(ApiError) as asked:
+                trips_api.api_trip_edit(conn, {}, both, str(trip))
+            self.assertEqual((asked.exception.status, asked.exception.data["see_trip"][0]["name"]), (409, "Mia Doe"))
+            added = trips_api.api_trip_edit(conn, {}, {**both, "confirm": True}, str(trip))
+            self.assertEqual(added["people"], [self.jane.person_id, self.guest])
+            made = trips_api.api_trip_add(conn, {}, {"name": "Road trip", "people": [self.jane.person_id, self.guest], "confirm": True})
+            self.addCleanup(self.drop, made["id"])
+            self.assertEqual(made["people"], [self.jane.person_id, self.guest])
+            with self.assertRaises(ApiError) as bad:
+                trips_api.api_trip_add(conn, {}, {"name": "x", "people": "everyone"})
+            self.assertEqual(bad.exception.status, 400)
+        self.assertEqual(self.tool(ALL, "update_trip", {"trip_id": trip, "fields": {"people": [self.jane.person_id]}})["people"],
+                         [self.jane.person_id])
+
+    def set_people(self, trip_id, ids):
+        with db.session() as conn:
+            trips.edit_trip(conn, Viewer(self.jane.person_id, household=True), trip_id, {"people": ids})
+
     def drop(self, *trip_ids):
         with db.session() as conn:
             conn.execute(delete(Trip).where(Trip.id.in_(trip_ids)))
