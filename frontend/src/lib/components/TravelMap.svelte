@@ -1,14 +1,14 @@
 <script lang="ts">
   import { geoContains, geoPath } from "d3-geo";
   import { errMsg } from "$lib/act";
-  import type { StatsFlights, StatsMapTrip, StatsStayPin } from "$lib/api-types";
+  import type { StatsFlights, StatsMapTrip, StatsStayPin, StatsVisit } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
   import { clampPan, fitBox, flownBounds, IDENTITY, loadCountries, loadStates, MAP_HEIGHT, MAP_WIDTH, mapData, pins as stayPins, US_ID, visitedFeatureIds, visitedPoints, worldProjection, zoomAt, type Country, type Transform } from "$lib/map";
   import { dateLabel } from "$lib/trips";
   import Minus from "@lucide/svelte/icons/minus";
   import Plus from "@lucide/svelte/icons/plus";
 
-  let { flights, stays = [] }: { flights: StatsFlights; stays?: StatsStayPin[] } = $props();
+  let { flights, stays = [], visits = [] }: { flights: StatsFlights; stays?: StatsStayPin[]; visits?: StatsVisit[] } = $props();
 
   let countries = $state<Country[] | null>(null);
   let states = $state<Country[]>([]);
@@ -25,11 +25,11 @@
   const path = geoPath(projection);
   const world = $derived(mapData(flights, projection));
   const stayDots = $derived(stayPins(stays, projection));
-  const places = $derived(visitedPoints(flights.airports, stays));
+  const places = $derived(visitedPoints(flights.airports, stays, visits));
   const outlines = $derived((countries ?? []).map((c) => ({ id: c.id, name: c.properties?.name ?? "", d: path(c) ?? "" })));
   const visited = $derived(countries ? visitedFeatureIds(places, countries, (f, p) => geoContains(f, p)) : new Set<string | number>());
   const stateOutlines = $derived(states.map((c) => ({ id: c.id, name: c.properties?.name ?? "", d: path(c) ?? "" })));
-  const visitedStates = $derived(states.length ? visitedFeatureIds(places, states, (f, p) => geoContains(f, p)) : new Set<string | number>());
+  const visitedStates = $derived(states.length ? visitedFeatureIds(visitedPoints(flights.airports, stays), states, (f, p) => geoContains(f, p)) : new Set<string | number>());
   const byState = $derived(states.length > 0);
   const sphere = path({ type: "Sphere" }) ?? "";
 

@@ -92,6 +92,8 @@ def _title(seg: SegmentOut) -> str:
         return " ".join(p for p in ("Flight", number, where) if p)
     if seg["kind"] == "hotel":
         return f"Hotel: {seg['origin']}" if seg["origin"] else "Hotel"
+    if seg["kind"] == "visit":
+        return f"Visit: {seg['destination']}" if seg["destination"] else "Visit"
     if seg["kind"] == "parking":
         return f"Parking: {seg['origin']}" if seg["origin"] else "Parking"
     if seg["kind"] == "car":

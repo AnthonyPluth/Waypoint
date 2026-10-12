@@ -3360,7 +3360,8 @@
               "car",
               "train",
               "cruise",
-              "parking"
+              "parking",
+              "visit"
             ]
           },
           "status": {
@@ -6222,7 +6223,8 @@
               "car",
               "train",
               "cruise",
-              "parking"
+              "parking",
+              "visit"
             ]
           },
           "status": {
@@ -6407,7 +6409,8 @@
               "car",
               "train",
               "cruise",
-              "parking"
+              "parking",
+              "visit"
             ]
           },
           "start_local": {
@@ -6517,7 +6520,8 @@
               "car",
               "train",
               "cruise",
-              "parking"
+              "parking",
+              "visit"
             ]
           },
           "status": {
@@ -7204,11 +7208,18 @@
             "items": {
               "$ref": "#/components/schemas/StatsPlace"
             }
+          },
+          "visits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsVisit"
+            }
           }
         },
         "required": [
           "countries",
-          "cities"
+          "cities",
+          "visits"
         ],
         "additionalProperties": false
       },
@@ -7489,6 +7500,26 @@
           "most_visited_city",
           "busiest_month",
           "pins"
+        ],
+        "additionalProperties": false
+      },
+      "StatsVisit": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "country",
+          "latitude",
+          "longitude"
         ],
         "additionalProperties": false
       },
@@ -8026,7 +8057,8 @@
               "car",
               "train",
               "cruise",
-              "parking"
+              "parking",
+              "visit"
             ]
           },
           "provider": {

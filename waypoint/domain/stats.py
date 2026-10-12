@@ -179,9 +179,16 @@ class ParkingStats(TypedDict):
     lots: list[Named]
 
 
+class VisitPoint(TypedDict):
+    country: str
+    latitude: float
+    longitude: float
+
+
 class PlaceStats(TypedDict):
     countries: list[Place]
     cities: list[Place]
+    visits: list[VisitPoint]
 
 
 class Stats(TypedDict):
@@ -505,7 +512,7 @@ def _visit_count(spans: Iterable[Span]) -> int:
 
 
 def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Airport],
-            city_countries: Mapping[str, str]) -> PlaceStats:
+            city_countries: Mapping[str, str], visits_abroad: Sequence[Seg] = ()) -> PlaceStats:
     countries: dict[str, list[str]] = {}
     cities: dict[str, list[str]] = {}
     came: dict[str, dict[str, list[Span]]] = {"country": {}, "city": {}}
@@ -537,6 +544,16 @@ def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Ai
                 seen(countries, country, s.start_local[:10])
                 note(stayed, "country", country, s.start_local, s.end_local)
 
+    points: dict[str, VisitPoint] = {}
+    for s in visits_abroad:
+        country = (s.destination or "").strip().upper()
+        if not country:
+            continue
+        seen(countries, country, s.start_local[:10])
+        note(stayed, "country", country, s.start_local, s.end_local)
+        if s.point is not None:
+            points.setdefault(country, {"country": country, "latitude": s.point[0], "longitude": s.point[1]})
+
     def visits(kind: str, name: str) -> int:
         arrivals, departures = came[kind].get(name, []), went[kind].get(name, [])
         flown = arrivals if _visit_count(arrivals) >= _visit_count(departures) else departures
@@ -545,7 +562,8 @@ def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Ai
     def listed(found: dict[str, list[str]], kind: str) -> list[Place]:
         return sorted(({"name": n, "first_visit": min(days), "visits": visits(kind, n)}
                        for n, days in found.items()), key=lambda p: (p["first_visit"], p["name"]))
-    return {"countries": listed(countries, "country"), "cities": listed(cities, "city")}
+    return {"countries": listed(countries, "country"), "cities": listed(cities, "city"),
+            "visits": sorted(points.values(), key=lambda p: p["country"])}
 
 
 def _years(live: Sequence[Seg]) -> list[int]:
@@ -559,7 +577,7 @@ def _years(live: Sequence[Seg]) -> list[int]:
             found.update(d.year for d in _days(s))
         elif s.kind == "cruise":
             found.update(d.year for d in _nights(s))
-        elif s.kind == "parking":
+        elif s.kind in ("parking", "visit"):
             found.update(d.year for d in _days(s))
     return sorted(found, reverse=True)
 
@@ -574,11 +592,12 @@ def build(segments: Iterable[Seg], known: Mapping[str, Airport], airlines: Mappi
     cars = [s for s in live if s.kind == "car"]
     cruises = [s for s in live if s.kind == "cruise"]
     spots = [s for s in live if s.kind == "parking"]
+    visits = [s for s in live if s.kind == "visit" and any(_in(d, year) for d in _days(s))]
     stays_in = [s for s in stays if year is None or any(_in(d, year) for d in _nights(s))]
     return {"years": _years(live), "flights": _flights(flights, known, airlines, trip_names),
             "stays": _stays(stays_in, year, city_countries, city_points, trip_names),
             "cars": _cars(cars, year), "cruises": _cruises(cruises, year),
-            "parking": _parking(spots, year), "places": _places(flights, stays_in, known, city_countries)}
+            "parking": _parking(spots, year), "places": _places(flights, stays_in, known, city_countries, visits)}
 
 
 def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: int | None, now: datetime) -> Stats | None:

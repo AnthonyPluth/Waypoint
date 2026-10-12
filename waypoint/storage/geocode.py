@@ -9,7 +9,7 @@ from . import reference
 
 Precision = Literal["airport", "zip", "city"]
 PRECISIONS: tuple[Precision, ...] = ("airport", "zip", "city")
-LOCATED_KINDS = ("hotel", "car", "train", "cruise", "parking")
+LOCATED_KINDS = ("hotel", "car", "train", "cruise", "parking", "visit")
 DOMINANCE = 3
 
 US_STATES = frozenset(
@@ -131,6 +131,9 @@ def places_of(kind: str, origin: str | None, destination: str | None) -> list[st
 def locate(kind: str, origin: str | None, destination: str | None, address: str | None) -> Point | None:
     if kind not in LOCATED_KINDS:
         return None
+    if kind == "visit":
+        found = reference.country_points().get((destination or "").strip().upper())
+        return Point(found[0], found[1], "city") if found else None
     places = places_of(kind, origin, destination)
     where = (address or "").strip()
     tokens = _tokens(where)

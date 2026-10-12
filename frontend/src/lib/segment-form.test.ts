@@ -235,3 +235,20 @@ describe("the cost", () => {
     expect(problem(priced({ cost: "", currency: "x" }))).toBeNull();
   });
 });
+
+describe("a past visit", () => {
+  const visit = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), kind: "visit", destination: "jp", start_local: "2006-04-02T00:00", end_local: "2006-04-12T00:00", people: [1], ...extra });
+  it("needs a country, both days in order and someone travelling", () => {
+    expect(problem(visit())).toBeNull();
+    expect(problem(visit({ destination: "" }))).toBe("Choose the country");
+    expect(problem(visit({ start_local: "" }))).toBe("Enter the first day you were there");
+    expect(problem(visit({ end_local: "" }))).toBe("Enter the last day you were there");
+    expect(problem(visit({ end_local: "2006-04-01T00:00" }))).toBe("The last day can’t be before the first");
+    expect(problem(visit({ people: [] }))).toBe("Choose who’s travelling");
+  });
+  it("sends the country code with no place or zone", () => {
+    const sent = body(visit());
+    expect(sent).toMatchObject({ kind: "visit", origin: null, destination: "JP", travelers: [{ person_id: 1 }] });
+    expect(sent).not.toHaveProperty("start_zone");
+  });
+});

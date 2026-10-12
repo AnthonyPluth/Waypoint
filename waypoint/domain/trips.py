@@ -11,15 +11,15 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import delete, select, update
 
 from .. import dates
-from ..storage import db, gate_codes, geocode, stored_mail
+from ..storage import db, gate_codes, geocode, reference, stored_mail
 from ..storage.models import Segment, SegmentPort, SegmentRecipient, SegmentTraveler, Trip
 from . import airports, links, logos, money, people, place_zones, regions, trippeople, visibility
 from .visibility import Viewer
 
-Kind = Literal["flight", "hotel", "car", "train", "cruise", "parking"]
+Kind = Literal["flight", "hotel", "car", "train", "cruise", "parking", "visit"]
 Status = Literal["confirmed", "changed", "cancelled"]
 SHARED_KINDS = frozenset({"hotel", "car", "parking"})
-KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train", "cruise", "parking")
+KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train", "cruise", "parking", "visit")
 STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
 TIME_UNKNOWN = "time_unknown"
 ADDRESS_LIMIT = 300
@@ -382,7 +382,15 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
             if not code or not IATA.fullmatch(code):
                 raise Invalid(f"A flight’s {label} is an airport code like JFK")
         origin, destination = (origin or "").upper(), (destination or "").upper()
-    if kind in ("hotel", "parking"):
+    details = fields.get("details") or {}
+    if kind == "visit":
+        origin, destination = None, (destination or "").strip().upper()
+        zone = reference.country_zones().get(destination)
+        if not zone:
+            raise Invalid("A visit’s country is a two-letter country code like JP")
+        start_zone = end_zone = zone
+        details = {**details, TIME_UNKNOWN: "yes"}
+    elif kind in ("hotel", "parking"):
         start_zone = end_zone = _stay_zone(conn, fields)
         if kind == "parking" and fields.get("end_zone"):
             end_zone = _zone(fields["end_zone"], "exit")
@@ -393,7 +401,6 @@ def check(conn: db.Connection, fields: SegmentIn) -> dict[str, str | None]:
     start, end = _local(fields.get("start_local"), "start"), _local(fields.get("end_local"), "end")
     if instant(end, end_zone) < instant(start, start_zone):
         raise Invalid("This ends before it starts (times are compared at their own places’ zones)")
-    details = fields.get("details") or {}
     if any(k not in DETAIL_KEYS for k in details):
         raise Invalid(f"Details can hold only: {', '.join(DETAIL_KEYS)}")
     if len(details.get("address", "")) > ADDRESS_LIMIT:
@@ -699,6 +706,8 @@ def _headline(conn: db.Connection, values: Mapping[str, str | None]) -> str | No
     if values["kind"] == "flight" and values["destination"]:
         known = airports.lookup(conn, values["destination"])
         return known["city"] if known else values["destination"]
+    if values["kind"] == "visit" and values["destination"]:
+        return reference.country_names().get(values["destination"], values["destination"])
     return values["destination"] or values["origin"]
 
 
@@ -709,6 +718,8 @@ def _name_for(place: str | None, start: str) -> str:
 
 def _region(conn: db.Connection, seg: Segment) -> str | None:
     address = decode_details(seg.details).get("address")
+    if seg.kind == "visit":
+        return reference.country_names().get((seg.destination or "").upper())
     if seg.kind in ("flight", "train"):
         return regions.of_place(conn, seg.destination)
     if seg.kind in ("hotel", "parking"):

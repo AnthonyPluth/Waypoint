@@ -68,7 +68,7 @@ export interface AssistantCandidate {
 }
 
 export interface AssistantCreateBody {
-  kind?: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
+  kind?: "flight" | "hotel" | "car" | "train" | "cruise" | "parking" | "visit";
   status?: "confirmed" | "changed" | "cancelled";
   confirmation?: string | null;
   provider?: string | null;
@@ -718,7 +718,7 @@ export interface ScanSummary {
 export interface Segment {
   id: number;
   trip_id: number;
-  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking" | "visit";
   status: "confirmed" | "changed" | "cancelled";
   confirmation: string | null;
   provider: string | null;
@@ -747,7 +747,7 @@ export interface Segment {
 }
 
 export interface SegmentBody {
-  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking" | "visit";
   start_local: string;
   end_local: string;
   trip_id?: number | null;
@@ -766,7 +766,7 @@ export interface SegmentBody {
 }
 
 export interface SegmentEdit {
-  kind?: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
+  kind?: "flight" | "hotel" | "car" | "train" | "cruise" | "parking" | "visit";
   status?: "confirmed" | "changed" | "cancelled";
   confirmation?: string | null;
   provider?: string | null;
@@ -920,6 +920,7 @@ export interface StatsPlace {
 export interface StatsPlaces {
   countries: StatsPlace[];
   cities: StatsPlace[];
+  visits: StatsVisit[];
 }
 
 export interface StatsRoute {
@@ -978,6 +979,12 @@ export interface StatsStays {
   most_visited_city: StatsStayPlace | null;
   busiest_month: string | null;
   pins: StatsStayPin[];
+}
+
+export interface StatsVisit {
+  country: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface StoredEmail {
@@ -1105,7 +1112,7 @@ export interface WhoIsThis {
   name: string;
   segment_id: number;
   trip_id: number;
-  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking";
+  kind: "flight" | "hotel" | "car" | "train" | "cruise" | "parking" | "visit";
   provider: string | null;
   origin: string | null;
   destination: string | null;

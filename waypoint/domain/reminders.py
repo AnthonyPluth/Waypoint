@@ -195,7 +195,7 @@ def _when(seg: SegmentOut) -> str:
 def _label(seg: SegmentOut) -> str:
     where = " → ".join(p for p in (seg["origin"], seg["destination"]) if p)
     number = seg["details"].get("flight_number")
-    names = {"flight": "Flight", "hotel": "Hotel check-in", "car": "Car pickup", "train": "Train", "cruise": "Cruise", "parking": "Parking"}
+    names = {"flight": "Flight", "hotel": "Hotel check-in", "car": "Car pickup", "train": "Train", "cruise": "Cruise", "parking": "Parking", "visit": "Visit"}
     return " ".join(p for p in (names[seg["kind"]], number, where) if p)
 
 

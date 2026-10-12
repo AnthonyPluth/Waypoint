@@ -7,6 +7,7 @@
   import { Input } from "$lib/components/ui/input";
   import FlightLength from "$lib/components/FlightLength.svelte";
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
+  import { countryChoices } from "$lib/countries";
   import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, SEAT_LIMIT, SEATED, FOR_EVERYONE, seatKey, type Draft } from "$lib/segment-form";
 
   let { initial, people, onsaved, oncancel, focus = "", titled = true }: { initial: Draft; people: Person[]; onsaved: (s: Segment) => void; oncancel: () => void; focus?: string; titled?: boolean } = $props();
@@ -25,6 +26,9 @@
 
   const flight = $derived(d.kind === "flight");
   const editing = $derived(d.id !== null);
+  const visit = $derived(d.kind === "visit");
+  const countries = countryChoices();
+  const day = (local: string) => local.slice(0, 10);
   const stay = $derived(d.kind === "hotel" || d.kind === "parking");
   const startBlank = $derived(flight ? "Work it out from the airport" : stay ? "Work it out from the address" : d.kind === "cruise" ? "Choose a time zone" : "Work it out from the airport or address");
 
@@ -53,6 +57,20 @@
         <select bind:value={d.kind} disabled={editing} class={selectClass}>
           {#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}
         </select></label>
+      {#if visit}
+        <p class="text-sm text-muted-foreground">For a trip you remember only by country and dates. Add flights or hotels to it later if you find them.</p>
+        <label class={label}><span class="font-medium">Country</span>
+          <select bind:value={d.destination} class={selectClass}>
+            <option value="">Choose a country</option>
+            {#each countries as [code, name] (code)}<option value={code}>{name}</option>{/each}
+          </select></label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class={label}><span class="font-medium">First day</span>
+            <Input type="date" value={day(d.start_local)} oninput={(e) => { d.start_local = e.currentTarget.value ? `${e.currentTarget.value}T00:00` : ""; }} autocomplete="off" /></label>
+          <label class={label}><span class="font-medium">Last day</span>
+            <Input type="date" value={day(d.end_local)} oninput={(e) => { d.end_local = e.currentTarget.value ? `${e.currentTarget.value}T00:00` : ""; }} autocomplete="off" /></label>
+        </div>
+      {:else}
       <label class={label}><span class="font-medium">Status</span>
         <select bind:value={d.status} class={selectClass}>
           <option value="confirmed">Confirmed</option><option value="changed">Changed</option><option value="cancelled">Cancelled</option>
@@ -134,6 +152,7 @@
         </div>
         <span class="text-muted-foreground">{d.costSource === "email" ? "Read from an email. Change it and your amount is kept: a later email won’t replace it. " : ""}The total for this booking, in its own currency (nothing is converted). Clear it to remove the cost.</span>
       </fieldset>
+      {/if}
       {#if !FOR_EVERYONE.includes(d.kind)}
       <fieldset class="flex flex-col gap-2 text-sm">
         <legend class="mb-1.5 font-medium">Who’s travelling</legend>

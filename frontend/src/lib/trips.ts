@@ -1,4 +1,5 @@
 import type { LoyaltyEntry, Segment, Trip } from "./api-types";
+import { countryName } from "./stats";
 
 export type Traveler = Segment["travelers"][number];
 
@@ -110,7 +111,7 @@ export function nextUp(trips: Trip[], now: number): NextUp | null {
 
 export const isPast = (trip: Trip, today: string): boolean => !!trip.end_date && trip.end_date < today;
 
-export const KIND_ORDER: Segment["kind"][] = ["flight", "hotel", "car", "train", "cruise", "parking"];
+export const KIND_ORDER: Segment["kind"][] = ["flight", "hotel", "car", "train", "cruise", "parking", "visit"];
 export function tripKinds(trip: Trip): Segment["kind"][] {
   const live = trip.segments.filter((s) => s.status !== "cancelled");
   const held = new Set((live.length ? live : trip.segments).map((s) => s.kind));
@@ -238,6 +239,7 @@ export function headline(s: Segment): string {
   if (s.kind === "train") return route || "Train";
   if (s.kind === "hotel") return s.origin || s.provider || "Hotel stay";
   if (s.kind === "parking") return s.origin || s.provider || "Parking";
+  if (s.kind === "visit") return s.destination ? countryName(s.destination) : "A visit";
   if (s.kind === "cruise") return [s.details.ship || s.provider, s.origin].filter(Boolean).join(" · ") || "Cruise";
   return [s.provider, s.origin].filter(Boolean).join(" · ") || "Car rental";
 }
@@ -282,8 +284,8 @@ export function subline(s: Segment, condensed = false): string {
   return parts.filter(Boolean).join(" · ");
 }
 
-export const START_WORD: Record<Segment["kind"], string> = { flight: "Departs", hotel: "Check-in", car: "Pick-up", train: "Departs", cruise: "Embarks", parking: "Entry" };
-export const END_WORD: Record<Segment["kind"], string> = { flight: "Arrives", hotel: "Check-out", car: "Drop-off", train: "Arrives", cruise: "Disembarks", parking: "Exit" };
+export const START_WORD: Record<Segment["kind"], string> = { flight: "Departs", hotel: "Check-in", car: "Pick-up", train: "Departs", cruise: "Embarks", parking: "Entry", visit: "From" };
+export const END_WORD: Record<Segment["kind"], string> = { flight: "Arrives", hotel: "Check-out", car: "Drop-off", train: "Arrives", cruise: "Disembarks", parking: "Exit", visit: "To" };
 
 export function when(word: string, ms: number): string {
   if (ms >= 60_000) return `${word} in ${until(ms)}`;
@@ -308,7 +310,7 @@ export function vendorLink(s: Segment, mobile: boolean): { href: string; label: 
   return { href: s.links.open, label: s.links.open_kind === "website" ? "Open website" : "Open in app" };
 }
 
-const PAST_WORD: Record<Segment["kind"], string> = { flight: "Landed", hotel: "Checked out", car: "Dropped off", train: "Arrived", cruise: "Disembarked", parking: "Exited" };
+const PAST_WORD: Record<Segment["kind"], string> = { flight: "Landed", hotel: "Checked out", car: "Dropped off", train: "Arrived", cruise: "Disembarked", parking: "Exited", visit: "Visited" };
 
 export function routeProgress(s: Segment, now: number): number {
   const from = startAt(s), to = endAt(s);

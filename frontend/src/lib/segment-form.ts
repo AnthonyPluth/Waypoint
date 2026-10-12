@@ -3,7 +3,7 @@ import { amountText, toMinor } from "./money";
 import { instant, untimed } from "./trips";
 
 export type Kind = Segment["kind"];
-export const KINDS: [Kind, string][] = [["flight", "Flight"], ["hotel", "Hotel"], ["car", "Car rental"], ["train", "Train"], ["cruise", "Cruise"], ["parking", "Parking"]];
+export const KINDS: [Kind, string][] = [["flight", "Flight"], ["hotel", "Hotel"], ["car", "Car rental"], ["train", "Train"], ["cruise", "Cruise"], ["parking", "Parking"], ["visit", "Past trip (country and dates only)"]];
 
 export const MAX_PORTS = 40;
 
@@ -16,6 +16,7 @@ export const DETAILS: Record<Kind, [string, string][]> = {
   train: [["cabin", "Class"], ["address", "Station address"]],
   cruise: [["ship", "Ship"], ["room", "Cabin"], ["deck", "Deck"], ["address", "Terminal address"], ["phone", "Phone"]],
   parking: [["address", "Address"], ["space_type", "Space type (covered, economy, valet)"], ["vehicle", "Vehicle (make and colour)"], ["notes", "Notes"]],
+  visit: [],
 };
 
 export const SEAT_LIMIT = 10;
@@ -92,6 +93,13 @@ function knownZone(zone: string): boolean {
 }
 
 export function problem(d: Draft): string | null {
+  if (d.kind === "visit") {
+    if (!/^[A-Za-z]{2}$/.test(d.destination.trim())) return "Choose the country";
+    if (!LOCAL.test(d.start_local)) return "Enter the first day you were there";
+    if (!LOCAL.test(d.end_local)) return "Enter the last day you were there";
+    if (d.end_local < d.start_local) return "The last day can’t be before the first";
+    return d.people.length + d.printed.length === 0 ? "Choose who’s travelling" : null;
+  }
   const flight = d.kind === "flight";
   if (flight) {
     if (!AIRPORT.test(d.origin.trim())) return "A flight’s origin is an airport code like JFK";
@@ -155,10 +163,11 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
   const seat = (who: number | string) => (seated ? { seat: d.seats[seatKey(who)]?.trim() || null } : {});
   return {
     kind: d.kind, status: d.status, provider: text(d.provider), confirmation: text(d.confirmation),
-    origin: flight ? d.origin.trim().toUpperCase() : text(d.origin), destination: flight ? d.destination.trim().toUpperCase() : text(d.destination),
+    origin: d.kind === "visit" ? null : flight ? d.origin.trim().toUpperCase() : text(d.origin), destination: flight || d.kind === "visit" ? d.destination.trim().toUpperCase() : text(d.destination),
     start_local: d.start_local, end_local: d.end_local,
     ...(flight || d.kind === "car" || d.kind === "train" ? { ...(startZone && { start_zone: startZone }), ...(d.end_zone.trim() && { end_zone: d.end_zone.trim() }) }
-      : d.kind === "hotel" || d.kind === "parking" ? { start_zone: startZone || null }
+      : d.kind === "visit" ? {}
+        : d.kind === "hotel" || d.kind === "parking" ? { start_zone: startZone || null }
         : { start_zone: startZone, end_zone: endZone }),
     details, manage_url: text(d.manage_url), ...(d.cost.trim() || d.costSource ? { price: priceOf(d) } : {}),
     ...(flight || d.kind !== "cruise" ? {} : { itinerary: d.itinerary.map((p) => ({ name: p.name.trim(), zone: p.zone.trim(), arrive_local: p.arrive || null, depart_local: p.depart || null })) }),
