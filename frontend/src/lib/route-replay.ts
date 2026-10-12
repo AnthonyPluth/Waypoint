@@ -4,7 +4,7 @@ import type { Segment, Trip, TripPlaces } from "./api-types";
 import { instant, isPast } from "./trips";
 
 export type Kind = Segment["kind"];
-export type StopKind = "airport" | "stay" | "place";
+export type StopKind = "airport" | "stay" | "place" | "home";
 export type Stop = { name: string; city: string; code: string | null; kind: StopKind; latitude: number; longitude: number; from: string; to: string; via: Kind | null; back: boolean };
 export type Spot = { x: number; y: number };
 export type Vehicle = "plane" | "car" | "boat";
@@ -79,7 +79,11 @@ export function maxStops(trip: Trip): number {
   }, 0);
 }
 
-export const worthLocating = (trip: Trip, today: string): boolean => isPast(trip, today) && maxStops(trip) >= 2;
+export const isRoadTrip = (trip: Trip): boolean => !trip.segments.some((s) => s.status !== "cancelled" && (s.kind === "flight" || s.kind === "train" || s.kind === "cruise"));
+
+export const startsAtHome = (trip: Trip): boolean => trip.replay_from_home && isRoadTrip(trip);
+
+export const worthLocating = (trip: Trip, today: string): boolean => isPast(trip, today) && maxStops(trip) >= (startsAtHome(trip) ? 1 : 2);
 
 function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
   const { airport, city, stay } = finder(places);
@@ -119,6 +123,15 @@ const sameStop = (a: Visit, b: Visit): boolean => {
   return false;
 };
 
+function wrapAtHome(merged: Visit[], trip: Trip, places: TripPlaces): void {
+  const first = merged[0], last = merged.at(-1);
+  if (!places.home || !first || !last || !startsAtHome(trip)) return;
+  const { city, latitude, longitude } = places.home;
+  const at: Visit = { name: city, city, code: null, kind: "home", latitude, longitude, from: "", to: "", via: null };
+  if (!samePlace(at, first)) merged.unshift({ ...at, from: first.from, to: first.from });
+  if (!samePlace(at, last)) merged.push({ ...at, from: last.to, to: last.to });
+}
+
 export function stopsOf(trip: Trip, places: TripPlaces): Stop[] {
   const merged: Visit[] = [];
   for (const v of visitsOf(trip, places)) {
@@ -132,6 +145,7 @@ export function stopsOf(trip: Trip, places: TripPlaces): Stop[] {
       last.via = via ?? v.via;
     } else merged.push({ ...v });
   }
+  wrapAtHome(merged, trip, places);
   return merged.map((v, i) => ({ ...v, back: i > 0 && merged.slice(0, i).some((e) => e.kind === v.kind && sameStop(e, v)) }));
 }
 
@@ -150,6 +164,7 @@ export function stopDates(stop: Stop, year: number): string {
 
 export function stopTitle(stop: Stop): string {
   if (stop.kind === "airport") return `${stop.name} (${stop.code})`;
+  if (stop.kind === "home") return stop.name;
   if (stop.kind === "stay") return key(stop.city) === key(stop.name) ? `Stay in ${stop.name}` : `Stay: ${stop.name}, ${stop.city}`;
   return stop.name;
 }

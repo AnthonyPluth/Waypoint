@@ -9,6 +9,7 @@ import RouteReplayMap from "./RouteReplayMap.svelte";
 vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [] }));
 
 const places: TripPlaces = {
+  home: null,
   airports: [
     { code: "MSP", city: "Minneapolis", latitude: 44.8848, longitude: -93.2223 },
     { code: "SFO", city: "San Francisco", latitude: 37.6213, longitude: -122.379 },

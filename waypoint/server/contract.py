@@ -507,6 +507,7 @@ class Trip(TypedDict):
     emails: int
     can_clear_emails: bool
     done_at: float | None
+    replay_from_home: bool
     people: list[int]
     costs: TripCosts
     segments: list[Segment]
@@ -557,7 +558,14 @@ class TripStateLine(TypedDict):
     points: list[list[float]]
 
 
+class TripHome(TypedDict):
+    city: str
+    latitude: float
+    longitude: float
+
+
 class TripPlaces(TypedDict):
+    home: TripHome | None
     airports: list[TripAirportPoint]
     cities: list[TripCityPoint]
     stays: list[TripStayPoint]
@@ -572,6 +580,7 @@ class TripBody(TypedDict):
     start_date: NotRequired[str | None]
     end_date: NotRequired[str | None]
     people: NotRequired[list[int]]
+    replay_from_home: NotRequired[bool]
     confirm: NotRequired[bool]
 
 
@@ -917,6 +926,22 @@ class DistanceUnit(TypedDict):
 
 class DistanceUnitBody(TypedDict):
     distance_unit: Literal["mi", "km"]
+
+
+class Home(TypedDict):
+    city: str
+    state: str
+    zip: str
+    country: str
+    saved: bool
+    placed: bool
+
+
+class HomeBody(TypedDict):
+    city: str
+    state: NotRequired[str]
+    zip: NotRequired[str]
+    country: NotRequired[str]
 
 
 class Stats(TypedDict):

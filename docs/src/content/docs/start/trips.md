@@ -142,6 +142,15 @@ A stop's coordinates come from Waypoint's own lists: a flight uses its airports,
 
 With reduced motion turned on in your system, nothing animates: the map shows the whole path with every stop labelled. Either way, the stops are listed in order under the map as text.
 
+### Starting and ending a road trip at home
+
+A road trip (a trip with stays, rental cars or visits but no flight, train or cruise, cancelled bookings not counted) has no booking for getting there and back, so its replay would begin at the first stay and end at the last. Set a **Home** under **Settings → Travel → Home** and the replay starts there, visits the stops in order and returns there as the last stop, which shows as “Back in” your home city like any place a trip returns to. Home is one place for the whole household, empty until someone sets it, with a **Clear** button to empty it again (`GET`, `POST` and `DELETE /api/home`).
+
+- **City level only.** Home is a city, a state or region, an optional ZIP or postal code and a country (the one most of your flights are in, until you change it). There is no street address to enter, and none is kept. The replay only needs a point, and Waypoint puts it at the ZIP or the city from the lists that ship with it ([Places](/Waypoint/reference/data-sources/#places)), never a street, and asks no outside service. If it can't place the city, the box says “Waypoint can’t place this on the map.” and the replay stays as it was.
+- **What the map shows.** The first and last stops are labelled with the home city's name and drawn as a house, never the word “Home” or an address. The legs to and from Home use the same roads and labels as the other legs, and a straight line when no road is drawn for one. A trip whose first or last stop is already in your home city doesn't get a second stop there. A trip with a flight, a train or a cruise is left as it is.
+- **Per trip.** A road trip's replay has a **Start and end at home** box, on by default, so a trip that really began somewhere else can turn it off. The choice is kept on the trip and shown to the people who can see it.
+- **Where it is kept.** Home is a household setting stored in the database with the other settings, so it is in [backups](/Waypoint/start/docker/#moving-your-data-from-another-machine) and gone when the data is. It reaches the browser only in a trip's map data, for people who can see that trip, and signed-in members can read it in Settings. It is not used for Stats, distances, the calendar feed, reminders or any booking, it is never logged, it is not sent to the AI fallback, and an [assistant](/Waypoint/start/mcp/) cannot reach it.
+
 ## In a backup
 
 Trips, segments, their costs and their travellers are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list and the lists used to place bookings on the map aren’t: every Waypoint has them already.

@@ -28,6 +28,7 @@ from .api.review import (api_review, api_review_attach, api_review_dismiss, api_
                          api_review_same, api_review_suggest, api_review_who)
 from .api.offline import api_offline
 from .api.state import api_state
+from .api.home import api_home, api_home_clear, api_home_save
 from .api.stats import api_distance_unit, api_distance_unit_save, api_stats
 
 
@@ -70,6 +71,9 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/stats", api_stats),
     ("GET", "/api/distance-unit", api_distance_unit),
     ("POST", "/api/distance-unit", api_distance_unit_save),
+    ("GET", "/api/home", api_home),
+    ("POST", "/api/home", api_home_save),
+    ("DELETE", "/api/home", api_home_clear),
     ("GET", "/api/flight-status", api_flight_statuses),
     ("POST", "/api/flight-status/{id}", api_flight_status_refresh),
     ("GET", "/api/loyalty/{id}/logo", api_loyalty_logo),

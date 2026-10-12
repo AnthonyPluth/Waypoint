@@ -95,6 +95,7 @@ class Trip(Base):
     auto: Mapped[bool]
     booked_by: Mapped[int | None]
     done_at: Mapped[float | None]
+    replay_from_home: Mapped[bool]
 
 
 class TripPerson(Base):

@@ -328,6 +328,22 @@ export interface GlanceScan {
   added: number;
 }
 
+export interface Home {
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  saved: boolean;
+  placed: boolean;
+}
+
+export interface HomeBody {
+  city: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+}
+
 export interface IgnoredSenders {
   domains: string[];
 }
@@ -1024,6 +1040,7 @@ export interface Trip {
   emails: number;
   can_clear_emails: boolean;
   done_at: number | null;
+  replay_from_home: boolean;
   people: number[];
   costs: TripCosts;
   segments: Segment[];
@@ -1043,6 +1060,7 @@ export interface TripBody {
   start_date?: string | null;
   end_date?: string | null;
   people?: number[];
+  replay_from_home?: boolean;
   confirm?: boolean;
 }
 
@@ -1058,11 +1076,18 @@ export interface TripCosts {
   bookings: number;
 }
 
+export interface TripHome {
+  city: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface TripList {
   trips: Trip[];
 }
 
 export interface TripPlaces {
+  home: TripHome | null;
   airports: TripAirportPoint[];
   cities: TripCityPoint[];
   stays: TripStayPoint[];
@@ -1155,6 +1180,9 @@ export interface Endpoints {
   "GET /api/stats": { body: never; reply: Stats };
   "GET /api/distance-unit": { body: never; reply: DistanceUnit };
   "POST /api/distance-unit": { body: DistanceUnitBody; reply: DistanceUnit };
+  "GET /api/home": { body: never; reply: Home };
+  "POST /api/home": { body: HomeBody; reply: Home };
+  "DELETE /api/home": { body: never; reply: Home };
   "GET /api/flight-status": { body: never; reply: FlightStatusList };
   "POST /api/flight-status/{id}": { body: never; reply: FlightStatusList };
   "GET /api/logodev": { body: never; reply: LogoDevStatus };

@@ -1239,6 +1239,97 @@
         }
       }
     },
+    "/api/home": {
+      "get": {
+        "operationId": "api_home",
+        "x-handler": "waypoint/server/api/home.py:api_home",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Home"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_home_save",
+        "x-handler": "waypoint/server/api/home.py:api_home_save",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HomeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Home"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "api_home_clear",
+        "x-handler": "waypoint/server/api/home.py:api_home_clear",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Home"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/flight-status": {
       "get": {
         "operationId": "api_flight_statuses",
@@ -4553,6 +4644,59 @@
         ],
         "additionalProperties": false
       },
+      "Home": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "zip": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "saved": {
+            "type": "boolean"
+          },
+          "placed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "city",
+          "state",
+          "zip",
+          "country",
+          "saved",
+          "placed"
+        ],
+        "additionalProperties": false
+      },
+      "HomeBody": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "zip": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ],
+        "additionalProperties": false
+      },
       "IgnoredSenders": {
         "type": "object",
         "properties": {
@@ -7687,6 +7831,9 @@
               "null"
             ]
           },
+          "replay_from_home": {
+            "type": "boolean"
+          },
           "people": {
             "type": "array",
             "items": {
@@ -7716,6 +7863,7 @@
           "emails",
           "can_clear_emails",
           "done_at",
+          "replay_from_home",
           "people",
           "costs",
           "segments"
@@ -7782,6 +7930,9 @@
               "type": "integer"
             }
           },
+          "replay_from_home": {
+            "type": "boolean"
+          },
           "confirm": {
             "type": "boolean"
           }
@@ -7832,6 +7983,26 @@
         ],
         "additionalProperties": false
       },
+      "TripHome": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "city",
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
       "TripList": {
         "type": "object",
         "properties": {
@@ -7850,6 +8021,16 @@
       "TripPlaces": {
         "type": "object",
         "properties": {
+          "home": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TripHome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "airports": {
             "type": "array",
             "items": {
@@ -7879,6 +8060,7 @@
           }
         },
         "required": [
+          "home",
           "airports",
           "cities",
           "stays",

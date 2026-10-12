@@ -249,6 +249,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_home.py",
         "tests/test_logos.py",
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
@@ -272,6 +273,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_home.py",
         "tests/test_trip_roads.py",
         "tests/test_trip_states.py",
         "tests/test_trips.py"
@@ -285,11 +287,13 @@
       "path": "/api/trips/{id}",
       "handler": "waypoint/server/api/trips.py:api_trip_edit",
       "web": [
+        "frontend/src/lib/components/RouteReplay.svelte",
         "frontend/src/lib/components/TripDestination.svelte",
         "frontend/src/pages/Trip.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_home.py",
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_offline.py",
@@ -651,6 +655,52 @@
       ],
       "docs": [
         "start/stats"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/home",
+      "handler": "waypoint/server/api/home.py:api_home",
+      "web": [
+        "frontend/src/lib/components/settings/HomeSection.svelte"
+      ],
+      "tests": [
+        "tests/test_home.py",
+        "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/home",
+      "handler": "waypoint/server/api/home.py:api_home_save",
+      "web": [
+        "frontend/src/lib/components/settings/HomeSection.svelte"
+      ],
+      "tests": [
+        "tests/test_home.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_trip_destination.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/home",
+      "handler": "waypoint/server/api/home.py:api_home_clear",
+      "web": [
+        "frontend/src/lib/components/settings/HomeSection.svelte"
+      ],
+      "tests": [
+        "tests/test_home.py",
+        "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/trips"
       ]
     },
     {

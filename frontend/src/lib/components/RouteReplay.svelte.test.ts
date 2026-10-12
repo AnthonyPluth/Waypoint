@@ -11,6 +11,7 @@ import { segment, trip } from "../../test/fixtures";
 import RouteReplay from "./RouteReplay.svelte";
 
 const places: TripPlaces = {
+  home: null,
   airports: [
     { code: "MSP", city: "Minneapolis", latitude: 44.8848, longitude: -93.2223 },
     { code: "SFO", city: "San Francisco", latitude: 37.6213, longitude: -122.379 },
@@ -120,10 +121,15 @@ describe("RouteReplay", () => {
     });
   });
 
-  it("is absent for a single stay, without asking", () => {
+  it("is absent for a single stay with no Home, and for one that opted out of Home without asking", async () => {
     const stay = segment({ id: 3, kind: "hotel", origin: "Inn", destination: "San Francisco", start_local: "2025-12-05T15:00", start_zone: "America/Los_Angeles", end_local: "2025-12-08T11:00", end_zone: "America/Los_Angeles" });
     render(RouteReplay, { trip: trip([stay]), now: after });
+    await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalled());
     expect(region()).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    vi.mocked(api).mockClear();
+    render(RouteReplay, { trip: trip([stay], { replay_from_home: false }), now: after });
+    await Promise.resolve();
     expect(vi.mocked(api)).not.toHaveBeenCalled();
   });
 

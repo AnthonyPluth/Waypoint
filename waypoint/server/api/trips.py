@@ -145,6 +145,10 @@ def trip_fields(body: Mapping[str, Any], creating: bool) -> trips.TripIn:
             out[key] = _v.day(body[key], key.replace("_", " "))   # type: ignore[literal-required]
     if "people" in body:
         out["people"] = _people(body["people"])
+    if "replay_from_home" in body:
+        if not isinstance(body["replay_from_home"], bool):
+            raise ApiError("Send replay_from_home as true or false")
+        out["replay_from_home"] = body["replay_from_home"]
     return out
 
 

@@ -849,6 +849,23 @@ class MigrationTests(unittest.TestCase):
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
 
+    def test_0035_adds_the_replay_from_home_choice_to_trips_on_and_takes_it_away_leaving_the_trips(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            names = lambda: {col["name"] for col in sa.inspect(c).get_columns("trips")}
+            self.assertIn("replay_from_home", names())
+            command.downgrade(db.alembic_config(c), "0034")
+            self.assertNotIn("replay_from_home", names())
+            c.execute(insert(schema.trips), [dict(id=1, name="Drive", auto=True), dict(id=2, name="Other", auto=False)])
+            command.upgrade(db.alembic_config(c), "head")
+            self.assertEqual(c.execute(select(schema.trips.c.id, schema.trips.c.replay_from_home).order_by(schema.trips.c.id)).fetchall(), [(1, True), (2, True)])
+            c.execute(sa.update(schema.trips).where(schema.trips.c.id == 2).values(replay_from_home=False))
+            command.downgrade(db.alembic_config(c), "0034")
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.trips)).scalar(), 2)
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+
     def test_0034_adds_the_automatic_ai_state_to_review_items_and_takes_it_away_leaving_the_rows(self):
         from alembic import command
         db.init(self.path)
