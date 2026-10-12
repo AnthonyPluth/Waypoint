@@ -190,6 +190,8 @@ class BackfillingByHand(Merging):
         self.assertEqual(self.c.orm.scalar(select(func.count()).select_from(SegmentRecipient)), 0)
 
     def test_a_stay_you_can_see_through_another_member_is_filled(self):
-        self.add(self.sam, BY_HAND, travelers=self.on(self.sam.person_id, self.jane.person_id))
+        made = self.add(self.sam, BY_HAND)
+        self.c.orm.add(SegmentRecipient(segment_id=made["id"], person_id=self.jane.person_id))
+        self.c.orm.flush()
         self.assertEqual(self.merge(self.jane, EMAILED), "updated")
         self.assertEqual(self.count(), 1)

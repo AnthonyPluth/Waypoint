@@ -110,7 +110,7 @@ class EmailBookingsForEveryone(IngestCase):
         self.assertEqual(sorted(t.person_id for t in self.rows(stay.id)), sorted([self.jid, self.mia]))
         self.assertEqual(sorted(self.aboard(stay.trip_id)), sorted([self.jid, self.mia]))
 
-    def test_editing_a_booking_for_everyone_by_hand_keeps_it_that_way_until_the_list_is_changed(self):
+    def test_editing_a_booking_for_everyone_by_hand_keeps_it_that_way_and_ignores_a_list(self):
         self.file(self.jane, booking("hotel_jsonld"))
         [stay] = self.stays()
         shown = trips.get_segment(self.c, self.jane, stay.id)["travelers"]
@@ -119,8 +119,8 @@ class EmailBookingsForEveryone(IngestCase):
         self.assertTrue(stay.travelers_from_trip)
         trips.edit_segment(self.c, self.jane, stay.id, {"travelers": self.on(self.jid, self.joan)})
         self.c.orm.refresh(stay)
-        self.assertFalse(stay.travelers_from_trip)
-        self.assertEqual(self.aboard(stay.trip_id), [self.jid, self.joan])
+        self.assertTrue(stay.travelers_from_trip)
+        self.assertEqual(self.aboard(stay.trip_id), [self.jid])
 
 
 class ReadingThemNow(IngestCase):

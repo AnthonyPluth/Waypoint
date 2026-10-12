@@ -305,6 +305,7 @@
               {#if showBookingTravellers(s, everyone)}
                 <h3 class="eyebrow">Travellers</h3>
                 {@render travellerList(s)}
+                {#if s.kind === "cruise" && !over}{@render membershipList(s)}{/if}
               {:else if !over}
                 {@render membershipList(s)}
               {/if}

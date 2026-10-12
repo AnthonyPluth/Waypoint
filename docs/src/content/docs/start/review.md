@@ -51,6 +51,8 @@ The bookings it could be are shown only to people who can see them: someone else
 
 A booking prints each traveller’s name its own way (`DOE/JANE MS`). Waypoint matches a name to a person by the loyalty number on the booking first, then by the person’s display name, legal name or aliases on [People](/Waypoint/start/people/); it never picks between two people with the same name. A name nobody matches stays as printed, and the booking is then visible only to whoever’s mailbox it came from.
 
+A hotel, rental car or parking booking added from an item, like one added by hand, is for everyone on the trip it joins, so its guest name is not kept.
+
 Each such name is listed here with the segment it’s on. Choose the person it is, or add a guest. Every traveller with that printed name on your trips becomes that person, and the printed name is kept as one of their aliases, so the next booking with it matches by itself.
 
 ## Letting an AI assistant help

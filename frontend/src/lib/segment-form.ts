@@ -23,6 +23,7 @@ export const SEAT_LIMIT = 10;
 export const DEFAULT_CURRENCY = "USD";
 
 export const SEATED: Kind[] = ["flight", "train"];
+export const FOR_EVERYONE: Kind[] = ["hotel", "car", "parking"];
 
 export const seatKey = (who: number | string): string => (typeof who === "number" ? `p${who}` : `n${who}`);
 
@@ -129,7 +130,7 @@ export function problem(d: Draft): string | null {
     if (!/^[A-Za-z]{3}$/.test(d.currency.trim())) return "Enter the cost’s currency as a three-letter code like USD";
     if (toMinor(d.cost, d.currency.trim().toUpperCase()) === null) return "Enter the cost as an amount like 1240.00";
   }
-  if (d.people.length + d.printed.length === 0) return "Choose who’s travelling";
+  if (!FOR_EVERYONE.includes(d.kind) && d.people.length + d.printed.length === 0) return "Choose who’s travelling";
   return null;
 }
 
@@ -161,6 +162,6 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
         : { start_zone: startZone, end_zone: endZone }),
     details, manage_url: text(d.manage_url), ...(d.cost.trim() || d.costSource ? { price: priceOf(d) } : {}),
     ...(flight || d.kind !== "cruise" ? {} : { itinerary: d.itinerary.map((p) => ({ name: p.name.trim(), zone: p.zone.trim(), arrive_local: p.arrive || null, depart_local: p.depart || null })) }),
-    travelers: [...d.people.map((id) => ({ person_id: id, ...seat(id) })), ...d.printed.map((name) => ({ person_id: null, name, ...seat(name) }))],
+    ...(FOR_EVERYONE.includes(d.kind) ? {} : { travelers: [...d.people.map((id) => ({ person_id: id, ...seat(id) })), ...d.printed.map((name) => ({ person_id: null, name, ...seat(name) }))] }),
   };
 }
