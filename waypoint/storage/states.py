@@ -12,10 +12,11 @@ HERE = Path(__file__).resolve().parent
 FILE = "states.tsv.gz"
 UNITS = 10_000
 CELL_DEGREES = 0.5
-RINGS = 10
 BUDGET = 1500
+THIN_FROM = 0.02
 
 Point = tuple[float, float]
+Extent = tuple[float, float, float, float]
 
 
 @dataclass(frozen=True)
@@ -40,25 +41,14 @@ class Borders:
                     for col in range(_cell(min(lon1, lon2)), _cell(max(lon1, lon2)) + 1):
                         self.cells[(row, col)].append((i, k))
 
-    def near(self, paths: list[list[Point]], rings: int = RINGS, budget: int = BUDGET) -> list[list[Point]]:
-        seeds: set[tuple[int, int]] = set()
-        for path in paths:
-            for (lat1, lon1), (lat2, lon2) in zip(path, path[1:] or path, strict=False):
-                steps = max(1, math.ceil(max(abs(lat2 - lat1), abs(lon2 - lon1)) / (CELL_DEGREES / 2)))
-                for n in range(steps + 1):
-                    seeds.add((_cell(lat1 + (lat2 - lat1) * n / steps), _cell(lon1 + (lon2 - lon1) * n / steps)))
-        reached: set[tuple[int, int]] = set()
-        chosen: list[tuple[int, int]] = []
-        seen: set[tuple[int, int]] = set()
-        for ring in range(rings + 1):
-            ring_cells = {(r + dr, c + dc) for r, c in seeds for dr in range(-ring, ring + 1) for dc in range(-ring, ring + 1)} - reached
-            reached |= ring_cells
-            chosen += sorted({hit for cell in ring_cells for hit in self.cells.get(cell, ())} - seen)
-            seen.update(chosen)
+    def within(self, extent: Extent, budget: int = BUDGET) -> list[list[Point]]:
+        south, west, north, east = extent
         taken: dict[int, set[int]] = defaultdict(set)
-        for i, k in chosen[:budget]:
-            taken[i].add(k)
-        return self._runs(taken)
+        for row in range(_cell(south), _cell(north) + 1):
+            for col in range(_cell(west), _cell(east) + 1):
+                for i, k in self.cells.get((row, col), ()):
+                    taken[i].add(k)
+        return thin(self._runs(taken), budget)
 
     def _runs(self, taken: dict[int, set[int]]) -> list[list[Point]]:
         out: list[list[Point]] = []
@@ -77,6 +67,39 @@ class Borders:
             if run:
                 out.append(run)
         return out
+
+
+def steps(lines: list[list[Point]]) -> int:
+    return sum(len(line) - 1 for line in lines)
+
+
+def simplify(points: list[Point], tolerance: float) -> list[Point]:
+    keep = {0, len(points) - 1}
+    stack = [(0, len(points) - 1)]
+    while stack:
+        first, last = stack.pop()
+        (y1, x1), (y2, x2) = points[first], points[last]
+        scale = math.cos(math.radians((y1 + y2) / 2))
+        dx, dy = (x2 - x1) * scale, y2 - y1
+        span = math.hypot(dx, dy)
+        far, farthest = -1, -1.0
+        for i in range(first + 1, last):
+            y, x = points[i]
+            gap = math.hypot((x - x1) * scale, y - y1) if span == 0 else abs(dx * (y - y1) - dy * (x - x1) * scale) / span
+            if gap > farthest:
+                far, farthest = i, gap
+        if farthest > tolerance:
+            keep.add(far)
+            stack += [(first, far), (far, last)]
+    return [points[i] for i in sorted(keep)]
+
+
+def thin(lines: list[list[Point]], budget: int) -> list[list[Point]]:
+    tolerance = THIN_FROM
+    while steps(lines) > budget and any(len(line) > 2 for line in lines):
+        lines = [simplify(line, tolerance) for line in lines]
+        tolerance *= 2
+    return lines
 
 
 def parse(rows: Iterable[str]) -> Borders:

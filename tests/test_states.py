@@ -61,28 +61,48 @@ class FixtureLoaderTests(unittest.TestCase):
         g = states.parse(["\n", "AA\tBB\t\n", "AA\tBB\t400000 -1050000\n", "AA\tBB\n", FIXTURE.splitlines()[0]])
         self.assertEqual(len(g.borders), 1)
 
-    def test_only_the_lines_near_the_points_come_back(self):
-        near = graph().near([[(40.5, -104.0)]], rings=1)
-        self.assertEqual(sorted(line[0] for line in near), [(40.0, -104.0), (41.0, -105.0)])
-        self.assertEqual(graph().near([[(30.2, -89.5)]], rings=0), [[(30.0, -90.0), (30.0, -89.0)]])
-        self.assertEqual(graph().near([[(50.0, 10.0)]]), [])
-        self.assertEqual(graph().near([]), [])
+    def test_only_the_lines_inside_the_extent_come_back(self):
+        inside = graph().within((40.4, -104.5, 40.6, -103.5))
+        self.assertEqual(inside, [[(40.0, -104.0), (40.5, -104.0), (41.0, -104.0)]])
+        self.assertEqual(graph().within((29.0, -91.0, 31.0, -88.0)), [[(30.0, -90.0), (30.0, -89.0)]])
+        self.assertEqual(graph().within((49.0, 9.0, 51.0, 11.0)), [])
 
-    def test_a_path_collects_the_lines_along_it(self):
-        near = graph().near([[(40.5, -104.0), (30.0, -90.0)]], rings=0)
-        self.assertIn([(30.0, -90.0), (30.0, -89.0)], near)
-        self.assertIn([(40.0, -104.0), (40.5, -104.0), (41.0, -104.0)], near)
+    def test_an_extent_collects_every_line_across_it(self):
+        got = graph().within((29.0, -105.0, 42.0, -88.0))
+        self.assertEqual(len(got), 3)
+        self.assertIn([(30.0, -90.0), (30.0, -89.0)], got)
+        self.assertIn([(40.0, -104.0), (40.5, -104.0), (41.0, -104.0)], got)
 
-    def test_a_line_is_cut_to_the_part_near_the_points(self):
-        got = graph(LONG).near([[(35.2, -100.0)]], rings=1)
+    def test_a_line_is_cut_to_the_part_inside_the_extent(self):
+        got = graph(LONG).within((35.0, -101.0, 36.0, -99.0))
         self.assertEqual(len(got), 1)
         self.assertLess(len(got[0]), 10)
         self.assertTrue(all(34 <= lat <= 37 for lat, _ in got[0]))
 
-    def test_the_budget_keeps_the_closest_pieces_and_caps_the_points(self):
-        got = graph(LONG).near([[(35.2, -100.0)]], rings=20, budget=6)
-        self.assertEqual(sum(len(line) - 1 for line in got), 6)
-        self.assertTrue(all(33 <= lat <= 38 for line in got for lat, _ in line))
+    def test_a_line_running_through_the_extent_is_kept_from_edge_to_edge(self):
+        got = graph(LONG).within((29.0, -101.0, 51.0, -99.0))
+        self.assertEqual(got, [[(30.0 + n * 0.5, -100.0) for n in range(40)]])
+
+    def test_over_the_budget_every_piece_stays_and_the_points_are_thinned(self):
+        zigzag = row("AA", "BB", *[(30.0 + n * 0.01, -100.0 + (0.0003 if n % 2 else 0.0)) for n in range(300)])
+        text = LONG + zigzag + row("CC", "DD", (35.0, -95.0), (35.5, -95.2), (36.0, -95.0))
+        full = graph(text).within((29.0, -102.0, 51.0, -94.0), budget=10_000)
+        got = graph(text).within((29.0, -102.0, 51.0, -94.0), budget=50)
+        self.assertEqual(len(got), len(full))
+        self.assertLessEqual(states.steps(got), 50)
+        self.assertGreater(states.steps(full), 300)
+        for before, after in zip(full, got, strict=True):
+            self.assertEqual((before[0], before[-1]), (after[0], after[-1]))
+
+    def test_a_budget_smaller_than_the_pieces_leaves_each_as_a_straight_line(self):
+        got = graph(LONG + FIXTURE).within((29.0, -106.0, 51.0, -88.0), budget=1)
+        self.assertTrue(all(len(line) == 2 for line in got))
+        self.assertEqual(len(got), 4)
+
+    def test_thinning_keeps_a_corner_and_drops_a_wobble(self):
+        bent = [(0.0, 0.0), (0.0001, 0.5), (0.0, 1.0), (1.0, 1.0)]
+        self.assertEqual(states.simplify(bent, 0.01), [(0.0, 0.0), (0.0, 1.0), (1.0, 1.0)])
+        self.assertEqual(states.simplify([(0.0, 0.0), (1.0, 1.0)], 0.5), [(0.0, 0.0), (1.0, 1.0)])
 
     def test_the_bundled_file_is_small_and_has_the_real_lines(self):
         self.assertLess((ROOT / "waypoint" / "storage" / states.FILE).stat().st_size, 100_000)
@@ -97,18 +117,25 @@ class FixtureLoaderTests(unittest.TestCase):
         total = sum(len(b.points) for b in g.borders)
         self.assertTrue(1000 < total < 6000)
 
-    def test_near_denver_the_real_lines_are_found_and_near_london_none(self):
-        found = states.state_lines().near([[(39.74, -104.99)]])
+    def test_around_denver_the_real_lines_are_found_and_around_london_none(self):
+        found = states.state_lines().within((36.0, -110.0, 43.0, -100.0))
         self.assertTrue(found)
         self.assertTrue(all(25 < lat < 50 and -125 < lon < -85 for line in found for lat, lon in line))
-        self.assertEqual(states.state_lines().near([[(51.5, -0.12)]]), [])
+        self.assertEqual(states.state_lines().within((50.0, -5.0, 53.0, 3.0)), [])
+
+    def test_the_whole_country_fits_the_budget_without_losing_a_border(self):
+        g = states.state_lines()
+        whole = g.within((24.0, -125.0, 50.0, -66.0), budget=10_000)
+        capped = g.within((24.0, -125.0, 50.0, -66.0))
+        self.assertEqual(len(capped), len(whole))
+        self.assertLessEqual(states.steps(capped), states.BUDGET)
 
     def test_the_lookup_opens_no_connection(self):
         with mock.patch.object(socket.socket, "connect", side_effect=AssertionError("network")), \
                 mock.patch.object(socket, "create_connection", side_effect=AssertionError("network")), \
                 mock.patch.object(socket, "getaddrinfo", side_effect=AssertionError("network")):
             states.state_lines.cache_clear()
-            self.assertTrue(states.state_lines().near([[(41.88, -87.63)]]))
+            self.assertTrue(states.state_lines().within((40.0, -90.0, 43.0, -85.0)))
         states.state_lines.cache_clear()
 
 

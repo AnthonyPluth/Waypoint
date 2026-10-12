@@ -52,3 +52,24 @@ describe("the state lines layer", () => {
     expect(boundariesShown(wide, 10)).toBe(false);
   });
 });
+
+describe("the state lines on long flights", () => {
+  const seattle = stopAt("Seattle", 47.45, -122.31, "airport"), miami = stopAt("Miami", 25.79, -80.29, "airport");
+  const portland = stopAt("Portland", 43.65, -70.31, "airport"), sanDiego = stopAt("San Diego", 32.73, -117.19, "airport");
+
+  it("shows at the full view of a coast-to-coast flight at phone, tablet and desktop widths", () => {
+    for (const [width, height] of [[600, 640], [960, 520]]) {
+      for (const pair of [[seattle, miami], [sanDiego, portland]]) {
+        const projection = routeProjection(pair, width, height);
+        expect(projection.scale(), `${pair[0].name} ${width}`).toBeGreaterThan(BOUNDARY_MIN_SCALE);
+        expect(boundariesShown(projection, 1)).toBe(true);
+      }
+    }
+  });
+
+  it("keeps a line that runs through the middle of the flight in view", () => {
+    const projection = routeProjection([seattle, miami], 960, 520);
+    const middle = boundaryShapes([{ points: [[44.0, -100.0], [30.0, -100.0]] }], projection);
+    expect(middle.filter((s) => inView(s, { x: 0, y: 0, w: 960, h: 520 }))).toHaveLength(1);
+  });
+});
