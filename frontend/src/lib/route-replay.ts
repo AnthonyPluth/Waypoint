@@ -1,6 +1,7 @@
 import { geoBounds, geoDistance, geoEqualEarth, type GeoProjection } from "d3-geo";
 import type { Geometry } from "geojson";
 import type { Segment, Trip, TripPlaces } from "./api-types";
+import { countryName } from "./stats";
 import { instant, isPast } from "./trips";
 
 export type Kind = Segment["kind"];
@@ -71,9 +72,20 @@ function finder(places: TripPlaces) {
   return { airport, city, stay };
 }
 
+const liveOf = (trip: Trip): Segment[] => trip.segments.filter((s) => s.status !== "cancelled");
+
+const byCountries = (trip: Trip): boolean => {
+  const live = liveOf(trip).filter((s) => s.kind !== "parking");
+  return live.length > 0 && live.every((s) => s.kind === "visit");
+};
+
+const dateOrder = (a: Segment, b: Segment): number => a.start_local.localeCompare(b.start_local) || a.end_local.localeCompare(b.end_local) || a.id - b.id;
+
 export function maxStops(trip: Trip): number {
-  return trip.segments.filter((s) => s.status !== "cancelled").reduce((n, s) => {
-    if (s.kind === "parking" || s.kind === "visit") return n;
+  const countries = byCountries(trip);
+  return liveOf(trip).reduce((n, s) => {
+    if (s.kind === "visit") return countries ? n + 1 : n;
+    if (s.kind === "parking") return n;
     if (s.kind === "flight" || s.kind === "train") return n + 2;
     if (s.kind === "cruise") return n + 2 + s.itinerary.length;
     return n + 1;
@@ -86,8 +98,9 @@ export const worthLocating = (trip: Trip, today: string): boolean => isPast(trip
 
 function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
   const { airport, city, stay } = finder(places);
-  const live = trip.segments.filter((s) => s.status !== "cancelled" && s.kind !== "parking" && s.kind !== "visit")
-    .sort((a, b) => instant(a.start_local, a.start_zone) - instant(b.start_local, b.start_zone) || a.id - b.id);
+  const countries = byCountries(trip);
+  const live = liveOf(trip).filter((s) => s.kind !== "parking" && (s.kind !== "visit" || countries))
+    .sort((a, b) => (countries ? dateOrder(a, b) : instant(a.start_local, a.start_zone) - instant(b.start_local, b.start_zone) || a.id - b.id));
   const out: Visit[] = [];
   const add = (p: Point | null, from: string, to: string, via: Kind | null) => {
     if (p) out.push({ ...p, city: p.city ?? p.name, code: p.code ?? null, kind: p.kind ?? "place", from, to, via });
@@ -96,6 +109,8 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
     if (s.kind === "flight") {
       add(airport(s.origin), s.start_local, s.start_local, null);
       add(airport(s.destination), s.end_local, s.end_local, "flight");
+    } else if (s.kind === "visit") {
+      add(stay(s, countryName(s.destination ?? "")), s.start_local, s.end_local, null);
     } else if (s.kind === "hotel") {
       const found = stay(s, s.destination) ?? city(s.destination);
       add(found && { ...found, kind: "stay", city: found.name, name: head(s.origin ?? "") || found.name }, s.start_local, s.end_local, null);

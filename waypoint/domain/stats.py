@@ -545,14 +545,18 @@ def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Ai
                 note(stayed, "country", country, s.start_local, s.end_local)
 
     points: dict[str, VisitPoint] = {}
+    abroad: dict[tuple[int | None, str], list[Seg]] = {}
     for s in visits_abroad:
         country = (s.destination or "").strip().upper()
-        if not country:
-            continue
+        if country:
+            abroad.setdefault((s.trip_id, country), []).append(s)
+    for (_, country), group in abroad.items():
+        s = min(group, key=lambda g: g.start_local)
         seen(countries, country, s.start_local[:10])
-        note(stayed, "country", country, s.start_local, s.end_local)
-        if s.point is not None:
-            points.setdefault(country, {"country": country, "latitude": s.point[0], "longitude": s.point[1]})
+        note(stayed, "country", country, s.start_local, max(g.end_local for g in group))
+        point = next((g.point for g in group if g.point is not None), None)
+        if point is not None:
+            points.setdefault(country, {"country": country, "latitude": point[0], "longitude": point[1]})
 
     def visits(kind: str, name: str) -> int:
         arrivals, departures = came[kind].get(name, []), went[kind].get(name, [])
