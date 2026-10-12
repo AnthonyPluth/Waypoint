@@ -994,6 +994,7 @@ export interface Trip {
   booked_by: number | null;
   emails: number;
   can_clear_emails: boolean;
+  done_at: number | null;
   people: number[];
   costs: TripCosts;
   segments: Segment[];

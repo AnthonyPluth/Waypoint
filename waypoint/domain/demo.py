@@ -4,7 +4,7 @@ import struct
 import zlib
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from ..storage import db, secretbox, stored_mail
 from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentMessage, SegmentPort, SegmentTraveler,
@@ -256,11 +256,16 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     past = _family_past(today)
     past_stay = past[1]
     past_stay_id = None
-    for fields in (*_family_two_years_ago(today), *_family_last_year(today), *past, *_family_now(today)):
+    last_year = _family_last_year(today)
+    done_trip = None
+    for fields in (*_family_two_years_ago(today), *last_year, *past, *_family_now(today)):
         seats = FAMILY_SEATS.get((fields.get("details") or {}).get("flight_number", ""), ())
         added = trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id, guests[0], seats=seats)})
         past_stay_id = added["id"] if added and fields is past_stay else past_stay_id
+        done_trip = added["trip_id"] if added and fields is last_year[0] else done_trip
         now_trip = added["trip_id"] if added and (fields.get("details") or {}).get("flight_number") == "AA 102" else now_trip
+    if done_trip is not None:
+        conn.execute(update(Trip).where(Trip.id == done_trip).values(done_at=datetime.now(UTC).timestamp()))
     for fields in _cruises(today):
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id)})
     for fields in _joan(today):

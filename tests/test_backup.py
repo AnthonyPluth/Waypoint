@@ -113,6 +113,12 @@ class BackupTests(unittest.TestCase):
                                          end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual"))
         c.execute(insert(SegmentTraveler).values(segment_id=9, person_id=11))
 
+    def without(self, data, table, *names):
+        part = data["tables"][table]
+        keep = [i for i, name in enumerate(part["columns"]) if name not in names]
+        part["columns"] = [part["columns"][i] for i in keep]
+        part["rows"] = [[row[i] for i in keep] for row in part["rows"]]
+
     def test_a_trips_people_come_back_with_it(self):
         src = db.connect(self.a)
         self.trip_with_people(src)
@@ -132,10 +138,8 @@ class BackupTests(unittest.TestCase):
         data = backup.load(backup.dump(src))
         data["revision"] = "0029"
         data["tables"].pop("trip_people")
-        seg = data["tables"]["segments"]
-        keep = [i for i, name in enumerate(seg["columns"]) if name not in ("travelers_from_trip", "price_minor", "price_currency", "price_source")]
-        seg["columns"] = [seg["columns"][i] for i in keep]
-        seg["rows"] = [[row[i] for i in keep] for row in seg["rows"]]
+        self.without(data, "segments", "travelers_from_trip", "price_minor", "price_currency", "price_source")
+        self.without(data, "trips", "done_at")
         dst = db.connect(self.b)
         with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)
@@ -155,15 +159,31 @@ class BackupTests(unittest.TestCase):
                          [(124000, "EUR", "manual")])
         data = backup.load(backup.dump(src))
         data["revision"] = "0030"
-        seg = data["tables"]["segments"]
-        keep = [i for i, name in enumerate(seg["columns"]) if name not in ("price_minor", "price_currency", "price_source")]
-        seg["columns"] = [seg["columns"][i] for i in keep]
-        seg["rows"] = [[row[i] for i in keep] for row in seg["rows"]]
+        self.without(data, "segments", "price_minor", "price_currency", "price_source")
+        self.without(data, "trips", "done_at")
         with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)
         dst.commit()
         self.assertEqual([tuple(r) for r in dst.execute(select(Segment.id, Segment.price_minor, Segment.price_currency, Segment.price_source))],
                          [(9, None, None, None)])
+        src.close(); dst.close()
+
+    def test_when_a_trip_was_marked_done_comes_back_with_it_and_a_backup_from_before_restores_with_none(self):
+        src = db.connect(self.a)
+        self.trip_with_people(src)
+        src.execute(update(Trip).where(Trip.id == 5).values(done_at=1700000000.25))
+        src.commit()
+        dst = db.connect(self.b)
+        backup.restore(dst, backup.load(backup.dump(src)))
+        dst.commit()
+        self.assertEqual([t.done_at for t in dst.orm.scalars(select(Trip))], [1700000000.25])
+        data = backup.load(backup.dump(src))
+        data["revision"] = "0031"
+        self.without(data, "trips", "done_at")
+        with mock.patch.object(backup, "head", return_value="not-this-one"):
+            backup.restore(dst, data)
+        dst.commit()
+        self.assertEqual([(t.id, t.done_at) for t in dst.orm.scalars(select(Trip))], [(5, None)])
         src.close(); dst.close()
 
     def test_people_come_back_exactly_with_their_links(self):

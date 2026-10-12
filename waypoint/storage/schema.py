@@ -116,8 +116,9 @@ trips = Table(
     Column('notes', Text),
     Column('auto', Boolean, nullable=False),
     Column('booked_by', Integer, refers('trips', 'booked_by', 'people.id', 'SET NULL')),
+    Column('done_at', Float),
     Index('ix_trips_booked_by', 'booked_by'),
-    info={'doc': 'a journey: its segments, grouped by Waypoint (auto) or made by hand; its dates are its local dates; its destination is worked out from its bookings unless destination_manual says a person set it'},
+    info={'doc': 'a journey: its segments, grouped by Waypoint (auto) or made by hand; its dates are its local dates; its destination is worked out from its bookings unless destination_manual says a person set it; done_at is when a member finalized it with Done (epoch seconds), empty until then'},
 )
 
 trip_people = Table(

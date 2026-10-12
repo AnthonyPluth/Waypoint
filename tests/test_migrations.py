@@ -830,6 +830,25 @@ class MigrationTests(unittest.TestCase):
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
 
+    def test_0032_adds_an_empty_done_time_to_every_trip_and_takes_it_away_leaving_the_trips(self):
+        from alembic import command
+        db.init(self.path)
+        with db.engine(self.path).begin() as c:
+            names = lambda: {col["name"] for col in sa.inspect(c).get_columns("trips")}
+            self.assertIn("done_at", names())
+            command.downgrade(db.alembic_config(c), "0031")
+            self.assertNotIn("done_at", names())
+            c.execute(insert(schema.trips), [dict(id=1, name="one", auto=False), dict(id=2, name="two", auto=True)])
+            command.upgrade(db.alembic_config(c), "head")
+            self.assertIn("done_at", names())
+            self.assertEqual(c.execute(select(schema.trips.c.done_at).order_by(schema.trips.c.id)).scalars().all(), [None, None])
+            c.execute(sa.update(schema.trips).where(schema.trips.c.id == 1).values(done_at=1700000000.5))
+            command.downgrade(db.alembic_config(c), "0031")
+            self.assertNotIn("done_at", names())
+            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.trips)).scalar(), 2)
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)
         with db.session(self.path) as conn:
