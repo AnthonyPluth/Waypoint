@@ -25,6 +25,7 @@ TIME_UNKNOWN = "time_unknown"
 ADDRESS_LIMIT = 300
 EMAILS_CLEARABLE_AFTER_DAYS = 7
 MAX_PORTS = 40
+VISIT_NAMES = 3
 SEAT_LIMIT = 10
 DETAIL_KEYS = ("flight_number", "terminal", "seat", "seat_position", "aircraft", "cabin", "room", "car_class", "address", "phone", "ship", "deck", "space_type", "vehicle", "notes", TIME_UNKNOWN)
 
@@ -731,6 +732,34 @@ def _region(conn: db.Connection, seg: Segment) -> str | None:
     return regions.of_place(conn, seg.origin)
 
 
+def _visit_order(segs: Iterable[Segment]) -> list[Segment]:
+    return sorted(segs, key=lambda s: (s.start_local[:10], s.end_local[:10], s.id))
+
+
+def visit_places(segs: Sequence[Segment]) -> str | None:
+    live = [s for s in segs if s.status != "cancelled"] or list(segs)
+    if not live or any(s.kind != "visit" for s in live):
+        return None
+    names = reference.country_names()
+    seen: dict[str, str] = {}
+    for s in _visit_order(live):
+        code = (s.destination or "").upper()
+        if code:
+            seen.setdefault(code, names.get(code, code))
+    found = list(seen.values())
+    if len(found) > VISIT_NAMES:
+        return f"{', '.join(found[:VISIT_NAMES])} and {len(found) - VISIT_NAMES} more"
+    if len(found) > 1:
+        return f"{', '.join(found[:-1])} and {found[-1]}"
+    return found[0] if found else None
+
+
+def _auto_name(conn: db.Connection, trip: Trip) -> str | None:
+    segs = list(conn.orm.scalars(select(Segment).where(Segment.trip_id == trip.id)).all())
+    place = visit_places(segs)
+    return _name_for(place, trip.start_date or "") if place and trip.start_date else None
+
+
 def _in_order(segs: Sequence[Segment]) -> list[Segment]:
     live = [s for s in segs if s.status != "cancelled"] or list(segs)
     return sorted(live, key=lambda s: (instant(s.start_local, s.start_zone), s.id))
@@ -740,6 +769,8 @@ def auto_destination(conn: db.Connection, segs: Sequence[Segment]) -> str | None
     ordered = _in_order(segs)
     if not ordered:
         return None
+    if visits := visit_places(segs):
+        return visits
     leaving = next((s for s in ordered if s.kind in ("flight", "train") and s.origin), None)
     home = regions.of_place(conn, leaving.origin) if leaving else None
     named = regions.phrase([r for s in ordered if (r := _region(conn, s))], home)
@@ -838,6 +869,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
                         booked_by=viewer.person_id)
             conn.orm.add(trip)
             conn.orm.flush()
+    before = _auto_name(conn, trip) if values["kind"] == "visit" else None
     named = [t["person_id"] for t in travelers if t["person_id"] is not None]
     for_everyone = (values["kind"] in SHARED_KINDS
                     and set(named) <= _seen_by_bookings(conn, trip) | {viewer.person_id})
@@ -855,6 +887,8 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
     if ports:
         _set_ports(conn, seg.id, ports)
     refresh(conn, trip)
+    if before is not None and trip.name == before and (renamed := _auto_name(conn, trip)):
+        trip.name = renamed
     return _after_change(conn, seg, viewer)
 
 
