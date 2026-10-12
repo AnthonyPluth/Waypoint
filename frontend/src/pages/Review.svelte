@@ -31,7 +31,7 @@
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
   import { Input } from "$lib/components/ui/input";
   import { Sheet } from "$lib/components/ui/sheet";
-  import { DETAILS, type Kind } from "$lib/segment-form";
+  import { DETAILS, KINDS as FORM_KINDS, type Kind } from "$lib/segment-form";
   import { apiCall } from "$lib/contract";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import { toast } from "svelte-sonner";
@@ -54,7 +54,7 @@
     await refreshState().catch(ignoreFailure);
   };
 
-  const KINDS: [string, string][] = [["flight", "Flight"], ["hotel", "Hotel stay"], ["car", "Car rental"], ["train", "Train"], ["cruise", "Cruise"], ["parking", "Parking"]];
+  const KINDS: [string, string][] = FORM_KINDS.map(([key, name]) => [key, key === "hotel" ? "Hotel stay" : name]);
   const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 
   const only = $derived.by(() => {
