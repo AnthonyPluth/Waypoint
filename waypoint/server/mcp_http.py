@@ -118,7 +118,7 @@ def local_fetch(path: str, params: dict[str, Any], body: dict | None, access: mc
         raise ToolError(str(e)) from None
     finally:
         _current.user = None
-        _current.assistant = False
+        _current.assistant = True
     if isinstance(result, Response):
         raise ToolError("Not found")
     return result

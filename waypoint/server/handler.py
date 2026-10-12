@@ -415,6 +415,8 @@ class Handler(BaseHTTPRequestHandler):
             result = routes.dispatch(hit, q, body)
         except ApiError as e:
             return self._json(e.status, {"error": str(e), **e.data})
+        finally:
+            _current.assistant = True
         if isinstance(result, Response):
             return self._respond(result)
         return self._json(200, result)

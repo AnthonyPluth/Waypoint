@@ -212,7 +212,7 @@ class VisibilityTests(Assistants):
         self.assertEqual(moved["id"], same["id"])
         self.assertIn("do it in the app", mcp_server.WRITE_RULES)
 
-    def test_the_person_in_the_app_can_confirm_that_move(self):
+    def test_a_dispatch_that_never_sets_the_assistant_flag_is_treated_as_an_assistant_and_the_web_path_can_confirm(self):
         with db.session() as conn:
             solo = self.book(conn, self.jane, {**OUT, "start_local": "2026-11-01T19:00", "end_local": "2026-11-02T07:10"}, "Solo", self.jane.person_id)
             shared = self.book(conn, self.jane, {**OUT, "start_local": "2026-12-01T19:00", "end_local": "2026-12-02T07:10"}, "Shared", self.jane.person_id)
@@ -221,6 +221,13 @@ class VisibilityTests(Assistants):
         self.addCleanup(self.drop, solo["id"], shared["id"])
         self.addCleanup(setattr, _current, "user", None)
         _current.user = {"sub": "u-jane", "name": "Jane Doe", "email": "jane@example.com"}
+        self.addCleanup(setattr, _current, "assistant", True)
+        vars(_current).pop("assistant", None)
+        with db.session() as conn:
+            with self.assertRaises(ApiError) as unset:
+                trips_api.api_segment_move(conn, {}, {"trip_id": shared["id"], "confirm": True}, str(solo["segment"]))
+            self.assertEqual(unset.exception.status, 403)
+        _current.assistant = False
         with db.session() as conn:
             with self.assertRaises(ApiError) as asked:
                 trips_api.api_segment_move(conn, {}, {"trip_id": shared["id"]}, str(solo["segment"]))

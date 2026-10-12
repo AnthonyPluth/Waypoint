@@ -217,7 +217,7 @@ def api_segment_move(conn, _q, body: MoveBody, segment_id) -> Trip:
     who, this = viewer(conn), row_id(segment_id, NO_SEGMENT)
     target = body.get("trip_id")
     into = None if target is None else _id(target, "Choose the trip to move this into")
-    assistant = bool(getattr(_current, "assistant", False))
+    assistant = bool(getattr(_current, "assistant", True))
     confirmed = validate.on(body.get("confirm")) and not assistant
     try:
         return _trip(_run(lambda: trips.move_segment(conn, who, this, into, confirmed), NO_SEGMENT))
