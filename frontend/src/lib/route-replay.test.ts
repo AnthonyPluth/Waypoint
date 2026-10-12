@@ -14,6 +14,7 @@ const places: TripPlaces = {
     { city: "napa", latitude: 38.2975, longitude: -122.2869 },
   ],
   stays: [],
+  roads: { legs: [], interstates: [] },
 };
 const out = segment({ id: 1, origin: "MSP", destination: "SFO", start_local: "2025-12-05T08:00", start_zone: "America/Chicago", end_local: "2025-12-05T10:30", end_zone: "America/Los_Angeles" });
 const stay = segment({ id: 2, kind: "hotel", origin: "Bayview Inn", destination: "San Francisco", start_local: "2025-12-05T15:00", start_zone: "America/Los_Angeles", end_local: "2025-12-11T11:00", end_zone: "America/Los_Angeles" });
@@ -137,7 +138,7 @@ describe("whether a trip can be replayed", () => {
     expect(canReplay(past, "2025-12-01", places)).toBe(false);
     expect(canReplay(past, "2026-01-01", null)).toBe(false);
     expect(canReplay(trip([stay]), "2026-01-01", places)).toBe(false);
-    expect(canReplay(trip([out]), "2026-01-01", { airports: [places.airports[0]], cities: [], stays: [] })).toBe(false);
+    expect(canReplay(trip([out]), "2026-01-01", { airports: [places.airports[0]], cities: [], stays: [], roads: { legs: [], interstates: [] } })).toBe(false);
   });
 
   it("counts the most stops a trip could have before asking for coordinates", () => {

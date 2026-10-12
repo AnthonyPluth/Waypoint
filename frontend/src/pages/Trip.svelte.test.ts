@@ -221,6 +221,22 @@ describe("Trip", () => {
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1/merge", { method: "POST", body: { merge: 7 } }));
     });
 
+    it("lists the trips to merge newest first, undated ones last", async () => {
+      const answer = vi.mocked(api).getMockImplementation()!;
+      const named = (id: number, name: string, start_date: string | null) => ({ ...march, id, name, start_date, end_date: start_date });
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips" && !opts) return { trips: [named(2, "Oldest", "2024-01-05"), named(3, "Undated", null), named(4, "Newest", "2026-09-01"), named(5, "Middle", "2025-06-10")] } as never;
+        return answer(path, opts) as never;
+      });
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Merge another trip" }));
+      const choose = await within(await screen.findByRole("dialog")).findByRole("combobox", { name: "Trip to merge in" });
+      await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(5));
+      const names = within(choose).getAllByRole("option").slice(1).map((o) => o.textContent?.split(" · ")[0]);
+      expect(names).toEqual(["Newest", "Middle", "Oldest", "Undated"]);
+    });
+
     it("offers a new trip of its own only when the trip has other bookings", async () => {
       held = trip([flight]);
       withOthers();
@@ -921,7 +937,7 @@ describe("Trip", () => {
         { day: 5, date: "2026-03-05", sea: false, stops: [{ name: "Miami", zone: "America/New_York", arrive_local: "2026-03-05T07:00", depart_local: null, recorded: true }] }] });
 
     it("lists its ports of call with their local times, its terminal address, and Directions to it", async () => {
-      held = trip([ship]);
+      held = trip([ship], { end_date: "2999-01-01" });
       render(TripPage);
       const days = (await screen.findByText("Itinerary")).closest("[data-itinerary]") as HTMLElement;
       const rows = within(days).getAllByRole("listitem");
@@ -934,6 +950,25 @@ describe("Trip", () => {
       expect(screen.getByText("Terminal address")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", ship.links.directions!);
       expect(screen.getByText("Embarks")).toBeInTheDocument();
+    });
+
+    it("shows the traveller's cruise-line membership number masked on the cruise card", async () => {
+      loyalty = [membership({ id: 31, person_id: 1, kind: "cruise", program: "Disney Castaway Club", masked: "••••0042" })];
+      held = trip([{ ...ship, provider: "Disney Cruise Line", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] }]);
+      render(TripPage);
+      await screen.findByRole("heading", { name: "Example Voyager · Miami" });
+      const line = document.querySelector("[data-membership]")!;
+      expect(line).toHaveTextContent("Disney Castaway Club");
+      expect(line).toHaveTextContent("••••0042");
+      expect(within(line as HTMLElement).getByRole("button", { name: /Show/ })).toBeInTheDocument();
+    });
+
+    it("shows no membership on a cruise from a line with no program saved for the traveller", async () => {
+      loyalty = [membership({ id: 31, person_id: 1, kind: "cruise", program: "Disney Castaway Club", masked: "••••0042" })];
+      held = trip([{ ...ship, provider: "Carnival Cruise Line", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] }]);
+      render(TripPage);
+      await screen.findByRole("heading", { name: "Example Voyager · Miami" });
+      expect(document.querySelector("[data-membership]")).toBeNull();
     });
 
     it("shows no ports section for a cruise without any", async () => {
@@ -975,6 +1010,72 @@ describe("Trip", () => {
       await u.click(screen.getByRole("button", { name: "Cancel" }));
       await u.click(screen.getByRole("button", { name: "Edit JFK → LHR" }));
       expect(screen.queryByText("Ports of call", { selector: "legend" })).toBeNull();
+    });
+  });
+
+  describe("a trip that is over", () => {
+    const hotel = { ...stay, status: "confirmed" as const, has_email: true, start_local: "2020-03-01T15:00", end_local: "2020-03-04T10:00", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] };
+    const cardOf = async (s: ReturnType<typeof segment>) => (await screen.findByRole("list", { name: "Bookings" })).querySelector(`#segment-${s.id}`) as HTMLElement;
+    const past = (extra: Partial<TripT> = {}) => trip([hotel], { start_date: "2020-03-01", end_date: "2020-03-04", ...extra });
+
+    it("keeps the essentials and drops the actions and loyalty numbers", async () => {
+      loyalty = [membership({ id: 12, person_id: 1, kind: "hotel", program: "Marriott Bonvoy", masked: "••••821L" })];
+      held = past();
+      render(TripPage);
+      const card = await cardOf(hotel);
+      expect(card).toHaveTextContent("H88231");
+      expect(card).toHaveTextContent("1 Quay Street, London");
+      expect(within(card).queryByRole("link", { name: "Directions" })).toBeNull();
+      expect(within(card).queryByRole("link", { name: "Call" })).toBeNull();
+      expect(within(card).queryByRole("button", { name: /email/i })).toBeNull();
+      expect(card.querySelector("[data-membership]")).toBeNull();
+      expect(within(card).getByRole("button", { name: /^Edit/ })).toBeInTheDocument();
+    });
+
+    describe("live flight status", () => {
+      const sams = segment({ id: 5, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe", seat: null }] });
+      const gone = { start_local: "2020-03-01T19:00", end_local: "2020-03-02T07:10" };
+      const withStatus = () => {
+        const answer = vi.mocked(api).getMockImplementation()!;
+        vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? delayed : answer(path, opts)) as never);
+      };
+      const flightCard = async () => within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"))[0];
+
+      it("shows none on a past flight, and still shows it on a future one", async () => {
+        held = trip([{ ...flight, ...gone }], { start_date: "2020-03-01", end_date: "2020-03-02" });
+        withStatus();
+        const view = render(TripPage);
+        const card = await flightCard();
+        await waitFor(() => expect(card).toHaveTextContent("JFK"));
+        expect(within(card).queryByTestId("flight-status")).toBeNull();
+        view.unmount();
+        held = trip([flight]);
+        render(TripPage);
+        expect(await within(await flightCard()).findByTestId("flight-status")).toBeInTheDocument();
+      });
+
+      it("shows none on a past flight with two bookings, and still shows it on a future one", async () => {
+        held = trip([{ ...flight, ...gone }, { ...sams, ...gone }], { start_date: "2020-03-01", end_date: "2020-03-02" });
+        withStatus();
+        const view = render(TripPage);
+        const card = await flightCard();
+        await waitFor(() => expect(card).toHaveTextContent("BBBBBB"));
+        expect(within(card).queryByTestId("flight-status")).toBeNull();
+        view.unmount();
+        held = trip([flight, sams]);
+        render(TripPage);
+        expect(await within(await flightCard()).findByTestId("flight-status")).toBeInTheDocument();
+      });
+    });
+
+    it("leaves a trip still to come as it was", async () => {
+      loyalty = [membership({ id: 12, person_id: 1, kind: "hotel", program: "Marriott Bonvoy", masked: "••••821L" })];
+      held = past({ end_date: "2999-01-01" });
+      render(TripPage);
+      const card = await cardOf(hotel);
+      expect(within(card).getByRole("link", { name: "Directions" })).toBeInTheDocument();
+      expect(within(card).getByRole("link", { name: "Call" })).toBeInTheDocument();
+      expect(card.querySelector("[data-membership]")).not.toBeNull();
     });
   });
 });

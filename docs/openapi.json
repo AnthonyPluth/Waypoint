@@ -7690,12 +7690,93 @@
             "items": {
               "$ref": "#/components/schemas/TripStayPoint"
             }
+          },
+          "roads": {
+            "$ref": "#/components/schemas/TripRoads"
           }
         },
         "required": [
           "airports",
           "cities",
-          "stays"
+          "stays",
+          "roads"
+        ],
+        "additionalProperties": false
+      },
+      "TripRoadLeg": {
+        "type": "object",
+        "properties": {
+          "from_segment_id": {
+            "type": "integer"
+          },
+          "to_segment_id": {
+            "type": "integer"
+          },
+          "refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "required": [
+          "from_segment_id",
+          "to_segment_id",
+          "refs",
+          "points"
+        ],
+        "additionalProperties": false
+      },
+      "TripRoadLine": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "required": [
+          "ref",
+          "points"
+        ],
+        "additionalProperties": false
+      },
+      "TripRoads": {
+        "type": "object",
+        "properties": {
+          "legs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripRoadLeg"
+            }
+          },
+          "interstates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripRoadLine"
+            }
+          }
+        },
+        "required": [
+          "legs",
+          "interstates"
         ],
         "additionalProperties": false
       },
