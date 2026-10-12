@@ -6,6 +6,7 @@
   import { Button } from "$lib/components/ui/button";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
+  import GateCode from "$lib/components/GateCode.svelte";
   import { takeEarlyTrips } from "$lib/early";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
@@ -105,7 +106,7 @@
     {@const s = next.segment}
     <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-8" condensed eyebrow={next.state === "now" ? "Under way" : "Next up"} pulse={next.state === "now"}>
       {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
-      {#snippet footer()}<Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm">Open {next.trip.name}</Button>{/snippet}
+      {#snippet footer()}<span class="flex flex-wrap gap-2"><GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm">Open {next.trip.name}</Button></span>{/snippet}
     </PassCard>
   {:else}
     <p class="mb-8 text-muted-foreground">Nothing coming up: every trip you can see is over. <a class="underline" href="#trips">See your trips</a>.</p>
@@ -149,7 +150,7 @@
     {@const d = detail}
     <PassCard segment={d.segment} bookings={d.bookings} {now} level={3} class="mb-4">
       {#snippet live()}{#if d.segment.kind === "flight" && d.segment.status !== "cancelled" && !untimed(d.segment)}<FlightStatus segment={d.segment} />{/if}{/snippet}
-      {#snippet footer()}<Button href={`#trip/${d.segment.trip_id}?segment=${d.segment.id}`} variant="outline" size="sm" onclick={() => (detail = null)}>Open trip</Button>{/snippet}
+      {#snippet footer()}<span class="flex flex-wrap gap-2"><GateCode segment={d.segment} {now} onchanged={load} /><Button href={`#trip/${d.segment.trip_id}?segment=${d.segment.id}`} variant="outline" size="sm" onclick={() => (detail = null)}>Open trip</Button></span>{/snippet}
     </PassCard>
   {/if}
 </Sheet>

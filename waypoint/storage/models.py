@@ -270,6 +270,15 @@ class SegmentMessage(Base):
     stored_message_id: Mapped[int]
 
 
+class SegmentCode(Base):
+    __table__ = schema.segment_codes
+    segment_id: Mapped[int]
+    mailbox_id: Mapped[int]
+    content: Mapped[str | None]
+    day: Mapped[str | None]
+    created: Mapped[float]
+
+
 class IgnoredSender(Base):
     __table__ = schema.ignored_senders
     id: Mapped[int]

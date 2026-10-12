@@ -203,7 +203,7 @@ class BackupTests(unittest.TestCase):
         dst.commit()
         self.assertEqual([tuple(r) for r in dst.execute(select(ReviewItem.auto_state, ReviewItem.auto_tries))], [("waiting", 2)])
         data = backup.load(backup.dump(src))
-        data["revision"] = "0032"
+        data["revision"] = "0033"
         self.without_ai_counters(data)
         with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)

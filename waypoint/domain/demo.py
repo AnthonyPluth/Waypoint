@@ -7,8 +7,8 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import func, select, update
 
 from ..storage import db, secretbox, stored_mail
-from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentMessage, SegmentPort, SegmentTraveler,
-                              StoredMessage, Trip, TripPerson, User)
+from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentCode, SegmentMessage, SegmentPort,
+                              SegmentTraveler, StoredMessage, Trip, TripPerson, User)
 from . import logos, loyalty, people, trips
 from .mail import ai, review, scan
 from .visibility import Viewer
@@ -46,6 +46,20 @@ def _square(color: tuple[int, int, int]) -> bytes:
     rows = b"".join(b"\x00" + bytes(color) * size for _ in range(size))
     chunk = _png_chunk
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
+
+
+def _pattern(modules: int = 29, scale: int = 10) -> bytes:
+    def dark(row: int, col: int) -> bool:
+        for top, left in ((0, 0), (0, modules - 7), (modules - 7, 0)):
+            r, c = row - top, col - left
+            if 0 <= r < 7 and 0 <= c < 7:
+                return max(abs(r - 3), abs(c - 3)) != 2
+        return (row * 7 + col * 13 + row * col) % 5 in (0, 2)
+
+    side = modules * scale
+    rows = b"".join(b"\x00" + bytes(0 if dark(y // scale, x // scale) else 255 for x in range(side)) for y in range(side))
+    return (b"\x89PNG\r\n\x1a\n" + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", side, side, 8, 0, 0, 0, 0)) + _png_chunk(b"IDAT", zlib.compress(rows))
+            + _png_chunk(b"IEND", b""))
 
 
 def _at(today: date, days: int, clock: str) -> str:
@@ -282,8 +296,10 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
         trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id, sam.person_id)})
     for fields in _joan(today):
         trips.add_segment(conn, jane, {**fields, "travelers": _on(guests[1])}, now_trip)
+    parking_id = None
     for fields in _jane_alone(today):
-        trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id)})
+        added = trips.add_segment(conn, jane, {**fields, "travelers": _on(jane.person_id)})
+        parking_id = added["id"] if added and fields["kind"] == "parking" else parking_id
     for fields in _sam_alone(today):
         trips.add_segment(conn, sam, {**fields, "travelers": _on(sam.person_id)})
     from_email = trips.add_segment(conn, jane, {**_read_from_email(today), "travelers": [{"person_id": None, "name": "RIVERA/ALEX MR"}]}, source="email")
@@ -326,6 +342,12 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
                                                       ("Hello,", "Your flight EX 410 leaves New York (JFK) at 7:00 am.", "Confirmation: CH3K5P"))
         stored_mail.put(conn, box.id, "demo-read-from-email", itinerary, 0.0, itinerary_images)
         stored_mail.link(conn, from_email["id"], box.id, "demo-read-from-email")
+    if parking_id is not None:
+        reminder = _message("example-parking.example", 1, today, "Your parking reservation: QR code reminder",
+                            ("Hello Jane,", "Show this code at the gate of Example Airport Long-Term Lot.", "Confirmation: PK30417"))
+        stored_mail.put(conn, box.id, "demo-parking-code", {**reminder, "images": 2}, 0.0,
+                        [{"type": "image/png", "data": _pattern()}, {"type": "image/png", "data": _png(64, 64, (253, 186, 116), (234, 88, 12))}])
+        stored_mail.link(conn, parking_id, box.id, "demo-parking-code")
     if past_stay_id is not None:
         stored_mail.put(conn, box.id, "demo-past-stay", _message("example-stays.example", 41, today, "Your reservation: Lakeside Resort",
                                                                  ("Hello Jane,", "Your stay at Lakeside Resort is booked.", "Confirmation: H41207")), 0.0)
@@ -353,4 +375,4 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
 
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
-               for m in (User, Person, LoyaltyId, BrandLogo, Trip, TripPerson, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage))
+               for m in (User, Person, LoyaltyId, BrandLogo, Trip, TripPerson, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage, SegmentCode))

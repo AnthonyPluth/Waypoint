@@ -5,6 +5,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
+from tests.test_gate_codes import png
 from waypoint.storage import backup, db, secretbox, stored_mail
 from waypoint.storage.models import IgnoredSender, LoyaltyId, Mailbox
 from waypoint.storage import settings_keys as sk
@@ -385,6 +386,11 @@ class Replies(DbCase):
                                             "html": None, "truncated": False}, 1.0)   # type: ignore[arg-type]
         stored_mail.link(self.c, seg["id"], box, "m9")   # type: ignore[arg-type]
         self.check("GET /api/segments/{id}/emails", trips_api.api_segment_emails(self.c, {}, {}, str(seg["id"])))
+        lot = trips_api.api_segment_add(self.c, {}, {"kind": "parking", "origin": "Lot", "start_local": "2026-03-01T05:00", "end_local": "2026-03-02T05:00", "start_zone": "America/New_York"})
+        stored_mail.put(self.c, box, "m10", {"subject": "Parking", "sender_domain": "air.example", "received": "2026-02-20", "text": "Hello.",
+                                             "html": None, "truncated": False}, 2.0, [{"type": "image/png", "data": png(290, 290)}])   # type: ignore[arg-type]
+        stored_mail.link(self.c, lot["id"], box, "m10")   # type: ignore[arg-type]
+        self.check("POST /api/segments/{id}/code", trips_api.api_segment_code_choose(self.c, {}, {"email": 0, "image": 0}, str(lot["id"])))
         self.check("POST /api/segments/{id}", trips_api.api_segment_edit(self.c, {}, {"status": "changed"}, str(seg["id"])))
         self.check("GET /api/trips", trips_api.api_trips(self.c, {}, {}))
         self.check("GET /api/trips/{id}", trips_api.api_trip(self.c, {}, {}, str(seg["trip_id"])))
@@ -474,7 +480,7 @@ class Generated(unittest.TestCase):
                                      "GET /api/people/claim-suggestions", "POST /api/people/claim-suggestions/dismiss",
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/emails/clear", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split", "POST /api/trips/{id}/destination/suggest",
-                                     "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}",
+                                     "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}", "POST /api/segments/{id}/code",
                                      "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/flight-status", "POST /api/flight-status/{id}",

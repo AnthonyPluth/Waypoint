@@ -447,6 +447,16 @@ class TripCosts(TypedDict):
     bookings: int
 
 
+class GateCode(TypedDict):
+    state: Literal["ready", "choose"]
+    day: str | None
+
+
+class GateCodeBody(TypedDict):
+    email: int
+    image: int
+
+
 class Segment(TypedDict):
     id: int
     trip_id: int
@@ -473,6 +483,7 @@ class Segment(TypedDict):
     logo_label: str | None
     hotel_brand: str | None
     has_email: bool
+    gate_code: GateCode | None
     price: Price | None
     links: SegmentLinks
 

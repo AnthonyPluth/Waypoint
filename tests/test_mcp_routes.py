@@ -25,7 +25,7 @@ BLOCKED = [
     "DELETE /api/loyalty/{id}", "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "POST /api/loyalty/{id}/reveal",
     "DELETE /api/feed", "DELETE /api/mailboxes/{id}", "DELETE /api/mcp-settings/connections/{id}", "DELETE /api/reminders/devices/{id}",
     "DELETE /api/review/{id}", "GET /api/ai", "GET /api/backup", "GET /api/mailboxes", "GET /api/mailboxes/callback", "GET /api/mailboxes/{id}/ignored", "GET /api/mailboxes/{id}/review-glance", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/unignore", "GET /api/offline",
-    "GET /api/trips/{id}/places", "GET /api/mcp-settings", "GET /api/reminders", "GET /api/review", "GET /api/review/{id}/preview", "GET /api/review/{id}/images/{id}", "GET /api/segments/{id}/emails/{id}/images/{id}", "GET /api/state",
+    "GET /api/trips/{id}/places", "GET /api/mcp-settings", "GET /api/reminders", "GET /api/review", "GET /api/review/{id}/preview", "GET /api/review/{id}/images/{id}", "GET /api/segments/{id}/emails/{id}/images/{id}", "GET /api/segments/{id}/code", "POST /api/segments/{id}/code", "GET /api/state",
     "POST /api/ai", "POST /api/backup/inspect", "POST /api/feed", "POST /api/flight-status/{id}", "POST /api/import",
     "POST /api/import/preview", "POST /api/mailboxes/connect", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/scan", "POST /api/mailboxes/{id}/share",
     "POST /api/mcp-settings/writes", "POST /api/mcp-settings/connections/{id}/mail", "POST /api/reminders", "POST /api/reminders/devices",
@@ -33,7 +33,7 @@ BLOCKED = [
     "POST /api/trips/{id}/emails/clear", "POST /api/restore", "POST /api/trips/{id}/destination/suggest", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "POST /api/review/{id}/suggest",
     "POST /api/review/{id}/same", "POST /api/review/{id}/attach",
 ]
-NEVER = re.compile(r"^/api/(mailboxes|review|ai|backup|restore|state|offline|feed|reminders|mcp-settings|import|loyalty|logodev)(/|$)|^/api/flight-status/|^/api/segments/\{id\}/emails(/|$)|^/api/trips/\{id\}/emails(/|$)|^/api/trips/\{id\}/destination(/|$)")
+NEVER = re.compile(r"^/api/(mailboxes|review|ai|backup|restore|state|offline|feed|reminders|mcp-settings|import|loyalty|logodev)(/|$)|^/api/flight-status/|^/api/segments/\{id\}/emails(/|$)|^/api/segments/\{id\}/code(/|$)|^/api/trips/\{id\}/emails(/|$)|^/api/trips/\{id\}/destination(/|$)")
 
 
 class RouteTests(unittest.TestCase):
@@ -67,7 +67,7 @@ class RouteTests(unittest.TestCase):
 
     def test_blocked_areas_block_what_is_added_under_them_too(self):
         for path in ("/api/mailboxes/{id}/anything", "/api/review/new/thing", "/api/ai/key", "/api/backup/x", "/api/feed/key",
-                     "/api/reminders/devices/{id}/x", "/api/review/{id}/images/{id}", "/api/segments/{id}/emails/{id}/images/{id}", "/api/segments/{id}/emails/0/images/1", "/api/trips/{id}/emails/clear", "/api/trips/{id}/emails/anything", "/api/mcp-settings/x", "/api/flight-status/{id}/x", "/api/import/csv", "/api/loyalty", "/api/loyalty/{id}/reveal"):
+                     "/api/reminders/devices/{id}/x", "/api/review/{id}/images/{id}", "/api/segments/{id}/emails/{id}/images/{id}", "/api/segments/{id}/emails/0/images/1", "/api/segments/{id}/code", "/api/segments/{id}/code/anything", "/api/trips/{id}/emails/clear", "/api/trips/{id}/emails/anything", "/api/mcp-settings/x", "/api/flight-status/{id}/x", "/api/import/csv", "/api/loyalty", "/api/loyalty/{id}/reveal"):
             self.assertTrue(mcp_access.blocked(path), path)
         for path in ("/api/flight-status", "/api/trips", "/api/people"):
             self.assertFalse(mcp_access.blocked(path), path)

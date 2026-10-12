@@ -4,6 +4,7 @@ from sqlalchemy import MetaData, func, select
 
 from waypoint.domain import demo, stats, trips
 from waypoint.domain.visibility import Viewer
+from waypoint.storage import gate_codes, stored_mail
 from tests.shared import DbCase
 
 
@@ -63,3 +64,13 @@ class DemoTests(DbCase):
             self.assertTrue(any(s["kind"] == "flight" for s in t["segments"]))
         lot = next(s for t in with_parking for s in t["segments"] if s["kind"] == "parking" and s["start_local"][:10] > "2026-10-05")
         self.assertEqual((lot["start_zone"], lot["details"]["space_type"]), ("America/New_York", "Covered"))
+
+    def test_the_coming_parking_booking_keeps_a_made_up_gate_code_chosen_from_its_email_and_the_past_one_none(self):
+        demo.seed(self.c, date(2026, 10, 5))
+        found = trips.listing(self.c, Viewer(None, household=True))
+        lots = sorted((s for t in found for s in t["segments"] if s["kind"] == "parking"), key=lambda s: s["start_local"])
+        self.assertEqual([s["gate_code"] for s in lots], [None, {"state": "ready", "day": "2026-10-04"}])
+        shown = gate_codes.image_for(self.c, lots[1]["id"])
+        assert shown
+        self.assertEqual(gate_codes.dimensions(shown["data"]), (290, 290))
+        self.assertEqual(len(stored_mail.for_segment(self.c, lots[1]["id"])), 1)

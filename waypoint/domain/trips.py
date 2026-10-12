@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import delete, select, update
 
 from .. import dates
-from ..storage import db, geocode, stored_mail
+from ..storage import db, gate_codes, geocode, stored_mail
 from ..storage.models import Segment, SegmentPort, SegmentRecipient, SegmentTraveler, Trip
 from . import airports, links, logos, money, people, place_zones, regions, trippeople, visibility
 from .visibility import Viewer
@@ -147,6 +147,11 @@ class CostsOut(TypedDict):
     bookings: int
 
 
+class GateCodeOut(TypedDict):
+    state: Literal["ready", "choose"]
+    day: str | None
+
+
 class SegmentOut(TypedDict):
     id: int
     trip_id: int
@@ -173,6 +178,7 @@ class SegmentOut(TypedDict):
     logo_label: str | None
     hotel_brand: str | None
     has_email: bool
+    gate_code: GateCodeOut | None
     price: PriceOut | None
     links: links.Links
 
@@ -548,6 +554,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
     brands = logos.brand_names(conn, segs, decoded)
     with_logo = logos.have(conn, brands)
     with_mail = stored_mail.with_messages(conn, [s.id for s in segs])
+    codes = gate_codes.states(conn, [s.id for s in segs if s.kind == gate_codes.KIND])
     out: list[SegmentOut] = [
         {"id": s.id, "trip_id": s.trip_id, "kind": cast(Kind, s.kind), "status": cast(Status, s.status), "confirmation": s.confirmation,
          "provider": s.provider, "start_local": s.start_local, "start_zone": s.start_zone, "end_local": s.end_local,
@@ -560,6 +567,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
          "logo_label": logos.chip(s.kind, s.origin, brand) if brand and logos.key(brand) in with_logo else None,
          "hotel_brand": logos.sub_brand(s.origin) if s.kind == "hotel" else None,
          "has_email": s.id in with_mail,
+         "gate_code": {"state": codes[s.id][0], "day": codes[s.id][1]} if s.id in codes else None,
          "price": priced(s),
          "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, details, s.origin)}
         for s, details, brand in zip(segs, decoded, brands, strict=True)]
@@ -1176,6 +1184,20 @@ def email_image_of(conn: db.Connection, viewer: Viewer, segment_id: int, email: 
     return None if seg is None else stored_mail.image_for_segment(conn, seg.id, email, index)
 
 
+def gate_code_of(conn: db.Connection, viewer: Viewer, segment_id: int) -> stored_mail.Image | None:
+    seg = visibility.visible_segment(conn, viewer, segment_id)
+    return None if seg is None else gate_codes.image_for(conn, seg.id)
+
+
+def choose_gate_code(conn: db.Connection, viewer: Viewer, segment_id: int, email: int, index: int, now: float) -> SegmentOut | None:
+    seg = visibility.visible_segment(conn, viewer, segment_id)
+    if seg is None:
+        return None
+    if not gate_codes.choose(conn, seg.id, email, index, now):
+        raise Invalid("Choose one of the pictures in this booking’s emails")
+    return get_segment(conn, viewer, seg.id)
+
+
 def clear_emails(conn: db.Connection, viewer: Viewer, trip_id: int, today: date, now: float) -> int | None:
     trip = visibility.visible_trip(conn, viewer, trip_id)
     if trip is None:
@@ -1184,6 +1206,7 @@ def clear_emails(conn: db.Connection, viewer: Viewer, trip_id: int, today: date,
         raise Invalid(f"The saved emails can be removed once a trip has ended at least {EMAILS_CLEARABLE_AFTER_DAYS} days ago")
     segment_ids = [s.id for s in visibility.visible_segments(conn, viewer, [trip.id])]
     removed = stored_mail.clear_for_segments(conn, segment_ids)
+    gate_codes.clear_for_segments(conn, segment_ids)
     if trip.done_at is None:
         conn.execute(update(Trip).where(Trip.id == trip.id).values(done_at=now))
     return removed

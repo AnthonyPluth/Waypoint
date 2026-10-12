@@ -18,6 +18,7 @@ NOT_JSON = {
     "GET /api/loyalty/{id}/logo": "a brand's logo, an image",
     "GET /api/segments/{id}/emails/{id}/images/{id}": "an image kept with an email",
     "GET /api/review/{id}/images/{id}": "an image kept with an email",
+    "GET /api/segments/{id}/code": "the picture of a parking booking's gate code, an image",
 }
 
 
