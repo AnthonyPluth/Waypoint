@@ -319,6 +319,35 @@ describe("Review", () => {
     expect(calls.find(([p]) => p === "/api/segments")?.[2]).not.toHaveProperty("end_zone");
   });
 
+  it("offers Cruise by hand, shows its port and ship fields and adds it", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    const kinds = within(screen.getByLabelText("What is it?")).getAllByRole("option").map((o) => o.textContent);
+    expect(kinds).toEqual(["Flight", "Hotel stay", "Car rental", "Train", "Cruise", "Parking"]);
+    await userEvent.selectOptions(screen.getByLabelText("What is it?"), "cruise");
+    await userEvent.type(screen.getByLabelText("Embarkation port"), "Miami");
+    await userEvent.type(screen.getByLabelText("Disembarkation port"), "Nassau");
+    await userEvent.type(screen.getByLabelText("Departs"), "2026-12-02T16:00");
+    await userEvent.type(screen.getByLabelText("Arrives"), "2026-12-09T07:00");
+    await userEvent.type(screen.getByLabelText(/^Ship/), "Example Voyager");
+    expect(screen.getByLabelText(/^Cabin/)).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Time zone where it starts"), "America/New_York");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({
+      kind: "cruise", origin: "Miami", destination: "Nassau", start_zone: "America/New_York", end_zone: "America/New_York", details: { ship: "Example Voyager" } })]));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42", "DELETE", undefined]));
+  });
+
+  it("preselects Cruise for a cruise suggestion", async () => {
+    const cruise = { kind: "cruise" as const, origin: "Miami", destination: "Nassau", start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00",
+      start_zone: "America/New_York", end_zone: "America/Nassau" };
+    held = { matches: [], items: [item({ suggestions: [cruise] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    expect(screen.getByLabelText("What is it?")).toHaveValue("cruise");
+    expect(screen.getByRole("option", { name: "Cruise" })).toBeInTheDocument();
+  });
+
   it("sends a stay’s address, and no zone, for the server to work the zone out from", async () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));

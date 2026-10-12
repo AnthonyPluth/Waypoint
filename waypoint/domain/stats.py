@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 
 from ..storage import db
 from ..storage.models import Airline, Airport
-from . import people, seatmaps, trips, visibility
+from . import people, seatmaps, trippeople, trips, visibility
 from .chains import clean, hotel_chain
 from .visibility import Viewer
 
@@ -587,7 +587,9 @@ def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: in
     segments = [s for s in visibility.visible_segments(conn, viewer) if s.status != "cancelled"]
     travelling = visibility.visible_travelers(conn, viewer, [s.id for s in segments])
     if person_id is not None:
+        aboard = trippeople.of(conn, {s.trip_id for s in segments if s.travelers_from_trip})
         on = {t.segment_id for t in travelling if t.person_id == person_id}
+        on |= {s.id for s in segments if s.travelers_from_trip and person_id in aboard[s.trip_id]}
         segments = [s for s in segments if s.id in on]
     seats_of: dict[int, list[str]] = {}
     for t in travelling:

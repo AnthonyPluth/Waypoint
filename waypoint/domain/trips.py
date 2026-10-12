@@ -18,6 +18,7 @@ from .visibility import Viewer
 
 Kind = Literal["flight", "hotel", "car", "train", "cruise", "parking"]
 Status = Literal["confirmed", "changed", "cancelled"]
+SHARED_KINDS = frozenset({"hotel", "car", "parking"})
 KINDS: tuple[Kind, ...] = ("flight", "hotel", "car", "train", "cruise", "parking")
 STATUSES: tuple[Status, ...] = ("confirmed", "changed", "cancelled")
 TIME_UNKNOWN = "time_unknown"
@@ -815,12 +816,19 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
                         booked_by=viewer.person_id)
             conn.orm.add(trip)
             conn.orm.flush()
+    named = [t["person_id"] for t in travelers if t["person_id"] is not None]
+    for_everyone = (source == "email" and values["kind"] in SHARED_KINDS
+                    and set(named) <= _seen_by_bookings(conn, trip) | {viewer.person_id})
     seg = Segment(**values, **located(values), trip_id=trip.id, source=source, booked_by=viewer.person_id, locked_fields=None,
                   check_times=bool(fields.get("check_times")))
     set_price(seg, cost, "email" if source == "email" else "manual")
     conn.orm.add(seg)
     conn.orm.flush()
-    _set_travelers(conn, seg.id, travelers)
+    if for_everyone:
+        seg.travelers_from_trip = True
+        trippeople.add(conn, trip.id, named)
+    else:
+        _set_travelers(conn, seg.id, travelers)
     trippeople.keep_lists_inside(conn, trip.id)
     if ports:
         _set_ports(conn, seg.id, ports)
@@ -1112,6 +1120,16 @@ def _known_people(conn: db.Connection, given: Sequence[int]) -> list[int]:
     return wanted
 
 
+def _seen_by_bookings(conn: db.Connection, trip: Trip) -> set[int]:
+    own = select(Segment.id).where(Segment.trip_id == trip.id)
+    listed = set(conn.orm.scalars(select(SegmentTraveler.person_id).where(SegmentTraveler.segment_id.in_(own),
+                                                                          SegmentTraveler.person_id.is_not(None))).all())
+    booked = {p for p in conn.orm.scalars(select(Segment.booked_by).where(Segment.trip_id == trip.id)).all() if p is not None}
+    received = conn.orm.scalars(select(SegmentRecipient.person_id).join(Segment, Segment.id == SegmentRecipient.segment_id)
+                                .where(Segment.trip_id == trip.id)).all()
+    return {p for p in listed if p is not None} | booked | set(received) | ({trip.booked_by} if trip.booked_by is not None else set())
+
+
 def _seeing(conn: db.Connection, trip: Trip) -> set[int]:
     _, who = _involved(conn, [trip.id])
     received = conn.orm.scalars(select(SegmentRecipient.person_id).join(Segment, Segment.id == SegmentRecipient.segment_id)
@@ -1252,6 +1270,9 @@ def split(conn: db.Connection, viewer: Viewer, trip_id: int, segment_ids: Sequen
     joined = before if any(s.travelers_from_trip for s in leaving) else listed
     trippeople.add(conn, new.id, joined)
     conn.execute(update(Segment).where(Segment.id.in_(list(moving))).values(trip_id=new.id))
+    conn.orm.flush()
+    if not conn.orm.scalars(select(Segment.id).where(Segment.trip_id == trip.id, Segment.travelers_from_trip.is_(True))).first():
+        trippeople.remove(conn, trip.id, [p for p in before if p not in trippeople.on_lists(conn, trip.id)])
     trip.auto = False
     conn.orm.flush()
     conn.orm.expire_all()

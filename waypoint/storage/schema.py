@@ -154,7 +154,7 @@ segments = Table(
     Column('longitude', Float),
     Column('geo_precision', Text),
     Column('travelers_from_trip', Boolean, nullable=False, server_default=false(),
-           doc='groundwork, not set by any path yet (the ingest slice turns it on). true: the booking is for everyone on its trip and has no traveller rows of its own; false: its rows are its list, possibly empty'),
+           doc='set for hotel, car and parking bookings made from an email, when everyone it names already sees the trip. true: the booking is for everyone on its trip and has no traveller rows of its own; false: its rows are its list, possibly empty'),
     Column('price_minor', Integer, doc="the booking's total in the currency's smallest unit, never converted; null when no cost is known"),
     Column('price_currency', Text, doc='the ISO 4217 code of price_minor; null exactly when price_minor is'),
     Column('price_source', Text, doc="'email' (read from a confirmation or receipt, an email may replace it) or 'manual' (set by a person, an email never replaces it); null exactly when price_minor is"),
