@@ -57,7 +57,7 @@ A trip’s dates are the local dates of its first and last segments.
 
 Without a trip named, a new segment joins an existing grouped trip when it is within two days of it, the trip hasn’t already got back to where it began before the segment starts, and everyone the segment involves (its travellers and whoever booked it) is already on the trip. Otherwise it starts a trip of its own, so one person’s solo trip never takes in another person’s booking. You can **rename** a trip, **merge** two of yours into one and **split** some segments off into a new one; a trip you merged or split is yours from then on, and grouping leaves it alone. A merge is refused unless the same people are on both trips, so nobody is shown a segment of a trip they aren’t on.
 
-On a trip’s page, **Merge another trip** brings another trip’s bookings into this one, and each booking has a **Move** button to send it to another trip or to a new trip of its own (not offered for a trip’s only booking). A trip left with no bookings is removed, and the same rule applies as for a merge: a move between trips with different people is refused until you add the missing travellers to the booking.
+On a trip’s page, **Merge another trip** brings another trip’s bookings into this one, and each booking has a **Move** button to send it to another trip or to a new trip of its own (not offered for a trip’s only booking). A trip left with no bookings is removed. A booking can move into any trip you can see, even one with different people: its travellers (and whoever booked it) are then on that trip and can see it, and the people already on that trip can see the booking. A merge still needs both trips to involve the same people.
 
 ## One flight, one card
 

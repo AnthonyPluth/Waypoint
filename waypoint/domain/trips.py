@@ -970,14 +970,6 @@ def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: 
         target = visibility.visible_trip(conn, viewer, trip_id)
         if target is None:
             return None
-        if not viewer.household:
-            _, who = _involved(conn, [seg.trip_id, target.id])
-            moving = {t.person_id for t in conn.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id)).all()
-                      if t.person_id is not None} | ({seg.booked_by} if seg.booked_by is not None else set())
-            there = who[target.id] | ({target.booked_by} if target.booked_by is not None else set())
-            if moving != there:
-                raise Invalid("That trip involves different people, and moving this there would show it to people who aren’t "
-                              "on it, or show them that trip. Add the missing travellers to the booking first.")
         target.auto = False
     conn.execute(update(Segment).where(Segment.id == seg.id).values(trip_id=target.id))
     conn.orm.flush()
