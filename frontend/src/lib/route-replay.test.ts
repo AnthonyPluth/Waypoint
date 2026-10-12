@@ -147,8 +147,7 @@ describe("whether a trip can be replayed", () => {
     expect(maxStops(trip([stay]))).toBe(1);
     expect(maxStops(trip([out, stay]))).toBe(3);
     expect(maxStops(trip([segment({ id: 9, kind: "parking" })]))).toBe(0);
-    expect(worthLocating(trip([stay]), "2027-01-01")).toBe(true);
-    expect(worthLocating(trip([stay], { replay_from_home: false }), "2027-01-01")).toBe(false);
+    expect(worthLocating(trip([stay]), "2027-01-01")).toBe(false);
     expect(worthLocating(trip([out]), "2027-01-01")).toBe(true);
     expect(worthLocating(trip([out]), "2025-12-05")).toBe(false);
   });

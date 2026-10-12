@@ -7831,9 +7831,6 @@
               "null"
             ]
           },
-          "replay_from_home": {
-            "type": "boolean"
-          },
           "people": {
             "type": "array",
             "items": {
@@ -7863,7 +7860,6 @@
           "emails",
           "can_clear_emails",
           "done_at",
-          "replay_from_home",
           "people",
           "costs",
           "segments"
@@ -7929,9 +7925,6 @@
             "items": {
               "type": "integer"
             }
-          },
-          "replay_from_home": {
-            "type": "boolean"
           },
           "confirm": {
             "type": "boolean"

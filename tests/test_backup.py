@@ -116,9 +116,6 @@ class BackupTests(unittest.TestCase):
     def without_ai_counters(self, data):
         self.without(data, "review_items", "auto_state", "auto_tries")
 
-    def without_replay_choice(self, data):
-        self.without(data, "trips", "replay_from_home")
-
     def without(self, data, table, *names):
         part = data["tables"][table]
         keep = [i for i, name in enumerate(part["columns"]) if name not in names]
@@ -147,7 +144,6 @@ class BackupTests(unittest.TestCase):
         self.without(data, "segments", "travelers_from_trip", "price_minor", "price_currency", "price_source")
         self.without(data, "trips", "done_at")
         self.without_ai_counters(data)
-        self.without_replay_choice(data)
         dst = db.connect(self.b)
         with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)
@@ -170,7 +166,6 @@ class BackupTests(unittest.TestCase):
         self.without(data, "segments", "price_minor", "price_currency", "price_source")
         self.without(data, "trips", "done_at")
         self.without_ai_counters(data)
-        self.without_replay_choice(data)
         with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)
         dst.commit()
@@ -191,29 +186,10 @@ class BackupTests(unittest.TestCase):
         data["revision"] = "0031"
         self.without(data, "trips", "done_at")
         self.without_ai_counters(data)
-        self.without_replay_choice(data)
         with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)
         dst.commit()
         self.assertEqual([(t.id, t.done_at) for t in dst.orm.scalars(select(Trip))], [(5, None)])
-        src.close(); dst.close()
-
-    def test_a_trips_replay_choice_comes_back_and_a_backup_from_before_restores_it_on(self):
-        src = db.connect(self.a)
-        self.trip_with_people(src)
-        src.execute(update(Trip).where(Trip.id == 5).values(replay_from_home=False))
-        src.commit()
-        dst = db.connect(self.b)
-        backup.restore(dst, backup.load(backup.dump(src)))
-        dst.commit()
-        self.assertEqual([t.replay_from_home for t in dst.orm.scalars(select(Trip))], [False])
-        data = backup.load(backup.dump(src))
-        data["revision"] = "0034"
-        self.without_replay_choice(data)
-        with mock.patch.object(backup, "head", return_value="not-this-one"):
-            backup.restore(dst, data)
-        dst.commit()
-        self.assertEqual([(t.id, t.replay_from_home) for t in dst.orm.scalars(select(Trip))], [(5, True)])
         src.close(); dst.close()
 
     def test_the_automatic_ai_state_comes_back_and_a_backup_from_before_restores_with_none(self):
@@ -229,7 +205,6 @@ class BackupTests(unittest.TestCase):
         data = backup.load(backup.dump(src))
         data["revision"] = "0033"
         self.without_ai_counters(data)
-        self.without_replay_choice(data)
         with mock.patch.object(backup, "head", return_value="not-this-one"):
             backup.restore(dst, data)
         dst.commit()

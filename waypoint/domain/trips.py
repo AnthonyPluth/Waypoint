@@ -106,7 +106,6 @@ class TripIn(TypedDict, total=False):
     start_date: str | None
     end_date: str | None
     people: list[int]
-    replay_from_home: bool
 
 
 class TravelerOut(TypedDict):
@@ -197,7 +196,6 @@ class TripOut(TypedDict):
     emails: int
     can_clear_emails: bool
     done_at: float | None
-    replay_from_home: bool
     people: list[int]
     costs: CostsOut
     segments: list[SegmentOut]
@@ -600,7 +598,6 @@ def _trip_outs(conn: db.Connection, viewer: Viewer, trips: Sequence[Trip], today
     return [{"id": t.id, "name": t.name, "start_date": t.start_date, "end_date": t.end_date,
              "destination": t.destination, "destination_manual": t.destination_manual, "notes": t.notes, "auto": t.auto, "booked_by": t.booked_by,
              "emails": (n := emails_of_trip(t)), "can_clear_emails": n > 0 and emails_clearable(t, day), "done_at": t.done_at,
-             "replay_from_home": t.replay_from_home,
              "people": aboard[t.id], "costs": costs_of(mine := [s for s in outs if s["trip_id"] == t.id]), "segments": mine} for t in trips]
 
 
@@ -1336,8 +1333,6 @@ def edit_trip(conn: db.Connection, viewer: Viewer, trip_id: int, fields: TripIn,
         trip.destination, trip.destination_manual = given, given is not None
     if "notes" in fields:
         trip.notes = fields["notes"]
-    if "replay_from_home" in fields:
-        trip.replay_from_home = fields["replay_from_home"]
     conn.orm.flush()
     refresh(conn, trip)
     return _trip_outs(conn, viewer, [trip])[0]

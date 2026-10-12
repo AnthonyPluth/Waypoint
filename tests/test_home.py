@@ -189,23 +189,6 @@ class HomeRouteTests(RouteCase):
         trip = self.book("ana", DRIVE)["trip_id"]
         self.assertNotIn(ZIP, json.dumps(self.ok("ana", "GET", f"/api/trips/{trip}/places")))
 
-    def test_the_replay_choice_defaults_on_and_persists(self):
-        trip = self.book("ana", DRIVE)["trip_id"]
-        self.assertIs(self.ok("ana", "GET", f"/api/trips/{trip}")["replay_from_home"], True)
-        off = self.ok("ana", "POST", f"/api/trips/{trip}", {"replay_from_home": False})
-        self.assertIs(off["replay_from_home"], False)
-        self.assertIs(self.ok("ana", "GET", f"/api/trips/{trip}")["replay_from_home"], False)
-        self.assertIs(self.ok("ana", "POST", f"/api/trips/{trip}", {"name": "Renamed"})["replay_from_home"], False)
-        self.assertIs(self.ok("ana", "POST", f"/api/trips/{trip}", {"replay_from_home": True})["replay_from_home"], True)
-
-    def test_the_replay_choice_must_be_true_or_false_and_belongs_to_those_who_see_the_trip(self):
-        trip = self.book("ana", DRIVE)["trip_id"]
-        for junk in ("yes", 1, None, "false"):
-            with self.subTest(junk=junk):
-                self.assertEqual(self.call("ana", "POST", f"/api/trips/{trip}", {"replay_from_home": junk})[0], 400)
-        self.assertEqual(self.call("ben", "POST", f"/api/trips/{trip}", {"replay_from_home": False}), (404, {"error": "No such trip"}))
-        self.assertIs(self.ok("ana", "GET", f"/api/trips/{trip}")["replay_from_home"], True)
-
     def test_home_is_not_in_the_calendar_feed_or_reminders(self):
         self.ok("ana", "POST", "/api/home", SPRINGFIELD)
         self.book("ana", DRIVE)
@@ -228,7 +211,6 @@ class HomeRouteTests(RouteCase):
             self.book("ana", SECOND, trip_id=trip)
             self.ok("ana", "GET", f"/api/trips/{trip}/places")
             self.ok("ana", "GET", "/api/home")
-            self.ok("ana", "POST", f"/api/trips/{trip}", {"replay_from_home": False})
             self.ok("ana", "DELETE", "/api/home")
 
     def test_home_is_kept_with_the_other_settings_and_nowhere_else(self):

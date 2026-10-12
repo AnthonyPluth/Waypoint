@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, LargeBinary, MetaData, Table, Text, UniqueConstraint, false, text, true
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, LargeBinary, MetaData, Table, Text, UniqueConstraint, false, text
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 
@@ -117,9 +117,8 @@ trips = Table(
     Column('auto', Boolean, nullable=False),
     Column('booked_by', Integer, refers('trips', 'booked_by', 'people.id', 'SET NULL')),
     Column('done_at', Float),
-    Column('replay_from_home', Boolean, nullable=False, server_default=true()),
     Index('ix_trips_booked_by', 'booked_by'),
-    info={'doc': 'a journey: its segments, grouped by Waypoint (auto) or made by hand; its dates are its local dates; its destination is worked out from its bookings unless destination_manual says a person set it; done_at is when a member finalized it with Done (epoch seconds), empty until then; replay_from_home says whether a road trip\'s route replay starts and ends at the household\'s Home place'},
+    info={'doc': 'a journey: its segments, grouped by Waypoint (auto) or made by hand; its dates are its local dates; its destination is worked out from its bookings unless destination_manual says a person set it; done_at is when a member finalized it with Done (epoch seconds), empty until then'},
 )
 
 trip_people = Table(

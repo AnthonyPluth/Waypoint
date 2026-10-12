@@ -82,9 +82,7 @@ export function maxStops(trip: Trip): number {
 
 export const isRoadTrip = (trip: Trip): boolean => !trip.segments.some((s) => s.status !== "cancelled" && (s.kind === "flight" || s.kind === "train" || s.kind === "cruise"));
 
-export const startsAtHome = (trip: Trip): boolean => trip.replay_from_home && isRoadTrip(trip);
-
-export const worthLocating = (trip: Trip, today: string): boolean => isPast(trip, today) && maxStops(trip) >= (startsAtHome(trip) ? 1 : 2);
+export const worthLocating = (trip: Trip, today: string): boolean => isPast(trip, today) && maxStops(trip) >= 2;
 
 function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
   const { airport, city, stay } = finder(places);
@@ -126,7 +124,7 @@ const sameStop = (a: Visit, b: Visit): boolean => {
 
 function wrapAtHome(merged: Visit[], trip: Trip, places: TripPlaces): void {
   const first = merged[0], last = merged.at(-1);
-  if (!places.home || !first || !last || !startsAtHome(trip)) return;
+  if (!places.home || !first || !last || !isRoadTrip(trip)) return;
   const { city, latitude, longitude } = places.home;
   const at: Visit = { name: city, city, code: null, kind: "home", latitude, longitude, from: "", to: "", via: null };
   if (!samePlace(at, first)) merged.unshift({ ...at, from: first.from, to: first.from });

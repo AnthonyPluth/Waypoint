@@ -13,7 +13,6 @@
     { "click": "a[href^='#trip/']:has-text('Denver') >> visible=true" },
     { "wait_for": "h1:has-text('Denver')" },
     { "wait_for": "section[aria-label='Route replay'] [data-testid='replay-map']" },
-    { "wait_for": "label:has-text('Start and end at home')" },
     { "expect_text": { "selector": "[data-testid='stop-list']", "text": "Kansas City" } },
     { "press": { "selector": "input[aria-label='Position along the route']", "key": "Home" } },
     { "wait_for": "[data-label='Kansas City'][data-visible='true']" },

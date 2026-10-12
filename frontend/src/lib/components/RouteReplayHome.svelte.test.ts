@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
+import { render, screen, within } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
@@ -62,40 +62,32 @@ describe("RouteReplayMap with Home", () => {
   });
 });
 
-describe("RouteReplay's start-and-end-at-home choice", () => {
-  const reply = (body: unknown) => vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string; body?: unknown }) =>
-    (opts?.method === "POST" ? { ...trip([first, second]), ...(opts.body as object) } : body) as never);
+describe("RouteReplay with Home", () => {
+  const reply = (body: unknown) => vi.mocked(api).mockImplementation(async () => body as never);
 
-  it("offers the choice on, for a road trip with a placed Home, and saves turning it off", async () => {
+  it("replays a road trip from Home and back, with no choice offered", async () => {
     reply(places);
-    const onchanged = vi.fn();
-    render(RouteReplay, { trip: trip([first, second]), now: after, onchanged });
-    const box = await screen.findByRole("checkbox", { name: "Start and end at home" });
-    expect(box).toBeChecked();
-    expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
-    await fireEvent.click(box);
-    await waitFor(() => expect(onchanged).toHaveBeenCalled());
-    expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "POST", body: { replay_from_home: false } });
-  });
-
-  it("keeps the choice offered when it is off, with the route as it was before Home", async () => {
-    reply(places);
-    render(RouteReplay, { trip: trip([first, second], { replay_from_home: false }), now: after });
-    const box = await screen.findByRole("checkbox", { name: "Start and end at home" });
-    expect(box).not.toBeChecked();
-    expect(within(await screen.findByRole("list", { name: "Stops in order" })).getAllByRole("listitem")).toHaveLength(2);
-  });
-
-  it("is not offered with no placed Home, or on a trip with a flight", async () => {
-    reply({ ...places, home: null });
-    const { unmount } = render(RouteReplay, { trip: trip([first, second]), now: after });
+    render(RouteReplay, { trip: trip([first, second]), now: after });
     expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
-    unmount();
+    const items = within(screen.getByRole("list", { name: "Stops in order" })).getAllByRole("listitem").map((li) => li.lastElementChild?.textContent?.replace(/\s+/g, " "));
+    expect(items).toHaveLength(4);
+    expect(items[0]).toBe("Springfield, Dec 5, 2025");
+    expect(items[3]).toBe("Back in Springfield, Dec 8, 2025");
+  });
+
+  it("is as before with no placed Home", async () => {
+    reply({ ...places, home: null });
+    render(RouteReplay, { trip: trip([first, second]), now: after });
+    expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
+    expect(within(screen.getByRole("list", { name: "Stops in order" })).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("leaves a trip with a flight alone", async () => {
     const flight = segment({ id: 9, origin: "MSP", destination: "SFO", start_local: "2025-12-05T08:00", start_zone: zone, end_local: "2025-12-05T10:30", end_zone: "America/Los_Angeles" });
     reply({ ...places, airports: [{ code: "MSP", city: "Minneapolis", latitude: 44.9, longitude: -93.2 }, { code: "SFO", city: "San Francisco", latitude: 37.6, longitude: -122.4 }] });
     render(RouteReplay, { trip: trip([first, flight]), now: after });
     expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
-    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(document.querySelector("[data-kind='home']")).toBeNull();
   });
 });

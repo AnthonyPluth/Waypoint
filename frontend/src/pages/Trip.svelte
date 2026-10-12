@@ -300,7 +300,7 @@
     {/if}
   </div>
 
-  <RouteReplay trip={t} {now} onchanged={() => { onchanged?.(); void load(); }} />
+  <RouteReplay trip={t} {now} />
 
   {#if form && form.id === null}
     <SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} />

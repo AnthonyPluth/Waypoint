@@ -507,7 +507,6 @@ class Trip(TypedDict):
     emails: int
     can_clear_emails: bool
     done_at: float | None
-    replay_from_home: bool
     people: list[int]
     costs: TripCosts
     segments: list[Segment]
@@ -580,7 +579,6 @@ class TripBody(TypedDict):
     start_date: NotRequired[str | None]
     end_date: NotRequired[str | None]
     people: NotRequired[list[int]]
-    replay_from_home: NotRequired[bool]
     confirm: NotRequired[bool]
 
 

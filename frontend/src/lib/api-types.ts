@@ -1040,7 +1040,6 @@ export interface Trip {
   emails: number;
   can_clear_emails: boolean;
   done_at: number | null;
-  replay_from_home: boolean;
   people: number[];
   costs: TripCosts;
   segments: Segment[];
@@ -1060,7 +1059,6 @@ export interface TripBody {
   start_date?: string | null;
   end_date?: string | null;
   people?: number[];
-  replay_from_home?: boolean;
   confirm?: boolean;
 }
 

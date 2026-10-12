@@ -52,9 +52,8 @@ describe("a road trip with a Home", () => {
     expect(replayMs(stopsOf(trip([first, second]), { ...places, home: null }).length)).toBe(6000);
   });
 
-  it("is wrapped even when it has one stop, and is worth locating then", () => {
-    expect(names(stopsOf(trip([first]), places))).toEqual(["Springfield", "Arch Inn", "Springfield"]);
-    expect(worthLocating(trip([first]), "2027-01-01")).toBe(true);
+  it("is still not worth locating with one stop, as before", () => {
+    expect(worthLocating(trip([first]), "2027-01-01")).toBe(false);
   });
 
   it("draws every leg, to and from Home, straight when no road data covers it", () => {
@@ -92,10 +91,8 @@ describe("a trip Home does not touch", () => {
     expect(names(stopsOf(trip([first, second, cancelled]), places))).toEqual(["Springfield", "Arch Inn", "Music Row Inn", "Springfield"]);
   });
 
-  it("is unchanged with no Home or one the trip turned off", () => {
+  it("is unchanged with no Home", () => {
     expect(names(stopsOf(trip([first, second]), { ...places, home: null }))).toEqual(["Arch Inn", "Music Row Inn"]);
-    expect(names(stopsOf(trip([first, second], { replay_from_home: false }), places))).toEqual(["Arch Inn", "Music Row Inn"]);
-    expect(worthLocating(trip([first], { replay_from_home: false }), "2027-01-01")).toBe(false);
   });
 
   it("adds nothing when no stop has coordinates", () => {

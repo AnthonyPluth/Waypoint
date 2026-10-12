@@ -249,7 +249,6 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_home.py",
         "tests/test_logos.py",
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
@@ -287,13 +286,11 @@
       "path": "/api/trips/{id}",
       "handler": "waypoint/server/api/trips.py:api_trip_edit",
       "web": [
-        "frontend/src/lib/components/RouteReplay.svelte",
         "frontend/src/lib/components/TripDestination.svelte",
         "frontend/src/pages/Trip.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_home.py",
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_offline.py",
