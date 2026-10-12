@@ -1267,6 +1267,208 @@ describe("Review: a booking email with several flights", () => {
   });
 });
 
+describe("Review: several legs or bookings added by hand from one email", () => {
+  type User = ReturnType<typeof userEvent.setup>;
+  const openByHand = async () => {
+    render(ReviewPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await screen.findByRole("dialog");
+    return u;
+  };
+  const typeLeg = async (u: User, leg: HTMLElement, fields: Record<string, string>) => {
+    for (const [label, value] of Object.entries(fields)) {
+      await u.clear(within(leg).getByLabelText(label));
+      await u.type(within(leg).getByLabelText(label), value);
+    }
+  };
+  const outbound = { "From (airport code)": "BOS", "To (airport code)": "DEN", Departs: "2027-01-02T07:15", Arrives: "2027-01-02T09:40" };
+  const inbound = { "To (airport code)": "BOS", Departs: "2027-01-09T16:00", Arrives: "2027-01-09T21:30" };
+  const roundTrip = async () => {
+    const u = await openByHand();
+    await u.type(screen.getByLabelText("Confirmation code"), "ZZ9Y8X");
+    await typeLeg(u, screen.getByRole("dialog"), outbound);
+    await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
+    await typeLeg(u, screen.getAllByTestId("leg")[1], inbound);
+    return u;
+  };
+  const posted = () => calls.filter(([p]) => p === "/api/segments").map(([, , b]) => b);
+  const takeOffs = () => calls.filter(([p, m]) => m === "DELETE" && p.startsWith("/api/review/")).map(([p]) => p);
+  const discardAsked = () => screen.queryByRole("dialog", { name: "Discard this booking?" });
+
+  it("offers the button under a single leg without changing the single-leg form", async () => {
+    const u = await openByHand();
+    expect(screen.getByRole("button", { name: "Add another leg or booking" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to my trips" })).toBeInTheDocument();
+    expect(screen.queryByTestId("leg")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Dismiss (Flight|Booking)/ })).toBeNull();
+    await u.click(screen.getByRole("button", { name: "Cancel" }));
+    await settled();
+  });
+
+  it("adds a leg with the same kind, provider and code, and a flight starting where the last one ended", async () => {
+    const u = await openByHand();
+    await u.type(screen.getByLabelText("Confirmation code"), "ZZ9Y8X");
+    await u.type(screen.getByLabelText("From (airport code)"), "BOS");
+    await u.type(screen.getByLabelText("To (airport code)"), "DEN");
+    await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
+    const legs = screen.getAllByTestId("leg");
+    expect(legs.map((l) => l.querySelector("legend")?.textContent)).toEqual(["Flight 1 of 2: BOS → DEN", "Flight 2 of 2"]);
+    expect(within(legs[1]).getByLabelText("What is it?")).toHaveValue("flight");
+    expect(within(legs[1]).getByLabelText("Provider")).toHaveValue("Example Air");
+    expect(within(legs[1]).getByLabelText("Confirmation code")).toHaveValue("ZZ9Y8X");
+    expect(within(legs[1]).getByLabelText("From (airport code)")).toHaveValue("DEN");
+    expect(within(legs[1]).getByLabelText("To (airport code)")).toHaveValue("");
+    expect(within(legs[1]).getByLabelText("Departs")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Add 2 flights" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add another leg or booking" })).toBeInTheDocument();
+    expect(within(legs[1]).getByLabelText("What is it?")).toHaveFocus();
+  });
+
+  it("adds a round trip as two flights from one email and takes the item off the list once", async () => {
+    const u = await roundTrip();
+    await u.click(screen.getByRole("button", { name: "Add 2 flights" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added 2 flights to your trips"));
+    expect(posted()).toEqual([
+      { kind: "flight", start_local: "2027-01-02T07:15", end_local: "2027-01-02T09:40", provider: "Example Air", confirmation: "ZZ9Y8X", origin: "BOS", destination: "DEN" },
+      { kind: "flight", start_local: "2027-01-09T16:00", end_local: "2027-01-09T21:30", provider: "Example Air", confirmation: "ZZ9Y8X", origin: "DEN", destination: "BOS" }]);
+    expect(calls.filter(([p]) => p.endsWith("/same"))).toHaveLength(2);
+    expect(takeOffs()).toEqual(["/api/review/1?segment=42&segment=43"]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("adds a flight and a hotel from one email, clearing the flight’s places when the kind changes", async () => {
+    const u = await openByHand();
+    await u.type(screen.getByLabelText("Confirmation code"), "ZZ9Y8X");
+    await typeLeg(u, screen.getByRole("dialog"), outbound);
+    await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
+    const second = screen.getAllByTestId("leg")[1];
+    expect(within(second).getByLabelText("From (airport code)")).toHaveValue("DEN");
+    await u.selectOptions(within(second).getByLabelText("What is it?"), "hotel");
+    expect(within(second).getByLabelText("Hotel")).toHaveValue("");
+    expect(within(second).getByLabelText("Provider")).toHaveValue("Example Air");
+    expect(screen.getByRole("button", { name: "Add 2 bookings" })).toBeInTheDocument();
+    await typeLeg(u, second, { Provider: "Example Hotels", Hotel: "Harbour Hotel", "Check-in": "2027-01-02T15:00", "Check-out": "2027-01-05T11:00", Address: "1 Harbour Road, Denver" });
+    await u.click(screen.getByRole("button", { name: "Add 2 bookings" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added 2 bookings to your trips"));
+    expect(posted()).toMatchObject([
+      { kind: "flight", origin: "BOS", destination: "DEN" },
+      { kind: "hotel", provider: "Example Hotels", confirmation: "ZZ9Y8X", origin: "Harbour Hotel", start_local: "2027-01-02T15:00", end_local: "2027-01-05T11:00", details: { address: "1 Harbour Road, Denver" } }]);
+    expect(takeOffs()).toEqual(["/api/review/1?segment=42&segment=43"]);
+  });
+
+  it("adds one more leg to the AI’s suggestions", async () => {
+    held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [], ai: false };
+    render(ReviewPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await u.click(await screen.findByRole("button", { name: "Add another leg or booking" }));
+    const legs = screen.getAllByTestId("leg");
+    expect(legs.map((l) => l.querySelector("legend")?.textContent)).toEqual(["Flight 1 of 2: BOS → DEN", "Flight 2 of 2"]);
+    expect(within(legs[1]).getByLabelText("Confirmation code")).toHaveValue("QW4R7T");
+    expect(within(legs[1]).getByLabelText("From (airport code)")).toHaveValue("DEN");
+    expect(screen.getByRole("heading", { name: "Check these suggestions" })).toBeInTheDocument();
+    await typeLeg(u, legs[1], { "To (airport code)": "BOS", Departs: "2026-12-09T10:00", Arrives: "2026-12-09T15:00" });
+    await u.click(screen.getByRole("button", { name: "Add 2 flights" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added 2 flights to your trips"));
+    expect(posted()).toMatchObject([{ origin: "BOS", destination: "DEN" }, { origin: "DEN", destination: "BOS", confirmation: "QW4R7T" }]);
+    expect(takeOffs()).toEqual(["/api/review/1?segment=42&segment=43"]);
+  });
+
+  it("dismisses a leg, leaving the last one as a plain form with nothing to dismiss", async () => {
+    const u = await openByHand();
+    await u.type(screen.getByLabelText("From (airport code)"), "BOS");
+    await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
+    expect(screen.getAllByRole("button", { name: /^Dismiss Flight/ })).toHaveLength(2);
+    await u.click(screen.getByRole("button", { name: "Dismiss Flight 2 of 2" }));
+    expect(screen.queryByTestId("leg")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Dismiss (Flight|Booking)/ })).toBeNull();
+    expect(screen.getByLabelText("From (airport code)")).toHaveValue("BOS");
+    expect(screen.getByRole("button", { name: "Add to my trips" })).toBeInTheDocument();
+  });
+
+  it("validates every leg before adding any", async () => {
+    const u = await openByHand();
+    await u.type(screen.getByLabelText("Confirmation code"), "ZZ9Y8X");
+    await typeLeg(u, screen.getByRole("dialog"), outbound);
+    await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
+    const second = screen.getAllByTestId("leg")[1];
+    await u.selectOptions(within(second).getByLabelText("What is it?"), "hotel");
+    await typeLeg(u, second, { Hotel: "Harbour Hotel", "Check-in": "2027-01-02T15:00", "Check-out": "2027-01-05T11:00" });
+    await u.click(screen.getByRole("button", { name: "Add 2 bookings" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Enter the hotel’s time zone");
+    expect(calls.some(([p]) => p === "/api/segments" || p.endsWith("/same"))).toBe(false);
+  });
+
+  it("keeps the leg that failed, drops the one that was added, and leaves the item on the list until it is added", async () => {
+    secondSegmentFails = "The flight was refused.";
+    const u = await roundTrip();
+    await u.click(screen.getByRole("button", { name: "Add 2 flights" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Added 1 of 2, but couldn’t add the rest: The flight was refused.");
+    expect(screen.queryByTestId("leg")).toBeNull();
+    expect(screen.getByLabelText("From (airport code)")).toHaveValue("DEN");
+    expect(screen.getByLabelText("To (airport code)")).toHaveValue("BOS");
+    expect(takeOffs()).toEqual([]);
+    secondSegmentFails = "";
+    await u.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(takeOffs()).toEqual(["/api/review/1?segment=42&segment=43"]));
+    await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+  });
+
+  it("asks before discarding a leg that was only added, and closes on Discard", async () => {
+    const u = await openByHand();
+    await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
+    await u.keyboard("{Escape}");
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard this booking?" })).getByRole("button", { name: "Keep editing" }));
+    await waitFor(() => expect(discardAsked()).toBeNull());
+    expect(screen.getAllByTestId("leg")).toHaveLength(2);
+    await u.keyboard("{Escape}");
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard this booking?" })).getByRole("button", { name: "Discard" }));
+    await settled();
+    expect(calls.some(([p]) => p === "/api/segments")).toBe(false);
+  });
+
+  it("asks before discarding when the only leg left is an added one that was changed", async () => {
+    const u = await openByHand();
+    await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
+    await u.type(within(screen.getAllByTestId("leg")[1]).getByLabelText("To (airport code)"), "SFO");
+    await u.click(screen.getByRole("button", { name: "Dismiss Flight 1 of 2" }));
+    expect(screen.queryByTestId("leg")).toBeNull();
+    await u.keyboard("{Escape}");
+    expect(await screen.findByRole("dialog", { name: "Discard this booking?" })).toBeInTheDocument();
+  });
+
+  it("closes without asking once the added leg is dismissed again", async () => {
+    const u = await openByHand();
+    await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
+    await u.click(screen.getByRole("button", { name: "Dismiss Flight 2 of 2" }));
+    await u.keyboard("{Escape}");
+    await settled();
+    expect(discardAsked()).toBeNull();
+  });
+
+  it("still hides and shows the email with several legs", async () => {
+    const u = await openByHand();
+    await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
+    const sheet = screen.getByRole("dialog");
+    await u.click(within(sheet).getByRole("button", { name: "Hide the email" }));
+    expect(within(sheet).getByText(/Your flight EX 410/)).not.toBeVisible();
+    expect(within(sheet).getAllByTestId("leg")).toHaveLength(2);
+    await u.click(within(sheet).getByRole("button", { name: "Show the email" }));
+    expect(within(sheet).getByText(/Your flight EX 410/)).toBeVisible();
+  });
+
+  it("hides the button while the same-booking question is asked, then adds the legs", async () => {
+    sameQueue = [null, candidate({ kind: "flight", origin: "DEN", destination: "BOS" })];
+    const u = await roundTrip();
+    await u.click(screen.getByRole("button", { name: "Add 2 flights" }));
+    expect(await screen.findByTestId("same-booking")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add another leg or booking" })).toBeNull();
+    await u.click(screen.getByRole("button", { name: "Add as a separate booking" }));
+    await waitFor(() => expect(takeOffs()).toEqual(["/api/review/1?segment=42&segment=43"]));
+  });
+});
+
 describe("Review: the form's explanatory text is gone", () => {
   const KINDS = ["flight", "hotel", "car", "train", "cruise", "parking"];
   const REMOVED = [

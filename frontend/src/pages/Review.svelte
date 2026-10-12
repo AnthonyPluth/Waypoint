@@ -32,6 +32,7 @@
 </script>
 
 <script lang="ts">
+  import { tick } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
   import { act, errMsg, ignoreFailure } from "$lib/act";
   import type { Person, Review, ReviewCandidate, ReviewMatch, SegmentBody, WhoIsThis } from "$lib/api-types";
@@ -117,6 +118,20 @@
     void peek(item);
   };
   const dropLeg = (leg: Draft) => { drafts = drafts.filter((d) => d !== leg); };
+  const addedLegs = new WeakSet<Draft>();
+  const addLeg = async () => {
+    const last = drafts.at(-1);
+    if (!last) return;
+    drafts = [...drafts, { ...handDraft(last.item), kind: last.kind, provider: last.provider, confirmation: last.confirmation, origin: last.kind === "flight" ? last.destination : "" }];
+    const made = drafts.at(-1);
+    if (made) addedLegs.add(made);
+    await tick();
+    document.querySelector<HTMLElement>("[data-slot='sheet'] fieldset[data-testid='leg']:last-of-type select")?.focus();
+  };
+  const kindChanged = (leg: Draft, kind: string) => {
+    if (!addedLegs.has(leg) || kind === leg.kind) return;
+    Object.assign(leg, { kind, origin: "", destination: "", startZone: "", endZone: "", details: {}, read: [], sources: {} });
+  };
   const plural = (n: number, ds: Draft[]) => (ds.every((d) => d.kind === "flight") ? `${n} flights` : `${n} bookings`);
   const legTitle = (leg: Draft, n: number) => `${leg.kind === "flight" ? "Flight" : "Booking"} ${n + 1} of ${drafts.length}${leg.origin && leg.destination ? `: ${leg.origin.toUpperCase()} → ${leg.destination.toUpperCase()}` : ""}`;
   type Peek = { state: "loading" } | { state: "ready"; subject: string | null; text: string; html: string | null; truncated: boolean; original: boolean; images: number } | { state: "error"; message: string };
@@ -324,7 +339,7 @@
 {#snippet legFields(d: Draft)}
   {@const labels = placeLabels(d.kind)}
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">What is it?</span>
-    <select bind:value={d.kind} class={selectClass}>{#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}</select></label>
+    <select value={d.kind} onchange={(e) => { kindChanged(d, e.currentTarget.value); d.kind = e.currentTarget.value; }} class={selectClass}>{#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}</select></label>
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Provider</span>
     <Input bind:value={d.provider} maxlength={100} autocomplete="off" /></label>
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Confirmation code {#if d.sources["confirmation"]}<span class="font-normal text-muted-foreground">from “{d.sources["confirmation"]}”</span>{/if}</span>
@@ -385,6 +400,9 @@
       {/each}
     {:else if lead}
       {@render legFields(lead)}
+    {/if}
+    {#if !joining}
+      <div><Button type="button" variant="outline" size="sm" disabled={saving} onclick={addLeg}>Add another leg or booking</Button></div>
     {/if}
     {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
     {#if joining}
