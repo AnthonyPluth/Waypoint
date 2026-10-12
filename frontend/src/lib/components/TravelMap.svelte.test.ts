@@ -22,8 +22,8 @@ const hawaii = {
     { code: "HNL", name: "Daniel K. Inouye International Airport", city: "Honolulu", country: "US", visits: 4, latitude: 21.3187, longitude: -157.9225 },
     { code: "LIH", name: "Lihue Airport", city: "Lihue", country: "US", visits: 2, latitude: 21.976, longitude: -159.339 },
   ],
-  routes: [{ a: "HNL", b: "LIH", flights: 2, distance_km: 170, a_latitude: 21.3187, a_longitude: -157.9225, b_latitude: 21.976, b_longitude: -159.339 }],
-} as StatsFlights;
+  routes: [{ a: "HNL", b: "LIH", flights: 2, distance_km: 170, a_latitude: 21.3187, a_longitude: -157.9225, b_latitude: 21.976, b_longitude: -159.339, trips: [] }],
+} as unknown as StatsFlights;
 const scale = (container: HTMLElement) => Number(/scale\(([\d.]+)\)/.exec(container.querySelector("[data-testid=map-layer]")!.getAttribute("transform") ?? "")?.[1]);
 
 const london = { city: "London", country: "GB", latitude: 51.47, longitude: -0.45, stays: 2, nights: 6,
@@ -48,7 +48,7 @@ describe("TravelMap", () => {
   });
 
   it("shades a country only remembered by a past visit, and no US state for one", async () => {
-    const { container } = render(TravelMap, { flights: noFlights, visits: [{ country: "JP", latitude: 35.77, longitude: 140.39 }, { country: "US", latitude: 39.05, longitude: -95.67 }] });
+    const { container } = render(TravelMap, { flights: noFlights, visits: [{ country: "JP", state: null, latitude: 35.77, longitude: 140.39, trips: [] }, { country: "US", state: null, latitude: 39.05, longitude: -95.67, trips: [] }] });
     await waitFor(() => expect(container.querySelectorAll("path[data-state]").length).toBeGreaterThan(50), { timeout: 8000 });
     expect([...container.querySelectorAll("path[data-visited]:not([data-state]) title")].map((t) => t.textContent)).toEqual(["Japan"]);
     expect(container.querySelectorAll("path[data-state][data-visited]").length).toBe(0);
@@ -173,5 +173,53 @@ describe("TravelMap", () => {
     await waitFor(() => expect(scale(container)).toBeGreaterThan(3));
     await rerender({ flights });
     await waitFor(() => expect(scale(container)).toBe(1));
+  });
+
+  describe("Alaska", () => {
+    const trip = (id: number, name: string) => ({ trip_id: id, name, start: "2026-07-01", end: "2026-07-08" });
+    const anchorage = { city: "Anchorage", country: null, latitude: 61.22, longitude: -149.86, stays: 1, nights: 3, trips: [trip(20, "Anchorage hotel trip")] };
+    const flown = { airports: [{ code: "JNU", name: "Juneau International Airport", city: "Juneau", country: "US", visits: 1, latitude: 58.3547, longitude: -134.5785 }],
+      routes: [{ a: "SEA", b: "JNU", flights: 1, distance_km: 1, a_latitude: 47.45, a_longitude: -122.31, b_latitude: 58.3547, b_longitude: -134.5785, trips: [trip(21, "Flight to Juneau")] }] } as unknown as StatsFlights;
+    const cases: [string, Record<string, unknown>, string][] = [
+      ["a hotel", { stays: [anchorage] }, "Anchorage hotel trip"],
+      ["a flight", { flights: flown }, "Flight to Juneau"],
+      ["a rental car", { points: [{ kind: "car", name: "Fairbanks", latitude: 64.84, longitude: -147.72, trips: [trip(22, "Rental trip")] }] }, "Rental trip"],
+      ["a train", { points: [{ kind: "train", name: "Seward", latitude: 60.1, longitude: -149.44, trips: [trip(23, "Train trip")] }] }, "Train trip"],
+      ["a cruise port of call", { points: [{ kind: "port", name: "Skagway", latitude: 59.46, longitude: -135.31, trips: [trip(24, "Cruise trip")] }] }, "Cruise trip"],
+      ["a past trip to the US with the state AK", { visits: [{ country: "US", state: "AK", latitude: 61.22, longitude: -149.9, trips: [trip(25, "Old Alaska trip")] }] }, "Old Alaska trip"],
+    ];
+
+    it.each(cases)("shades Alaska for %s, and tapping it lists the trip", async (_name, props, tripName) => {
+      const { container } = render(TravelMap, { flights: noFlights, ...props });
+      await waitFor(() => expect(container.querySelectorAll("path[data-state]").length).toBeGreaterThan(50), { timeout: 8000 });
+      expect([...container.querySelectorAll("path[data-state][data-visited]")].map((p) => p.getAttribute("data-state"))).toEqual(["Alaska"]);
+      await userEvent.click(container.querySelector("path[data-state=Alaska]")!);
+      expect(within(screen.getByTestId("map-trips")).getByRole("link", { name: tripName })).toBeTruthy();
+      expect(screen.getByText("Alaska", { selector: "span" })).toBeTruthy();
+    });
+
+    it("shades nothing for a cruise with no placed port, a US past trip with no state, or an unplaced stay", async () => {
+      const { container } = render(TravelMap, { flights: noFlights, points: [], visits: [{ country: "US", state: null, latitude: 39.05, longitude: -95.67, trips: [trip(26, "Old US trip")] }] });
+      await waitFor(() => expect(container.querySelectorAll("path[data-state]").length).toBeGreaterThan(50), { timeout: 8000 });
+      expect(container.querySelectorAll("path[data-state][data-visited]")).toHaveLength(0);
+      expect(container.querySelectorAll("path[data-state][role=button]")).toHaveLength(0);
+    });
+
+    it("opens framed on an Alaska past trip or cruise, and Alaska can be reached from the world view", async () => {
+      const { container } = render(TravelMap, { flights: noFlights, points: [{ kind: "port", name: "Juneau", latitude: 58.3, longitude: -134.4, trips: [trip(27, "Cruise")] }] });
+      await waitFor(() => expect(scale(container)).toBeGreaterThan(3));
+      await userEvent.click(screen.getByRole("button", { name: "World" }));
+      expect(scale(container)).toBe(1);
+      await waitFor(() => expect(container.querySelectorAll("path[data-state=Alaska][data-visited]")).toHaveLength(1));
+    });
+
+    it("picks a shaded state with the keyboard", async () => {
+      const { container } = render(TravelMap, { flights: noFlights, stays: [anchorage] });
+      await waitFor(() => expect(container.querySelector("path[data-state=Alaska][data-visited]")).toBeTruthy(), { timeout: 8000 });
+      const alaska = container.querySelector("path[data-state=Alaska]") as SVGPathElement;
+      alaska.focus();
+      await userEvent.keyboard("{Enter}");
+      expect(within(screen.getByTestId("map-trips")).getByRole("link", { name: "Anchorage hotel trip" })).toBeTruthy();
+    });
   });
 });

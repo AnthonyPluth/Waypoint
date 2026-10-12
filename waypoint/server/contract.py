@@ -908,14 +908,25 @@ class StatsParking(TypedDict):
 
 class StatsVisit(TypedDict):
     country: str
+    state: str | None
     latitude: float
     longitude: float
+    trips: list[StatsMapTrip]
+
+
+class StatsPlacePoint(TypedDict):
+    name: str
+    kind: str
+    latitude: float
+    longitude: float
+    trips: list[StatsMapTrip]
 
 
 class StatsPlaces(TypedDict):
     countries: list[StatsPlace]
     cities: list[StatsPlace]
     visits: list[StatsVisit]
+    points: list[StatsPlacePoint]
 
 
 class DistanceUnit(TypedDict):

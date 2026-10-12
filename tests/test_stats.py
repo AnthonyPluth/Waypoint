@@ -6,11 +6,11 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
-from waypoint.domain import stats, trips
+from waypoint.domain import calendar, place_zones, stats, trips, visibility
 from waypoint.domain.visibility import Viewer
 from waypoint.server.api import stats as api
 from waypoint.server.common import ApiError
-from waypoint.storage import db
+from waypoint.storage import db, reference
 from waypoint.storage import settings_keys as sk
 from waypoint.storage.models import Airline
 from tests.shared import DbCase
@@ -76,7 +76,6 @@ class HistoricalVisitTests(StatsCase):
         self.assertEqual(len(self.stats(self.jane, person=self.jane.person_id)["places"]["countries"]), 1)
 
     def test_the_calendar_names_the_country_and_a_stranger_cannot_see_the_trip(self):
-        from waypoint.domain import calendar, visibility
         got = self.add(self.jane, VISIT_JP, travelers=self.on(self.jane.person_id))
         self.assertIn("SUMMARY:Visit: Japan", calendar.feed(trips.listing(self.c, self.jane), NOW))
         self.assertIsNone(visibility.visible_trip(self.c, self.sam, got["trip_id"]))
@@ -90,7 +89,6 @@ class HistoricalVisitTests(StatsCase):
 
     def test_the_countries_the_form_offers_are_exactly_the_ones_the_server_accepts(self):
         import re
-        from waypoint.storage import reference
         text = (Path(__file__).resolve().parent.parent / "frontend" / "src" / "lib" / "countries.ts").read_text(encoding="utf-8")
         offered = set(re.search(r'const CODES = "([A-Z ]+)"', text).group(1).split())
         self.assertEqual(offered - set(reference.country_zones()), set())
@@ -100,6 +98,97 @@ class HistoricalVisitTests(StatsCase):
         for bad in (None, "", "ZZ", "Japan"):
             with self.assertRaises(trips.Invalid):
                 self.add(self.jane, {**VISIT_JP, "destination": bad})
+
+
+VISIT_AK = {"kind": "visit", "destination": "us", "details": {"state": "ak"}, "start_local": "2006-07-02T00:00", "end_local": "2006-07-12T00:00"}
+
+
+class VisitStateTests(StatsCase):
+    def test_a_us_visit_with_a_state_is_kept_with_its_zone_and_names_the_state(self):
+        got = self.add(self.jane, VISIT_AK, travelers=self.on(self.jane.person_id))
+        self.assertEqual((got["destination"], got["start_zone"], got["end_zone"], got["details"]),
+                         ("US", "America/Anchorage", "America/Anchorage", {"state": "AK", "time_unknown": "yes"}))
+        self.assertEqual(visibility.visible_trip(self.c, self.jane, got["trip_id"]).destination, "Alaska")
+        self.assertIn("SUMMARY:Visit: Alaska", calendar.feed(trips.listing(self.c, self.jane), NOW))
+
+    def test_a_us_visit_without_a_state_is_as_before(self):
+        got = self.add(self.jane, {**VISIT_AK, "details": {}}, travelers=self.on(self.jane.person_id))
+        self.assertEqual((got["start_zone"], got["details"]), (reference.country_zones()["US"], {"time_unknown": "yes"}))
+        self.assertEqual(visibility.visible_trip(self.c, self.jane, got["trip_id"]).destination, "United States")
+        (point,) = self.stats(self.jane)["places"]["visits"]
+        self.assertEqual((point["country"], point["state"]), ("US", None))
+
+    def test_the_state_is_refused_outside_the_us_or_when_it_is_not_a_state(self):
+        for bad in ({"destination": "jp"}, {"details": {"state": "ZZ"}}, {"details": {"state": "Alaska"}}):
+            with self.assertRaises(trips.Invalid):
+                self.add(self.jane, {**VISIT_AK, **({"details": {"state": "AK"}} | bad)})
+
+    def test_the_state_reaches_the_map_with_its_trip_and_a_us_visit_without_one_is_a_separate_point(self):
+        got = self.add(self.jane, VISIT_AK, travelers=self.on(self.jane.person_id))
+        self.add(self.jane, {**VISIT_AK, "details": {}, "start_local": "2007-07-02T00:00", "end_local": "2007-07-04T00:00"}, travelers=self.on(self.jane.person_id))
+        alaska, plain = self.stats(self.jane)["places"]["visits"][::-1]
+        self.assertEqual((alaska["state"], plain["state"]), ("AK", None))
+        self.assertEqual([t["trip_id"] for t in alaska["trips"]], [got["trip_id"]])
+        self.assertAlmostEqual(alaska["latitude"], 61.2, delta=0.1)
+        self.assertEqual([c["name"] for c in self.stats(self.jane)["places"]["countries"]], ["US"])
+
+    def test_editing_a_visits_country_away_from_the_us_with_a_state_is_refused_and_clearing_it_works(self):
+        got = self.add(self.jane, VISIT_AK, travelers=self.on(self.jane.person_id))
+        with self.assertRaises(trips.Invalid):
+            trips.edit_segment(self.c, self.jane, got["id"], {"destination": "ca"})
+        edited = trips.edit_segment(self.c, self.jane, got["id"], {"details": {}})
+        self.assertEqual((edited["start_zone"], edited["details"]), (reference.country_zones()["US"], {"time_unknown": "yes"}))
+
+    def test_the_states_the_form_offers_are_exactly_the_ones_the_server_accepts(self):
+        import re
+        text = (Path(__file__).resolve().parent.parent / "frontend" / "src" / "lib" / "countries.ts").read_text(encoding="utf-8")
+        offered = dict(re.findall(r'\["([A-Z]{2})", "([^"]+)"\]', text.split("const US_STATES")[1]))
+        self.assertEqual(offered, place_zones.STATE_NAMES)
+
+
+ALASKA_CRUISE = {**{"kind": "cruise", "origin": "Seattle", "destination": "Seattle", "provider": "Example Cruise Line",
+                    "start_local": "2026-07-01T16:30", "start_zone": "America/Los_Angeles", "end_local": "2026-07-08T07:00", "end_zone": "America/Los_Angeles"},
+                 "itinerary": [{"name": "Juneau", "zone": "America/Juneau", "arrive_local": "2026-07-04T08:00", "depart_local": "2026-07-04T17:00"},
+                               {"name": "Skagway", "zone": "America/Juneau", "arrive_local": "2026-07-05T08:00", "depart_local": "2026-07-05T17:00"},
+                               {"name": "Ketchikan", "zone": "America/Sitka", "arrive_local": "2026-07-06T08:00", "depart_local": "2026-07-06T17:00"},
+                               {"name": "Imaginary Cove", "zone": "America/Juneau", "arrive_local": "2026-07-07T08:00", "depart_local": "2026-07-07T09:00"}]}
+
+
+class PlacePointTests(StatsCase):
+    def points(self, **kwargs):
+        return self.stats(self.jane, **kwargs)["places"]["points"]
+
+    def test_ports_of_call_that_can_be_placed_are_points_with_their_trip_and_the_counts_do_not_change(self):
+        got = self.add(self.jane, ALASKA_CRUISE, travelers=self.on(self.jane.person_id))
+        ports = [p for p in self.points() if p["kind"] == "port"]
+        self.assertEqual([p["name"] for p in ports], ["Juneau", "Ketchikan", "Skagway"])
+        self.assertTrue(all(p["trips"] and p["trips"][0]["trip_id"] == got["trip_id"] for p in ports))
+        cruises = self.stats(self.jane)["cruises"]
+        self.assertEqual((cruises["count"], cruises["ports"]), (1, 4))
+
+    def test_the_cruises_own_port_is_a_point_too(self):
+        self.add(self.jane, {**ALASKA_CRUISE, "origin": "Seward", "destination": "Whittier, AK"}, travelers=self.on(self.jane.person_id))
+        self.assertEqual({(p["name"], p["kind"]) for p in self.points()} - {("Imaginary Cove", "port")},
+                         {("Whittier, AK", "cruise"), ("Juneau", "port"), ("Skagway", "port"), ("Ketchikan", "port")})
+
+    def test_a_cruise_whose_ports_cannot_be_placed_has_no_port_points_and_does_not_fail(self):
+        self.add(self.jane, {**ALASKA_CRUISE, "origin": "Imaginary Dock", "destination": "Imaginary Dock", "itinerary": ALASKA_CRUISE["itinerary"][-1:]},
+                 travelers=self.on(self.jane.person_id))
+        self.assertEqual(self.points(), [])
+        self.assertEqual(self.stats(self.jane)["cruises"]["ports"], 1)
+
+    def test_a_rental_car_a_train_and_parking_are_points_at_their_places(self):
+        base = {"start_local": "2026-07-01T09:00", "end_local": "2026-07-03T09:00", "start_zone": "America/Anchorage", "end_zone": "America/Anchorage"}
+        self.mine({**base, "kind": "car", "origin": "Example Rentals", "destination": "Fairbanks", "provider": "Example Rentals"},
+                  {**base, "kind": "train", "origin": "Anchorage", "destination": "Seward"},
+                  {**base, "kind": "parking", "origin": "Example Lot", "destination": "Anchorage"})
+        self.assertEqual({(p["name"], p["kind"]) for p in self.points()}, {("Fairbanks", "car"), ("Seward", "train"), ("Anchorage", "parking")})
+
+    def test_a_year_keeps_only_the_points_in_it_and_a_stranger_sees_none(self):
+        self.add(self.jane, ALASKA_CRUISE, travelers=self.on(self.jane.person_id))
+        self.assertEqual(self.points(year=2025), [])
+        self.assertEqual(len([p for p in self.points(year=2026) if p["kind"] == "port"]), 3)
+        self.assertEqual(self.stats(self.sam)["places"]["points"], [])
 
 
 class SameNamePlaceTests(StatsCase):
@@ -211,7 +300,7 @@ class FlightTests(StatsCase):
         s = self.stats(self.jane)
         self.assertEqual((s["flights"]["count"], s["flights"]["distance_km"], s["flights"]["longest"], s["flights"]["top_seat"],
                           s["flights"]["busiest_month"], s["flights"]["most_visited_airport"]), (0, 0.0, None, None, None, None))
-        self.assertEqual((s["stays"]["nights"], s["cars"]["days"], s["places"]), (0, 0, {"countries": [], "cities": [], "visits": []}))
+        self.assertEqual((s["stays"]["nights"], s["cars"]["days"], s["places"]), (0, 0, {"countries": [], "cities": [], "visits": [], "points": []}))
 
     def test_a_route_is_one_route_either_way_round(self):
         self.mine(JFK_LHR, LHR_JFK)

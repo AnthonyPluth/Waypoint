@@ -123,6 +123,28 @@ describe("SegmentForm: the cost", () => {
   });
 });
 
+describe("SegmentForm: a past trip's state", () => {
+  const visit = (destination: string, extra: Partial<Draft> = {}) => mount({ ...blank(1), kind: "visit", destination, start_local: "2006-07-02T00:00", end_local: "2006-07-12T00:00", people: [1], ...extra });
+
+  it("offers a State only when the country is the United States", async () => {
+    visit("JP");
+    expect(screen.queryByLabelText("State (optional)")).toBeNull();
+    await userEvent.selectOptions(screen.getByLabelText("Country"), "US");
+    expect(screen.getByLabelText("State (optional)")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Country"), "CA");
+    expect(screen.queryByLabelText("State (optional)")).toBeNull();
+  });
+
+  it("shows the state a visit has, and clears it with Any state", async () => {
+    visit("US", { details: { state: "AK" } });
+    expect(screen.getByLabelText("State (optional)")).toHaveValue("AK");
+    await userEvent.selectOptions(screen.getByLabelText("State (optional)"), "");
+    expect(screen.getByLabelText("State (optional)")).toHaveValue("");
+    await userEvent.selectOptions(screen.getByLabelText("State (optional)"), "HI");
+    expect(screen.getByLabelText("State (optional)")).toHaveValue("HI");
+  });
+});
+
 describe("SegmentForm: the time zone field", () => {
   it("searches the start zone of a stay and fills it in", async () => {
     mount(draft("hotel"));

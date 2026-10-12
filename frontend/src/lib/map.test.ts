@@ -1,7 +1,7 @@
-import { geoContains } from "d3-geo";
+import { geoContains, geoPath } from "d3-geo";
 import { describe, expect, it } from "vitest";
-import type { StatsAirport, StatsFlights, StatsRoute, StatsStayPin } from "./api-types";
-import { arcs, clampPan, dots, fitBox, flownBounds, IDENTITY, loadStates, MAP_HEIGHT, MAP_WIDTH, mapData, pieces, pins, visitedFeatureIds, visitedPoints, worldProjection, zoomAt } from "./map";
+import type { StatsAirport, StatsFlights, StatsPlacePoint, StatsRoute, StatsStayPin, StatsVisit } from "./api-types";
+import { arcs, clampPan, dots, fitBox, flownBounds, IDENTITY, loadStates, MAP_HEIGHT, MAP_WIDTH, mapData, pieces, pins, stateAt, stateSources, visitedFeatureIds, visitedPoints, visitedStateTrips, worldProjection, zoomAt } from "./map";
 
 const airport = (code: string, visits: number, latitude: number | null, longitude: number | null, city: string | null = null): StatsAirport =>
   ({ code, name: code, city, country: "XX", visits, latitude, longitude });
@@ -161,5 +161,96 @@ describe("the US states", () => {
     const hnl: [number, number] = [-157.92, 21.32], jfk: [number, number] = [JFK[1], JFK[0]];
     const ids = visitedFeatureIds([hnl, jfk, [-0.45, 51.47]], states, (f, p) => geoContains(f, p));
     expect([...ids].map((id) => states.find((x) => x.id === id)?.properties?.name).sort()).toEqual(["Hawaii", "New York"]);
+  });
+});
+
+describe("Alaska", () => {
+  const trip = (id: number) => ({ trip_id: id, name: `Trip ${id}`, start: "2026-07-01", end: "2026-07-08" });
+  const state = (name: string, ...rest: Awaited<ReturnType<typeof loadStates>>) => rest.find((x) => x.properties?.name === name);
+  const shaded = async (sources: ReturnType<typeof stateSources>) => {
+    const states = await loadStates();
+    const found = visitedStateTrips(sources, states, (f, p) => geoContains(f, p));
+    return { names: [...found.keys()].map((id) => states.find((x) => x.id === id)?.properties?.name).sort(), found, states };
+  };
+  const none = { airports: [], routes: [] } as unknown as StatsFlights;
+  const spot = (kind: string, name: string, latitude: number, longitude: number): StatsPlacePoint => ({ kind, name, latitude, longitude, trips: [trip(3)] });
+  const visit = (state: string | null, latitude = 61.2181, longitude = -149.9003): StatsVisit => ({ country: "US", state, latitude, longitude, trips: [trip(5)] });
+
+  it("shades Alaska for an airport in each corner of it, even Ketchikan's, which the coarse outline puts just off shore", async () => {
+    const states = await loadStates();
+    const alaska = state("Alaska", ...states)!;
+    expect(geoContains(alaska, [-131.7112, 55.3541])).toBe(false);
+    for (const [code, lat, lon] of [["ANC", 61.1741, -149.9981], ["FAI", 64.8154, -147.8567], ["JNU", 58.3547, -134.5785], ["KTN", 55.3541, -131.7112], ["SIT", 57.0468, -135.3611]] as const) {
+      const flown = { airports: [airport(code, 1, lat, lon)], routes: [] } as unknown as StatsFlights;
+      expect((await shaded(stateSources(flown, [], [], []))).names, code).toEqual(["Alaska"]);
+    }
+  });
+
+  it("shades Alaska for a hotel, a rental, a train, a port of call and a past trip with the state AK", async () => {
+    for (const source of [
+      { stays: [stay("Anchorage", 61.22, -149.8578)] }, { stays: [stay("Anchorage", 61.2181, -149.9003)] },
+      { points: [spot("car", "Fairbanks", 64.8378, -147.7164)] }, { points: [spot("train", "Seward", 60.1042, -149.4422)] },
+      { points: [spot("port", "Skagway", 59.4583, -135.3139)] }, { points: [spot("port", "Ketchikan", 55.3422, -131.6461)] },
+      { visits: [visit("AK")] },
+    ]) {
+      const { stays = [], points = [], visits = [] } = source as { stays?: StatsStayPin[]; points?: StatsPlacePoint[]; visits?: StatsVisit[] };
+      expect((await shaded(stateSources(none, stays, points, visits))).names).toEqual(["Alaska"]);
+    }
+  });
+
+  it("shades no state for a US past trip without one, a country centroid, a point offshore or a cruise with nothing placed", async () => {
+    expect((await shaded(stateSources(none, [], [], [visit(null, 39.05, -95.67)]))).names).toEqual([]);
+    expect((await shaded(stateSources(none, [], [], [{ ...visit("AK"), country: "CA" }]))).names).toEqual([]);
+    expect((await shaded(stateSources(none, [], [], []))).names).toEqual([]);
+    expect((await shaded(stateSources(none, [], [spot("port", "Mid-Pacific", 30, -150)], []))).names).toEqual([]);
+  });
+
+  it("lists, for the shaded state, the trips of everything that shaded it, once each", async () => {
+    const both = [spot("port", "Juneau", 58.3019, -134.4197), spot("port", "Skagway", 59.4583, -135.3139), { ...spot("car", "Fairbanks", 64.8378, -147.7164), trips: [trip(3), trip(9)] }];
+    const { found, states } = await shaded(stateSources(none, [], both, [visit("AK")]));
+    expect(found.get(state("Alaska", ...states)!.id!)?.map((t) => t.trip_id)).toEqual([3, 5, 9]);
+  });
+
+  it("handles the Aleutian islands that cross the antimeridian, in the shape test and in the drawn outline", async () => {
+    const states = await loadStates();
+    const alaska = state("Alaska", ...states)!;
+    expect(geoContains(alaska, [-176.64, 51.88])).toBe(true);
+    expect(geoContains(alaska, [172.9, 52.9])).toBe(true);
+    expect(stateAt([172.9, 52.9], states, (f, p) => geoContains(f, p))).toBe(alaska);
+    const parts = pieces(geoPath(worldProjection())(alaska) ?? "");
+    expect(parts.length).toBeGreaterThan(1);
+    const xs = parts.flatMap((part) => [...part.matchAll(/[ML,]?(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/g)].map((m) => Number(m[1])));
+    expect(Math.min(...xs)).toBeLessThan(MAP_WIDTH * 0.2);
+    expect(Math.max(...xs)).toBeGreaterThan(MAP_WIDTH * 0.8);
+  });
+
+  it("frames an Alaska trip so it is on screen, and for a trip that also has the lower 48 shows the world, which panning covers", () => {
+    const at = (kind: string, lat: number, lon: number) => spot(kind, "x", lat, lon);
+    for (const [more, visits] of [[[at("port", 58.3, -134.4), at("port", 59.46, -135.31)], []], [[], [visit("AK")]]] as const) {
+      const box = flownBounds(none, worldProjection(), [], [...more, ...visits]);
+      const t = fitBox(box);
+      expect(t.k).toBeGreaterThan(1.2);
+      const p = worldProjection()([-134.4, 58.3])!;
+      const [x, y] = [t.x + t.k * p[0], t.y + t.k * p[1]];
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(MAP_WIDTH);
+      expect(y).toBeGreaterThan(0);
+      expect(y).toBeLessThan(MAP_HEIGHT);
+      expect(clampPan(t)).toEqual(t);
+    }
+    const both = fitBox(flownBounds(flights([airport("SEA", 1, 47.45, -122.31), airport("ANC", 1, 61.17, -150)], []), worldProjection(), [stay("Miami", 25.76, -80.19)]));
+    for (const [lat, lon] of [[47.45, -122.31], [61.17, -150], [25.76, -80.19]]) {
+      const p = worldProjection()([lon, lat])!;
+      const [x, y] = [both.x + both.k * p[0], both.y + both.k * p[1]];
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(MAP_WIDTH);
+      expect(y).toBeGreaterThan(0);
+      expect(y).toBeLessThan(MAP_HEIGHT);
+    }
+    const alaska = worldProjection()([-150, 61.17])!;
+    const farEast = clampPan({ k: 4, x: -1e6, y: 1e6 });
+    const farWest = clampPan({ k: 4, x: 1e6, y: -1e6 });
+    expect(farWest.x + 4 * alaska[0]).toBeGreaterThan(0);
+    expect(farEast.x + 4 * alaska[0]).toBeLessThan(MAP_WIDTH);
   });
 });

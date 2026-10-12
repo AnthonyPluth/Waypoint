@@ -7338,6 +7338,37 @@
         ],
         "additionalProperties": false
       },
+      "StatsPlacePoint": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsMapTrip"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "latitude",
+          "longitude",
+          "trips"
+        ],
+        "additionalProperties": false
+      },
       "StatsPlaces": {
         "type": "object",
         "properties": {
@@ -7358,12 +7389,19 @@
             "items": {
               "$ref": "#/components/schemas/StatsVisit"
             }
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsPlacePoint"
+            }
           }
         },
         "required": [
           "countries",
           "cities",
-          "visits"
+          "visits",
+          "points"
         ],
         "additionalProperties": false
       },
@@ -7653,17 +7691,31 @@
           "country": {
             "type": "string"
           },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "latitude": {
             "type": "number"
           },
           "longitude": {
             "type": "number"
+          },
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsMapTrip"
+            }
           }
         },
         "required": [
           "country",
+          "state",
           "latitude",
-          "longitude"
+          "longitude",
+          "trips"
         ],
         "additionalProperties": false
       },

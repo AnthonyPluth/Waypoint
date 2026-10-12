@@ -23,7 +23,7 @@ MAX_FIELD = 200
 MAX_TEXT = 20_000
 MAX_HTML = 100_000
 MAX_EMAILS = 5
-SHOWN_DETAILS = tuple(k for k in trips.DETAIL_KEYS if k not in ("notes", trips.TIME_UNKNOWN, "address", "phone"))
+SHOWN_DETAILS = tuple(k for k in trips.DETAIL_KEYS if k not in ("notes", trips.TIME_UNKNOWN, trips.STATE, "address", "phone"))
 NOT_KEPT = "This message wasn’t kept."
 
 

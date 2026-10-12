@@ -1,14 +1,14 @@
 <script lang="ts">
   import { geoContains, geoPath } from "d3-geo";
   import { errMsg } from "$lib/act";
-  import type { StatsFlights, StatsMapTrip, StatsStayPin, StatsVisit } from "$lib/api-types";
+  import type { StatsFlights, StatsMapTrip, StatsPlacePoint, StatsStayPin, StatsVisit } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
-  import { clampPan, fitBox, flownBounds, IDENTITY, loadCountries, loadStates, MAP_HEIGHT, MAP_WIDTH, mapData, pins as stayPins, US_ID, visitedFeatureIds, visitedPoints, worldProjection, zoomAt, type Country, type Transform } from "$lib/map";
+  import { clampPan, fitBox, flownBounds, IDENTITY, loadCountries, loadStates, MAP_HEIGHT, MAP_WIDTH, mapData, pins as stayPins, stateSources, US_ID, visitedFeatureIds, visitedPoints, visitedStateTrips, worldProjection, zoomAt, type Country, type Transform } from "$lib/map";
   import { dateLabel } from "$lib/trips";
   import Minus from "@lucide/svelte/icons/minus";
   import Plus from "@lucide/svelte/icons/plus";
 
-  let { flights, stays = [], visits = [] }: { flights: StatsFlights; stays?: StatsStayPin[]; visits?: StatsVisit[] } = $props();
+  let { flights, stays = [], visits = [], points = [] }: { flights: StatsFlights; stays?: StatsStayPin[]; visits?: StatsVisit[]; points?: StatsPlacePoint[] } = $props();
 
   let countries = $state<Country[] | null>(null);
   let states = $state<Country[]>([]);
@@ -29,7 +29,8 @@
   const outlines = $derived((countries ?? []).map((c) => ({ id: c.id, name: c.properties?.name ?? "", d: path(c) ?? "" })));
   const visited = $derived(countries ? visitedFeatureIds(places, countries, (f, p) => geoContains(f, p)) : new Set<string | number>());
   const stateOutlines = $derived(states.map((c) => ({ id: c.id, name: c.properties?.name ?? "", d: path(c) ?? "" })));
-  const visitedStates = $derived(states.length ? visitedFeatureIds(visitedPoints(flights.airports, stays), states, (f, p) => geoContains(f, p)) : new Set<string | number>());
+  const stateTrips = $derived(states.length ? visitedStateTrips(stateSources(flights, stays, points, visits), states, (f, p) => geoContains(f, p)) : new Map<string | number, StatsMapTrip[]>());
+  const visitedStates = $derived(new Set(stateTrips.keys()));
   const byState = $derived(states.length > 0);
   const sphere = path({ type: "Sphere" }) ?? "";
 
@@ -39,7 +40,7 @@
   const caption = $derived(hovered ?? picked?.label ?? null);
   const when = (t: StatsMapTrip) => (t.start === t.end ? dateLabel(t.start) : `${dateLabel(t.start)} – ${dateLabel(t.end)}`);
 
-  const framed = $derived(fitBox(flownBounds(flights, projection, stays)));
+  const framed = $derived(fitBox(flownBounds(flights, projection, stays, [...points, ...visits.filter((v) => v.state)])));
   let t = $state<Transform>(IDENTITY);
   $effect(() => { t = framed; picked = null; });
   let svg = $state<SVGSVGElement>();
@@ -114,7 +115,12 @@
               <path d={c.d} class={shaded ? "fill-map-visited" : "fill-map-land"} data-visited={shaded ? "true" : undefined}><title>{c.name}</title></path>
             {/each}
             {#each stateOutlines as c (c.id ?? c.name)}
-              <path d={c.d} class={visitedStates.has(c.id ?? "") ? "fill-map-visited" : "fill-map-land"} data-state={c.name} data-visited={visitedStates.has(c.id ?? "") ? "true" : undefined}><title>{c.name}</title></path>
+              {@const shaded = visitedStates.has(c.id ?? "")}
+              <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+              <path d={c.d} class={shaded ? "fill-map-visited cursor-pointer outline-none focus-visible:stroke-foreground" : "fill-map-land"} data-state={c.name} data-visited={shaded ? "true" : undefined}
+                role={shaded ? "button" : undefined} tabindex={shaded ? 0 : undefined} aria-label={shaded ? `${c.name}: visited` : undefined}
+                onclick={shaded ? (e) => { e.stopPropagation(); pick(c.name, stateTrips.get(c.id ?? "") ?? []); } : undefined}
+                onkeydown={shaded ? (e) => key(e, c.name, stateTrips.get(c.id ?? "") ?? []) : undefined}><title>{c.name}</title></path>
             {/each}
           </g>
           <g fill="none" stroke-linecap="round" class="stroke-map-route" data-testid="arcs">

@@ -1,4 +1,5 @@
 import type { Segment, SegmentBody, SegmentEdit } from "./api-types";
+import { isUsState } from "./countries";
 import { amountText, toMinor } from "./money";
 import { instant, untimed } from "./trips";
 
@@ -30,7 +31,7 @@ export const seatKey = (who: number | string): string => (typeof who === "number
 
 export const MAX_VISITS = 20;
 
-export type VisitRow = { destination: string; start_local: string; end_local: string };
+export type VisitRow = { destination: string; start_local: string; end_local: string; state?: string };
 
 export type PortDraft = { name: string; zone: string; arrive: string; depart: string };
 
@@ -62,7 +63,7 @@ export type Draft = {
   more?: VisitRow[];
 };
 
-export const visitRows = (d: Draft): VisitRow[] => [{ destination: d.destination, start_local: d.start_local, end_local: d.end_local }, ...(d.more ?? [])];
+export const visitRows = (d: Draft): VisitRow[] => [{ destination: d.destination, start_local: d.start_local, end_local: d.end_local, state: d.details.state ?? "" }, ...(d.more ?? [])];
 
 export const nextVisitRow = (previous: VisitRow): VisitRow => ({ destination: "", start_local: previous.end_local, end_local: previous.end_local });
 
@@ -92,6 +93,7 @@ const LOCAL = /^\d{4}-\d\d-\d\dT\d\d:\d\d/;
 
 export function visitProblem(row: VisitRow): string | null {
   if (!/^[A-Za-z]{2}$/.test(row.destination.trim())) return "Choose the country";
+  if (row.destination.trim().toUpperCase() === "US" && (row.state ?? "").trim() && !isUsState(row.state?.trim().toUpperCase() ?? "")) return "Choose one of the states, or leave the state blank";
   if (!LOCAL.test(row.start_local)) return "Enter the first day you were there";
   if (!LOCAL.test(row.end_local)) return "Enter the last day you were there";
   if (row.end_local < row.start_local) return "The last day can’t be before the first";
@@ -185,7 +187,10 @@ export function priceOf(d: Pick<Draft, "cost" | "currency">): { amount_minor: nu
 }
 
 export const visitBodies = (d: Draft): (SegmentBody & SegmentEdit)[] =>
-  visitRows(d).map((row) => body({ ...d, ...row, more: [] }));
+  visitRows(d).map(({ state, ...row }) => {
+    const details = Object.fromEntries(Object.entries(d.details).filter(([key]) => key !== "state"));
+    return body({ ...d, ...row, details: state?.trim() ? { ...details, state: state.trim() } : details, more: [] });
+  });
 
 export function body(d: Draft): SegmentBody & SegmentEdit {
   const flight = d.kind === "flight";
@@ -199,6 +204,7 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
   }
   if (d.untimed && d.untimed[0] === d.start_local && d.untimed[1] === d.end_local) details.time_unknown = "yes";
   else delete details.time_unknown;
+  if (d.kind === "visit" && d.destination.trim().toUpperCase() !== "US") delete details.state;
   const startZone = d.start_zone.trim(), endZone = d.end_zone.trim() || startZone;
   const seated = SEATED.includes(d.kind);
   if (seated && d.people.length + d.printed.length === 1) delete details.seat;
