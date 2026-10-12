@@ -127,12 +127,14 @@ class OfflineRouteTests(ServerCase):
         self.assertEqual(self.ok("cy")["trip"]["segments"][0]["confirmation"], "CY0000")
         self.assertEqual(self.ok("ben"), {"trip": None, "messages": []})
 
-    def test_adding_a_traveller_shares_the_trip_and_removing_one_takes_it_back(self):
+    def test_adding_a_traveller_shares_the_trip_and_taking_them_off_the_trip_takes_it_back(self):
         seg = self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
         self.assertIsNone(self.ok("ben")["trip"])
         self.call("ana", "POST", f"/api/segments/{seg['id']}", {"travelers": [{"person_id": self.person["ana"]}, {"person_id": self.person["ben"]}]})
         self.assertEqual(self.ok("ben")["trip"]["id"], seg["trip_id"])
         self.call("ana", "POST", f"/api/segments/{seg['id']}", {"travelers": [{"person_id": self.person["ana"]}]})
+        self.assertEqual(self.ok("ben")["trip"]["id"], seg["trip_id"])
+        self.call("ana", "POST", f"/api/trips/{seg['trip_id']}", {"people": [self.person["ana"]]})
         self.assertIsNone(self.ok("ben")["trip"])
 
     def test_no_loyalty_or_known_traveler_number_is_in_the_reply(self):

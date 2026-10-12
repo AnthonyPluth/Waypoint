@@ -169,8 +169,8 @@ WRITE_RULES = (
     "destructive) also needs the person to confirm what will be lost, separately from any other yes. Ask for each change on its own, "
     "never under one blanket yes for several. "
     "3) Times are wall-clock times at the place (start_local in start_zone); never convert them. "
-    "4) Moving a booking into a trip with different people is refused for assistants: tell the person to do it in the app. "
-    "Moves between trips of the same people are fine. Adding someone to a trip who can't see it yet is refused the same way; taking someone off a trip is fine. "
+    "4) Moving a booking into a trip with different people, or merging two trips with different people, is refused for assistants: tell the person to do it in the app. "
+    "Moves and merges between trips of the same people are fine. Adding someone to a trip who can't see it yet is refused the same way; taking someone off a trip is fine. "
     "Mailboxes, AI settings, backups, sign-in and these assistant settings are out of reach.")
 MAIL_RULES = (
     "This connection may read the text and kept markup of kept emails (get_segment_email, and the email in get_review_item). That is the household's "
@@ -288,7 +288,7 @@ WRITE_TOOLS: list[dict[str, Any]] = [
                 ["fields"], route=("POST", "/api/trips")),
     _write_tool("update_trip", "Rename a trip, or change its destination or notes.", _change("trips/{id}", "trip_id", True),
                 {"trip_id": _TRIP_ID, "fields": _TRIP_FIELDS}, ["trip_id", "fields"], route=("POST", "/api/trips/{id}"), idempotent=True),
-    _write_tool("merge_trips", "Fold another trip into this one: its segments move here and it goes.", _change("trips/{id}/merge", "trip_id", extra=("merge",)),
+    _write_tool("merge_trips", "Fold another trip into this one: its segments move here and it goes. When the two trips have different people, merging would show each trip’s bookings to the other trip’s people, so it is refused for assistants: tell the person to do it in the app, where they confirm who will newly see what.", _change("trips/{id}/merge", "trip_id", extra=("merge",)),
                 {"trip_id": {**_TRIP_ID, "description": "The trip that stays."}, "merge": {**_TRIP_ID, "description": "The trip folded into it."}},
                 ["trip_id", "merge"], route=("POST", "/api/trips/{id}/merge")),
     _write_tool("match_review_item", "Settle a Review item by attaching the booking read from its email to an existing segment (segment_id: it gets "
@@ -343,7 +343,7 @@ ANY_TOOLS: list[dict[str, Any]] = [
      "inputSchema": _schema(), "run": lambda fetch, _a: fetch("endpoints", {}), "needs": (WRITE,), "reads": True},
     {"name": "call_endpoint", "description": "Last resort, for what no other tool does (splitting a trip, claiming a guest, the "
      "distance unit): call one of Waypoint's endpoints (list_endpoints) as its web app does. body is what the web app's form sends. "
-     "Moving a booking into a trip with different people is refused here (the person must do it in the app). "
+     "Moving a booking into a trip with different people, or merging trips with different people, is refused here (the person must do it in the app). "
      f"Anything it can't reach is refused. {ASK} {DESTRUCTIVE}",
      "inputSchema": _schema({"method": {"type": "string", "enum": ["GET", "POST", "DELETE"]},
                              "path": {"type": "string", "description": "Like /api/trips/12/split."},

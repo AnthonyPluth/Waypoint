@@ -56,6 +56,9 @@
   let others = $state<Trip[]>([]);
   let merging = $state(false);
   let mergeWith = $state("");
+  let confirmMergeOpen = $state(false);
+  let newlySeeThisTrip = $state<string[]>([]);
+  let newlySeeOtherTrip = $state<string[]>([]);
   let moveOpen = $state(false);
   let moving = $state<Segment | null>(null);
   let moveTo = $state("");
@@ -175,9 +178,21 @@
       .sort((a, b) => (b.start_date ?? "").localeCompare(a.start_date ?? ""));
   });
 
-  const merge = () => act(async () => {
+  const merge = (confirm = false) => act(async () => {
     if (!trip || !mergeWith) return;
-    trip = await apiCall<"POST /api/trips/{id}/merge">(`/api/trips/${trip.id}/merge`, { method: "POST", body: { merge: Number(mergeWith) } });
+    const body = { merge: Number(mergeWith), ...(confirm ? { confirm: true } : {}) };
+    try {
+      trip = await apiCall<"POST /api/trips/{id}/merge">(`/api/trips/${trip.id}/merge`, { method: "POST", body });
+    } catch (e) {
+      const said = e as { status?: number; data?: { see_booking?: unknown; see_trip?: unknown } };
+      if (said.status === 409 && Array.isArray(said.data?.see_booking)) {
+        newlySeeThisTrip = namesOf(said.data.see_booking);
+        newlySeeOtherTrip = namesOf(said.data.see_trip);
+        confirmMergeOpen = true;
+        return;
+      }
+      throw e;
+    }
     toast.success("Merged");
     onchanged?.();
   });
@@ -492,6 +507,15 @@
         <option value="">Choose a trip</option>
         {#each others as o (o.id)}<option value={String(o.id)}>{o.name} · {dates(o)}</option>{/each}
       </select></label>
+  {/snippet}
+</ConfirmDialog>
+
+<ConfirmDialog bind:open={confirmMergeOpen} title="Merge them anyway?" confirmLabel="Merge anyway" busyLabel="Merging…"
+  onconfirm={async () => await merge(true)}>
+  {#snippet description()}
+    <p>These trips involve different people, so merging them changes who sees what.</p>
+    {#if newlySeeThisTrip.length}<p><strong class="text-foreground">Will newly see this trip’s bookings:</strong> {newlySeeThisTrip.join(", ")}</p>{/if}
+    {#if newlySeeOtherTrip.length}<p><strong class="text-foreground">Will newly see the other trip’s bookings:</strong> {newlySeeOtherTrip.join(", ")}</p>{/if}
   {/snippet}
 </ConfirmDialog>
 

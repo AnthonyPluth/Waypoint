@@ -222,7 +222,15 @@ def api_trip_emails_clear(conn, _q, _b, trip_id) -> EmailsCleared:
 def api_trip_merge(conn, _q, body: MergeBody, trip_id) -> Trip:
     who, this = viewer(conn), row_id(trip_id, NO_TRIP)
     other = _id(body.get("merge"), "Choose the trip to merge into this one")
-    return _trip(_run(lambda: trips.merge(conn, who, this, other), NO_TRIP))
+    assistant = _assistant()
+    confirmed = validate.on(body.get("confirm")) and not assistant
+    try:
+        return _trip(_run(lambda: trips.merge(conn, who, this, other, confirmed), NO_TRIP))
+    except trips.NeedsConfirmation as e:
+        if assistant:
+            raise ApiError("This needs the person to do it in the app: merging trips with different people changes who sees what, "
+                           "and only they can confirm it.", 403) from None
+        raise ApiError(str(e), 409, {"see_booking": e.see_booking, "see_trip": e.see_trip}) from None
 
 
 def api_trip_split(conn, _q, body: SplitBody, trip_id) -> Trip:
