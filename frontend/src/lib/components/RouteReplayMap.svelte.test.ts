@@ -83,7 +83,7 @@ describe("RouteReplayMap", () => {
     await Promise.resolve();
     expect(container.querySelector(".animate-ping")).toBeNull();
     expect(frames).toHaveLength(0);
-    expect(container.querySelectorAll("[data-plane]").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll("[data-plane]")).toHaveLength(0);
     expect(list()).toHaveLength(3);
   });
 
@@ -108,7 +108,7 @@ describe("RouteReplayMap", () => {
     expect(labels(container)).toEqual(["Minneapolis", "San Francisco", "Minneapolis"]);
     expect(container.querySelectorAll("[data-leg]")).toHaveLength(2);
     expect(container.querySelectorAll("path[data-leg][stroke-dashoffset='0']")).toHaveLength(2);
-    expect([...container.querySelectorAll("[data-plane]")].map((p) => p.getAttribute("data-flying"))).toEqual(["false", "false"]);
+    expect(container.querySelector("[data-testid='movers']")!.children).toHaveLength(0);
     expect(container.querySelector(".animate-ping")).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.queryByRole("slider")).toBeNull();
@@ -143,12 +143,13 @@ describe("RouteReplayMap", () => {
     advance(1000);
     await Promise.resolve();
     expect(container.querySelector("[data-plane='0']")!.getAttribute("transform")).not.toBe(before);
+    const angle = (i: number) => Number(/rotate\((-?[\d.]+)\)/.exec(container.querySelector(`[data-plane='${i}']`)!.getAttribute("transform")!)![1]);
+    const out = angle(0);
     advance(3000);
     await Promise.resolve();
     expect(container.querySelector("[data-plane='1']")!.getAttribute("data-flying")).toBe("true");
-    expect(container.querySelector("[data-plane='0']")!.getAttribute("data-flying")).toBe("false");
-    const angle = (i: number) => Number(/rotate\((-?[\d.]+)\)/.exec(container.querySelector(`[data-plane='${i}']`)!.getAttribute("transform")!)![1]);
-    expect(Math.abs(Math.cos((angle(0) * Math.PI) / 180) - Math.cos((angle(1) * Math.PI) / 180))).toBeGreaterThan(0.5);
+    expect(container.querySelector("[data-plane='0']")).toBeNull();
+    expect(Math.abs(Math.cos((out * Math.PI) / 180) - Math.cos((angle(1) * Math.PI) / 180))).toBeGreaterThan(0.5);
   });
 
   it("fades a label out after its hold and fades the next one in", async () => {
@@ -197,7 +198,7 @@ describe("RouteReplayMap", () => {
     expect(container.querySelector("[data-stop='Bayview Inn'] circle")).toBeNull();
     expect(container.querySelector("[data-label='Bayview Inn']")!.textContent).toContain("Stay: Bayview Inn, San Francisco");
     expect(container.querySelectorAll("[data-leg]")).toHaveLength(4);
-    expect(container.querySelectorAll("[data-plane]")).toHaveLength(2);
+    expect(container.querySelectorAll("[data-plane]")).toHaveLength(0);
   });
 
   const la = "America/Los_Angeles";
@@ -244,14 +245,13 @@ describe("RouteReplayMap", () => {
     expect(container.querySelector("[data-car]")).toBeNull();
   });
 
-  it("with reduced motion keeps the whole map, with no zoom and static icons", () => {
+  it("with reduced motion keeps the whole map, with no zoom and no vehicle icons", () => {
     const far = stopsOf(trip([...flights, segment({ id: 3, kind: "hotel", origin: "Bay Lodge", destination: "Monterey", start_local: "2025-12-05T15:00", start_zone: la, end_local: "2025-12-11T11:00", end_zone: la })]),
       { ...places, stays: [{ segment_id: 3, latitude: 36.6, longitude: -121.9, precision: "city" }] });
     const { container } = render(RouteReplayMap, { stops: far, year: 2025, still: true });
     expect(viewBox(container)).toEqual([0, 0, 960, 520]);
     expect(container.querySelector("svg")!.getAttribute("data-zoomed")).toBe("false");
-    expect(container.querySelector("[data-car]")!.getAttribute("data-flying")).toBe("false");
-    expect(container.querySelector("[data-plane]")!.getAttribute("data-flying")).toBe("false");
+    expect(container.querySelector("[data-testid='movers']")!.children).toHaveLength(0);
     expect(container.querySelector(".animate-ping")).toBeNull();
   });
 

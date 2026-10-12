@@ -93,7 +93,7 @@ describe("RouteReplay", () => {
       render(RouteReplay, { trip: trip([first, second]), now: after });
       expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
       const items = within(screen.getByRole("list", { name: "Stops in order" })).getAllByRole("listitem").map((li) => li.textContent);
-      expect(items[1]).toContain("(via I-25, I-80)");
+      expect(items[1]).not.toContain("via");
       expect(document.querySelector("path[data-road-leg='I-25 I-80']")).toBeTruthy();
       expect(document.querySelector("[data-road='I-80']")).toBeTruthy();
     });

@@ -14,7 +14,7 @@
     { "wait_for": "svg[data-zoomed='true']" },
     { "screenshot": "replay-zoomed" },
     { "press": { "selector": "input[aria-label='Position along the route']", "key": "End" } },
-    { "wait_for": "[data-plane]" },
+    { "wait_for": "[data-testid='stop-list']" },
     { "expect_text": { "selector": "[data-testid='stop-list']", "text": "Back in New York" } },
     { "screenshot": "replay-end" }
   ]

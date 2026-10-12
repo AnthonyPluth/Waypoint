@@ -41,7 +41,7 @@ describe("RouteReplayMap on the interstates", () => {
     expect(ground(container).getAttribute("d")).not.toContain("Q");
     expect(ground(container).getAttribute("data-road-leg")).toBe("I-25 I-80");
     expect([...container.querySelectorAll("[data-road]")].map((p) => p.getAttribute("data-road"))).toEqual(["I-25", "I-80"]);
-    expect(list()).toEqual(["Stay in Denver, Dec 5 – 6", "Stay in Salt Lake City, Dec 5 – 6 (via I-25, I-80)"]);
+    expect(list()).toEqual(["Stay in Denver, Dec 5 – 6", "Stay in Salt Lake City, Dec 5 – 6"]);
     expect(screen.getByLabelText("Map key").textContent).toContain("Interstate");
   });
 
@@ -70,10 +70,9 @@ describe("RouteReplayMap on the interstates", () => {
     expect(ground(container).getAttribute("d")).toContain("Q");
   });
 
-  it("with reduced motion shows the road, a still car on it and no controls", () => {
+  it("with reduced motion shows the road, no vehicle icon and no controls", () => {
     const { container } = render(RouteReplayMap, { stops: [denver, saltLake], year: 2025, roads, still: true });
-    const car = container.querySelector("[data-car]")!;
-    expect(car.getAttribute("data-flying")).toBe("false");
+    expect(container.querySelector("[data-car]")).toBeNull();
     expect(container.querySelector("path[data-leg][stroke-dashoffset='0']")).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.queryByRole("slider")).toBeNull();

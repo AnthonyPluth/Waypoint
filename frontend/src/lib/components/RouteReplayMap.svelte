@@ -3,7 +3,7 @@
   import { Button } from "$lib/components/ui/button";
   import { loadCountries, type Country } from "$lib/map";
   import { viewport } from "$lib/phone.svelte";
-  import { activeStop, boundariesShown, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, roadShapes, roadsShown, SCRUB_STEPS, shieldsOf, STATIC_MOVER_PX, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Roads, type Stop } from "$lib/route-replay";
+  import { activeStop, boundariesShown, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, roadShapes, roadsShown, SCRUB_STEPS, shieldsOf, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Roads, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
@@ -72,29 +72,19 @@
   const scrub = (e: Event) => { playing = false; tail = 0; progress = Number((e.currentTarget as HTMLInputElement).value) / SCRUB_STEPS; };
 
   const showing = (i: number) => calm || reached(i, stops.length, progress);
-  const crowd = $derived(spots.map((p, i) => spots.slice(0, i).filter((q) => Math.hypot(p.x - q.x, p.y - q.y) / zoom < 40).length));
-  const above = (i: number) => {
-    const base = fy(spots[i].y) > 0.72 ? true : fy(spots[i].y) < 0.28 ? false : i % 2 === 0;
-    return crowd[i] % 2 === 0 ? base : !base;
-  };
-  const shift = (i: number) => 12 + Math.floor(crowd[i] / 2) * 40;
-  const edge = (x: number) => (fx(x) < 0.22 ? "0%" : fx(x) > 0.78 ? "-100%" : "-50%");
   const lit = (i: number) => calm || (i === stops.length - 1 ? progress >= 1 && playing && tail < LABEL_HOLD_MS : labelLit(i, stops.length, progress, !playing));
   const box = $derived(calm ? { x: 0, y: 0, w: width, h: height } : cameraAt(stops, spots, width, height, progress, legs));
   const zoom = $derived(box.w / width);
   const drawn = $derived(roadsShown(projection, zoom) ? shapes.filter((r) => inView(r, box)) : []);
   const stateLines = $derived(boundariesShown(projection, zoom) ? lines.filter((l) => inView(l, box)) : []);
   const shields = $derived(shieldsOf(drawn, box, zoom));
-  const via = (i: number) => (i > 0 && legs[i - 1].refs.length ? ` (via ${legs[i - 1].refs.join(", ")})` : "");
   const zoomed = $derived(box.w < width - 0.5);
   const fx = (x: number) => (x - box.x) / box.w;
   const fy = (y: number) => (y - box.y) / box.h;
   const movers = $derived(legs.flatMap((leg, i) => {
     const done = calm ? 1 : legProgress(i, stops.length, progress);
-    if (done <= 0) return [];
-    const moving = !calm && done < 1;
-    if (!moving && Math.hypot(leg.to.x - leg.from.x, leg.to.y - leg.from.y) < STATIC_MOVER_PX) return [];
-    return [{ i, moving, vehicle: leg.vehicle, ...moverAt(leg, moving ? done : 0.5) }];
+    if (done <= 0 || done >= 1) return [];
+    return [{ i, moving: true, vehicle: leg.vehicle, ...moverAt(leg, done) }];
   }));
   const buttonLabel = $derived(progress >= 1 ? "Replay" : playing ? "Pause" : progress > 0 ? "Resume" : "Play");
 </script>
@@ -169,14 +159,15 @@
         {/each}
       </g>
     </svg>
-    {#each stops as s, i (i)}
-      <div aria-hidden="true" class="pointer-events-none absolute w-max max-w-[11rem] rounded-lg transition-opacity duration-500 motion-reduce:transition-none border border-border bg-card px-2 py-1 text-xs leading-tight shadow-elevation-1"
-          style="left: {fx(spots[i].x) * 100}%; top: {fy(spots[i].y) * 100}%; transform: translate({edge(spots[i].x)}, {above(i) ? `calc(-100% - ${shift(i)}px)` : `${shift(i)}px`})"
-          class:opacity-0={!lit(i)} data-visible={lit(i)} data-label={s.name}>
+    <div aria-hidden="true" class="pointer-events-none absolute left-2 top-2 grid max-w-[11rem]">
+      {#each stops as s, i (i)}
+        <div class="col-start-1 row-start-1 w-max max-w-[11rem] self-start rounded-lg transition-opacity duration-500 motion-reduce:transition-none border border-border bg-card px-2 py-1 text-xs leading-tight shadow-elevation-1"
+            class:opacity-0={!lit(i)} data-visible={lit(i)} data-label={s.name}>
           <p class="break-words font-semibold text-foreground">{s.back ? "Back in " : ""}{stopTitle(s)}</p>
           <p class="text-muted-foreground">{stopDates(s, year)}</p>
         </div>
-    {/each}
+      {/each}
+    </div>
   </div>
   <ul class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground" aria-label="Map key">
     <li class="flex items-center gap-2"><span class="size-2.5 rounded-full bg-map-airport" aria-hidden="true"></span>Airport</li>
@@ -200,7 +191,7 @@
   {/if}
   <ol class="space-y-1 text-sm" aria-label="Stops in order" data-testid="stop-list">
     {#each stops as s, i (i)}
-      <li class="flex gap-2"><span class="w-5 shrink-0 text-right text-muted-foreground" aria-hidden="true">{i + 1}.</span><span class="min-w-0 break-words">{stopLine(s, year)}{via(i)}</span></li>
+      <li class="flex gap-2"><span class="w-5 shrink-0 text-right text-muted-foreground" aria-hidden="true">{i + 1}.</span><span class="min-w-0 break-words">{stopLine(s, year)}</span></li>
     {/each}
   </ol>
 </div>
