@@ -28,6 +28,7 @@ MAX_REPLY = 1_000_000
 MAX_BOOKINGS = 10
 KINDS = ("flight", "hotel", "car", "train", "cruise", "parking")
 REMOVED = "[removed]"
+EMAIL_REMOVED = "[email]"
 
 
 @dataclass(frozen=True)
@@ -122,6 +123,8 @@ def clean_url(text: str) -> str | None:
     return text.rstrip("/")
 
 
+EMAIL = re.compile(
+    r"(?i)(?:mailto:)?<?(?<![\w.%+'-])[\w.%+'-]+@(?:[^\W_](?:[\w-]*[^\W_])?\.)+(?:[^\W\d_]{2,}|xn--[a-z0-9-]+)(?![\w-])>?")
 LABELLED = re.compile(
     r"(?i)(frequent[- ]?flyer|loyalty|member(?:ship)?|rewards?|skymiles|aadvantage|mileageplus|known[- ]traveler|ktn|passid|"
     r"pre-?check|global entry|card(?: number)?|account(?: number)?)(?:s|no|num|number|id|ids)?(?![a-z])([^\n\d]{0,40}?)\b((?-i:[A-Z0-9][A-Z0-9 -]{2,30}\d))\b")
@@ -134,6 +137,7 @@ FOOTER = re.compile(r"(?i)unsubscribe|manage (?:your )?(?:email )?(?:preferences
 
 
 def redact(text: str, known: tuple[str, ...] = ()) -> str:
+    text = EMAIL.sub(EMAIL_REMOVED, text)
     cut = CUT.search(text)
     lines = [ln for ln in (text[:cut.start()] if cut else text).splitlines()
              if not ln.lstrip().startswith(">") and not FOOTER.search(ln)]
