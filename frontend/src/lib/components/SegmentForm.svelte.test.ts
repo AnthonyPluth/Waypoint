@@ -18,6 +18,29 @@ const draft = (kind: Kind, extra: Partial<Draft> = {}): Draft => ({
 
 const mount = (initial: Draft, onsaved = vi.fn()) => render(SegmentForm, { props: { initial, people: [], onsaved, oncancel: vi.fn() } });
 
+describe("SegmentForm: who is travelling", () => {
+  const withPeople = (initial: Draft) => render(SegmentForm, { props: { initial, people: [{ id: 1, display_name: "Jane Doe" }, { id: 2, display_name: "Sam Doe" }] as never, onsaved: vi.fn(), oncancel: vi.fn() } });
+
+  it.each(["hotel", "car", "parking"] as const)("asks nobody for a %s", (kind) => {
+    withPeople(draft(kind));
+    expect(screen.queryByText("Who’s travelling")).toBeNull();
+    expect(screen.queryByLabelText("Sam Doe")).toBeNull();
+  });
+
+  it.each(["flight", "cruise", "train"] as const)("lets you choose who is on a %s", (kind) => {
+    withPeople(draft(kind));
+    expect(screen.getByText("Who’s travelling")).toBeInTheDocument();
+    expect(screen.getByLabelText("Sam Doe")).toBeInTheDocument();
+  });
+
+  it("shows the choice again when the booking is changed from a stay to a flight", async () => {
+    withPeople(draft("hotel"));
+    expect(screen.queryByLabelText("Sam Doe")).toBeNull();
+    await userEvent.selectOptions(screen.getByLabelText("What is it"), "Flight");
+    expect(screen.getByLabelText("Sam Doe")).toBeInTheDocument();
+  });
+});
+
 describe("SegmentForm: the explanatory text is gone", () => {
   it.each(KINDS)("the %s form shows none of the removed lines", (kind) => {
     mount(draft(kind));
