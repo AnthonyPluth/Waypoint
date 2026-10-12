@@ -262,6 +262,7 @@ describe("Trip", () => {
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2/move", { method: "POST", body: { trip_id: 7 } }));
       expect(location.hash).toBe("#trip/7");
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await waitFor(() => expect(getComputedStyle(document.body).pointerEvents).not.toBe("none"));
       await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
       dialog = await screen.findByRole("dialog");
       await u.selectOptions(within(dialog).getByRole("combobox", { name: "Move it to" }), "new");
