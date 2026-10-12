@@ -408,12 +408,11 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                         conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(scan_labels=encode_labels(kept)))
                 labelled = list(dict.fromkeys(m for label in kept for m in gmail.search(token, "", label)))
                 forced = set(labelled)
-                already = set(found)
-                labelled = [m for m in labelled if m not in already]
                 if backfill:
-                    pages = itertools.chain(pages, [labelled])
+                    pages = itertools.chain(([m for m in page if m not in forced] for page in pages), [labelled])
                 else:
-                    found += labelled
+                    already = set(found)
+                    found += [m for m in labelled if m not in already]
             if forced:
                 with db.session() as conn:
                     conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.outcome == SKIPPED,

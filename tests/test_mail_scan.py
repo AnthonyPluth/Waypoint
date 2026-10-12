@@ -1730,6 +1730,19 @@ class WholeInboxLookBackTests(ScanCase):
         self.assertEqual((tally["found"], tally["pending"]), (40000, 39300))
         self.assertEqual(list(scan._unread(self.mailbox, [ids[:10]], False, Counter())), ids[:10])
 
+    def test_a_message_in_a_picked_label_and_the_listing_is_fetched_once_in_a_look_back_even_when_nothing_is_recorded_for_it(self):
+        self.google.page = 2
+        self.google.mailbox_labels = [{"id": "Label_1", "name": "Trips", "type": "user"}]
+        self.c.execute(update(Mailbox).values(scan_labels='["Label_1"]'))
+        self.c.commit()
+        self.years(3)
+        self.google.label_mail["Label_1"] = ["old1"]
+        self.google.fail_on = None
+        with mock.patch.object(scan, "_record"):
+            self.scan(backfill=True)
+        self.assertEqual(self.google.fetched, ["old1"])
+        self.assertEqual(sorted(self.google.heads), ["old0", "old2"])
+
     def test_a_look_back_after_the_first_scan_leaves_the_scan_state_and_summary_alone(self):
         self.put("flight_jsonld")
         self.scan()
