@@ -43,12 +43,12 @@ class PooledSchemaTests(unittest.TestCase):
         with db.session("/pool/one.db") as conn:
             conn.execute(insert(schema.users).values(sub="only-in-one"))
         with db.session("/pool/two.db") as conn:
-            self.assertEqual(conn.execute(select(schema.users.c.sub)).scalars(), [])
+            self.assertEqual(list(conn.execute(select(schema.users.c.sub)).scalars()), [])
             conn.execute(insert(schema.users).values(sub="only-in-two"))
         with db.session("/pool/one.db") as conn:
-            self.assertEqual(conn.execute(select(schema.users.c.sub)).scalars(), ["only-in-one"])
+            self.assertEqual(list(conn.execute(select(schema.users.c.sub)).scalars()), ["only-in-one"])
         with db.session("/pool/two.db") as conn:
-            self.assertEqual(conn.execute(select(schema.users.c.sub)).scalars(), ["only-in-two"])
+            self.assertEqual(list(conn.execute(select(schema.users.c.sub)).scalars()), ["only-in-two"])
 
     def test_a_connection_left_open_does_not_stop_a_schema_being_given_back(self):
         path = "/pool/open.db"
