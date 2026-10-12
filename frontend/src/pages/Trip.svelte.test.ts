@@ -221,6 +221,22 @@ describe("Trip", () => {
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1/merge", { method: "POST", body: { merge: 7 } }));
     });
 
+    it("lists the trips to merge newest first, undated ones last", async () => {
+      const answer = vi.mocked(api).getMockImplementation()!;
+      const named = (id: number, name: string, start_date: string | null) => ({ ...march, id, name, start_date, end_date: start_date });
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips" && !opts) return { trips: [named(2, "Oldest", "2024-01-05"), named(3, "Undated", null), named(4, "Newest", "2026-09-01"), named(5, "Middle", "2025-06-10")] } as never;
+        return answer(path, opts) as never;
+      });
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Merge another trip" }));
+      const choose = await within(await screen.findByRole("dialog")).findByRole("combobox", { name: "Trip to merge in" });
+      await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(5));
+      const names = within(choose).getAllByRole("option").slice(1).map((o) => o.textContent?.split(" · ")[0]);
+      expect(names).toEqual(["Newest", "Middle", "Oldest", "Undated"]);
+    });
+
     it("offers a new trip of its own only when the trip has other bookings", async () => {
       held = trip([flight]);
       withOthers();

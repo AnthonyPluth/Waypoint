@@ -169,7 +169,8 @@
   });
 
   const loadOthers = () => act(async () => {
-    others = (await apiCall<"GET /api/trips">("/api/trips")).trips.filter((o) => o.id !== (trip?.id ?? -1));
+    others = (await apiCall<"GET /api/trips">("/api/trips")).trips.filter((o) => o.id !== (trip?.id ?? -1))
+      .sort((a, b) => (b.start_date ?? "").localeCompare(a.start_date ?? ""));
   });
 
   const merge = () => act(async () => {
