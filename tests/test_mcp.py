@@ -193,6 +193,26 @@ class VisibilityTests(Assistants):
                 self.assertRegex(self.refused(ALL, name, args), "No such|Choose")
         self.assertEqual(self.sams(), before)
 
+    def test_an_assistant_can_only_move_a_booking_among_different_people_with_an_explicit_confirm(self):
+        with db.session() as conn:
+            solo = self.book(conn, self.jane, {**OUT, "start_local": "2026-11-01T19:00", "end_local": "2026-11-02T07:10"}, "Solo", self.jane.person_id)
+            shared = self.book(conn, self.jane, {**OUT, "start_local": "2026-12-01T19:00", "end_local": "2026-12-02T07:10"}, "Shared", self.jane.person_id)
+            added = trips.add_segment(conn, self.jane, {**HOTEL, "travelers": [{"person_id": self.sam.person_id, "name": None}]}, shared["id"])
+            assert added is not None
+        self.addCleanup(self.drop, solo["id"], shared["id"])
+        path = f"/api/segments/{solo['segment']}/move"
+        asked = self.refused(ALL, "call_endpoint", {"method": "POST", "path": path, "body": {"trip_id": shared["id"]}})
+        self.assertIn("Sam Doe", asked)
+        still = self.tool(ALL, "get_trip", {"trip_id": solo["id"]})
+        self.assertEqual(still["id"], solo["id"])
+        moved = self.tool(ALL, "call_endpoint", {"method": "POST", "path": path, "body": {"trip_id": shared["id"], "confirm": True}})
+        self.assertEqual(moved["id"], shared["id"])
+        self.assertIn("confirm set to true", mcp_server.WRITE_RULES)
+
+    def drop(self, *trip_ids):
+        with db.session() as conn:
+            conn.execute(delete(Trip).where(Trip.id.in_(trip_ids)))
+
     def test_the_same_tools_work_on_her_own_trip(self):
         got = self.tool(ALL, "update_trip", {"trip_id": self.jane_trip["id"], "fields": {"notes": "Window seat"}})
         self.assertEqual(got["notes"], "Window seat")

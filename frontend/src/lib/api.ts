@@ -7,7 +7,7 @@ export function newPage(): void {
 }
 
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number) { super(message); }
+  constructor(message: string, readonly status: number, readonly data: Record<string, unknown> = {}) { super(message); }
 }
 
 export type Options = { method?: "GET" | "POST" | "DELETE"; body?: unknown; keep?: boolean; background?: boolean; failed?: string };
@@ -56,7 +56,7 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   if (page?.signal.aborted) return new Promise(() => {});
   if (!res.ok) {
     const said = opts.failed ? `${opts.failed} (${res.status})` : [502, 503, 504].includes(res.status) ? UNREACHABLE : `Request failed (${res.status})`;
-    throw new ApiError(data.error || said, res.status);
+    throw new ApiError(data.error || said, res.status, data);
   }
   return data as T;
 }

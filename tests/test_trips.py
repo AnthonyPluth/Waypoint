@@ -523,27 +523,49 @@ class MoveTests(Household):
         self.assertIsNone(trips.move_segment(self.c, self.sam, a["id"], None))
         self.assertIsNone(trips.move_segment(self.c, self.jane, 9999, None))
 
-    def test_a_member_moves_a_one_person_booking_into_a_trip_with_other_people(self):
+    def test_a_member_moving_a_booking_among_different_people_is_asked_to_confirm_first(self):
         a, b = self.two(later_for=[self.jane.person_id, self.sam.person_id])
-        moved = trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        with self.assertRaises(trips.NeedsConfirmation) as asked:
+            trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        self.assertEqual(asked.exception.see_booking, [{"id": self.sam.person_id, "name": "Sam Doe"}])
+        self.assertEqual(asked.exception.see_trip, [])
+        self.assertIsNotNone(trips.get(self.c, self.jane, a["trip_id"]))
+        self.assertIsNone(trips.get(self.c, self.sam, a["trip_id"]))
+
+    def test_a_confirmed_move_into_a_trip_with_other_people_succeeds(self):
+        a, b = self.two(later_for=[self.jane.person_id, self.sam.person_id])
+        moved = trips.move_segment(self.c, self.jane, a["id"], b["trip_id"], True)
         self.assertEqual((moved["id"], sorted(s["id"] for s in moved["segments"])), (b["trip_id"], sorted([a["id"], b["id"]])))
         self.assertIsNone(trips.get(self.c, self.jane, a["trip_id"]))
 
-    def test_after_a_move_the_target_trips_people_see_the_booking(self):
+    def test_the_confirmation_lists_exactly_who_would_newly_see_each_side(self):
+        a = self.add(self.jane, OUT, None, self.on(self.jane.person_id, self.mia))
+        b = self.add(self.jane, LATER, None, self.on(self.jane.person_id, self.sam.person_id))
+        with self.assertRaises(trips.NeedsConfirmation) as asked:
+            trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        self.assertEqual([p["id"] for p in asked.exception.see_booking], [self.sam.person_id])
+        self.assertEqual([p["id"] for p in asked.exception.see_trip], [self.mia])
+
+    def test_a_move_between_trips_of_the_same_people_needs_no_confirmation(self):
+        a, b = self.two()
+        moved = trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        self.assertEqual(len(moved["segments"]), 2)
+
+    def test_after_a_confirmed_move_the_target_trips_people_see_the_booking(self):
         a = self.add(self.jane, OUT, None, self.on(self.jane.person_id))
         b = self.add(self.jane, LATER, None, self.on(self.jane.person_id, self.sam.person_id))
         self.assertIsNone(trips.get_segment(self.c, self.sam, a["id"]))
-        trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        trips.move_segment(self.c, self.jane, a["id"], b["trip_id"], True)
         seen = trips.get(self.c, self.sam, b["trip_id"])
         assert seen
         self.assertIn(a["id"], [s["id"] for s in seen["segments"]])
         self.assertIsNotNone(trips.get_segment(self.c, self.sam, a["id"]))
 
-    def test_after_a_move_the_bookings_travellers_see_the_target_trip(self):
+    def test_after_a_confirmed_move_the_bookings_travellers_see_the_target_trip(self):
         a = self.add(self.jane, OUT, None, self.on(self.jane.person_id, self.sam.person_id))
         b = self.add(self.jane, LATER, None, self.on(self.jane.person_id))
         self.assertIsNone(trips.get(self.c, self.sam, b["trip_id"]))
-        trips.move_segment(self.c, self.jane, a["id"], b["trip_id"])
+        trips.move_segment(self.c, self.jane, a["id"], b["trip_id"], True)
         seen = trips.get(self.c, self.sam, b["trip_id"])
         assert seen
         self.assertEqual(sorted(s["id"] for s in seen["segments"]), sorted([a["id"], b["id"]]))
@@ -551,14 +573,15 @@ class MoveTests(Household):
     def test_someone_not_involved_gets_nothing_after_a_move(self):
         _, b = self.two(later_for=[self.jane.person_id, self.sam.person_id])
         solo = self.add(self.jane, OUT, None, self.on(self.jane.person_id))
-        trips.move_segment(self.c, self.jane, solo["id"], b["trip_id"])
         stranger = Viewer(self.mia)
+        self.assertIsNone(trips.move_segment(self.c, stranger, solo["id"], b["trip_id"], True))
+        trips.move_segment(self.c, self.jane, solo["id"], b["trip_id"], True)
         self.assertIsNone(trips.get(self.c, stranger, b["trip_id"]))
         self.assertIsNone(trips.get_segment(self.c, stranger, solo["id"]))
-        self.assertIsNone(trips.move_segment(self.c, stranger, solo["id"], b["trip_id"]))
+        self.assertIsNone(trips.move_segment(self.c, stranger, solo["id"], b["trip_id"], True))
         self.assertEqual(trips.listing(self.c, stranger), [])
 
-    def test_a_household_viewer_moves_a_booking_between_trips_of_different_people(self):
+    def test_a_household_viewer_moves_a_booking_between_trips_of_different_people_without_confirming(self):
         a, b = self.two(later_for=[self.jane.person_id, self.sam.person_id])
         moved = trips.move_segment(self.c, Viewer(None, household=True), a["id"], b["trip_id"])
         self.assertEqual(len(moved["segments"]), 2)

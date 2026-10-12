@@ -454,6 +454,7 @@ export interface MergeBody {
 
 export interface MoveBody {
   trip_id: number | null;
+  confirm?: boolean;
 }
 
 export interface Offline {

@@ -413,7 +413,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             result = routes.dispatch(hit, q, body)
         except ApiError as e:
-            return self._json(e.status, {"error": str(e)})
+            return self._json(e.status, {"error": str(e), **e.data})
         if isinstance(result, Response):
             return self._respond(result)
         return self._json(200, result)

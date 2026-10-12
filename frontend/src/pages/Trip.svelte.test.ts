@@ -168,6 +168,52 @@ describe("Trip", () => {
       await u.click(within(dialog).getByRole("button", { name: "Move" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2/move", { method: "POST", body: { trip_id: null } }));
     });
+
+    it("lists the other trips newest first, without the one it is in", async () => {
+      const older = trip([segment({ id: 10 })], { id: 5, name: "Older trip", start_date: "2026-01-10" });
+      const sameDay = trip([segment({ id: 11 })], { id: 8, name: "Same day, later id", start_date: "2026-03-01" });
+      const newest = trip([segment({ id: 12 })], { id: 3, name: "Newest trip", start_date: "2026-12-01" });
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips" && !opts) return { trips: [older, held, march, newest, sameDay] } as never;
+        return answer(path, opts) as never;
+      });
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      const choose = within(await screen.findByRole("dialog")).getByRole("combobox", { name: "Move it to" });
+      await waitFor(() => expect(within(choose).getByRole("option", { name: /Newest trip/ })).toBeInTheDocument());
+      const names = within(choose).getAllByRole("option").map((o) => o.textContent ?? "");
+      expect(names.filter((n) => n.includes(" · ")).map((n) => n.split(" · ")[0])).toEqual(["Newest trip", "Same day, later id", "Spring trip", "Older trip"]);
+      expect(names.some((n) => n.startsWith(held.name))).toBe(false);
+    });
+
+    it("asks before moving among different people, then moves anyway", async () => {
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path.endsWith("/move") && !(opts?.body as { confirm?: boolean }).confirm) {
+          throw Object.assign(new Error("Moving this changes who sees what."), { status: 409, data: { see_booking: [{ id: 2, name: "Sam Doe" }], see_trip: [{ id: 3, name: "Mia Doe" }] } });
+        }
+        if (path === "/api/trips" && !opts) return { trips: [held, march] } as never;
+        if (path.endsWith("/move")) return march as never;
+        return answer(path, opts) as never;
+      });
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      let dialog = await screen.findByRole("dialog");
+      const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
+      await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
+      await u.selectOptions(choose, "7");
+      await u.click(within(dialog).getByRole("button", { name: "Move" }));
+      dialog = await screen.findByRole("dialog", { name: "Move it anyway?" });
+      expect(dialog).toHaveTextContent("Will newly see this booking: Sam Doe");
+      expect(dialog).toHaveTextContent("Will newly see that trip: Mia Doe");
+      expect(location.hash).not.toBe("#trip/7");
+      await u.click(within(dialog).getByRole("button", { name: "Move anyway" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2/move", { method: "POST", body: { trip_id: 7, confirm: true } }));
+      expect(location.hash).toBe("#trip/7");
+    });
   });
 
   it("opens the email a booking was made from, in place, and closes it again", async () => {

@@ -463,6 +463,7 @@ class MergeBody(TypedDict):
 
 class MoveBody(TypedDict):
     trip_id: int | None
+    confirm: NotRequired[bool]
 
 
 class SplitBody(TypedDict):

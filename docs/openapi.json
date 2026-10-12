@@ -4742,6 +4742,9 @@
               "integer",
               "null"
             ]
+          },
+          "confirm": {
+            "type": "boolean"
           }
         },
         "required": [
