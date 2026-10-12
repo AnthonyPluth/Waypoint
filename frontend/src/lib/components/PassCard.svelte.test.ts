@@ -234,3 +234,21 @@ describe("a booking's cost", () => {
     expect(screen.queryByText("Cost")).toBeNull();
   });
 });
+
+describe("a past trip with no times", () => {
+  const visit = segment({ id: 3, kind: "visit", provider: null, origin: null, destination: "JP", confirmation: null, start_local: "2005-03-10T00:00", start_zone: LON, end_local: "2005-03-29T00:00", end_zone: LON, details: { time_unknown: "yes" } });
+
+  it("shows its dates with the year and no time not recorded line above the title", () => {
+    render(PassCard, { segment: visit, now: instant("2026-11-21T10:00", LON) });
+    expect(screen.queryByText("Time not recorded")).toBeNull();
+    expect(screen.queryByText(/time not recorded/)).toBeNull();
+    expect(screen.getByText("Thu, Mar 10, 2005")).toBeInTheDocument();
+    expect(screen.getByText("Tue, Mar 29, 2005")).toBeInTheDocument();
+  });
+
+  it("still says time not recorded for a booking of another kind", () => {
+    render(PassCard, { segment: { ...visit, kind: "hotel", origin: "Harbour Hotel", destination: null, details: { time_unknown: "yes" } }, now: instant("2005-03-10T10:00", LON) });
+    expect(screen.getByText("Time not recorded")).toBeInTheDocument();
+    expect(screen.getAllByText(/time not recorded/)).toHaveLength(2);
+  });
+});
