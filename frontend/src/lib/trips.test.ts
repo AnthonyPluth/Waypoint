@@ -488,11 +488,14 @@ describe("trip travellers", () => {
     expect(showTripTravellers([], 1)).toBe(false);
   });
 
-  it("keeps travellers on a flight and never lists them on a hotel, rental car, parking or cruise booking", () => {
+  it("keeps travellers on a flight and a cruise and never lists them on a hotel, rental car or parking booking", () => {
     const flight = segment({ id: 1, travelers: [jane, sam] });
     const all = tripTravellers([flight, stay([jane, sam])]);
     expect(showBookingTravellers(flight, all)).toBe(true);
-    for (const kind of ["hotel", "car", "parking", "cruise"] as const) {
+    for (const travelers of [[jane, sam], [jane], []]) {
+      expect(showBookingTravellers(segment({ kind: "cruise", provider: "Local Line", travelers }), all)).toBe(true);
+    }
+    for (const kind of ["hotel", "car", "parking"] as const) {
       expect(showBookingTravellers(segment({ kind, provider: "Local", travelers: [jane, sam] }), all)).toBe(false);
       expect(showBookingTravellers(segment({ kind, provider: "Local", travelers: [jane] }), all)).toBe(false);
       expect(showBookingTravellers(segment({ kind, provider: "Local", travelers: [] }), all)).toBe(false);

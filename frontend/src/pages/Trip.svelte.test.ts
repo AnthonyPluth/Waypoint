@@ -609,10 +609,11 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText(/^Check-in/), "2026-11-21T15:00");
     await u.type(screen.getByLabelText(/^Check-out/), "2026-11-27T10:00");
     await u.selectOptions(screen.getByLabelText(/^Time zone/), "Europe/London");
-    await u.click(screen.getByLabelText("Sam Doe"));
+    expect(screen.queryByLabelText("Sam Doe")).toBeNull();
     await u.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({
-      trip_id: 1, kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London", travelers: [{ person_id: 2 }] }) }));
+      trip_id: 1, kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London" }) }));
+    expect(vi.mocked(api).mock.calls.find((c) => c[0] === "/api/segments")?.[1]?.body).not.toHaveProperty("travelers");
   });
 
   it("doesn't show a stay's time zone on its card", async () => {
@@ -647,10 +648,11 @@ describe("Trip", () => {
     await u.selectOptions(screen.getByLabelText(/^Time zone/), "America/New_York");
     await u.type(screen.getByLabelText("Space type (covered, economy, valet)"), "Covered");
     await u.type(screen.getByLabelText("Vehicle (make and colour)"), "Blue hatchback");
-    await u.click(screen.getByLabelText("Sam Doe"));
+    expect(screen.queryByLabelText("Sam Doe")).toBeNull();
     await u.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({
-      trip_id: 1, kind: "parking", origin: "Example Long-Term Lot", start_zone: "America/New_York", details: { space_type: "Covered", vehicle: "Blue hatchback" }, travelers: [{ person_id: 2 }] }) }));
+      trip_id: 1, kind: "parking", origin: "Example Long-Term Lot", start_zone: "America/New_York", details: { space_type: "Covered", vehicle: "Blue hatchback" } }) }));
+    expect(vi.mocked(api).mock.calls.find((c) => c[0] === "/api/segments")?.[1]?.body).not.toHaveProperty("travelers");
   });
 
   describe("a parking booking", () => {

@@ -264,7 +264,7 @@ _SEGMENT_FIELDS = _fields("kind (flight, hotel, car, train, cruise or parking), 
                           "destination (a flight's airport codes; a stay's, a rental's or a parking lot's place), start_zone and end_zone (IANA; a "
                           "flight's come from its airports), details (flight_number, terminal, seat, cabin, room, car_class, "
                           "address, phone, ship, deck, space_type, vehicle, notes: texts), itinerary (a cruise's ports of call in order: [{name, zone, arrive_local, depart_local}], "
-                          "times local to the port or null), manage_url and travelers ([{person_id}] or [{name}], the person asking when left out).")
+                          "times local to the port or null), manage_url and travelers ([{person_id}] or [{name}], the person asking when left out; a stay, rental or parking spot is for everyone on its trip and ignores travelers).")
 _TRIP_FIELDS = _fields("name, and optionally destination, notes; start_date and end_date (YYYY-MM-DD) for a trip with no segments yet; "
                        "people, the list of person ids who are on the trip (replaces the whole list; taking someone off removes them from its stays and "
                        "rentals, and is refused while they are on one of its flights; adding someone who can't see the trip yet needs the person to do it in the app).")

@@ -6,6 +6,9 @@ from waypoint.storage.models import Segment, SegmentTraveler, Trip, TripPerson
 from tests.privacy import no_leaks
 from tests.test_trips import BACK, HOTEL, OUT, Household, guest
 
+SHIP = {"kind": "cruise", "origin": "Port Example", "destination": "Port Example", "start_local": "2026-06-02T15:00",
+        "end_local": "2026-06-08T10:00", "start_zone": "Europe/London", "end_zone": "Europe/London"}
+
 FAR = {**OUT, "start_local": "2026-09-10T19:00", "end_local": "2026-09-11T07:10"}
 
 
@@ -34,7 +37,7 @@ class TheInvariant(TripPeopleCase):
     def test_a_trip_lists_everyone_named_on_its_bookings(self):
         flight = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
         self.assertEqual(trips.get(self.c, self.jane, flight["trip_id"])["people"], [self.jid, self.mia])
-        self.add(self.jane, HOTEL, flight["trip_id"], self.on(self.jid, self.sid))
+        self.add(self.jane, SHIP, flight["trip_id"], self.on(self.jid, self.sid))
         self.assertEqual(self.aboard(flight["trip_id"]), [self.jid, self.mia, self.sid])
 
     def test_a_name_as_printed_is_not_a_person_until_it_is_matched(self):
@@ -45,7 +48,7 @@ class TheInvariant(TripPeopleCase):
         self.assertEqual(self.aboard(seg["trip_id"]), [self.jid, self.joan])
 
     def test_editing_a_bookings_travellers_adds_them_and_taking_one_off_keeps_them_on_the_trip(self):
-        seg = self.add(self.jane, HOTEL, None, self.on(self.jid))
+        seg = self.add(self.jane, SHIP, None, self.on(self.jid))
         trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": self.on(self.jid, self.joan)})
         self.assertEqual(self.aboard(seg["trip_id"]), [self.jid, self.joan])
         trips.edit_segment(self.c, self.jane, seg["id"], {"travelers": self.on(self.jid)})
@@ -97,11 +100,11 @@ class BookingsForEveryone(TripPeopleCase):
         self.assertTrue(self.c.orm.get(Segment, stay_id).travelers_from_trip)
         self.assertEqual(self.c.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.segment_id == stay_id)).all(), [])
 
-    def test_choosing_some_of_them_makes_the_list_its_own(self):
+    def test_a_list_sent_for_a_booking_for_everyone_is_ignored(self):
         trip_id, stay_id = self.hotel_for_everyone(self.jid, self.mia)
         trips.edit_segment(self.c, self.jane, stay_id, {"travelers": self.on(self.jid)})
-        self.assertFalse(self.c.orm.get(Segment, stay_id).travelers_from_trip)
-        self.assertEqual([t["person_id"] for t in trips.get_segment(self.c, self.jane, stay_id)["travelers"]], [self.jid])
+        self.assertTrue(self.c.orm.get(Segment, stay_id).travelers_from_trip)
+        self.assertEqual([t["person_id"] for t in trips.get_segment(self.c, self.jane, stay_id)["travelers"]], [self.jid, self.mia])
         self.assertEqual(self.aboard(trip_id), [self.jid, self.mia])
 
     def test_an_email_naming_someone_new_freezes_the_list_and_adds_them(self):
@@ -174,13 +177,11 @@ class CreatingAndEditingPeople(TripPeopleCase):
         self.assertEqual(self.aboard(seg["trip_id"]), [self.jid, self.mia])
         self.assertIsNone(trips.get(self.c, self.sam, seg["trip_id"]))
 
-    def test_taking_someone_off_removes_them_from_the_stays_and_rentals_but_not_the_other_people(self):
+    def test_taking_someone_off_removes_them_from_the_other_bookings_but_not_the_other_people(self):
         flight = self.add(self.jane, OUT, None, self.on(self.jid))
         trip_id = flight["trip_id"]
-        stay = self.add(self.jane, HOTEL, trip_id, self.on(self.jid, self.mia))
-        car = self.add(self.jane, {"kind": "car", "origin": "LHR", "destination": "LHR", "start_local": "2026-06-02T09:00",
-                                   "end_local": "2026-06-08T09:00", "start_zone": "Europe/London", "end_zone": "Europe/London"},
-                       trip_id, self.on(self.mia, self.joan))
+        stay = self.add(self.jane, SHIP, trip_id, self.on(self.jid, self.mia))
+        car = self.add(self.jane, {**SHIP, "start_local": "2026-06-03T09:00", "end_local": "2026-06-07T09:00"}, trip_id, self.on(self.mia, self.joan))
         got = trips.edit_trip(self.c, self.jane, trip_id, {"people": [self.jid, self.joan]})
         self.assertEqual(got["people"], [self.jid, self.joan])
         by_id = {s["id"]: [t["person_id"] for t in s["travelers"]] for s in got["segments"]}
@@ -199,7 +200,7 @@ class CreatingAndEditingPeople(TripPeopleCase):
 
     def test_the_refusal_leaves_the_other_removals_undone(self):
         out = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
-        stay = self.add(self.jane, HOTEL, out["trip_id"], self.on(self.jid, self.joan))
+        stay = self.add(self.jane, SHIP, out["trip_id"], self.on(self.jid, self.joan))
         with self.assertRaises(trips.Invalid):
             trips.edit_trip(self.c, self.jane, out["trip_id"], {"people": [self.jid]})
         self.assertEqual([t["person_id"] for t in trips.get_segment(self.c, self.jane, stay["id"])["travelers"]], [self.jid, self.joan])
@@ -271,7 +272,7 @@ class MergingSplittingMoving(TripPeopleCase):
 
     def test_splitting_gives_the_new_trip_the_people_on_the_bookings_it_took(self):
         out = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
-        stay = self.add(self.jane, HOTEL, out["trip_id"], self.on(self.jid, self.joan))
+        stay = self.add(self.jane, SHIP, out["trip_id"], self.on(self.jid, self.joan))
         new = trips.split(self.c, self.jane, out["trip_id"], [stay["id"]])
         self.assertEqual(new["people"], [self.jid, self.joan])
         self.assertEqual(self.aboard(out["trip_id"]), [self.jid, self.mia])
@@ -337,3 +338,76 @@ class MergingSplittingMoving(TripPeopleCase):
         trips.edit_trip(self.c, self.jane, a["trip_id"], {"people": [self.jid, self.mia]}, True)
         self.add(self.jane, HOTEL, None, self.on(self.jid, self.mia))
         self.assertEqual(len(trips.listing(self.c, self.jane)), 1)
+
+
+CAR = {"kind": "car", "origin": "LHR", "destination": "LHR", "start_local": "2026-06-02T09:00", "end_local": "2026-06-08T09:00",
+       "start_zone": "Europe/London", "end_zone": "Europe/London"}
+LOT = {"kind": "parking", "origin": "Example Lot", "start_local": "2026-06-01T12:00", "end_local": "2026-06-09T12:00", "start_zone": "Europe/London"}
+FAR = {**OUT, "start_local": "2026-09-10T19:00", "end_local": "2026-09-11T07:10"}
+
+
+class AddedByHand(TripPeopleCase):
+    def test_a_hotel_car_or_parking_spot_added_by_hand_is_for_everyone_whatever_list_is_sent(self):
+        flight = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
+        for fields in (HOTEL, CAR, LOT):
+            with self.subTest(kind=fields["kind"]):
+                got = self.add(self.jane, fields, flight["trip_id"], self.on(self.sid, self.joan))
+                seg = self.c.orm.get(Segment, got["id"])
+                self.assertTrue(seg.travelers_from_trip)
+                self.assertEqual(self.c.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.segment_id == got["id"])).all(), [])
+                self.assertEqual([t["person_id"] for t in got["travelers"]], [self.jid, self.mia])
+        self.assertEqual(self.aboard(flight["trip_id"]), [self.jid, self.mia])
+        self.assertIsNone(trips.get(self.c, self.sam, flight["trip_id"]))
+
+    def test_the_names_sent_with_a_hotel_are_not_kept_anywhere(self):
+        flight = self.add(self.jane, OUT, None, self.on(self.jid))
+        with no_leaks(self, "Quentin Canaryfield"):
+            got = self.add(self.jane, HOTEL, flight["trip_id"], [{"person_id": None, "name": "Quentin Canaryfield"}])
+        self.assertEqual(self.c.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.name == "Quentin Canaryfield")).all(), [])
+        self.assertTrue(self.c.orm.get(Segment, got["id"]).travelers_from_trip)
+
+    def test_a_new_trip_from_a_hotel_alone_lists_the_person_who_added_it(self):
+        got = self.add(self.jane, HOTEL)
+        self.assertEqual(self.aboard(got["trip_id"]), [self.jid])
+        self.assertEqual([t["person_id"] for t in got["travelers"]], [self.jid])
+
+    def test_a_flight_or_cruise_added_by_hand_keeps_the_travellers_sent(self):
+        flight = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
+        ship = self.add(self.jane, SHIP, flight["trip_id"], self.on(self.jid, self.joan))
+        self.assertFalse(self.c.orm.get(Segment, ship["id"]).travelers_from_trip)
+        self.assertEqual([t["person_id"] for t in ship["travelers"]], [self.jid, self.joan])
+        self.assertEqual(self.aboard(flight["trip_id"]), [self.jid, self.mia, self.joan])
+
+    def test_editing_one_keeps_it_for_everyone_and_changing_it_to_a_train_gives_it_the_current_list(self):
+        flight = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
+        stay = self.add(self.jane, HOTEL, flight["trip_id"])
+        trips.edit_segment(self.c, self.jane, stay["id"], {"details": {"room": "9"}, "travelers": self.on(self.joan)})
+        self.assertTrue(self.c.orm.get(Segment, stay["id"]).travelers_from_trip)
+        changed = trips.edit_segment(self.c, self.jane, stay["id"], {"kind": "train", "origin": "A", "destination": "B"})
+        self.assertFalse(self.c.orm.get(Segment, stay["id"]).travelers_from_trip)
+        self.assertEqual([t["person_id"] for t in changed["travelers"]], [self.jid, self.mia])
+
+    def test_an_existing_hotel_with_its_own_travellers_is_left_as_it_is(self):
+        flight = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
+        seg = Segment(trip_id=flight["trip_id"], kind="hotel", status="confirmed", source="manual", booked_by=self.jid, origin="Old Hotel",
+                      start_local="2026-06-02T15:00", start_zone="Europe/London", end_local="2026-06-08T10:00", end_zone="Europe/London")
+        self.c.orm.add(seg)
+        self.c.orm.flush()
+        self.c.orm.add(SegmentTraveler(segment_id=seg.id, person_id=self.jid))
+        self.c.orm.flush()
+        got = trips.edit_segment(self.c, self.jane, seg.id, {"details": {"room": "2"}})
+        self.assertFalse(self.c.orm.get(Segment, seg.id).travelers_from_trip)
+        self.assertEqual([t["person_id"] for t in got["travelers"]], [self.jid])
+
+    def test_moving_one_into_a_trip_keeps_it_for_everyone_when_the_people_match_and_asks_when_they_do_not(self):
+        flight = self.add(self.jane, OUT, None, self.on(self.jid, self.mia))
+        stay = self.add(self.jane, HOTEL, flight["trip_id"])
+        same = self.add(self.jane, FAR, None, self.on(self.jid, self.mia))
+        trips.move_segment(self.c, self.jane, stay["id"], same["trip_id"])
+        self.assertTrue(self.c.orm.get(Segment, stay["id"]).travelers_from_trip)
+        other = self.add(self.jane, {**FAR, "start_local": "2027-03-01T19:00", "end_local": "2027-03-02T07:10"}, None, self.on(self.jid, self.sid))
+        with self.assertRaises(trips.NeedsConfirmation):
+            trips.move_segment(self.c, self.jane, stay["id"], other["trip_id"])
+        trips.move_segment(self.c, self.jane, stay["id"], other["trip_id"], True)
+        self.assertFalse(self.c.orm.get(Segment, stay["id"]).travelers_from_trip)
+        self.assertEqual(sorted(self.aboard(other["trip_id"])), sorted([self.jid, self.sid, self.mia]))

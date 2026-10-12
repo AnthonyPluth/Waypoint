@@ -7,7 +7,7 @@
   import { Input } from "$lib/components/ui/input";
   import FlightLength from "$lib/components/FlightLength.svelte";
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
-  import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, SEAT_LIMIT, SEATED, seatKey, type Draft } from "$lib/segment-form";
+  import { ADDRESS_LIMIT, body, DETAILS, KINDS, MAX_PORTS, problem, SEAT_LIMIT, SEATED, FOR_EVERYONE, seatKey, type Draft } from "$lib/segment-form";
 
   let { initial, people, onsaved, oncancel, focus = "", titled = true }: { initial: Draft; people: Person[]; onsaved: (s: Segment) => void; oncancel: () => void; focus?: string; titled?: boolean } = $props();
   // svelte-ignore state_referenced_locally
@@ -126,6 +126,7 @@
       {/if}
       <label class={label}><span class="font-medium">Manage link</span>
         <Input bind:value={d.manage_url} maxlength={500} autocomplete="off" spellcheck={false} placeholder="https://" /></label>
+      {#if !FOR_EVERYONE.includes(d.kind)}
       <fieldset class="flex flex-col gap-2 text-sm">
         <legend class="mb-1.5 font-medium">Who’s travelling</legend>
         {#each people as p (p.id)}
@@ -137,6 +138,7 @@
           {@render seat(seatKey(name), name, true)}
         {/each}
       </fieldset>
+      {/if}
       {#if error}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{error}</p>{/if}
       <div class="flex flex-wrap gap-2">
         <Button type="submit" disabled={saving}>{saving ? "Saving…" : editing ? "Save" : "Add"}</Button>

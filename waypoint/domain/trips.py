@@ -720,7 +720,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
     _needs_person(viewer)
     values = check(conn, fields)
     ports = check_itinerary(fields.get("kind") or "", fields.get("itinerary") or [], _span(values, "start"), _span(values, "end"))
-    given = fields.get("travelers")
+    given = None if source != "email" and values["kind"] in SHARED_KINDS else fields.get("travelers")
     travelers = _travelers(conn, given if given is not None else
                            ([{"person_id": viewer.person_id, "name": None}] if viewer.person_id is not None else []))
     trip: Trip | None
@@ -740,7 +740,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
             conn.orm.add(trip)
             conn.orm.flush()
     named = [t["person_id"] for t in travelers if t["person_id"] is not None]
-    for_everyone = (source == "email" and values["kind"] in SHARED_KINDS
+    for_everyone = (values["kind"] in SHARED_KINDS
                     and set(named) <= _seen_by_bookings(conn, trip) | {viewer.person_id})
     seg = Segment(**values, **located(values), trip_id=trip.id, source=source, booked_by=viewer.person_id, locked_fields=None,
                   check_times=bool(fields.get("check_times")))
@@ -780,6 +780,8 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         retimed = any(k in changes and changes[k] != before.get(k) for k in ("start_local", "end_local"))
         kept = {k: v for k, v in (merged.get("details") or {}).items() if k != TIME_UNKNOWN}
         merged["details"] = kept if retimed else {**kept, TIME_UNKNOWN: "yes"}
+    if seg.travelers_from_trip and merged.get("kind") in SHARED_KINDS:
+        merged["travelers"] = before.get("travelers") or []
     if merged.get("kind") != "cruise" and "itinerary" not in changes:
         merged["itinerary"] = []
     for place, zone in (("origin", "start_zone"), ("destination", "end_zone")):
@@ -795,7 +797,7 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         values["details"] = json.dumps(kept_details, ensure_ascii=False) if kept_details else None
     changed = [f for f in FIELDS if f in values and (decode_details(values[f]) != decode_details(seg.details) if f == "details"
                                                     else values[f] != getattr(seg, f))]
-    if sorted(map(_key, travelers)) != sorted(map(_key, old)):
+    if sorted(map(_key, travelers)) != sorted(map(_key, old)) or (seg.travelers_from_trip and values["kind"] not in SHARED_KINDS):
         changed.append("travelers")
     if ports != ports_before:
         changed.append("itinerary")

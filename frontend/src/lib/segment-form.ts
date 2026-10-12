@@ -20,6 +20,7 @@ export const DETAILS: Record<Kind, [string, string][]> = {
 export const SEAT_LIMIT = 10;
 
 export const SEATED: Kind[] = ["flight", "train"];
+export const FOR_EVERYONE: Kind[] = ["hotel", "car", "parking"];
 
 export const seatKey = (who: number | string): string => (typeof who === "number" ? `p${who}` : `n${who}`);
 
@@ -118,7 +119,7 @@ export function problem(d: Draft): string | null {
   }
   for (const seat of Object.values(d.seats)) if (seat.trim().length > SEAT_LIMIT) return `A seat is at most ${SEAT_LIMIT} characters`;
   if (d.manage_url.trim() && !/^https?:\/\//i.test(d.manage_url.trim())) return "The manage link must start with https:// or http://";
-  if (d.people.length + d.printed.length === 0) return "Choose who’s travelling";
+  if (!FOR_EVERYONE.includes(d.kind) && d.people.length + d.printed.length === 0) return "Choose who’s travelling";
   return null;
 }
 
@@ -144,6 +145,6 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
         : { start_zone: startZone, end_zone: endZone }),
     details, manage_url: text(d.manage_url),
     ...(flight || d.kind !== "cruise" ? {} : { itinerary: d.itinerary.map((p) => ({ name: p.name.trim(), zone: p.zone.trim(), arrive_local: p.arrive || null, depart_local: p.depart || null })) }),
-    travelers: [...d.people.map((id) => ({ person_id: id, ...seat(id) })), ...d.printed.map((name) => ({ person_id: null, name, ...seat(name) }))],
+    ...(FOR_EVERYONE.includes(d.kind) ? {} : { travelers: [...d.people.map((id) => ({ person_id: id, ...seat(id) })), ...d.printed.map((name) => ({ person_id: null, name, ...seat(name) }))] }),
   };
 }

@@ -43,6 +43,7 @@ describe("the segment form's messages", () => {
     expect(problem(flight({ manage_url: "javascript:alert(1)" }))).toBe("The manage link must start with https:// or http://");
     expect(problem(flight({ manage_url: "https://example.com/manage" }))).toBeNull();
     expect(problem(flight({ people: [], printed: [] }))).toBe("Choose who’s travelling");
+    expect(problem(hotel({ people: [], printed: [] }))).toBeNull();
     expect(problem(flight({ people: [], printed: ["DOE/MIA MISS"] }))).toBeNull();
   });
 });
@@ -70,9 +71,9 @@ describe("the request the form makes", () => {
     expect(problem(hotel({ start_zone: "" }))).toBe("Enter the time zone of the stay (for example America/New_York), or its address to work it out from");
     expect(problem(hotel({ start_zone: "Mars/Olympus" }))).toMatch(/isn’t one Waypoint knows/);
   });
-  it("keeps travellers known only by their printed name, and details it has no field for", () => {
+  it("keeps details it has no field for, and sends no travellers for a stay", () => {
     const sent = body(hotel({ printed: ["DOE/MIA MISS"], details: { address: "1 Quay Street", seat: "12A" } }));
-    expect(sent.travelers).toEqual([{ person_id: 1 }, { person_id: null, name: "DOE/MIA MISS" }]);
+    expect(sent).not.toHaveProperty("travelers");
     expect(sent.details).toEqual({ address: "1 Quay Street", seat: "12A" });
   });
   it("starts an edit from what's there, leaving a flight's airport-given zones empty", () => {
@@ -137,7 +138,7 @@ describe("a parking booking", () => {
       details: { space_type: "Covered", vehicle: "Blue hatchback", address: "1 Terminal Road" } });
     expect(sent).not.toHaveProperty("end_zone");
     expect(sent.details).not.toHaveProperty("notes");
-    expect(sent.travelers).toEqual([{ person_id: 1 }]);
+    expect(sent).not.toHaveProperty("travelers");
   });
   it("opens a saved booking as it was and sends no zone when it is to be worked out", () => {
     const d = draftOf(segment({ kind: "parking", origin: "Example Long-Term Lot", destination: null, start_zone: "America/New_York", end_zone: "America/New_York",
@@ -155,8 +156,9 @@ describe("a seat for each traveller", () => {
       { person_id: 1, seat: "31a" }, { person_id: 2, seat: null }, { person_id: null, name: "DOE/MIA MISS", seat: null }]);
     expect(body(two({ seats: { "nDOE/MIA MISS": "32A" } })).travelers?.at(-1)).toEqual({ person_id: null, name: "DOE/MIA MISS", seat: "32A" });
   });
-  it("sends no seats for a booking that has none (a hotel's guests keep what they had)", () => {
-    expect(body({ ...two(), kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London" }).travelers).toEqual([
+  it("sends no travellers for a hotel, rental car or parking booking, whoever is ticked, and a cruise keeps them without seats", () => {
+    for (const kind of ["hotel", "car", "parking"] as const) expect(body({ ...two(), kind, origin: "Harbour", start_zone: "Europe/London" })).not.toHaveProperty("travelers");
+    expect(body({ ...two(), kind: "cruise", origin: "Miami", start_zone: "America/New_York" }).travelers).toEqual([
       { person_id: 1 }, { person_id: 2 }, { person_id: null, name: "DOE/MIA MISS" }]);
   });
   it("starts from each traveller's seat, and gives a booking's old seat to its one traveller only", () => {
