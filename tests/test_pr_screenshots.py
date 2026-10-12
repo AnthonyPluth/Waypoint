@@ -83,6 +83,25 @@ class Arguments(unittest.TestCase):
         a = ps.parse_args(["7", "x.png", "--trailer", "A: b"])
         self.assertEqual((a.pr, a.files, a.trailer), (7, ["x.png"], ["A: b"]))
 
+    def test_git_config_is_repeatable_and_empty_by_default(self):
+        self.assertEqual(ps.parse_args(["7"]).git_config, [])
+        a = ps.parse_args(["7", "--git-config", "gpg.ssh.program=/x/sign", "--git-config=user.name=A B"])
+        self.assertEqual(a.git_config, ["gpg.ssh.program=/x/sign", "user.name=A B"])
+
+    def test_rejects_a_git_config_that_is_not_key_value(self):
+        for bad in ("nothing", "=value"):
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                ps.parse_args(["7", "--git-config", bad])
+
+    def test_git_config_comes_from_the_environment_one_setting_per_line_then_flags_and_keeps_spaces_and_quotes(self):
+        env = {"PR_SCREENSHOTS_GIT_CONFIG": "gpg.ssh.program=/x y/sign\n\nuser.name=A \"B\"; $(x)\n"}
+        self.assertEqual(ps.git_config_from(env, ["core.abbrev=9"]), ["gpg.ssh.program=/x y/sign", 'user.name=A "B"; $(x)', "core.abbrev=9"])
+        self.assertEqual(ps.git_config_from({}, []), [])
+
+    def test_a_git_config_line_in_the_environment_must_be_key_value(self):
+        with self.assertRaises(ps.ScreenshotError):
+            ps.git_config_from({"PR_SCREENSHOTS_GIT_CONFIG": "gpg.ssh.program"}, [])
+
     def test_rejects_a_theme_option_since_the_app_is_dark_only(self):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             ps.parse_args(["7", "--theme", "dark"])
@@ -160,6 +179,12 @@ class Publishing(unittest.TestCase):
         self.assertEqual(run(self.repo, "status", "--porcelain"), "")
         self.assertEqual(run(self.repo, "worktree", "list").strip().count("\n"), 0)
         self.assertNotIn("app.txt", self.remote_files())
+
+    def test_git_config_applies_to_the_screenshots_commit_only(self):
+        ps.publish(self.repo, 12, [self.shot("a-phone-top.png")], "origin", TRAILERS, sleep=self.waits.append, log=lambda m: None,
+                   git_config=["user.name=Signer Test"])
+        self.assertEqual(run(self.remote, "log", "-1", "--format=%an", ps.BRANCH).strip(), "Signer Test")
+        self.assertEqual(run(self.repo, "config", "user.name").strip(), "Test")
 
     def test_rerunning_replaces_that_prs_folder_and_keeps_other_prs(self):
         self.publish(1, [self.shot("a-phone-top.png", b"one")])

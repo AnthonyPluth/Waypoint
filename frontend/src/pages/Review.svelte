@@ -24,7 +24,7 @@
   import { refreshState, route, setQuery } from "$lib/app.svelte";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
-  import { Button, buttonVariants } from "$lib/components/ui/button";
+  import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import MessageView from "$lib/components/MessageView.svelte";
   import FlightLength from "$lib/components/FlightLength.svelte";
@@ -103,6 +103,12 @@
   const legTitle = (leg: Draft, n: number) => `${leg.kind === "flight" ? "Flight" : "Booking"} ${n + 1} of ${drafts.length}${leg.origin && leg.destination ? `: ${leg.origin.toUpperCase()} → ${leg.destination.toUpperCase()}` : ""}`;
   type Peek = { state: "loading" } | { state: "ready"; subject: string | null; text: string; html: string | null; truncated: boolean; original: boolean; images: number; width: number | null } | { state: "error"; message: string };
   let peeks = $state<Record<number, Peek>>({});
+  let viewing = $state<number | null>(null);
+  const toggleView = (item: ReviewItem) => {
+    if (viewing === item.id) { viewing = null; return; }
+    viewing = item.id;
+    void peek(item);
+  };
   async function peek(item: ReviewItem) {
     if (peeks[item.id] && peeks[item.id]?.state !== "error") return;
     peeks[item.id] = { state: "loading" };
@@ -141,7 +147,7 @@
     const open = draft;
     const picks = addedPicks;
     addedPicks = [];
-    if (open) delete peeks[open.item.id];
+    if (open && viewing !== open.item.id) delete peeks[open.item.id];
     drafts = [];
     if (open && picks.length) void act(async () => {
       await apiCall<"DELETE /api/review/{id}">(`/api/review/${open.item.id}?${picks.map((n) => `suggestion=${n}`).join("&")}`, { method: "DELETE" });
@@ -355,7 +361,7 @@
     {#if review.items.length}
       <section aria-labelledby="unread-title" class="space-y-2">
         <h2 id="unread-title" class="eyebrow px-1">Couldn’t read</h2>
-        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Mail and AI → Gmail), and then you can add those by hand or dismiss them. Open one in Gmail, or choose Add by hand to read it beside the form. Waypoint keeps each message here, encrypted, so you can read it without Gmail: until the item is dismissed or added, and for as long as a booking you add from it exists.</p>
+        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Mail and AI → Gmail), and then you can add those by hand or dismiss them. Choose View email to read one here, or Add by hand to read it beside the form. Waypoint keeps each message here, encrypted, so you can read it without Gmail: until the item is dismissed or added, and for as long as a booking you add from it exists.</p>
         {#if only}
           <p class="px-1 text-sm" data-testid="review-filter">Showing only mail from {only.sender}{only.mailbox ? ` in ${only.mailbox}` : ""}{shown.length ? "" : ", and none is waiting"}. <button type="button" class="underline underline-offset-2" onclick={() => setQuery("")}>Show everything</button></p>
         {/if}
@@ -372,7 +378,7 @@
                 {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
               </div>
               <div class="flex basis-full flex-wrap gap-2">
-                {#if item.gmail_url}<a class={buttonVariants({ variant: "outline", size: "sm" })} href={item.gmail_url} target="_blank" rel="noopener noreferrer" aria-label={`Open “${subject(item)}” in Gmail`}>Open in Gmail</a>{/if}
+                <Button variant="outline" size="sm" aria-expanded={viewing === item.id} onclick={() => toggleView(item)} aria-label={`View email “${subject(item)}”`}>View email</Button>
                 {#if review.ai && item.mine && item.reason !== "generic"}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestions.length ? "Ask again" : "Ask AI"}</Button>{/if}
                 {#if item.suggestions.length}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : item.suggestions.length > 1 ? `Check the AI’s ${item.suggestions.length} suggestions for “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>{item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
@@ -380,6 +386,9 @@
                 <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={`Dismiss “${subject(item)}”`}>Dismiss</Button>
               </div>
             </li>
+            {#if viewing === item.id && peeks[item.id]}
+              <li class="row items-stretch" data-testid="preview">{@render messagePeek(item)}</li>
+            {/if}
           {/each}
         </ul>
       </section>
