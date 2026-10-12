@@ -480,9 +480,13 @@ def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY) -> Any:
     return _answer(cfg, reply)
 
 
+def prepare(cfg: Config, text: str, known: tuple[str, ...] = ()) -> str:
+    return text if cfg.mode == LOCAL else redact(text, known)
+
+
 def suggest(cfg: Config, text: str, known: tuple[str, ...] = ()) -> Reading:
-    sent = redact(text, known)
-    if not sent:
+    sent = prepare(cfg, text, known)
+    if not sent.strip():
         raise AiError(NO_BOOKING)
     return parse(_ask(cfg, sent, system_for(cfg)), sent, cfg.mode == LOCAL)
 
