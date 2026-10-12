@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from ..money import Price
+
 Kind = Literal["flight", "hotel", "car", "train", "cruise", "parking"]
 Status = Literal["confirmed", "cancelled"]
 
@@ -47,6 +49,7 @@ class Booking:
     end_zone: str | None = None
     ports: tuple[Port, ...] = ()
     generic: tuple[tuple[str, str], ...] = ()
+    price: Price | None = None
 
 
 @dataclass(frozen=True)

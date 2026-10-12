@@ -398,6 +398,21 @@ class WriteTests(Assistants):
         self.switch(True)
         self.assertEqual(self.tool(WRITE, "remove_segment", {"segment_id": got["id"]}), {"ok": True})
 
+    def test_an_assistant_reads_a_cost_and_sets_or_clears_one_as_a_cost_entered_by_hand(self):
+        self.switch(True)
+        seg = self.tool(WRITE, "add_segment", {"fields": {**self.SEGMENT, "start_local": "2026-11-01T15:00", "end_local": "2026-11-05T10:00"}})
+        self.assertIsNone(seg["price"])
+        got = self.tool(WRITE, "update_segment", {"segment_id": seg["id"], "fields": {"price": {"amount_minor": 124000, "currency": "USD"}}})
+        self.assertEqual(got["price"], {"amount_minor": 124000, "currency": "USD", "source": "manual"})
+        read = self.tool(READ, "get_trip", {"trip_id": seg["trip_id"]})
+        self.assertEqual(read["costs"], {"totals": [{"currency": "USD", "amount_minor": 124000}], "priced": 1, "bookings": 1})
+        self.assertEqual(read["segments"][0]["price"]["amount_minor"], 124000)
+        self.assertIn("cost", self.refused(WRITE, "update_segment", {"segment_id": seg["id"], "fields": {"price": {"amount_minor": "x", "currency": "USD"}}}))
+        cleared = self.tool(WRITE, "update_segment", {"segment_id": seg["id"], "fields": {"price": None}})
+        self.assertIsNone(cleared["price"])
+        self.switch(False)
+        self.assertIn("Changes are switched off", self.refused(WRITE, "update_segment", {"segment_id": seg["id"], "fields": {"price": {"amount_minor": 1, "currency": "USD"}}}))
+
     def test_every_changing_tool_works_with_both(self):
         self.switch(True)
         trip = self.tool(WRITE, "create_trip", {"fields": {"name": "Lisbon", "start_date": "2026-11-01", "end_date": "2026-11-05"}})

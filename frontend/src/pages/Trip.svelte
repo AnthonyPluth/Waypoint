@@ -27,6 +27,7 @@
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import TripDestination from "$lib/components/TripDestination.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
+  import { countNote, formatMoney, formatTotals } from "$lib/money";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
   import { appWord, bookingCards, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
@@ -138,7 +139,7 @@
   function edit(s: Segment, field = "") {
     focus = field;
     inSheet = viewport.phone;
-    form = draftOf(s);
+    form = draftOf(s, trip?.costs.totals[0]?.currency);
   }
 
   const rename = (e: SubmitEvent) => {
@@ -229,9 +230,11 @@
           <p class="eyebrow">{eyebrowOf(s)}</p>
           <p class="mt-1 break-words font-medium">{headline(s)}</p>
           {#if s.confirmation}<p class="mt-1 text-lg"><CopyCode code={s.confirmation} /></p>{/if}
+          {#if s.price}<p class="mt-1 text-sm" class:line-through={s.status === "cancelled"}>{formatMoney(s.price.amount_minor, s.price.currency)}</p>{/if}
         </li>
       {/each}
     </ul>
+    {#if copy.costs?.totals.length}<p class="mt-3 text-sm" data-trip-total><span class="eyebrow">Total</span> <span class="font-medium">{formatTotals(copy.costs.totals)}</span>{#if countNote(copy.costs)}<span class="text-muted-foreground"> · {countNote(copy.costs)}</span>{/if}</p>{/if}
   {:else}
     <SavedTripLock onunlocked={(v) => { if (isTrip(v)) savedCopy = v; else throw new Error("unreadable"); }} onremoved={() => (lockedCopy = false)} />
   {/if}
@@ -264,11 +267,15 @@
       {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
         <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
       {/if}
+      {#if t.costs.totals.length}
+        <p class="mt-1 text-sm" data-trip-total><span class="eyebrow">Total</span> <span class="break-words font-medium">{formatTotals(t.costs.totals)}</span>
+          {#if countNote(t.costs)}<span class="text-muted-foreground"> · {countNote(t.costs)}</span>{/if}</p>
+      {/if}
       {#if t.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
     </div>
     {#if !form}
       <div class="flex flex-wrap gap-2">
-        <Button onclick={() => { focus = ""; form = blank(t.id); }}><Plus /> Add a booking</Button>
+        <Button onclick={() => { focus = ""; form = blank(t.id, t.costs.totals[0]?.currency); }}><Plus /> Add a booking</Button>
         <Button variant="outline" onclick={() => { deleting = true; }}>Delete trip</Button>
         <Button variant="outline" onclick={() => { mergeWith = ""; merging = true; void loadOthers(); }}>Merge another trip</Button>
       </div>
@@ -306,7 +313,7 @@
           {/snippet}
         </PassCard>
       {:else}
-        <PassCard as="li" id={`segment-${s.id}`} highlight={wanted === String(s.id)} segment={s} {now} level={2} eyebrow={eyebrowOf(s)} showCode={false} showApp={false}
+        <PassCard as="li" id={`segment-${s.id}`} highlight={wanted === String(s.id)} segment={s} {now} level={2} eyebrow={eyebrowOf(s)} showCode={false} showApp={false} showCost={false}
           label={`${headline(s)}, on ${card.segments.length} bookings`}>
           {#snippet times()}
             {#if card.timesDiffer}
@@ -328,6 +335,10 @@
                       {#if b.status !== "confirmed"}<Badge variant={b.status === "cancelled" ? "destructive" : "secondary"}>{b.status === "cancelled" ? "Cancelled" : "Changed"}</Badge>{/if}</p>
                     {#if card.timesDiffer && b.status !== "cancelled"}
                       <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(b)}</dl>
+                    {/if}
+                    {#if b.price}
+                      <p class="text-sm" data-cost><span class="eyebrow">Cost</span> <span class="font-medium" class:line-through={b.status === "cancelled"}>{formatMoney(b.price.amount_minor, b.price.currency)}</span>
+                        {#if b.status === "cancelled"}<span class="text-muted-foreground"> · cancelled, so not in the trip’s total</span>{/if}</p>
                     {/if}
                     {@render links(b)}
                     <h4 class="eyebrow">Travellers</h4>

@@ -14,6 +14,7 @@ The trip under way, or else the next trip starting within 7 days. Each time Wayp
 Saved:
 
 - the trip’s bookings: kind, provider, confirmation codes, flight numbers, times with their time zones, places, terminal, gate, seat, cabin, room, car class, addresses, phone numbers and manage links;
+- each booking’s [cost](/Waypoint/start/trips/#cost) and the trip’s total, which anyone who can see the trip already sees;
 - the travellers’ display names;
 - the confirmation message Waypoint keeps for each of the trip’s bookings, as **View email** shows it, except for its images: subject, the sender’s domain and day, its text and its formatting. The images stay on the server, so offline an email shows its text and layout, with each image’s description in place of the picture.
 

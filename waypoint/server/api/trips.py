@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from ... import monitoring, validate
-from ...domain import airports, loyalty, people, tripmap, trips
+from ...domain import airports, loyalty, money, people, tripmap, trips
 from ...domain.mail import ai
 from ...domain.visibility import Viewer
 from ...storage import db
@@ -86,6 +86,19 @@ def _travelers(raw: Any) -> list[trips.TravelerIn]:
     return found
 
 
+def _price(raw: Any) -> trips.PriceIn | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ApiError('Send "price" as an amount and a currency, or null to clear it')
+    amount, currency = raw.get("amount_minor"), raw.get("currency")
+    if isinstance(amount, bool) or not isinstance(amount, int) or not isinstance(currency, str):
+        raise ApiError('Send the cost as {"amount_minor": a whole number of cents, "currency": "USD"}')
+    if not money.valid(amount, currency):
+        raise ApiError("The cost needs an amount between 0 and 1,000,000,000 in the currency’s smallest unit and a three-letter currency code like USD")
+    return {"amount_minor": amount, "currency": currency}
+
+
 def _people(raw: Any) -> list[int]:
     if not isinstance(raw, list):
         raise ApiError('Send "people" as a list of people')
@@ -112,6 +125,8 @@ def segment_fields(body: Mapping[str, Any]) -> trips.SegmentIn:
         out["travelers"] = _travelers(body["travelers"])
     if "itinerary" in body:
         out["itinerary"] = _itinerary(body["itinerary"])
+    if "price" in body:
+        out["price"] = _price(body["price"])
     return out
 
 

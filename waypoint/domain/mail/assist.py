@@ -333,6 +333,8 @@ def _from_suggestion(suggestion: Mapping[str, Any]) -> trips.SegmentIn:
     details = {k: suggestion[k] for k in ("address", "phone", "room", "ship", "deck", "flight_number", "cabin") if suggestion.get(k)}
     if details:
         out["details"] = details
+    if suggestion.get("price_minor") and suggestion.get("price_currency"):
+        out["price"] = {"amount_minor": suggestion["price_minor"], "currency": suggestion["price_currency"]}
     return out
 
 

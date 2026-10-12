@@ -87,6 +87,8 @@ def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
                             "check_times": guessed}
     if b.passengers:
         out["travelers"] = travelers(conn, b.passengers)
+    if b.price is not None:
+        out["price"] = {"amount_minor": b.price.amount_minor, "currency": b.price.currency}
     if b.ports:
         out["itinerary"] = [{"name": p.name, "zone": p.zone, "arrive_local": p.arrive_local, "depart_local": p.depart_local} for p in b.ports]
     return out
@@ -106,6 +108,8 @@ def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:
         out["flight_number"] = number
     if ship := dict(b.details).get("ship"):
         out["ship"] = ship
+    if b.price is not None:
+        out["price_minor"], out["price_currency"] = b.price.amount_minor, b.price.currency
     if zone := _zone(conn, b, b.origin, b.start_place):
         out["start_zone"] = zone
     if b.kind in ("car", "train", "cruise") and (end_zone := _zone(conn, b, b.destination, b.end_place)) and end_zone != out.get("start_zone"):

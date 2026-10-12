@@ -209,3 +209,28 @@ describe("the other kinds of pass", () => {
     expect(screen.queryByText(/Check-in in/)).toBeNull();
   });
 });
+
+describe("a booking's cost", () => {
+  const stay = segment({ id: 2, kind: "hotel", provider: "Marriott", origin: "Harbour Hotel", destination: null, confirmation: "HT5521", start_local: "2026-11-21T15:00", start_zone: LON, end_local: "2026-11-27T10:00", end_zone: LON, details: { address: "1 Quay Street, London", room: "412" } });
+  const nowStay = instant("2026-11-21T10:00", LON);
+
+  it("is a fact on the card in its own currency", () => {
+    render(PassCard, { segment: { ...stay, price: { amount_minor: 31000, currency: "EUR", source: "email" } }, now: nowStay });
+    expect(screen.getByText("Cost")).toBeInTheDocument();
+    expect(screen.getByText(/€310\.00/)).toBeInTheDocument();
+  });
+  it("is absent when the booking has none", () => {
+    render(PassCard, { segment: stay, now: nowStay });
+    expect(screen.queryByText("Cost")).toBeNull();
+  });
+  it("is struck through and noted as not counted when the booking is cancelled", () => {
+    render(PassCard, { segment: { ...stay, status: "cancelled", price: { amount_minor: 124000, currency: "USD", source: "manual" } }, now: nowStay });
+    expect(screen.getByText(/\$1,240\.00/)).toHaveClass("line-through");
+    expect(screen.getByText("Cancelled, so not in the trip’s total")).toBeInTheDocument();
+  });
+  it("is left to the caller on a card that holds several bookings", () => {
+    const other = { ...stay, id: 99, price: { amount_minor: 100, currency: "USD", source: "email" as const } };
+    render(PassCard, { segment: { ...stay, price: { amount_minor: 31000, currency: "EUR", source: "email" } }, bookings: [stay, other], now: nowStay });
+    expect(screen.queryByText("Cost")).toBeNull();
+  });
+});

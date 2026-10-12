@@ -211,3 +211,27 @@ describe("the long flight warning", () => {
     expect(longFlightWarning("2026-12-05T07:15", "2026-12-04T21:50", BOS, DEN)).toBeNull();
   });
 });
+
+describe("the cost", () => {
+  const priced = (extra: Partial<Draft> = {}): Draft => flight({ cost: "1,240.50", currency: "eur", ...extra });
+
+  it("is sent in the currency's smallest unit with an upper-case code, and as null when the amount is empty", () => {
+    expect(body(priced()).price).toEqual({ amount_minor: 124050, currency: "EUR" });
+    expect(body(priced({ cost: "", costSource: "manual" })).price).toBeNull();
+    expect(body(priced({ cost: "" }))).not.toHaveProperty("price");
+    expect(body(priced({ cost: "12300", currency: "JPY" })).price).toEqual({ amount_minor: 12300, currency: "JPY" });
+  });
+  it("starts from the booking's price, noting where it came from, and from the trip's currency when there is none", () => {
+    const withCost = draftOf(segment({ price: { amount_minor: 31000, currency: "EUR", source: "email" } }));
+    expect(withCost).toMatchObject({ cost: "310.00", currency: "EUR", costSource: "email" });
+    expect(draftOf(segment(), "GBP")).toMatchObject({ cost: "", currency: "GBP", costSource: null });
+    expect(blank(1, "CAD").currency).toBe("CAD");
+    expect(blank(1).currency).toBe("USD");
+  });
+  it("is checked only when an amount is given", () => {
+    expect(problem(priced())).toBeNull();
+    expect(problem(priced({ cost: "abc" }))).toBe("Enter the cost as an amount like 1240.00");
+    expect(problem(priced({ currency: "dollars" }))).toBe("Enter the cost’s currency as a three-letter code like USD");
+    expect(problem(priced({ cost: "", currency: "x" }))).toBeNull();
+  });
+});

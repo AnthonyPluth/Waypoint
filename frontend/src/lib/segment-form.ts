@@ -1,4 +1,5 @@
 import type { Segment, SegmentBody, SegmentEdit } from "./api-types";
+import { amountText, toMinor } from "./money";
 import { instant, untimed } from "./trips";
 
 export type Kind = Segment["kind"];
@@ -18,6 +19,8 @@ export const DETAILS: Record<Kind, [string, string][]> = {
 };
 
 export const SEAT_LIMIT = 10;
+
+export const DEFAULT_CURRENCY = "USD";
 
 export const SEATED: Kind[] = ["flight", "train"];
 export const FOR_EVERYONE: Kind[] = ["hotel", "car", "parking"];
@@ -45,15 +48,18 @@ export type Draft = {
   seats: Record<string, string>;
   people: number[];
   printed: string[];
+  cost: string;
+  currency: string;
+  costSource: "email" | "manual" | null;
   untimed?: [string, string];
 };
 
-export const blank = (tripId: number | null = null): Draft => ({
+export const blank = (tripId: number | null = null, currency = DEFAULT_CURRENCY): Draft => ({
   id: null, tripId, kind: "flight", status: "confirmed", provider: "", confirmation: "", origin: "", destination: "", start_local: "", end_local: "",
-  start_zone: "", end_zone: "", details: {}, itinerary: [], manage_url: "", seats: {}, people: [], printed: [],
+  start_zone: "", end_zone: "", details: {}, itinerary: [], manage_url: "", seats: {}, people: [], printed: [], cost: "", currency, costSource: null,
 });
 
-export const draftOf = (s: Segment): Draft => ({
+export const draftOf = (s: Segment, currency = DEFAULT_CURRENCY): Draft => ({
   id: s.id, tripId: s.trip_id, kind: s.kind, status: s.status, provider: s.provider ?? "", confirmation: s.confirmation ?? "", origin: s.origin ?? "",
   destination: s.destination ?? "", start_local: s.start_local, end_local: s.end_local,
   start_zone: s.kind === "flight" ? "" : s.start_zone, end_zone: s.kind === "flight" ? "" : s.end_zone,
@@ -64,6 +70,7 @@ export const draftOf = (s: Segment): Draft => ({
   })),
   people: s.travelers.flatMap((t) => (t.person_id === null ? [] : [t.person_id])),
   printed: s.travelers.flatMap((t) => (t.person_id === null ? [t.name] : [])),
+  cost: s.price ? amountText(s.price.amount_minor, s.price.currency) : "", currency: s.price?.currency ?? currency, costSource: s.price?.source ?? null,
   ...(untimed(s) && { untimed: [s.start_local, s.end_local] as [string, string] }),
 });
 
@@ -119,11 +126,21 @@ export function problem(d: Draft): string | null {
   }
   for (const seat of Object.values(d.seats)) if (seat.trim().length > SEAT_LIMIT) return `A seat is at most ${SEAT_LIMIT} characters`;
   if (d.manage_url.trim() && !/^https?:\/\//i.test(d.manage_url.trim())) return "The manage link must start with https:// or http://";
+  if (d.cost.trim()) {
+    if (!/^[A-Za-z]{3}$/.test(d.currency.trim())) return "Enter the cost’s currency as a three-letter code like USD";
+    if (toMinor(d.cost, d.currency.trim().toUpperCase()) === null) return "Enter the cost as an amount like 1240.00";
+  }
   if (!FOR_EVERYONE.includes(d.kind) && d.people.length + d.printed.length === 0) return "Choose who’s travelling";
   return null;
 }
 
 const text = (v: string): string | null => v.trim() || null;
+
+export function priceOf(d: Pick<Draft, "cost" | "currency">): { amount_minor: number; currency: string } | null {
+  const currency = d.currency.trim().toUpperCase();
+  const amount = d.cost.trim() ? toMinor(d.cost, currency) : null;
+  return amount === null ? null : { amount_minor: amount, currency };
+}
 
 export function body(d: Draft): SegmentBody & SegmentEdit {
   const flight = d.kind === "flight";
@@ -143,7 +160,7 @@ export function body(d: Draft): SegmentBody & SegmentEdit {
     ...(flight || d.kind === "car" || d.kind === "train" ? { ...(startZone && { start_zone: startZone }), ...(d.end_zone.trim() && { end_zone: d.end_zone.trim() }) }
       : d.kind === "hotel" || d.kind === "parking" ? { start_zone: startZone || null }
         : { start_zone: startZone, end_zone: endZone }),
-    details, manage_url: text(d.manage_url),
+    details, manage_url: text(d.manage_url), ...(d.cost.trim() || d.costSource ? { price: priceOf(d) } : {}),
     ...(flight || d.kind !== "cruise" ? {} : { itinerary: d.itinerary.map((p) => ({ name: p.name.trim(), zone: p.zone.trim(), arrive_local: p.arrive || null, depart_local: p.depart || null })) }),
     ...(FOR_EVERYONE.includes(d.kind) ? {} : { travelers: [...d.people.map((id) => ({ person_id: id, ...seat(id) })), ...d.printed.map((name) => ({ person_id: null, name, ...seat(name) }))] }),
   };

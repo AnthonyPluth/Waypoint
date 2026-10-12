@@ -11,15 +11,16 @@
   import { Button } from "$lib/components/ui/button";
   import { flightStatus, statusFor } from "$lib/flightstatus.svelte";
   import { isMobile } from "$lib/platform";
+  import { formatMoney } from "$lib/money";
   import { segmentChips } from "$lib/status";
   import { appWord, dayLabel, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
 
   type Props = {
     segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
-    as?: "section" | "li"; id?: string; highlight?: boolean; label?: string; showCode?: boolean; showApp?: boolean; omit?: string[]; condensed?: boolean;
+    as?: "section" | "li"; id?: string; highlight?: boolean; label?: string; showCode?: boolean; showApp?: boolean; omit?: string[]; condensed?: boolean; showCost?: boolean;
     live?: Snippet; footer?: Snippet; times?: Snippet; details?: Snippet;
   };
-  let { segment: s, bookings = [s], now = Date.now(), eyebrow = "", pulse = false, level = 3, class: cls = "", as: tag = "section", id, highlight = false, label, showCode = true, showApp = true, omit = [], condensed = false,
+  let { segment: s, bookings = [s], now = Date.now(), eyebrow = "", pulse = false, level = 3, class: cls = "", as: tag = "section", id, highlight = false, label, showCode = true, showApp = true, omit = [], condensed = false, showCost = true,
     live: liveArea, footer, times: timesArea, details }: Props = $props();
 
   const flight = $derived(s.kind === "flight");
@@ -46,7 +47,8 @@
           : s.kind === "cruise" ? [["Ship", s.details.ship], ["Cabin", s.details.room], ["Deck", s.details.deck]]
             : [["Seat", seat], ["Cabin", s.details.cabin]],
   );
-  const facts = $derived(rows.filter((f): f is [string, string] => !!f[1] && !omit.includes(f[0])));
+  const cost = $derived(showCost && bookings.length === 1 && s.price ? formatMoney(s.price.amount_minor, s.price.currency) : "");
+  const facts = $derived([...rows, ["Cost", cost] as [string, string]].filter((f): f is [string, string] => !!f[1] && !omit.includes(f[0])));
 </script>
 
 <svelte:element this={tag} {id} class={`pass scroll-mt-20 ${cls}`} class:ring-2={highlight} class:ring-ring={highlight} class:opacity-80={cancelled} aria-label={label ?? (tag === "section" ? headline(s) : undefined)} data-kind={s.kind} data-progress={flight ? progress : undefined}>
@@ -123,7 +125,8 @@
     {#if facts.length}
       <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
         {#each facts as [label, value] (label)}
-          <div class="min-w-0"><dt class="eyebrow">{label}</dt><dd class="mt-1 break-words text-base font-medium">{value}</dd></div>
+          <div class="min-w-0"><dt class="eyebrow">{label}</dt><dd class="mt-1 break-words text-base font-medium" class:line-through={label === "Cost" && cancelled}>{value}</dd>
+            {#if label === "Cost" && cancelled}<dd class="text-sm text-muted-foreground">Cancelled, so not in the trip’s total</dd>{/if}</div>
         {/each}
       </dl>
     {/if}

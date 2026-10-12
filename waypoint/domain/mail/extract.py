@@ -18,8 +18,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from ... import monitoring
 from ...providers import mailimages
 from ...storage.stored_mail import Content, Image
-from .. import seatmaps
-from . import cars, cruises, flights, lodging, parsers, references, safe_html, seats, trains, triage, words
+from .. import money, seatmaps
+from . import cars, cruises, flights, lodging, parsers, price, references, safe_html, seats, trains, triage, words
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger
@@ -49,6 +49,7 @@ class Message:
     other_markup: bool = False
     forwarded_by: str | None = None
     revises: bool = False
+    price: money.Price | None = None
     found: references.Found = field(default=references.Found(), repr=False, compare=False)
 
 
@@ -384,8 +385,10 @@ def _bookings(nodes: list[dict[str, Any]]) -> tuple[list[Booking], int, bool, li
                 if made is None:
                     unread += 1
                     gaps += _gaps(RESERVATIONS[t], node)
-                elif made not in found:
-                    found.append(made)
+                else:
+                    made = replace(made, price=price.structured(node.get("totalPrice"), node.get("priceCurrency")))
+                    if made not in found:
+                        found.append(made)
             elif t.endswith("Reservation"):
                 seen, unread = True, unread + 1
                 gaps.append("another kind of reservation")
@@ -586,11 +589,13 @@ def read(message: Mapping[str, Any]) -> Message:
                 break
             if why:
                 gaps.append(f"generic reader: {why}")
+    bookings = price.assign(bookings, visible)
     if any(utc_marked(t) for b in bookings for t in (b.start, b.end)):
         shown = clock_times(_visible(htmls, texts))
         bookings = [replace(b, clock_times=shown) if utc_marked(b.start) or utc_marked(b.end) else b for b in bookings]
     return Message(sender, received, tuple(bookings), unread, markup=seen, gaps=tuple(gaps), other_markup=other, forwarded_by=forwarded_by,
                    revises=bool(triage.CHANGES.search(subject) or words.CANCEL.search(subject) or references.changes(visible)),
+                   price=price.read(visible) if not bookings and not unread and not words.CANCEL.search(subject) else None,
                    found=references.read(subject, visible) if not bookings and not unread else references.Found())
 
 
