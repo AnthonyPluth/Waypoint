@@ -124,6 +124,7 @@
     tick().then(() => document.getElementById(`segment-${wanted}`)?.scrollIntoView({ block: "start" }));
   });
 
+  const done = $derived(trip?.done_at != null);
   const over = $derived(trip ? isPast(trip, dayIn(now, viewerZone())) : false);
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
   const everyone = $derived(trip ? tripTravellers(trip.segments) : []);
@@ -471,11 +472,13 @@
 {/snippet}
 
 {#snippet buttons(s: Segment, name: string)}
-  <div class="flex flex-wrap gap-2">
-    <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => edit(s)}>Edit</Button>
-    <Button variant="outline" size="sm" aria-label={`Move ${name}`} onclick={() => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); }}>Move</Button>
-    <Button variant="outline" size="sm" aria-label={`Remove ${name}`} onclick={() => { removing = s; asking = true; }}>Remove</Button>
-  </div>
+  {#if !done}
+    <div class="flex flex-wrap gap-2">
+      <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => edit(s)}>Edit</Button>
+      <Button variant="outline" size="sm" aria-label={`Move ${name}`} onclick={() => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); }}>Move</Button>
+      <Button variant="outline" size="sm" aria-label={`Remove ${name}`} onclick={() => { removing = s; asking = true; }}>Remove</Button>
+    </div>
+  {/if}
 {/snippet}
 
 <ConfirmDialog bind:open={deleting} title={`Delete ${trip?.name ?? "this trip"}?`} confirmLabel="Delete trip" busyLabel="Deleting…" destructive

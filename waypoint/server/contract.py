@@ -485,6 +485,7 @@ class Trip(TypedDict):
     booked_by: int | None
     emails: int
     can_clear_emails: bool
+    done_at: float | None
     people: list[int]
     costs: TripCosts
     segments: list[Segment]

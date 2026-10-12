@@ -4,7 +4,7 @@ import time
 from datetime import date, timedelta
 from unittest import mock
 
-from sqlalchemy import delete, event, insert, select
+from sqlalchemy import delete, event, insert, select, update
 
 from waypoint import oidc
 from waypoint.domain import offline, people, trips
@@ -200,6 +200,35 @@ class ClearEmailsTests(ServerCase):
         self.assertEqual(self.clear("ana", seg["trip_id"]), (200, {"removed": 1}))
         self.assertEqual(self.clear("ana", seg["trip_id"]), (200, {"removed": 0}))
 
+    def test_pressing_done_marks_the_trip_done_once_and_nothing_before_it_does(self):
+        seg = self.book(days(-20), days(-19))
+        other = self.book(days(-60), days(-59), confirmation="OLDER1")
+        self.keep("m", seg["id"])
+        self.assertIsNone(self.trip("ana", seg["trip_id"])["done_at"])
+        before = time.time()
+        self.assertEqual(self.clear("ana", seg["trip_id"]), (200, {"removed": 1}))
+        first = self.trip("ana", seg["trip_id"])["done_at"]
+        self.assertGreaterEqual(first, before)
+        self.assertLessEqual(first, time.time())
+        self.assertIsNone(self.trip("ana", other["trip_id"])["done_at"])
+        _, listed = self.call("ana", "GET", "/api/trips")
+        self.assertEqual({t["id"]: t["done_at"] is not None for t in listed["trips"]}, {seg["trip_id"]: True, other["trip_id"]: False})
+        with mock.patch("waypoint.server.api.trips.time.time", return_value=first + 500):
+            self.assertEqual(self.clear("ana", seg["trip_id"]), (200, {"removed": 0}))
+        self.assertEqual(self.trip("ana", seg["trip_id"])["done_at"], first)
+
+    def test_the_done_time_is_in_the_copy_saved_on_the_device(self):
+        seg = self.book(days(-2), days(3))
+        with db.session() as conn:
+            conn.execute(update(Trip).where(Trip.id == seg["trip_id"]).values(done_at=1234.5))
+            got = offline.projection(conn, Viewer(self.person["ana"]), TODAY)
+        self.assertEqual(got["trip"]["done_at"], 1234.5)
+
+    def test_someone_who_cannot_see_the_trip_cannot_mark_it_done(self):
+        seg = self.book(days(-20), days(-19))
+        self.assertEqual(self.clear("cy", seg["trip_id"])[0], 404)
+        self.assertIsNone(self.trip("ana", seg["trip_id"])["done_at"])
+
     def test_a_trip_that_has_no_messages_removes_none(self):
         seg = self.book(days(-20), days(-19))
         self.assertEqual(self.trip("ana", seg["trip_id"])["can_clear_emails"], False)
@@ -218,6 +247,7 @@ class ClearEmailsTests(ServerCase):
                 self.assertIn("at least 7 days ago", body["error"])
                 self.assertIn(f"m-{name}", self.kept())
                 self.assertEqual(self.trip("ana", seg["trip_id"])["emails"], 1)
+                self.assertIsNone(self.trip("ana", seg["trip_id"])["done_at"])
 
     def test_seven_days_after_the_end_is_the_first_day_it_works(self):
         seg = self.book(days(-9), days(-7))
@@ -271,7 +301,7 @@ class OfflineAfterClearTests(ServerCase):
             self.assertIn(BODY_CANARY, json.dumps(offline.projection(conn, ana, TODAY)))
             with no_leaks(self, SUBJECT_CANARY, BODY_CANARY):
                 with self.assertRaises(trips.Invalid):
-                    trips.clear_emails(conn, ana, seg["trip_id"], TODAY)
-                self.assertEqual(trips.clear_emails(conn, ana, seg["trip_id"], days(10)), 1)
+                    trips.clear_emails(conn, ana, seg["trip_id"], TODAY, 1.0)
+                self.assertEqual(trips.clear_emails(conn, ana, seg["trip_id"], days(10), 1.0), 1)
             self.assertNotIn(BODY_CANARY, json.dumps(offline.projection(conn, ana, TODAY)))
             self.assertEqual(offline.projection(conn, ana, TODAY)["messages"], [])

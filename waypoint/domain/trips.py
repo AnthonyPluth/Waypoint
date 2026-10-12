@@ -189,6 +189,7 @@ class TripOut(TypedDict):
     booked_by: int | None
     emails: int
     can_clear_emails: bool
+    done_at: float | None
     people: list[int]
     costs: CostsOut
     segments: list[SegmentOut]
@@ -579,7 +580,7 @@ def _trip_outs(conn: db.Connection, viewer: Viewer, trips: Sequence[Trip], today
         return len(removable[trip.id])
     return [{"id": t.id, "name": t.name, "start_date": t.start_date, "end_date": t.end_date,
              "destination": t.destination, "destination_manual": t.destination_manual, "notes": t.notes, "auto": t.auto, "booked_by": t.booked_by,
-             "emails": (n := emails_of_trip(t)), "can_clear_emails": n > 0 and emails_clearable(t, day),
+             "emails": (n := emails_of_trip(t)), "can_clear_emails": n > 0 and emails_clearable(t, day), "done_at": t.done_at,
              "people": aboard[t.id], "costs": costs_of(mine := [s for s in outs if s["trip_id"] == t.id]), "segments": mine} for t in trips]
 
 
@@ -1085,14 +1086,17 @@ def email_image_of(conn: db.Connection, viewer: Viewer, segment_id: int, email: 
     return None if seg is None else stored_mail.image_for_segment(conn, seg.id, email, index)
 
 
-def clear_emails(conn: db.Connection, viewer: Viewer, trip_id: int, today: date) -> int | None:
+def clear_emails(conn: db.Connection, viewer: Viewer, trip_id: int, today: date, now: float) -> int | None:
     trip = visibility.visible_trip(conn, viewer, trip_id)
     if trip is None:
         return None
     if not emails_clearable(trip, today):
         raise Invalid(f"The saved emails can be removed once a trip has ended at least {EMAILS_CLEARABLE_AFTER_DAYS} days ago")
     segment_ids = [s.id for s in visibility.visible_segments(conn, viewer, [trip.id])]
-    return stored_mail.clear_for_segments(conn, segment_ids)
+    removed = stored_mail.clear_for_segments(conn, segment_ids)
+    if trip.done_at is None:
+        conn.execute(update(Trip).where(Trip.id == trip.id).values(done_at=now))
+    return removed
 
 
 def delete_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> bool:

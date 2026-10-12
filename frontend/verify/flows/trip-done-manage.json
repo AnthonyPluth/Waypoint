@@ -1,0 +1,16 @@
+{
+  "name": "trip-done-manage",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Orlando') >> visible=true" },
+    { "wait_for": "ul[aria-label='Bookings'] button[aria-label^='Edit ']" },
+    { "screenshot": "past-not-done" },
+    { "goto": "#trips" },
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('San Francisco') >> visible=true" },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "expect_text": { "selector": "main", "text": "Jane Doe" } },
+    { "screenshot": "past-done" }
+  ]
+}

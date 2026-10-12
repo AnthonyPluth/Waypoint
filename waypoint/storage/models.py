@@ -94,6 +94,7 @@ class Trip(Base):
     notes: Mapped[str | None]
     auto: Mapped[bool]
     booked_by: Mapped[int | None]
+    done_at: Mapped[float | None]
 
 
 class TripPerson(Base):

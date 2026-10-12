@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Mapping
 from datetime import date
 from typing import Any
@@ -214,7 +215,7 @@ def api_trip_remove(conn, _q, _b, trip_id) -> Ok:
 
 def api_trip_emails_clear(conn, _q, _b, trip_id) -> EmailsCleared:
     who, this = viewer(conn), row_id(trip_id, NO_TRIP)
-    removed = _run(lambda: trips.clear_emails(conn, who, this, date.today()), NO_TRIP)
+    removed = _run(lambda: trips.clear_emails(conn, who, this, date.today(), time.time()), NO_TRIP)
     monitoring.log(f"Removed {removed} saved emails of a trip")
     return {"removed": removed}
 
