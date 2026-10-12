@@ -4,6 +4,7 @@ name: Agent review
 # session that wrote it, reads the change against main's AGENTS.md and posts its findings as a comment. Its verdict is
 # the "Agent review" commit status on the pull request's head, which the merge gate requires (.github/scripts/
 # merge-gate.sh): a blocking finding fails it, and so does a review that couldn't run. A new push reviews again.
+# Marking a pull request ready does not review again (drafts are reviewed too); a review that errored needs a new push.
 #
 # A re-review reads what changed since the last one: the comment's hidden state line records the commit it read and
 # its verdict, and when the new head descends from it the reviewer also gets that review's findings and the diff since
@@ -44,7 +45,7 @@ name: Agent review
 on:  # zizmor: ignore[dangerous-triggers] -- runs main's workflow; the pull request's code is only read, never run
   pull_request_target:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened]
 
 permissions: {}
 
