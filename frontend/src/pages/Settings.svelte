@@ -17,18 +17,34 @@
   import RemindersSection from "$lib/components/settings/RemindersSection.svelte";
   import { flightStatus, loadFlightStatus } from "$lib/flightstatus.svelte";
   import { onMount } from "svelte";
-  import { cn } from "$lib/utils";
+  import ChevronLeft from "@lucide/svelte/icons/chevron-left";
 
   const s = $derived(app.state);
   const user = $derived(s?.user);
   let signingOut = $state(false);
   const flights = $derived(flightStatus.list);
   onMount(loadFlightStatus);
+  onMount(() => {
+    if (landing && !route.sub) {
+      history.replaceState(history.state, "", `${location.pathname}${location.search}#settings/${landing}`);
+      route.sub = landing;
+      landing = "";
+    }
+  });
 
-  const TABS = [["account", "Account"], ["mail", "Mail and AI"], ["travel", "Travel"], ["data", "Data"]] as const;
-  type Tab = (typeof TABS)[number][0];
-  const landing: Tab | "" = new URLSearchParams(location.search).has("gmail") ? "mail" : "";
-  const tab = $derived<Tab>((TABS.find(([id]) => id === route.sub)?.[0]) ?? (landing || "account"));
+  const GROUPS = [
+    { id: "account", label: "Account & household", about: "Who’s signed in, your household and the version.", tasks: ["Sign out", "Household members", "Version and advanced"] },
+    { id: "mail", label: "Mail & review", about: "Connect Gmail, reconnect it, choose what is read and set up AI suggestions.", tasks: ["Connect or reconnect Gmail", "Choose labels", "Ignored senders", "AI suggestions"] },
+    { id: "travel", label: "Travel preferences", about: "Where home is, miles or kilometres and brand logos.", tasks: ["Home", "Distances", "Brand logos"] },
+    { id: "offline", label: "Offline & notifications", about: "Keep your trip on this device, reminders and your calendar.", tasks: ["Offline access", "Reminders", "Calendar subscription"] },
+    { id: "assistants", label: "Connected assistants", about: "The AI assistants that can reach Waypoint, and what they may do.", tasks: ["Connect an assistant", "Disconnect an assistant", "Let an assistant read email"] },
+    { id: "backup", label: "Backup & import", about: "Download or restore a backup and import past flights.", tasks: ["Download a backup", "Restore a backup", "Import past flights"] },
+  ] as const;
+  type Group = (typeof GROUPS)[number]["id"];
+  const OLD_LINKS: Record<string, Group> = { data: "backup" };
+  let landing = $state<Group | "">(new URLSearchParams(location.search).has("gmail") ? "mail" : "");
+  const sub = $derived(OLD_LINKS[route.sub] ?? route.sub);
+  const group = $derived<(typeof GROUPS)[number] | undefined>(GROUPS.find((g) => g.id === sub) ?? GROUPS.find((g) => g.id === landing));
 
   const signOut = () => act(async () => {
     await clearSaved();
@@ -37,22 +53,31 @@
   }, { busy: (on) => (signingOut = on) });
 </script>
 
-<h1 class="mb-4 text-display">Settings</h1>
+<h1 class="mb-4 text-display">{group ? group.label : "Settings"}</h1>
 
-<nav aria-label="Settings sections" class="-mx-4 mb-6 overflow-x-auto px-4 md:mx-0 md:px-0">
-  <ul class="flex w-max gap-1 rounded-2xl bg-muted p-1 md:w-fit">
-    {#each TABS as [id, label] (id)}
-      <li>
-        <a href={`#settings/${id}`} aria-current={tab === id ? "page" : undefined}
-          class={cn("block rounded-xl px-4 py-2 phone:py-3 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-            tab === id ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground")}>{label}</a>
-      </li>
-    {/each}
-  </ul>
-</nav>
+{#if group}
+  <nav aria-label="Settings sections" class="mb-6">
+    <a href="#settings" class="inline-flex min-h-11 items-center gap-1 rounded-md py-2 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"><ChevronLeft class="size-4" aria-hidden="true" />All settings</a>
+  </nav>
+{:else}
+  <nav aria-label="Settings sections" class="mb-6">
+    <ul class="grid gap-3 md:grid-cols-2">
+      {#each GROUPS as g (g.id)}
+        <li class="rounded-2xl bg-card p-4 shadow-card">
+          <h2 class="font-medium"><a href={`#settings/${g.id}`} class="rounded-md underline-offset-2 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50">{g.label}</a></h2>
+          <p class="text-sm text-muted-foreground">{g.about}</p>
+          <ul class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+            {#each g.tasks as task (task)}<li><a href={`#settings/${g.id}`} class="rounded-md underline underline-offset-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">{task}</a></li>{/each}
+          </ul>
+        </li>
+      {/each}
+    </ul>
+  </nav>
+{/if}
 
+{#if group}
 <div class="space-y-8">
-  {#if tab === "account"}
+  {#if group.id === "account"}
   <section aria-labelledby="account-title" class="space-y-2">
     <h2 id="account-title" class="eyebrow px-1">Account</h2>
     <div class="rows">
@@ -76,38 +101,49 @@
     </div>
   </section>
 
+  <section aria-labelledby="household-title" class="space-y-2">
+    <h2 id="household-title" class="eyebrow px-1">Household</h2>
+    <div class="rows">
+      <div class="row">
+        <div><p class="font-medium">Household members</p><p class="text-sm text-muted-foreground">Who travels, and their loyalty and Known Traveler numbers.</p></div>
+        <Button variant="outline" href="#people">Open People</Button>
+      </div>
+    </div>
+  </section>
+
   <section aria-labelledby="about-title" class="space-y-2">
-    <h2 id="about-title" class="eyebrow px-1">About</h2>
+    <h2 id="about-title" class="eyebrow px-1">Advanced: for whoever runs Waypoint</h2>
     <dl class="rows">
       <div class="row"><dt class="text-muted-foreground">Version</dt><dd class="code normal-case">{s?.version}</dd></div>
       <div class="row"><dt class="text-muted-foreground">Database</dt><dd class="font-medium">{s?.database === "postgres" ? "Postgres" : "SQLite"}</dd></div>
       {#if flights}
         <div class="row" data-testid="flight-status-usage">
           <dt class="text-muted-foreground">Flight status</dt>
-          <dd class="font-medium">{flights.enabled ? `${flights.used} of ${flights.limit} calls used this month` : "Off (RAPIDAPI_KEY isn’t set)"}</dd>
+          <dd class="font-medium">{flights.enabled ? `${flights.used} of ${flights.limit} calls used this month` : "Live flight status has not been enabled by your administrator."}</dd>
         </div>
       {/if}
     </dl>
   </section>
-  {:else if tab === "mail"}
+  {:else if group.id === "mail"}
     <GmailSection />
 
     <AiSection />
-  {:else if tab === "travel"}
-    <RemindersSection />
-
+  {:else if group.id === "travel"}
     <HomeSection />
 
     <DistanceSection />
 
     <LogosSection />
-
-    <ImportSection />
-  {:else}
+  {:else if group.id === "offline"}
     <OfflineSection />
 
+    <RemindersSection />
+  {:else if group.id === "assistants"}
     <McpSection />
-
+  {:else}
     <DataSection />
+
+    <ImportSection />
   {/if}
 </div>
+{/if}

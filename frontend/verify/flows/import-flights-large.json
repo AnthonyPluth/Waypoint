@@ -2,7 +2,7 @@
   "name": "import-flights-large",
   "page": "settings",
   "steps": [
-    { "goto": "#settings/travel" },
+    { "goto": "#settings/backup" },
     { "upload": { "selector": "[aria-labelledby=import-title] input[type=file]", "file": "tests/fixtures/flight_import/flighty_large.csv" } },
     { "wait_for": "[data-testid=import-preview]" },
     { "expect_text": { "selector": "[data-testid=import-preview]", "text": "227 new flights" } },

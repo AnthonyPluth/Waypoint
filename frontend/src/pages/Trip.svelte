@@ -25,6 +25,7 @@
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
   import MessageView from "$lib/components/MessageView.svelte";
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
+  import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
@@ -303,6 +304,7 @@
           {#if countNote(t.costs)}<span class="text-muted-foreground"> · {countNote(t.costs)}</span>{/if}</p>
       {/if}
       {#if t.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
+      <OfflineStatus tripId={t.id} />
     </div>
     {#if !form}
       <div class="flex flex-wrap gap-2">

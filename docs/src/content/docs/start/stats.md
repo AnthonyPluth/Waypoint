@@ -11,7 +11,7 @@ Waypoint adds up what you have flown, stayed and driven. The numbers come from `
 
 Pick **who** (you by default, any member or guest, or Everyone) and **when** (All time, or a year that has something to count); the choice is kept in the address, so you can link it. The page opens with a row of big headline totals (flights, distance, countries and nights away, each left out when there is nothing to total). Below it the page is in sections: **Where you’ve been** (the map and the countries), then **Flights**, **Hotels**, **Cars**, **Parking** and **Cruises**, each with its own big numbers and top five lists (Show all lists the rest), and, for flights and hotels, records. Flights also show how far that is around the Earth and toward the Moon, and your cabin and seat split. A section you have nothing finished for isn’t shown. A person or year with nothing finished says so, with links to add a trip or import past flights.
 
-Miles or kilometres is a household setting, under **Settings → Travel → Distances** (`GET` and `POST /api/distance-unit`).
+Miles or kilometres is a household setting, under **Settings → Travel preferences → Distances** (`GET` and `POST /api/distance-unit`).
 
 ## Who and when
 
