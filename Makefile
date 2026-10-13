@@ -21,7 +21,7 @@ PG_JOBS ?= $(shell tools/test_jobs.sh)
 # so it goes through pipx, on pipx's own Python.
 SEMGREP ?= pipx run semgrep==1.146.0
 
-.PHONY: check lint python-lint frontend-lint semgrep test test-parallel test-pg test-timings fix \
+.PHONY: setup check lint python-lint frontend-lint semgrep test test-parallel test-pg test-timings fix \
 	frontend-check frontend-typecheck frontend-test frontend-build docs docs-build verify feature-map feature-map-check \
 	fleet-checks api-contract api-contract-check pr-screenshots
 
@@ -69,6 +69,12 @@ test-timings:
 # Applies ruff's safe fixes (unused imports and the like); review the diff before committing.
 fix:
 	$(RUFF) check --fix .
+
+# A fresh checkout's dependencies: Poetry's environment (Python and its dev tools) and the web app's packages. The cloud
+# container does this itself (.claude/hooks/session-start.sh); on your own machine it's the first command to run.
+setup:
+	poetry install --no-root --no-interaction
+	cd frontend && $(NPM) ci --no-audit --no-fund
 
 # Reinstalled whenever package-lock.json is newer, so a pull that adds a dependency picks it up.
 frontend/node_modules: frontend/package-lock.json

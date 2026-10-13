@@ -32,3 +32,6 @@ frontend/junit.xml
 
 # make verify: screenshots and the report
 artifacts/
+
+# Subagents' git worktrees (AGENTS.md, "Working in a container")
+.claude/worktrees/
