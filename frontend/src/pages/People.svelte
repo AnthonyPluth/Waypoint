@@ -37,6 +37,7 @@
 
   type Draft = { id: number | null; member: boolean; display_name: string; first_name: string; legal_name: string; aliases: string };
   let draft = $state<Draft | null>(null);
+  let advancedOpen = $state(false);
   let formError = $state("");
   let saving = $state(false);
   let inSheet = $state(false);
@@ -46,12 +47,13 @@
   const personBase = baseline(() => draft);
   const personGuard = draftGuard({ dirty: () => draft !== null && personBase.changed(), saving: () => saving, discard: () => { draft = null; } });
   const startAdd = () => leave(() => {
-    inSheet = viewport.phone; draft = { id: null, member: false, display_name: "", first_name: "", legal_name: "", aliases: "" }; formError = "";
+    inSheet = viewport.phone; draft = { id: null, member: false, display_name: "", first_name: "", legal_name: "", aliases: "" }; advancedOpen = false; formError = "";
     personBase.reset();
   });
   const startEdit = (p: Person) => leave(() => {
     inSheet = viewport.phone;
     draft = { id: p.id, member: p.member, display_name: p.display_name, first_name: p.first_name ?? "", legal_name: p.legal_name ?? "", aliases: p.aliases.join("\n") };
+    advancedOpen = p.aliases.length > 0;
     formError = "";
     personBase.reset();
   });
@@ -182,7 +184,7 @@
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Legal name</span>
       <Input bind:value={d.legal_name} maxlength={200} autocomplete="off" />
       <span class="text-muted-foreground">The name on their ID and bookings, used to match them.</span></label>
-    <details class="rounded-xl border border-input px-3 py-2 text-sm" open={d.aliases !== ""}>
+    <details class="rounded-xl border border-input px-3 py-2 text-sm" bind:open={advancedOpen}>
       <summary class="min-h-11 cursor-pointer py-2.5 font-medium focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none">Advanced matching</summary>
       <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name aliases</span>
         <textarea bind:value={d.aliases} rows="3" autocomplete="off" spellcheck="false" placeholder={"DOE/JANE MS"}
@@ -282,7 +284,7 @@
                         {/if}</p>
                       {#if itemDetails(m)}<p class="break-words text-muted-foreground">{itemDetails(m)}</p>{/if}
                     </div>
-                    <div class="-mt-3 -mr-2 flex shrink-0">
+                    <div class="-mt-2 mb-2 -mr-2 flex shrink-0">
                       <Button variant="ghost" size="icon" class="size-11 text-muted-foreground" aria-label={`Edit ${p.display_name}’s ${m.program}`} title="Edit" onclick={() => startEditId(m)}><Pencil class="size-4" /></Button>
                       <Button variant="ghost" size="icon" class="size-11 text-muted-foreground" aria-label={`Remove ${p.display_name}’s ${m.program}`} title="Remove" onclick={() => { idRemoving = m; idAsking = true; }}><Trash class="size-4" /></Button>
                     </div>

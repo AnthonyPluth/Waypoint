@@ -221,6 +221,35 @@ describe("People", () => {
     expect(screen.queryByRole("form")).toBeNull();
   });
 
+  it("keeps Advanced matching open while the last alias is deleted or replaced", async () => {
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Mia Doe" }));
+    const details = screen.getByText("Advanced matching").closest("details")!;
+    expect(details.open).toBe(true);
+    const aliases = screen.getByLabelText(/Name aliases/);
+    await userEvent.clear(aliases);
+    expect(details.open).toBe(true);
+    await userEvent.type(aliases, "DOE/MIA");
+    expect(details.open).toBe(true);
+    expect(screen.getByLabelText(/Name aliases/)).toBeVisible();
+  });
+
+  it("starts Advanced matching closed for a person with no aliases", async () => {
+    render(People);
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Jane Doe" }));
+    expect(screen.getByText("Advanced matching").closest("details")!.open).toBe(false);
+  });
+
+  it("gives each membership's action buttons a full 44 px row, so stacked rows can't overlap", async () => {
+    ids = [aa, { ...aa, id: 13, program: "Other" }];
+    render(People);
+    const edit = await screen.findByRole("button", { name: "Edit Jane Doe’s American AAdvantage" });
+    const cls = edit.parentElement!.className;
+    expect(cls).toContain("-mt-2");
+    expect(cls).toContain("mb-2");
+    expect(cls).not.toContain("-mt-3");
+  });
+
   it("edits a member without offering their login", async () => {
     render(People);
     await userEvent.click(await screen.findByRole("button", { name: "Edit Jane Doe" }));
