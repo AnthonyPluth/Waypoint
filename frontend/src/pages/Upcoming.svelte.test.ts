@@ -137,6 +137,40 @@ describe("Upcoming", () => {
     expect(await navigator.clipboard.readText()).toBe("KQ7M2X");
   });
 
+  it("starts an ongoing trip's timeline at today and keeps the earlier days behind a keyboard-reachable disclosure", async () => {
+    at("2026-11-27T08:00:00+00:00");
+    serve([london]);
+    render(Upcoming);
+    const toggle = await screen.findByText(/Earlier in this trip · 2 days/);
+    expect(toggle.closest("details")).not.toHaveAttribute("open");
+    expect(toggle.tagName).toBe("SUMMARY");
+    const days = screen.getByRole("list", { name: "Trip to London, day by day" });
+    expect(within(days).getByRole("heading", { name: /Today/ })).toBeInTheDocument();
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(toggle);
+    expect(toggle.closest("details")).toHaveAttribute("open");
+    expect(within(screen.getByRole("list", { name: "Trip to London, earlier days" })).getAllByRole("heading", { level: 3 })).toHaveLength(2);
+  });
+
+  it("offers no earlier days before a trip starts", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    expect(screen.queryByText(/Earlier in this trip/)).toBeNull();
+  });
+
+  it("shows Directions and Call for the stay under way, in place of the app link", async () => {
+    at("2026-11-21T08:00:00Z");
+    const here = segment({ ...stay, links: { app: "https://example.test/app", open: null, open_kind: null, directions: "https://maps.example/dir", call: "tel:+442000000000" } });
+    serve([trip([outbound, here])]);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "Harbour Hotel" })).closest("section")!;
+    expect(within(card).getByRole("link", { name: "Directions" })).toHaveAttribute("href", "https://maps.example/dir");
+    expect(within(card).getByRole("link", { name: "Call" })).toHaveAttribute("href", "tel:+442000000000");
+    expect(within(card).queryByRole("link", { name: /app/i })).toBeNull();
+    expect(within(card).getByRole("button", { name: /Copy confirmation code H88231/ })).toBeInTheDocument();
+  });
+
   it("counts down to check-in until it opens, 24 hours before departure", async () => {
     at("2026-11-18T09:00:00-05:00");
     serve([london]);
@@ -342,7 +376,7 @@ describe("Upcoming", () => {
     expect(within(days).getByRole("link", { name: "Harbour Hotel" })).toHaveAttribute("href", "#trip/1?segment=2");
     expect(within(days).getByRole("link", { name: "Check-out: Harbour Hotel" })).toHaveAttribute("href", "#trip/1?segment=2");
     expect(within(days).getByRole("link", { name: "JFK → LHR" })).toHaveAttribute("href", "#trip/1?segment=1");
-    expect(screen.getByRole("link", { name: "Open Trip to London" })).toHaveAttribute("href", "#trip/1?segment=1");
+    expect(screen.getByRole("link", { name: "Open trip: Trip to London" })).toHaveAttribute("href", "#trip/1?segment=1");
   });
 
   it("shows a time at its place and never a second time in your zone", async () => {

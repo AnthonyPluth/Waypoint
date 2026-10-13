@@ -9,6 +9,9 @@
       }
     },
     {
+      "click": "summary:has-text('Earlier in this trip')"
+    },
+    {
       "wait_for": "ol[aria-label$='day by day'] li.row-tap time"
     },
     {

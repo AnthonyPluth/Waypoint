@@ -1,0 +1,11 @@
+{
+  "name": "upcoming-earlier-days",
+  "page": "upcoming",
+  "steps": [
+    { "wait_for": "summary:has-text('Earlier in this trip')" },
+    { "screenshot": "collapsed" },
+    { "press": { "selector": "summary:has-text('Earlier in this trip')", "key": "Enter" } },
+    { "expect_text": { "selector": "ol[aria-label$='earlier days']", "text": "Harbour Hotel" } },
+    { "screenshot": "expanded" }
+  ]
+}
