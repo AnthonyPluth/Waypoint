@@ -104,7 +104,7 @@
 {:else}
   {#if next}
     {@const s = next.segment}
-    <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-8" condensed eyebrow={next.state === "now" ? "Under way" : "Next up"} pulse={next.state === "now"}>
+    <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-8" condensed eyebrow={next.state === "now" ? (s.kind === "flight" ? "In the air, by schedule" : "Under way") : "Next up"} pulse={next.state === "now"}>
       {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
       {#snippet footer()}<span class="flex flex-wrap gap-2"><GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm">Open {next.trip.name}</Button></span>{/snippet}
     </PassCard>

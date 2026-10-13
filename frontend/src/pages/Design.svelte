@@ -39,7 +39,7 @@
   const type = [
     { name: "Display", cls: "text-display", sample: "K7Q2ZM" },
     { name: "Title", cls: "text-title", sample: "Upcoming" },
-    { name: "Heading", cls: "text-heading", sample: "Check-in is open" },
+    { name: "Heading", cls: "text-heading", sample: "Scheduled departure in 3 h" },
     { name: "Body", cls: "text-body", sample: "Departs at 7:05 AM from Terminal 1." },
     { name: "Caption", cls: "text-caption text-muted-foreground", sample: "As of 6:42 AM" },
     { name: "Eyebrow", cls: "text-eyebrow uppercase text-muted-foreground", sample: "Next up" },

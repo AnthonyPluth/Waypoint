@@ -33,7 +33,7 @@ afterEach(() => { flightStatus.list = null; });
 describe("a flight pass", () => {
   it("leads with the headline, then the code as the largest element, then the flight", () => {
     render(PassCard, goes());
-    expect(screen.getByText("Check-in is open, departs in 3 h")).toBeInTheDocument();
+    expect(screen.getByText("Check-in usually open, scheduled departure in 3 h")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toHaveClass("text-display");
     expect(screen.getByText("American Airlines AA 101")).toBeInTheDocument();
     expect(screen.getByText("JFK")).toBeInTheDocument();
@@ -120,7 +120,7 @@ describe("the plane on a pass", () => {
     flightStatus.list = list();
     const { container } = render(PassCard, { segment: flight, now: dep + (arr - dep) / 2 });
     expect(progressOf(container)).toBe("0.5");
-    expect(screen.getByText("Under way, arrives in 3 h 35 min")).toBeInTheDocument();
+    expect(screen.getByText("Scheduled arrival in 3 h 35 min")).toBeInTheDocument();
   });
   it("says it is worked out from the booked times", () => {
     render(PassCard, goes());
@@ -139,7 +139,7 @@ describe("live status on a pass", () => {
     flightStatus.list = list();
     render(PassCard, goes());
     expect(screen.getByText("Delayed 50 min")).toBeInTheDocument();
-    expect(screen.getByText("Check-in is open, departs in 3 h")).toBeInTheDocument();
+    expect(screen.getByText("Check-in usually open, scheduled departure in 3 h")).toBeInTheDocument();
     expect(screen.getByText(/50 min late · Gate B24 · as of/)).toBeInTheDocument();
     expect(screen.getByText("Gate")).toBeInTheDocument();
   });
@@ -250,5 +250,47 @@ describe("a past trip with no times", () => {
     render(PassCard, { segment: { ...visit, kind: "hotel", origin: "Harbour Hotel", destination: null, details: { time_unknown: "yes" } }, now: instant("2005-03-10T10:00", LON) });
     expect(screen.getByText("Time not recorded")).toBeInTheDocument();
     expect(screen.getAllByText(/time not recorded/)).toHaveLength(2);
+  });
+});
+
+describe("evidence on a pass", () => {
+  const fresh = (extra: Partial<FlightStatus> = {}) => list({ statuses: [status({ fetched_at: new Date(dep + HOUR).toISOString(), ...extra })] });
+  const midway = dep + 2 * HOUR;
+
+  it("labels the plane as based on the schedule", () => {
+    render(PassCard, { segment: flight, now: midway });
+    expect(screen.getByText("Based on schedule")).toBeInTheDocument();
+  });
+  it("never calls a flight landed or under way from the clock, with live status unavailable, stale or offline", () => {
+    const offline = vi.spyOn(navigator, "onLine", "get");
+    for (const [setup, list_] of [["none", null], ["stale", list({ statuses: [status({ state: "departed", fetched_at: new Date(dep - 6 * HOUR).toISOString() })] })], ["offline", fresh({ state: "departed" })]] as const) {
+      flightStatus.list = list_;
+      offline.mockReturnValue(setup !== "offline");
+      const { container, unmount } = render(PassCard, { segment: flight, now: arr + HOUR });
+      const text = container.querySelector("[data-headline]")?.textContent;
+      expect(text, setup).toBe("Scheduled arrival time passed");
+      unmount();
+    }
+    offline.mockRestore();
+  });
+  it("leads with a delay instead of under way", () => {
+    flightStatus.list = fresh();
+    render(PassCard, { segment: flight, now: midway });
+    expect(screen.getByText("Delayed 50 min, not yet confirmed as departed")).toBeInTheDocument();
+    expect(screen.queryByText(/Under way/)).toBeNull();
+  });
+  it("leads with a live cancellation in red and parks the plane", () => {
+    flightStatus.list = fresh({ state: "cancelled" });
+    const { container } = render(PassCard, { segment: flight, now: midway });
+    expect(screen.getByText("Cancelled by the airline")).toHaveClass("text-destructive");
+    expect(progressOf(container)).toBe("0");
+    expect(screen.queryByText("Based on schedule")).toBeNull();
+  });
+  it("says landed, with the plane at the end and no schedule label, only when live status does", () => {
+    flightStatus.list = fresh({ state: "landed", arr_actual: "2026-11-21T07:03" });
+    const { container } = render(PassCard, { segment: flight, now: arr - 2 * HOUR });
+    expect(container.querySelector("[data-headline]")?.textContent).toBe("Landed");
+    expect(progressOf(container)).toBe("1");
+    expect(screen.queryByText("Based on schedule")).toBeNull();
   });
 });
