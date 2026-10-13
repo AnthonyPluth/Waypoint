@@ -6,12 +6,15 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, select, update
 
+from ..providers import flightstatus as service
 from ..storage import db, secretbox, stored_mail
 from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentCode, SegmentMessage, SegmentPort,
                               SegmentTraveler, StoredMessage, Trip, TripPerson, User)
-from . import logos, loyalty, people, trips
+from . import flightstatus, logos, loyalty, people, trips
 from .mail import ai, review, scan
 from .visibility import Viewer
+
+DEMO_STATUS_HELD = timedelta(days=30)
 
 MEMBERS = [("demo-jane", "jane.doe@example.com", "Jane Doe", "Jane"),
            ("demo-sam", "sam.doe@example.com", "Sam Doe", "Sam")]
@@ -372,7 +375,9 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     for brand, color in DEMO_LOGO_COLORS.items():
         db.upsert(conn, BrandLogo, {"key": logos.key(brand), "name": brand, "logo": _square(color), "logo_type": "image/png",
                                     "checked": datetime.now(UTC).isoformat(timespec="seconds"), "source": "logodev"}, key=["key"])
-    db.upsert(conn, FlightStatus, {**_flight_status(today), "fetched_at": datetime.now(UTC).timestamp()}, key=["flight_number", "date"])
+    shown = _flight_status(today)
+    fetched = datetime.now(UTC)
+    flightstatus.hold(shown.pop("flight_number"), shown.pop("date"), service.Status(**shown), fetched, fetched + DEMO_STATUS_HELD)
     return _rows(conn) - before
 
 
