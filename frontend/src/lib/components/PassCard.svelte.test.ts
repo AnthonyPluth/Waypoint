@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/svelte";
+import { createRawSnippet } from "svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
+import { api } from "$lib/api";
+import { forgetAirportZones } from "$lib/airport-zones";
 import type { FlightStatus, FlightStatusList } from "$lib/api-types";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { instant } from "$lib/trips";
@@ -27,7 +31,18 @@ const status = (extra: Partial<FlightStatus> = {}): FlightStatus => ({
 });
 const list = (extra: Partial<FlightStatusList> = {}): FlightStatusList => ({ enabled: true, month: "2026-11", used: 1, limit: 400, paused: null, statuses: [status()], ...extra });
 
-beforeEach(() => { flightStatus.list = null; vi.mocked(toast.success).mockReset(); });
+const times = createRawSnippet(() => ({ render: () => "<p>custom rows</p>" }));
+const AIRPORTS: Record<string, object> = {
+  JFK: { code: "JFK", name: "John F. Kennedy International Airport", city: "New York", country: "US", zone: NY },
+  LHR: { code: "LHR", name: "Heathrow Airport", city: "London", country: "GB", zone: LON },
+  SYD: { code: "SYD", name: "Sydney Kingsford Smith Airport", city: "Sydney", country: "AU", zone: "Australia/Sydney" },
+  LAX: { code: "LAX", name: "Los Angeles International Airport", city: "Los Angeles", country: "US", zone: "America/Los_Angeles" },
+};
+beforeEach(() => { forgetAirportZones(); vi.mocked(api).mockReset().mockImplementation(async (path: string) => {
+  const found = AIRPORTS[path.split("/").pop() ?? ""];
+  if (!found) throw new Error("No such airport");
+  return found;
+}); flightStatus.list = null; vi.mocked(toast.success).mockReset(); });
 afterEach(() => { flightStatus.list = null; });
 
 describe("a flight pass", () => {
@@ -292,5 +307,63 @@ describe("evidence on a pass", () => {
     expect(container.querySelector("[data-headline]")?.textContent).toBe("Landed");
     expect(progressOf(container)).toBe("1");
     expect(screen.queryByText("Based on schedule")).toBeNull();
+  });
+});
+
+describe("airports and days on a flight pass", () => {
+  it("puts the city and airport name under each code", async () => {
+    render(PassCard, goes());
+    expect(await screen.findByText("New York")).toBeInTheDocument();
+    expect(screen.getByText("John F. Kennedy International Airport")).toBeInTheDocument();
+    expect(screen.getByText("London")).toBeInTheDocument();
+    expect(screen.getByText("Heathrow Airport")).toBeInTheDocument();
+  });
+  it("shows the code alone for an airport Waypoint doesn’t know", async () => {
+    const { container } = render(PassCard, goes({ origin: "ZZZ" }));
+    await screen.findByText("London");
+    expect(screen.getByText("ZZZ")).toBeInTheDocument();
+    expect(container.querySelectorAll("[data-airport-name]")).toHaveLength(1);
+  });
+  it("marks nothing for a same-day flight", () => {
+    const { container } = render(PassCard, goes({ start_local: "2026-11-20T08:00", end_local: "2026-11-20T11:00" }));
+    expect(container.querySelector("[data-day-shift]")).toBeNull();
+  });
+  it("marks an overnight arrival as +1 day, with words for a screen reader", () => {
+    const { container } = render(PassCard, goes());
+    const mark = container.querySelector("[data-day-shift]") as HTMLElement;
+    expect(mark).toHaveTextContent("+1 day");
+    expect(mark).toHaveTextContent("1 day later on the calendar than departure");
+  });
+  it("marks a flight that lands a calendar day earlier across the date line as −1 day, and one that lands two days later as +2 days", () => {
+    const west = render(PassCard, goes({ origin: "SYD", destination: "LAX", start_local: "2026-11-20T10:00", start_zone: "Australia/Sydney", end_local: "2026-11-19T06:00", end_zone: "America/Los_Angeles" }));
+    expect(west.container.querySelector("[data-day-shift]")).toHaveTextContent("−1 day");
+    west.unmount();
+    const east = render(PassCard, goes({ origin: "LAX", destination: "SYD", start_local: "2026-11-20T22:00", start_zone: "America/Los_Angeles", end_local: "2026-11-22T06:00", end_zone: "Australia/Sydney" }));
+    expect(east.container.querySelector("[data-day-shift]")).toHaveTextContent("+2 days");
+  });
+  it("names each zone for a screen reader and no longer prints a local-times note", () => {
+    const { container } = render(PassCard, goes());
+    expect(container.textContent).not.toContain("Times are local to each airport");
+    expect(container.querySelector("[data-zone-note]")).toBeNull();
+    expect(container.textContent).toContain(`(${NY})`);
+    expect(container.textContent).toContain(`(${LON})`);
+  });
+  it("writes the live line’s clock like the scheduled times", () => {
+    flightStatus.list = list();
+    render(PassCard, goes());
+    expect(screen.getByText(/as of \d?\d:\d\d [AP]M/)).toBeInTheDocument();
+  });
+  it("keeps the day marker and the zones when the page supplies its own time rows", () => {
+    const { container } = render(PassCard, { ...goes(), times });
+    const mark = container.querySelector("[data-day-shift]") as HTMLElement;
+    expect(mark).toHaveTextContent("+1 day");
+    expect(container.textContent).not.toContain("Times are local to each airport");
+    expect(container.textContent).toContain(`departs ${NY}, arrives ${LON}`);
+    expect(screen.getByText("custom rows")).toBeInTheDocument();
+  });
+  it("asks for airport names in a way that survives leaving the page", async () => {
+    render(PassCard, goes());
+    await screen.findByText("London");
+    expect(vi.mocked(api).mock.calls.every(([, opts]) => (opts as { keep?: boolean } | undefined)?.keep === true)).toBe(true);
   });
 });

@@ -8,7 +8,7 @@ WRITE = ("write",)
 MAIL = ("mail",)
 
 READS = [
-    "GET /api/airports/{id}", "GET /api/distance-unit", "GET /api/flight-status", "GET /api/people",
+    "GET /api/airports", "GET /api/airports/{id}", "GET /api/distance-unit", "GET /api/flight-status", "GET /api/people",
     "GET /api/segments/{id}", "GET /api/stats", "GET /api/trips", "GET /api/trips/{id}",
     "GET /api/assistant/review", "GET /api/assistant/review/{id}",
 ]

@@ -1,4 +1,4 @@
-export const TWO_PANES_QUERY = "(min-width: 1024px)";
+export const TWO_PANES_QUERY = "(min-width: 73rem)";
 export const SETTLE_MS = 100;
 
 const mq = typeof matchMedia === "function" ? matchMedia(TWO_PANES_QUERY) : null;

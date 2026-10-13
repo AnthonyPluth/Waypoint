@@ -73,7 +73,7 @@ describe("SegmentForm: a past trip with several countries", () => {
     await fill(1, "PE", "2005-03-10", "2005-03-20");
     await userEvent.click(screen.getByRole("button", { name: "Add another country" }));
     await fill(2, "EC", "2005-03-21", "2005-03-25");
-    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
     await waitFor(() => expect(onsaved).toHaveBeenCalledTimes(1));
     expect(sent().map((b) => [b.destination, b.start_local, b.end_local, b.trip_id])).toEqual([
       ["EC", "2005-03-01T00:00", "2005-03-10T00:00", null], ["PE", "2005-03-10T00:00", "2005-03-20T00:00", 7], ["EC", "2005-03-21T00:00", "2005-03-25T00:00", 7],
@@ -88,7 +88,7 @@ describe("SegmentForm: a past trip with several countries", () => {
     await fill(0, "ES", "2008-06-01", "2008-06-05");
     await userEvent.click(screen.getByRole("button", { name: "Add another country" }));
     await fill(1, "FR", "2008-06-05", "2008-06-09");
-    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
     await waitFor(() => expect(onsaved).toHaveBeenCalledTimes(1));
     expect(sent().map((b) => b.trip_id)).toEqual([3, 3]);
   });
@@ -98,8 +98,8 @@ describe("SegmentForm: a past trip with several countries", () => {
     mount(past(), onsaved);
     await fill(0, "EC", "2005-03-01", "2005-03-10");
     await userEvent.click(screen.getByRole("button", { name: "Add another country" }));
-    await userEvent.click(screen.getByRole("button", { name: "Add" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Country 2: Choose the country");
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
+    expect(await screen.findByText(/Country 2: Choose the country/)).toBeInTheDocument();
     expect(api).not.toHaveBeenCalled();
     expect(onsaved).not.toHaveBeenCalled();
   });
@@ -111,13 +111,13 @@ describe("SegmentForm: a past trip with several countries", () => {
     await fill(0, "EC", "2005-03-01", "2005-03-10");
     await userEvent.click(screen.getByRole("button", { name: "Add another country" }));
     await fill(1, "PE", "2005-03-10", "2005-03-20");
-    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Country 2: Too many requests The countries before it were saved.");
     expect(onsaved).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Country")).toHaveValue("PE");
     expect(screen.queryByLabelText("Country 2")).toBeNull();
     vi.mocked(api).mockImplementationOnce(async () => segment({ trip_id: 7, kind: "visit", destination: "PE" }));
-    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
     await waitFor(() => expect(onsaved).toHaveBeenCalledTimes(1));
     expect(sent().map((b) => [b.destination, b.trip_id])).toEqual([["EC", null], ["PE", 7], ["PE", 7]]);
   });

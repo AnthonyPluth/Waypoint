@@ -15,7 +15,7 @@ Each `*.json` file here is a flow that `make verify` runs after visiting the pag
 }
 ```
 
-- `page` is the route the flow starts on (default `upcoming`); `viewports` defaults to all three. The app is dark only, so every flow runs in the dark colour scheme.
+- `page` is the route the flow starts on (default `upcoming`); `viewports` defaults to phone, tablet and desktop; `laptop` (1024 px), `wide` (1440 px) and `zoomed` (853 px, a 1280 px window at 150% zoom) are there for a flow that lists them. The app is dark only, so every flow runs in the dark colour scheme.
 - A step has one action, and an optional `timeout` in milliseconds (default 10000). Selectors are [Playwright selectors](https://playwright.dev/docs/other-locators) (CSS, `text=…`, `role=…`).
   - `{"goto": "#route"}` opens a route of the app (or a full URL).
   - `{"select": {"selector": "label:has-text('When') select", "index": 2}}` chooses an option of a `<select>` by its position.
@@ -29,6 +29,7 @@ Each `*.json` file here is a flow that `make verify` runs after visiting the pag
   - `{"fake_destination": "Colorado & Texas"}` makes the page's later loads of the app's state say the AI fallback is on, and answers a request for a trip's suggested destination with that made-up text (the demo has no AI to ask). Put it before a `reload`.
   - `{"fake_first_run": "connect"}` makes the page's later loads show a household with no trips, in the given first-run state: `connect` (no mailbox), `scanning`, `review` (3 emails waiting) or `manual` (a connected mailbox, nothing waiting); nothing is stored. Put it before a `reload`.
   - `{"fake_merge_warning": "Sam Doe | Mia Doe"}` answers the page's later request to merge a trip with the warning a member gets when the two trips involve different people (the names before the bar will newly see this trip's bookings, the names after it the other trip's), and lets the confirmed request through to the demo data; the demo's household view is never asked, so a flow needs it to show the dialog.
+  - `{"fake_archive": 400}` adds that many made-up past trips to the page's later loads of the trip list (copies of a demo trip with other names, places, airlines and dates; nothing is stored), to show a list the size of a long archive. Put it before a `reload`.
   - `{"wait_for": selector}` waits for it to appear; `{"expect_text": {"selector": …, "text": …}}` fails unless it contains the text within the timeout (it keeps looking while the page settles).
   - `{"screenshot": "name"}` saves `flow-<flow name>-<name>-<viewport>.png` (full page) and `…-<viewport>-top.png` (the top of the page, the size of the viewport).
 - `host` (default the server's own address, 127.0.0.1) opens the flow on another name for the same server: passkeys need a host name such as `localhost`, not an IP address.

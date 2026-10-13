@@ -16,7 +16,7 @@ describe("panes", () => {
     const m = media(true);
     const { panes, TWO_PANES_QUERY } = await load();
     expect(m.matchMedia).toHaveBeenCalledExactlyOnceWith(TWO_PANES_QUERY);
-    expect(TWO_PANES_QUERY).toBe("(min-width: 1024px)");
+    expect(TWO_PANES_QUERY).toBe("(min-width: 73rem)");
     expect(panes.two).toBe(true);
   });
 

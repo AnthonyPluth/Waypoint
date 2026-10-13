@@ -10,10 +10,12 @@
     { "click": "button:has-text('Add a booking') >> visible=true" },
     { "wait_for": "label:has-text('What is it') select" },
     { "select": { "selector": "label:has-text('What is it') select", "index": 1 } },
+    { "click": "button:has-text('Set the time zone by hand')" },
     { "scroll_to": "label:has-text('Time zone')" },
     { "screenshot": "hotel-form-no-picker" },
     { "select": { "selector": "label:has-text('What is it') select", "index": 4 } },
     { "wait_for": "legend:has-text('Who’s travelling')" },
+    { "click": "summary:has-text('More details')" },
     { "scroll_to": "label:has-text('Manage link')" },
     { "screenshot": "cruise-form-picker" }
   ]

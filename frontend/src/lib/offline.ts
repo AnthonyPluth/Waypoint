@@ -6,6 +6,7 @@ export const KEEP_DAYS_AFTER_TRIP = 3;
 const LONGEST_TIMER = 2 ** 31 - 1;
 
 export type SavedCopy = Offline & { savedAt: number };
+export type SavedNow = SavedInfo & { tripId: number; tripName: string };
 
 export function expiryOf(copy: Pick<Offline, "trip">): number | null {
   const last = copy.trip?.end_date ?? copy.trip?.start_date;
@@ -52,7 +53,7 @@ export function watchExpiry(info: SavedInfo | null): void {
   expiryTimer = setTimeout(() => { void expire(); }, Math.min(Math.max(0, info.expiresAt - Date.now()), LONGEST_TIMER));
 }
 
-let inFlight: Promise<SavedInfo | null> | null = null;
+let inFlight: Promise<SavedNow | null> | null = null;
 let clears = 0;
 
 export async function clearSaved(): Promise<void> {
@@ -72,7 +73,7 @@ export async function dropIfExpired(info: SavedInfo | null): Promise<boolean> {
   return true;
 }
 
-async function replaceSaved(): Promise<SavedInfo | null> {
+async function replaceSaved(): Promise<SavedNow | null> {
   if (!(await isSetUp()) || (await isSavingOff())) return null;
   const before = clears;
   const projection = await apiCall<"GET /api/offline">("/api/offline");
@@ -82,10 +83,10 @@ async function replaceSaved(): Promise<SavedInfo | null> {
   const copy: SavedCopy = { ...projection, savedAt: info.savedAt };
   if (!(await save(copy, info))) return null;
   watchExpiry(info);
-  return info;
+  return { ...info, tripId: projection.trip.id, tripName: projection.trip.name };
 }
 
-export function saveCurrentTrip(): Promise<SavedInfo | null> {
+export function saveCurrentTrip(): Promise<SavedNow | null> {
   inFlight ??= replaceSaved().finally(() => { inFlight = null; });
   return inFlight;
 }

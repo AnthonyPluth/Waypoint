@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import { animationsRunning, auditPage } from "./a11y.mjs";
 
 export const PHONE_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 } };
+export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 }, laptop: { width: 1024, height: 768 }, wide: { width: 1440, height: 900 }, zoomed: { width: 853, height: 533 } };
+export const DEFAULT_VIEWPORTS = ["phone", "tablet", "desktop"];
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];
 const OWN_PAGES = ["oauth-approve"];
 
@@ -24,7 +25,7 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -32,6 +33,25 @@ export function lengthenNames(value, suffix) {
   if (value === null || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, LONG_NAME_KEYS.has(k) && typeof v === "string" ? v + suffix : lengthenNames(v, suffix)]));
 }
+const ARCHIVE_PLACES = [["Lisbon", "TAP Air Portugal"], ["Denver", "United Airlines"], ["Tokyo", "All Nippon Airways"], ["Chicago", "American Airlines"], ["Reykjavik", "Icelandair"], ["Mexico City", "Delta Air Lines"], ["Sydney", "Qantas"], ["Seattle", "Alaska Airlines"], ["Rome", "ITA Airways"], ["Vancouver", "Air Canada"]];
+
+export function fakeArchive(trips, count) {
+  const model = trips.find((t) => t.segments.length) ?? trips[0];
+  if (!model) return [];
+  const first = Math.max(0, ...trips.map((t) => t.id)) + 1;
+  return Array.from({ length: count }, (_, i) => {
+    const [city, airline] = ARCHIVE_PLACES[i % ARCHIVE_PLACES.length];
+    const year = 2025 - Math.floor(i / 60);
+    const month = String(1 + (i % 12)).padStart(2, "0");
+    const day = String(1 + (i % 27)).padStart(2, "0");
+    const start = `${year}-${month}-${day}`;
+    const end = `${year}-${month}-${String(Number(day) + 1).padStart(2, "0")}`;
+    const id = first + i;
+    const segments = model.segments.slice(0, 1).map((s) => ({ ...s, id: id * 10, trip_id: id, provider: airline, destination: city, start_local: `${start}T09:00`, end_local: `${end}T12:00` }));
+    return { ...model, id, name: `Trip to ${city} ${i + 1}`, destination: city, start_date: start, end_date: end, segments, emails: 0, can_clear_emails: false };
+  });
+}
+
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const unknownPages = (names) => names.filter((n) => !PAGES.includes(n));
 
@@ -129,6 +149,21 @@ async function runStep(page, step, shot, saveDownload) {
     await page.route("**/api/state", async (route) => {
       const response = await route.fetch();
       await route.fulfill({ response, json: { ...(await response.json()), review_count: step.fake_first_run === "review" ? 3 : 0 } });
+    });
+  } else if ("fake_archive" in step) {
+    const made = new Map();
+    await page.route("**/api/trips", async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      const added = fakeArchive(body.trips, step.fake_archive);
+      for (const t of added) made.set(String(t.id), t);
+      await route.fulfill({ response, json: { ...body, trips: [...body.trips, ...added] } });
+    });
+    await page.route(/\/api\/trips\/\d+(\/places)?$/, (route) => {
+      const [, id, places] = /\/api\/trips\/(\d+)(\/places)?$/.exec(new URL(route.request().url()).pathname) ?? [];
+      const t = made.get(id);
+      if (!t || route.request().method() !== "GET") return route.fallback();
+      return route.fulfill({ json: places ? { home: null, airports: [], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] } : t });
     });
   } else if ("fake_merge_warning" in step) {
     const [first, second] = step.fake_merge_warning.split("|").map((part) => part.split(",").map((n) => n.trim()).filter(Boolean));
@@ -245,7 +280,7 @@ async function main() {
   }
 
   for (const name of pages) {
-    for (const viewport of Object.keys(VIEWPORTS)) {
+    for (const viewport of DEFAULT_VIEWPORTS) {
       await visit(name, viewport, async (page, shot) => {
         if (OWN_PAGES.includes(name)) {
           if (!approveUrl) throw new Error("no approval page: seeding the demo assistants failed");
@@ -258,7 +293,7 @@ async function main() {
   }
   for (const flow of flows) {
     if (args.length && !args.includes(flow.page ?? "upcoming")) continue;
-    for (const viewport of flow.viewports ?? Object.keys(VIEWPORTS)) {
+    for (const viewport of flow.viewports ?? DEFAULT_VIEWPORTS) {
       await visit(`flow ${flow.name}`, viewport, async (page, shot, saveDownload) => {
         await page.goto(`${flow.host ? base.replace("127.0.0.1", flow.host) : base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
         for (const [i, step] of flow.steps.entries()) {

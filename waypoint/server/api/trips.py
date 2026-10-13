@@ -12,7 +12,7 @@ from ...domain.mail import ai
 from ...domain.visibility import Viewer
 from ...storage import db
 from ..common import NO_IMAGE, ApiError, Response, _current, image_response, own_session, position, row_id
-from ..contract import (Airport, DestinationSuggestion, EmailsCleared, GateCodeBody, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
+from ..contract import (Airport, AirportMatches, DestinationSuggestion, EmailsCleared, GateCodeBody, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
                         TripList, TripPlaces)
 
 NAME_LIMIT = 100
@@ -26,7 +26,7 @@ NO_TRIP = "No such trip"
 NO_SEGMENT = "No such segment"
 NO_CODE = NO_IMAGE
 MAX_PICTURE_POSITION = 999
-NO_AI = "Suggestions need the AI fallback, which is off. Turn it on under Settings, in Mail and AI."
+NO_AI = "Suggestions need the AI fallback, which is off. Turn it on under Settings, in Mail & review."
 NO_PLACES = "Add a booking to this trip first, so there are places to describe."
 TEXTS = {"confirmation": ("confirmation code", 50), "provider": ("provider", 100), "origin": ("origin", 100),
          "destination": ("destination", 100), "start_zone": ("start time zone", 64), "end_zone": ("end time zone", 64)}
@@ -337,3 +337,8 @@ def api_airport(conn, _q, _b, code) -> Airport:
     if found is None:
         raise ApiError("No such airport", 404)
     return Airport(**found)
+
+
+def api_airport_search(conn, q, _b) -> AirportMatches:
+    wanted = (q.get("q") or [""])[0]
+    return AirportMatches(airports=[Airport(**a) for a in airports.search(conn, wanted)])

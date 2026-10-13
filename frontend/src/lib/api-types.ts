@@ -52,6 +52,10 @@ export interface Airport {
   zone: string;
 }
 
+export interface AirportMatches {
+  airports: Airport[];
+}
+
 export interface AssistantCandidate {
   segment_id: number;
   trip_id: number;
@@ -1184,6 +1188,7 @@ export interface Endpoints {
   "GET /api/segments/{id}/emails": { body: never; reply: SegmentEmails };
   "POST /api/segments/{id}/code": { body: GateCodeBody; reply: Segment };
   "POST /api/segments/{id}/move": { body: MoveBody; reply: Trip };
+  "GET /api/airports": { body: never; reply: AirportMatches };
   "GET /api/airports/{id}": { body: never; reply: Airport };
   "POST /api/import/preview": { body: never; reply: ImportPreview };
   "POST /api/import": { body: ImportBody; reply: Imported };

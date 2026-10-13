@@ -241,7 +241,7 @@ describe("Review", () => {
     expect(calls.some(([p]) => p.endsWith("/ignore"))).toBe(false);
     await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1/ignore", "POST", undefined]));
-    expect(toast.success).toHaveBeenCalledWith("Ignoring example-air.example", expect.objectContaining({ description: "You can undo this in Settings → Mail and AI → Gmail", action: expect.objectContaining({ label: "Undo" }) }));
+    expect(toast.success).toHaveBeenCalledWith("Ignoring example-air.example", expect.objectContaining({ description: "You can undo this in Settings → Mail & review → Gmail", action: expect.objectContaining({ label: "Undo" }) }));
   });
 
   it("offers Undo on the toast, and Undo stops ignoring that sender and says the mail is read again", async () => {
@@ -282,7 +282,7 @@ describe("Review", () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore example-air.example" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("You can undo this in Settings → Mail and AI → Gmail.")).toBeInTheDocument();
+    expect(within(dialog).getByText("You can undo this in Settings → Mail & review → Gmail.")).toBeInTheDocument();
     expect(within(dialog).queryByTestId("known-sender-warning")).toBeNull();
   });
 

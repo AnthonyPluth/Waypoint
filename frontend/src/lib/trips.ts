@@ -43,6 +43,18 @@ export const dayLabel = (local: string, withYear = yearOf(local) !== new Date().
   asUtc(local).toLocaleDateString(locale(), { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", ...(withYear && { year: "numeric" }) });
 export const dayOf = (s: Pick<Segment, "kind">, local: string): string => dayLabel(local, s.kind === "visit" || undefined);
 export const sameDay = (s: Pick<Segment, "start_local" | "end_local">): boolean => s.start_local.slice(0, 10) === s.end_local.slice(0, 10);
+const dayNumber = (local: string): number => Math.floor(utcOf(local) / 86_400_000);
+export const daysBetween = (from: string | null, to: string | null): number => (from && to ? dayNumber(to) - dayNumber(from) || 0 : 0);
+export function dayShift(from: string | null, to: string | null): string {
+  const days = daysBetween(from, to);
+  if (!days || Number.isNaN(days)) return "";
+  return `${days > 0 ? "+" : "−"}${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"}`;
+}
+export function dayShiftWords(from: string | null, to: string | null): string {
+  const days = daysBetween(from, to);
+  if (!days || Number.isNaN(days)) return "";
+  return `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ${days > 0 ? "later" : "earlier"} on the calendar than departure`;
+}
 export const dateLabel = (day: string): string => asUtc(`${day}T00:00`).toLocaleDateString(locale(), { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
 
 export function until(ms: number): string {
@@ -134,6 +146,23 @@ export function splitTrips(trips: Trip[], today: string): { upcoming: Trip[]; pa
   const upcoming = trips.filter((t) => !isPast(t, today)).sort((a, b) => key(a).localeCompare(key(b)));
   const past = trips.filter((t) => isPast(t, today)).sort((a, b) => key(b).localeCompare(key(a)));
   return { upcoming, past };
+}
+
+export type TripWhen = "upcoming" | "past";
+
+export function matchesText(trip: Trip, text: string): boolean {
+  const terms = text.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const haystack = [trip.name, trip.destination, ...trip.segments.map((s) => s.provider)].filter(Boolean).join("\n").toLowerCase();
+  return terms.every((t) => haystack.includes(t));
+}
+
+const yearsOf = (trip: Trip): number[] => (trip.start_date ? [Number(trip.start_date.slice(0, 4)), Number((trip.end_date ?? trip.start_date).slice(0, 4))] : []);
+export const inYear = (trip: Trip, year: number): boolean => { const [from, to] = yearsOf(trip); return from !== undefined && year >= from && year <= Math.max(from, to); };
+export function tripYears(trips: Trip[]): number[] {
+  const years = new Set<number>();
+  for (const t of trips) { const [from, to] = yearsOf(t); if (from !== undefined) for (let y = from; y <= Math.max(from, to); y++) years.add(y); }
+  return [...years].sort((a, b) => b - a);
 }
 
 export const featuredTrip = (trips: Trip[], next: NextUp | null, today: string): Trip | null =>

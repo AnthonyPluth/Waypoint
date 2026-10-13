@@ -13,6 +13,7 @@ import { app, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { membership, segment, state, trip } from "../test/fixtures";
+import { bookingOptions, tripOptions } from "../test/menu";
 import TripPage from "./Trip.svelte";
 
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
@@ -151,11 +152,35 @@ describe("Trip", () => {
     });
   });
 
+  describe("what the header and each booking put first", () => {
+    it("leads with Add a booking and keeps Merge and Delete under Trip options", async () => {
+      render(TripPage);
+      const u = userEvent.setup();
+      expect(await screen.findByRole("button", { name: "Add a booking" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Delete trip" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Merge another trip" })).toBeNull();
+      await u.click(screen.getByRole("button", { name: "Trip options" }));
+      expect(screen.getByRole("button", { name: "Merge another trip" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Delete trip" })).toBeInTheDocument();
+    });
+
+    it("keeps Edit on each booking and Move and Remove under that booking’s More menu", async () => {
+      render(TripPage);
+      const u = userEvent.setup();
+      expect(await screen.findByRole("button", { name: "Edit Harbour Hotel" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Move Harbour Hotel" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Remove Harbour Hotel" })).toBeNull();
+      await u.click(screen.getByRole("button", { name: "More options for Harbour Hotel" }));
+      expect(screen.getByRole("button", { name: "Move Harbour Hotel" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove Harbour Hotel" })).toBeInTheDocument();
+    });
+  });
+
   describe("deleting a trip", () => {
     it("names the trip and how many bookings go with it, and does nothing until confirmed", async () => {
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await tripOptions(u, "Delete trip");
       const dialog = await screen.findByRole("dialog");
       expect(dialog).toHaveTextContent(/Delete .*\?/);
       expect(dialog).toHaveTextContent("Its 2 bookings are removed too. This can’t be undone.");
@@ -166,14 +191,14 @@ describe("Trip", () => {
     it("says it in the singular for one booking", async () => {
       held = trip([flight]);
       render(TripPage);
-      await userEvent.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await tripOptions(userEvent, "Delete trip");
       expect(await screen.findByRole("dialog")).toHaveTextContent("Its 1 booking is removed too.");
     });
 
     it("deletes the trip once confirmed and goes back to Trips", async () => {
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await tripOptions(u, "Delete trip");
       await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "DELETE" }));
       await waitFor(() => expect(location.hash).toBe("#trips"));
@@ -184,7 +209,7 @@ describe("Trip", () => {
       const u = userEvent.setup();
       await u.click(await screen.findByRole("button", { name: "Rename trip" }));
       await u.type(screen.getByLabelText("Trip name"), " again");
-      await u.click(screen.getByRole("button", { name: "Delete trip" }));
+      await tripOptions(u, "Delete trip");
       await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
       await waitFor(() => expect(route.page).toBe("trips"));
       expect(location.hash).toBe("#trips");
@@ -199,7 +224,7 @@ describe("Trip", () => {
       });
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await tripOptions(u, "Delete trip");
       await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "DELETE" }));
       expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -223,7 +248,7 @@ describe("Trip", () => {
       withOthers();
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Merge another trip" }));
+      await tripOptions(u, "Merge another trip");
       const dialog = await screen.findByRole("dialog");
       const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
       await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(2));
@@ -246,7 +271,7 @@ describe("Trip", () => {
       });
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Merge another trip" }));
+      await tripOptions(u, "Merge another trip");
       let dialog = await screen.findByRole("dialog");
       const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
@@ -269,7 +294,7 @@ describe("Trip", () => {
       });
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Merge another trip" }));
+      await tripOptions(u, "Merge another trip");
       const choose = await within(await screen.findByRole("dialog")).findByRole("combobox", { name: "Trip to merge in" });
       await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(5));
       const names = within(choose).getAllByRole("option").slice(1).map((o) => o.textContent?.split(" · ")[0]);
@@ -281,7 +306,7 @@ describe("Trip", () => {
       withOthers();
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: /^Move / }));
+      await bookingOptions(u, /^Move /);
       const choose = within(await screen.findByRole("dialog")).getByRole("combobox", { name: "Move it to" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
       expect(within(choose).queryByRole("option", { name: "A new trip of its own" })).toBeNull();
@@ -291,7 +316,7 @@ describe("Trip", () => {
       withOthers();
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      await bookingOptions(u, "Move Harbour Hotel");
       let dialog = await screen.findByRole("dialog");
       const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
       expect(within(dialog).getByRole("button", { name: "Move" })).toBeDisabled();
@@ -302,7 +327,7 @@ describe("Trip", () => {
       expect(location.hash).toBe("#trip/7");
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       await waitFor(() => expect(getComputedStyle(document.body).pointerEvents).not.toBe("none"));
-      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      await bookingOptions(u, "Move Harbour Hotel");
       dialog = await screen.findByRole("dialog");
       await u.selectOptions(within(dialog).getByRole("combobox", { name: "Move it to" }), "new");
       await u.click(within(dialog).getByRole("button", { name: "Move" }));
@@ -320,7 +345,7 @@ describe("Trip", () => {
       });
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      await bookingOptions(u, "Move Harbour Hotel");
       const choose = within(await screen.findByRole("dialog")).getByRole("combobox", { name: "Move it to" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Newest trip/ })).toBeInTheDocument());
       const names = within(choose).getAllByRole("option").map((o) => o.textContent ?? "");
@@ -340,7 +365,7 @@ describe("Trip", () => {
       });
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      await bookingOptions(u, "Move Harbour Hotel");
       let dialog = await screen.findByRole("dialog");
       const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
@@ -545,7 +570,7 @@ describe("Trip", () => {
     render(TripPage);
     const u = userEvent.setup();
     await screen.findByRole("heading", { name: "Trip to London" });
-    await u.click(screen.getByRole("button", { name: "Remove Harbour Hotel" }));
+    await bookingOptions(u, "Remove Harbour Hotel");
     vi.mocked(api).mockImplementation(async (path, opts) => {
       if (opts?.method === "DELETE") return { ok: true };
       throw new Error("Waypoint is unreachable");
@@ -568,7 +593,7 @@ describe("Trip", () => {
     expect(screen.getByLabelText("Terminal")).toHaveValue("8");
     await u.clear(screen.getByLabelText("Terminal"));
     await u.type(screen.getByLabelText("Terminal"), "7");
-    await u.click(screen.getByRole("button", { name: "Save" }));
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({
       kind: "flight", origin: "JFK", details: { flight_number: "AA 101", terminal: "7" }, travelers: [{ person_id: 1, seat: null }, { person_id: 2, seat: null }, { person_id: null, name: "DOE/MIA MISS", seat: null }] }) }));
     await waitFor(() => expect(screen.queryByRole("form")).toBeNull());
@@ -649,8 +674,8 @@ describe("Trip", () => {
     await u.clear(screen.getByLabelText(/From \(airport\)/));
     await u.type(screen.getByLabelText(/From \(airport\)/), "N1");
     await u.type(screen.getByLabelText("Seat of Jane Doe"), "12A");
-    await u.click(screen.getByRole("button", { name: "Save" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("A flight’s origin is an airport code like JFK");
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText(/Choose the airport it leaves from/)).toBeInTheDocument();
     expect(api).not.toHaveBeenCalledWith("/api/segments/1", expect.anything());
     expect(screen.getByLabelText("Seat of Jane Doe")).toHaveValue("12A");
   });
@@ -664,10 +689,10 @@ describe("Trip", () => {
       if (opts?.method === "POST") throw new Error("Someone on this isn’t in People");
       return held;
     });
-    await u.click(screen.getByRole("button", { name: "Save" }));
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Someone on this isn’t in People");
     expect(screen.getByLabelText("Seat of Jane Doe")).toHaveValue("12A");
-    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 
   it("adds a booking to this trip", async () => {
@@ -678,9 +703,10 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Hotel name"), "Harbour Hotel");
     await u.type(screen.getByLabelText(/^Check-in/), "2026-11-21T15:00");
     await u.type(screen.getByLabelText(/^Check-out/), "2026-11-27T10:00");
+    await u.click(screen.getByRole("button", { name: "Set the time zone by hand" }));
     await chooseZone(screen.getByLabelText(/^Time zone/), "Europe/London");
     expect(screen.queryByLabelText("Sam Doe")).toBeNull();
-    await u.click(screen.getByRole("button", { name: "Add" }));
+    await u.click(screen.getByRole("button", { name: "Add booking" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({
       trip_id: 1, kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London" }) }));
     expect(vi.mocked(api).mock.calls.find((c) => c[0] === "/api/segments")?.[1]?.body).not.toHaveProperty("travelers");
@@ -691,7 +717,7 @@ describe("Trip", () => {
     await screen.findByRole("heading", { name: "Trip to London" });
     expect(screen.queryByTestId("stay-zone")).toBeNull();
     expect(screen.queryByText("Time zone")).toBeNull();
-    expect(screen.queryByText(/Europe\/London|Europe London/)).toBeNull();
+    expect(screen.queryAllByText(/Europe\/London|Europe London/).filter((e) => !e.classList.contains("sr-only"))).toEqual([]);
   });
 
   it("asks a stay for one time zone, and says it can be worked out from the address", async () => {
@@ -702,6 +728,7 @@ describe("Trip", () => {
     expect(screen.queryByLabelText(/Time zone at the end/)).toBeNull();
     expect(screen.queryByText(/Leave this empty to work it out from the address/)).toBeNull();
     await u.selectOptions(screen.getByLabelText("What is it"), "Car rental");
+    await u.click(screen.getByRole("button", { name: "Set the time zone by hand" }));
     expect(screen.getByLabelText(/Time zone at the end/)).toBeInTheDocument();
   });
 
@@ -715,11 +742,12 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Lot name"), "Example Long-Term Lot");
     await u.type(screen.getByLabelText(/^Entry/), "2026-11-20T16:00");
     await u.type(screen.getByLabelText(/^Exit/), "2026-11-27T21:00");
+    await u.click(screen.getByRole("button", { name: "Set the time zone by hand" }));
     await chooseZone(screen.getByLabelText(/^Time zone/), "America/New_York");
     await u.type(screen.getByLabelText("Space type (covered, economy, valet)"), "Covered");
     await u.type(screen.getByLabelText("Vehicle (make and colour)"), "Blue hatchback");
     expect(screen.queryByLabelText("Sam Doe")).toBeNull();
-    await u.click(screen.getByRole("button", { name: "Add" }));
+    await u.click(screen.getByRole("button", { name: "Add booking" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({
       trip_id: 1, kind: "parking", origin: "Example Long-Term Lot", start_zone: "America/New_York", details: { space_type: "Covered", vehicle: "Blue hatchback" } }) }));
     expect(vi.mocked(api).mock.calls.find((c) => c[0] === "/api/segments")?.[1]?.body).not.toHaveProperty("travelers");
@@ -754,7 +782,7 @@ describe("Trip", () => {
       expect(screen.getByLabelText("Space type (covered, economy, valet)")).toHaveValue("Covered");
       await u.clear(screen.getByLabelText("Space type (covered, economy, valet)"));
       await u.type(screen.getByLabelText("Space type (covered, economy, valet)"), "Valet");
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/6", { method: "POST", body: expect.objectContaining({
         kind: "parking", origin: "Example Long-Term Lot", start_zone: "America/New_York", details: expect.objectContaining({ space_type: "Valet", vehicle: "Blue hatchback" }) }) }));
     });
@@ -769,7 +797,7 @@ describe("Trip", () => {
   it("removes a booking after asking", async () => {
     render(TripPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Remove Harbour Hotel" }));
+    await bookingOptions(u, "Remove Harbour Hotel");
     await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2", { method: "DELETE" }));
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Harbour Hotel" })).toBeNull());
@@ -804,7 +832,7 @@ describe("Trip", () => {
     it("removes the one booking whose Remove was pressed, and keeps the flight", async () => {
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Remove JFK → LHR booking BBBBBB" }));
+      await bookingOptions(u, "Remove JFK → LHR booking BBBBBB");
       await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/5", { method: "DELETE" }));
       expect(api).not.toHaveBeenCalledWith("/api/segments/1", expect.anything());
@@ -842,7 +870,7 @@ describe("Trip", () => {
       await u.type(screen.getByLabelText("Seat of DOE/MIA MISS"), "32A");
       await u.click(screen.getByRole("checkbox", { name: "Sam Doe" }));
       expect(screen.queryByLabelText("Seat of Sam Doe")).toBeNull();
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({
         travelers: [{ person_id: 1, seat: "31A" }, { person_id: null, name: "DOE/MIA MISS", seat: "32A" }] }) }));
     });
@@ -853,7 +881,7 @@ describe("Trip", () => {
       render(TripPage);
       await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
       expect(screen.getByLabelText("Seat of Jane Doe")).toHaveValue("14C");
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({
         details: { flight_number: "AA 101" }, travelers: [{ person_id: 1, seat: "14C" }] }) }));
     });
@@ -954,7 +982,7 @@ describe("Trip", () => {
       render(TripPage);
       await u.click(await screen.findByRole("button", { name: "Add address to Harbour Hotel" }));
       await u.type(await screen.findByLabelText("Address"), "  7 Mill Lane{Enter}London N1 1AA ");
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       const post = vi.mocked(api).mock.calls.find(([path, o]) => path === "/api/segments/2" && o?.method === "POST")!;
       expect((post[1] as { body: { details: Record<string, string> } }).body.details.address).toBe("7 Mill Lane\nLondon N1 1AA");
     });
@@ -1068,7 +1096,7 @@ describe("Trip", () => {
       await u.click(screen.getByRole("button", { name: "Remove port 1" }));
       expect(screen.getByLabelText("Port 1 name")).toHaveValue("Grand Cayman");
       expect(screen.queryByLabelText("Port 3 name")).toBeNull();
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/5", { method: "POST", body: expect.objectContaining({
         kind: "cruise", itinerary: [{ name: "Grand Cayman", zone: "America/Cancun", arrive_local: null, depart_local: null },
                                     { name: "Cozumel", zone: "America/Cancun", arrive_local: null, depart_local: null }] }) }));
@@ -1080,8 +1108,8 @@ describe("Trip", () => {
       render(TripPage);
       await u.click(await screen.findByRole("button", { name: "Edit Example Voyager · Miami" }));
       await u.clear(screen.getByLabelText("Port 1 name"));
-      await u.click(screen.getByRole("button", { name: "Save" }));
-      expect(await screen.findByRole("alert")).toHaveTextContent("Name port 1");
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
+      expect(await screen.findByText(/Name port 1/)).toBeInTheDocument();
       expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
       await u.click(screen.getByRole("button", { name: "Cancel" }));
       await u.click(await screen.findByRole("button", { name: "Discard changes" }));
@@ -1115,7 +1143,9 @@ describe("Trip", () => {
       held = past({ done_at: null });
       render(TripPage);
       const card = await cardOf(hotel);
-      for (const verb of ["Edit", "Move", "Remove"]) expect(within(card).getByRole("button", { name: `${verb} Harbour Hotel` })).toBeInTheDocument();
+      expect(within(card).getByRole("button", { name: "Edit Harbour Hotel" })).toBeInTheDocument();
+      await userEvent.click(within(card).getByRole("button", { name: "More options for Harbour Hotel" }));
+      for (const verb of ["Move", "Remove"]) expect(within(card).getByRole("button", { name: `${verb} Harbour Hotel` })).toBeInTheDocument();
     });
 
     it("hides Edit, Move and Remove once the trip is Done, and keeps the booking's details", async () => {
@@ -1123,7 +1153,7 @@ describe("Trip", () => {
       render(TripPage);
       const card = await cardOf(hotel);
       expect(card).toHaveTextContent("H88231");
-      for (const verb of ["Edit", "Move", "Remove"]) expect(within(card).queryByRole("button", { name: new RegExp(`^${verb}`) })).toBeNull();
+      for (const verb of ["Edit", "Move", "Remove", "More options"]) expect(within(card).queryByRole("button", { name: new RegExp(`^${verb}`) })).toBeNull();
     });
 
     it("hides them on each booking of a combined flight card once the trip is Done", async () => {
@@ -1210,7 +1240,7 @@ describe("Trip on a phone", () => {
     const sheet = await screen.findByRole("dialog");
     await u.clear(within(sheet).getByLabelText("Terminal"));
     await u.type(within(sheet).getByLabelText("Terminal"), "7");
-    await u.click(within(sheet).getByRole("button", { name: "Save" }));
+    await u.click(within(sheet).getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({ details: { flight_number: "AA 101", terminal: "7" } }) }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
@@ -1260,7 +1290,7 @@ describe("Trip on a phone", () => {
     const sheet = await screen.findByRole("dialog");
     await u.clear(within(sheet).getByLabelText("Terminal"));
     await u.type(within(sheet).getByLabelText("Terminal"), "7");
-    await u.click(within(sheet).getByRole("button", { name: "Save" }));
+    await u.click(within(sheet).getByRole("button", { name: "Save changes" }));
     await within(sheet).findByRole("button", { name: "Saving…" });
     await u.keyboard("{Escape}");
     await u.click(within(sheet).getByRole("button", { name: "Close" }));
@@ -1294,11 +1324,11 @@ describe("Trip on a phone", () => {
       if (opts?.method === "POST") throw new Error("Someone on this isn’t in People");
       return held;
     });
-    await u.click(within(sheet).getByRole("button", { name: "Save" }));
+    await u.click(within(sheet).getByRole("button", { name: "Save changes" }));
     expect(await within(sheet).findByRole("alert")).toHaveTextContent("Someone on this isn’t in People");
     expect(screen.getByRole("dialog")).toBe(sheet);
     expect(within(sheet).getByLabelText("Seat of Jane Doe")).toHaveValue("12A");
-    expect(within(sheet).getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(within(sheet).getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 
   it("opens Add address in the sheet too", async () => {
@@ -1328,7 +1358,7 @@ describe("Trip on a phone", () => {
 
 describe("beside a list of trips", () => {
   const removeFlightAndConfirm = async (u: ReturnType<typeof userEvent.setup>) => {
-    await u.click(await screen.findByRole("button", { name: "Remove JFK → LHR" }));
+    await bookingOptions(u, "Remove JFK → LHR");
     await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   };
@@ -1360,7 +1390,7 @@ describe("beside a list of trips", () => {
     const onchanged = vi.fn();
     render(TripPage, { tripId: 1, onchanged });
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Remove Harbour Hotel" }));
+    await bookingOptions(u, "Remove Harbour Hotel");
     await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(onchanged).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
@@ -1382,7 +1412,7 @@ describe("beside a list of trips", () => {
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
     moveOnSave();
-    await u.click(screen.getByRole("button", { name: "Save" }));
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(onchanged).toHaveBeenCalledWith(7));
     expect(location.hash).toBe("#trip/1");
   });
@@ -1393,7 +1423,7 @@ describe("on its own page", () => {
     held = trip([flight], { auto: true });
     render(TripPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Remove JFK → LHR" }));
+    await bookingOptions(u, "Remove JFK → LHR");
     await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(location.hash).toBe("#trips"));
   });
@@ -1450,7 +1480,7 @@ describe("on its own page", () => {
       expect(amount).toHaveValue("1240.00");
       await u.clear(amount);
       await u.type(amount, "1,300.50");
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", expect.objectContaining({
         method: "POST", body: expect.objectContaining({ price: { amount_minor: 130050, currency: "USD" } }) })));
     });
@@ -1461,7 +1491,7 @@ describe("on its own page", () => {
       const u = userEvent.setup();
       await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
       await u.clear(screen.getByLabelText("Cost amount"));
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", expect.objectContaining({ body: expect.objectContaining({ price: null }) })));
     });
   });
@@ -1471,7 +1501,7 @@ describe("on its own page", () => {
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1" && opts?.method === "POST" ? segment({ ...flight, trip_id: 7 }) : path === "/api/people" ? { people: [jane, sam] } : path === "/api/loyalty" ? { loyalty, programs: {} } : held) as never);
-    await u.click(screen.getByRole("button", { name: "Save" }));
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(location.hash).toBe("#trip/7"));
   });
   describe("the gate code of a parking booking", () => {

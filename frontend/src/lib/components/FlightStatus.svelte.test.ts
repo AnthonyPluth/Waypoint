@@ -11,7 +11,7 @@ import type { FlightStatus as Status, FlightStatusList } from "$lib/api-types";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { toast } from "svelte-sonner";
 import { segment } from "../../test/fixtures";
-import FlightStatus, { clock, dayShift } from "./FlightStatus.svelte";
+import FlightStatus from "./FlightStatus.svelte";
 
 const seg = segment({ id: 7 });
 const status = (extra: Partial<Status> = {}): Status => ({
@@ -36,21 +36,21 @@ describe("a flight’s live status", () => {
     render(FlightStatus, { segment: seg });
     const card = screen.getByTestId("flight-status");
     expect(card).toHaveTextContent("Delayed 50 min");
-    expect(card).toHaveTextContent("Now 19:50 (booked 19:00)");
+    expect(card).toHaveTextContent("Now 7:50 PM (booked 7:00 PM)");
     expect(card).toHaveTextContent("Terminal 7 · Gate B24");
-    expect(card).toHaveTextContent("Arrives 08:05");
+    expect(card).toHaveTextContent("Arrives 8:05 AM");
     expect(card).toHaveTextContent("Arrival terminal 5 · gate a10");
-    expect(card).toHaveTextContent(/as of \d\d:\d\d/);
+    expect(card).toHaveTextContent(/as of \d?\d:\d\d [AP]M/);
     expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
   });
 
   it("says on time, departed, landed, cancelled and diverted in words", () => {
     const cases: [Partial<Status>, string, string][] = [
-      [{ state: "scheduled", dep_estimated: null, delay_minutes: null, arr_estimated: null }, "On time", "Booked 19:00"],
-      [{ state: "departed", dep_actual: "2026-11-20T19:12", delay_minutes: 12 }, "Departed", "Left 19:12 (booked 19:00)"],
-      [{ state: "landed", arr_actual: "2026-11-21T07:03" }, "Landed", "Landed 07:03"],
-      [{ state: "cancelled", dep_estimated: null }, "Cancelled", "Booked 19:00"],
-      [{ state: "diverted", dep_actual: "2026-11-20T19:06" }, "Diverted", "Left 19:06"],
+      [{ state: "scheduled", dep_estimated: null, delay_minutes: null, arr_estimated: null }, "On time", "Booked 7:00 PM"],
+      [{ state: "departed", dep_actual: "2026-11-20T19:12", delay_minutes: 12 }, "Departed", "Left 7:12 PM (booked 7:00 PM)"],
+      [{ state: "landed", arr_actual: "2026-11-21T07:03" }, "Landed", "Landed 7:03 AM"],
+      [{ state: "cancelled", dep_estimated: null }, "Cancelled", "Booked 7:00 PM"],
+      [{ state: "diverted", dep_actual: "2026-11-20T19:06" }, "Diverted", "Left 7:06 PM"],
     ];
     for (const [extra, word, line] of cases) {
       flightStatus.list = list({ statuses: [status(extra)] });
@@ -64,12 +64,14 @@ describe("a flight’s live status", () => {
   it("shows a time on another day with how many", () => {
     flightStatus.list = list({ statuses: [status({ dep_estimated: "2026-11-21T00:40" })] });
     render(FlightStatus, { segment: seg });
-    expect(screen.getByTestId("flight-status")).toHaveTextContent("Now 00:40 (+1 day) (booked 19:00)");
-    expect(dayShift("2026-11-22T01:00", "2026-11-20T19:00")).toBe(" (+2 days)");
-    expect(dayShift("2026-11-19T23:00", "2026-11-20T19:00")).toBe(" (−1 day)");
-    expect(dayShift("2026-11-20T19:50", "2026-11-20T19:00")).toBe("");
-    expect(dayShift(null, "2026-11-20T19:00")).toBe("");
-    expect(clock(null)).toBe("");
+    expect(screen.getByTestId("flight-status")).toHaveTextContent("Now 12:40 AM (+1 day) (booked 7:00 PM)");
+  });
+
+  it("writes the clock the way the scheduled times are written, not as 24-hour text", () => {
+    flightStatus.list = list({ statuses: [status({ state: "landed", arr_actual: "2026-11-21T13:03" })] });
+    render(FlightStatus, { segment: seg });
+    expect(screen.getByTestId("flight-status")).toHaveTextContent("Landed 1:03 PM");
+    expect(screen.getByTestId("flight-status")).not.toHaveTextContent("13:03");
   });
 
   it("shows nothing without the key, and nothing for a flight with no status but a way to ask", async () => {
@@ -92,14 +94,14 @@ describe("a flight’s live status", () => {
     unmount();
     flightStatus.list = list({ statuses: [status({ state: "landed", arr_actual: "2026-11-21T07:03" })] });
     render(FlightStatus, { segment: seg });
-    expect(screen.getByTestId("flight-status")).toHaveTextContent("Landed 07:03");
+    expect(screen.getByTestId("flight-status")).toHaveTextContent("Landed 7:03 AM");
     expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("says why nothing is fetched: the monthly limit, a rate limit, a refused key", () => {
     const until = "2026-12-01T00:00:00-05:00";
-    for (const [reason, text] of [["limit", /Live status paused until Dec 1 \(monthly limit\)/], ["rate", /paused until \d\d:\d\d \(rate limit\)/],
-      ["key", /paused until \d\d:\d\d \(RapidAPI didn’t accept the key\)/]] as const) {
+    for (const [reason, text] of [["limit", /Live status paused until Dec 1 \(monthly limit\)/], ["rate", /paused until \d?\d:\d\d [AP]M \(rate limit\)/],
+      ["key", /paused until \d?\d:\d\d [AP]M \(RapidAPI didn’t accept the key\)/]] as const) {
       flightStatus.list = list({ paused: { until, reason } });
       const { unmount } = render(FlightStatus, { segment: seg });
       expect(screen.getByRole("status")).toHaveTextContent(text);

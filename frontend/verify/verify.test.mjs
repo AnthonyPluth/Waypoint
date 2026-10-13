@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findChromium, flowProblems, lengthenNames, PAGES, screenshotFiles, unknownPages } from "./verify.mjs";
+import { fakeArchive, findChromium, flowProblems, lengthenNames, PAGES, screenshotFiles, unknownPages } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -67,6 +67,17 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ fake_first_run: true }] })).toEqual(["step 1: fake_first_run takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_merge_warning: "Sam Doe | Mia Doe" }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_merge_warning: 3 }] })).toEqual(["step 1: fake_merge_warning takes a string"]);
+    expect(flowProblems({ ...ok, steps: [{ fake_archive: 400 }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ fake_archive: "400" }] })).toEqual(["step 1: fake_archive takes a number"]);
+  });
+
+  it("makes a made-up archive of the asked size from a trip of the demo, with ids of their own", () => {
+    const model = { id: 7, name: "Demo", segments: [{ id: 70, trip_id: 7, provider: "X" }] };
+    const made = fakeArchive([model], 120);
+    expect(made).toHaveLength(120);
+    expect(new Set(made.map((t) => t.id)).size).toBe(120);
+    expect(made.every((t) => t.id > 7 && t.segments[0].trip_id === t.id)).toBe(true);
+    expect(fakeArchive([], 5)).toEqual([]);
   });
 
   it("takes a download to click and save, named", () => {
@@ -78,6 +89,7 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, phone_agent: true })).toEqual([]);
     expect(flowProblems({ ...ok, phone_agent: "yes" })).toEqual(["phone_agent is true or false"]);
   });
+  it("takes the laptop, wide and zoomed viewports a flow asks for", () => expect(flowProblems({ ...ok, viewports: ["laptop", "wide", "zoomed"] })).toEqual([]));
   it("rejects a viewport it doesn't know", () => expect(flowProblems({ ...ok, viewports: ["watch"] })).toEqual(["unknown viewport watch"]));
 
   it("rejects a page the app doesn't have, so a typo can't pass for a clean run", () => {
