@@ -24,6 +24,13 @@
   let signingOut = $state(false);
   const flights = $derived(flightStatus.list);
   onMount(loadFlightStatus);
+  onMount(() => {
+    if (landing && !route.sub) {
+      history.replaceState(history.state, "", `${location.pathname}${location.search}#settings/${landing}`);
+      route.sub = landing;
+      landing = "";
+    }
+  });
 
   const GROUPS = [
     { id: "account", label: "Account & household", about: "Who’s signed in, your household and the version.", tasks: ["Sign out", "Household members", "Version and advanced"] },
@@ -35,7 +42,7 @@
   ] as const;
   type Group = (typeof GROUPS)[number]["id"];
   const OLD_LINKS: Record<string, Group> = { data: "backup" };
-  const landing: Group | "" = new URLSearchParams(location.search).has("gmail") ? "mail" : "";
+  let landing = $state<Group | "">(new URLSearchParams(location.search).has("gmail") ? "mail" : "");
   const sub = $derived(OLD_LINKS[route.sub] ?? route.sub);
   const group = $derived<(typeof GROUPS)[number] | undefined>(GROUPS.find((g) => g.id === sub) ?? GROUPS.find((g) => g.id === landing));
 

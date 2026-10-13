@@ -170,6 +170,15 @@ describe("Settings index", () => {
     render(Settings);
     expect(screen.getByRole("heading", { level: 1, name: "Mail & review" })).toBeInTheDocument();
   });
+
+  it("leaves the mail group for the index after Google sends you back", async () => {
+    history.replaceState(null, "", "/?gmail=connected#settings");
+    route.sub = "";
+    render(Settings);
+    await waitFor(() => expect(location.hash).toBe("#settings/mail"));
+    route.sub = "";
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument());
+  });
 });
 
 describe("Settings data", () => {
