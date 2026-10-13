@@ -269,11 +269,11 @@
                   {@const reserve = group.items.some((x) => x.logo)}
                   <li class="flex items-start justify-between gap-x-3 text-sm">
                     <div class="min-w-0 flex-1">
-                      <p class="flex items-center gap-x-2">
+                      <p class="flex flex-wrap items-center gap-x-2">
                         <BrandLogo src={m.logo} size={20} monogram={reserve ? m.program : null} />
                         <span class="min-w-0 break-words font-medium">{m.program}</span>
                         {#if m.readable}
-                          <button type="button" class="-my-2 inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md px-1.5 focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+                          <button type="button" class="-my-2 inline-flex min-h-11 max-w-full flex-wrap items-center gap-x-2 rounded-md px-1.5 focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
                             aria-label={revealed[m.id] !== undefined ? `Hide ${m.program} number` : `Show and copy ${m.program} number`} onclick={() => toggle(m)}>
                             <span class="font-mono">{revealed[m.id] ?? m.masked}</span>
                             <span class="text-xs font-medium text-primary">{revealed[m.id] !== undefined ? "Hide" : "Show and copy"}</span></button>

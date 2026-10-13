@@ -1,0 +1,10 @@
+{
+  "name": "people-reveal",
+  "page": "people",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "People" } },
+    { "click": "button[aria-label^='Show and copy']" },
+    { "wait_for": "button[aria-label^='Hide']" },
+    { "screenshot": "number-revealed" }
+  ]
+}
