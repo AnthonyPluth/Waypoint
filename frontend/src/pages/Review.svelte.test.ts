@@ -1118,7 +1118,8 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     const open = await screen.findByRole("button", { name: /Add .* by hand/ });
     await u.click(open);
     const sheet = await screen.findByRole("dialog");
-    await waitFor(() => expect(within(sheet).getByLabelText("What is it?")).toHaveFocus());
+    if (phone) await waitFor(() => expect(within(sheet).getByRole("heading", { name: "Add this booking by hand" })).toHaveFocus());
+    else await waitFor(() => expect(within(sheet).getByLabelText("What is it?")).toHaveFocus());
     await u.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(open).toHaveFocus());
@@ -1165,7 +1166,6 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     expect(within(sheet).getByRole("button", { name: "Hide the email" })).toHaveAttribute("aria-expanded", "true");
     expect(within(sheet).getByText(/Your flight EX 410/)).toBeVisible();
   });
-
 
   it("replaces the open form when another item’s Add by hand is used", async () => {
     held = { matches: [], items: [item({ id: 1, subject: "First booking" }), item({ id: 2, subject: "Second booking" })], who: [], ai: false };

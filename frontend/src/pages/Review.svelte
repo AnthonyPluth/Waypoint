@@ -214,7 +214,7 @@
   const focusSheet = (e: Event) => {
     e.preventDefault();
     const sheet = document.querySelector<HTMLElement>("[data-slot='sheet']");
-    const target = draft?.suggested ? "[data-dialog-title]" : "form[data-editor] select";
+    const target = draft?.suggested || !showFields ? "[data-dialog-title]" : "form[data-editor] select";
     sheet?.querySelector<HTMLElement>(target)?.focus({ preventScroll: true });
   };
 
