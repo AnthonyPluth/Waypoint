@@ -171,6 +171,13 @@ class LoyaltyId(Base):
     notes: Mapped[str | None]
 
 
+class FlightCheck(Base):
+    __table__ = schema.flight_checks
+    flight_number: Mapped[str]
+    date: Mapped[str]
+    checked_at: Mapped[float]
+
+
 class FlightStatus(Base):
     __table__ = schema.flight_status
     flight_number: Mapped[str]
@@ -191,7 +198,6 @@ class FlightStatus(Base):
     arr_terminal: Mapped[str | None]
     arr_gate: Mapped[str | None]
     fetched_at: Mapped[float]
-    attempted_at: Mapped[float | None]
 
 
 class Setting(Base):

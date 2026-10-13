@@ -1,0 +1,18 @@
+{
+  "name": "airport-search",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "button:has-text('Add a booking')" },
+    { "wait_for": "form[data-editor]" },
+    { "click": "input[placeholder^='JFK']" },
+    { "fill": { "selector": "input[placeholder^='JFK']", "text": "lond" } },
+    { "wait_for": "[role='option']:has-text('LHR')" },
+    { "scroll_to": "input[placeholder^='JFK']" },
+    { "screenshot": "city-matches" },
+    { "press": { "selector": "input[placeholder^='JFK']", "key": "ArrowDown" } },
+    { "press": { "selector": "input[placeholder^='JFK']", "key": "Enter" } },
+    { "expect_text": { "selector": "form[data-editor]", "text": "From (airport)" } },
+    { "screenshot": "chosen" }
+  ]
+}

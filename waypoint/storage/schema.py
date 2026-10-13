@@ -232,8 +232,15 @@ flight_status = Table(
     Column('arr_terminal', Text),
     Column('arr_gate', Text),
     Column('fetched_at', Float, nullable=False),
-    Column('attempted_at', Float),
-    info={'doc': "the last live status answer for a flight number on a local departure date (a cache shared by everyone on the flight, with no personal data; not part of a backup)"},
+    info={'doc': "the final status (landed, cancelled or diverted) of a flight number on a local departure date, kept for good (a cache shared by everyone on the flight, with no personal data; not part of a backup); a status that can still change is never stored"},
+)
+
+flight_checks = Table(
+    'flight_checks', metadata,
+    Column('flight_number', Text, primary_key=True),
+    Column('date', Text, primary_key=True),
+    Column('checked_at', Float, nullable=False),
+    info={'doc': "when a flight number on a local departure date was last asked about, so the call budget and the check schedule survive a restart; holds no status (a cache shared by everyone on the flight, with no personal data; not part of a backup)"},
 )
 
 settings = Table(

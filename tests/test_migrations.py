@@ -207,6 +207,28 @@ class MigrationTests(unittest.TestCase):
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
 
+    def test_0035_keeps_only_the_final_flight_statuses_and_leaves_the_times_of_the_last_checks(self):
+        from alembic import command
+        old_status = sa.table("flight_status", *(sa.column(n) for n in ("flight_number", "date", "state", "dep_gate", "fetched_at", "attempted_at")))
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0034")
+            for number, state, fetched, attempted in (("EX1", "landed", 10.0, 10.0), ("EX2", "cancelled", 20.0, None), ("EX3", "diverted", 30.0, 31.0),
+                                                      ("EX4", "delayed", 40.0, 45.0), ("EX5", "scheduled", 50.0, None), ("EX6", "departed", 60.0, 55.0),
+                                                      ("EX7", "unknown", 0.0, 70.0), ("EX8", "unknown", 0.0, None)):
+                c.execute(old_status.insert().values(flight_number=number, date="2026-11-20", state=state, dep_gate="B24",
+                                                     fetched_at=fetched, attempted_at=attempted))
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual([(r[0], r[1], r[2]) for r in rows_of(self.path, "flight_status")],
+                         [("EX1", "2026-11-20", "landed"), ("EX2", "2026-11-20", "cancelled"), ("EX3", "2026-11-20", "diverted")])
+        self.assertNotIn("attempted_at", [col[0] for col in shape(self.path)["flight_status"]["columns"]])
+        self.assertEqual(rows_of(self.path, "flight_checks"),
+                         [("EX4", "2026-11-20", 45.0), ("EX5", "2026-11-20", 50.0), ("EX6", "2026-11-20", 60.0), ("EX7", "2026-11-20", 70.0)])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0034")
+        self.assertEqual(len(rows_of(self.path, "flight_status")), 3)
+        self.assertIn("attempted_at", [col[0] for col in shape(self.path)["flight_status"]["columns"]])
+
     def test_a_cruises_ports_go_with_the_cruise(self):
         db.init(self.path)
         with db.session(self.path) as conn:
