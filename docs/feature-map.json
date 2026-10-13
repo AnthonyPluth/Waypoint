@@ -87,6 +87,7 @@
       "handler": "waypoint/server/api/map.py:api_map",
       "web": [],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_map.py"
       ],
       "docs": [

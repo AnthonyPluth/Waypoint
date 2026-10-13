@@ -18,7 +18,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/backup` | `backups.py:api_backup` | - | `test_backup.py`, `test_http_pinned.py` | [start/docker](/Waypoint/start/docker/) |
 | `POST /api/backup/inspect` | `backups.py:api_backup_inspect` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_http_pinned.py`, `test_monitoring.py`, `test_security.py`, `test_server_errors.py` | [start/docker](/Waypoint/start/docker/) |
 | `POST /api/restore` | `backups.py:api_restore` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_hardening.py`, `test_http_pinned.py`, `test_http_server.py`, `test_monitoring.py` | [start/docker](/Waypoint/start/docker/) |
-| `GET /api/map` | `map.py:api_map` | - | `test_map.py` | [reference/configuration](/Waypoint/reference/configuration/) |
+| `GET /api/map` | `map.py:api_map` | - | `test_api_contract.py`, `test_map.py` | [reference/configuration](/Waypoint/reference/configuration/) |
 | `GET /api/map/tiles` | `map.py:api_map_tiles` | - | `test_map.py` | [reference/configuration](/Waypoint/reference/configuration/) |
 | `GET /api/people` | `people.py:api_people` | `lib/components/settings/ImportSection.svelte`, `pages/People.svelte`, `pages/Review.svelte`, `pages/Stats.svelte`, `pages/Trip.svelte`, `pages/Trips.svelte` | `test_api_contract.py`, `test_mail_scan.py`, `test_mcp_routes.py`, `test_people.py` | [start/people](/Waypoint/start/people/) |
 | `POST /api/people` | `people.py:api_person_add` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp_routes.py`, `test_people.py`, `test_trips.py` | [start/people](/Waypoint/start/people/) |
