@@ -86,10 +86,72 @@ describe("Settings → Import past flights", () => {
     render(ImportSection);
     await choose(csv());
     await screen.findByTestId("import-preview");
-    expect(screen.getByText(/first 200 of 2,300 rows/)).toBeInTheDocument();
+    expect(screen.getByText(/Rows 1–50 of 2,300/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Add 2,300 flights" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added 2,300 flights"));
     expect(saved.mock.calls.map((c) => c[0].flights.length)).toEqual([1000, 1000, 300]);
+  });
+
+  it("lets every row be inspected by paging, past row 200, including errors at the end", async () => {
+    const rows = [...Array.from({ length: 250 }, (_, i) => row(i + 2)), row(252, { status: "unreadable", reason: "Waypoint doesn’t know the airport QQQ", day: null, origin: null, destination: null })];
+    serve(preview(rows));
+    render(ImportSection);
+    await choose(csv());
+    await screen.findByTestId("import-preview");
+    expect(screen.queryByText(/doesn’t know the airport QQQ/)).toBeNull();
+    for (let i = 0; i < 5; i++) await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText(/Rows 251–251 of 251/)).toBeInTheDocument();
+    expect(screen.getByText(/doesn’t know the airport QQQ/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+  });
+
+  it("filters to problems only and searches, keeping the totals by status", async () => {
+    serve(preview([row(2), row(3, { origin: "SEA", destination: "SFO", flight_number: "AS55" }), row(4, { status: "unreadable", reason: "Waypoint doesn’t know the airport ZZZ", day: null, origin: null, destination: null }), row(5, { status: "exists", reason: "Already in Waypoint" })]));
+    render(ImportSection);
+    await choose(csv());
+    await screen.findByTestId("import-preview");
+    const list = screen.getByTestId("import-rows");
+    await userEvent.click(screen.getByRole("button", { name: /Problems only \(1\)/ }));
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /^All \(4\)/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^All/ }));
+    await userEvent.type(screen.getByLabelText("Search rows"), "as55");
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    await userEvent.clear(screen.getByLabelText("Search rows"));
+    await userEvent.type(screen.getByLabelText("Search rows"), "nothing like this");
+    expect(within(list).getByText("No rows match.")).toBeInTheDocument();
+  });
+
+  it("sends exactly the rows left included, and the button says how many", async () => {
+    const saved = vi.fn(() => ({ added: 2, existing: 0 }));
+    serve(preview([row(2, { origin: "JFK" }), row(3, { origin: "SEA" }), row(4, { origin: "ORD" })]), saved);
+    render(ImportSection);
+    await choose(csv());
+    await screen.findByTestId("import-preview");
+    await userEvent.click(screen.getByRole("checkbox", { name: /Add line 3, SEA to LAX/ }));
+    expect(screen.getByText(/2 new flights will be added; 1 left out/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Add 2 flights" }));
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+    const sent = saved.mock.calls[0] as unknown as [{ flights: { origin: string }[] }];
+    expect(sent[0].flights.map((f) => f.origin)).toEqual(["JFK", "ORD"]);
+  });
+
+  it("retries only what wasn’t added after a failure, so nothing is sent twice", async () => {
+    let calls = 0;
+    const batches: number[] = [];
+    serve(preview(Array.from({ length: 1500 }, (_, i) => row(i + 2))), (b) => {
+      batches.push(b.flights.length);
+      if (++calls === 2) throw new Error("Waypoint is busy saving something else.");
+      return { added: b.flights.length, existing: 0 };
+    });
+    render(ImportSection);
+    await choose(csv());
+    await screen.findByTestId("import-preview");
+    await userEvent.click(screen.getByRole("button", { name: "Add 1,500 flights" }));
+    await screen.findByRole("alert");
+    await userEvent.click(screen.getByRole("button", { name: "Add 500 flights" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added 500 flights"));
+    expect(batches).toEqual([1000, 500, 500]);
   });
 
   it("says why a file can’t be used, and offers nothing to add", async () => {
@@ -125,7 +187,7 @@ describe("Settings → Import past flights", () => {
     await choose(csv());
     await screen.findByTestId("import-preview");
     await userEvent.click(screen.getByRole("button", { name: "Add 1,500 flights" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Added 1,000 flights before this stopped: Waypoint is busy saving something else.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Added 1,000 flights before this stopped: Waypoint is busy saving something else. 500 flights left; add again to retry only those.");
     expect(screen.getByTestId("import-preview")).toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
   });
