@@ -10,8 +10,6 @@
 
   const along = $derived(clampProgress(progress));
   const percent = $derived(`${Math.round(along * 1000) / 10}%`);
-  // The route is a quadratic arc (0,100) -> (50,0) -> (100,100) in a stretched viewBox, so x is linear in progress
-  // and the plane's height is 100 * (1 - 2t(1 - t)) percent. It tilts up on the way out and down on the way in.
   const height = $derived(`${Math.round((1 - 2 * along * (1 - along)) * 1000) / 10}%`);
   const tilt = $derived(Math.round((2 * along - 1) * 30));
 </script>
