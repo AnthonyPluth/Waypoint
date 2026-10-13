@@ -3,7 +3,7 @@
   import { tick } from "svelte";
   import { MAX_SHOWN, buildIndex, describeZone, searchZones, supportedZones, zoneEntry, zoneLabel } from "$lib/zone-search";
 
-  let { value = $bindable(""), blank, label = undefined, required = false }: { value: string; blank: string; label?: string; required?: boolean } = $props();
+  let { value = $bindable(""), blank, label = undefined, required = false, invalid = false, describedby = undefined }: { value: string; blank: string; label?: string; required?: boolean; invalid?: boolean; describedby?: string } = $props();
 
   const FIELD = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
   const uid = $props.id();
@@ -66,7 +66,7 @@
   <Combobox.Root type="single" allowDeselect={false} bind:open {value} onValueChange={pick} onOpenChange={changed}>
     <Combobox.Input bind:ref={box} class={FIELD} oninput={typed} onkeydown={keydown} onfocus={() => (open = true)} onclick={() => (open = true)}>
       {#snippet child({ props })}
-        <input {...props} value={text} aria-label={label} aria-controls={open ? listId : undefined} placeholder={blank} {required} autocomplete="off" autocapitalize="off" spellcheck={false} />
+        <input {...props} value={text} aria-label={label} aria-controls={open ? listId : undefined} aria-invalid={invalid ? "true" : undefined} aria-describedby={describedby} placeholder={blank} {required} autocomplete="off" autocapitalize="off" spellcheck={false} />
       {/snippet}
     </Combobox.Input>
     <Combobox.Content id={listId} sideOffset={4} collisionPadding={8} class="zone-list" onpointerdown={(event) => event.preventDefault()}>
@@ -88,5 +88,5 @@
     </Combobox.Content>
   </Combobox.Root>
 {:else}
-  <input bind:value aria-label={label} {required} placeholder={blank} autocomplete="off" autocapitalize="off" spellcheck={false} class={FIELD} />
+  <input bind:value aria-label={label} aria-invalid={invalid ? "true" : undefined} aria-describedby={describedby} {required} placeholder={blank} autocomplete="off" autocapitalize="off" spellcheck={false} class={FIELD} />
 {/if}

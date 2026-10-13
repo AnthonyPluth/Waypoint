@@ -13,9 +13,9 @@ describe("the segment form's messages", () => {
     expect(problem(hotel())).toBeNull();
   });
   it("wants airport codes for a flight", () => {
-    expect(problem(flight({ origin: "" }))).toBe("A flight’s origin is an airport code like JFK");
-    expect(problem(flight({ origin: "New York" }))).toBe("A flight’s origin is an airport code like JFK");
-    expect(problem(flight({ destination: "L" }))).toBe("A flight’s destination is an airport code like LHR");
+    expect(problem(flight({ origin: "" }))).toMatch(/^Choose the airport it leaves from/);
+    expect(problem(flight({ origin: "New York" }))).toMatch(/^Choose the airport it leaves from/);
+    expect(problem(flight({ destination: "L" }))).toMatch(/^Choose the airport it arrives at/);
   });
   it("wants a name for a stay, and both times", () => {
     expect(problem(hotel({ origin: " " }))).toBe("Enter the hotel’s name");

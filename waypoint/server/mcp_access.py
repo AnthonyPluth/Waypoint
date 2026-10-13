@@ -10,7 +10,7 @@ from . import mcp_oauth
 READ, WRITE, MAIL = "read", "write", "mail"
 
 READABLE = frozenset({
-    "/api/trips", "/api/trips/{id}", "/api/segments/{id}", "/api/airports/{id}", "/api/people", "/api/stats",
+    "/api/trips", "/api/trips/{id}", "/api/segments/{id}", "/api/airports", "/api/airports/{id}", "/api/people", "/api/stats",
     "/api/distance-unit", "/api/flight-status", "/api/assistant/review", "/api/assistant/review/{id}",
 })
 

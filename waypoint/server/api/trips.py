@@ -12,7 +12,7 @@ from ...domain.mail import ai
 from ...domain.visibility import Viewer
 from ...storage import db
 from ..common import NO_IMAGE, ApiError, Response, _current, image_response, own_session, position, row_id
-from ..contract import (Airport, DestinationSuggestion, EmailsCleared, GateCodeBody, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
+from ..contract import (Airport, AirportMatches, DestinationSuggestion, EmailsCleared, GateCodeBody, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
                         TripList, TripPlaces)
 
 NAME_LIMIT = 100
@@ -337,3 +337,8 @@ def api_airport(conn, _q, _b, code) -> Airport:
     if found is None:
         raise ApiError("No such airport", 404)
     return Airport(**found)
+
+
+def api_airport_search(conn, q, _b) -> AirportMatches:
+    wanted = (q.get("q") or [""])[0]
+    return AirportMatches(airports=[Airport(**a) for a in airports.search(conn, wanted)])
