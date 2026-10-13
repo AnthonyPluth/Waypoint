@@ -157,6 +157,22 @@ describe("Settings → Import past flights", () => {
     expect(batches).toEqual([1000, 500, 500]);
   });
 
+  it("counts only flights actually added when a stale preview makes some already exist, and clears the alert when the selection changes", async () => {
+    let calls = 0;
+    serve(preview(Array.from({ length: 1500 }, (_, i) => row(i + 2))), (b) => {
+      if (++calls === 2) throw new Error("Waypoint is busy saving something else.");
+      return { added: b.flights.length - 400, existing: 400 };
+    });
+    render(ImportSection);
+    await choose(csv());
+    await screen.findByTestId("import-preview");
+    await userEvent.click(screen.getByRole("button", { name: "Add 1,500 flights" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Added 600 flights (400 were already here) before this stopped");
+    await userEvent.type(screen.getByLabelText("Search rows"), "1200");
+    await userEvent.click(screen.getByRole("checkbox", { name: /Add line 1200/ }));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("says why a file can’t be used, and offers nothing to add", async () => {
     serve(new Error("Waypoint can import CSV exports from Flighty, myFlightRadar24, OpenFlights and App in the Air. This file’s columns don’t match any of them."));
     render(ImportSection);

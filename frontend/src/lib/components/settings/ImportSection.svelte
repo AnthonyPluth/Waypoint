@@ -76,6 +76,7 @@
 
   function include(r: ImportRow, on: boolean) {
     if (on) left.delete(r.line); else left.add(r.line);
+    problem = "";
   }
 
   const show = (f: Filter) => { filter = f; page = 0; };
@@ -97,7 +98,7 @@
         for (const b of batch) added.add(b.line);
         progress = Math.min(i + BATCH, rows.length);
       }
-    }, { busy: (on) => (saving = on), onError: (m) => { problem = progress ? `Added ${n(progress, "flight")} before this stopped: ${m} ${n(rows.length - progress, "flight")} left; add again to retry only those.` : m; } });
+    }, { busy: (on) => (saving = on), onError: (m) => { problem = progress ? `Added ${n(total, "flight")}${existing ? ` (${existing.toLocaleString("en-US")} were already here)` : ""} before this stopped: ${m} ${n(rows.length - progress, "flight")} left; add again to retry only those.` : m; } });
     if (ok) { toast.success(`Added ${n(total, "flight")}${existing ? `; ${existing.toLocaleString("en-US")} were already here` : ""}`); done(); }
   }
 </script>
