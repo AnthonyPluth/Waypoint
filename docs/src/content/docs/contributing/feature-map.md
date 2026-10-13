@@ -65,8 +65,8 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/loyalty/{id}` | `loyalty.py:api_loyalty_edit` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp.py` | [start/loyalty](/Waypoint/start/loyalty/) |
 | `DELETE /api/loyalty/{id}` | `loyalty.py:api_loyalty_remove` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp.py` | [start/loyalty](/Waypoint/start/loyalty/) |
 | `POST /api/loyalty/{id}/reveal` | `loyalty.py:api_loyalty_reveal` | `lib/components/LoyaltyNumber.svelte`, `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp.py`, `test_mcp_routes.py` | [start/loyalty](/Waypoint/start/loyalty/) |
-| `GET /api/mailboxes` | `mailboxes.py:api_mailboxes` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/Waypoint/start/gmail/) |
-| `POST /api/mailboxes/connect` | `mailboxes.py:api_mailbox_connect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/Waypoint/start/gmail/) |
+| `GET /api/mailboxes` | `mailboxes.py:api_mailboxes` | `lib/components/settings/GmailSection.svelte`, `pages/Upcoming.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/Waypoint/start/gmail/) |
+| `POST /api/mailboxes/connect` | `mailboxes.py:api_mailbox_connect` | `lib/components/settings/GmailSection.svelte`, `pages/Upcoming.svelte` | `test_api_contract.py`, `test_gmail.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `GET /api/mailboxes/callback` | `mailboxes.py:api_mailbox_callback` | - | `test_gmail.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `DELETE /api/mailboxes/{id}` | `mailboxes.py:api_mailbox_disconnect` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_gmail.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |
 | `POST /api/mailboxes/{id}/scan` | `mailboxes.py:api_mailbox_scan` | `lib/components/settings/GmailSection.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/gmail](/Waypoint/start/gmail/) |

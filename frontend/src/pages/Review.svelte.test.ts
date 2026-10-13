@@ -38,6 +38,7 @@ const SUGGESTION = { kind: "flight" as const, provider: "Example Air", confirmat
 const PREVIEW = "Hello Jane,\nYour flight EX 410 leaves Boston at 7:15 am on 2 January.";
 let previewFails = "";
 let suggestFails = "";
+let suggestOkFirst = 0;
 let suggestGate: Promise<void> | null = null;
 let segmentsMade = 0;
 let secondSegmentFails = "";
@@ -62,7 +63,7 @@ function serve(failOn?: string) {
     if (path.endsWith("/same")) { if (sameFails) throw new Error(sameFails); return { booking: sameQueue.length ? sameQueue.shift() ?? null : sameAs } as never; }
     if (path.endsWith("/attach")) return { ok: true, segment_id: 99 } as never;
     if (path.endsWith("/preview")) { if (previewFails) throw new Error(previewFails); return { text: PREVIEW, html: null, truncated } as never; }
-    if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestions: [SUGGESTION] })) }; return { ok: true } as never; }
+    if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails && suggestOkFirst-- <= 0) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestions: [SUGGESTION] })) }; return { ok: true } as never; }
     if (path.endsWith("/unignore")) return { started: true } as never;
     if (path.endsWith("/ignore")) { const id = Number(path.split("/")[3]); const domain = held.items.find((i) => i.id === id)?.sender_domain ?? ""; held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true, mailbox_id: 5, domain } as never; }
     if (opts?.method === "DELETE" && path.includes("?suggestion=")) { const id = Number(path.split("/")[3]?.split("?")[0]); const gone = path.split("?")[1]?.split("&").map((q) => Number(q.split("=")[1])) ?? []; held = { ...held, items: held.items.map((i) => (i.id === id ? { ...i, suggestions: i.suggestions.filter((_, n) => !gone.includes(n + 1)) } : i)) }; return { ok: true } as never; }
@@ -75,7 +76,7 @@ function serve(failOn?: string) {
 }
 
 afterEach(() => { setQuery(""); });
-beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
+beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestOkFirst = 0; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
@@ -1003,6 +1004,17 @@ describe("Review: Ask AI", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 2 messages"));
     expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/4/suggest", "/api/review/5/suggest"]);
+  });
+
+  it("says how many were asked when a later message fails after earlier ones completed", async () => {
+    held = { matches: [], items: [item(), item({ id: 2 }), item({ id: 3 })], who: [], ai: true };
+    suggestFails = "The AI didn’t answer.";
+    suggestOkFirst = 1;
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 3" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Asked about 1 of 3: The AI didn’t answer."));
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest", "/api/review/2/suggest"]);
   });
 
   it("stops the bulk ask at the first failure and says how far it got", async () => {
