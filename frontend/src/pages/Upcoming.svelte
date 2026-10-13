@@ -12,7 +12,7 @@
   import { takeEarlyTrips } from "$lib/early";
   import { flightStatus, loadFlightStatus, statusFor } from "$lib/flightstatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
-  import { type Day, dateLabel, dayIn, dayLabel, END_WORD, featuredTrip, flightEvidence, headline, nextUp, subline, timesDiffer, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
+  import { type Day, type DayItem, dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, startAt, subline, timesDiffer, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
@@ -89,8 +89,10 @@
   const next = $derived(trips ? nextUp(trips, now) : null);
   const featured = $derived(trips ? featuredTrip(trips, next, today) : null);
   const days = $derived(featured ? tripDays(featured) : []);
-  const earlier = $derived(days.filter((d) => d.date < today));
-  const ahead = $derived(days.filter((d) => d.date >= today));
+  const happened = (i: DayItem) => dayIn(i.role === "end" ? endAt(i.segment) : startAt(i.segment), viewerZone()) < today;
+  const firstAhead = $derived(days.findIndex((d) => !d.items.every(happened)));
+  const earlier = $derived(firstAhead < 0 ? days : days.slice(0, firstAhead));
+  const ahead = $derived(firstAhead < 0 ? [] : days.slice(firstAhead));
   const waiting = $derived(app.state?.review_count ?? 0);
   const boxes = $derived(mail?.mailboxes ?? []);
   const scanning = $derived(boxes.some((m) => m.scanning));

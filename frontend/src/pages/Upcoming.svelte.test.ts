@@ -181,6 +181,17 @@ describe("Upcoming", () => {
     expect(within(screen.getByRole("list", { name: "Trip to London, earlier days" })).getAllByRole("heading", { level: 3 })).toHaveLength(2);
   });
 
+  it("judges earlier days by the instant in the viewer's day, not the booking's calendar date", async () => {
+    at("2026-11-21T00:00:00-05:00");
+    const LA = "America/Los_Angeles";
+    const late = segment({ id: 1, origin: "LAX", destination: "JFK", start_local: "2026-11-20T22:00", start_zone: LA, end_local: "2026-11-21T06:00", end_zone: NY });
+    serve([trip([late, stay])]);
+    render(Upcoming);
+    await screen.findByRole("heading", { name: "LAX → JFK" });
+    expect(screen.queryByText(/Earlier in this trip/)).toBeNull();
+    expect(within(screen.getByRole("list", { name: "Trip to London, day by day" })).getByText(/Nov 20/)).toBeInTheDocument();
+  });
+
   it("offers no earlier days before a trip starts", async () => {
     at("2026-11-20T09:00:00-05:00");
     serve([london]);
