@@ -14,13 +14,13 @@ from tests.privacy import no_leaks
 from tests.shared import DbCase
 from tests.test_trips import RouteCase
 from waypoint import monitoring, oidc
-from waypoint.domain import flightstatus, loyalty, people, trips
+from waypoint.domain import demo, flightstatus, loyalty, people, trips
 from waypoint.domain.visibility import Viewer
 from waypoint.providers import flightstatus as service
 from waypoint.server import jobs
 from waypoint.storage import db
 from waypoint.storage import settings_keys as sk
-from waypoint.storage.models import FlightStatus, Segment
+from waypoint.storage.models import FlightCheck, FlightStatus, Segment
 
 FIXTURES = Path(__file__).parent / "fixtures" / "aerodatabox"
 KEY = "test-rapidapi-key-8f3a91c2"
@@ -298,6 +298,8 @@ class Household(DbCase):
 
     def setUp(self):
         super().setUp()
+        flightstatus.drop_held()
+        self.addCleanup(flightstatus.drop_held)
         self.fake = serve_fake(self)
         for sub, name in (("u-jane", "Jane Doe"), ("u-sam", "Sam Doe")):
             oidc.remember_user(self.c, sub, f"{sub}@example.com", name, None)
@@ -313,9 +315,25 @@ class Household(DbCase):
     def when(self, name: str, extra: timedelta = timedelta()) -> datetime:
         return {n: t for t, n in flightstatus.checkpoints(FLIGHT)}[name] + extra
 
-    def cached(self) -> FlightStatus | None:
+    def final(self) -> FlightStatus | None:
         self.c.orm.expire_all()
         return self.c.orm.get(FlightStatus, ("EX101", "2026-11-20"))
+
+    def held(self) -> str | None:
+        entry = flightstatus._held.get(("EX101", "2026-11-20"))
+        return entry[0].state if entry else None
+
+    def stored(self) -> list[tuple[str, str]]:
+        self.c.orm.expire_all()
+        return [(r.flight_number, r.state) for r in self.c.orm.scalars(select(FlightStatus)).all()]
+
+    def checked(self) -> float | None:
+        self.c.orm.expire_all()
+        row = self.c.orm.get(FlightCheck, ("EX101", "2026-11-20"))
+        return row.checked_at if row else None
+
+    def hold(self, found: service.Status, fetched: datetime = EARLY) -> None:
+        flightstatus.hold("EX101", "2026-11-20", found, fetched, fetched + flightstatus.REFRESH_AFTER)
 
     def used(self, now: datetime | None = None) -> int:
         other = db.connect(self.path)
@@ -344,7 +362,7 @@ class CheckTests(Household):
         self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 1)
         self.assertEqual(len(self.fake.calls), 1)
         self.assertEqual(self.fake.calls[0]["path"], "/flights/number/EX101/2026-11-20")
-        self.assertEqual(self.cached().state, "delayed")   # type: ignore[union-attr]
+        self.assertEqual((self.held(), self.stored()), ("delayed", []))
         self.assertEqual(flightstatus.run_due(self.c, self.when("3h", timedelta(minutes=5))), 0)
         self.assertEqual(len(self.fake.calls), 1)
 
@@ -382,11 +400,11 @@ class CheckTests(Household):
             self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 0)
         self.assertEqual(self.fake.calls, [])
 
-    def test_an_unknown_flight_is_kept_as_one_so_it_isnt_asked_again_until_the_next_check(self):
+    def test_an_unknown_flight_leaves_only_the_time_it_was_asked_so_it_isnt_asked_again_until_the_next_check(self):
         self.book(self.jane)
         self.fake.answer = (200, [])
         self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 1)
-        self.assertEqual(self.cached().state, "unknown")   # type: ignore[union-attr]
+        self.assertEqual((self.held(), self.stored(), self.checked()), (None, [], self.when("3h").timestamp()))
         self.assertEqual(flightstatus.run_due(self.c, self.when("3h", timedelta(minutes=30))), 0)
         self.assertEqual(flightstatus.overview(self.c, self.jane, self.when("3h"))["statuses"], [])
         self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)
@@ -407,16 +425,74 @@ class CheckTests(Household):
         self.assertEqual(flightstatus.run_due(self.c, ARRIVES), 0)
         self.assertEqual(len(self.fake.calls), 1)
 
-    def test_answers_go_seven_days_after_the_flight(self):
+    def test_the_last_checks_go_seven_days_after_the_flight_and_a_final_status_never_does(self):
         for day in ("2026-11-12", "2026-11-13", "2026-11-14", "2026-11-20"):
             self.c.execute(insert(FlightStatus).values(flight_number="EX9", date=day, state="landed", fetched_at=1.0))
+            self.c.execute(insert(FlightCheck).values(flight_number="EX9", date=day, checked_at=1.0))
         flightstatus.purge(self.c, datetime(2026, 11, 20, 12, 0, tzinfo=UTC))
         self.c.orm.expire_all()
-        self.assertEqual(sorted(r.date for r in self.c.orm.scalars(select(FlightStatus)).all()), ["2026-11-14", "2026-11-20"])
-        self.book(self.jane)
-        self.assertEqual(flightstatus.run_due(self.c, datetime(2026, 11, 28, 12, 0, tzinfo=UTC)), 0)
+        self.assertEqual(sorted(r.date for r in self.c.orm.scalars(select(FlightCheck)).all()), ["2026-11-14", "2026-11-20"])
+        self.assertEqual(len(self.c.orm.scalars(select(FlightStatus)).all()), 4)
+        flightstatus.purge(self.c, datetime(2027, 3, 1, 12, 0, tzinfo=UTC))
         self.c.orm.expire_all()
-        self.assertEqual(list(self.c.orm.scalars(select(FlightStatus)).all()), [])
+        self.assertEqual(list(self.c.orm.scalars(select(FlightCheck)).all()), [])
+        self.assertEqual(len(self.c.orm.scalars(select(FlightStatus)).all()), 4)
+
+    def test_a_status_that_can_still_change_is_never_stored_whatever_the_airline_says(self):
+        self.book(self.jane)
+        for name in ("on_time", "delayed_gate_change", "departed", "expected_but_late", "unknown_flight"):
+            with self.subTest(name):
+                self.fake.answer = (200, fixture(name))
+                self.assertEqual(flightstatus.run_due(self.c, self.when("20m")), 1)
+                self.assertEqual(self.stored(), [])
+                self.assertEqual(self.checked(), self.when("20m").timestamp())
+                self.c.execute(FlightCheck.__table__.delete())
+                self.c.commit()
+
+    def test_a_final_status_is_stored_for_good_and_the_flight_is_never_asked_about_again(self):
+        self.book(self.jane)
+        for name in ("landed", "cancelled", "diverted"):
+            with self.subTest(name):
+                self.c.execute(FlightStatus.__table__.delete())
+                self.c.commit()
+                flightstatus.drop_held()
+                self.fake.answer = (200, fixture(name))
+                calls = len(self.fake.calls)
+                self.assertEqual(flightstatus.run_due(self.c, self.when("20m")), 1)
+                self.assertEqual(self.stored(), [("EX101", name)])
+                self.assertIsNone(self.held())
+                for later in (ARRIVES, ARRIVES + timedelta(hours=5), ARRIVES + timedelta(days=30), ARRIVES + timedelta(days=3650)):
+                    self.assertEqual(flightstatus.run_due(self.c, later), 0)
+                    flightstatus.purge(self.c, later)
+                self.assertEqual(len(self.fake.calls), calls + 1)
+                self.assertEqual(self.stored(), [("EX101", name)])
+                shown = flightstatus.overview(self.c, self.jane, ARRIVES + timedelta(days=3650))["statuses"]
+                self.assertEqual([s["state"] for s in shown], [name])
+
+    def test_a_delay_is_shown_while_fresh_then_is_gone_and_a_restart_forgets_it(self):
+        seg = self.book(self.jane)
+        self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 1)
+        for minutes, shown in ((0, 1), (14, 1), (15, 0), (60, 0)):
+            got = flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=minutes)))["statuses"]
+            self.assertEqual(len(got), shown, minutes)
+        got = flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=1)))["statuses"]
+        self.assertEqual((got[0]["segment_id"], got[0]["state"], got[0]["delay_minutes"]), (seg["id"], "delayed", 50))
+        flightstatus.drop_held()
+        self.assertEqual(flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=1)))["statuses"], [])
+        self.assertEqual(self.stored(), [])
+
+    def test_a_restart_forgets_the_status_but_not_which_checks_were_made(self):
+        self.book(self.jane)
+        self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 1)
+        flightstatus.drop_held()
+        other = db.connect(self.path)
+        try:
+            self.assertEqual(flightstatus.run_due(other, self.when("3h", timedelta(minutes=5))), 0)
+            self.assertEqual(flightstatus.run_due(other, self.when("1h")), 1)
+        finally:
+            other.close()
+        self.assertEqual(len(self.fake.calls), 2)
+        self.assertEqual(self.stored(), [])
 
 
 class BudgetTests(Household):
@@ -494,7 +570,7 @@ class BudgetTests(Household):
         self.assertIsNone(flightstatus.usage(self.c, now + timedelta(hours=1, seconds=1)).paused)
         self.assertEqual(flightstatus.run_due(self.c, now + timedelta(hours=1, minutes=1)), 0)
         self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)
-        self.assertEqual(self.cached().state, "scheduled")   # type: ignore[union-attr]
+        self.assertEqual((self.held(), self.stored()), ("scheduled", []))
 
     def test_a_key_rapidapi_refuses_pauses_too_and_a_garbled_pause_is_none(self):
         self.fake.answer = (403, {"message": "You are not subscribed to this API."})
@@ -515,19 +591,19 @@ class BudgetTests(Household):
         self.assertEqual(self.used(), 1)
         self.assertIn("Flight status: The flight status service had a problem.", out)
         self.assertNotIn("EX101", out + err)
-        self.assertEqual(self.cached().state, "unknown")   # type: ignore[union-attr]
+        self.assertEqual((self.held(), self.stored(), self.checked()), (None, [], now.timestamp()))
         for minutes in (5, 10, 60):
             self.assertEqual(flightstatus.run_due(self.c, now + timedelta(minutes=minutes)), 0)
         self.fake.answer = (200, fixture("on_time"))
         self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)
-        self.assertEqual(self.cached().state, "scheduled")   # type: ignore[union-attr]
+        self.assertEqual((self.held(), self.stored()), ("scheduled", []))
         self.assertEqual(self.used(), 2)
 
     def test_a_failed_call_keeps_the_answer_held(self):
         self.assertEqual(flightstatus.run_due(self.c, self.when("24h")), 1)
         self.fake.answer = (500, {})
         self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 1)
-        self.assertEqual(self.cached().state, "delayed")   # type: ignore[union-attr]
+        self.assertEqual((self.held(), self.stored()), ("delayed", []))
         self.assertEqual(flightstatus.run_due(self.c, self.when("3h", timedelta(minutes=30))), 0)
 
     def test_a_long_outage_costs_no_more_than_the_five_checks_and_survives_a_restart(self):
@@ -615,22 +691,23 @@ class RefreshTests(Household):
         self.assertEqual((got["paused"]["reason"] if got["paused"] else None, got["statuses"]), ("rate", []))
         self.assertEqual(len(self.fake.calls), 1)
 
-    def test_refresh_after_a_failure_keeps_the_old_answer(self):
+    def test_refresh_after_a_failure_shows_nothing_once_the_held_answer_is_stale_and_stores_nothing(self):
         self.refresh(self.when("3h"))
         self.fake.answer = (500, {})
         with self.assertRaises(service.Unavailable):
             self.refresh(self.when("3h", timedelta(minutes=20)))
-        got = flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=20)))
+        got = flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=10)))
         self.assertEqual([s["state"] for s in got["statuses"]], ["delayed"])
+        got = flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=20)))
+        self.assertEqual(got["statuses"], [])
+        self.assertEqual(self.stored(), [])
 
 
 class WhoSeesAStatus(Household):
     def test_a_status_shows_only_on_the_segments_the_viewer_can_see(self):
         mine = self.book(self.jane, OUT, travelers=[self.jane.person_id, self.mia])
-        self.c.execute(insert(FlightStatus).values(
-            flight_number="EX101", date="2026-11-20", state="delayed", origin="JFK", destination="LHR",
-            dep_scheduled="2026-11-20T19:00", dep_estimated="2026-11-20T19:50", dep_zone="America/New_York", dep_gate="B24",
-            arr_scheduled="2026-11-21T07:10", arr_zone=None, fetched_at=DEPARTS.timestamp()))
+        self.hold(service.Status("delayed", origin="JFK", destination="LHR", dep_scheduled="2026-11-20T19:00", dep_estimated="2026-11-20T19:50",
+                                 dep_zone="America/New_York", dep_gate="B24", arr_scheduled="2026-11-21T07:10"))
         self.assertEqual([s["segment_id"] for s in flightstatus.overview(self.c, self.jane, EARLY)["statuses"]], [mine["id"]])
         self.assertEqual(flightstatus.overview(self.c, self.sam, EARLY)["statuses"], [])
         self.assertEqual(flightstatus.overview(self.c, Viewer(None), EARLY)["statuses"], [])
@@ -639,24 +716,21 @@ class WhoSeesAStatus(Household):
 
     def test_a_status_for_another_leg_of_the_flight_number_isnt_shown(self):
         seg = self.book(self.jane, OUT)
-        self.c.execute(insert(FlightStatus).values(flight_number="EX101", date="2026-11-20", state="delayed", origin="DUB",
-                                                   fetched_at=1.0))
+        self.hold(service.Status("delayed", origin="DUB"))
         self.assertEqual(flightstatus.overview(self.c, self.jane, EARLY)["statuses"], [])
-        self.c.execute(FlightStatus.__table__.update().values(origin="jfk"))
-        self.c.orm.expire_all()
+        self.hold(service.Status("delayed", origin="jfk"))
         self.assertEqual([s["segment_id"] for s in flightstatus.overview(self.c, self.jane, EARLY)["statuses"]], [seg["id"]])
 
     def test_times_come_with_their_zones_and_fall_back_to_the_segments(self):
         seg = self.book(self.jane)
-        self.c.execute(insert(FlightStatus).values(flight_number="EX101", date="2026-11-20", state="departed", dep_actual="2026-11-20T19:12",
-                                                   dep_scheduled="2026-11-20T19:00", fetched_at=ARRIVES.timestamp()))
+        self.hold(service.Status("departed", dep_actual="2026-11-20T19:12", dep_scheduled="2026-11-20T19:00"))
         (s,) = flightstatus.overview(self.c, self.jane, EARLY)["statuses"]
         self.assertEqual((s["dep_zone"], s["arr_zone"], s["delay_minutes"], s["fetched_at"]),
-                         (seg["start_zone"], seg["end_zone"], 12, "2026-11-21T07:10:00+00:00"))
+                         (seg["start_zone"], seg["end_zone"], 12, "2026-11-19T18:00:00+00:00"))
 
     def test_without_a_key_there_is_nothing_to_show(self):
         self.book(self.jane)
-        self.c.execute(insert(FlightStatus).values(flight_number="EX101", date="2026-11-20", state="delayed", fetched_at=1.0))
+        self.hold(service.Status("delayed"))
         with mock.patch.dict(os.environ, {"RAPIDAPI_KEY": ""}):
             over = flightstatus.overview(self.c, self.jane, EARLY)
         self.assertEqual((over["enabled"], over["statuses"]), (False, []))
@@ -674,12 +748,13 @@ class NeverTheBookingTests(Household):
         for name, now in (("delayed_gate_change", self.when("3h")), ("cancelled", self.when("1h")), ("diverted", self.when("20m")),
                           ("landed", ARRIVES)):
             self.c.execute(FlightStatus.__table__.delete())
+            flightstatus.drop_held()
             self.fake.answer = (200, fixture(name))
             flightstatus.refresh(self.c, self.jane, seg["id"], now + timedelta(hours=1))
             flightstatus.run_due(self.c, now)
             flightstatus.overview(self.c, self.jane, now)
             self.assertEqual(self.rows(), before, name)
-        self.assertEqual(self.cached().state, "landed")   # type: ignore[union-attr]
+        self.assertEqual(self.final().state, "landed")   # type: ignore[union-attr]
         self.assertEqual(trips.get_segment(self.c, self.jane, seg["id"])["status"], "confirmed")   # type: ignore[index]
         self.assertEqual(trips.get_segment(self.c, self.jane, seg["id"])["locked_fields"], ["details"])   # type: ignore[index]
 
@@ -701,6 +776,34 @@ class LeakTests(Household):
             self.assertEqual(call["path"], "/flights/number/EX101/2026-11-20")
             self.assertEqual({k.lower() for k in call["headers"]} - {"host", "accept", "user-agent", "connection", "accept-encoding"},
                              {"x-rapidapi-key", "x-rapidapi-host"})
+
+
+class DemoTests(Household):
+    def test_the_demo_shows_a_delay_from_memory_and_stores_no_status(self):
+        demo.seed(self.c)
+        got = flightstatus.overview(self.c, Viewer(None, household=True), datetime.now(UTC))["statuses"]
+        self.assertEqual([(s["state"], s["delay_minutes"]) for s in got], [("delayed", 50)] * 2)
+        self.assertEqual(self.stored(), [])
+
+
+    def test_a_server_started_on_a_database_seeded_by_another_process_shows_the_demo_delay(self):
+        demo.seed(self.c)
+        self.c.commit()
+        flightstatus.drop_held()
+        self.assertEqual(flightstatus.overview(self.c, Viewer(None, household=True), datetime.now(UTC))["statuses"], [])
+        from waypoint.server import handler
+        with mock.patch.object(handler, "Server"), mock.patch.object(handler.jobs, "start"), mock.patch.object(handler.db, "init"), \
+                mock.patch.object(handler.db, "session", lambda real=db.session: real(self.path)), \
+                mock.patch.object(handler.monitoring, "log"), mock.patch.dict(os.environ, {"WAYPOINT_SECRET_KEY": "k" * 32}):
+            handler.serve()
+        got = flightstatus.overview(self.c, Viewer(None, household=True), datetime.now(UTC))["statuses"]
+        self.assertEqual([(s["state"], s["delay_minutes"]) for s in got], [("delayed", 50)] * 2)
+        self.assertEqual(self.stored(), [])
+
+    def test_a_server_on_a_database_without_the_demo_holds_nothing(self):
+        self.book(self.jane)
+        demo.restore_status(self.c)
+        self.assertEqual(flightstatus._held, {})
 
 
 class JobTests(Household):
@@ -748,6 +851,8 @@ class StatusRoutes(RouteCase):
         super().setUp()
         with db.session() as conn:
             conn.execute(FlightStatus.__table__.delete())
+            flightstatus.drop_held()
+            self.addCleanup(flightstatus.drop_held)
             for k in (sk.FLIGHT_STATUS_CALLS, sk.FLIGHT_STATUS_MONTH, sk.FLIGHT_STATUS_PAUSED):
                 db.set_setting(conn, k, None)
         self.mine = self.book("ana", OUT, travelers=[{"person_id": self.person["ana"]}])
@@ -757,9 +862,8 @@ class StatusRoutes(RouteCase):
         self.addCleanup(self.fetch.stop)
 
     def test_the_list_has_the_month_and_the_statuses_of_the_viewers_flights(self):
-        with db.session() as conn:
-            conn.execute(insert(FlightStatus).values(flight_number="EX101", date="2026-11-20", state="delayed", origin="JFK",
-                                                     dep_gate="B24", fetched_at=time_now()))
+        now = datetime.now(UTC)
+        flightstatus.hold("EX101", "2026-11-20", service.Status("delayed", origin="JFK", dep_gate="B24"), now, now + flightstatus.REFRESH_AFTER)
         ana = self.ok("ana", "GET", "/api/flight-status")
         self.assertEqual((ana["enabled"], ana["used"], ana["limit"], ana["paused"]), (True, 0, 400, None))
         self.assertRegex(ana["month"], r"^\d{4}-\d\d$")
