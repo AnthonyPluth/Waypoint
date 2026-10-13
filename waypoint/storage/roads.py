@@ -16,6 +16,7 @@ UNITS = 10_000
 CELL_DEGREES = 0.25
 EARTH_MILES = 3958.8
 MAX_LINK_MILES = 30.0
+MIN_NETWORK_MILES = 50.0
 MIN_RUN_MILES = 3.0
 NETWORK_RINGS = 2
 NETWORK_POINTS = 4000
@@ -109,7 +110,7 @@ class Graph:
             self.joined[edge.a].append(i)
             if edge.b != edge.a:
                 self.joined[edge.b].append(i)
-        self.main = frozenset(self._largest_network())
+        self.part: dict[int, int] = {i: n for n, found in enumerate(self._networks()) for i in found}
         for i, edge in enumerate(edges):
             for k in range(len(edge.points) - 1):
                 (lat1, lon1), (lat2, lon2) = edge.points[k], edge.points[k + 1]
@@ -117,9 +118,9 @@ class Graph:
                     for col in range(_cell(min(lon1, lon2)), _cell(max(lon1, lon2)) + 1):
                         self.cells[(row, col)].append((i, k))
 
-    def _largest_network(self) -> list[int]:
+    def _networks(self) -> list[list[int]]:
         seen: set[int] = set()
-        best: list[int] = []
+        found_all: list[list[int]] = []
         for first in range(len(self.edges)):
             if first in seen:
                 continue
@@ -133,11 +134,11 @@ class Graph:
                             seen.add(i)
                             found.append(i)
                             stack.append(i)
-            if len(found) > len(best):
-                best = found
-        return sorted(best)
+            if sum(self.edges[i].miles for i in found) >= MIN_NETWORK_MILES:
+                found_all.append(sorted(found))
+        return found_all
 
-    def snap(self, point: Point, within: float = MAX_LINK_MILES) -> Snap | None:
+    def snap(self, point: Point, within: float = MAX_LINK_MILES, network: int | None = None) -> Snap | None:
         lat, lon = point
         reach = within / 69.0
         wide = reach / max(0.2, math.cos(math.radians(lat)))
@@ -146,7 +147,7 @@ class Graph:
         for row in range(_cell(lat - reach), _cell(lat + reach) + 1):
             for col in range(_cell(lon - wide), _cell(lon + wide) + 1):
                 for i, k in self.cells.get((row, col), ()):
-                    if (i, k) in seen or i not in self.main:
+                    if (i, k) in seen or i not in self.part or (network is not None and self.part[i] != network):
                         continue
                     seen.add((i, k))
                     edge = self.edges[i]
@@ -158,7 +159,7 @@ class Graph:
         return best[1] if best else None
 
     def route(self, start: Point, end: Point, within: float = MAX_LINK_MILES) -> Route | None:
-        a, b = self.snap(start, within), self.snap(end, within)
+        a, b = self._ends(start, end, within)
         if a is None or b is None:
             return None
         arcs = self._cheapest(a, b)
@@ -174,6 +175,14 @@ class Graph:
         marks = [_main_ref(points, names, first, last) for first, last in pairwise(kept)]
         marks.insert(0, marks[0] if marks else names[0])
         return Route([points[i] for i in kept], long_runs([(arc.ref, arc.miles) for arc in arcs]), sum(arc.miles for arc in arcs), a.link_miles, b.link_miles, marks)
+
+    def _ends(self, start: Point, end: Point, within: float) -> tuple[Snap | None, Snap | None]:
+        a, b = self.snap(start, within), self.snap(end, within)
+        if a is None or b is None or self.part[a.edge] == self.part[b.edge]:
+            return a, b
+        pairs = [(a, self.snap(end, within, self.part[a.edge])), (self.snap(start, within, self.part[b.edge]), b)]
+        found = [(x, y) for x, y in pairs if x is not None and y is not None]
+        return min(found, key=lambda xy: xy[0].link_miles + xy[1].link_miles) if found else (None, None)
 
     def _cheapest(self, a: Snap, b: Snap) -> list[Arc] | None:
         ea, eb = self.edges[a.edge], self.edges[b.edge]
@@ -217,20 +226,22 @@ class Graph:
                 steps = max(1, math.ceil(max(abs(lat2 - lat1), abs(lon2 - lon1)) / (CELL_DEGREES / 2)))
                 for n in range(steps + 1):
                     seeds.add((_cell(lat1 + (lat2 - lat1) * n / steps), _cell(lon1 + (lon2 - lon1) * n / steps)))
-        taken: set[int] = set()
         reached: set[tuple[int, int]] = set()
-        out: list[tuple[str, list[Point]]] = []
-        spent = 0
+        nearest: dict[int, int] = {}
         for ring in range(rings + 1):
             ring_cells = {(r + dr, c + dc) for r, c in seeds for dr in range(-ring, ring + 1) for dc in range(-ring, ring + 1)} - reached
             reached |= ring_cells
-            for i in sorted({i for cell in ring_cells for i, _ in self.cells.get(cell, ())} - taken, key=lambda i: (rank(self.edges[i].ref), i)):
-                line = simplified(list(self.edges[i].points), NETWORK_FLAT_DEGREES)
-                if spent + len(line) > budget:
-                    continue
-                taken.add(i)
-                spent += len(line)
-                out.append((self.edges[i].ref, line))
+            for cell in ring_cells:
+                for i, _ in self.cells.get(cell, ()):
+                    nearest.setdefault(i, ring)
+        out: list[tuple[str, list[Point]]] = []
+        spent = 0
+        for i in sorted(nearest, key=lambda i: (rank(self.edges[i].ref), nearest[i], i)):
+            line = simplified(list(self.edges[i].points), NETWORK_FLAT_DEGREES)
+            if spent + len(line) > budget:
+                continue
+            spent += len(line)
+            out.append((self.edges[i].ref, line))
         return out
 
     def _arc(self, node: int, index: int) -> Arc:

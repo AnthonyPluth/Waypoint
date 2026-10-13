@@ -67,8 +67,30 @@ class FixtureGraphTests(unittest.TestCase):
         self.assertIsNone(graph().snap((43.5, -103.0)))
         self.assertIsNotNone(graph().snap((43.5, -103.0), within=150))
 
-    def test_a_road_cut_off_from_the_main_network_is_not_snapped_to(self):
-        self.assertIsNone(graph().snap((35.0, -89.5)))
+    def test_a_separate_network_is_snapped_to_but_never_routed_across_to_the_main_one(self):
+        g = graph()
+        got = g.snap((35.0, -89.5))
+        assert got is not None
+        self.assertEqual(g.edges[got.edge].ref, "I-9")
+        self.assertNotEqual(g.part[got.edge], g.part[g.snap((40.0, -104.9)).edge])
+        self.assertIsNone(g.route((40.0, -104.9), (35.0, -89.5)))
+        island = g.route((35.0, -89.9), (35.0, -89.1))
+        assert island is not None
+        self.assertEqual(island.refs, ["I-9"])
+
+    def test_a_stub_too_short_to_matter_is_not_snapped_to(self):
+        rows = [row("I-1", 0, 1, (40.0, -105.0), (40.0, -103.0)), row("US-9", 5, 6, (40.2, -104.0), (40.2, -103.9))]
+        g = roads.parse(rows)
+        got = g.snap((40.19, -103.95))
+        assert got is not None
+        self.assertEqual(g.edges[got.edge].ref, "I-1")
+
+    def test_a_point_nearer_a_separate_network_still_routes_over_the_one_that_connects(self):
+        rows = [row("I-1", 0, 1, (40.0, -105.0), (40.0, -101.0)), row("US-9", 5, 6, (40.1, -105.0), (40.1, -103.9))]
+        found = roads.parse(rows).route((40.12, -104.5), (40.0, -101.2))
+        assert found is not None
+        self.assertEqual(found.refs, ["I-1"])
+        self.assertGreater(found.start_link_miles, 5)
 
     def test_the_route_follows_the_shorter_way_round_the_graph(self):
         got = graph().route((40.0, -104.9), (40.0, -101.1))
@@ -150,6 +172,13 @@ class FixtureGraphTests(unittest.TestCase):
         g = roads.parse(rows)
         self.assertEqual([ref for ref, _ in g.near([[(40.0, -104.3)]], rings=0)], ["I-1", "US-9", "MN-5"])
         self.assertEqual([ref for ref, _ in g.near([[(40.0, -104.3)]], rings=0, budget=2)], ["I-1"])
+
+    def test_the_interstate_budget_is_kept_for_interstates_in_a_wider_ring(self):
+        rows = [row("MN-5", 0, 1, (40.0, -104.3), (40.0, -104.2)), row("I-1", 2, 3, (40.3, -104.3), (40.3, -104.2))]
+        g = roads.parse(rows)
+        self.assertEqual([ref for ref, _ in g.near([[(40.0, -104.3)]], rings=1, budget=2)], ["I-1"])
+        self.assertEqual([ref for ref, _ in g.near([[(40.0, -104.3)]], rings=1)], ["I-1", "MN-5"])
+        self.assertEqual([ref for ref, _ in g.near([[(40.0, -104.3)]], rings=0)], ["MN-5"])
 
     def test_simplifying_keeps_the_ends_and_the_bends(self):
         line = [(40.0, -105.0), (40.0001, -104.5), (40.0, -104.0), (40.5, -103.5)]
