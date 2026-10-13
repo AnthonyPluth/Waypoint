@@ -11,6 +11,7 @@
   import GateCode from "$lib/components/GateCode.svelte";
   import { takeEarlyTrips } from "$lib/early";
   import { flightStatus, loadFlightStatus, statusFor } from "$lib/flightstatus.svelte";
+  import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import { type Day, type DayItem, dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, startAt, subline, timesDiffer, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
@@ -182,6 +183,7 @@
     </div>
   </section>
 {:else}
+  <div class="-mt-1 mb-6"><OfflineStatus /></div>
   {#if next}
     {@const s = next.segment}
     {@const proof = s.kind === "flight" && flightStatus.list?.enabled ? flightEvidence(statusFor(s.id), now, typeof navigator === "undefined" || navigator.onLine !== false) : "scheduled"}

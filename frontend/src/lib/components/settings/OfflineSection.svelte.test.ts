@@ -15,7 +15,7 @@ const withDevice = (b: Behaviour = {}) => { device = installDevice(b); };
 
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
-  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false });
+  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, tripId: null, tripName: "" });
   withDevice();
 });
 afterEach(() => { lock(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });

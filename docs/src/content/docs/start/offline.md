@@ -28,6 +28,17 @@ On the device you signed in on, in the browser’s Cache storage, by one part of
 
 An **installed home-screen app** keeps the copy far more reliably than a browser tab does on iPhone: Safari clears the stored data of sites you haven’t visited for a while, and an app added to the Home Screen is exempt from that. On an iPhone, add Waypoint to the Home Screen (Share → Add to Home Screen) before you rely on this.
 
+## Seeing it before you rely on it
+
+Upcoming and each trip’s page show a small **Offline access** panel, so you can check before you board:
+
+- **Saved on this device · updated 2 h ago** says the copy is there and how fresh it is. On Upcoming it also names the trip. On a trip that isn’t the one saved, it says which trip is.
+- **Set up offline access** appears when the device isn’t set up; it opens the same sheet as Settings. A device that can’t do it says so and why, and a saved trip that can’t be read links to Settings to remove it.
+- **Couldn’t save the trip on this device** appears when the last save failed, with **Try again** and the age of the copy still on the device.
+- **What offline includes** says that opening it offline asks for the device’s check, and lists what a connection is still needed for: loyalty and Known Traveler numbers, a parking booking’s gate-code image, live flight status and every trip but the current one.
+
+Which trip is saved is known only while the app is open: it isn’t written to the device in the clear, so after a reload the panel shows the age until the next online save names the trip again.
+
 ## Opening it with no connection
 
 Open Waypoint offline and it shows **Saved trip is locked**. Unlock it with the device’s check and it opens to the saved trip, read-only, under a banner such as “Offline. Saved 2 h ago.”
