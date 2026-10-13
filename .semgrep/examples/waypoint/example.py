@@ -95,6 +95,11 @@ LOGO_SEARCH = "https://api.logo.dev/search?q=Example"
 # ok: waypoint-logodev-hosts
 logos.fetch_due(conn, now)
 
+# ruleid: waypoint-protomaps-hosts
+TILES = "https://build.protomaps.com/20261012.pmtiles"
+# ruleid: waypoint-protomaps-hosts
+TILE_LIST = "https://build-metadata.protomaps.dev/builds.json"
+
 # ruleid: waypoint-wikimedia-hosts
 BRAND_SEARCH = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=Hyatt"
 # ruleid: waypoint-wikimedia-hosts

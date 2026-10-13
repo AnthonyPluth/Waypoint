@@ -95,7 +95,7 @@ class Labels(WithFile):
 
     def test_an_encoded_path_cant_climb_out_of_the_static_folders(self):
         for path in ("/%2e%2e/%2e%2e/etc/passwd", "/map/fonts/%2e%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd", "/map/%00/x", "/%2e%2e%2fwaypoint%2fstorage%2fdb.py"):
-            status, _, body = self.get(path)
+            body = self.get(path)[2]
             self.assertNotIn(b"root:", body, path)
             self.assertNotIn(b"def data_dir", body, path)
 
