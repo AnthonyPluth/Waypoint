@@ -18,7 +18,7 @@
       }
     },
     {
-      "scroll_to": "#unread-title"
+      "scroll_to": "[data-testid='review-item']"
     },
     {
       "screenshot": "shared-item"

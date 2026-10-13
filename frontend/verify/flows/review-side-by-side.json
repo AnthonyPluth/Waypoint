@@ -1,0 +1,30 @@
+{
+  "name": "review-side-by-side",
+  "page": "review",
+  "viewports": [
+    "desktop"
+  ],
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Review"
+      }
+    },
+    {
+      "wait_for": "[data-testid='review-item']"
+    },
+    {
+      "click": "button:has-text('Add by hand') >> visible=true >> nth=0"
+    },
+    {
+      "wait_for": "[role='dialog'] [data-testid='preview-html'][aria-busy='false']"
+    },
+    {
+      "wait_for": "[role='dialog'] label:has-text('Provider') input"
+    },
+    {
+      "screenshot": "email-beside-form"
+    }
+  ]
+}

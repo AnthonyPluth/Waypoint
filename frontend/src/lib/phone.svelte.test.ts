@@ -17,7 +17,7 @@ describe("isPhone", () => {
   it("asks the browser the one phone query, once", async () => {
     const m = media(false);
     const { PHONE_QUERY } = await load();
-    expect(m.matchMedia).toHaveBeenCalledExactlyOnceWith(PHONE_QUERY);
+    expect(m.matchMedia.mock.calls.filter(([q]) => q === PHONE_QUERY)).toEqual([[PHONE_QUERY]]);
   });
 
   it("counts a narrow screen and a short touch screen (a phone turned sideways), and nothing else", async () => {
@@ -44,6 +44,21 @@ describe("isPhone", () => {
   it("is a computer where there is no matchMedia", async () => {
     vi.stubGlobal("matchMedia", undefined);
     expect((await load()).isPhone()).toBe(false);
+  });
+
+  it("knows when the screen is wide enough for the email beside the form, and follows it", async () => {
+    const m = media(false);
+    const { viewport, SPLIT_QUERY } = await load();
+    expect(SPLIT_QUERY).toBe("(min-width: 1100px)");
+    expect(viewport.split).toBe(false);
+    m.fire(true);
+    expect(viewport.split).toBe(true);
+  });
+
+  it("is the same width the Review sheet’s side-by-side styles use", async () => {
+    const { SPLIT_QUERY } = await load();
+    const css = readFileSync(new URL("../app.css", import.meta.url), "utf8");
+    expect(css).toContain(`@media ${SPLIT_QUERY} {`);
   });
 
   it("is the same query the phone: and desktop: styles use", async () => {

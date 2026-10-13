@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-**Settings → Mail and AI → AI** is off until you turn it on. When it’s on, you can choose **Ask AI** on an item in [Review](/Waypoint/start/review/)’s “Couldn’t read” list, and an AI suggests the booking. A booking Waypoint could already read is never sent. Nothing is sent until someone chooses **Ask AI**, unless you also turn on the second switch below.
+**Settings → Mail and AI → AI** is off until you turn it on. When it’s on, you can choose **Ask AI** on an item in [Review](/Waypoint/start/review/) (in Check suggestions or Add missing details), and an AI suggests the booking. A booking Waypoint could already read is never sent. Nothing is sent until someone chooses **Ask AI**, unless you also turn on the second switch below.
 
 ## Choosing where it runs
 
@@ -33,7 +33,7 @@ What is sent, whether it is redacted (it is for OpenRouter, not for Local) and w
 
 The setting is the household’s: any member can change it, and once the automatic switch is on, qualifying mail from every connected mailbox is sent, not just the mailbox of whoever turned it on. Whoever sets the Ollama address chooses where that mail goes, so use a server you trust.
 
-Only the message’s plain text, and only for an item in “Couldn’t read” (when you choose **Ask AI** on it, or, with the automatic switch on, when a scan reads it by itself as above).
+Only the message’s plain text, and only for an item in Review’s Check suggestions or Add missing details (when you choose **Ask AI** on it, or, with the automatic switch on, when a scan reads it by itself as above).
 
 **With Local (Ollama), the text goes to your Ollama server unredacted and untrimmed**: quoted replies, signatures and footers stay, and email addresses, loyalty, Known Traveler, account and card numbers, long digit runs and the numbers saved under [Loyalty](/Waypoint/start/loyalty/) are sent as written. This is the household’s choice, because the model runs on your own network; it means those numbers do reach that server, so use one you trust and don’t point it at a hosted address. The sender and the subject are still not sent, and prompts and replies are never logged.
 
@@ -41,7 +41,7 @@ Only the message’s plain text, and only for an item in “Couldn’t read” (
 
 ### Who can ask
 
-Anyone who can see a “Couldn’t read” item in Review can choose **Ask AI** on it, or **Ask AI about all** (**Ask AI about these N emails** when Review is narrowed to one sender or mailbox, which asks only about those): the mailbox’s owner, and every other member for an item in a mailbox its owner [shared with the household](/Waypoint/start/review/#sharing-a-mailboxs-items-with-the-household). Someone who can’t see the item gets “No such item”, as for any other Review route, and an AI assistant connected over MCP can’t ask. For the owner, Waypoint fetches the message again from Gmail, as before. For another member it uses the message Waypoint already keeps for the item (kept text is capped per message) and, if none is kept, fetches it through the mailbox’s own connection. Either way the text goes through the same module and the same AI setting, and the suggestion is saved on the item for everyone who sees it. The AI setting must be on.
+Anyone who can see an unread item in Review can choose **Ask AI** on it, or **Ask AI about all** (**Ask AI about these N emails** when Review is narrowed to one sender or mailbox, which asks only about those): the mailbox’s owner, and every other member for an item in a mailbox its owner [shared with the household](/Waypoint/start/review/#sharing-a-mailboxs-items-with-the-household). Someone who can’t see the item gets “No such item”, as for any other Review route, and an AI assistant connected over MCP can’t ask. For the owner, Waypoint fetches the message again from Gmail, as before. For another member it uses the message Waypoint already keeps for the item (kept text is capped per message) and, if none is kept, fetches it through the mailbox’s own connection. Either way the text goes through the same module and the same AI setting, and the suggestion is saved on the item for everyone who sees it. The AI setting must be on.
 
 ### The destination button on a trip
 

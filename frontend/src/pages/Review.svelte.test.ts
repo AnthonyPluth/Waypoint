@@ -80,7 +80,7 @@ beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api)
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
     render(ReviewPage);
-    const list = await screen.findByRole("list", { name: "Couldn’t read" });
+    const list = await screen.findByRole("list", { name: "Add missing details" });
     expect(within(list).getByText("Mail from example-air.example on 2026-10-17")).toBeInTheDocument();
     expect(within(list).getByText("Sent 2026-10-17 · to ana@gmail.example")).toBeInTheDocument();
     expect(within(list).getByText(REASONS.no_markup)).toBeInTheDocument();
@@ -91,7 +91,7 @@ describe("Review", () => {
   it("names an item by its message's subject, and says who it came from beside it", async () => {
     held = { matches: [], items: [item({ subject: "Your itinerary: EX 410" })], who: [], ai: false };
     render(ReviewPage);
-    const list = await screen.findByRole("list", { name: "Couldn’t read" });
+    const list = await screen.findByRole("list", { name: "Add missing details" });
     expect(within(list).getByText("Your itinerary: EX 410")).toBeInTheDocument();
     expect(within(list).getByRole("button", { name: "Add “Your itinerary: EX 410” by hand" })).toBeInTheDocument();
     expect(within(list).getByText("Sent 2026-10-17 · to ana@gmail.example")).toBeInTheDocument();
@@ -471,7 +471,7 @@ describe("Review", () => {
 
   it("lists names to match, with the booking each is on, and matches one to a person", async () => {
     render(ReviewPage);
-    const list = await screen.findByRole("list", { name: "Who is this?" });
+    const list = await screen.findByRole("list", { name: "Match people" });
     expect(within(list).getByText("DOE/MIA MISS")).toBeInTheDocument();
     expect(within(list).getByText("Flight JFK → SFO on 2026-12-08 (Example Air)")).toBeInTheDocument();
     const button = within(list).getByRole("button", { name: "Match DOE/MIA MISS" });
@@ -480,12 +480,12 @@ describe("Review", () => {
     await userEvent.click(button);
     await waitFor(() => expect(calls).toContainEqual(["/api/review/who/7", "POST", { person_id: 2 }]));
     expect(toast.success).toHaveBeenCalledWith("Matched on 2 bookings");
-    await waitFor(() => expect(screen.queryByRole("list", { name: "Who is this?" })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("list", { name: "Match people" })).toBeNull());
   });
 
   it("adds a guest for a name nobody is", async () => {
     render(ReviewPage);
-    const list = await screen.findByRole("list", { name: "Who is this?" });
+    const list = await screen.findByRole("list", { name: "Match people" });
     await userEvent.selectOptions(within(list).getByLabelText("Who is DOE/MIA MISS?"), "A new guest…");
     const button = within(list).getByRole("button", { name: "Match DOE/MIA MISS" });
     expect(button).toBeDisabled();
@@ -506,7 +506,7 @@ describe("Review", () => {
   it("lists a booking email that could be more than one of yours, with each candidate and its trip", async () => {
     held = { matches: [held_match()], items: [], who: [], ai: false };
     render(ReviewPage);
-    const list = await screen.findByRole("list", { name: "Could be one of your bookings" });
+    const list = await screen.findByRole("list", { name: "Match bookings" });
     expect(within(list).getByText("Stay Harbour Hotel on 2026-11-21 (Example Hotels) · H88231")).toBeInTheDocument();
     const options = within(within(list).getByRole("list", { name: "It could be" })).getAllByRole("listitem");
     expect(options).toHaveLength(2);
@@ -559,7 +559,7 @@ describe("Review", () => {
     expect(screen.queryByRole("list")).toBeNull();
     up = true;
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByRole("list", { name: "Couldn’t read" })).toBeInTheDocument();
+    expect(await screen.findByRole("list", { name: "Add missing details" })).toBeInTheDocument();
   });
 });
 
@@ -1038,7 +1038,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     expect(peek.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(sheet).getByLabelText("Provider")).toHaveValue("Example Air");
     expect(within(sheet).getAllByRole("heading", { name: "Add this booking by hand" })).toHaveLength(1);
-    const list = screen.getByRole("list", { name: "Couldn’t read" });
+    const list = screen.getByRole("list", { name: "Add missing details" });
     expect(list.querySelector("form")).toBeNull();
     expect(within(list).queryByTestId("preview")).toBeNull();
     expect(within(list).getAllByRole("listitem")).toHaveLength(1);
@@ -1055,7 +1055,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     expect(await within(sheet).findByTestId("preview")).toHaveTextContent("EX 410");
     expect(within(sheet).getByLabelText("Confirmation code")).toHaveValue("QW4R7T");
     expect(within(sheet).queryByText(/An AI read the email/)).toBeNull();
-    expect(screen.getByRole("list", { name: "Couldn’t read" }).querySelector("form")).toBeNull();
+    expect(screen.getByRole("list", { name: "Check suggestions" }).querySelector("form")).toBeNull();
   });
 
   it("closes an untouched form with Escape, the close button, Cancel or an outside click without asking", async () => {
@@ -1137,6 +1137,22 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
     const sheet = await screen.findByRole("dialog");
+    if (phone) {
+      const email = within(sheet).getByRole("button", { name: "Email" });
+      const booking = within(sheet).getByRole("button", { name: "Booking" });
+      expect(email).toHaveAttribute("aria-pressed", "true");
+      expect(await within(sheet).findByText(/Your flight EX 410/)).toBeVisible();
+      expect(within(sheet).getByTestId("booking-fields")).not.toBeVisible();
+      expect(within(sheet).getByRole("button", { name: "Add to my trips" })).toBeVisible();
+      await u.click(booking);
+      expect(booking).toHaveAttribute("aria-pressed", "true");
+      expect(within(sheet).getByText(/Your flight EX 410/)).not.toBeVisible();
+      expect(within(sheet).getByTestId("booking-fields")).toBeVisible();
+      expect(within(sheet).getByRole("button", { name: "Add to my trips" })).toBeVisible();
+      await u.click(email);
+      expect(within(sheet).getByText(/Your flight EX 410/)).toBeVisible();
+      return;
+    }
     const toggle = within(sheet).getByRole("button", { name: "Hide the email" });
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(await within(sheet).findByText(/Your flight EX 410/)).toBeVisible();
@@ -1149,6 +1165,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     expect(within(sheet).getByRole("button", { name: "Hide the email" })).toHaveAttribute("aria-expanded", "true");
     expect(within(sheet).getByText(/Your flight EX 410/)).toBeVisible();
   });
+
 
   it("replaces the open form when another item’s Add by hand is used", async () => {
     held = { matches: [], items: [item({ id: 1, subject: "First booking" }), item({ id: 2, subject: "Second booking" })], who: [], ai: false };
@@ -1740,5 +1757,221 @@ describe("Review: a suggestion that is a booking already in your trips", () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added 2 flights to your trips"));
     expect(calls.filter(([p]) => p.endsWith("/attach"))).toHaveLength(1);
     expect(calls.filter(([p]) => p === "/api/segments")).toHaveLength(1);
+  });
+});
+
+describe("Review as a queue of decisions", () => {
+  const many = (n: number, withSuggestion: (i: number) => boolean) => Array.from({ length: n }, (_, i) =>
+    item({ id: i + 1, subject: `Message ${i + 1}`, sender_domain: `sender${i % 3}.example`, suggestions: withSuggestion(i) ? [SUGGESTION] : [] }));
+
+  it("says in one line why the emails are waiting, and keeps the long explanation in a closed disclosure", async () => {
+    render(ReviewPage);
+    expect(await screen.findByText("These emails need your help before they can become bookings.")).toBeInTheDocument();
+    const privacy = screen.getByTestId("review-privacy");
+    expect(privacy).not.toHaveAttribute("open");
+    expect(within(privacy).getByText("How Waypoint handles these emails")).toBeInTheDocument();
+    expect(privacy).toHaveTextContent("encrypted");
+    expect(privacy).toHaveTextContent("for as long as a booking you add from it exists");
+  });
+
+  it("groups by the decision needed, with counts, and omits a group with nothing in it", async () => {
+    held = { matches: [held_match()], items: [item({ id: 1, suggestions: [SUGGESTION] }), item({ id: 2 }), item({ id: 3 })], who: [who()], ai: false };
+    render(ReviewPage);
+    const headings = (await screen.findAllByRole("heading", { level: 2 })).map((h) => h.textContent?.replace(/\s+/g, " ").trim());
+    expect(headings).toEqual(["Check suggestions 1", "Add missing details 2", "Match bookings 1", "Match people 1"]);
+    expect(within(screen.getByRole("list", { name: "Check suggestions" })).getAllByTestId("review-item")).toHaveLength(1);
+    expect(within(screen.getByRole("list", { name: "Add missing details" })).getAllByTestId("review-item")).toHaveLength(2);
+  });
+
+  it("shows only the groups that have something, and no jump links for a single group", async () => {
+    held = { matches: [], items: [item()], who: [], ai: false };
+    render(ReviewPage);
+    await screen.findByRole("list", { name: "Add missing details" });
+    expect(screen.queryByRole("heading", { name: /Check suggestions/ })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /Match/ })).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Jump to a group" })).toBeNull();
+  });
+
+  it("moves a partly read email out of the unreadable group, under the suggestion to check", async () => {
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [SUGGESTION] })], who: [], ai: false };
+    render(ReviewPage);
+    const list = await screen.findByRole("list", { name: "Check suggestions" });
+    expect(within(list).getByText(REASONS.incomplete)).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Add missing details" })).toBeNull();
+  });
+
+  it("gives each email one prominent next step: check the suggestion if there is one, else add by hand", async () => {
+    held = { matches: [], items: [item({ id: 1, suggestions: [SUGGESTION] }), item({ id: 2 })], who: [], ai: true };
+    render(ReviewPage);
+    const [suggested, bare] = await screen.findAllByTestId("review-item");
+    const prominent = (row: HTMLElement) => within(row).getAllByRole("button").filter((b) => /(^| )bg-primary( |$)/.test(b.className));
+    expect(prominent(suggested!).map((b) => b.textContent)).toEqual(["Check suggestion"]);
+    expect(prominent(bare!).map((b) => b.textContent)).toEqual(["Add by hand"]);
+    expect(within(suggested!).getByRole("button", { name: /View email/ }).className).toContain("bg-secondary");
+  });
+
+  it("puts the uncommon actions under a menu labelled More, with this email apart from all future mail from its sender", async () => {
+    held = { matches: [], items: [item({ subject: "Your itinerary" })], who: [], ai: true };
+    render(ReviewPage);
+    const row = await screen.findByTestId("review-item");
+    const menu = within(row).getByTestId("action-menu");
+    expect(within(menu).getByText("More")).toBeInTheDocument();
+    expect(within(row).getByLabelText("More actions for “Your itinerary”")).toBeInTheDocument();
+    const mine = within(menu).getByRole("group", { name: "This email" });
+    expect(within(mine).getByRole("button", { name: "Ask AI about “Your itinerary”" })).toBeInTheDocument();
+    expect(within(mine).getByRole("button", { name: "Dismiss “Your itinerary”" })).toBeInTheDocument();
+    expect(within(mine).queryByRole("button", { name: /ignore/ })).toBeNull();
+    const future = within(menu).getByRole("group", { name: "All future mail from example-air.example" });
+    expect(within(future).getByRole("button", { name: "Not travel: ignore example-air.example" })).toBeInTheDocument();
+    expect(within(future).queryByRole("button", { name: /Dismiss/ })).toBeNull();
+  });
+
+  it("offers Add by hand inside the menu for an email with a suggestion", async () => {
+    held = { matches: [], items: [item({ subject: "Your itinerary", suggestions: [SUGGESTION] })], who: [], ai: false };
+    render(ReviewPage);
+    const menu = within(await screen.findByTestId("action-menu"));
+    await userEvent.click(menu.getByText("More"));
+    await userEvent.click(menu.getByRole("button", { name: "Add “Your itinerary” by hand" }));
+    expect(await screen.findByRole("dialog", { name: "Add this booking by hand" })).toBeInTheDocument();
+  });
+
+  it("closes the menu on Escape and gives focus back to its button, and on a click elsewhere", async () => {
+    render(ReviewPage);
+    const u = userEvent.setup();
+    const menu = await screen.findByTestId("action-menu");
+    const summary = within(menu).getByText("More").closest("summary") as HTMLElement;
+    await u.click(summary);
+    expect(menu).toHaveAttribute("open");
+    await u.keyboard("{Escape}");
+    expect(menu).not.toHaveAttribute("open");
+    expect(summary).toHaveFocus();
+    await u.click(summary);
+    expect(menu).toHaveAttribute("open");
+    await u.click(document.body);
+    expect(menu).not.toHaveAttribute("open");
+  });
+
+  it("closes the menu when an action in it is chosen, and returns focus to it when the question is cancelled", async () => {
+    render(ReviewPage);
+    const u = userEvent.setup();
+    const menu = await screen.findByTestId("action-menu");
+    const summary = within(menu).getByText("More").closest("summary") as HTMLElement;
+    await u.click(summary);
+    await u.click(within(menu).getByRole("button", { name: /^Dismiss/ }));
+    expect(menu).not.toHaveAttribute("open");
+    const dialog = await screen.findByRole("dialog");
+    await u.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(summary).toHaveFocus());
+    expect(calls.filter(([, method]) => method === "DELETE")).toEqual([]);
+  });
+
+  it("keeps the warning about where the text goes beside the button that sends it", async () => {
+    held = { matches: [], items: many(2, () => false), who: [], ai: true };
+    render(ReviewPage);
+    const ask = await screen.findByTestId("ask-all");
+    expect(within(ask).getByRole("button", { name: "Ask AI about all 2" })).toBeInTheDocument();
+    expect(ask).toHaveTextContent("OpenRouter, redacted first");
+    expect(screen.getByRole("list", { name: "Add missing details" })).toBeInTheDocument();
+  });
+
+  it("handles a six-item queue: counts in the headings, jump links, one primary step per row", async () => {
+    held = { matches: [held_match()], items: many(4, (i) => i < 2), who: [who()], ai: false };
+    render(ReviewPage);
+    const jump = await screen.findByRole("navigation", { name: "Jump to a group" });
+    expect(within(jump).getAllByRole("button").map((b) => b.textContent?.replace(/\s+/g, " ").trim())).toEqual(["Check suggestions 2", "Add missing details 2", "Match bookings 1", "Match people 1"]);
+    expect(screen.getAllByTestId("review-item")).toHaveLength(4);
+    const u = userEvent.setup();
+    await u.click(within(jump).getByRole("button", { name: /Match people/ }));
+    expect(screen.getByRole("heading", { name: /Match people/ })).toHaveFocus();
+  });
+
+  it("handles a fifty-item queue: every row is there under its group, each with one primary step", async () => {
+    held = { matches: [], items: many(50, (i) => i % 5 === 0), who: [], ai: true };
+    render(ReviewPage);
+    const rows = await screen.findAllByTestId("review-item");
+    expect(rows).toHaveLength(50);
+    expect(screen.getByRole("heading", { name: /Check suggestions/ })).toHaveTextContent("10");
+    expect(screen.getByRole("heading", { name: /Add missing details/ })).toHaveTextContent("40");
+    expect(screen.getByRole("button", { name: "Ask AI about all 40" })).toBeInTheDocument();
+    for (const row of rows) {
+      const primary = within(row).getAllByRole("button").filter((b) => /^(Check|Add by hand)/.test(b.textContent ?? "") && /(^| )bg-primary( |$)/.test(b.className));
+      expect(primary).toHaveLength(1);
+    }
+  });
+
+  it("keeps the filter note and the bulk-ask scoping from a sender link", async () => {
+    held = { matches: [], items: many(6, () => false), who: [], ai: true };
+    setQuery("sender=sender1.example");
+    render(ReviewPage);
+    expect(await screen.findByTestId("review-filter")).toHaveTextContent("Showing only mail from sender1.example");
+    expect(screen.getByRole("button", { name: "Ask AI about these 2 emails" })).toBeInTheDocument();
+    expect(screen.getAllByTestId("review-item")).toHaveLength(2);
+  });
+});
+
+describe("Review's sheet on a wide screen", () => {
+  beforeEach(() => { viewport.split = true; });
+  afterEach(() => { viewport.split = false; });
+
+  it("shows the email beside the form, with no Hide the email button", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    const sheet = await screen.findByRole("dialog");
+    expect(sheet).toHaveAttribute("data-split");
+    expect(await within(sheet).findByText(/Your flight EX 410/)).toBeVisible();
+    expect(within(sheet).queryByRole("button", { name: "Hide the email" })).toBeNull();
+    expect(within(sheet).getByLabelText("Confirmation code")).toBeVisible();
+  });
+
+  it("is not split below that width, and the email can be hidden there", async () => {
+    viewport.split = false;
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    const sheet = await screen.findByRole("dialog");
+    await userEvent.click(within(sheet).getByRole("button", { name: "Hide the email" }));
+    expect(within(sheet).getByText(/Your flight EX 410/)).not.toBeVisible();
+  });
+});
+
+describe("Review's sheet on a phone", () => {
+  beforeEach(() => { viewport.phone = true; });
+  afterEach(() => { viewport.phone = false; });
+
+  it("starts a hand entry on the email, and a suggestion on the booking", async () => {
+    held = { matches: [], items: [item({ id: 1, subject: "By hand" }), item({ id: 2, subject: "Suggested", suggestions: [SUGGESTION] })], who: [], ai: false };
+    render(ReviewPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Add “By hand” by hand" }));
+    let sheet = await screen.findByRole("dialog");
+    expect(within(sheet).getByRole("button", { name: "Email" })).toHaveAttribute("aria-pressed", "true");
+    await u.click(within(sheet).getByRole("button", { name: "Cancel" }));
+    await settled();
+    await u.click(screen.getByRole("button", { name: /Check the AI’s suggestion/ }));
+    sheet = await screen.findByRole("dialog");
+    expect(within(sheet).getByRole("button", { name: "Booking" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(sheet).getByLabelText("Confirmation code")).toBeVisible();
+  });
+
+  it("saves from the email pane too, by showing the booking fields it needs first", async () => {
+    held = { matches: [], items: [item({ id: 1, suggestions: [SUGGESTION] })], who: [], ai: false };
+    render(ReviewPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    const sheet = await screen.findByRole("dialog");
+    await u.click(within(sheet).getByRole("button", { name: "Email" }));
+    expect(within(sheet).getByTestId("booking-fields")).not.toBeVisible();
+    await u.click(within(sheet).getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(calls.some(([path]) => path === "/api/segments")).toBe(true));
+  });
+
+  it("keeps the save action in a sticky bar at the bottom of the sheet", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    const sheet = await screen.findByRole("dialog");
+    const bar = within(sheet).getByTestId("form-actions");
+    expect(bar).toHaveClass("review-actions");
+    expect(within(bar).getByRole("button", { name: "Add to my trips" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   });
 });

@@ -200,6 +200,14 @@
     transform: translateY(var(--sheet-drag, 0px)); }
   .sheet[data-side="right"] { top: 0; right: 0; bottom: 0; width: min(34rem, 100vw); border-top: 0; border-bottom: 0; border-right: 0; }
   .sheet[data-side="right"][data-wide] { width: min(40rem, 100vw); }
+  .sheet { scroll-padding-bottom: 6rem; }
+  .review-split { display: flex; flex-direction: column; gap: 1rem; }
+  .review-actions { position: sticky; bottom: 0; z-index: 1; padding-block: 0.75rem; background: var(--card); border-top: 1px solid var(--border); }
+  @media (min-width: 1100px) {
+    .sheet[data-side="right"][data-split] { width: min(72rem, calc(100vw - 4rem)); }
+    .review-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 1.5rem; }
+    .review-email-col { position: sticky; top: 0; max-height: 100dvh; overflow-y: auto; }
+  }
   .sheet[data-dragging] { transition: none; }
   .sheet-handle { display: flex; justify-content: center; padding: 0.75rem 0 0.25rem; touch-action: none; cursor: grab; }
   .sheet-grip { width: 2.5rem; height: 0.3rem; border-radius: 9999px; background: var(--border); }

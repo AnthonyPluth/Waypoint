@@ -2,18 +2,53 @@
   "name": "review-add-another-leg",
   "page": "review",
   "steps": [
-    { "expect_text": { "selector": "h1", "text": "Review" } },
-    { "wait_for": "[data-testid='review-item']" },
-    { "click": "button:has-text('Add by hand') >> nth=0" },
-    { "wait_for": "[data-testid='message-subject']" },
-    { "fill": { "selector": "[role='dialog'] label:has-text('From (airport code)') input", "text": "BOS" } },
-    { "fill": { "selector": "[role='dialog'] label:has-text('To (airport code)') input", "text": "DEN" } },
-    { "click": "[role='dialog'] button:has-text('Add another leg or booking')" },
-    { "click": "[role='dialog'] button:has-text('Add another leg or booking')" },
-    { "expect_text": { "selector": "[role='dialog']", "text": "Flight 3 of 3" } },
-    { "screenshot": "three-legs" },
-    { "click": "[role='dialog'] button:has-text('Hide the email')" },
-    { "scroll_to": "[role='dialog'] button:has-text('Add 3 flights')" },
-    { "screenshot": "three-legs-end" }
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Review"
+      }
+    },
+    {
+      "wait_for": "[data-testid='review-item']"
+    },
+    {
+      "click": "button:has-text('Add by hand') >> visible=true >> nth=0"
+    },
+    {
+      "wait_for": "[data-testid='message-subject']"
+    },
+    {
+      "fill": {
+        "selector": "[role='dialog'] label:has-text('From (airport code)') input",
+        "text": "BOS"
+      }
+    },
+    {
+      "fill": {
+        "selector": "[role='dialog'] label:has-text('To (airport code)') input",
+        "text": "DEN"
+      }
+    },
+    {
+      "click": "[role='dialog'] button:has-text('Add another leg or booking')"
+    },
+    {
+      "click": "[role='dialog'] button:has-text('Add another leg or booking')"
+    },
+    {
+      "expect_text": {
+        "selector": "[role='dialog']",
+        "text": "Flight 3 of 3"
+      }
+    },
+    {
+      "screenshot": "three-legs"
+    },
+    {
+      "scroll_to": "[role='dialog'] button:has-text('Add 3 flights')"
+    },
+    {
+      "screenshot": "three-legs-end"
+    }
   ]
 }

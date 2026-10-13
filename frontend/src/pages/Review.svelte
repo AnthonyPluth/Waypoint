@@ -32,7 +32,7 @@
 </script>
 
 <script lang="ts">
-  import { tick } from "svelte";
+  import { flushSync, tick } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
   import { act, errMsg, ignoreFailure } from "$lib/act";
   import type { Person, Review, ReviewCandidate, ReviewMatch, SegmentBody, WhoIsThis } from "$lib/api-types";
@@ -41,12 +41,14 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
+  import ActionMenu from "$lib/components/ActionMenu.svelte";
   import MessageView from "$lib/components/MessageView.svelte";
   import FlightLength from "$lib/components/FlightLength.svelte";
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
   import { Input } from "$lib/components/ui/input";
   import { DiscardDialog } from "$lib/components/ui/discard-dialog";
   import { draftGuard, leave } from "$lib/drafts.svelte";
+  import { viewport } from "$lib/phone.svelte";
   import { Sheet } from "$lib/components/ui/sheet";
   import { amountText } from "$lib/money";
   import { carAddress, differs, DEFAULT_CURRENCY, DETAILS, KINDS as FORM_KINDS, priceOf, SAME_AS_PICKUP, SEAT_LIMIT, type Kind } from "$lib/segment-form";
@@ -102,6 +104,9 @@
   let formError = $state("");
   let saving = $state(false);
   let emailOpen = $state(true);
+  let pane = $state<"email" | "booking">("email");
+  const showEmail = $derived(viewport.phone ? pane === "email" : viewport.split || emailOpen);
+  const showFields = $derived(!viewport.phone || pane === "booking");
   let baseline = "";
   let addedIds: number[] = [];
   let addedPicks: number[] = [];
@@ -112,6 +117,7 @@
   const startAdd = (item: ReviewItem, use = false) => {
     if (draft && draft.item.id !== item.id) delete peeks[draft.item.id];
     emailOpen = true;
+    pane = use && item.suggestions.length ? "booking" : "email";
     addedIds = [];
     addedPicks = [];
     joining = null;
@@ -119,6 +125,11 @@
     baseline = fingerprints();
     formError = "";
     void peek(item);
+  };
+  const revealFields = () => {
+    if (showFields) return;
+    pane = "booking";
+    flushSync();
   };
   const dropLeg = (leg: Draft) => { drafts = drafts.filter((d) => d !== leg); };
   const addedLegs = new WeakSet<Draft>();
@@ -162,6 +173,8 @@
 
   let asking_all = $state(false);
   const askable = (items: ReviewItem[]) => review?.ai ? items.filter((i) => !i.suggestions.length && !asking_ai.has(i.id)) : [];
+  const suggested = $derived(shown.filter((i) => i.suggestions.length > 0));
+  const missing = $derived(shown.filter((i) => i.suggestions.length === 0));
   const unasked = $derived(askable(shown));
   const unaskedElsewhere = $derived(only ? askable(review?.items ?? []).length - unasked.length : 0);
   const aiWhere = $derived(review?.ai_mode === "local" ? "your own Ollama server, unredacted" : "OpenRouter, redacted first");
@@ -280,6 +293,21 @@
     toast.success(attached === bodies.length ? (attached > 1 ? "Added the email to your existing bookings" : "Added the email to your existing booking") : added.length > 1 ? `Added ${plural(added.length, legs)} to your trips` : "Added to your trips");
     await settle();
   }
+
+  let menuButtons = $state<Record<number, HTMLElement | null>>({});
+  const groups = $derived([
+    { id: "group-suggestions", title: "Check suggestions", count: suggested.length },
+    { id: "group-missing", title: "Add missing details", count: missing.length },
+    { id: "group-matches", title: "Match bookings", count: review?.matches.length ?? 0 },
+    { id: "group-people", title: "Match people", count: review?.who.length ?? 0 },
+  ].filter((g) => g.count > 0));
+  const jump = (id: string) => {
+    const heading = document.getElementById(id);
+    if (!heading) return;
+    const calm = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    heading.scrollIntoView?.({ block: "start", behavior: calm ? "auto" : "smooth" });
+    heading.focus({ preventScroll: true });
+  };
 
   let dismissing = $state<ReviewItem | null>(null);
   let dismissAsking = $state(false);
@@ -406,6 +434,7 @@
       <label class="flex items-start gap-2 text-sm"><input type="checkbox" class="mt-0.5 size-5 shrink-0 accent-primary" bind:checked={trustSender} />
         <span class="min-w-0 break-words">Also trust {sender(item)}: add its later mail to your trips without asking.</span></label>
     {/if}
+    <div class="flex flex-col gap-4" hidden={!showFields} data-testid="booking-fields">
     {#if many}
       {#each drafts as leg, n (leg)}
         <fieldset class="flex min-w-0 flex-col gap-4 rounded-xl border border-border p-3" data-testid="leg">
@@ -420,6 +449,7 @@
     {#if !joining}
       <div><Button type="button" variant="outline" size="sm" disabled={saving} onclick={addLeg}>Add another leg or booking</Button></div>
     {/if}
+    </div>
     {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
     {#if joining}
       {@const matches = joining.found.filter((f): f is ReviewCandidate => f !== null)}
@@ -436,8 +466,8 @@
         </div>
       </div>
     {:else}
-      <div class="flex flex-wrap gap-2">
-        <Button type="submit" disabled={saving}>{saving ? "Adding…" : many ? `Add ${plural(drafts.length, drafts)}` : "Add to my trips"}</Button>
+      <div class="review-actions flex flex-wrap gap-2" data-testid="form-actions">
+        <Button type="submit" disabled={saving} onclick={revealFields}>{saving ? "Adding…" : many ? `Add ${plural(drafts.length, drafts)}` : "Add to my trips"}</Button>
         <Button type="button" variant="outline" disabled={saving} onclick={requestClose}>Cancel</Button>
       </div>
     {/if}
@@ -455,6 +485,54 @@
   </div>
 {/snippet}
 
+{#snippet itemRow(item: ReviewItem)}
+  <li class="row items-start" data-testid="review-item">
+    <div class="min-w-0 basis-full">
+      <p class="break-words font-medium">{subject(item)}</p>
+      <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, item.mine ? `to ${item.address}` : `in ${item.owner}’s mailbox, shared with the household`].filter(Boolean).join(" · ")}</p>
+      <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">AI suggestion</Badge>{/if}{#if item.auto_read && item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">read automatically</Badge>{/if}</p>
+      {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
+      {#if item.count > 1}
+        <details class="mt-2 text-sm" data-testid="same-reservation">
+          <summary class="cursor-pointer text-muted-foreground">{item.count} emails about the same reservation</summary>
+          <ul class="mt-1 space-y-1 pl-4" aria-label="The other emails about it">
+            {#each item.others as other (other.id)}
+              <li class="break-words">{other.subject ?? `Mail from ${sender(item)}${other.received ? ` on ${other.received}` : ""}`}{other.subject && other.received ? ` · ${other.received}` : ""}</li>
+            {/each}
+          </ul>
+        </details>
+      {/if}
+    </div>
+    <div class="flex basis-full flex-wrap items-center gap-2">
+      {#if item.suggestions.length}
+        <Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : item.suggestions.length > 1 ? `Check the AI’s ${item.suggestions.length} suggestions for “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>{item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}</Button>
+      {:else}
+        <Button size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
+      {/if}
+      <Button variant="outline" size="sm" aria-expanded={viewing === item.id} onclick={() => toggleView(item)} aria-label={`View email “${subject(item)}”`}>View email</Button>
+      <ActionMenu label={`More actions for “${subject(item)}”`} bind:button={menuButtons[item.id]}>
+        {#snippet children(close)}
+          <div class="flex flex-col items-stretch gap-1" role="group" aria-label="This email">
+            <p class="eyebrow px-1">This email</p>
+            {#if item.suggestions.length}<Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); startAdd(item); }} aria-label={`Add “${subject(item)}” by hand`}>Add by hand instead</Button>{/if}
+            {#if review?.ai && item.reason !== "generic"}<Button variant="ghost" size="sm" class="justify-start" disabled={asking_all || asking_ai.has(item.id)} onclick={() => { close(); void askAi(item); }} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestions.length ? "Ask again" : "Ask AI"}</Button>{/if}
+            <Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); dismissing = item; dismissAsking = true; }} aria-label={item.count > 1 ? `Dismiss all ${item.count} emails about “${subject(item)}”` : `Dismiss “${subject(item)}”`}>{item.count > 1 ? "Dismiss all" : "Dismiss"}</Button>
+          </div>
+          {#if item.sender_domain && item.mine}
+            <div class="flex flex-col items-stretch gap-1 border-t border-border pt-2" role="group" aria-label={`All future mail from ${item.sender_domain}`}>
+              <p class="eyebrow break-words px-1">All future mail from {item.sender_domain}</p>
+              <Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); ignoring = item; asking = true; }} aria-label={`Not travel: ignore ${item.sender_domain}`}>Not travel: ignore this sender</Button>
+            </div>
+          {/if}
+        {/snippet}
+      </ActionMenu>
+    </div>
+  </li>
+  {#if viewing === item.id && peeks[item.id]}
+    <li class="row items-stretch" data-testid="preview">{@render messagePeek(item)}</li>
+  {/if}
+{/snippet}
+
 {#if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">
     <span>{loadError}</span><Button variant="outline" onclick={load}>Try again</Button>
@@ -468,62 +546,63 @@
   </div>
 {:else}
   <div class="space-y-8">
-    {#if review.items.length}
-      <section aria-labelledby="unread-title" class="space-y-2">
-        <h2 id="unread-title" class="eyebrow px-1">Couldn’t read</h2>
-        <p class="px-1 text-sm text-muted-foreground">These looked like bookings, and Waypoint couldn’t get one out of them. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Mail and AI → Gmail), and then you can add those by hand or dismiss them. Choose View email to read one here, or Add by hand to read it beside the form. Waypoint keeps each message here, encrypted, so you can read it without Gmail: until the item is dismissed or added, and for as long as a booking you add from it exists.</p>
-        {#if only}
-          <p class="px-1 text-sm" data-testid="review-filter">Showing only mail from {only.sender}{only.mailbox ? ` in ${only.mailbox}` : ""}{shown.length ? "" : ", and none is waiting"}. <button type="button" class="underline underline-offset-2" onclick={() => setQuery("")}>Show everything</button></p>
-        {/if}
+    <div class="space-y-3">
+      <p class="max-w-prose px-1 text-lg">These emails need your help before they can become bookings.</p>
+      <details class="px-1 text-sm text-muted-foreground" data-testid="review-privacy">
+        <summary class="cursor-pointer">How Waypoint handles these emails</summary>
+        <div class="mt-2 max-w-prose space-y-2">
+          <p>Waypoint looked at these because they seemed to be about a booking, and couldn’t make one from them, or made one that needs your check. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Mail and AI → Gmail), and then you can add those by hand or dismiss them.</p>
+          <p>Waypoint keeps each message here, encrypted, so you can read it without Gmail: until the item is dismissed or added, and for as long as a booking you add from it exists.</p>
+        </div>
+      </details>
+      {#if groups.length > 1}
+        <nav aria-label="Jump to a group" class="px-1">
+          <ul class="flex flex-wrap gap-2">
+            {#each groups as g (g.id)}
+              <li><Button variant="outline" size="sm" onclick={() => jump(g.id)}>{g.title} <Badge variant="secondary">{g.count}</Badge></Button></li>
+            {/each}
+          </ul>
+        </nav>
+      {/if}
+      {#if only}
+        <p class="px-1 text-sm" data-testid="review-filter">Showing only mail from {only.sender}{only.mailbox ? ` in ${only.mailbox}` : ""}{shown.length ? "" : ", and none is waiting"}. <button type="button" class="underline underline-offset-2" onclick={() => setQuery("")}>Show everything</button></p>
+      {/if}
+      {#if !unasked.length && only && unaskedElsewhere > 0 && review?.ai}
+        <p class="px-1 text-sm text-muted-foreground" data-testid="ask-none-here">Nothing shown here is waiting for the AI. {unaskedElsewhere} {unaskedElsewhere === 1 ? "email" : "emails"} from other senders or mailboxes {unaskedElsewhere === 1 ? "is" : "are"} hidden by this filter; show everything to ask about them.</p>
+      {/if}
+    </div>
+
+    {#if suggested.length}
+      <section aria-labelledby="group-suggestions" class="space-y-2">
+        <h2 id="group-suggestions" tabindex="-1" class="eyebrow px-1 outline-none">Check suggestions <Badge variant="secondary">{suggested.length}</Badge></h2>
+        <p class="px-1 text-sm text-muted-foreground">Waypoint read a booking from each of these. Check it against the email, change what’s off, then add it.</p>
+        <ul class="rows" aria-label="Check suggestions">
+          {#each suggested as item (item.id)}{@render itemRow(item)}{/each}
+        </ul>
+      </section>
+    {/if}
+
+    {#if missing.length}
+      <section aria-labelledby="group-missing" class="space-y-2">
+        <h2 id="group-missing" tabindex="-1" class="eyebrow px-1 outline-none">Add missing details <Badge variant="secondary">{missing.length}</Badge></h2>
+        <p class="px-1 text-sm text-muted-foreground">Waypoint couldn’t get a booking out of these. Read the email and type the booking in, or dismiss it if it isn’t travel.</p>
         {#if unasked.length > 1 || (only && unasked.length > 0)}
           <div class="space-y-1 px-1" data-testid="ask-all">
             <Button variant="outline" size="sm" disabled={asking_all} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : only ? `Ask AI about these ${unasked.length} ${unasked.length === 1 ? "email" : "emails"}` : `Ask AI about all ${unasked.length}`}</Button>
             <p class="text-xs text-muted-foreground">{aiNote(unasked.length)}</p>
           </div>
-        {:else if only && unaskedElsewhere > 0 && review?.ai}
-          <p class="px-1 text-sm text-muted-foreground" data-testid="ask-none-here">Nothing shown here is waiting for the AI. {unaskedElsewhere} {unaskedElsewhere === 1 ? "email" : "emails"} from other senders or mailboxes {unaskedElsewhere === 1 ? "is" : "are"} hidden by this filter; show everything to ask about them.</p>
         {/if}
-        <ul class="rows" aria-label="Couldn’t read">
-          {#each shown as item (item.id)}
-            <li class="row items-start" data-testid="review-item">
-              <div class="min-w-0 basis-full">
-                <p class="break-words font-medium">{subject(item)}</p>
-                <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, item.mine ? `to ${item.address}` : `in ${item.owner}’s mailbox, shared with the household`].filter(Boolean).join(" · ")}</p>
-                <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">AI suggestion</Badge>{/if}{#if item.auto_read && item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">read automatically</Badge>{/if}</p>
-                {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
-                {#if item.count > 1}
-                  <details class="mt-2 text-sm" data-testid="same-reservation">
-                    <summary class="cursor-pointer text-muted-foreground">{item.count} emails about the same reservation</summary>
-                    <ul class="mt-1 space-y-1 pl-4" aria-label="The other emails about it">
-                      {#each item.others as other (other.id)}
-                        <li class="break-words">{other.subject ?? `Mail from ${sender(item)}${other.received ? ` on ${other.received}` : ""}`}{other.subject && other.received ? ` · ${other.received}` : ""}</li>
-                      {/each}
-                    </ul>
-                  </details>
-                {/if}
-              </div>
-              <div class="flex basis-full flex-wrap gap-2">
-                <Button variant="outline" size="sm" aria-expanded={viewing === item.id} onclick={() => toggleView(item)} aria-label={`View email “${subject(item)}”`}>View email</Button>
-                {#if review.ai && item.reason !== "generic"}<Button variant="outline" size="sm" disabled={asking_all || asking_ai.has(item.id)} onclick={() => askAi(item)} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestions.length ? "Ask again" : "Ask AI"}</Button>{/if}
-                {#if item.suggestions.length}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : item.suggestions.length > 1 ? `Check the AI’s ${item.suggestions.length} suggestions for “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>{item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}</Button>{/if}
-                <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
-                {#if item.sender_domain && item.mine}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Not travel: ignore ${item.sender_domain}`}>Not travel: ignore this sender</Button>{/if}
-                <Button variant="outline" size="sm" onclick={() => { dismissing = item; dismissAsking = true; }} aria-label={item.count > 1 ? `Dismiss all ${item.count} emails about “${subject(item)}”` : `Dismiss “${subject(item)}”`}>{item.count > 1 ? "Dismiss all" : "Dismiss"}</Button>
-              </div>
-            </li>
-            {#if viewing === item.id && peeks[item.id]}
-              <li class="row items-stretch" data-testid="preview">{@render messagePeek(item)}</li>
-            {/if}
-          {/each}
+        <ul class="rows" aria-label="Add missing details">
+          {#each missing as item (item.id)}{@render itemRow(item)}{/each}
         </ul>
       </section>
     {/if}
 
     {#if review.matches.length}
-      <section aria-labelledby="matches-title" class="space-y-2">
-        <h2 id="matches-title" class="eyebrow px-1">Could be one of your bookings</h2>
-        <p class="px-1 text-sm text-muted-foreground">A booking email fits more than one of the bookings you added yourself, so Waypoint hasn’t guessed. Choose which one it is and the email fills in its confirmation code and link, or add it as a booking of its own.</p>
-        <ul class="rows" aria-label="Could be one of your bookings">
+      <section aria-labelledby="group-matches" class="space-y-2">
+        <h2 id="group-matches" tabindex="-1" class="eyebrow px-1 outline-none">Match bookings <Badge variant="secondary">{review.matches.length}</Badge></h2>
+        <p class="px-1 text-sm text-muted-foreground">Each email fits more than one booking you added yourself, so Waypoint hasn’t guessed. Choose which one it is and the email fills in its confirmation code and link, or add it as a booking of its own.</p>
+        <ul class="rows" aria-label="Match bookings">
           {#each review.matches as m (matchKey(m))}
             <li class="row flex-col items-stretch gap-3" data-testid="match-item">
               <div class="min-w-0">
@@ -556,10 +635,10 @@
     {/if}
 
     {#if review.who.length}
-      <section aria-labelledby="who-title" class="space-y-2">
-        <h2 id="who-title" class="eyebrow px-1">Who is this?</h2>
+      <section aria-labelledby="group-people" class="space-y-2">
+        <h2 id="group-people" tabindex="-1" class="eyebrow px-1 outline-none">Match people <Badge variant="secondary">{review.who.length}</Badge></h2>
         <p class="px-1 text-sm text-muted-foreground">A booking’s name that Waypoint couldn’t match to anyone in People. Choose who it is, and every booking with that name becomes theirs, and the next one matches by itself.</p>
-        <ul class="rows" aria-label="Who is this?">
+        <ul class="rows" aria-label="Match people">
           {#each review.who as w (w.id)}
             <li class="row items-start" data-testid="who-item">
               <div class="min-w-0 basis-full sm:basis-0 sm:flex-1">
@@ -587,7 +666,7 @@
 {/if}
 
 <ConfirmDialog bind:open={asking} title={`Ignore ${ignoring?.sender_domain ?? "this sender"}?`} confirmLabel="Ignore" busyLabel="Ignoring…" destructive
-  onconfirm={async () => { const i = ignoring; return i ? await ignore(i) : true; }}>
+  returnFocus={() => (ignoring ? menuButtons[ignoring.id] : null)} onconfirm={async () => { const i = ignoring; return i ? await ignore(i) : true; }}>
   {#snippet description()}
     {#if ignoring?.known_sender}<p class="text-signal-ink" data-testid="known-sender-warning">This sender is a travel company Waypoint knows. Ignoring it means its bookings won’t be added.</p>{/if}
     <p>Not travel: Waypoint stops looking at mail from this sender in that mailbox, and {goingCount === 1 ? "this item leaves" : `${goingCount} items from them (this one included) leave`} this list. Bookings already made from their emails stay. Other mailboxes aren’t affected.</p>
@@ -596,24 +675,33 @@
 </ConfirmDialog>
 
 <ConfirmDialog bind:open={dismissAsking} title={dismissing && dismissing.count > 1 ? `Dismiss ${dismissing.count} emails?` : "Dismiss this email?"} confirmLabel={dismissing && dismissing.count > 1 ? "Dismiss all" : "Dismiss"} busyLabel="Dismissing…" destructive
-  onconfirm={async () => { const i = dismissing; return i ? await dismiss(i) : true; }}>
+  returnFocus={() => (dismissing ? menuButtons[dismissing.id] : null)} onconfirm={async () => { const i = dismissing; return i ? await dismiss(i) : true; }}>
   {#snippet description()}
     <p>{dismissing && dismissing.count > 1 ? `Waypoint deletes its stored copy of all ${dismissing.count} emails about this reservation` : "Waypoint deletes its stored copy of this email"} and takes {dismissing && dismissing.count > 1 ? "them" : "it"} off this list. Nothing is added to your trips, and this can’t be undone.</p>
     <p>Your mailbox isn’t touched. Waypoint won’t look at {dismissing && dismissing.count > 1 ? "these messages" : "this message"} again, and later mail from the same sender is still read as usual. Bookings you already added from {dismissing && dismissing.count > 1 ? "them" : "it"} stay.</p>
   {/snippet}
 </ConfirmDialog>
 
-<Sheet bind:open={() => draft !== null, (v) => { if (!v) closeForm(); }} {guard} title={draft?.suggested ? (drafts.length > 1 ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"} wide onOpenAutoFocus={focusSheet}>
+<Sheet bind:open={() => draft !== null, (v) => { if (!v) closeForm(); }} {guard} title={draft?.suggested ? (drafts.length > 1 ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"} wide split onOpenAutoFocus={focusSheet}>
   {#if draft}
-    <div class="flex flex-col gap-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        {#if !emailOpen}<p class="min-w-0 break-words text-sm font-medium">{subject(draft.item)}</p>{/if}
-        <Button type="button" variant="outline" size="sm" class="ml-auto" aria-expanded={emailOpen} aria-controls="review-email" onclick={() => (emailOpen = !emailOpen)}>{emailOpen ? "Hide the email" : "Show the email"}</Button>
+    <div class="review-split">
+      <div class="review-email-col flex flex-col gap-4">
+        {#if viewport.phone}
+          <div class="grid grid-cols-2 gap-1 rounded-xl bg-secondary p-1" role="group" aria-label="Show">
+            <Button type="button" size="sm" variant={pane === "email" ? "default" : "ghost"} aria-pressed={pane === "email"} onclick={() => (pane = "email")}>Email</Button>
+            <Button type="button" size="sm" variant={pane === "booking" ? "default" : "ghost"} aria-pressed={pane === "booking"} onclick={() => (pane = "booking")}>Booking</Button>
+          </div>
+        {:else if !viewport.split}
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            {#if !emailOpen}<p class="min-w-0 break-words text-sm font-medium">{subject(draft.item)}</p>{/if}
+            <Button type="button" variant="outline" size="sm" class="ml-auto" aria-expanded={emailOpen} aria-controls="review-email" onclick={() => (emailOpen = !emailOpen)}>{emailOpen ? "Hide the email" : "Show the email"}</Button>
+          </div>
+        {/if}
+        <div id="review-email" hidden={!showEmail}>
+          {#if peeks[draft.item.id]}<div data-testid="preview">{@render messagePeek(draft.item)}</div>{/if}
+        </div>
       </div>
-      <div id="review-email" hidden={!emailOpen}>
-        {#if peeks[draft.item.id]}<div data-testid="preview">{@render messagePeek(draft.item)}</div>{/if}
-      </div>
-      {@render addForm(draft.item)}
+      <div class="review-form-col">{@render addForm(draft.item)}</div>
     </div>
   {/if}
 </Sheet>

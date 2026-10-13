@@ -2,18 +2,53 @@
   "name": "zone-search-review",
   "page": "review",
   "steps": [
-    { "wait_for": "[data-testid='review-item']" },
-    { "click": "button:has-text('Add by hand') >> nth=0" },
-    { "wait_for": "[role='dialog'] label:has-text('What is it?') select" },
-    { "select": { "selector": "[role='dialog'] label:has-text('What is it?') select", "index": 1 } },
-    { "scroll_to": "[role='dialog'] label:has-text('Time zone') input" },
-    { "screenshot": "closed" },
-    { "click": "[role='dialog'] label:has-text('Time zone') input" },
-    { "fill": { "selector": "[role='dialog'] label:has-text('Time zone') input", "text": "chicago" } },
-    { "wait_for": "[role='option']:has-text('America/Chicago')" },
-    { "screenshot": "matches" },
-    { "fill": { "selector": "[role='dialog'] label:has-text('Time zone') input", "text": "qqqqzzzz" } },
-    { "wait_for": "text=No matching time zone" },
-    { "screenshot": "no-matches" }
+    {
+      "wait_for": "[data-testid='review-item']"
+    },
+    {
+      "click": "button:has-text('Add by hand') >> visible=true >> nth=0"
+    },
+    {
+      "wait_for": "[role='dialog'] label:has-text('What is it?') select"
+    },
+    {
+      "select": {
+        "selector": "[role='dialog'] label:has-text('What is it?') select",
+        "index": 1
+      }
+    },
+    {
+      "scroll_to": "[role='dialog'] label:has-text('Time zone') input"
+    },
+    {
+      "screenshot": "closed"
+    },
+    {
+      "click": "[role='dialog'] label:has-text('Time zone') input"
+    },
+    {
+      "fill": {
+        "selector": "[role='dialog'] label:has-text('Time zone') input",
+        "text": "chicago"
+      }
+    },
+    {
+      "wait_for": "[role='option']:has-text('America/Chicago')"
+    },
+    {
+      "screenshot": "matches"
+    },
+    {
+      "fill": {
+        "selector": "[role='dialog'] label:has-text('Time zone') input",
+        "text": "qqqqzzzz"
+      }
+    },
+    {
+      "wait_for": "text=No matching time zone"
+    },
+    {
+      "screenshot": "no-matches"
+    }
   ]
 }
