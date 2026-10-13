@@ -1505,6 +1505,21 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/api/show-costs",
+      "handler": "waypoint/server/api/state.py:api_show_costs_save",
+      "web": [
+        "frontend/src/lib/components/settings/CostsSection.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_api_state.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
       "method": "GET",
       "path": "/api/offline",
       "handler": "waypoint/server/api/offline.py:api_offline",

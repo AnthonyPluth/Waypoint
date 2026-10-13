@@ -147,6 +147,7 @@ class Replies(DbCase):
     def test_state(self):
         _current.user = {"name": None, "email": None, "local": True}
         self.check("GET /api/state", state.api_state(self.c, {}, {}))
+        self.check("POST /api/show-costs", state.api_show_costs_save(self.c, {}, {"show_costs": False}))
         _current.user = {"sub": "u1", "name": "Rosa Example", "email": "rosa@example.com"}
         db.set_setting(self.c, sk.LAST_BACKUP, "2026-09-30T07:02:00")
         self.check("GET /api/state", state.api_state(self.c, {}, {}))
@@ -472,7 +473,7 @@ class Mismatches(unittest.TestCase):
 
     def test_a_renamed_field_a_wrong_type_and_a_missing_one(self):
         st = {"version": "dev", "database": "sqlite", "user": {"name": None, "email": None, "local": True},
-              "last_backup": None, "review_count": 0, "person_id": None, "ai": False}
+              "last_backup": None, "review_count": 0, "person_id": None, "ai": False, "show_costs": True}
         schema = reply_schema("GET /api/state")
         self.assertEqual(problems(st, schema), [])
         renamed = {("backed_up" if k == "last_backup" else k): v for k, v in st.items()}
@@ -491,7 +492,7 @@ class Generated(unittest.TestCase):
         self.assertEqual(contract.TS_OUT.read_text(), contract.render_ts(doc), "run `make api-contract`")
 
     def test_only_routes_typed_with_the_contract_s_types_are_covered(self):
-        self.assertEqual(covered(), {"GET /api/state", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
+        self.assertEqual(covered(), {"GET /api/state", "POST /api/show-costs", "POST /api/backup/inspect", "POST /api/restore", "GET /api/mailboxes",
                                      "POST /api/mailboxes/connect", "DELETE /api/mailboxes/{id}", "POST /api/mailboxes/{id}/scan", "GET /api/mailboxes/{id}/labels", "POST /api/mailboxes/{id}/labels", "GET /api/mailboxes/{id}/ignored", "GET /api/mailboxes/{id}/review-glance", "POST /api/mailboxes/{id}/unignore",
                                      "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/share",
                                      "GET /api/ai", "POST /api/ai", "GET /api/logodev", "POST /api/logodev", "POST /api/logodev/fetch",

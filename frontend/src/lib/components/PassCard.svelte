@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import type { Segment } from "$lib/api-types";
+  import { app as appState } from "$lib/app.svelte";
   import AirportCode from "$lib/components/AirportCode.svelte";
   import AirportName from "$lib/components/AirportName.svelte";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
@@ -56,7 +57,7 @@
           : s.kind === "cruise" ? [["Ship", s.details.ship], ["Cabin", s.details.room], ["Deck", s.details.deck]]
             : [["Seat", seat], ["Cabin", s.details.cabin]],
   );
-  const cost = $derived(showCost && bookings.length === 1 && s.price ? formatMoney(s.price.amount_minor, s.price.currency) : "");
+  const cost = $derived(showCost && appState.state?.show_costs !== false && bookings.length === 1 && s.price ? formatMoney(s.price.amount_minor, s.price.currency) : "");
   const COMPACT_OMIT = ["Cost", "Room", "Cabin", "Notes", "Vehicle", "Space", "Car", "Deck", "Ship"];
   const facts = $derived([...rows, ["Cost", cost] as [string, string]].filter((f): f is [string, string] => !!f[1] && !omit.includes(f[0]) && !(compact && COMPACT_OMIT.includes(f[0]))));
   const pad = $derived(compact ? "p-4 md:p-6" : "p-6 md:p-8");

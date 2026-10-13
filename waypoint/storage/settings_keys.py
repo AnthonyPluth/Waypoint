@@ -4,6 +4,8 @@ LAST_BACKUP = "last_backup"
 
 DISTANCE_UNIT = "distance_unit"
 
+SHOW_COSTS = "show_costs"
+
 HOME = "home"
 
 FLIGHT_STATUS_MONTH = "flight_status_month"

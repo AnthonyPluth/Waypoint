@@ -27,7 +27,7 @@ from .api.reminders import (api_device_add, api_device_remove, api_feed_make, ap
 from .api.review import (api_review, api_review_attach, api_review_dismiss, api_review_ignore, api_review_image, api_review_match, api_review_preview,
                          api_review_same, api_review_suggest, api_review_who)
 from .api.offline import api_offline
-from .api.state import api_state
+from .api.state import api_show_costs_save, api_state
 from .api.home import api_home, api_home_clear, api_home_save
 from .api.stats import api_distance_unit, api_distance_unit_save, api_stats
 
@@ -127,6 +127,7 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/assistant/review/{id}/dismiss", api_assistant_review_dismiss),
     ("GET", "/api/assistant/segments/{id}/email", api_assistant_segment_emails),
     ("GET", "/api/state", api_state),
+    ("POST", "/api/show-costs", api_show_costs_save),
     ("GET", "/api/offline", api_offline),
 ]
 

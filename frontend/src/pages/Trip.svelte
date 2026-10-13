@@ -138,6 +138,7 @@
   });
 
   const done = $derived(trip?.done_at != null);
+  const costsShown = $derived(app.state?.show_costs !== false);
   const over = $derived(trip ? isPast(trip, dayIn(now, viewerZone())) : false);
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
   const everyone = $derived(trip ? tripTravellers(trip.segments) : []);
@@ -247,11 +248,11 @@
           <p class="eyebrow">{eyebrowOf(s)}</p>
           <p class="mt-1 break-words font-medium">{headline(s)}</p>
           {#if s.confirmation}<p class="mt-1 text-lg"><CopyCode code={s.confirmation} /></p>{/if}
-          {#if s.price}<p class="mt-1 text-sm" class:line-through={s.status === "cancelled"}>{formatMoney(s.price.amount_minor, s.price.currency)}</p>{/if}
+          {#if s.price && costsShown}<p class="mt-1 text-sm" class:line-through={s.status === "cancelled"}>{formatMoney(s.price.amount_minor, s.price.currency)}</p>{/if}
         </li>
       {/each}
     </ul>
-    {#if copy.costs?.totals.length}<p class="mt-3 text-sm" data-trip-total><span class="eyebrow">Total</span> <span class="font-medium">{formatTotals(copy.costs.totals)}</span>{#if countNote(copy.costs)}<span class="text-muted-foreground"> · {countNote(copy.costs)}</span>{/if}</p>{/if}
+    {#if costsShown && copy.costs?.totals.length}<p class="mt-3 text-sm" data-trip-total><span class="eyebrow">Total</span> <span class="font-medium">{formatTotals(copy.costs.totals)}</span>{#if countNote(copy.costs)}<span class="text-muted-foreground"> · {countNote(copy.costs)}</span>{/if}</p>{/if}
   {:else if savedTrips.length}
     <div class="mb-6 space-y-2" data-testid="trip-not-saved">
       <h1 class="text-display">This trip isn’t saved on this device</h1>
@@ -279,7 +280,7 @@
       {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
         <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
       {/if}
-      {#if t.costs.totals.length}
+      {#if costsShown && t.costs.totals.length}
         <p class="mt-1 text-sm" data-trip-total><span class="eyebrow">Total</span> <span class="break-words font-medium">{formatTotals(t.costs.totals)}</span>
           {#if countNote(t.costs)}<span class="text-muted-foreground"> · {countNote(t.costs)}</span>{/if}</p>
       {/if}
@@ -351,7 +352,7 @@
                     {#if card.timesDiffer && b.status !== "cancelled"}
                       <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(b)}</dl>
                     {/if}
-                    {#if b.price}
+                    {#if costsShown && b.price}
                       <p class="text-sm" data-cost><span class="eyebrow">Cost</span> <span class="font-medium" class:line-through={b.status === "cancelled"}>{formatMoney(b.price.amount_minor, b.price.currency)}</span>
                         {#if b.status === "cancelled"}<span class="text-muted-foreground"> · cancelled, so not in the trip’s total</span>{/if}</p>
                     {/if}

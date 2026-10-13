@@ -2,7 +2,7 @@ import type { LoyaltyEntry, Segment, Trip } from "$lib/api-types";
 import type { AppState } from "$lib/types";
 
 export const state = (extra: Partial<AppState> = {}): AppState => ({
-  version: "1.2.3", database: "sqlite", user: { name: "Ada Lovelace", email: "ada@example.com" }, last_backup: null, review_count: 0, person_id: 1, ai: false, ...extra,
+  version: "1.2.3", database: "sqlite", user: { name: "Ada Lovelace", email: "ada@example.com" }, last_backup: null, review_count: 0, person_id: 1, ai: false, show_costs: true, ...extra,
 });
 
 export const segment = (extra: Partial<Segment> = {}): Segment => ({

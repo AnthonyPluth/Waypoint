@@ -3173,6 +3173,48 @@
         }
       }
     },
+    "/api/show-costs": {
+      "post": {
+        "operationId": "api_show_costs_save",
+        "x-handler": "waypoint/server/api/state.py:api_show_costs_save",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShowCostsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShowCosts"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/offline": {
       "get": {
         "operationId": "api_offline",
@@ -6896,6 +6938,30 @@
         ],
         "additionalProperties": false
       },
+      "ShowCosts": {
+        "type": "object",
+        "properties": {
+          "show_costs": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "show_costs"
+        ],
+        "additionalProperties": false
+      },
+      "ShowCostsBody": {
+        "type": "object",
+        "properties": {
+          "show_costs": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "show_costs"
+        ],
+        "additionalProperties": false
+      },
       "SignedIn": {
         "type": "object",
         "properties": {
@@ -6990,6 +7056,9 @@
           },
           "ai": {
             "type": "boolean"
+          },
+          "show_costs": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -6999,7 +7068,8 @@
           "last_backup",
           "review_count",
           "person_id",
-          "ai"
+          "ai",
+          "show_costs"
         ],
         "additionalProperties": false
       },

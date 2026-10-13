@@ -828,6 +828,14 @@ export interface ShareBody {
   share: boolean;
 }
 
+export interface ShowCosts {
+  show_costs: boolean;
+}
+
+export interface ShowCostsBody {
+  show_costs: boolean;
+}
+
 export interface SignedIn {
   name: string | null;
   email: string | null;
@@ -851,6 +859,7 @@ export interface State {
   review_count: number;
   person_id: number | null;
   ai: boolean;
+  show_costs: boolean;
 }
 
 export interface Stats {
@@ -1255,5 +1264,6 @@ export interface Endpoints {
   "POST /api/assistant/review/{id}/dismiss": { body: AssistantDismissBody; reply: AssistantDismissed };
   "GET /api/assistant/segments/{id}/email": { body: never; reply: AssistantSegmentEmails };
   "GET /api/state": { body: never; reply: State };
+  "POST /api/show-costs": { body: ShowCostsBody; reply: ShowCosts };
   "GET /api/offline": { body: never; reply: Offline };
 }

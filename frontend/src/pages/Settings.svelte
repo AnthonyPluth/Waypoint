@@ -5,6 +5,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import AiSection from "$lib/components/settings/AiSection.svelte";
+  import CostsSection from "$lib/components/settings/CostsSection.svelte";
   import DistanceSection from "$lib/components/settings/DistanceSection.svelte";
   import DataSection from "$lib/components/settings/DataSection.svelte";
   import HomeSection from "$lib/components/settings/HomeSection.svelte";
@@ -35,7 +36,7 @@
   const GROUPS = [
     { id: "account", label: "Account & household", about: "Who’s signed in, your household and the version.", tasks: ["Sign out", "Household members", "Version and advanced"] },
     { id: "mail", label: "Mail & review", about: "Connect Gmail, reconnect it, choose what is read and set up AI suggestions.", tasks: ["Connect or reconnect Gmail", "Choose labels", "Ignored senders", "AI suggestions"] },
-    { id: "travel", label: "Travel preferences", about: "Where home is, miles or kilometres and brand logos.", tasks: ["Home", "Distances", "Brand logos"] },
+    { id: "travel", label: "Travel preferences", about: "Where home is, miles or kilometres, trip costs and brand logos.", tasks: ["Home", "Distances", "Trip costs", "Brand logos"] },
     { id: "offline", label: "Offline & notifications", about: "Keep your trip on this device, reminders and your calendar.", tasks: ["Offline access", "Reminders", "Calendar subscription"] },
     { id: "assistants", label: "Connected assistants", about: "The AI assistants that can reach Waypoint, and what they may do.", tasks: ["Connect an assistant", "Disconnect an assistant", "Let an assistant read email"] },
     { id: "backup", label: "Backup & import", about: "Download or restore a backup and import past flights.", tasks: ["Download a backup", "Restore a backup", "Import past flights"] },
@@ -132,6 +133,8 @@
     <HomeSection />
 
     <DistanceSection />
+
+    <CostsSection />
 
     <LogosSection />
   {:else if group.id === "offline"}
