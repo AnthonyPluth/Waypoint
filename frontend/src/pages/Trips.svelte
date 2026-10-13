@@ -35,6 +35,13 @@
   $effect(() => { void load(); });
 
   const who = $derived(Number(new URLSearchParams(route.query).get("who")) || null);
+  const tripParam = $derived(Number(new URLSearchParams(route.query).get("trip")) || null);
+  const queryFor = (id: number | null) => {
+    const q = new URLSearchParams();
+    if (who) q.set("who", String(who));
+    if (id) q.set("trip", String(id));
+    return q.toString();
+  };
   const pick = (e: Event) => {
     const field = e.currentTarget as HTMLSelectElement;
     const v = field.value;
@@ -42,14 +49,13 @@
     leave(() => setQuery(v ? `who=${v}` : ""));
   };
   const shown = $derived(trips && splitTrips(trips.filter((t) => !who || t.segments.some((s) => s.travelers.some((x) => x.person_id === who))), dayIn(Date.now(), viewerZone())));
-  let picked = $state<number | null>(null);
   const everyTrip = $derived(shown ? [...shown.upcoming, ...shown.past] : []);
-  const selected = $derived(everyTrip.find((t) => t.id === picked) ?? everyTrip[0] ?? null);
-  const reloaded = (movedTo?: number) => { if (movedTo) picked = movedTo; void load(); };
+  const selected = $derived(everyTrip.find((t) => t.id === tripParam) ?? everyTrip[0] ?? null);
+  const reloaded = (movedTo?: number) => { if (movedTo) setQuery(queryFor(movedTo)); void load(); };
   const choose = (e: MouseEvent, t: Trip) => {
     if (!panes.two || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
-    leave(() => { picked = t.id; });
+    leave(() => setQuery(queryFor(t.id)));
   };
   const names = (t: Trip) => [...new Set(t.segments.flatMap((s) => s.travelers.map((x) => x.name)))].join(", ");
   const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
@@ -109,7 +115,7 @@
     {/each}
   {/snippet}
   {#if panes.two && selected}
-    <div class="grid grid-cols-[22rem_minmax(0,1fr)] items-start gap-8">
+    <div class="grid grid-cols-[clamp(16rem,28%,22rem)_minmax(0,1fr)] items-start gap-8">
       <div class="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto pr-1">{@render list()}</div>
       <div class="min-w-0" data-testid="trip-pane" aria-label="Selected trip" role="region">{#key selected.id}<TripPane tripId={selected.id} onchanged={reloaded} />{/key}</div>
     </div>

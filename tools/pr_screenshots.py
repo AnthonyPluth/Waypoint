@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 VERIFY_DIR = ROOT / "artifacts" / "verify"
 BRANCH = "pr-screenshots"
 REPO_SLUG = "AnthonyPluth/waypoint"
-WIDTHS = {"phone": 390, "tablet": 768, "desktop": 1280}
+WIDTHS = {"phone": 390, "tablet": 768, "desktop": 1280, "laptop": 1024, "wide": 1440, "zoomed": 853}
 _spec = importlib.util.spec_from_file_location("fleet_checks", Path(__file__).resolve().parent / "fleet_checks.py")
 assert _spec and _spec.loader
 fleet_checks = importlib.util.module_from_spec(_spec)
@@ -40,13 +40,13 @@ def raw_url(pr: int, name: str, slug: str = REPO_SLUG) -> str:
 
 
 def viewport_of(name: str) -> str | None:
-    m = re.search(r"-(phone|tablet|desktop)(?:-top)?\.png$", name)
+    m = re.search(r"-(phone|tablet|desktop|laptop|wide|zoomed)(?:-top)?\.png$", name)
     return m.group(1) if m else None
 
 
 def alt_text(name: str) -> str:
     viewport = viewport_of(name)
-    page = re.sub(r"-(?:phone|tablet|desktop)(?:-top)?\.png$|-top\.png$|\.png$", "", name).replace("-", " ").replace("_", " ")
+    page = re.sub(r"-(?:phone|tablet|desktop|laptop|wide|zoomed)(?:-top)?\.png$|-top\.png$|\.png$", "", name).replace("-", " ").replace("_", " ")
     page = page[:1].upper() + page[1:]
     return f"{page} at {viewport} width" if viewport else page
 

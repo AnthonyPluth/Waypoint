@@ -211,7 +211,37 @@ describe("two panes", () => {
     expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
     expect(links[1]).toHaveAttribute("aria-current", "true");
     expect(links[0]).not.toHaveAttribute("aria-current");
-    expect(location.hash).toBe("#trips");
+    expect(location.hash).toBe("#trips?trip=2");
+    expect(route.query).toBe("trip=2");
+  });
+
+  it("opens the trip the address names, and keeps the filter beside it", async () => {
+    panes.two = true;
+    serveTrips();
+    route.query = "who=2&trip=2";
+    location.hash = "#trips?who=2&trip=2";
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
+    await user().click(within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[0]);
+    expect(route.query).toBe("who=2&trip=1");
+  });
+
+  it("shows the first trip when the address names one that isn’t in the list", async () => {
+    panes.two = true;
+    serveTrips();
+    route.query = "trip=999";
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to London" })).toBeInTheDocument();
+  });
+
+  it("stays a plain list where the address names a trip but the screen is narrow", async () => {
+    serveTrips();
+    route.query = "trip=2";
+    render(Trips);
+    await screen.findByRole("list", { name: "Upcoming trips" });
+    expect(screen.queryByRole("region", { name: "Selected trip" })).toBeNull();
   });
 
   it("asks before another trip is picked, or the filter swaps it, over a changed booking, and stays on the trip on Keep editing", async () => {
@@ -368,7 +398,7 @@ describe("changing a trip in the pane", () => {
     await u.click(within(pane).getByRole("button", { name: "Save changes" }));
     expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
     expect(within(pane).getByRole("button", { name: "Edit Harbour Hotel" })).toBeInTheDocument();
-    expect(location.hash).toBe("#trips");
+    expect(location.hash).toBe("#trips?trip=2");
     expect(within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[1]).toHaveAttribute("aria-current", "true");
   });
 });

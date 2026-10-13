@@ -1,0 +1,16 @@
+{
+  "name": "trips-widths",
+  "page": "trips",
+  "viewports": ["tablet", "laptop", "desktop", "wide", "zoomed"],
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "wait_for": "a[href^='#trip/'] >> visible=true" },
+    { "screenshot": "list" },
+    { "click": "a[href^='#trip/'] >> nth=1" },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "screenshot": "second-trip" },
+    { "reload": true },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "screenshot": "after-reload" }
+  ]
+}
