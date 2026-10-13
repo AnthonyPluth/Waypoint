@@ -3,13 +3,11 @@
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
   import { ago } from "$lib/offline";
   import { offline, refreshOffline, syncSavedTrip } from "$lib/offline.svelte";
-  import { deviceCheckName } from "$lib/platform";
   import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
   import { onMount } from "svelte";
 
   let { tripId = null }: { tripId?: number | null } = $props();
 
-  const check = deviceCheckName();
   let setting = $state(false);
   let retrying = $state(false);
   let now = $state(Date.now());
@@ -20,7 +18,8 @@
   });
 
   const savedElsewhere = $derived(tripId !== null && offline.tripId !== null && offline.tripId !== tripId);
-  const savedHere = $derived(offline.hasCopy && !savedElsewhere);
+  const unidentified = $derived(tripId !== null && offline.tripId === null);
+  const savedHere = $derived(offline.hasCopy && !savedElsewhere && !unidentified);
   const which = $derived(offline.tripName ? `“${offline.tripName}”` : "your current trip");
 
   async function retry() {
@@ -47,6 +46,9 @@
             <span class="font-medium">Couldn’t save the trip on this device.</span> <span class="text-muted-foreground">{savedHere && offline.savedAt ? `The copy from ${ago(offline.savedAt, now)} is still there.` : "Nothing is saved yet."}</span>
           {:else if savedElsewhere}
             <span class="font-medium">Saved on this device: {which}.</span> <span class="text-muted-foreground">This trip isn’t the one saved: only your current trip is.</span>
+          {:else if offline.hasCopy && unidentified}
+            <span class="font-medium">A trip is saved on this device</span>
+            {#if offline.savedAt}<span class="text-muted-foreground">· updated {ago(offline.savedAt, now)}</span>{/if}
           {:else if savedHere && offline.savedAt}
             <span class="font-medium">Saved on this device</span> <span class="text-muted-foreground">· updated {ago(offline.savedAt, now)}{tripId === null && offline.tripName ? ` · ${which}` : ""}</span>
           {:else if savedHere}
@@ -64,16 +66,6 @@
         {/if}
       {/if}
     </div>
-    {#if offline.supported && !offline.damaged && (!offline.setUp || !offline.off)}
-      <details class="mt-2">
-        <summary class="inline-flex min-h-8 cursor-pointer items-center font-medium underline-offset-2 hover:underline">What offline includes</summary>
-        <ul class="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
-          <li>Opening it with no connection asks for {check}. It stays locked until you unlock it.</li>
-          <li>Bookings, confirmation codes, times, places and the booking emails’ text are saved, encrypted on this device.</li>
-          <li>Not saved, so you need a connection for them: loyalty and Known Traveler numbers, a parking booking’s gate-code image, live flight status, and every trip but your current one.</li>
-        </ul>
-      </details>
-    {/if}
   </section>
   <OfflineSetup bind:open={setting} title="Set up offline access" />
 {/if}
