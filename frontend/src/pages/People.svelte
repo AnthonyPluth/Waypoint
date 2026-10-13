@@ -174,21 +174,17 @@
   <form class="flex w-full flex-col gap-4" data-editor onsubmit={save} aria-labelledby={titled ? "person-form-title" : undefined} aria-label={titled ? undefined : personSheetTitle(d)}>
   <div class="flex w-full flex-col gap-4">
     {#if titled}<h2 id="person-form-title" class="font-medium">{personFormTitle(d)}</h2>{/if}
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Display name</span>
-      <Input bind:value={d.display_name} required maxlength={100} autocomplete="off" />
-      <span class="text-muted-foreground">How Waypoint shows them.</span></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name</span>
+      <Input bind:value={d.display_name} required maxlength={100} autocomplete="off" placeholder="How Waypoint shows them" /></label>
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">First name</span>
       <Input bind:value={d.first_name} maxlength={100} autocomplete="off" /></label>
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Legal name</span>
       <Input bind:value={d.legal_name} maxlength={200} autocomplete="off" />
-      <span class="text-muted-foreground">The name on their ID and bookings, used to match them.</span></label>
-    <details class="rounded-xl border border-input px-3 py-2 text-sm" open={d.aliases !== ""}>
-      <summary class="min-h-11 cursor-pointer py-2.5 font-medium focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none">Advanced matching</summary>
-  <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name aliases</span>
-        <textarea bind:value={d.aliases} rows="3" autocomplete="off" spellcheck="false" placeholder={"DOE/JANE MS"}
-          class="border-input bg-secondary placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"></textarea>
-        <span class="text-muted-foreground">How airlines print the name, one per line.</span></label>
-    </details>
+      <span class="text-muted-foreground">As on their ID, for matching bookings.</span></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name aliases</span>
+      <textarea bind:value={d.aliases} rows="3" autocomplete="off" spellcheck="false" placeholder={"DOE/JANE MS"}
+        class="border-input bg-secondary placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"></textarea>
+      <span class="text-muted-foreground">How airlines print the name, one per line.</span></label>
     {#if d.member}<p class="text-sm text-muted-foreground">They’re a household member: their link to their sign-in stays as it is.</p>{/if}
     {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
     <div class="flex flex-wrap gap-2">
@@ -215,7 +211,7 @@
           {#if d.program === "Other"}<span class="text-muted-foreground">Say which program in the notes.</span>{/if}</label>
         <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Number</span>
           <Input bind:value={d.number} required={d.id === null} maxlength={64} autocomplete="off" spellcheck={false} placeholder={d.id === null ? "" : `Leave empty to keep ${d.masked}`} /></label>
-        <p class="-mt-2 text-sm text-muted-foreground">Every signed-in household member can see this number once they choose Show and copy. It’s encrypted and stays hidden until someone asks.</p>
+        <p class="-mt-2 text-sm text-muted-foreground">Every signed-in household member can see this number once they ask to show it. It’s encrypted and stays hidden until someone asks.</p>
         {#if EXPIRES.includes(d.kind)}
           <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Expiry</span>
             <Input type="date" bind:value={d.expiry} autocomplete="off" /></label>
@@ -241,7 +237,7 @@
 {:else if people.length === 0}
   <p class="text-muted-foreground">Nobody yet. Household members appear here when they sign in; add a guest for someone who travels with you but has no login.</p>
 {:else}
-  <p class="mb-3 text-sm text-muted-foreground">Saved loyalty and Known Traveler numbers are visible to every signed-in household member. They stay hidden until someone chooses Show and copy.</p>
+  <p class="mb-3 text-sm text-muted-foreground">Saved loyalty and Known Traveler numbers are visible to every signed-in household member. They stay hidden until someone asks to show them.</p>
   <ul class="rows" aria-label="People">
     {#each people as p (p.id)}
       <li class="row items-start">
@@ -249,9 +245,9 @@
           <div class="flex items-start justify-between gap-2">
             <p class="flex flex-wrap items-center gap-2 font-medium"><span class="break-words">{p.display_name}</span>
               <Badge variant={p.member ? "default" : "outline"}>{p.member ? "Member" : "Guest"}</Badge></p>
-            <span class="-mt-2 -mr-2 flex shrink-0">
-              <Button variant="ghost" size="icon" class="size-11 text-muted-foreground" aria-label={`Edit ${p.display_name}`} title="Edit" onclick={() => startEdit(p)}><Pencil class="size-4" /></Button>
-            {#if !p.member}<Button variant="ghost" size="icon" class="size-11 text-muted-foreground" aria-label={`Remove ${p.display_name}`} title="Remove" onclick={() => { removing = p; asking = true; }}><Trash class="size-4" /></Button>{/if}
+            <span class="-mt-1 -mr-2 flex shrink-0 gap-1">
+              <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Edit ${p.display_name}`} title="Edit" onclick={() => startEdit(p)}><Pencil class="size-4" /></Button>
+            {#if !p.member}<Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:min-h-8 phone:min-w-8" aria-label={`Remove ${p.display_name}`} title="Remove" onclick={() => { removing = p; asking = true; }}><Trash class="size-4" /></Button>{/if}
             </span>
           </div>
           {#if details(p)}<p class="break-words text-sm text-muted-foreground">{details(p)}</p>{/if}
@@ -269,22 +265,20 @@
                   {@const reserve = group.items.some((x) => x.logo)}
                   <li class="flex items-start justify-between gap-x-3 text-sm">
                     <div class="min-w-0 flex-1">
-                      <p class="flex flex-wrap items-center gap-x-2">
+                      <p class="flex items-center gap-x-2">
                         <BrandLogo src={m.logo} size={20} monogram={reserve ? m.program : null} />
                         <span class="min-w-0 break-words font-medium">{m.program}</span>
                         {#if m.readable}
-                          <button type="button" class="-my-2 inline-flex min-h-11 max-w-full flex-wrap items-center gap-x-2 rounded-md px-1.5 focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
-                            aria-label={revealed[m.id] !== undefined ? `Hide ${m.program} number` : `Show and copy ${m.program} number`} onclick={() => toggle(m)}>
-                            <span class="font-mono">{revealed[m.id] ?? m.masked}</span>
-                            <span class="text-xs font-medium text-primary">{revealed[m.id] !== undefined ? "Hide" : "Show and copy"}</span></button>
+                          <button type="button" class="shrink-0 rounded-md px-1.5 py-0.5 phone:min-h-11 phone:-my-3 font-mono underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+                            aria-label={revealed[m.id] !== undefined ? `Hide ${m.program} number` : `Show and copy ${m.program} number`} onclick={() => toggle(m)}>{revealed[m.id] ?? m.masked}</button>
                         {:else}
                           <span class="text-muted-foreground">Can’t be read with this key: enter it again</span>
                         {/if}</p>
                       {#if itemDetails(m)}<p class="break-words text-muted-foreground">{itemDetails(m)}</p>{/if}
                     </div>
-                    <div class="-mt-3 -mr-2 flex shrink-0">
-                      <Button variant="ghost" size="icon" class="size-11 text-muted-foreground" aria-label={`Edit ${p.display_name}’s ${m.program}`} title="Edit" onclick={() => startEditId(m)}><Pencil class="size-4" /></Button>
-                      <Button variant="ghost" size="icon" class="size-11 text-muted-foreground" aria-label={`Remove ${p.display_name}’s ${m.program}`} title="Remove" onclick={() => { idRemoving = m; idAsking = true; }}><Trash class="size-4" /></Button>
+                    <div class="-mt-1 -mr-2 flex shrink-0 gap-1 phone:gap-0">
+                      <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:justify-end phone:pr-1" aria-label={`Edit ${p.display_name}’s ${m.program}`} title="Edit" onclick={() => startEditId(m)}><Pencil class="size-4" /></Button>
+                      <Button variant="ghost" size="icon" class="size-8 text-muted-foreground phone:justify-start phone:pl-1" aria-label={`Remove ${p.display_name}’s ${m.program}`} title="Remove" onclick={() => { idRemoving = m; idAsking = true; }}><Trash class="size-4" /></Button>
                     </div>
                   </li>
                 {/each}
