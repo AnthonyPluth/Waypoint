@@ -15,20 +15,24 @@ poetry run python run.py                               # run Waypoint at http://
 poetry run python -m unittest discover tests           # the test suite (SQLite)
 DATABASE_URL=postgresql://... poetry run python -m unittest discover tests   # the same tests against Postgres
 poetry run coverage run -m unittest discover tests && poetry run coverage report   # how much they cover
-poetry run unittest-parallel -t . -s tests -j 4   # the same suite across 4 processes (what CI does): about 3x faster; `make test-parallel`
+poetry run unittest-parallel -t . -s tests -j 4   # the same suite across 4 processes (what CI does on SQLite): about 3x faster; `make test-parallel`
 poetry run mypy                                        # type-check the Python (settings in pyproject.toml)
 poetry add <package>                                   # add a dependency (updates pyproject.toml and poetry.lock)
 ```
 
-To run the tests on Postgres as CI does (in parallel, where tests that share the database can trip over each other), start a throwaway one; Docker's default 64 MB of shared memory isn't enough for the schemas the tests make:
+To run the tests on Postgres as CI does (in parallel, where tests that share the database can trip over each other), start a throwaway one. The data directory is in memory and nothing is flushed to disk, which is what makes the tests fast; a crash loses the database, so use these settings only for a database that lives for one test run, never for a real one. Docker's default 64 MB of shared memory isn't enough for the schemas the tests make:
 
 ```bash
-docker run -d --rm --name waypoint-test-pg --shm-size=1g -p 5432:5432 -e POSTGRES_USER=waypoint -e POSTGRES_PASSWORD=waypoint -e POSTGRES_DB=waypoint postgres:16
-DATABASE_URL=postgresql://waypoint:waypoint@127.0.0.1:5432/waypoint poetry run unittest-parallel -t . -s tests -j 4
+docker run -d --rm --name waypoint-test-pg --shm-size=1g --tmpfs /var/lib/postgresql/data -p 5432:5432 -e POSTGRES_USER=waypoint -e POSTGRES_PASSWORD=waypoint -e POSTGRES_DB=waypoint postgres:16 -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c shared_buffers=512MB -c max_connections=300
+DATABASE_URL=postgresql://waypoint:waypoint@127.0.0.1:5432/waypoint make test-pg
 docker stop waypoint-test-pg
 ```
 
-`make test-pg` runs the suite against the Postgres at `$DATABASE_URL` (the command above, with a check that the variable is set). Whatever Postgres you use must be UTF-8: a cluster you make yourself needs `initdb -E UTF8 --locale=C.UTF-8` (the `postgres` Docker image already is). Each test that writes settings or goes through the server makes and drops its own schema, so running the suite twice on the same database gives the same result.
+`make test-pg` runs the suite against the Postgres at `$DATABASE_URL`, with one test process per CPU (at least 4, at most 16: `tools/test_jobs.sh`; `PG_JOBS=8 make test-pg` sets it), after checking that the variable is set. `max_connections` needs 30 for each process plus 100, so 300 serves the cap of 16. Whatever Postgres you use must be UTF-8: a cluster you make yourself needs `initdb -E UTF8 --locale=C.UTF-8` (the `postgres` Docker image already is). A test that needs a database of its own (`tests/shared.py`'s `own_database`) borrows one of a few schemas each test process keeps, built once from the schema and emptied (`TRUNCATE`, with the airport and airline reference rows restored) when the test is done; a schema a test still holds a connection to is freed by ending that connection. Schemas are named `p_<process id>_<n>` and a later run drops the ones left by a process that no longer exists, so running the suite twice on the same database gives the same result.
+
+To see where the time goes, `make test-timings` prints the slowest tests and classes and the time spent making and emptying databases (on Postgres when `DATABASE_URL` is set), and the "Docker image" workflow prints the same in its run summary when started by hand with "timings" ticked. Neither is part of `make check`.
+
+A new database, for the tests and for a first start, is built in one step: the tables from `waypoint/storage/schema.py`, the airport and airline rows, and the stamp for the newest migration (`db.create_fresh`), with no migration replayed. A database that already has tables and a version is upgraded by `upgrade head` as before. `tests/test_migrations.py` builds one database each way and compares them. The migration history up to revision `0034` was squashed into one baseline (`0034_baseline.py`, written out in full with its airport and airline rows, `down_revision = None`); the earlier migrations and their tests are in the repository's history, and the baseline was checked equal to that chain on SQLite and Postgres (tables, columns, types, constraints, indexes, foreign keys and rows) before it replaced it. A backup made at an older revision is refused with a message saying so: restore it with the last release before the squash, then take a new backup.
 
 `make check` runs the checks to run before you push, each tool once: ruff, mypy and import-linter, Waypoint’s own Semgrep rules, the fleet checks (see [Merging](#merging)), the feature map and API contract checks, the Python tests (on SQLite, in parallel as CI runs them), and the web app's type-check, ESLint, Vitest tests and build, and the docs site's build. `make lint`, `make test` (serial, for a clearer failure), `make test-parallel` and `make frontend-check` run one part. The security scans run only in CI, each on the pull requests it can affect (see `.github/workflows/security.yml`): Semgrep, Trivy, zizmor, pip-audit, npm audit and CodeQL. So do the Postgres tests (see above to run them yourself). For the quick checks on every commit (ruff, trailing whitespace, YAML/TOML syntax, merge-conflict markers, large files), install [pre-commit](https://pre-commit.com) and run `pre-commit install` once.
 
@@ -113,7 +117,7 @@ poetry run alembic check                                       # the schema and 
 
 A column that refers to another table’s row gets a foreign key, `schema.refers(table, column, "users.id", ondelete)` (a hypothetical `segments.trip_id` would be `schema.refers(segments, "trip_id", "trips.id", "CASCADE")`): `CASCADE` when the row belongs to what it refers to (a trip’s flights), `SET NULL` when it only points at it. A backup restores with the keys checked when the restore commits, so rows may come in any order.
 
-Give each migration the next four-digit number after main's newest (`0002_…py`, `revision = '0002'`) and a test of its own in `tests/test_migrations.py`, a method named `test_0002_…` that downgrades to the revision before it, writes the data it changes, upgrades and checks the result. `make check` and CI fail when there is more than one Alembic head (two branches that each added the next number), a number is used twice, or a migration has no test (`tools/fleet_checks.py`).
+Give each migration the next four-digit number after main's newest (`0035_…py`, `revision = '0035'`) and a test of its own in `tests/test_migrations.py`, a method named `test_0035_…` that downgrades to the revision before it, writes the data it changes, upgrades and checks the result. `make check` and CI fail when there is more than one Alembic head (two branches that each added the next number), a number is used twice, or a migration has no test (`tools/fleet_checks.py`).
 
 Waypoint applies it on its next start. Queries, in the app and in the tests, are SQLAlchemy statements over the ORM models (`Connection.execute()` doesn't take SQL text), compiled for whichever database is in use; [Queries with SQLAlchemy](/Waypoint/contributing/orm/) is the guide.
 
@@ -127,7 +131,7 @@ Waypoint applies it on its next start. Queries, in the app and in the tests, are
 | `waypoint/providers/` | Each outside service Waypoint reads from or sends to. Providers don’t import each other; what two of them share sits in a module of its own |
 | `waypoint/storage/` | The database, at the bottom: it imports nothing from the domain, the providers or the server, and only it imports the database drivers and Alembic |
 | `waypoint/storage/db.py`, `schema.py`, `models.py`, `settings_keys.py`, `secretbox.py`, `backup.py` | Database connections (SQLite or Postgres), the schema and its ORM models, the settings’ names, secrets encrypted at rest, backups |
-| `waypoint/storage/migrations/`, `alembic.ini` | Alembic migrations, applied on start-up (with foreign keys off on SQLite while they run: batch mode remakes tables). Repairs for data saved by older versions are migrations too, run once, not code run at every start. A migration that removes data saves a backup first |
+| `waypoint/storage/migrations/`, `alembic.ini` | Alembic migrations, applied on start-up (with foreign keys off on SQLite while they run: batch mode remakes tables). The first one, `0034`, is the baseline that replaced the whole earlier chain. Repairs for data saved by older versions are migrations too, run once, not code run at every start. A migration that removes data saves a backup first |
 | `waypoint/tls.py`, `validate.py` | The only module that opens outbound connections (every https request goes through it); checking numbers and other input |
 | `waypoint/dates.py`, `monitoring.py`, `oidc.py` | Date helpers; the log (scrubbed); OpenID Connect sign-in |
 | `waypoint/verify.py` | The `run.py verify` browser check |

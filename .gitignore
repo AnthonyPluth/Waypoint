@@ -27,6 +27,7 @@ coverage.xml
 coverage.json
 # test results (CI sends them to Codecov)
 junit/
+.timings/
 frontend/junit.xml
 
 # make verify: screenshots and the report

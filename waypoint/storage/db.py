@@ -14,6 +14,8 @@ from urllib.parse import urlsplit
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
+from alembic.util import CommandError
 from sqlalchemy import create_engine, event, inspect, select
 from sqlalchemy.dialects import postgresql as pg_dialect
 from sqlalchemy.dialects import sqlite as sqlite_dialect
@@ -23,7 +25,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 from .. import monitoring
-from . import secretbox
+from . import reference, schema, secretbox
 from .models import Setting
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -89,6 +91,13 @@ def _lower(v):
     return str(v).lower()
 
 
+TEST_SCHEMAS: dict[str, str] = {}
+
+
+def schema_for(path: str) -> str:
+    return TEST_SCHEMAS.get(path) or "t_" + hashlib.sha256(path.encode()).hexdigest()[:12]
+
+
 def _postgres_engine(url: str, path: str | None) -> Engine:
     from psycopg.adapt import Dumper
 
@@ -100,7 +109,7 @@ def _postgres_engine(url: str, path: str | None) -> Engine:
                 return b"1" if obj else b"0"
             return str(obj).encode()
 
-    test_schema = None if path is None else "t_" + hashlib.sha256(path.encode()).hexdigest()[:12]
+    test_schema = None if path is None else schema_for(path)
     eng = (create_engine(url, poolclass=NullPool) if test_schema
            else create_engine(url, pool_pre_ping=True, pool_size=10, max_overflow=60))
 
@@ -317,6 +326,34 @@ def _sqlite_turn(path: str | None):
             fcntl.flock(f, fcntl.LOCK_UN)
 
 
+def seed_reference(sa_conn) -> None:
+    sa_conn.execute(schema.airports.insert(), reference.airport_rows())
+    sa_conn.execute(schema.airlines.insert(), reference.airline_rows())
+
+
+def create_fresh(sa_conn, cfg: Config) -> None:
+    schema.metadata.create_all(sa_conn)
+    seed_reference(sa_conn)
+    command.stamp(cfg, "head")
+
+
+SQUASHED = ("This database was last used by a version of Waypoint from before its database migrations were squashed into one, "
+            "so this version can't upgrade it. Upgrade to the last release before the squash first, start it once, and then "
+            "start this version.")
+
+
+def _refuse_squashed(sa_conn, cfg: Config) -> None:
+    version = sa_conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar()
+    scripts = ScriptDirectory.from_config(cfg)
+    try:
+        known = version is None or scripts.get_revision(version) is not None
+    except CommandError:
+        known = False
+    first = [b for b in scripts.get_bases() if b.isdigit()]
+    if not known and version.isdigit() and first and int(version) < int(first[0]):
+        raise RuntimeError(SQUASHED)
+
+
 def migrate(path: str | None = None) -> None:
     with _sqlite_turn(path), engine(path).connect() as sa_conn:
         sqlite = sa_conn.dialect.name == "sqlite"
@@ -333,7 +370,11 @@ def migrate(path: str | None = None) -> None:
             cfg = alembic_config(sa_conn)
             if tables and "alembic_version" not in tables:
                 raise RuntimeError("The database has tables but no migration history: it isn't one Waypoint made.")
-            command.upgrade(cfg, "head")
+            if tables:
+                _refuse_squashed(sa_conn, cfg)
+                command.upgrade(cfg, "head")
+            else:
+                create_fresh(sa_conn, cfg)
             if sqlite:
                 broken = sorted({r[0] for r in sa_conn.exec_driver_sql("PRAGMA foreign_key_check").fetchall()})
                 if broken:

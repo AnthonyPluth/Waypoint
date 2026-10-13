@@ -1,5 +1,7 @@
 import os
+import shutil
 import unittest
+from unittest import mock
 
 import sqlalchemy as sa
 from alembic.autogenerate import compare_metadata
@@ -9,12 +11,7 @@ from sqlalchemy import delete, insert, select
 
 from waypoint.storage import db, schema
 from waypoint.storage.models import Setting, User
-from tests.shared import database_path
-
-
-def json_list(raw):
-    import json
-    return json.loads(raw)
+from tests.shared import database_path, scratch_dir
 
 
 def drift(path):
@@ -30,6 +27,60 @@ def drift(path):
             and not (isinstance(d, list) and d[0][0] == "modify_nullable" and pk(d[0][2], d[0][3]))]
 
 
+def replay(path):
+    from alembic import command
+    with db.engine(path).begin() as c:
+        command.upgrade(db.alembic_config(c), "head")
+
+
+def shape(path):
+    with db.engine(path).connect() as c:
+        insp = sa.inspect(c)
+        out = {}
+        for table in sorted(insp.get_table_names()):
+            out[table] = dict(
+                columns=[(col["name"], str(col["type"]), col["nullable"], str(col["default"]), col.get("autoincrement"))
+                         for col in insp.get_columns(table)],
+                pk=insp.get_pk_constraint(table)["constrained_columns"],
+                fks=sorted((fk["name"], tuple(fk["constrained_columns"]), fk["referred_table"], tuple(fk["referred_columns"]),
+                            str(fk.get("options"))) for fk in insp.get_foreign_keys(table)),
+                uniques=sorted((u["name"], tuple(u["column_names"])) for u in insp.get_unique_constraints(table)),
+                indexes=sorted((i["name"], tuple(i["column_names"]), bool(i["unique"])) for i in insp.get_indexes(table)))
+        return out
+
+
+def rows_of(path, table):
+    with db.engine(path).connect() as c:
+        return sorted(tuple(r) for r in c.exec_driver_sql(f"SELECT * FROM {table}"))
+
+
+def with_next_migration(case, probe="9001"):
+    source = os.path.join(os.path.dirname(db.__file__), "migrations")
+    root = os.path.join(scratch_dir(case), "migrations")
+    os.makedirs(root)
+    for name in ("env.py", "script.py.mako"):
+        shutil.copy(os.path.join(source, name), root)
+    for name in ("airports.tsv.gz", "airlines.tsv.gz"):
+        shutil.copy(os.path.join(os.path.dirname(source), name), os.path.dirname(root))
+    shutil.copytree(os.path.join(source, "versions"), os.path.join(root, "versions"), ignore=shutil.ignore_patterns("__pycache__"))
+    head = ScriptDirectory.from_config(db.alembic_config()).get_current_head()
+    with open(os.path.join(root, "versions", f"{probe}_probe.py"), "w") as f:
+        f.write(f"import sqlalchemy as sa\nfrom alembic import op\n\nrevision = {probe!r}\ndown_revision = {head!r}\n"
+                "branch_labels = None\ndepends_on = None\n\n\ndef upgrade() -> None:\n"
+                "    op.add_column('settings', sa.Column('probe', sa.Text()))\n\n\ndef downgrade() -> None:\n"
+                "    op.drop_column('settings', 'probe')\n")
+    real = db.alembic_config
+
+    def config(connection=None):
+        cfg = real(connection)
+        cfg.set_main_option("script_location", root)
+        return cfg
+    patch = mock.patch.object(db, "alembic_config", config)
+    patch.start()
+    case.addCleanup(patch.stop)
+    return probe
+
+
 class MigrationTests(unittest.TestCase):
     def setUp(self):
         self.path = database_path(self, "m.db")
@@ -42,6 +93,70 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(c.exec_driver_sql("SELECT version_num FROM alembic_version").scalar(), head)
         db.init(self.path)
         self.assertEqual(drift(self.path), [])
+
+    def test_a_new_database_is_made_in_one_step_and_equals_one_made_by_running_the_migrations(self):
+        made = database_path(self, "replayed.db")
+        replay(made)
+        db.init(self.path)
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual(shape(self.path), shape(made))
+        for table in ("airports", "airlines", "alembic_version"):
+            with self.subTest(table=table):
+                self.assertEqual(rows_of(self.path, table), rows_of(made, table))
+        self.assertGreater(len(rows_of(self.path, "airports")), 5000)
+        self.assertGreater(len(rows_of(self.path, "airlines")), 500)
+
+    def test_the_first_start_makes_the_schema_in_one_step_and_the_second_does_nothing_more(self):
+        from alembic import command
+        with mock.patch.object(command, "upgrade", wraps=command.upgrade) as upgrade, \
+                mock.patch.object(schema.metadata, "create_all", wraps=schema.metadata.create_all) as create_all:
+            db.init(self.path)
+            self.assertEqual((create_all.call_count, upgrade.call_count), (1, 0))
+            head = ScriptDirectory.from_config(db.alembic_config()).get_current_head()
+            self.assertEqual(rows_of(self.path, "alembic_version"), [(head,)])
+            with db.session(self.path) as conn:
+                conn.execute(insert(User).values(sub="s1", email="ana@example.com"))
+            before = shape(self.path)
+            db.init(self.path)
+            self.assertEqual(create_all.call_count, 1)
+            self.assertEqual(shape(self.path), before)
+            self.assertEqual(rows_of(self.path, "alembic_version"), [(head,)])
+            self.assertEqual([r[0] for r in rows_of(self.path, "users")], ["s1"])
+
+    def test_a_database_the_migrations_made_starts_with_nothing_to_do_and_keeps_its_rows(self):
+        from alembic import command
+        replay(self.path)
+        with db.session(self.path) as conn:
+            conn.execute(insert(User).values(sub="s1", email="ana@example.com"))
+            conn.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
+        head = ScriptDirectory.from_config(db.alembic_config()).get_current_head()
+        before = (shape(self.path), rows_of(self.path, "users"), rows_of(self.path, "trips"), rows_of(self.path, "airports"))
+        with mock.patch.object(schema.metadata, "create_all") as create_all, \
+                mock.patch.object(command, "upgrade", wraps=command.upgrade) as upgrade:
+            db.init(self.path)
+        create_all.assert_not_called()
+        self.assertEqual(upgrade.call_count, 1)
+        self.assertEqual((shape(self.path), rows_of(self.path, "users"), rows_of(self.path, "trips"), rows_of(self.path, "airports")), before)
+        self.assertEqual(rows_of(self.path, "alembic_version"), [(head,)])
+        self.assertEqual(drift(self.path), [])
+
+    def test_a_migration_added_later_upgrades_a_database_of_either_kind(self):
+        fresh, replayed = database_path(self, "fresh.db"), database_path(self, "replayed.db")
+        db.init(fresh)
+        replay(replayed)
+        for path in (fresh, replayed):
+            with db.session(path) as conn:
+                conn.execute(insert(Setting).values(key="kept", value="yes"))
+        probe = with_next_migration(self)
+        for path in (fresh, replayed):
+            with self.subTest(path=os.path.basename(path)):
+                db.init(path)
+                with db.engine(path).connect() as c:
+                    self.assertIn("probe", {col["name"] for col in sa.inspect(c).get_columns("settings")})
+                self.assertEqual(rows_of(path, "alembic_version"), [(probe,)])
+                self.assertEqual([r[:2] for r in rows_of(path, "settings")], [("kept", "yes")])
+                db.init(path)
+                self.assertEqual(rows_of(path, "alembic_version"), [(probe,)])
 
     def test_every_migration_goes_down_and_up_again(self):
         from alembic import command
@@ -63,380 +178,32 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "isn't one Waypoint made"):
             db.migrate(self.path)
 
-    def test_0001_makes_the_sign_in_and_settings_tables_and_takes_them_away(self):
-        from alembic import command
+    def test_a_database_last_used_before_the_squash_is_refused_with_a_plain_message_and_left_as_it_was(self):
         db.init(self.path)
         with db.session(self.path) as conn:
             conn.execute(insert(User).values(sub="s1", email="ana@example.com"))
+        for old in ("0001", "0033"):
+            with db.engine(self.path).begin() as c:
+                c.exec_driver_sql(f"UPDATE alembic_version SET version_num = '{old}'")
+            before = (shape(self.path), rows_of(self.path, "users"))
+            with self.subTest(revision=old):
+                with self.assertRaisesRegex(RuntimeError, "before its database migrations were squashed into one") as raised:
+                    db.migrate(self.path)
+                self.assertIn("last release before the squash", str(raised.exception))
+                self.assertNotIn("Can't locate", str(raised.exception))
+                self.assertEqual((shape(self.path), rows_of(self.path, "users")), before)
+                self.assertEqual(rows_of(self.path, "alembic_version"), [(old,)])
+
+    def test_0034_is_the_baseline_that_makes_every_table_and_the_reference_rows_and_takes_them_away(self):
+        from alembic import command
+        replay(self.path)
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual({name for name in shape(self.path)} - {"alembic_version"}, set(schema.metadata.tables))
+        self.assertGreater(len(rows_of(self.path, "airports")), 5000)
+        self.assertGreater(len(rows_of(self.path, "airlines")), 500)
         with db.engine(self.path).begin() as c:
             command.downgrade(db.alembic_config(c), "base")
-            left = set(sa.inspect(c).get_table_names()) - {"alembic_version"}
-        self.assertEqual(left, set())
-        db.migrate(self.path)
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            self.assertEqual(conn.execute(select(User.sub)).scalars(), [])
-
-    def test_0002_makes_the_mailbox_tables_and_takes_them_away(self):
-        from alembic import command
-        from sqlalchemy.exc import IntegrityError
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0001")
-            self.assertNotIn("mailboxes", sa.inspect(c).get_table_names())
-            command.upgrade(db.alembic_config(c), "0002")
-            tables = sa.inspect(c)
-            self.assertEqual([col["name"] for col in tables.get_columns("mailboxes")],
-                             ["id", "owner_sub", "address", "token", "history_id", "last_scan", "status", "last_error", "created"])
-            self.assertEqual([col["name"] for col in tables.get_columns("mailbox_pending")], ["state", "owner_sub", "verifier", "created"])
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        row = dict(owner_sub="sub-1", address="ana@gmail.example", token="enc:v1:x", status="connected")
-        with db.session(self.path) as conn:
-            conn.execute(sa.insert(schema.mailboxes).values(row))
-            conn.execute(sa.insert(schema.mailboxes).values({**row, "owner_sub": "sub-2"}))
-        with self.assertRaises(IntegrityError), db.session(self.path) as conn:
-            conn.execute(sa.insert(schema.mailboxes).values(row))
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0001")
-            self.assertEqual(set(sa.inspect(c).get_table_names()) - {"alembic_version"}, {"auth_pending", "auth_sessions", "users", "settings"})
-        db.migrate(self.path)
-        self.assertEqual(drift(self.path), [])
-
-    def test_0003_makes_people_from_the_users_who_signed_in_and_takes_them_away(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0002")
-            self.assertNotIn("people", sa.inspect(c).get_table_names())
-            c.execute(insert(User), [
-                {"sub": "b", "email": "bo@example.com", "name": "Bo Example", "first_name": "Bo"},
-                {"sub": "a", "email": "ana@example.com", "name": None, "first_name": "Ana"},
-                {"sub": "c", "email": None, "name": " ", "first_name": None}])
-            command.upgrade(db.alembic_config(c), "0003")
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            made = [tuple(r) for r in conn.execute(select(schema.people.c.display_name, schema.people.c.first_name,
-                                                          schema.people.c.user_sub).order_by(schema.people.c.user_sub))]
-            self.assertEqual(made, [("ana@example.com", "Ana", "a"), ("Bo Example", "Bo", "b"), ("c", None, "c")])
-            with self.assertRaises(sa.exc.IntegrityError):
-                conn.execute(insert(schema.people).values(display_name="Again", user_sub="a"))
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0002")
-            self.assertNotIn("people", sa.inspect(c).get_table_names())
-            self.assertEqual(c.execute(select(User.sub)).scalars().all().__len__(), 3)
-
-    def test_0004_makes_the_loyalty_table_and_takes_it_away(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0003")
-            self.assertNotIn("loyalty_ids", sa.inspect(c).get_table_names())
-            command.upgrade(db.alembic_config(c), "0004")
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            conn.execute(insert(schema.people).values(id=7, display_name="Mia"))
-            row = dict(person_id=7, kind="airline", program="Other", number="enc:v1:x")
-            conn.execute(insert(schema.loyalty_ids).values(**row))
-            with self.assertRaises(sa.exc.IntegrityError):
-                conn.execute(insert(schema.loyalty_ids).values(**{**row, "person_id": 8}))
-        with db.session(self.path) as conn:
-            conn.execute(sa.delete(schema.people).where(schema.people.c.id == 7))
-            self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.loyalty_ids)).scalar(), 0)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0003")
-            self.assertNotIn("loyalty_ids", sa.inspect(c).get_table_names())
-            self.assertIn("people", sa.inspect(c).get_table_names())
-
-    def test_0005_makes_trips_with_the_airports_and_takes_them_away(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0004")
-            self.assertEqual(set(sa.inspect(c).get_table_names()) & {"airports", "trips", "segments", "segment_travelers"}, set())
-            c.execute(insert(schema.people).values(id=1, display_name="Jane Doe"))
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            zones = dict(conn.execute(select(schema.airports.c.code, schema.airports.c.zone)
-                                      .where(schema.airports.c.code.in_(["AKL", "LAX", "LHR"]))).fetchall())
-            self.assertEqual(zones, {"AKL": "Pacific/Auckland", "LAX": "America/Los_Angeles", "LHR": "Europe/London"})
-            self.assertGreater(conn.execute(sa.select(sa.func.count()).select_from(schema.airports)).scalar(), 5000)
-            conn.execute(insert(schema.trips).values(id=1, name="Spring", auto=True, booked_by=1))
-            conn.execute(insert(schema.segments).values(
-                id=1, trip_id=1, kind="flight", status="confirmed", start_local="2026-03-01T22:15:00",
-                start_zone="Pacific/Auckland", end_local="2026-03-01T15:10:00", end_zone="America/Los_Angeles",
-                source="manual", booked_by=1))
-            conn.execute(insert(schema.segment_travelers).values(segment_id=1, person_id=1))
-            conn.execute(insert(schema.segment_travelers).values(segment_id=1, name="DOE/GUEST MR"))
-            conn.execute(sa.delete(schema.people).where(schema.people.c.id == 1))
-            self.assertEqual(conn.execute(select(schema.trips.c.booked_by)).scalar(), None)
-            self.assertEqual(conn.execute(select(schema.segments.c.booked_by)).scalar(), None)
-            self.assertEqual(conn.execute(select(schema.segment_travelers.c.name)).scalars(), ["DOE/GUEST MR"])
-            conn.execute(sa.delete(schema.trips))
-            self.assertEqual(conn.execute(sa.select(sa.func.count()).select_from(schema.segments)).scalar(), 0)
-            self.assertEqual(conn.execute(sa.select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 0)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0004")
-            self.assertEqual(set(sa.inspect(c).get_table_names()) & {"airports", "trips", "segments", "segment_travelers"}, set())
-            self.assertIn("people", sa.inspect(c).get_table_names())
-            self.assertIn("loyalty_ids", sa.inspect(c).get_table_names())
-
-    def test_0006_makes_the_flight_status_cache_and_takes_it_away(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0005")
-            self.assertNotIn("flight_status", sa.inspect(c).get_table_names())
-            self.assertIn("trips", sa.inspect(c).get_table_names())
-            command.upgrade(db.alembic_config(c), "0006")
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            row = dict(flight_number="EX101", date="2026-11-20", state="delayed", fetched_at=1.0)
-            conn.execute(insert(schema.flight_status).values(**row))
-            conn.execute(insert(schema.flight_status).values(**{**row, "date": "2026-11-21"}))
-        for values in (row,
-                       dict(flight_number="EX9", date="2026-11-20", state="landed")):
-            with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:
-                conn.execute(insert(schema.flight_status).values(**values))
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0005")
-            self.assertNotIn("flight_status", sa.inspect(c).get_table_names())
-            self.assertIn("trips", sa.inspect(c).get_table_names())
-
-    def test_0007_makes_the_scan_tables_and_takes_them_away(self):
-        from alembic import command
-        db.init(self.path)
-        scan_tables = {"scanned_messages", "review_items", "ignored_senders"}
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0006")
-            self.assertEqual(set(sa.inspect(c).get_table_names()) & scan_tables, set())
-            self.assertNotIn("scan_error", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
-            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="enc:v1:x", status="connected"))
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            self.assertIsNone(conn.execute(select(schema.mailboxes.c.scan_error)).scalar())
-            conn.execute(insert(schema.scanned_messages).values(mailbox_id=1, message_id="m1", outcome="booking", scanned=1.0))
-            conn.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m2", sender_domain="air.example",
-                                                            reason="no_markup", created=1.0))
-            conn.execute(insert(schema.ignored_senders).values(mailbox_id=1, domain="air.example"))
-        with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:
-            conn.execute(insert(schema.scanned_messages).values(mailbox_id=1, message_id="m1", outcome="booking", scanned=2.0))
-        with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:
-            conn.execute(insert(schema.review_items).values(mailbox_id=9, message_id="m3", sender_domain="x.example",
-                                                            reason="no_markup", created=1.0))
-        with db.session(self.path) as conn:
-            conn.execute(sa.delete(schema.mailboxes))
-            for t in (schema.scanned_messages, schema.review_items, schema.ignored_senders):
-                self.assertEqual(conn.execute(select(sa.func.count()).select_from(t)).scalar(), 0)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0006")
-            self.assertEqual(set(sa.inspect(c).get_table_names()) & scan_tables, set())
-            self.assertNotIn("scan_error", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
-            self.assertIn("mailboxes", sa.inspect(c).get_table_names())
-
-    def test_0008_makes_the_reminder_and_feed_tables_and_takes_them_away(self):
-        from alembic import command
-        db.init(self.path)
-        tables = {"push_devices", "reminder_prefs", "reminders_sent", "calendar_feeds"}
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0007")
-            self.assertEqual(set(sa.inspect(c).get_table_names()) & tables, set())
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            conn.execute(insert(schema.push_devices).values(owner_sub="u", endpoint="https://push.example.com/a", p256dh="k",
-                                                            auth="a", created=1.0))
-            conn.execute(insert(schema.reminder_prefs).values(owner_sub="u", check_in=True, day_of=False))
-            conn.execute(insert(schema.reminders_sent).values(owner_sub="u", kind="check_in", ref="1@2026-11-20T19:00", sent=1.0))
-            conn.execute(insert(schema.calendar_feeds).values(owner_sub="u", key_hash="h1", created=1.0))
-        for table, values in ((schema.push_devices, dict(owner_sub="v", endpoint="https://push.example.com/a", p256dh="k", auth="a", created=2.0)),
-                              (schema.reminder_prefs, dict(owner_sub="u", check_in=True, day_of=True)),
-                              (schema.reminders_sent, dict(owner_sub="u", kind="check_in", ref="1@2026-11-20T19:00", sent=2.0)),
-                              (schema.calendar_feeds, dict(owner_sub="u", key_hash="h2", created=2.0)),
-                              (schema.calendar_feeds, dict(owner_sub="w", key_hash="h1", created=2.0))):
-            with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:
-                conn.execute(insert(table).values(**values))
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0007")
-            self.assertEqual(set(sa.inspect(c).get_table_names()) & tables, set())
-            self.assertIn("scanned_messages", sa.inspect(c).get_table_names())
-
-    def test_0009_adds_the_ai_suggestion_columns_and_takes_them_away(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0008")
-            self.assertNotIn("suggestion", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
-            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="enc:v1:x", status="connected"))
-            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m1", sender_domain="air.example",
-                                                         reason="no_markup", created=1.0))
-            command.upgrade(db.alembic_config(c), "0009")
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            row = conn.execute(select(schema.review_items.c.suggestion, schema.review_items.c.suggestion_error)).fetchone()
-            self.assertEqual((row[0], row[1]), (None, None))
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0008")
-            names = {col["name"] for col in sa.inspect(c).get_columns("review_items")}
-            self.assertNotIn("suggestion", names)
-            self.assertNotIn("suggestion_error", names)
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)
-
-    def test_0010_seeds_the_airlines_and_takes_them_away(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0009")
-            self.assertNotIn("airlines", sa.inspect(c).get_table_names())
-            command.upgrade(db.alembic_config(c), "0010")
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            a = schema.airlines.c
-            found = {code: (name, icao, country) for code, name, icao, country in conn.execute(select(a.code, a.name, a.icao, a.country)).fetchall()}
-            self.assertEqual(found["NZ"], ("Air New Zealand", "ANZ", "New Zealand"))
-            self.assertGreater(len(found), 900)
-        with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:
-            conn.execute(insert(schema.airlines).values(code="NZ", name="Another"))
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0009")
-            self.assertNotIn("airlines", sa.inspect(c).get_table_names())
-            self.assertIn("scanned_messages", sa.inspect(c).get_table_names())
-
-    def test_0012_makes_the_recipients_table_and_merges_the_duplicate_segments(self):
-        from alembic import command
-        db.init(self.path)
-        seg = dict(kind="flight", status="confirmed", provider="American Airlines", start_zone="America/New_York",
-                   end_zone="Europe/London", origin="JFK", destination="LHR", source="email", locked_fields=None, manage_url=None)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0011")
-            self.assertNotIn("segment_recipients", sa.inspect(c).get_table_names())
-            for i, name in ((1, "Jane"), (2, "Sam"), (3, "Mia")):
-                c.execute(insert(schema.people).values(id=i, display_name=name))
-            for i, booker in ((1, 1), (2, 2)):
-                c.execute(insert(schema.trips).values(id=i, name=f"Trip {i}", auto=True, booked_by=booker))
-            c.execute(insert(schema.segments), [
-                {**seg, "id": 1, "trip_id": 1, "booked_by": 1, "confirmation": "ZQ4PXD", "start_local": "2026-06-01T19:00",
-                 "end_local": "2026-06-02T07:10", "details": '{"flight_number": "AA 4001", "seat": "12A"}', "locked_fields": '["seat"]'},
-                {**seg, "id": 2, "trip_id": 2, "booked_by": 2, "confirmation": "zq4pxd ", "provider": "American Airlines Inc.",
-                 "start_local": "2026-06-01T19:00", "end_local": "2026-06-02T07:10", "status": "cancelled",
-                 "details": '{"flight_number": "AA04001", "seat": "30D"}', "locked_fields": '["manage_url", "seat"]',
-                 "manage_url": "https://example.com/manage/mine"},
-                {**seg, "id": 3, "trip_id": 1, "booked_by": 1, "confirmation": "ZQ4PXD", "start_local": "2026-06-01T19:00",
-                 "end_local": "2026-06-02T07:10", "details": '{"flight_number": "AA 4001"}'},
-                {**seg, "id": 4, "trip_id": 1, "booked_by": 1, "confirmation": "QW9ERT", "start_local": "2026-06-01T19:00",
-                 "end_local": "2026-06-02T07:10", "details": '{"flight_number": "AA 4001"}'},
-                {**seg, "id": 5, "trip_id": 1, "booked_by": 1, "confirmation": "ZQ4PXD", "start_local": "2026-06-01T19:00",
-                 "end_local": "2026-06-02T07:10", "details": '{"flight_number": "AA 4002"}'},
-                {**seg, "id": 6, "trip_id": 1, "booked_by": 1, "confirmation": None, "start_local": "2026-06-01T19:00",
-                 "end_local": "2026-06-02T07:10", "details": '{"flight_number": "AA 4001"}'}])
-            c.execute(insert(schema.segment_travelers), [
-                {"segment_id": 1, "person_id": 1, "name": None}, {"segment_id": 2, "person_id": 1, "name": None}, {"segment_id": 2, "person_id": 3, "name": None},
-                {"segment_id": 2, "person_id": None, "name": "ROE/ALEX MR"}, {"segment_id": 3, "person_id": None, "name": "Roe/Alex Mr"},
-                {"segment_id": 1, "person_id": None, "name": "roe/alex mr"}])
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            kept = {r["id"]: r for r in db.rows(conn.execute(select(schema.segments).order_by(schema.segments.c.id)))}
-            self.assertEqual(set(kept), {1, 4, 5, 6})
-            one = kept[1]
-            self.assertEqual((one["trip_id"], one["booked_by"], one["provider"], one["status"]), (1, 1, "American Airlines", "cancelled"))
-            self.assertEqual(one["details"], '{"flight_number": "AA 4001", "seat": "12A"}')
-            self.assertEqual(json_list(one["locked_fields"]), ["manage_url", "seat"])
-            self.assertEqual(one["manage_url"], "https://example.com/manage/mine")
-            travelers = db.rows(conn.execute(select(schema.segment_travelers).order_by(schema.segment_travelers.c.id)))
-            on = sorted((t["person_id"] or 0, (t["name"] or "").casefold()) for t in travelers if t["segment_id"] == 1)
-            self.assertEqual(on, [(0, "roe/alex mr"), (1, ""), (3, "")])
-            self.assertEqual([t for t in travelers if t["segment_id"] in (2, 3)], [])
-            self.assertEqual([t["id"] for t in db.rows(conn.execute(select(schema.trips)))], [1])
-            self.assertEqual([(r["segment_id"], r["person_id"]) for r in db.rows(conn.execute(select(schema.segment_recipients)))], [(1, 2)])
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0011")
-            self.assertNotIn("segment_recipients", sa.inspect(c).get_table_names())
-            command.upgrade(db.alembic_config(c), "head")
-        with db.session(self.path) as conn:
-            self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.segment_recipients)).scalar(), 0)
-            self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 4)
-        with self.assertRaises(sa.exc.IntegrityError), db.session(self.path) as conn:
-            conn.execute(insert(schema.segment_recipients).values(segment_id=1, person_id=2))
-            conn.execute(insert(schema.segment_recipients).values(segment_id=1, person_id=2))
-
-    def test_0011_adds_the_check_times_flag_to_segments_and_takes_it_away(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0010")
-            self.assertNotIn("check_times", {col["name"] for col in sa.inspect(c).get_columns("segments")})
-            c.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
-            c.execute(insert(schema.segments).values(trip_id=1, kind="flight", status="confirmed", start_local="2026-12-04T09:00",
-                                                     start_zone="America/Chicago", end_local="2026-12-04T11:10", end_zone="America/Denver",
-                                                     origin="ORD", destination="DEN", source="email"))
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            self.assertEqual(conn.execute(select(schema.segments.c.check_times)).scalar(), False)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0010")
-            self.assertNotIn("check_times", {col["name"] for col in sa.inspect(c).get_columns("segments")})
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 1)
-
-    def test_0013_adds_the_claim_columns_to_people_and_takes_them_away(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0012")
-            self.assertNotIn("links", {col["name"] for col in sa.inspect(c).get_columns("people")})
-            c.execute(insert(schema.people).values(display_name="Mia Doe"))
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            row = conn.execute(select(schema.people.c.links, schema.people.c.claim_dismissed)).fetchone()
-            self.assertEqual((row[0], row[1]), (None, None))
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0012")
-            names = {col["name"] for col in sa.inspect(c).get_columns("people")}
-            self.assertEqual(names & {"links", "claim_dismissed"}, set())
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.people)).scalar(), 1)
-
-    def test_0014_adds_the_assistant_tables_and_takes_them_away(self):
-        from alembic import command
-        tables = {"oauth_clients", "oauth_grants", "oauth_codes", "oauth_tokens", "oauth_consents"}
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            self.assertEqual(tables - set(sa.inspect(c).get_table_names()), set())
-            command.downgrade(db.alembic_config(c), "0013")
-            self.assertEqual(tables & set(sa.inspect(c).get_table_names()), set())
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            for table in tables:
-                self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.metadata.tables[table])).scalar(), 0)
-            self.assertIsNone(db.get_setting(conn, "mcp_allow_ids"))
-            self.assertIsNone(db.get_setting(conn, "mcp_allow_writes"))
-
-    def test_0015_adds_the_ports_table_and_takes_it_away(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            self.assertIn("segment_ports", sa.inspect(c).get_table_names())
-            command.downgrade(db.alembic_config(c), "0014")
-            self.assertNotIn("segment_ports", sa.inspect(c).get_table_names())
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-
-    def test_0016_adds_the_brand_logos_table_and_takes_it_away(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            self.assertIn("brand_logos", sa.inspect(c).get_table_names())
-            command.downgrade(db.alembic_config(c), "0015")
-            self.assertNotIn("brand_logos", sa.inspect(c).get_table_names())
+            self.assertEqual(set(sa.inspect(c).get_table_names()) - {"alembic_version"}, set())
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
 
@@ -450,445 +217,6 @@ class MigrationTests(unittest.TestCase):
             conn.execute(insert(schema.segment_ports).values(segment_id=1, position=0, name="Nassau", zone="America/Nassau"))
             conn.execute(delete(schema.segments).where(schema.segments.c.id == 1))
             self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.segment_ports)).scalar(), 0)
-
-    def test_0017_adds_the_sharing_switch_to_mailboxes_off_and_takes_it_away_without_losing_a_review_item(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0016")
-            self.assertNotIn("share_review", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
-            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected"))
-            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m", sender_domain="x.example", reason="no_markup", created=1.0))
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            self.assertEqual(conn.execute(select(schema.mailboxes.c.share_review)).scalar(), False)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0016")
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)
-
-    def test_0018_adds_a_seat_to_each_traveller_empty_and_takes_it_away_keeping_the_travellers(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0017")
-            self.assertNotIn("seat", {col["name"] for col in sa.inspect(c).get_columns("segment_travelers")})
-            c.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
-            c.execute(insert(schema.segments).values(id=1, trip_id=1, kind="flight", status="confirmed", start_local="2026-03-01T10:00",
-                                                     start_zone="America/New_York", end_local="2026-03-01T12:00", end_zone="America/New_York", source="manual"))
-            c.execute(insert(schema.segment_travelers).values(segment_id=1, name="DOE/JANE MS"))
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            self.assertIsNone(conn.execute(select(schema.segment_travelers.c.seat)).scalar())
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0017")
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 1)
-
-    def test_0019_adds_where_a_logo_came_from_marks_the_ones_from_before_logodev_and_asks_again(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0018")
-            self.assertNotIn("source", {col["name"] for col in sa.inspect(c).get_columns("brand_logos")})
-            c.execute(insert(schema.brand_logos).values(key="harbour hotels", name="Harbour Hotels", logo=b"png", logo_type="image/png", checked="2026-10-01T00:00:00"))
-            c.execute(insert(schema.brand_logos).values(key="nowhere air", name="Nowhere Air", checked="2026-10-01T00:00:00"))
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            rows = {r[0]: r[1:] for r in conn.execute(select(schema.brand_logos.c.key, schema.brand_logos.c.source, schema.brand_logos.c.checked))}
-            self.assertEqual(rows, {"harbour hotels": ("logodev", None), "nowhere air": (None, None)})
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0018")
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.brand_logos)).scalar(), 2)
-
-    def test_0020_drops_the_tier_from_memberships_and_clears_an_expiry_that_an_airline_hotel_or_car_one_had(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0019")
-            self.assertIn("tier", {col["name"] for col in sa.inspect(c).get_columns("loyalty_ids")})
-            c.execute(insert(schema.people).values(id=1, display_name="Pat"))
-            old_loyalty_ids = sa.table("loyalty_ids", *(sa.column(n) for n in ("person_id", "kind", "program", "number", "tier", "expiry")))
-            for kind, program, expiry in (("airline", "Other", "2029-01-31"), ("hotel", "Other", "2029-01-31"), ("car", "Other", "2029-01-31"),
-                                          ("known_traveler", "Global Entry", "2029-03-31"), ("redress", "DHS TRIP", "2030-01-01")):
-                c.execute(insert(old_loyalty_ids).values(person_id=1, kind=kind, program=program, number="n", tier="Gold", expiry=expiry))
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertNotIn("tier", {col["name"] for col in sa.inspect(c).get_columns("loyalty_ids")})
-        self.assertEqual(drift(self.path), [])
-        with db.session(self.path) as conn:
-            got = dict(conn.execute(select(schema.loyalty_ids.c.kind, schema.loyalty_ids.c.expiry)).fetchall())
-            self.assertEqual(got, {"airline": None, "hotel": None, "car": None, "known_traveler": "2029-03-31", "redress": "2030-01-01"})
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0019")
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.loyalty_ids)).scalar(), 5)
-            command.upgrade(db.alembic_config(c), "head")
-
-    def test_0021_adds_the_tables_that_keep_messages_and_takes_them_away_leaving_everything_else(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            self.assertTrue({"stored_messages", "segment_messages"} <= set(sa.inspect(c).get_table_names()))
-            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected"))
-            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m", sender_domain="x.example", reason="no_markup", created=1.0))
-            command.downgrade(db.alembic_config(c), "0020")
-            self.assertFalse({"stored_messages", "segment_messages"} & set(sa.inspect(c).get_table_names()))
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-
-    def test_0022_adds_the_column_for_held_matches_and_takes_it_away_leaving_the_items(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            self.assertIn("matches", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
-            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected"))
-            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m", sender_domain="x.example", reason="match", created=1.0,
-                                                          matches='[{"booking": {}, "candidates": [1, 2]}]'))
-            command.downgrade(db.alembic_config(c), "0021")
-            self.assertNotIn("matches", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertIsNone(c.execute(select(schema.review_items.c.matches)).scalar())
-        self.assertEqual(drift(self.path), [])
-
-    def test_0023_adds_the_column_for_a_scans_counts_and_takes_it_away_leaving_the_mailboxes(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            self.assertIn("scan_summary", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
-            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected",
-                                                      scan_summary='{"found":1}'))
-            command.downgrade(db.alembic_config(c), "0022")
-            self.assertNotIn("scan_summary", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.mailboxes)).scalar(), 1)
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertIsNone(c.execute(select(schema.mailboxes.c.scan_summary)).scalar())
-        self.assertEqual(drift(self.path), [])
-
-    def test_0024_adds_the_picked_labels_and_the_trusted_senders_and_takes_them_away_leaving_the_mailboxes(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            self.assertIn("scan_labels", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
-            self.assertIn("trusted_senders", sa.inspect(c).get_table_names())
-            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected",
-                                                      scan_labels='["Label_1"]'))
-            c.execute(insert(schema.trusted_senders).values(mailbox_id=1, domain="seaside-stays.example"))
-            command.downgrade(db.alembic_config(c), "0023")
-            self.assertNotIn("scan_labels", {col["name"] for col in sa.inspect(c).get_columns("mailboxes")})
-            self.assertNotIn("trusted_senders", sa.inspect(c).get_table_names())
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.mailboxes)).scalar(), 1)
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertIsNone(c.execute(select(schema.mailboxes.c.scan_labels)).scalar())
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.trusted_senders)).scalar(), 0)
-        self.assertEqual(drift(self.path), [])
-
-    def test_0025_adds_the_sender_domain_to_the_seen_messages_and_takes_it_away_leaving_the_rows(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            self.assertIn("sender_domain", {col["name"] for col in sa.inspect(c).get_columns("scanned_messages")})
-            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected"))
-            c.execute(insert(schema.scanned_messages).values(mailbox_id=1, message_id="m1", outcome="ignored", scanned=1.0,
-                                                             sender_domain="seaside-stays.example"))
-            command.downgrade(db.alembic_config(c), "0024")
-            self.assertNotIn("sender_domain", {col["name"] for col in sa.inspect(c).get_columns("scanned_messages")})
-            self.assertEqual(c.execute(select(schema.scanned_messages.c.outcome)).scalars().all(), ["ignored"])
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertIsNone(c.execute(select(schema.scanned_messages.c.sender_domain)).scalar())
-        self.assertEqual(drift(self.path), [])
-
-    def test_0026_adds_the_gap_to_the_review_items_and_takes_it_away_leaving_the_rows(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            self.assertIn("gap", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
-            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected"))
-            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m1", sender_domain="seaside-stays.example",
-                                                         reason="incomplete", created=1.0, gap="no place"))
-            command.downgrade(db.alembic_config(c), "0025")
-            self.assertNotIn("gap", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
-            self.assertEqual(c.execute(select(schema.review_items.c.reason)).scalars().all(), ["incomplete"])
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertIsNone(c.execute(select(schema.review_items.c.gap)).scalar())
-        self.assertEqual(drift(self.path), [])
-
-    def test_0027_adds_the_reference_to_review_items_and_the_booking_to_seen_messages_and_takes_them_away_leaving_the_rows(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            self.assertIn("reference", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
-            self.assertIn("segment_id", {col["name"] for col in sa.inspect(c).get_columns("scanned_messages")})
-            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected"))
-            c.execute(insert(schema.trips).values(id=1, name="t", auto=True))
-            c.execute(insert(schema.segments).values(id=1, trip_id=1, kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="Europe/London",
-                                                     end_local="2026-11-02T10:00", end_zone="Europe/London", source="email"))
-            c.execute(insert(schema.review_items).values(mailbox_id=1, message_id="m1", sender_domain="example-stays.example", reason="no_markup",
-                                                         created=1.0, reference="abc"))
-            c.execute(insert(schema.scanned_messages).values(mailbox_id=1, message_id="m1", outcome="follow-up", scanned=1.0, segment_id=1))
-            c.execute(delete(schema.segments).where(schema.segments.c.id == 1))
-            self.assertIsNone(c.execute(select(schema.scanned_messages.c.segment_id)).scalar())
-            command.downgrade(db.alembic_config(c), "0026")
-            self.assertNotIn("reference", {col["name"] for col in sa.inspect(c).get_columns("review_items")})
-            self.assertNotIn("segment_id", {col["name"] for col in sa.inspect(c).get_columns("scanned_messages")})
-            self.assertEqual(c.execute(select(schema.review_items.c.message_id)).scalars().all(), ["m1"])
-            self.assertEqual(c.execute(select(schema.scanned_messages.c.outcome)).scalars().all(), ["follow-up"])
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertIsNone(c.execute(select(schema.review_items.c.reference)).scalar())
-        self.assertEqual(drift(self.path), [])
-
-    def test_0028_marks_the_destinations_a_person_wrote_and_leaves_the_ones_waypoint_made_automatic(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            self.assertIn("destination_manual", {col["name"] for col in sa.inspect(c).get_columns("trips")})
-            command.downgrade(db.alembic_config(c), "0027")
-            self.assertNotIn("destination_manual", {col["name"] for col in sa.inspect(c).get_columns("trips")})
-            made = {1: "Denver", 2: "Colorado & Texas", 3: None, 4: "", 5: "Paris", 6: "Harbour Hotel", 7: "Lake", 8: "Seattle, WA", 9: "Orlando"}
-            for trip_id, destination in made.items():
-                c.execute(insert(schema.trips).values(id=trip_id, name=f"trip {trip_id}", auto=trip_id != 7, destination=destination))
-
-            def add(seg_id, trip_id, kind, origin, destination):
-                c.execute(insert(schema.segments).values(
-                    id=seg_id, trip_id=trip_id, kind=kind, status="confirmed", origin=origin, destination=destination,
-                    start_local="2026-11-01T15:00", start_zone="Europe/London", end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual"))
-            add(1, 1, "flight", "JFK", "DEN")
-            add(2, 2, "flight", "JFK", "DEN")
-            add(3, 3, "flight", "JFK", "DEN")
-            add(4, 4, "flight", "JFK", "DEN")
-            add(5, 5, "hotel", "Hôtel du Parc", "Paris")
-            add(6, 6, "hotel", "Harbour Hotel", None)
-            add(8, 8, "flight", "JFK", "SEA")
-            add(9, 9, "flight", "JFK", "MCO")
-            add(10, 9, "flight", "MCO", "JFK")
-            add(11, 1, "flight", "DEN", "DFW")
-            command.upgrade(db.alembic_config(c), "head")
-            flags = dict(c.execute(select(schema.trips.c.id, schema.trips.c.destination_manual)).all())
-            self.assertEqual({k: bool(v) for k, v in flags.items()},
-                             {1: False, 2: True, 3: False, 4: False, 5: False, 6: False, 7: True, 8: True, 9: False})
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 10)
-            self.assertEqual(dict(c.execute(select(schema.trips.c.id, schema.trips.c.destination)).all()), {**made, 4: ""})
-            command.downgrade(db.alembic_config(c), "0027")
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 10)
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-
-    def test_0029_adds_coordinates_to_bookings_locates_the_existing_ones_offline_and_takes_them_away_leaving_the_rows(self):
-        from alembic import command
-        import json
-        db.init(self.path)
-        stay = dict(trip_id=1, kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="America/Denver",
-                    end_local="2026-11-02T10:00", end_zone="America/Denver", source="email")
-        with db.engine(self.path).begin() as c:
-            names = {col["name"] for col in sa.inspect(c).get_columns("segments")}
-            self.assertLessEqual({"latitude", "longitude", "geo_precision"}, names)
-            command.downgrade(db.alembic_config(c), "0028")
-            names = {col["name"] for col in sa.inspect(c).get_columns("segments")}
-            self.assertFalse({"latitude", "longitude", "geo_precision"} & names)
-            c.execute(insert(schema.trips).values(id=1, name="t", auto=True))
-            rows = [
-                dict(id=1, destination="Boulder", details=json.dumps({"address": "100 Pearl Street, Boulder, CO 80302"}), **stay),
-                dict(id=2, destination="Boulder", details=None, **stay),
-                dict(id=3, destination="Nowhereville", details="not json", **stay),
-                dict(id=4, destination="Nowhereville", details=json.dumps(["list"]), **stay),
-                dict(id=5, kind="car", origin="SFO airport", destination="SFO airport", **{k: v for k, v in stay.items() if k != "kind"}),
-                dict(id=6, kind="flight", origin="JFK", destination="LHR", **{k: v for k, v in stay.items() if k != "kind"}),
-            ]
-            c.execute(insert(schema.segments), [{"origin": None, "details": None, **r} for r in rows])
-            c.execute(insert(schema.segment_travelers).values(segment_id=1, name="A Traveller"))
-            command.upgrade(db.alembic_config(c), "head")
-            got = {r.id: (r.geo_precision, r.latitude, r.longitude) for r in c.execute(select(
-                schema.segments.c.id, schema.segments.c.geo_precision, schema.segments.c.latitude, schema.segments.c.longitude))}
-            self.assertEqual({k: v[0] for k, v in got.items()}, {1: "zip", 2: "city", 3: None, 4: None, 5: "airport", 6: None})
-            self.assertAlmostEqual(got[1][1], 40.0, delta=0.15)
-            self.assertAlmostEqual(got[2][1], 40.015, delta=0.05)
-            self.assertAlmostEqual(got[5][1], 37.62, delta=0.05)
-            self.assertEqual(got[3][1:], (None, None))
-            command.downgrade(db.alembic_config(c), "0028")
-            self.assertEqual(c.execute(select(schema.segments.c.id).order_by(schema.segments.c.id)).scalars().all(), [1, 2, 3, 4, 5, 6])
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 1)
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertEqual(c.execute(select(schema.segments.c.geo_precision).order_by(schema.segments.c.id)).scalars().all(),
-                             ["zip", "city", None, None, "airport", None])
-        self.assertEqual(drift(self.path), [])
-
-    def test_0029_locates_as_the_live_lookup_did_when_it_was_written(self):
-        import importlib
-        from waypoint.storage import geocode
-        frozen = importlib.import_module("waypoint.storage.migrations.versions.0029_segment_coordinates")
-        data = frozen._data()
-        cases = [("hotel", "Quay Inn", "Boulder", "100 Pearl Street, Boulder, CO 80302"), ("hotel", None, "Boulder", None),
-                 ("hotel", None, "Springfield", None), ("hotel", None, "Springfield, IL", None),
-                 ("hotel", None, "London", "10 High Street, London SW1A 1AA, UK"),
-                 ("hotel", None, "Toronto", "100 King Street West, Toronto, ON M5X 1A9"),
-                 ("hotel", None, None, "5 Rue de Exemple, 75001 Paris, France"), ("car", "SFO airport", None, None),
-                 ("car", "SFO", "SFO", None), ("train", "Boulder", "Denver", None), ("cruise", "Miami, FL", "Nassau", None),
-                 ("parking", "Lot A", None, "12345 Nowhere Rd, Madison, WI"), ("hotel", None, "Nowhereville", None),
-                 ("flight", "JFK", "LHR", None)]
-        for kind, origin, destination, address in cases:
-            with self.subTest(kind=kind, origin=origin, destination=destination, address=address):
-                live = geocode.locate(kind, origin, destination, address)
-                self.assertEqual(frozen._locate(data, kind, origin, destination, address),
-                                 None if live is None else (live.latitude, live.longitude, live.precision))
-
-    def test_0030_lists_each_trips_people_from_its_bookings_and_takes_the_table_and_flag_away_leaving_every_traveller(self):
-        from alembic import command
-        db.init(self.path)
-        stay = dict(kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="Europe/London",
-                    end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual")
-        with db.engine(self.path).begin() as c:
-            self.assertIn("trip_people", sa.inspect(c).get_table_names())
-            self.assertIn("travelers_from_trip", {col["name"] for col in sa.inspect(c).get_columns("segments")})
-            command.downgrade(db.alembic_config(c), "0029")
-            self.assertNotIn("trip_people", sa.inspect(c).get_table_names())
-            self.assertNotIn("travelers_from_trip", {col["name"] for col in sa.inspect(c).get_columns("segments")})
-            for pid in (1, 2, 3, 4):
-                c.execute(insert(schema.people).values(id=pid, display_name=f"Person {pid}"))
-            for trip_id in (1, 2, 3, 4):
-                c.execute(insert(schema.trips).values(id=trip_id, name=f"trip {trip_id}", auto=False, booked_by=4 if trip_id == 4 else None))
-            c.execute(insert(schema.segments), [dict(id=1, trip_id=1, **stay), dict(id=2, trip_id=1, **stay),
-                                                dict(id=3, trip_id=1, **{**stay, "status": "cancelled"}), dict(id=4, trip_id=2, **stay),
-                                                dict(id=5, trip_id=3, **stay), dict(id=6, trip_id=4, **stay)])
-            c.execute(insert(schema.segment_travelers), [
-                dict(segment_id=1, person_id=2, name=None, seat="12A"), dict(segment_id=1, person_id=1, name=None, seat=None),
-                dict(segment_id=2, person_id=1, name=None, seat=None), dict(segment_id=2, person_id=None, name="PRINTED/NAME MR", seat=None),
-                dict(segment_id=3, person_id=3, name=None, seat=None), dict(segment_id=4, person_id=None, name="ONLY/PRINTED MS", seat=None),
-                dict(segment_id=6, person_id=2, name=None, seat=None)])
-            c.execute(insert(schema.segment_recipients).values(segment_id=5, person_id=4))
-            command.upgrade(db.alembic_config(c), "head")
-            listed = c.execute(select(schema.trip_people.c.trip_id, schema.trip_people.c.person_id)
-                               .order_by(schema.trip_people.c.trip_id, schema.trip_people.c.person_id)).all()
-            self.assertEqual([tuple(r) for r in listed], [(1, 1), (1, 2), (1, 3), (4, 2)])
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments).where(schema.segments.c.travelers_from_trip.is_(True))).scalar(), 0)
-            before = [tuple(r) for r in c.execute(select(schema.segment_travelers.c.segment_id, schema.segment_travelers.c.person_id,
-                                                         schema.segment_travelers.c.name, schema.segment_travelers.c.seat)
-                                                  .order_by(schema.segment_travelers.c.id))]
-            self.assertEqual(len(before), 7)
-            with self.assertRaises(sa.exc.IntegrityError), c.begin_nested():
-                c.execute(insert(schema.trip_people).values(trip_id=1, person_id=1))
-        with db.engine(self.path).begin() as c:
-            c.execute(sa.update(schema.segments).where(schema.segments.c.id == 4).values(travelers_from_trip=True))
-            c.execute(sa.delete(schema.segment_travelers).where(schema.segment_travelers.c.segment_id == 4))
-            c.execute(sa.update(schema.segments).where(schema.segments.c.id == 6).values(travelers_from_trip=True))
-            c.execute(sa.delete(schema.segment_travelers).where(schema.segment_travelers.c.segment_id == 6))
-            command.downgrade(db.alembic_config(c), "0029")
-            rows = [tuple(r) for r in c.execute(select(schema.segment_travelers.c.segment_id, schema.segment_travelers.c.person_id,
-                                                       schema.segment_travelers.c.name, schema.segment_travelers.c.seat)
-                                                .order_by(schema.segment_travelers.c.segment_id, schema.segment_travelers.c.id))]
-            self.assertEqual([r for r in rows if r[0] not in (4, 6)], sorted(
-                [r for r in before if r[0] not in (4, 6)], key=lambda r: r[0]))
-            self.assertEqual([r for r in rows if r[0] == 6], [(6, 2, None, None)])
-            self.assertEqual([r for r in rows if r[0] == 4], [])
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.trip_people)).scalar(), 4)
-        self.assertEqual(drift(self.path), [])
-
-    def test_0030_leaves_who_sees_which_trip_exactly_as_it_was(self):
-        from alembic import command
-        from waypoint.domain import visibility
-        db.init(self.path)
-        stay = dict(kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="Europe/London",
-                    end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual")
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0029")
-            for pid in (1, 2, 3):
-                c.execute(insert(schema.people).values(id=pid, display_name=f"Person {pid}"))
-            c.execute(insert(schema.trips), [dict(id=1, name="a", auto=False, booked_by=None), dict(id=2, name="b", auto=False, booked_by=3)])
-            c.execute(insert(schema.segments), [dict(id=1, trip_id=1, **stay), dict(id=2, trip_id=2, **stay)])
-            c.execute(insert(schema.segment_travelers), [dict(segment_id=1, person_id=1), dict(segment_id=1, person_id=2)])
-            c.execute(insert(schema.segment_recipients).values(segment_id=2, person_id=1))
-            command.upgrade(db.alembic_config(c), "head")
-        with db.session(self.path) as conn:
-            seen = {pid: [t.id for t in visibility.visible_trips(conn, visibility.Viewer(pid))] for pid in (1, 2, 3)}
-        self.assertEqual(seen, {1: [1, 2], 2: [1], 3: [2]})
-
-    def test_0031_adds_an_empty_cost_to_every_booking_and_takes_it_away_leaving_the_rows_and_their_travellers(self):
-        from alembic import command
-        db.init(self.path)
-        stay = dict(kind="hotel", status="confirmed", start_local="2026-11-01T15:00", start_zone="Europe/London",
-                    end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual")
-        columns = ("price_minor", "price_currency", "price_source")
-        with db.engine(self.path).begin() as c:
-            names = lambda: {col["name"] for col in sa.inspect(c).get_columns("segments")}
-            self.assertTrue(set(columns) <= names())
-            command.downgrade(db.alembic_config(c), "0030")
-            self.assertFalse(set(columns) & names())
-            c.execute(insert(schema.people).values(id=1, display_name="Person 1"))
-            c.execute(insert(schema.trips).values(id=1, name="trip", auto=False))
-            c.execute(insert(schema.segments), [dict(id=1, trip_id=1, **stay), dict(id=2, trip_id=1, **stay)])
-            c.execute(insert(schema.segment_travelers), [dict(segment_id=1, person_id=1), dict(segment_id=2, person_id=None, name="PRINTED/NAME MR")])
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertTrue(set(columns) <= names())
-            rows = c.execute(select(*(schema.segments.c[n] for n in columns)).order_by(schema.segments.c.id)).all()
-            self.assertEqual([tuple(r) for r in rows], [(None, None, None), (None, None, None)])
-            c.execute(sa.update(schema.segments).where(schema.segments.c.id == 1).values(price_minor=124000, price_currency="EUR", price_source="manual"))
-            command.downgrade(db.alembic_config(c), "0030")
-            self.assertFalse(set(columns) & names())
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segments)).scalar(), 2)
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segment_travelers)).scalar(), 2)
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-
-    def test_0032_adds_an_empty_done_time_to_every_trip_and_takes_it_away_leaving_the_trips(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            names = lambda: {col["name"] for col in sa.inspect(c).get_columns("trips")}
-            self.assertIn("done_at", names())
-            command.downgrade(db.alembic_config(c), "0031")
-            self.assertNotIn("done_at", names())
-            c.execute(insert(schema.trips), [dict(id=1, name="one", auto=False), dict(id=2, name="two", auto=True)])
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertIn("done_at", names())
-            self.assertEqual(c.execute(select(schema.trips.c.done_at).order_by(schema.trips.c.id)).scalars().all(), [None, None])
-            c.execute(sa.update(schema.trips).where(schema.trips.c.id == 1).values(done_at=1700000000.5))
-            command.downgrade(db.alembic_config(c), "0031")
-            self.assertNotIn("done_at", names())
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.trips)).scalar(), 2)
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-
-    def test_0034_adds_the_automatic_ai_state_to_review_items_and_takes_it_away_leaving_the_rows(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            names = lambda table: {col["name"] for col in sa.inspect(c).get_columns(table)}
-            self.assertLessEqual({"auto_state", "auto_tries"}, names("review_items"))
-            command.downgrade(db.alembic_config(c), "0033")
-            self.assertFalse({"auto_state", "auto_tries"} & names("review_items"))
-            c.execute(insert(schema.mailboxes), [dict(id=1, owner_sub="u", address="a@x.example", token="t", status="connected")])
-            c.execute(insert(schema.review_items), [dict(id=1, mailbox_id=1, message_id="m", sender_domain="x.example", reason="no_markup", created=1.0)])
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertEqual(c.execute(select(schema.review_items.c.auto_state, schema.review_items.c.auto_tries)).fetchone(), (None, 0))
-            c.execute(sa.update(schema.review_items).values(auto_state="waiting", auto_tries=2))
-            command.downgrade(db.alembic_config(c), "0033")
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.review_items)).scalar(), 1)
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
-
-    def test_0033_adds_the_table_of_gate_codes_empty_and_takes_it_away_leaving_the_bookings(self):
-        from alembic import command
-        db.init(self.path)
-        with db.engine(self.path).begin() as c:
-            has = lambda: sa.inspect(c).has_table("segment_codes")
-            self.assertTrue(has())
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segment_codes)).scalar(), 0)
-            command.downgrade(db.alembic_config(c), "0032")
-            self.assertFalse(has())
-            c.execute(insert(schema.trips), [dict(id=1, name="one", auto=True)])
-            c.execute(insert(schema.segments), [dict(id=1, trip_id=1, kind="parking", status="confirmed", start_local="2026-12-01T05:15", start_zone="UTC",
-                                                     end_local="2026-12-04T03:00", end_zone="UTC", source="email")])
-            command.upgrade(db.alembic_config(c), "head")
-            self.assertTrue(has())
-            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="u", address="a@gmail.example", token="t", status="connected", created=1.0))
-            c.execute(insert(schema.segment_codes).values(segment_id=1, mailbox_id=1, content=None, day="2026-10-16", created=1.0))
-            c.execute(sa.delete(schema.segments).where(schema.segments.c.id == 1))
-            self.assertEqual(c.execute(select(sa.func.count()).select_from(schema.segment_codes)).scalar(), 0)
-            command.downgrade(db.alembic_config(c), "0032")
-            self.assertFalse(has())
-            command.upgrade(db.alembic_config(c), "head")
-        self.assertEqual(drift(self.path), [])
 
     def test_a_grant_takes_its_codes_and_tokens_with_it_and_a_client_its_grants(self):
         db.init(self.path)

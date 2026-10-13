@@ -18,6 +18,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      timings:
+        description: Print each Postgres test's time, the slowest tests and classes, and the time spent making and dropping databases
+        type: boolean
+        default: false
 
 concurrency:
   group: docker-image-${{ github.ref }}
@@ -97,16 +102,6 @@ jobs:
         include:
           - {python: "3.14", database: sqlite}
           - {python: "3.14", database: postgres}
-    services:
-      postgres:                # used by the postgres run; the sqlite run ignores it
-        image: postgres:16
-        env:
-          POSTGRES_USER: waypoint
-          POSTGRES_PASSWORD: waypoint
-          POSTGRES_DB: waypoint
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
         with:
@@ -115,11 +110,42 @@ jobs:
         with:
           cache-name: ${{ matrix.database }}
           python-version: ${{ matrix.python }}
+      # A throwaway Postgres for the tests, not a service container: a service can't take server settings. The data
+      # directory is in memory and nothing is flushed to disk (fsync, synchronous_commit and full_page_writes off): a
+      # crash loses the database, which is fine for a database that lives for one test run. Never for the image, the
+      # Compose files or the docs' production setup. max_connections follows the number of test processes.
+      - name: Start Postgres (postgres)
+        if: matrix.database == 'postgres'
+        run: |
+          jobs="$(tools/test_jobs.sh)"
+          echo "TEST_JOBS=$jobs" >> "$GITHUB_ENV"
+          docker rm -f waypoint-test-pg || true
+          docker run -d --name waypoint-test-pg --shm-size=1g --tmpfs /var/lib/postgresql/data -p 5432:5432 \
+            -e POSTGRES_USER=waypoint -e POSTGRES_PASSWORD=waypoint -e POSTGRES_DB=waypoint postgres:16 \
+            -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c shared_buffers=512MB -c max_connections="$(( jobs * 30 + 100 ))"
+          for _ in $(seq 1 60); do
+            docker exec waypoint-test-pg pg_isready -h 127.0.0.1 -p 5432 -U waypoint -d waypoint && exit 0
+            sleep 1
+          done
+          docker logs waypoint-test-pg
+          exit 1
       - name: Run tests (postgres)
         if: matrix.database == 'postgres'
         env:
           DATABASE_URL: postgresql://waypoint:waypoint@localhost:5432/waypoint
-        run: poetry run unittest-parallel -t . -s tests -j 4
+          TIMINGS: ${{ inputs.timings }}
+          PYTHONPATH: .            # so unittest-parallel finds tests/timing_result.py
+        run: |
+          if [ "$TIMINGS" = true ]; then
+            export TIMINGS_DIR="$RUNNER_TEMP/timings"
+            poetry run unittest-parallel -t . -s tests -j "$TEST_JOBS" --result tests.timing_result.TimingResult || status=$?
+            poetry run python tools/test_timings.py "$TIMINGS_DIR" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit "${status:-0}"
+          fi
+          poetry run unittest-parallel -t . -s tests -j "$TEST_JOBS"
+      - name: Stop Postgres (postgres)
+        if: matrix.database == 'postgres' && always()
+        run: docker rm -f waypoint-test-pg
       # The SQLite run also measures how much of Waypoint the tests run: the table goes in the run's summary, and the
       # report goes to Codecov (the README's backend badge), along with each test's result (JUnit XML, from
       # tests/junit_result.py) for Codecov's test analytics.

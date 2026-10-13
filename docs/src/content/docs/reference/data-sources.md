@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-Waypoint ships with five reference lists. The airports and airlines are loaded into the database by its migrations; the places list, the interstates and the state lines are read from their files. They are the same for every Waypoint, and aren’t part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine).
+Waypoint ships with five reference lists. The airports and airlines are loaded into the database when it is created (by the baseline migration or, on a first start, directly); the places list, the interstates and the state lines are read from their files. They are the same for every Waypoint, and aren’t part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine).
 
 ## Airports
 

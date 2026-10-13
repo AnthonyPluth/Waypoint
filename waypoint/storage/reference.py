@@ -25,6 +25,16 @@ def _rows(name: str) -> list[list[str]]:
         return [line.rstrip("\n").split("\t") for line in f if line.strip()]
 
 
+def airport_rows() -> list[dict]:
+    return [{"code": c, "name": n, "city": city, "country": country, "zone": z, "latitude": float(lat), "longitude": float(lon)}
+            for c, n, city, country, z, lat, lon in _rows("airports.tsv.gz")]
+
+
+def airline_rows() -> list[dict]:
+    return [{"code": code, "icao": icao or None, "name": name, "country": country or None}
+            for code, icao, name, country in _rows("airlines.tsv.gz")]
+
+
 def place_key(name: str) -> str:
     plain = "".join(c for c in unicodedata.normalize("NFKD", name) if not unicodedata.combining(c))
     return " ".join(re.sub(r"[^a-z0-9]+", " ", plain.casefold()).split())
