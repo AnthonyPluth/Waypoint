@@ -217,7 +217,7 @@
           {#if d.program === "Other"}<span class="text-muted-foreground">Say which program in the notes.</span>{/if}</label>
         <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Number</span>
           <Input bind:value={d.number} required={d.id === null} maxlength={64} autocomplete="off" spellcheck={false} placeholder={d.id === null ? "" : `Leave empty to keep ${d.masked}`} /></label>
-        <p class="-mt-2 text-sm text-muted-foreground">Every signed-in household member can see this number once they choose Show and copy. It’s encrypted and stays hidden until someone asks.</p>
+        <p class="-mt-2 text-sm text-muted-foreground">Every signed-in household member can see this number once they ask to show it. It’s encrypted and stays hidden until someone asks.</p>
         {#if EXPIRES.includes(d.kind)}
           <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Expiry</span>
             <Input type="date" bind:value={d.expiry} autocomplete="off" /></label>
@@ -243,7 +243,7 @@
 {:else if people.length === 0}
   <p class="text-muted-foreground">Nobody yet. Household members appear here when they sign in; add a guest for someone who travels with you but has no login.</p>
 {:else}
-  <p class="mb-3 text-sm text-muted-foreground">Saved loyalty and Known Traveler numbers are visible to every signed-in household member. They stay hidden until someone chooses Show and copy.</p>
+  <p class="mb-3 text-sm text-muted-foreground">Saved loyalty and Known Traveler numbers are visible to every signed-in household member. They stay hidden until someone asks to show them.</p>
   <ul class="rows" aria-label="People">
     {#each people as p (p.id)}
       <li class="row items-start">
@@ -271,14 +271,12 @@
                   {@const reserve = group.items.some((x) => x.logo)}
                   <li class="flex items-start justify-between gap-x-3 text-sm">
                     <div class="min-w-0 flex-1">
-                      <p class="flex flex-wrap items-center gap-x-2">
+                      <p class="flex items-center gap-x-2">
                         <BrandLogo src={m.logo} size={20} monogram={reserve ? m.program : null} />
                         <span class="min-w-0 break-words font-medium">{m.program}</span>
                         {#if m.readable}
-                          <button type="button" class="-my-2 inline-flex min-h-11 max-w-full flex-wrap items-center gap-x-2 rounded-md px-1.5 focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
-                            aria-label={revealed[m.id] !== undefined ? `Hide ${m.program} number` : `Show and copy ${m.program} number`} onclick={() => toggle(m)}>
-                            <span class="font-mono">{revealed[m.id] ?? m.masked}</span>
-                            <span class="text-xs font-medium text-primary">{revealed[m.id] !== undefined ? "Hide" : "Show and copy"}</span></button>
+                          <button type="button" class="shrink-0 rounded-md px-1.5 py-0.5 phone:min-h-11 phone:-my-3 font-mono underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+                            aria-label={revealed[m.id] !== undefined ? `Hide ${m.program} number` : `Show and copy ${m.program} number`} onclick={() => toggle(m)}>{revealed[m.id] ?? m.masked}</button>
                         {:else}
                           <span class="text-muted-foreground">Can’t be read with this key: enter it again</span>
                         {/if}</p>

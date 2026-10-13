@@ -23,7 +23,7 @@ A person has one membership in each program: once one is saved, that program is 
 ## How the numbers are protected
 
 - A number is **encrypted** in the database, with the same key as Waypoint’s other secrets (`WAYPOINT_SECRET_KEY`).
-- The People page shows it **masked**, with only its last four characters. Choose **Show and copy** beside it to reveal it and copy it; the form says, before you save, that every signed-in household member can see saved numbers. The edit and remove buttons are separate, 44 × 44 px targets, so tapping a number never edits or deletes it. Revealing is its own request, so loading the page never carries your numbers.
+- The People page shows it **masked**, with only its last four characters. Choose **Show** to reveal it and **Copy** to copy it. The People page and the form say, before you save, that every signed-in household member can see saved numbers. Revealing is its own request, so loading the page never carries your numbers.
 - A program shows its company’s or agency’s logo beside its name when [brand logos](/Waypoint/start/logos/) are set up and that logo has been fetched; a program without one shows a small letter circle in its place when others of its kind have a logo, and otherwise it looks as it always did. Only the public company or agency name is ever asked of the logo service, never anything about you or your number.
 - Numbers are never written to the log, to reports or notifications, and never sent to an AI.
 - Waypoint keeps nothing in your browser: a number you revealed is gone when you leave the page.

@@ -154,12 +154,11 @@ describe("People", () => {
     expect(screen.queryByRole("button", { name: /This is me/ })).toBeNull();
   });
 
-  it("says who can see saved numbers before saving, and keeps the edit and remove buttons 44 px apart from the number", async () => {
+  it("says who can see saved numbers before saving, and reveals nothing until asked", async () => {
     render(People);
     expect(await screen.findByText(/visible to every signed-in household member/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit Jane Doe’s TSA PreCheck" }).className).toContain("size-11");
     expect(screen.getByRole("button", { name: "Remove Jane Doe’s TSA PreCheck" }).className).toContain("size-11");
-    expect(screen.getByRole("button", { name: "Show and copy TSA PreCheck number" })).toHaveTextContent("Show and copy");
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/reveal"), expect.anything());
     await userEvent.click(screen.getAllByRole("button", { name: /Add a loyalty or traveler number for Mia Doe/ })[0]);
     expect(await screen.findByText(/Every signed-in household member can see this number/)).toBeInTheDocument();
