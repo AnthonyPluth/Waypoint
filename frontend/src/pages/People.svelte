@@ -37,6 +37,7 @@
 
   type Draft = { id: number | null; member: boolean; display_name: string; first_name: string; legal_name: string; aliases: string };
   let draft = $state<Draft | null>(null);
+  let advancedOpen = $state(false);
   let formError = $state("");
   let saving = $state(false);
   let inSheet = $state(false);
@@ -46,12 +47,13 @@
   const personBase = baseline(() => draft);
   const personGuard = draftGuard({ dirty: () => draft !== null && personBase.changed(), saving: () => saving, discard: () => { draft = null; } });
   const startAdd = () => leave(() => {
-    inSheet = viewport.phone; draft = { id: null, member: false, display_name: "", first_name: "", legal_name: "", aliases: "" }; formError = "";
+    inSheet = viewport.phone; draft = { id: null, member: false, display_name: "", first_name: "", legal_name: "", aliases: "" }; advancedOpen = false; formError = "";
     personBase.reset();
   });
   const startEdit = (p: Person) => leave(() => {
     inSheet = viewport.phone;
     draft = { id: p.id, member: p.member, display_name: p.display_name, first_name: p.first_name ?? "", legal_name: p.legal_name ?? "", aliases: p.aliases.join("\n") };
+    advancedOpen = p.aliases.length > 0;
     formError = "";
     personBase.reset();
   });
@@ -174,17 +176,21 @@
   <form class="flex w-full flex-col gap-4" data-editor onsubmit={save} aria-labelledby={titled ? "person-form-title" : undefined} aria-label={titled ? undefined : personSheetTitle(d)}>
   <div class="flex w-full flex-col gap-4">
     {#if titled}<h2 id="person-form-title" class="font-medium">{personFormTitle(d)}</h2>{/if}
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name</span>
-      <Input bind:value={d.display_name} required maxlength={100} autocomplete="off" placeholder="How Waypoint shows them" /></label>
+    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Display name</span>
+      <Input bind:value={d.display_name} required maxlength={100} autocomplete="off" />
+      <span class="text-muted-foreground">How Waypoint shows them.</span></label>
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">First name</span>
       <Input bind:value={d.first_name} maxlength={100} autocomplete="off" /></label>
     <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Legal name</span>
       <Input bind:value={d.legal_name} maxlength={200} autocomplete="off" />
-      <span class="text-muted-foreground">As on their ID, for matching bookings.</span></label>
-    <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name aliases</span>
-      <textarea bind:value={d.aliases} rows="3" autocomplete="off" spellcheck="false" placeholder={"DOE/JANE MS"}
-        class="border-input bg-secondary placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"></textarea>
-      <span class="text-muted-foreground">How airlines print the name, one per line.</span></label>
+      <span class="text-muted-foreground">The name on their ID and bookings, used to match them.</span></label>
+    <details class="rounded-xl border border-input px-3 py-2 text-sm" bind:open={advancedOpen}>
+      <summary class="min-h-11 cursor-pointer py-2.5 font-medium focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none">Advanced matching</summary>
+      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Name aliases</span>
+        <textarea bind:value={d.aliases} rows="3" autocomplete="off" spellcheck="false" placeholder={"DOE/JANE MS"}
+          class="border-input bg-secondary placeholder:text-muted-foreground w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"></textarea>
+        <span class="text-muted-foreground">How airlines print the name, one per line.</span></label>
+    </details>
     {#if d.member}<p class="text-sm text-muted-foreground">They’re a household member: their link to their sign-in stays as it is.</p>{/if}
     {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
     <div class="flex flex-wrap gap-2">

@@ -31,9 +31,9 @@ Linking can’t be undone in Waypoint; restoring a [backup](/Waypoint/start/dock
 
 Each person has:
 
-- a **name** (how Waypoint shows them) and a **first name**;
-- a **legal name**, as it appears on their ID;
-- **name aliases**, the ways an airline prints their name on a booking, such as `DOE/JANE MS`. Add one per line; Waypoint will match bookings against them. When a name matches both a member and a guest, the booking goes to the member; when it matches two members, or two guests, Waypoint doesn’t guess and asks in Review.
+- a **display name** (how Waypoint shows them) and a **first name**;
+- a **legal name**, the name on their ID and bookings, used to match them;
+- **name aliases**, under **Advanced matching**: the ways an airline prints their name on a booking, such as `DOE/JANE MS`. Add one per line; Waypoint will match bookings against them. When a name matches both a member and a guest, the booking goes to the member; when it matches two members, or two guests, Waypoint doesn’t guess and asks in Review.
 
 ## In a backup
 
