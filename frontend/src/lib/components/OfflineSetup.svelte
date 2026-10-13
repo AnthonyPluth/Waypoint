@@ -33,8 +33,8 @@
   <div class="space-y-4">
     <ul class="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
       <li>The copy is locked on this device. Anyone who gets at a backup or a copy of the device’s stored data finds only scrambled text.</li>
-      <li>Saving never asks for {check}. Only opening the saved trip offline does.</li>
-      <li>Signing in to Waypoint works as before. The passkey this creates only unlocks the saved trip.</li>
+      <li>Saving never asks for {check}. Only opening the saved trips offline does.</li>
+      <li>Signing in to Waypoint works as before. The passkey this creates only unlocks the saved trips.</li>
     </ul>
     {#if !offline.supported}
       <Alert><AlertDescription>{offline.reason}</AlertDescription></Alert>

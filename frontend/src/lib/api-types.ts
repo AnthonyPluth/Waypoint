@@ -541,13 +541,17 @@ export interface MoveBody {
 }
 
 export interface Offline {
-  trip: Trip | null;
-  messages: OfflineMessages[];
+  trips: OfflineTrip[];
 }
 
 export interface OfflineMessages {
   segment_id: number;
   emails: StoredEmail[];
+}
+
+export interface OfflineTrip {
+  trip: Trip;
+  messages: OfflineMessages[];
 }
 
 export interface Ok {

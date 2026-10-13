@@ -71,7 +71,10 @@ export function installDevice(behaviour: Behaviour = {}) {
       files.set(url, bytes);
     },
   };
-  const cache2 = Object.assign(cache, { delete: async (url: string) => files.delete(url) });
+  const cache2 = Object.assign(cache, {
+    delete: async (url: string) => files.delete(url),
+    keys: async () => [...files.keys()].map((url) => ({ url: `https://waypoint.test${url}` })),
+  });
   const cacheStorage = {
     open: vi.fn(async () => cache2),
     delete: vi.fn(async () => { calls.deleted++; files.clear(); return true; }),

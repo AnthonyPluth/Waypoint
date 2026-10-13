@@ -177,7 +177,7 @@
         <ul class="mt-2 flex list-disc flex-col gap-1 pl-5 text-muted-foreground" aria-label="Setup checklist">
           <li><a class="underline underline-offset-2" href="#people">Add the people who travel with you</a></li>
           <li><a class="underline underline-offset-2" href="#trips?add=booking">Add your first booking</a></li>
-          <li><a class="underline underline-offset-2" href="#settings/offline">Save your current trip for offline use</a></li>
+          <li><a class="underline underline-offset-2" href="#settings/offline">Save your upcoming trips for offline use</a></li>
         </ul>
       </details>
     </div>
@@ -188,7 +188,7 @@
     {@const s = next.segment}
     {@const proof = s.kind === "flight" && flightStatus.list?.enabled ? flightEvidence(statusFor(s.id), now, typeof navigator === "undefined" || navigator.onLine !== false) : "scheduled"}
     {@const grounded = proof === "landed" || proof === "cancelled" || proof === "diverted"}
-    {@const eyebrow = next.state !== "now" ? "Next up" : s.kind !== "flight" ? "Under way" : grounded ? "Latest flight" : proof === "departed" ? "In the air" : proof === "delayed" ? "Delayed" : "In the air, by schedule"}
+    {@const eyebrow = next.state !== "now" ? "Next up" : s.kind !== "flight" ? "Under way" : grounded ? "Latest flight" : proof === "departed" ? "In the air" : proof === "delayed" ? "Delayed" : "Under way"}
     <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-6" condensed compact showApp={!(s.links.directions || s.links.call)} {eyebrow} pulse={next.state === "now" && !grounded}>
       {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
       {#snippet footer()}<span class="contents">

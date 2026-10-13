@@ -1,6 +1,8 @@
 import { onDenied } from "./api";
-import { clearSaved, dropIfExpired, resumeSaving, saveCurrentTrip, savedInfo, stopSaving, watchExpiry, whenExpired } from "./offline";
+import { clearSaved, dropExpired, resumeSaving, saveCurrentTrip, savedInfos, stopSaving, watchExpiry, whenExpired } from "./offline";
 import { isSavingOff, isSetUp, remove, setUp, support, VaultError } from "./offline-vault";
+
+export type KnownTrip = { id: number | null; name: string };
 
 export const offline = $state({
   checked: false,
@@ -13,13 +15,11 @@ export const offline = $state({
   reason: "",
   declined: false,
   failed: false,
-  tripId: null as number | null,
-  tripName: "",
+  trips: [] as KnownTrip[],
 });
 
-function forgetTrip(): void {
-  offline.tripId = null;
-  offline.tripName = "";
+function forgetTrips(): void {
+  offline.trips = [];
 }
 
 export async function refreshOffline(): Promise<void> {
@@ -29,28 +29,35 @@ export async function refreshOffline(): Promise<void> {
   try {
     offline.setUp = await isSetUp();
     offline.off = offline.setUp && (await isSavingOff());
-    let info = offline.setUp ? await savedInfo() : null;
-    if (await dropIfExpired(info)) info = null;
-    watchExpiry(info);
-    offline.hasCopy = info !== null;
-    offline.savedAt = info ? info.savedAt : null;
-    if (!info) forgetTrip();
+    let infos = offline.setUp ? await savedInfos() : [];
+    infos = await dropExpired(infos);
+    watchExpiry(infos);
+    offline.hasCopy = infos.length > 0;
+    offline.savedAt = infos.length ? Math.max(...infos.map((i) => i.savedAt)) : null;
+    if (infos.length === 0) forgetTrips();
+    else offline.trips = infos.map((i) => ({ id: i.tripId ?? null, name: offline.trips.find((t) => t.id === (i.tripId ?? null))?.name ?? "" }));
     offline.damaged = false;
   } catch {
     offline.setUp = false;
     offline.off = false;
     offline.hasCopy = false;
     offline.savedAt = null;
-    forgetTrip();
+    forgetTrips();
     offline.damaged = true;
   }
   offline.checked = true;
 }
 
-whenExpired(() => { offline.hasCopy = false; offline.savedAt = null; forgetTrip(); });
+function forgetCopy(): void {
+  offline.hasCopy = false;
+  offline.savedAt = null;
+  forgetTrips();
+}
+
+whenExpired(() => { void refreshOffline(); });
 
 export function clearOnDenied(): void {
-  onDenied(async () => { await clearSaved(); offline.hasCopy = false; offline.savedAt = null; forgetTrip(); });
+  onDenied(async () => { await clearSaved(); forgetCopy(); });
 }
 
 export async function turnOnOffline(): Promise<VaultError | null> {
@@ -69,7 +76,7 @@ export async function turnOnOffline(): Promise<VaultError | null> {
 export async function syncSavedTrip(): Promise<void> {
   try {
     const info = await saveCurrentTrip();
-    if (info) { offline.hasCopy = true; offline.savedAt = info.savedAt; offline.tripId = info.tripId; offline.tripName = info.tripName; offline.failed = false; }
+    if (info) { offline.hasCopy = true; offline.savedAt = info.savedAt; offline.trips = info.trips; offline.failed = false; }
     else { offline.failed = false; await refreshOffline(); }
   } catch {
     offline.failed = true;
@@ -83,10 +90,8 @@ export async function switchSaving(on: boolean): Promise<void> {
   if (on) { await resumeSaving(); offline.off = false; await syncSavedTrip(); return; }
   await stopSaving();
   offline.off = true;
-  offline.hasCopy = false;
-  offline.savedAt = null;
   offline.failed = false;
-  forgetTrip();
+  forgetCopy();
 }
 
 export async function removeOffline(): Promise<void> {

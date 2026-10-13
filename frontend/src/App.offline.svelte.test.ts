@@ -10,7 +10,7 @@ import { api } from "$lib/api";
 import { app } from "$lib/app.svelte";
 import { expiryOf, type SavedCopy } from "$lib/offline";
 import { offline } from "$lib/offline.svelte";
-import { lock, save, setUp } from "$lib/offline-vault";
+import { lock, save, saveAll, setUp } from "$lib/offline-vault";
 import { installDevice, type Device } from "./test/webauthn";
 import { segment, trip } from "./test/fixtures";
 import App from "./App.svelte";
@@ -26,6 +26,17 @@ const copyOf = (savedAt: number): SavedCopy => ({
   savedAt, trip: { ...trip([flight, hotel]), name: "Trip to London" },
   messages: [{ segment_id: 1, emails: [{ subject: "Your itinerary", sender_domain: "air.example", received: "2026-11-01", text: CANARY, html: `<p>${CANARY}</p>`, truncated: false, original: true, images: 0 }] }],
 });
+
+const several = (savedAt: number): SavedCopy[] => [
+  { ...copyOf(savedAt), trip: { ...copyOf(savedAt).trip, id: 1, name: "Trip to London", end_date: "2026-11-24" } },
+  { ...copyOf(savedAt), messages: [], trip: { ...trip([hotel]), id: 2, name: "Trip to Paris", start_date: "2026-11-27", end_date: "2026-11-30" } },
+  { ...copyOf(savedAt), messages: [], trip: { ...trip([hotel]), id: 3, name: "Trip to Rome", start_date: "2027-03-02", end_date: "2027-03-06" } },
+];
+
+async function saveSeveral(copies: SavedCopy[]) {
+  await setUp();
+  await saveAll(copies.map((c) => ({ value: c, info: { savedAt: c.savedAt, expiresAt: expiryOf(c), tripId: c.trip.id } })));
+}
 
 const go = async (hash: string) => { location.hash = hash; window.dispatchEvent(new HashChangeEvent("hashchange")); await Promise.resolve(); };
 
@@ -188,5 +199,58 @@ describe("opening the app with no connection", () => {
     render(App);
     expect(await screen.findByText("Can’t reach Waypoint")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Saved trip is locked" })).not.toBeInTheDocument();
+  });
+
+  describe("with several trips saved", () => {
+    it("unlocks them all at once and lets the person choose one, then go back", async () => {
+      await saveSeveral(several(Date.now() - 3_600_000));
+      render(App);
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Unlock" }));
+      expect(await screen.findByText("Trips saved on this device")).toBeInTheDocument();
+      for (const name of ["Trip to London", "Trip to Paris", "Trip to Rome"]) expect(screen.getByRole("button", { name })).toBeInTheDocument();
+      expect(screen.queryByText("QX7R2M")).not.toBeInTheDocument();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Trip to Rome" }));
+      expect(await screen.findByRole("heading", { name: "Trip to Rome" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "All saved trips" }));
+      expect(await screen.findByText("Trips saved on this device")).toBeInTheDocument();
+    });
+
+    it("opens the trip a page address names, and says so when that trip isn't one of the saved", async () => {
+      await saveSeveral(several(Date.now() - 3_600_000));
+      await go("#trip/2");
+      const first = render(App);
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Unlock" }));
+      expect(await screen.findByRole("heading", { name: "Trip to Paris" })).toBeInTheDocument();
+      first.unmount();
+      lock();
+      await go("#trip/9");
+      render(App);
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Unlock" }));
+      expect(await screen.findByText("This trip isn’t saved on this device")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Trip to Rome" })).toHaveAttribute("href", "#trip/3");
+      expect(screen.queryByRole("heading", { name: "Trip to Rome" })).not.toBeInTheDocument();
+    });
+
+    it("leaves out a trip whose copy has run out and shows the rest", async () => {
+      const copies = several(Date.now() - 6 * 86_400_000);
+      copies[0] = { ...copies[0], trip: { ...copies[0].trip, end_date: "2026-11-10" } };
+      await saveSeveral(copies);
+      render(App);
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Unlock" }));
+      expect(await screen.findByText("Trips saved on this device")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Trip to London" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Trip to Paris" })).toBeInTheDocument();
+    });
+
+    it("goes back to the unlock screen, with no trip showing, when the app locks", async () => {
+      await saveSeveral(several(Date.now() - 3_600_000));
+      render(App);
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Unlock" }));
+      await screen.findByText("Trips saved on this device");
+      window.dispatchEvent(new Event("pagehide"));
+      expect(await screen.findByRole("heading", { name: "Saved trip is locked" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Trip to Paris" })).not.toBeInTheDocument();
+    });
   });
 });
