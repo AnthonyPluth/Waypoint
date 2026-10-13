@@ -42,7 +42,7 @@
 <svelte:window onkeydown={onKeydown} onpointerdown={onPointerDown} />
 
 <div class="relative" onfocusout={onFocusOut}>
-  <Button bind:ref={button} variant="outline" {size} aria-label={label} aria-expanded={open} aria-controls={id} aria-haspopup="true" onclick={() => (open = !open)}><Ellipsis /> {text}</Button>
+  <Button bind:ref={button} variant="outline" {size} aria-label={label} aria-expanded={open} aria-controls={id} onclick={() => (open = !open)}><Ellipsis /> {text}</Button>
   {#if open}
     <div bind:this={menu} {id} role="group" aria-label={label} class={cn("absolute top-full z-20 mt-2 flex min-w-48 max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-border bg-surface-2 p-1.5 shadow-elevation-3", align === "right" ? "right-0" : "left-0")}>
       {#each items as item (item.label)}
