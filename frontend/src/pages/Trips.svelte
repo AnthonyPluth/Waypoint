@@ -42,7 +42,7 @@
   const when = $derived<TripWhen | null>(param("when") === "upcoming" || param("when") === "past" ? (param("when") as TripWhen) : null);
   const year = $derived(Number(param("year")) || null);
   const queryFor = (change: Record<string, string | number | null>) => {
-    const next = { who, q: text, when, year, trip: null as number | null, ...change };
+    const next = { who, q: text, when, year, trip: tripParam, ...change };
     const q = new URLSearchParams();
     for (const [key, value] of Object.entries(next)) if (value) q.set(key, String(value));
     return q.toString();

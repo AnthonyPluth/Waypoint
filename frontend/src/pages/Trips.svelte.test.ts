@@ -492,6 +492,18 @@ describe("finding a trip", () => {
     expect(screen.getByText("No trips match.")).toBeInTheDocument();
   });
 
+  it("keeps the open trip in the address while a filter still shows it, and falls back to the first result when it doesn’t", async () => {
+    route.query = "trip=2";
+    location.hash = "#trips?trip=2";
+    render(Trips);
+    await screen.findByText("3 trips");
+    await user().selectOptions(screen.getByLabelText("Year"), "2027");
+    expect(route.query).toBe("year=2027&trip=2");
+    await user().selectOptions(screen.getByLabelText("Show"), "Past");
+    expect(route.query).toBe("when=past&year=2027&trip=2");
+    expect(screen.getByText("No trips match.")).toBeInTheDocument();
+  });
+
   it("shows no filters before there is a trip to find", async () => {
     serve([]);
     render(Trips);
