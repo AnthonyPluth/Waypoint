@@ -1,0 +1,24 @@
+{
+  "name": "review-dismiss-confirm",
+  "page": "review",
+  "steps": [
+    {
+      "wait_for": "[data-testid='review-item']"
+    },
+    {
+      "click": "button[aria-label^='Dismiss']:visible >> nth=0"
+    },
+    {
+      "wait_for": "[role='dialog']"
+    },
+    {
+      "expect_text": {
+        "selector": "[role='dialog']",
+        "text": "can’t be undone"
+      }
+    },
+    {
+      "screenshot": "confirm"
+    }
+  ]
+}

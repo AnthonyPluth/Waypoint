@@ -111,6 +111,23 @@
       {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
       {#snippet footer()}<span class="flex flex-wrap gap-2"><GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm">Open {next.trip.name}</Button></span>{/snippet}
     </PassCard>
+    {#if next.alongside.length}
+      <section class="-mt-4 mb-8" aria-label="Also under way">
+        <p class="eyebrow mb-2">Also under way</p>
+        <ul class="rows">
+          {#each next.alongside as item (item.segment.id)}
+            {@const seg = item.segment}
+            <li class="row row-tap items-start">
+              <BrandLogo src={seg.logo} label={seg.logo_label} size={32} class="mt-0.5" />
+              <div class="min-w-0 flex-1">
+                <p class="break-words text-body font-medium"><a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`} onclick={(e) => openDetail(e, seg, item.bookings)}>{upcomingTitle(seg)}</a></p>
+                <p class="text-caption text-muted-foreground">{END_WORD[seg.kind]} <DayTime segment={seg} end dated /></p>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
   {:else}
     <p class="mb-8 text-muted-foreground">Nothing coming up: every trip you can see is over. <a class="underline" href="#trips">See your trips</a>.</p>
   {/if}

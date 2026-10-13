@@ -1,0 +1,22 @@
+{
+  "name": "import-flights-large",
+  "page": "settings",
+  "steps": [
+    { "goto": "#settings/travel" },
+    { "upload": { "selector": "[aria-labelledby=import-title] input[type=file]", "file": "tests/fixtures/flight_import/flighty_large.csv" } },
+    { "wait_for": "[data-testid=import-preview]" },
+    { "expect_text": { "selector": "[data-testid=import-preview]", "text": "227 new flights" } },
+    { "click": "[data-testid=import-preview] button:has-text('Problems only')" },
+    { "expect_text": { "selector": "[data-testid=import-rows]", "text": "doesn’t know the airport ZZZ" } },
+    { "scroll_to": "#import-title" },
+    { "screenshot": "problems" },
+    { "click": "[data-testid=import-preview] button:has-text('All (')" },
+    { "click": "[data-testid=import-preview] button:has-text('Next') >> nth=0" },
+    { "click": "[data-testid=import-preview] button:has-text('Next') >> nth=0" },
+    { "click": "[data-testid=import-preview] button:has-text('Next') >> nth=0" },
+    { "click": "[data-testid=import-preview] button:has-text('Next') >> nth=0" },
+    { "expect_text": { "selector": "[data-testid=import-preview]", "text": "Rows 201–230 of 230" } },
+    { "scroll_to": "#import-title" },
+    { "screenshot": "last-page" }
+  ]
+}

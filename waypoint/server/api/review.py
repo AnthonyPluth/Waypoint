@@ -21,13 +21,17 @@ _v = validate.Validator(ApiError, too_long="The {label} is too long (at most {li
 
 def api_review(conn, _q, _b) -> Review:
     gmail.end_lapsed(conn)
-    return {"items": [cast(ReviewItem, {**i}) for i in review.listing(conn, owner())],
+    chosen = ai.config(conn)
+    reply: Review = {"items": [cast(ReviewItem, {**i}) for i in review.listing(conn, owner())],
             "matches": [cast(ReviewMatch, {**m}) for m in review.matches(conn, owner(), viewer(conn))],
             "who": [{"id": t.id, "name": t.name or "", "segment_id": s["id"], "trip_id": s["trip_id"], "kind": s["kind"],
                      "provider": s["provider"], "origin": s["origin"], "destination": s["destination"],
                      "start_local": s["start_local"], "start_zone": s["start_zone"]}
                     for t, s in trips.unmatched(conn, viewer(conn))],
-            "ai": ai.config(conn) is not None}
+            "ai": chosen is not None}
+    if chosen is not None:
+        reply["ai_mode"] = chosen.mode
+    return reply
 
 
 def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
@@ -43,7 +47,7 @@ def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
         return {"ok": True}
     added = [a for a in _q.get("segment") or [] if a]
     bookings = (viewer(conn), [row_id(a, "No such segment", 400) for a in added]) if added else None
-    if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), bookings):
+    if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), bookings, trust=(_q.get("trust") or [""])[0] == "1"):
         raise ApiError(NO_ITEM, 404)
     return {"ok": True}
 

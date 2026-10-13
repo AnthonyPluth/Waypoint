@@ -165,7 +165,7 @@ def stored_image(conn: db.Connection, owner: str, item_id: int, index: int) -> s
     return None if found is None else stored_mail.image_of(conn, *found, index)
 
 
-def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewer, list[int]] | None = None) -> bool:
+def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewer, list[int]] | None = None, trust: bool = False) -> bool:
     seen = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.sender_domain,
                                ReviewItem.reference, ReviewItem.matches)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
@@ -175,7 +175,7 @@ def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewe
     made = [n for n in bookings[1] if visibility.visible_segment(conn, bookings[0], n) is not None] if bookings is not None else []
     for n in made:
         stored_mail.link(conn, n, int(seen["mailbox_id"]), str(seen["message_id"]))
-    if made and seen["reason"] == "generic" and seen["sender_domain"] != UNKNOWN_SENDER:
+    if trust and made and seen["reason"] == "generic" and seen["sender_domain"] != UNKNOWN_SENDER:
         db.insert_ignore(conn, TrustedSender, {"mailbox_id": seen["mailbox_id"], "domain": seen["sender_domain"]}, key=["mailbox_id", "domain"])
     same = [ReviewItem.id == item_id]
     if _group_key(seen, 0)[0] != "alone":
