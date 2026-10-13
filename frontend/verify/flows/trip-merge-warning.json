@@ -3,17 +3,18 @@
   "page": "trips",
   "allow_console": ["409"],
   "steps": [
-    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "expect_text": {"selector": "h1", "text": "Trips"} },
     { "click": "a[href^='#trip/'] >> visible=true" },
     { "wait_for": "ul[aria-label='Bookings']" },
     { "fake_merge_warning": "Sam Doe | Mia Doe" },
+    { "click": "button:has-text('Trip options') >> visible=true" },
     { "click": "button:has-text('Merge another trip') >> visible=true" },
     { "wait_for": "[role='dialog'] select" },
-    { "select": { "selector": "[role='dialog'] select", "index": 1 } },
+    { "select": {"selector": "[role='dialog'] select", "index": 1} },
     { "screenshot": "merge-choose" },
     { "click": "[role='dialog'] button:has-text('Merge') >> visible=true" },
     { "wait_for": "[role='dialog']:has-text('Merge them anyway?')" },
-    { "expect_text": { "selector": "[role='dialog']", "text": "Will newly see this trip’s bookings: Sam Doe" } },
+    { "expect_text": {"selector": "[role='dialog']", "text": "Will newly see this trip’s bookings: Sam Doe"} },
     { "screenshot": "merge-warning" }
   ]
 }

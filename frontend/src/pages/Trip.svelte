@@ -9,6 +9,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
+  import { OptionsMenu } from "$lib/components/ui/options-menu";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import DayTime from "$lib/components/DayTime.svelte";
@@ -306,8 +307,10 @@
     {#if !form}
       <div class="flex flex-wrap gap-2">
         <Button onclick={() => { focus = ""; form = blank(t.id, t.costs.totals[0]?.currency); }}><Plus /> Add a booking</Button>
-        <Button variant="outline" onclick={() => { deleting = true; }}>Delete trip</Button>
-        <Button variant="outline" onclick={() => { mergeWith = ""; merging = true; void loadOthers(); }}>Merge another trip</Button>
+        <OptionsMenu label="Trip options" text="Trip options" items={[
+          { label: "Merge another trip", onselect: () => { mergeWith = ""; merging = true; void loadOthers(); } },
+          { label: "Delete trip", destructive: true, onselect: () => { deleting = true; } },
+        ]} />
       </div>
     {/if}
   </div>
@@ -508,8 +511,10 @@
   {#if !done}
     <div class="flex flex-wrap gap-2">
       <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => edit(s)}>Edit</Button>
-      <Button variant="outline" size="sm" aria-label={`Move ${name}`} onclick={() => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); }}>Move</Button>
-      <Button variant="outline" size="sm" aria-label={`Remove ${name}`} onclick={() => { removing = s; asking = true; }}>Remove</Button>
+      <OptionsMenu size="sm" label={`More options for ${name}`} text="More" items={[
+        { label: "Move", name: `Move ${name}`, onselect: () => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); } },
+        { label: "Remove", name: `Remove ${name}`, destructive: true, onselect: () => { removing = s; asking = true; } },
+      ]} />
     </div>
   {/if}
 {/snippet}
