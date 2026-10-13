@@ -52,7 +52,7 @@ A booking can carry its **cost**: the total for that booking, as a whole amount 
 - **By hand.** The booking’s edit form has a **Cost** field (the amount and the currency). Change it and the cost is yours: a later email never replaces it. Clear the amount to remove the cost. A cost you leave alone stays as it was read.
 - **Later emails.** A receipt or other follow-up about a booking fills a missing cost and never changes one that is already there (a follow-up whose code is shared by several legs of one booking fills none, since its total can’t be put on one leg). A second confirmation for the same booking attaches to it the same way (it only fills). An email that changes the booking (its times or places moved) also updates a cost that was read from an email, to the new total; one you entered by hand is never touched, and an email with no total never clears a cost.
 - **Cancelled bookings** keep their cost on the card, struck through and marked as not counted, and are left out of the trip’s total.
-- **Who sees it.** A cost is part of its booking: everyone who can see the booking and its trip sees it, and no one else does. It is part of the [offline copy](/Waypoint/start/offline/) of a current trip.
+- **Who sees it.** A cost is part of its booking: everyone who can see the booking and its trip sees it, and no one else does. It is part of the [offline copy](/Waypoint/start/offline/) of a saved trip.
 
 ## Seats
 

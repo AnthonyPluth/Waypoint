@@ -222,7 +222,7 @@ class ClearEmailsTests(ServerCase):
         with db.session() as conn:
             conn.execute(update(Trip).where(Trip.id == seg["trip_id"]).values(done_at=1234.5))
             got = offline.projection(conn, Viewer(self.person["ana"]), TODAY)
-        self.assertEqual(got["trip"]["done_at"], 1234.5)
+        self.assertEqual(got["trips"][0]["trip"]["done_at"], 1234.5)
 
     def test_someone_who_cannot_see_the_trip_cannot_mark_it_done(self):
         seg = self.book(days(-20), days(-19))
@@ -315,4 +315,4 @@ class OfflineAfterClearTests(ServerCase):
                     trips.clear_emails(conn, ana, seg["trip_id"], TODAY, 1.0)
                 self.assertEqual(trips.clear_emails(conn, ana, seg["trip_id"], days(10), 1.0), 1)
             self.assertNotIn(BODY_CANARY, json.dumps(offline.projection(conn, ana, TODAY)))
-            self.assertEqual(offline.projection(conn, ana, TODAY)["messages"], [])
+            self.assertEqual(offline.projection(conn, ana, TODAY)["trips"][0]["messages"], [])

@@ -141,7 +141,7 @@ class Replies(DbCase):
                                             "html": None, "truncated": False}, 1.0)   # type: ignore[arg-type]
         stored_mail.link(self.c, seg["id"], box, "m8")   # type: ignore[arg-type]
         found = offline_api.api_offline(self.c, {}, {})
-        self.assertEqual([m["segment_id"] for m in found["messages"]], [seg["id"]])
+        self.assertEqual([m["segment_id"] for m in found["trips"][0]["messages"]], [seg["id"]])
         self.check("GET /api/offline", found)
 
     def test_state(self):

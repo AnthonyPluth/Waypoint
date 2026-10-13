@@ -5533,26 +5533,15 @@
       "Offline": {
         "type": "object",
         "properties": {
-          "trip": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Trip"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "messages": {
+          "trips": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/OfflineMessages"
+              "$ref": "#/components/schemas/OfflineTrip"
             }
           }
         },
         "required": [
-          "trip",
-          "messages"
+          "trips"
         ],
         "additionalProperties": false
       },
@@ -5572,6 +5561,25 @@
         "required": [
           "segment_id",
           "emails"
+        ],
+        "additionalProperties": false
+      },
+      "OfflineTrip": {
+        "type": "object",
+        "properties": {
+          "trip": {
+            "$ref": "#/components/schemas/Trip"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfflineMessages"
+            }
+          }
+        },
+        "required": [
+          "trip",
+          "messages"
         ],
         "additionalProperties": false
       },

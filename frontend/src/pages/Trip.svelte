@@ -20,6 +20,7 @@
   import { Sheet } from "$lib/components/ui/sheet";
   import { draftGuard, dropDrafts, leave } from "$lib/drafts.svelte";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
+  import { isSavedCopy } from "$lib/offline";
   import { askAboutOffline, offline, refreshOffline, saveTripCopy } from "$lib/offline.svelte";
   import { hasSavedTrip, onLock } from "$lib/offline-vault";
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
@@ -58,6 +59,7 @@
   let askOffline = $state(false);
   let lockedCopy = $state(false);
   let savedCopy = $state<Trip | null>(null);
+  let savedTrips = $state<Trip[]>([]);
   let deleting = $state(false);
   let others = $state<Trip[]>([]);
   let merging = $state(false);
@@ -76,7 +78,14 @@
 
   const pick = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
   const isTrip = (v: unknown): v is Trip => !!v && typeof v === "object" && Array.isArray((v as Trip).segments) && typeof (v as Trip).name === "string";
-  $effect(() => onLock(() => { savedCopy = null; }));
+  $effect(() => onLock(() => { savedCopy = null; savedTrips = []; }));
+
+  function openSaved(values: unknown) {
+    const found = (Array.isArray(values) ? values : []).map((v) => (isSavedCopy(v) ? v.trip : v)).filter(isTrip);
+    if (found.length === 0) throw new Error("unreadable");
+    savedTrips = found;
+    savedCopy = found.find((t) => String(t.id) === id) ?? null;
+  }
 
   async function afterOnlineLoad(t: Trip) {
     await refreshOffline();
@@ -124,7 +133,7 @@
       await offerSavedCopy();
     }
   }
-  $effect(() => { void id; form = null; renaming = null; savedCopy = null; void load(); });
+  $effect(() => { void id; form = null; renaming = null; savedCopy = null; savedTrips = []; void load(); });
 
   const wanted = $derived(new URLSearchParams(route.query).get("segment"));
   $effect(() => {
@@ -267,8 +276,16 @@
       {/each}
     </ul>
     {#if copy.costs?.totals.length}<p class="mt-3 text-sm" data-trip-total><span class="eyebrow">Total</span> <span class="font-medium">{formatTotals(copy.costs.totals)}</span>{#if countNote(copy.costs)}<span class="text-muted-foreground"> · {countNote(copy.costs)}</span>{/if}</p>{/if}
+  {:else if savedTrips.length}
+    <div class="mb-6 space-y-2" data-testid="trip-not-saved">
+      <h1 class="text-display">This trip isn’t saved on this device</h1>
+      <p class="text-muted-foreground">Only trips under way or starting within a week, and your next upcoming trip, are saved. Saved:</p>
+      <ul class="flex flex-col gap-1">
+        {#each savedTrips as t (t.id)}<li><a class="underline underline-offset-2" href={`#trip/${t.id}`}>{t.name}</a></li>{/each}
+      </ul>
+    </div>
   {:else}
-    <SavedTripLock onunlocked={(v) => { if (isTrip(v)) savedCopy = v; else throw new Error("unreadable"); }} onremoved={() => (lockedCopy = false)} />
+    <SavedTripLock onunlocked={openSaved} onremoved={() => (lockedCopy = false)} />
   {/if}
 {:else if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">

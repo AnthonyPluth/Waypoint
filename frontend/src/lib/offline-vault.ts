@@ -1,6 +1,7 @@
 const CACHE_NAME = "waypoint-offline-vault-v1";
 const KEYS_URL = "/offline-vault/keys";
 const TRIP_URL = "/offline-vault/trip";
+const tripUrl = (tripId?: number) => (tripId === undefined ? TRIP_URL : `${TRIP_URL}/${tripId}`);
 const VERSION = 1;
 const IDLE_MS = 5 * 60 * 1000;
 const ACTIVITY_EVENTS = ["pointerdown", "keydown", "touchstart", "scroll"] as const;
@@ -35,9 +36,10 @@ export type Support = { ok: true } | { ok: false; reason: string };
 
 type Sealed = { iv: string; data: string };
 type StoredKeys = { v: number; credentialId: string; publicKey: string; wrappedKey: Sealed; off?: boolean };
-type StoredTrip = { v: number; ephemeralPublicKey: string; iv: string; data: string; savedAt?: number; expiresAt?: number | null };
+type StoredTrip = { v: number; ephemeralPublicKey: string; iv: string; data: string; savedAt?: number; expiresAt?: number | null; tripId?: number; order?: number };
 
-export type SavedInfo = { savedAt: number; expiresAt: number | null };
+export type SavedInfo = { savedAt: number; expiresAt: number | null; tripId?: number; order?: number };
+export type SavedItem = { value: unknown; info?: SavedInfo };
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
@@ -136,7 +138,8 @@ function validKeys(x: StoredKeys | null): StoredKeys | null {
 function validTrip(x: StoredTrip | null): StoredTrip | null {
   if (x === null) return null;
   const stamp = (n: unknown) => n === undefined || n === null || Number.isFinite(n);
-  if (x.v !== VERSION || !isText(x.ephemeralPublicKey) || !isText(x.iv) || !isText(x.data) || !stamp(x.savedAt) || !stamp(x.expiresAt)) throw new VaultError("damaged", DAMAGED);
+  if (x.v !== VERSION || !isText(x.ephemeralPublicKey) || !isText(x.iv) || !isText(x.data) || !stamp(x.savedAt) || !stamp(x.expiresAt)
+    || (x.tripId !== undefined && !Number.isInteger(x.tripId)) || (x.order !== undefined && !Number.isInteger(x.order))) throw new VaultError("damaged", DAMAGED);
   return x;
 }
 
@@ -146,15 +149,25 @@ export async function isSetUp(): Promise<boolean> {
   return (await storedKeys()) !== null;
 }
 
-export async function hasSavedTrip(): Promise<boolean> {
-  return (await isSetUp()) && validTrip(await read<StoredTrip>(TRIP_URL)) !== null;
+async function storedTrips(): Promise<{ url: string; stored: StoredTrip }[]> {
+  if (typeof caches === "undefined") return [];
+  const cache = await caches.open(CACHE_NAME);
+  const urls = (await cache.keys()).map((r) => new URL(r.url, "http://waypoint.invalid").pathname).filter((u) => u === TRIP_URL || u.startsWith(`${TRIP_URL}/`));
+  const found: { url: string; stored: StoredTrip }[] = [];
+  for (const url of urls) {
+    const stored = validTrip(await read<StoredTrip>(url));
+    if (stored) found.push({ url, stored });
+  }
+  return found.sort((a, b) => (a.stored.order ?? 0) - (b.stored.order ?? 0) || a.url.localeCompare(b.url, "en", { numeric: true }));
 }
 
-export async function savedInfo(): Promise<SavedInfo | null> {
-  if (!(await isSetUp())) return null;
-  const stored = validTrip(await read<StoredTrip>(TRIP_URL));
-  if (!stored) return null;
-  return { savedAt: stored.savedAt ?? 0, expiresAt: stored.expiresAt ?? null };
+export async function hasSavedTrip(): Promise<boolean> {
+  return (await isSetUp()) && (await storedTrips()).length > 0;
+}
+
+export async function savedInfos(): Promise<SavedInfo[]> {
+  if (!(await isSetUp())) return [];
+  return (await storedTrips()).map(({ stored }) => ({ savedAt: stored.savedAt ?? 0, expiresAt: stored.expiresAt ?? null, ...(stored.tripId === undefined ? {} : { tripId: stored.tripId }) }));
 }
 
 export async function isSavingOff(): Promise<boolean> {
@@ -169,9 +182,22 @@ export async function setSavingOff(off: boolean): Promise<void> {
   await write(KEYS_URL, next);
 }
 
+async function deleteTrips(keep: (url: string) => boolean = () => false): Promise<void> {
+  if (typeof caches === "undefined") return;
+  const cache = await caches.open(CACHE_NAME);
+  for (const { url } of await storedTrips()) if (!keep(url)) await cache.delete(url);
+}
+
 export async function clearTrip(): Promise<void> {
   lock();
-  if (typeof caches !== "undefined") await (await caches.open(CACHE_NAME)).delete(TRIP_URL);
+  await deleteTrips();
+}
+
+export async function dropTrips(tripIds: number[]): Promise<void> {
+  if (typeof caches === "undefined") return;
+  const cache = await caches.open(CACHE_NAME);
+  for (const id of tripIds) await cache.delete(tripUrl(id));
+  lock();
 }
 
 export async function support(): Promise<Support> {
@@ -285,21 +311,45 @@ async function saveKey(shared: ArrayBuffer, ephemeralPublic: Bytes, recipientPub
   );
 }
 
-export async function save(value: unknown, info?: SavedInfo): Promise<boolean> {
-  const keys = await storedKeys();
-  if (!keys || keys.off) return false;
-  const recipientPublic = fromBase64(keys.publicKey);
-  const recipient = await crypto.subtle.importKey("raw", recipientPublic, CURVE, false, []);
+async function seal(recipientPublic: Bytes, recipient: CryptoKey, value: unknown, info?: SavedInfo): Promise<StoredTrip> {
   const ephemeral = await crypto.subtle.generateKey(CURVE, false, ["deriveBits"]);
   const ephemeralPublic = new Uint8Array(await crypto.subtle.exportKey("raw", ephemeral.publicKey));
   const shared = await crypto.subtle.deriveBits({ name: "ECDH", public: recipient }, ephemeral.privateKey, 256);
   const aes = await saveKey(shared, ephemeralPublic, recipientPublic, "encrypt");
   const iv = random(12);
   const sealed = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: SAVE_AAD }, aes, text(JSON.stringify(value)));
-  const stored: StoredTrip = { v: VERSION, ephemeralPublicKey: toBase64(ephemeralPublic), iv: toBase64(iv), data: toBase64(new Uint8Array(sealed)), ...info };
-  await write(TRIP_URL, stored);
+  return { v: VERSION, ephemeralPublicKey: toBase64(ephemeralPublic), iv: toBase64(iv), data: toBase64(new Uint8Array(sealed)), ...info };
+}
+
+export async function saveAll(items: SavedItem[]): Promise<boolean> {
+  const keys = await storedKeys();
+  if (!keys || keys.off) return false;
+  const recipientPublic = fromBase64(keys.publicKey);
+  const recipient = await crypto.subtle.importKey("raw", recipientPublic, CURVE, false, []);
+  const sealed: { url: string; stored: StoredTrip }[] = [];
+  for (const [order, { value, info }] of items.entries()) {
+    sealed.push({ url: tripUrl(info?.tripId), stored: await seal(recipientPublic, recipient, value, info && { ...info, order }) });
+  }
+  const before = new Map((await storedTrips()).map(({ url, stored }) => [url, stored]));
+  const cache = await caches.open(CACHE_NAME);
+  const written: string[] = [];
+  try {
+    for (const { url, stored } of sealed) {
+      await write(url, stored);
+      written.push(url);
+    }
+  } catch (err) {
+    for (const url of written) {
+      const old = before.get(url);
+      try { if (old) await write(url, old); else await cache.delete(url); } catch { continue; }
+    }
+    throw err;
+  }
+  await deleteTrips((url) => written.includes(url));
   return true;
 }
+
+export const save = (value: unknown, info?: SavedInfo): Promise<boolean> => saveAll([{ value, info }]);
 
 async function unwrapPrivateKey(keys: StoredKeys): Promise<CryptoKey> {
   const secret = await assertWithPrf(fromBase64(keys.credentialId));
@@ -331,16 +381,17 @@ async function decrypt(key: CryptoKey, keys: StoredKeys, stored: StoredTrip): Pr
   }
 }
 
-export async function unlock(): Promise<unknown> {
+export async function unlock(): Promise<unknown[]> {
   const keys = await storedKeys();
   if (!keys) throw new VaultError("not-set-up", "Offline access isn’t set up on this device.");
-  const stored = validTrip(await read<StoredTrip>(TRIP_URL));
-  if (!stored) throw new VaultError("not-set-up", "There’s no saved trip on this device.");
+  const found = await storedTrips();
+  if (found.length === 0) throw new VaultError("not-set-up", "There’s no saved trip on this device.");
   const key = privateKey ?? (await unwrapPrivateKey(keys));
-  const value = await decrypt(key, keys, stored);
+  const values: unknown[] = [];
+  for (const { stored } of found) values.push(await decrypt(key, keys, stored));
   if (privateKey === null) keep(key);
   else noteActivity();
-  return value;
+  return values;
 }
 
 export async function remove(): Promise<void> {
