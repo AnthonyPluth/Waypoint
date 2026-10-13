@@ -37,5 +37,5 @@ Supplement, Latin Extended-A and general punctuation) and the dark sprite of ico
 map draws with, taken from Protomaps' basemaps-assets (https://github.com/protomaps/basemaps-assets). Noto Sans is
 Copyright 2022 The Noto Project Authors, licensed under the SIL Open Font License 1.1, https://openfontlicense.org/. The
 sprites are derived from the MIT-licensed icons of Tangram/Mapzen (https://github.com/tangrams/icons); the licences are
-beside the files (fonts/OFL.txt, sprites/LICENSE.md). The map's data is (c) OpenStreetMap contributors under the ODbL, https://www.openstreetmap.org/copyright.
+beside the files (fonts/OFL.txt, sprites/LICENSE.txt). The map's data is (c) OpenStreetMap contributors under the ODbL, https://www.openstreetmap.org/copyright.
 

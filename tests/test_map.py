@@ -87,7 +87,7 @@ class Labels(WithFile):
             for rng in ("0-255", "256-511", "8192-8447"):
                 status, headers, body = self.get(f"/map/fonts/{name}/{rng}.pbf")
                 self.assertEqual(status, 200, (name, rng))
-                self.assertEqual(headers["Content-Type"], "application/x-protobuf")
+                self.assertEqual(headers["Content-Type"], "application/octet-stream")
                 self.assertIn("max-age=604800", headers["Cache-Control"])
                 self.assertGreater(len(body), 100)
         for name in ("dark.json", "dark.png", "dark@2x.json", "dark@2x.png"):

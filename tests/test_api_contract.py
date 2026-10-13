@@ -21,6 +21,7 @@ from waypoint.domain.mail import review, scan
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
 from waypoint.server.api import ai as ai_api
+from waypoint.server.api import map as map_api
 from waypoint.server.api import logos as logos_api
 from waypoint.server.api import backups, flight_import as flight_import_api, flightstatus as flightstatus_api, mailboxes, people, state, stats as stats_api
 from waypoint.server.api import home as home_api
@@ -126,7 +127,11 @@ class Replies(DbCase):
         self.test_reminders()
         self.test_mcp_settings()
         self.test_assistant()
+        self.test_map()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
+
+    def test_map(self):
+        self.check("GET /api/map", map_api.api_map(self.c, {}, {}))
 
     def test_offline(self):
         _current.user = {"name": None, "email": None, "local": True}
@@ -506,7 +511,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}", "POST /api/segments/{id}/code",
                                      "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
-                                     "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/home", "POST /api/home", "DELETE /api/home", "GET /api/flight-status", "POST /api/flight-status/{id}",
+                                     "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/home", "POST /api/home", "DELETE /api/home", "GET /api/map", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",
                                      "POST /api/loyalty/{id}/reveal",
                                      "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",
