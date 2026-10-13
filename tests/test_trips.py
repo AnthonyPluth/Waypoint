@@ -1007,6 +1007,7 @@ class AirportTests(DbCase):
     def test_exact_code_then_city_prefix_then_name_prefix_then_other_words(self):
         found = airports.search(self.c, "london")
         self.assertTrue(all(a["city"].lower().startswith("london") for a in found[:3]))
+        self.assertNotIn(self.codes("lond")[0], ("LNV", "LDZ"))
         by_name = self.codes("heathrow")
         self.assertEqual(by_name[0], "LHR")
 

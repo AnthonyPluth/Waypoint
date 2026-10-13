@@ -51,14 +51,16 @@ def _index() -> tuple[_Entry, ...]:
 def _tier(entry: _Entry, query: str, tokens: list[str]) -> int | None:
     if entry.code == query:
         return 0
-    if entry.city.startswith(query):
+    if entry.city == query or entry.city.startswith(f"{query} "):
         return 1
-    if entry.name.startswith(query):
+    if entry.city.startswith(query):
         return 2
-    if all(any(word.startswith(token) for word in entry.words) for token in tokens):
+    if entry.name.startswith(query):
         return 3
-    if len(tokens) == 1 and entry.code.startswith(query):
+    if all(any(word.startswith(token) for word in entry.words) for token in tokens):
         return 4
+    if len(tokens) == 1 and entry.code.startswith(query):
+        return 5
     return None
 
 
@@ -67,8 +69,8 @@ def search(conn: db.Connection, text: str, limit: int = MAX_MATCHES) -> list[Fou
     if len(query) < 2:
         return []
     tokens = query.split()
-    ranked = [(tier, entry.city, entry.code, entry.found) for entry in _index() if (tier := _tier(entry, query, tokens)) is not None]
-    return [found for _tier_, _city, _code, found in sorted(ranked, key=lambda r: r[:3])[:limit]]
+    ranked = [(tier, len(entry.city), entry.city, entry.code, entry.found) for entry in _index() if (tier := _tier(entry, query, tokens)) is not None]
+    return [r[-1] for r in sorted(ranked, key=lambda r: r[:-1])[:limit]]
 
 
 def zones(conn: db.Connection, codes: list[str]) -> dict[str, str]:
