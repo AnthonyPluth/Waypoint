@@ -8,7 +8,7 @@
     { "screenshot": "index" },
     { "click": "h2 a[href='#settings/account']" },
     { "expect_text": { "selector": "h1", "text": "Account & household" } },
-    { "expect_text": { "selector": "main", "text": "Advanced: for whoever runs Waypoint" } },
+    { "expect_text": { "selector": "main", "text": "Database" } },
     { "screenshot": "account" },
     { "click": "a:has-text('All settings')" },
     { "click": "h2 a[href='#settings/mail']" },
@@ -26,7 +26,7 @@
     { "screenshot": "assistants" },
     { "goto": "#settings/data" },
     { "expect_text": { "selector": "h1", "text": "Backup & import" } },
-    { "expect_text": { "selector": "main", "text": "Import past flights" } },
+    { "expect_text": { "selector": "main", "text": "IMPORT PAST FLIGHTS" } },
     { "screenshot": "backup" }
   ]
 }
