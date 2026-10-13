@@ -41,6 +41,8 @@ Then open `WAYPOINT_PUBLIC_URL`. You’re sent to your provider to sign in, then
 
 A backup holds saved secrets encrypted with your key: set the same `WAYPOINT_SECRET_KEY` on the server (or copy `secret.key` into its `./data`) before restoring. Restored under another key, they can’t be read: put the key the backup was made with in `WAYPOINT_SECRET_KEY_OLD` and restart once, and Waypoint re-encrypts them with the current key. Delete stray copies of the file once you’ve restored it.
 
+A backup made before Waypoint’s database migrations were squashed into one can’t be restored by this version, and Waypoint says so. Restore it with the last release before the squash, then take a new backup and restore that one here. Backups made since restore as before, including into a newer version.
+
 ## Using Postgres (optional)
 
 Set `DATABASE_URL` in `.env` (e.g. `postgresql://waypoint:password@db-host:5432/waypoint`) and restart. Waypoint creates its tables on first start and applies any schema migrations each time a new version starts. To bring your data along, restore a backup into it as above. There’s a commented-out `db` service in `docker-compose.yml` if you want Postgres alongside Waypoint. Without `DATABASE_URL`, Waypoint keeps using its built-in database in `./data`.

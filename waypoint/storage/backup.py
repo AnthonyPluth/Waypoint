@@ -30,6 +30,8 @@ SKIP = {"auth_sessions", "auth_pending", "mailbox_pending", "airports", "airline
         "reminders_sent", "oauth_clients", "oauth_grants", "oauth_codes", "oauth_tokens", "oauth_consents"}
 ASSISTANT_TABLES = ("oauth_tokens", "oauth_codes", "oauth_consents", "oauth_grants", "oauth_clients")
 NEWER = "That backup is from a newer version of Waypoint. Update Waypoint first."
+SQUASHED = ("That backup was made before Waypoint's database migrations were squashed into one, so this version can't restore it. "
+            "Restore it with the last release before the squash, then take a new backup and restore that one here.")
 
 
 def tables() -> list[str]:
@@ -116,12 +118,17 @@ def _check_revision(data: dict) -> None:
     rev = data.get("revision")
     if not isinstance(rev, str):
         raise ValueError("That file isn't a Waypoint backup.")
+    scripts = _scripts()
     try:
-        known = _scripts().get_revision(rev) is not None
+        known = scripts.get_revision(rev) is not None
     except CommandError:
         known = False
-    if not known:
-        raise ValueError(NEWER)
+    if known:
+        return
+    first = [b for b in scripts.get_bases() if b.isdigit()]
+    if rev.isdigit() and first and int(rev) < int(first[0]):
+        raise ValueError(SQUASHED)
+    raise ValueError(NEWER)
 
 
 def load(raw: bytes) -> dict:
@@ -374,6 +381,7 @@ class Busy(RuntimeError):
 
 
 def restore_all(data: dict, locks: Sequence[threading.Lock] = (), directory: str | None = None) -> dict:
+    _check_revision(data)
     held: list[threading.Lock] = []
     try:
         for lock in locks:

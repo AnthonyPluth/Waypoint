@@ -113,15 +113,6 @@ class BackupTests(unittest.TestCase):
                                          end_local="2026-11-02T10:00", end_zone="Europe/London", source="manual"))
         c.execute(insert(SegmentTraveler).values(segment_id=9, person_id=11))
 
-    def without_ai_counters(self, data):
-        self.without(data, "review_items", "auto_state", "auto_tries")
-
-    def without(self, data, table, *names):
-        part = data["tables"][table]
-        keep = [i for i, name in enumerate(part["columns"]) if name not in names]
-        part["columns"] = [part["columns"][i] for i in keep]
-        part["rows"] = [[row[i] for i in keep] for row in part["rows"]]
-
     def test_a_trips_people_come_back_with_it(self):
         src = db.connect(self.a)
         self.trip_with_people(src)
@@ -134,24 +125,7 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(sorted((t.trip_id, t.person_id) for t in dst.orm.scalars(select(TripPerson))), [(5, 11), (5, 12)])
         src.close(); dst.close()
 
-    def test_a_backup_from_before_trip_people_gets_each_trips_people_from_its_bookings(self):
-        src = db.connect(self.a)
-        self.trip_with_people(src)
-        src.commit()
-        data = backup.load(backup.dump(src))
-        data["revision"] = "0029"
-        data["tables"].pop("trip_people")
-        self.without(data, "segments", "travelers_from_trip", "price_minor", "price_currency", "price_source")
-        self.without(data, "trips", "done_at")
-        self.without_ai_counters(data)
-        dst = db.connect(self.b)
-        with mock.patch.object(backup, "head", return_value="not-this-one"):
-            backup.restore(dst, data)
-        dst.commit()
-        self.assertEqual([(t.trip_id, t.person_id) for t in dst.orm.scalars(select(TripPerson))], [(5, 11)])
-        src.close(); dst.close()
-
-    def test_a_trips_costs_come_back_with_it_and_a_backup_from_before_costs_restores_with_none(self):
+    def test_a_trips_costs_come_back_with_it(self):
         src = db.connect(self.a)
         self.trip_with_people(src)
         src.execute(update(Segment).where(Segment.id == 9).values(price_minor=124000, price_currency="EUR", price_source="manual"))
@@ -161,19 +135,9 @@ class BackupTests(unittest.TestCase):
         dst.commit()
         self.assertEqual([tuple(r) for r in dst.execute(select(Segment.price_minor, Segment.price_currency, Segment.price_source))],
                          [(124000, "EUR", "manual")])
-        data = backup.load(backup.dump(src))
-        data["revision"] = "0030"
-        self.without(data, "segments", "price_minor", "price_currency", "price_source")
-        self.without(data, "trips", "done_at")
-        self.without_ai_counters(data)
-        with mock.patch.object(backup, "head", return_value="not-this-one"):
-            backup.restore(dst, data)
-        dst.commit()
-        self.assertEqual([tuple(r) for r in dst.execute(select(Segment.id, Segment.price_minor, Segment.price_currency, Segment.price_source))],
-                         [(9, None, None, None)])
         src.close(); dst.close()
 
-    def test_when_a_trip_was_marked_done_comes_back_with_it_and_a_backup_from_before_restores_with_none(self):
+    def test_when_a_trip_was_marked_done_comes_back_with_it(self):
         src = db.connect(self.a)
         self.trip_with_people(src)
         src.execute(update(Trip).where(Trip.id == 5).values(done_at=1700000000.25))
@@ -182,17 +146,9 @@ class BackupTests(unittest.TestCase):
         backup.restore(dst, backup.load(backup.dump(src)))
         dst.commit()
         self.assertEqual([t.done_at for t in dst.orm.scalars(select(Trip))], [1700000000.25])
-        data = backup.load(backup.dump(src))
-        data["revision"] = "0031"
-        self.without(data, "trips", "done_at")
-        self.without_ai_counters(data)
-        with mock.patch.object(backup, "head", return_value="not-this-one"):
-            backup.restore(dst, data)
-        dst.commit()
-        self.assertEqual([(t.id, t.done_at) for t in dst.orm.scalars(select(Trip))], [(5, None)])
         src.close(); dst.close()
 
-    def test_the_automatic_ai_state_comes_back_and_a_backup_from_before_restores_with_none(self):
+    def test_the_automatic_ai_state_comes_back_with_it(self):
         src = db.connect(self.a)
         src.execute(insert(Mailbox).values(id=3, owner_sub="u", address="a@x.example", token="t", status="connected"))
         src.execute(insert(ReviewItem).values(id=4, mailbox_id=3, message_id="m", sender_domain="x.example", reason="no_markup", created=1.0,
@@ -202,13 +158,6 @@ class BackupTests(unittest.TestCase):
         backup.restore(dst, backup.load(backup.dump(src)))
         dst.commit()
         self.assertEqual([tuple(r) for r in dst.execute(select(ReviewItem.auto_state, ReviewItem.auto_tries))], [("waiting", 2)])
-        data = backup.load(backup.dump(src))
-        data["revision"] = "0033"
-        self.without_ai_counters(data)
-        with mock.patch.object(backup, "head", return_value="not-this-one"):
-            backup.restore(dst, data)
-        dst.commit()
-        self.assertEqual([tuple(r) for r in dst.execute(select(ReviewItem.auto_state, ReviewItem.auto_tries))], [(None, 0)])
         src.close(); dst.close()
 
     def test_people_come_back_exactly_with_their_links(self):
@@ -300,19 +249,6 @@ class BackupTests(unittest.TestCase):
             self.assertEqual(self.loyalty_rows(c)[0][3], "DEMO777")
             c.close()
 
-    def test_a_backup_through_the_migrations_from_the_first_revision(self):
-        src = self.fill(self.a)
-        data = backup.load(backup.dump(src))
-        data["revision"] = "0001"
-        dst = db.connect(self.b)
-        with mock.patch.object(backup, "head", return_value="not-this-one"):
-            backup.restore(dst, data)
-        dst.commit()
-        self.assertEqual(self.rows_of(dst)["users"], self.rows_of(src)["users"])
-        if db.using_postgres():
-            self.assertEqual(dst.sa.exec_driver_sql("SELECT count(*) FROM pg_namespace WHERE nspname LIKE 'waypoint_restore_%%'").scalar(), 0)
-        src.close(); dst.close()
-
     def test_a_backup_from_a_newer_version_is_refused(self):
         src = self.fill(self.a)
         data = backup.load(backup.dump(src))
@@ -329,6 +265,47 @@ class BackupTests(unittest.TestCase):
         for bad in (5, ["0001"], None):
             with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "isn't a Waypoint backup"):
                 backup.load(json.dumps({**data, "revision": bad}).encode())
+        src.close(); dst.close()
+
+    def test_a_backup_from_before_the_migrations_were_squashed_is_refused_with_its_own_message_and_changes_nothing(self):
+        src = self.fill(self.a)
+        data = backup.load(backup.dump(src))
+        directory = os.path.join(self.dir, "copies")
+        os.mkdir(directory)
+        dst = db.connect(self.b)
+        dst.execute(insert(User).values(sub="kept", email="kept@example.com"))
+        dst.commit()
+        before = self.rows_of(dst)
+        for rev in ("0001", "0029", "0033"):
+            old = {**data, "revision": rev}
+            with self.subTest(revision=rev):
+                with self.assertRaisesRegex(ValueError, "before Waypoint's database migrations were squashed into one") as raised:
+                    backup.load(gzip.compress(json.dumps(old).encode()))
+                self.assertIn("last release before the squash", str(raised.exception))
+                self.assertNotIn("newer", str(raised.exception))
+                with self.assertRaisesRegex(ValueError, "squashed"):
+                    backup.restore(dst, old)
+                with self.assertRaisesRegex(ValueError, "squashed"):
+                    backup.restore_all(old, directory=directory)
+                dst.rollback()
+                self.assertEqual(self.rows_of(dst), before)
+                self.assertEqual(os.listdir(directory), [])
+        src.close(); dst.close()
+
+    def test_a_backup_made_at_the_baseline_is_brought_up_to_a_later_migration_on_restore(self):
+        from tests.test_migrations import with_next_migration
+        src = self.fill(self.a)
+        raw = backup.dump(src)
+        probe = with_next_migration(self)
+        data = backup.load(raw)
+        self.assertEqual((data["revision"], backup.head()), ("0034", probe))
+        dst = db.connect(self.b)
+        dst.execute(insert(User).values(sub="old", email="old@example.com"))
+        backup.restore(dst, data)
+        dst.commit()
+        self.assertEqual(self.rows_of(dst)["users"], self.rows_of(src)["users"])
+        if db.using_postgres():
+            self.assertEqual(dst.sa.exec_driver_sql("SELECT count(*) FROM pg_namespace WHERE nspname LIKE 'waypoint_restore_%%'").scalar(), 0)
         src.close(); dst.close()
 
     def test_a_backup_without_a_revision_is_refused(self):
