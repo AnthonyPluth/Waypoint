@@ -21,6 +21,8 @@ beforeEach(() => { vi.mocked(api).mockReset(); app.state = state(); });
 afterEach(() => { app.state = null; flightStatus.list = null; route.sub = ""; route.query = ""; history.replaceState(null, "", "/"); });
 
 describe("Settings flight status", () => {
+  beforeEach(() => { route.sub = "account"; });
+
   const usage = (extra = {}) => ({ enabled: true, month: "2026-11", used: 12, limit: 400, paused: null, statuses: [], ...extra });
 
   it("shows the calls used this month out of the limit", async () => {
@@ -30,10 +32,10 @@ describe("Settings flight status", () => {
     expect(screen.getByText("Flight status")).toBeInTheDocument();
   });
 
-  it("says it’s off without the key", async () => {
+  it("says in plain words that the administrator hasn’t enabled it", async () => {
     vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? usage({ enabled: false, used: 0 }) : {}) as never);
     render(Settings);
-    expect(await screen.findByText(/Off \(RAPIDAPI_KEY isn’t set\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/Live flight status has not been enabled by your administrator/)).toBeInTheDocument();
   });
 
   it("shows nothing until it knows", () => {
@@ -43,6 +45,8 @@ describe("Settings flight status", () => {
 });
 
 describe("Settings account", () => {
+  beforeEach(() => { route.sub = "account"; });
+
   it("says who is signed in, with a Sign out button", () => {
     render(Settings);
     expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
@@ -96,51 +100,89 @@ describe("Settings account", () => {
   });
 });
 
-describe("Settings tabs", () => {
-  const tabs = () => within(screen.getByRole("navigation", { name: "Settings sections" }));
+describe("Settings index", () => {
+  const index = () => within(screen.getByRole("navigation", { name: "Settings sections" }));
 
-  it("opens on Account, with a link to each group kept in the address", () => {
+  it("opens on an index of task groups, each linked by its address", () => {
     render(Settings);
-    expect(tabs().getAllByRole("link").map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
-      ["Account", "#settings/account"], ["Mail and AI", "#settings/mail"], ["Travel", "#settings/travel"], ["Data", "#settings/data"]]);
-    expect(tabs().getByRole("link", { name: "Account" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByText("Signed in as")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Download backup" })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => [h.textContent, h.querySelector("a")?.getAttribute("href")])).toEqual([
+      ["Account & household", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
+      ["Offline & notifications", "#settings/offline"], ["Connected assistants", "#settings/assistants"], ["Backup & import", "#settings/backup"]]);
+    expect(screen.queryByText("Signed in as")).toBeNull();
   });
 
-  it("shows each group's sections on its own tab", () => {
+  it.each([
+    ["Offline access", "#settings/offline"], ["Calendar subscription", "#settings/offline"], ["Import past flights", "#settings/backup"],
+    ["Connect or reconnect Gmail", "#settings/mail"], ["Download a backup", "#settings/backup"], ["Connect an assistant", "#settings/assistants"],
+  ])("lists %s where it lives", (task, href) => {
+    render(Settings);
+    expect(index().getByRole("link", { name: task })).toHaveAttribute("href", href);
+  });
+
+  it("shows each group's sections on its own page, with a way back", () => {
     const heading = (name: string) => screen.queryByRole("heading", { name });
-    const onTab = (sub: string) => { route.sub = sub; return render(Settings); };
-    let view = onTab("mail");
+    const open = (sub: string) => { route.sub = sub; return render(Settings); };
+    let view = open("mail");
     expect(heading("Gmail")).not.toBeNull();
     expect(heading("AI")).not.toBeNull();
     expect(heading("Account")).toBeNull();
+    expect(index().getByRole("link", { name: "All settings" })).toHaveAttribute("href", "#settings");
     view.unmount();
-    view = onTab("travel");
-    for (const name of ["Reminders and calendar", "Home", "Distances", "Brand logos", "Import past flights"]) expect(heading(name)).not.toBeNull();
+    view = open("travel");
+    for (const name of ["Home", "Distances", "Brand logos"]) expect(heading(name)).not.toBeNull();
     expect(heading("Gmail")).toBeNull();
     view.unmount();
-    view = onTab("data");
-    for (const name of ["AI assistants (MCP)", "Data"]) expect(heading(name)).not.toBeNull();
-    expect(tabs().getByRole("link", { name: "Data" })).toHaveAttribute("aria-current", "page");
+    view = open("offline");
+    for (const name of ["Offline access", "Reminders and calendar"]) expect(heading(name)).not.toBeNull();
+    view.unmount();
+    view = open("assistants");
+    expect(heading("AI assistants (MCP)")).not.toBeNull();
+    view.unmount();
+    view = open("backup");
+    for (const name of ["Data", "Import past flights"]) expect(heading(name)).not.toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "Backup & import" })).toBeInTheDocument();
     view.unmount();
   });
 
-  it("falls back to Account for a tab it doesn't have", () => {
-    route.sub = "nope";
+  it("keeps the database and flight status under an advanced heading, with a link to People", () => {
+    route.sub = "account";
     render(Settings);
-    expect(tabs().getByRole("link", { name: "Account" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("heading", { name: "Advanced: for whoever runs Waypoint" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open People" })).toHaveAttribute("href", "#people");
   });
 
-  it("opens on the mail tab when Google sends you back", () => {
+  it("opens an old Data link on Backup & import", () => {
+    route.sub = "data";
+    render(Settings);
+    expect(screen.getByRole("heading", { level: 1, name: "Backup & import" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Download backup" })).toBeInTheDocument();
+  });
+
+  it("shows the index for a group it doesn't have", () => {
+    route.sub = "nope";
+    render(Settings);
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
+  });
+
+  it("opens on the mail group when Google sends you back", () => {
     history.replaceState(null, "", "/?gmail=connected#settings");
     render(Settings);
-    expect(tabs().getByRole("link", { name: "Mail and AI" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("heading", { level: 1, name: "Mail & review" })).toBeInTheDocument();
+  });
+
+  it("leaves the mail group for the index after Google sends you back", async () => {
+    history.replaceState(null, "", "/?gmail=connected#settings");
+    route.sub = "";
+    render(Settings);
+    await waitFor(() => expect(location.hash).toBe("#settings/mail"));
+    route.sub = "";
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument());
   });
 });
 
 describe("Settings data", () => {
-  beforeEach(() => { route.sub = "data"; });
+  beforeEach(() => { route.sub = "backup"; });
 
   it("links to the backup download and says when the last one was", () => {
     app.state = state({ last_backup: new Date().toISOString() });

@@ -37,13 +37,13 @@
         <HardDriveDownload class="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span class="min-w-0 break-words" data-testid="offline-status-line">
           {#if offline.damaged}
-            <span class="font-medium">The saved trip can’t be read.</span> <a class="underline underline-offset-2" href="#settings/data">Remove it in Settings</a>, then set up offline access again.
+            <span class="font-medium">The saved trip can’t be read.</span> <a class="underline underline-offset-2" href="#settings/offline">Remove it in Settings</a>, then set up offline access again.
           {:else if !offline.supported}
             <span class="font-medium">Offline access isn’t available on this device.</span> <span class="text-muted-foreground">{offline.reason}</span>
           {:else if !offline.setUp}
             <span class="font-medium">Not saved for offline use.</span> <span class="text-muted-foreground">Set up offline access to open your current trip with no connection.</span>
           {:else if offline.off}
-            <span class="font-medium">Offline saving is off on this device.</span> <a class="underline underline-offset-2" href="#settings/data">Turn it on in Settings</a>.
+            <span class="font-medium">Offline saving is off on this device.</span> <a class="underline underline-offset-2" href="#settings/offline">Turn it on in Settings</a>.
           {:else if offline.failed}
             <span class="font-medium">Couldn’t save the trip on this device.</span> <span class="text-muted-foreground">{savedHere && offline.savedAt ? `The copy from ${ago(offline.savedAt, now)} is still there.` : "Nothing is saved yet."}</span>
           {:else if savedElsewhere}
