@@ -26,7 +26,7 @@ from .models import LoyaltyId, Mailbox, Setting
 
 FORMAT = "waypoint-backup"
 VERSION = 1
-SKIP = {"auth_sessions", "auth_pending", "mailbox_pending", "airports", "airlines", "flight_status", "brand_logos", "push_devices", "calendar_feeds",
+SKIP = {"auth_sessions", "auth_pending", "mailbox_pending", "airports", "airlines", "flight_status", "flight_checks", "brand_logos", "push_devices", "calendar_feeds",
         "reminders_sent", "oauth_clients", "oauth_grants", "oauth_codes", "oauth_tokens", "oauth_consents"}
 ASSISTANT_TABLES = ("oauth_tokens", "oauth_codes", "oauth_consents", "oauth_grants", "oauth_clients")
 NEWER = "That backup is from a newer version of Waypoint. Update Waypoint first."
