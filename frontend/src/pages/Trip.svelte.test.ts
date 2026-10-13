@@ -22,7 +22,7 @@ const flight = segment({ id: 1, locked_fields: ["terminal"], manage_url: "https:
   travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }, { id: 2, person_id: 2, name: "Sam Doe", seat: null }, { id: 3, person_id: null, name: "DOE/MIA MISS", seat: null }] });
 const stay = segment({ id: 2, kind: "hotel", provider: "Marriott", origin: "Harbour Hotel", destination: null, start_local: "2026-11-21T15:00", start_zone: "Europe/London",
   end_local: "2026-11-27T10:00", end_zone: "Europe/London", confirmation: "H88231", details: { address: "1 Quay Street, London", phone: "+44 20 7946 0000" },
-  links: { app: null, open: null, open_kind: null, directions: "https://maps.apple.com/?q=1%20Quay%20Street%2C%20London", call: "tel:+442079460000" }, status: "changed", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] });
+  links: { app: null, open: null, open_kind: null, directions: "https://www.google.com/maps/search/?api=1&query=1%20Quay%20Street%2C%20London", call: "tel:+442079460000" }, status: "changed", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] });
 const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: null, statuses: [{
   segment_id: 1, state: "delayed", origin: "JFK", destination: "LHR", dep_scheduled: "2026-11-20T19:00", dep_estimated: "2026-11-20T19:50",
   dep_actual: null, dep_zone: "America/New_York", dep_terminal: "7", dep_gate: "B24", arr_scheduled: "2026-11-21T07:10", arr_estimated: "2026-11-21T08:05",
@@ -91,6 +91,23 @@ describe("Trip", () => {
       const card = await cardOf(flightFor);
       expect(card).toHaveTextContent("Jane Doe · Seat 31A");
       expect(card).toHaveTextContent("Sam Doe · Seat 31B");
+    });
+
+    it("keeps a booking-level seat that no traveller holds", async () => {
+      const odd = segment({ id: 1, details: { seat: "99Z" }, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: "12A" }, { id: 2, person_id: 2, name: "Sam Doe", seat: null }] });
+      held = trip([odd, car]);
+      render(TripPage);
+      const card = await cardOf(odd);
+      expect(card).toHaveTextContent("99Z");
+      expect(card).toHaveTextContent("Jane Doe · Seat 12A");
+    });
+
+    it("lists each seat once on a flight, beside its traveller", async () => {
+      held = trip([flightFor, car]);
+      render(TripPage);
+      const card = await cardOf(flightFor);
+      expect(card.textContent?.match(/31A/g)).toHaveLength(1);
+      expect(card.textContent?.match(/31B/g)).toHaveLength(1);
     });
 
     it("never lists travellers on a rental car, whether it has the trip's full set or a smaller one", async () => {
@@ -451,7 +468,7 @@ describe("Trip", () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
     const hotel = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
-    expect(hotel.getByRole("link", { name: "Directions" })).toHaveAttribute("href", "https://maps.apple.com/?q=1%20Quay%20Street%2C%20London");
+    expect(hotel.getByRole("link", { name: "Directions" })).toHaveAttribute("href", "https://www.google.com/maps/search/?api=1&query=1%20Quay%20Street%2C%20London");
     expect(hotel.getByRole("link", { name: "Call" })).toHaveAttribute("href", "tel:+442079460000");
     expect(hotel.queryByRole("link", { name: "Manage booking" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Wallet" })).toBeNull();
@@ -487,7 +504,7 @@ describe("Trip", () => {
   });
 
   it("keeps a cancelled booking’s manage link and drops its other actions", async () => {
-    held = trip([{ ...stay, status: "cancelled", links: { app: "https://example.com/manage", open: null, open_kind: null, directions: "https://maps.apple.com/?q=x", call: "tel:+442079460000" } }]);
+    held = trip([{ ...stay, status: "cancelled", links: { app: "https://example.com/manage", open: null, open_kind: null, directions: "https://www.google.com/maps/search/?api=1&query=x", call: "tel:+442079460000" } }]);
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
     const group = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
@@ -768,7 +785,7 @@ describe("Trip", () => {
   describe("a parking booking", () => {
     const lot = segment({ id: 6, kind: "parking", provider: "Example Parking", origin: "Example Long-Term Lot", destination: null, start_zone: "America/New_York", end_zone: "America/New_York",
       start_local: "2026-11-20T16:00", end_local: "2026-11-27T21:00", confirmation: "PK1234", details: { space_type: "Covered", address: "1 Terminal Road\nJamaica, NY", vehicle: "Blue hatchback" },
-      links: { app: null, open: null, open_kind: null, directions: "https://maps.apple.com/?q=1%20Terminal%20Road%20Jamaica%2C%20NY", call: null } });
+      links: { app: null, open: null, open_kind: null, directions: "https://www.google.com/maps/search/?api=1&query=1%20Terminal%20Road%20Jamaica%2C%20NY", call: null } });
 
     it("leads with the lot, shows Entry and Exit at the lot’s times, its address, details and a Directions button", async () => {
       held = trip([lot]);
@@ -977,7 +994,7 @@ describe("Trip", () => {
     });
 
     it("offers Add address only when there is none, and opens the form at the address field", async () => {
-      held = trip([flight, { ...stay, details: {}, links: { app: null, open: null, open_kind: null, directions: "https://maps.apple.com/?q=Harbour%20Hotel", call: null } }]);
+      held = trip([flight, { ...stay, details: {}, links: { app: null, open: null, open_kind: null, directions: "https://www.google.com/maps/search/?api=1&query=Harbour%20Hotel", call: null } }]);
       const u = userEvent.setup();
       render(TripPage);
       await screen.findByRole("heading", { name: "Trip to London" });
@@ -1041,7 +1058,7 @@ describe("Trip", () => {
   describe("a cruise", () => {
     const ship = segment({ id: 5, kind: "cruise", provider: "Example Cruise Line", origin: "Miami", destination: "Miami", start_zone: "America/New_York", end_zone: "America/New_York",
       start_local: "2026-03-01T16:30", end_local: "2026-03-08T07:00", confirmation: "CR48210", details: { ship: "Example Voyager", room: "9214", address: "1 Port Boulevard\nMiami" },
-      links: { app: null, open: null, open_kind: null, directions: "https://maps.apple.com/?q=1%20Port%20Boulevard%20Miami", call: null },
+      links: { app: null, open: null, open_kind: null, directions: "https://www.google.com/maps/search/?api=1&query=1%20Port%20Boulevard%20Miami", call: null },
       itinerary: [{ name: "Nassau", zone: "America/Nassau", arrive_local: "2026-03-02T08:00", depart_local: "2026-03-02T17:00" },
                   { name: "Cozumel", zone: "America/Cancun", arrive_local: null, depart_local: null }],
       days: [

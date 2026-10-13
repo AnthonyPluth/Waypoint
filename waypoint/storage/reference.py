@@ -30,6 +30,11 @@ def airport_rows() -> list[dict]:
             for c, n, city, country, z, lat, lon in _rows("airports.tsv.gz")]
 
 
+@cache
+def airport_names() -> dict[str, str]:
+    return {row["code"]: row["name"] for row in airport_rows()}
+
+
 def airline_rows() -> list[dict]:
     return [{"code": code, "icao": icao or None, "name": name, "country": country or None}
             for code, icao, name, country in _rows("airlines.tsv.gz")]

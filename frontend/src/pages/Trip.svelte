@@ -143,6 +143,12 @@
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
   const everyone = $derived(trip ? tripTravellers(trip.segments) : []);
   const eyebrowOf = (s: Segment) => `${kindName(s)} · ${dayLabel(s.start_local)}`;
+  const omitted = (s: Segment) => ["Address", "Pick-up address", ...(seatsListed(s) ? ["Seat"] : [])];
+  const seatsListed = (s: Segment) => {
+    const named = new Set(s.travelers.map((t) => t.seat?.trim()).filter(Boolean));
+    const shown = (s.details.seat || [...named].join(",")).split(",").map((x) => x.trim()).filter(Boolean);
+    return showBookingTravellers(s, everyone) && named.size > 0 && shown.every((x) => named.has(x));
+  };
   const kindName = (s: Segment) => KINDS.find(([k]) => k === s.kind)?.[1] ?? s.kind;
   const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
 
@@ -311,7 +317,7 @@
     {#each cards as card (card.id)}
       {@const s = card.lead}
       {#if card.segments.length === 1}
-        <PassCard as="li" id={`segment-${s.id}`} highlight={wanted === String(s.id)} segment={s} {now} level={2} eyebrow={eyebrowOf(s)} showApp={false} omit={["Address"]}>
+        <PassCard as="li" id={`segment-${s.id}`} highlight={wanted === String(s.id)} segment={s} {now} level={2} eyebrow={eyebrowOf(s)} showApp={false} omit={omitted(s)}>
           {#snippet times()}<dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(s)}</dl>{/snippet}
           {#snippet details()}{@render ports(s)}{@render links(s)}{/snippet}
           {#snippet live()}{#if !over && s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
@@ -406,7 +412,7 @@
     <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
       {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>
       {:else if vendor}<Button variant="outline" size="sm" href={vendor.href}>{vendor.label}</Button>{/if}
-      {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
+      {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">{s.kind === "flight" && s.origin ? `Directions to ${s.origin}` : "Directions"}</Button>{/if}
       {#if s.status !== "cancelled" && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
       <GateCode segment={s} {now} onchanged={() => void load()} />
       {#if s.has_email}

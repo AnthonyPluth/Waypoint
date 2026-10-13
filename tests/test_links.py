@@ -54,7 +54,7 @@ class Others(unittest.TestCase):
             self.assertIsNone(links.https_only(bad), bad)
 
     def test_directions_and_call(self):
-        self.assertEqual(links.directions_link("1 Quay St, London & more"), "https://maps.apple.com/?q=1%20Quay%20St%2C%20London%20%26%20more")
+        self.assertEqual(links.directions_link("1 Quay St, London & more"), "https://www.google.com/maps/search/?api=1&query=1%20Quay%20St%2C%20London%20%26%20more")
         self.assertIsNone(links.directions_link("  "))
         self.assertEqual(links.call_link("+44 (20) 7946-0000"), "tel:+442079460000")
         self.assertEqual(links.call_link("800 555 0100"), "tel:8005550100")
@@ -108,11 +108,11 @@ class Others(unittest.TestCase):
 
     def test_segment_links(self):
         hotel = links.segment_links("hotel", "Hilton", "H1", "Doe", "https://example.com/m", {"address": "1 Quay St", "phone": "+1 555 010 0100"}, "Harbour")
-        self.assertEqual(hotel, {"app": "https://example.com/m", "open": None, "open_kind": None, "directions": "https://maps.apple.com/?q=1%20Quay%20St", "call": "tel:+15550100100"})
+        self.assertEqual(hotel, {"app": "https://example.com/m", "open": None, "open_kind": None, "directions": "https://www.google.com/maps/search/?api=1&query=1%20Quay%20St", "call": "tel:+15550100100"})
         flight = links.segment_links("flight", "Example Air", "ABC123", "Doe", "http://example.com/m", {}, "JFK")
-        self.assertEqual(flight, {"app": None, "open": None, "open_kind": None, "directions": None, "call": None})
+        self.assertEqual(flight, {"app": None, "open": None, "open_kind": None, "directions": links.directions_link(links.airport_query("JFK")), "call": None})
         car = links.segment_links("car", "Hertz", "C1", None, None, {}, "SFO airport")
-        self.assertEqual(car["directions"], "https://maps.apple.com/?q=SFO%20airport")
+        self.assertEqual(car["directions"], "https://www.google.com/maps/search/?api=1&query=SFO%20airport")
 
 
 class VendorLinkTests(unittest.TestCase):
@@ -174,3 +174,19 @@ class VendorLinkTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AirportAndAppLinks(unittest.TestCase):
+    def test_a_flight_gets_directions_to_its_departure_airport_by_name(self):
+        got = links.segment_links("flight", "United Airlines", None, None, None, {}, "MSP")
+        self.assertEqual(got["directions"], "https://www.google.com/maps/search/?api=1&query=" + links.quote(links.airport_query("MSP") or "", safe=""))
+        self.assertIn("Minneapolis", links.airport_query("msp") or "")
+
+    def test_an_unknown_airport_or_none_has_no_directions(self):
+        self.assertIsNone(links.segment_links("flight", None, None, None, None, {}, "ZZZZ")["directions"])
+        self.assertIsNone(links.segment_links("flight", None, None, None, None, {}, None)["directions"])
+
+    def test_a_hotel_cruise_chain_with_a_verified_app_link_opens_the_app(self):
+        for kind, provider in (("hotel", "Wyndham"), ("hotel", "Best Western"), ("cruise", "Holland America Line")):
+            got = links.segment_links(kind, provider, None, None, None, {}, None)
+            self.assertEqual(got["open_kind"], "app", provider)
