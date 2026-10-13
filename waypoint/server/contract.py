@@ -279,6 +279,7 @@ class Review(TypedDict):
     matches: list[ReviewMatch]
     who: list[WhoIsThis]
     ai: bool
+    ai_mode: NotRequired[Literal["local", "openrouter"]]
 
 
 class Preview(TypedDict):

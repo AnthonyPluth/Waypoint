@@ -159,7 +159,11 @@
   }, { busy: (on) => (on ? asking_ai.add(item.id) : asking_ai.delete(item.id)) });
 
   let asking_all = $state(false);
-  const unasked = $derived(review?.ai ? review.items.filter((i) => !i.suggestions.length && !asking_ai.has(i.id)) : []);
+  const askable = (items: ReviewItem[]) => review?.ai ? items.filter((i) => !i.suggestions.length && !asking_ai.has(i.id)) : [];
+  const unasked = $derived(askable(shown));
+  const unaskedElsewhere = $derived(only ? askable(review?.items ?? []).length - unasked.length : 0);
+  const aiWhere = $derived(review?.ai_mode === "local" ? "your own Ollama server, unredacted" : "OpenRouter, redacted first");
+  const aiNote = (n: number) => `The text of ${n === 1 ? "this email goes" : `these ${n} emails goes`} to ${aiWhere}.`;
   const askAll = (items: ReviewItem[]) => act(async () => {
     let done = 0;
     try {
@@ -466,8 +470,13 @@
         {#if only}
           <p class="px-1 text-sm" data-testid="review-filter">Showing only mail from {only.sender}{only.mailbox ? ` in ${only.mailbox}` : ""}{shown.length ? "" : ", and none is waiting"}. <button type="button" class="underline underline-offset-2" onclick={() => setQuery("")}>Show everything</button></p>
         {/if}
-        {#if unasked.length > 1}
-          <div class="px-1"><Button variant="outline" size="sm" disabled={asking_all} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : `Ask AI about all ${unasked.length}`}</Button></div>
+        {#if unasked.length > 1 || (only && unasked.length > 0)}
+          <div class="space-y-1 px-1" data-testid="ask-all">
+            <Button variant="outline" size="sm" disabled={asking_all} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : only ? `Ask AI about these ${unasked.length} ${unasked.length === 1 ? "email" : "emails"}` : `Ask AI about all ${unasked.length}`}</Button>
+            <p class="text-xs text-muted-foreground">{aiNote(unasked.length)}</p>
+          </div>
+        {:else if only && unaskedElsewhere > 0 && review?.ai}
+          <p class="px-1 text-sm text-muted-foreground" data-testid="ask-none-here">Nothing shown here is waiting for the AI. {unaskedElsewhere} {unaskedElsewhere === 1 ? "email" : "emails"} from other senders or mailboxes {unaskedElsewhere === 1 ? "is" : "are"} hidden by this filter; show everything to ask about them.</p>
         {/if}
         <ul class="rows" aria-label="Couldn’t read">
           {#each shown as item (item.id)}

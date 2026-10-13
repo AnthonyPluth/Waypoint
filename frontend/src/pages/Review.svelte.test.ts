@@ -929,6 +929,47 @@ describe("Review: Ask AI", () => {
     expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest", "/api/review/2/suggest", "/api/review/3/suggest"]);
   });
 
+  it("asks only about the filtered emails, not the ones the filter hides", async () => {
+    held = { matches: [], who: [], ai: true, ai_mode: "openrouter", items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "seaside-stays.example" }),
+      item({ id: 3, sender_domain: "seaside-stays.example" }), item({ id: 4, sender_domain: "other.example" })] };
+    setQuery("sender=seaside-stays.example");
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about these 2 emails" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 2 messages"));
+    expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/2/suggest", "/api/review/3/suggest"]);
+  });
+
+  it("says where the text goes next to the bulk button", async () => {
+    held = { matches: [], who: [], ai: true, ai_mode: "openrouter", items: [item(), item({ id: 2 })] };
+    const view = render(ReviewPage);
+    expect(await screen.findByTestId("ask-all")).toHaveTextContent("The text of these 2 emails goes to OpenRouter, redacted first.");
+    view.unmount();
+    held = { ...held, ai_mode: "local" };
+    render(ReviewPage);
+    expect(await screen.findByTestId("ask-all")).toHaveTextContent("to your own Ollama server, unredacted.");
+  });
+
+  it("does not widen the scope when the filter has nothing to ask about", async () => {
+    held = { matches: [], who: [], ai: true, items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "example-air.example" }),
+      item({ id: 3, sender_domain: "seaside-stays.example", suggestions: [SUGGESTION] })] };
+    setQuery("sender=seaside-stays.example");
+    render(ReviewPage);
+    expect(await screen.findByTestId("ask-none-here")).toHaveTextContent("2 emails from other senders or mailboxes are hidden by this filter");
+    expect(screen.queryByRole("button", { name: /Ask AI about (all|these)/ })).toBeNull();
+    expect(calls.filter((c) => c[0].endsWith("/suggest"))).toHaveLength(0);
+  });
+
+  it("offers the filtered bulk ask for a single email, and keeps the count when stopped by a failure", async () => {
+    held = { matches: [], who: [], ai: true, ai_mode: "local", items: [item({ id: 1, sender_domain: "a.example" }), item({ id: 2, sender_domain: "b.example" }), item({ id: 3, sender_domain: "b.example" })] };
+    suggestFails = "Turn on AI suggestions in Settings first.";
+    setQuery("sender=b.example");
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about these 2 emails" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Asked about 0 of 2: Turn on AI suggestions in Settings first."));
+    setQuery("sender=a.example");
+    expect(await screen.findByRole("button", { name: "Ask AI about these 1 email" })).toBeInTheDocument();
+  });
+
   it("asks about shared items too, alone and in bulk", async () => {
     held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" }), item({ id: 5, mine: true })], who: [], ai: true };
     render(ReviewPage);
