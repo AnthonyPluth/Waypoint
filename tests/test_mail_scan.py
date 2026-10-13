@@ -895,7 +895,7 @@ class RoundTripScanTests(ScanCase):
         ids = [m["id"] for m in made if m]
         self.assertEqual(len(ids), 2)
         self.assertEqual(len({m["trip_id"] for m in made if m}), 1)
-        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, ids))))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, ids), trust=True)))
         self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, "rewards-travel.example")))
         for each in ids:
             emails = self.read(lambda conn, each=each: trips.emails_of(conn, self.jane, each))
