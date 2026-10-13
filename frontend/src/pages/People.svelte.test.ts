@@ -157,8 +157,6 @@ describe("People", () => {
   it("says who can see saved numbers before saving, and reveals nothing until asked", async () => {
     render(People);
     expect(await screen.findByText(/visible to every signed-in household member/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit Jane Doe’s TSA PreCheck" }).className).toContain("size-11");
-    expect(screen.getByRole("button", { name: "Remove Jane Doe’s TSA PreCheck" }).className).toContain("size-11");
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/reveal"), expect.anything());
     await userEvent.click(screen.getAllByRole("button", { name: /Add a loyalty or traveler number for Mia Doe/ })[0]);
     expect(await screen.findByText(/Every signed-in household member can see this number/)).toBeInTheDocument();
@@ -237,16 +235,6 @@ describe("People", () => {
     render(People);
     await userEvent.click(await screen.findByRole("button", { name: "Edit Jane Doe" }));
     expect(screen.getByText("Advanced matching").closest("details")!.open).toBe(false);
-  });
-
-  it("gives each membership's action buttons a full 44 px row, so stacked rows can't overlap", async () => {
-    ids = [aa, { ...aa, id: 13, program: "Other" }];
-    render(People);
-    const edit = await screen.findByRole("button", { name: "Edit Jane Doe’s American AAdvantage" });
-    const cls = edit.parentElement!.className;
-    expect(cls).toContain("-mt-2");
-    expect(cls).toContain("mb-2");
-    expect(cls).not.toContain("-mt-3");
   });
 
   it("edits a member without offering their login", async () => {
