@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from typing import TypedDict
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from ..storage import db
 from ..storage.models import Airport
@@ -20,6 +20,24 @@ class Found(TypedDict):
 def lookup(conn: db.Connection, code: str) -> Found | None:
     a = conn.orm.get(Airport, code.strip().upper())
     return {"code": a.code, "name": a.name, "city": a.city, "country": a.country, "zone": a.zone} if a else None
+
+
+def search(conn: db.Connection, text: str, limit: int = 8) -> list[Found]:
+    wanted = " ".join(text.split())[:60]
+    if len(wanted) < 2:
+        return []
+    code = wanted.upper()
+    rows = conn.orm.scalars(
+        select(Airport).where(or_(Airport.code == code, func.lower(Airport.city).contains(wanted.lower(), autoescape=True),
+                                  func.lower(Airport.name).contains(wanted.lower(), autoescape=True)))
+    ).all()
+
+    def rank(a: Airport) -> tuple[int, str, str]:
+        low = wanted.lower()
+        tier = 0 if a.code == code else 1 if a.city.lower().startswith(low) else 2 if a.name.lower().startswith(low) else 3
+        return (tier, a.city.lower(), a.code)
+
+    return [{"code": a.code, "name": a.name, "city": a.city, "country": a.country, "zone": a.zone} for a in sorted(rows, key=rank)[:limit]]
 
 
 def zones(conn: db.Connection, codes: list[str]) -> dict[str, str]:

@@ -91,14 +91,19 @@ export const draftOf = (s: Segment, currency = DEFAULT_CURRENCY): Draft => ({
 const AIRPORT = /^[A-Za-z]{3}$/;
 const LOCAL = /^\d{4}-\d\d-\d\dT\d\d:\d\d/;
 
-export function visitProblem(row: VisitRow): string | null {
-  if (!/^[A-Za-z]{2}$/.test(row.destination.trim())) return "Choose the country";
-  if (row.destination.trim().toUpperCase() === "US" && (row.state ?? "").trim() && !isUsState(row.state?.trim().toUpperCase() ?? "")) return "Choose one of the states, or leave the state blank";
-  if (!LOCAL.test(row.start_local)) return "Enter the first day you were there";
-  if (!LOCAL.test(row.end_local)) return "Enter the last day you were there";
-  if (row.end_local < row.start_local) return "The last day can’t be before the first";
-  return null;
+export type Issue = { field: string; message: string };
+
+export function visitIssues(row: VisitRow): Issue[] {
+  const found: Issue[] = [];
+  if (!/^[A-Za-z]{2}$/.test(row.destination.trim())) found.push({ field: "country", message: "Choose the country" });
+  else if (row.destination.trim().toUpperCase() === "US" && (row.state ?? "").trim() && !isUsState(row.state?.trim().toUpperCase() ?? "")) found.push({ field: "state", message: "Choose one of the states, or leave the state blank" });
+  if (!LOCAL.test(row.start_local)) found.push({ field: "first", message: "Enter the first day you were there" });
+  if (!LOCAL.test(row.end_local)) found.push({ field: "last", message: "Enter the last day you were there" });
+  else if (LOCAL.test(row.start_local) && row.end_local < row.start_local) found.push({ field: "last", message: "The last day can’t be before the first" });
+  return found;
 }
+
+export const visitProblem = (row: VisitRow): string | null => visitIssues(row)[0]?.message ?? null;
 
 export const MAX_FLIGHT_HOURS = 30;
 
@@ -114,57 +119,76 @@ function knownZone(zone: string): boolean {
   try { new Intl.DateTimeFormat("en-US", { timeZone: zone }); return true; } catch { return false; }
 }
 
-export function problem(d: Draft): string | null {
+const place = (kind: Kind, hotel: string, parking: string, other: string) => (kind === "hotel" ? hotel : kind === "parking" ? parking : other);
+
+export function issues(d: Draft): Issue[] {
+  const found: Issue[] = [];
+  const add = (field: string, message: string) => found.push({ field, message });
   if (d.kind === "visit") {
     const rows = visitRows(d);
-    if (rows.length > MAX_VISITS) return `Add at most ${MAX_VISITS} countries`;
+    if (rows.length > MAX_VISITS) add("visits", `Add at most ${MAX_VISITS} countries`);
     for (const [i, row] of rows.entries()) {
-      const found = visitProblem(row);
-      if (found) return rows.length > 1 ? `Country ${i + 1}: ${found}` : found;
+      for (const one of visitIssues(row)) add(`${one.field}-${i}`, rows.length > 1 ? `Country ${i + 1}: ${one.message}` : one.message);
     }
-    return d.people.length + d.printed.length === 0 ? "Choose who’s travelling" : null;
+    if (d.people.length + d.printed.length === 0) add("travelers", "Choose who’s travelling");
+    return found;
   }
   const flight = d.kind === "flight";
   if (flight) {
-    if (!AIRPORT.test(d.origin.trim())) return "A flight’s origin is an airport code like JFK";
-    if (!AIRPORT.test(d.destination.trim())) return "A flight’s destination is an airport code like LHR";
+    if (!AIRPORT.test(d.origin.trim())) add("origin", "Choose the airport it leaves from: search by city or name, or enter its three-letter code like JFK");
+    if (!AIRPORT.test(d.destination.trim())) add("destination", "Choose the airport it arrives at: search by city or name, or enter its three-letter code like LHR");
   } else if (d.kind === "hotel" && !d.origin.trim()) {
-    return "Enter the hotel’s name";
+    add("origin", "Enter the hotel’s name");
   } else if (d.kind === "parking" && !d.origin.trim()) {
-    return "Enter the lot’s name";
+    add("origin", "Enter the lot’s name");
   }
   const stay = d.kind === "hotel" || d.kind === "parking";
-  if (!LOCAL.test(d.start_local)) return d.kind === "hotel" ? "Enter the check-in date and time" : d.kind === "parking" ? "Enter the entry date and time" : "Enter when it starts";
-  if (!LOCAL.test(d.end_local)) return d.kind === "hotel" ? "Enter the check-out date and time" : d.kind === "parking" ? "Enter the exit date and time" : "Enter when it ends";
-  if (stay && !d.start_zone.trim() && !(d.details.address ?? "").trim()) return "Enter the time zone of the stay (for example America/New_York), or its address to work it out from";
-  if (d.kind === "cruise" && !d.start_zone.trim()) return "Enter the time zone of the place (for example America/New_York)";
-  for (const zone of [d.start_zone.trim(), stay ? "" : d.end_zone.trim()]) {
-    if (zone && !knownZone(zone)) return `The time zone “${zone.slice(0, 40)}” isn’t one Waypoint knows (use a name like America/New_York)`;
-  }
-  const startZone = d.start_zone.trim(), endZone = stay ? startZone : d.end_zone.trim() || startZone;
-  if (startZone && endZone && instant(d.end_local, endZone) < instant(d.start_local, startZone)) {
-    return "This ends before it starts (times are compared at their own places’ zones)";
-  }
-  if ((d.details.address ?? "").trim().length > ADDRESS_LIMIT) return `The address can be at most ${ADDRESS_LIMIT} characters`;
-  if (d.kind === "cruise") {
-    if (d.itinerary.length > MAX_PORTS) return `Add at most ${MAX_PORTS} ports of call`;
-    for (const [i, p] of d.itinerary.entries()) {
-      if (!p.name.trim()) return `Name port ${i + 1}`;
-      if (!p.zone.trim()) return `Enter the time zone of ${p.name.trim().slice(0, 40)} (for example America/Nassau)`;
-      if (!knownZone(p.zone.trim())) return `The time zone “${p.zone.trim().slice(0, 40)}” of ${p.name.trim().slice(0, 40)} isn’t one Waypoint knows (use a name like America/Nassau)`;
-      for (const [word, at] of [["arrival", p.arrive], ["departure", p.depart]]) if (at && !LOCAL.test(at)) return `Enter ${p.name.trim().slice(0, 40)}’s ${word} as a date and time`;
-      if (p.arrive && p.depart && instant(p.depart, p.zone.trim()) < instant(p.arrive, p.zone.trim())) return `${p.name.trim().slice(0, 40)}: the ship can’t leave before it arrives`;
+  const startOk = LOCAL.test(d.start_local), endOk = LOCAL.test(d.end_local);
+  if (!startOk) add("start", place(d.kind, "Enter the check-in date and time", "Enter the entry date and time", "Enter when it starts"));
+  if (!endOk) add("end", place(d.kind, "Enter the check-out date and time", "Enter the exit date and time", "Enter when it ends"));
+  let zonesKnown = true;
+  if (stay && !d.start_zone.trim() && !(d.details.address ?? "").trim()) add("start_zone", "Enter the time zone of the stay (for example America/New_York), or its address to work it out from");
+  if (d.kind === "cruise" && !d.start_zone.trim()) add("start_zone", "Enter the time zone of the place (for example America/New_York)");
+  for (const [field, zone] of [["start_zone", d.start_zone.trim()], ["end_zone", stay ? "" : d.end_zone.trim()]]) {
+    if (zone && !knownZone(zone)) {
+      zonesKnown = false;
+      add(field, `The time zone “${zone.slice(0, 40)}” isn’t one Waypoint knows (use a name like America/New_York)`);
     }
   }
-  for (const seat of Object.values(d.seats)) if (seat.trim().length > SEAT_LIMIT) return `A seat is at most ${SEAT_LIMIT} characters`;
-  if (d.manage_url.trim() && !/^https?:\/\//i.test(d.manage_url.trim())) return "The manage link must start with https:// or http://";
-  if (d.cost.trim()) {
-    if (!/^[A-Za-z]{3}$/.test(d.currency.trim())) return "Enter the cost’s currency as a three-letter code like USD";
-    if (toMinor(d.cost, d.currency.trim().toUpperCase()) === null) return "Enter the cost as an amount like 1240.00";
+  const startZone = d.start_zone.trim(), endZone = stay ? startZone : d.end_zone.trim() || startZone;
+  if (startOk && endOk && zonesKnown && startZone && endZone && instant(d.end_local, endZone) < instant(d.start_local, startZone)) {
+    add("end", "This ends before it starts (times are compared at their own places’ zones)");
   }
-  if (!FOR_EVERYONE.includes(d.kind) && d.people.length + d.printed.length === 0) return "Choose who’s travelling";
-  return null;
+  if ((d.details.address ?? "").trim().length > ADDRESS_LIMIT) add("address", `The address can be at most ${ADDRESS_LIMIT} characters`);
+  if (d.kind === "cruise") {
+    if (d.itinerary.length > MAX_PORTS) add("ports", `Add at most ${MAX_PORTS} ports of call`);
+    for (const [i, p] of d.itinerary.entries()) {
+      const name = p.name.trim().slice(0, 40);
+      if (!p.name.trim()) add(`port-${i}-name`, `Name port ${i + 1}`);
+      if (!p.zone.trim()) add(`port-${i}-zone`, `Enter the time zone of ${name} (for example America/Nassau)`);
+      else if (!knownZone(p.zone.trim())) add(`port-${i}-zone`, `The time zone “${p.zone.trim().slice(0, 40)}” of ${name} isn’t one Waypoint knows (use a name like America/Nassau)`);
+      for (const [word, at, key] of [["arrival", p.arrive, "arrive"], ["departure", p.depart, "depart"]]) if (at && !LOCAL.test(at)) add(`port-${i}-${key}`, `Enter ${name}’s ${word} as a date and time`);
+      if (p.arrive && p.depart && LOCAL.test(p.arrive) && LOCAL.test(p.depart) && p.zone.trim() && knownZone(p.zone.trim()) && instant(p.depart, p.zone.trim()) < instant(p.arrive, p.zone.trim())) add(`port-${i}-depart`, `${name}: the ship can’t leave before it arrives`);
+    }
+  }
+  for (const [key, seat] of Object.entries(d.seats)) if (seat.trim().length > SEAT_LIMIT) add(`seat-${key}`, `A seat is at most ${SEAT_LIMIT} characters`);
+  if (d.manage_url.trim() && !/^https?:\/\//i.test(d.manage_url.trim())) add("manage_url", "The manage link must start with https:// or http://");
+  if (d.cost.trim()) {
+    if (!/^[A-Za-z]{3}$/.test(d.currency.trim())) add("currency", "Enter the cost’s currency as a three-letter code like USD");
+    else if (toMinor(d.cost, d.currency.trim().toUpperCase()) === null) add("cost", "Enter the cost as an amount like 1240.00");
+  }
+  if (!FOR_EVERYONE.includes(d.kind) && d.people.length + d.printed.length === 0) add("travelers", "Choose who’s travelling");
+  return found;
 }
+
+export const problem = (d: Draft): string | null => issues(d)[0]?.message ?? null;
+
+export const STAYS: Kind[] = ["hotel", "parking"];
+
+export const inMore = (field: string, kind: Kind): boolean => ["manage_url", "cost", "currency"].includes(field) || (field === "address" && !STAYS.includes(kind));
+
+export const hasMore = (d: Draft): boolean =>
+  d.status !== "confirmed" || !!d.manage_url.trim() || !!d.cost.trim() || d.costSource !== null || DETAILS[d.kind].some(([key]) => !(key === "address" && STAYS.includes(d.kind)) && (d.details[key] ?? "").trim()) || (d.kind === "car" && !!d.addressField);
 
 export const differs = (address: string | undefined, origin: string | null | undefined): boolean =>
   !!address?.trim() && address.trim().split(/\s+/).join(" ").toLowerCase() !== (origin ?? "").trim().split(/\s+/).join(" ").toLowerCase();

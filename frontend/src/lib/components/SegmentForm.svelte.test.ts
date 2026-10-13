@@ -87,16 +87,17 @@ describe("SegmentForm: the explanatory text is gone", () => {
     }
   });
 
-  it.each(["hotel", "parking"] as const)("keeps the blank zone choice for a %s", (kind) => {
+  it.each(["hotel", "parking"] as const)("keeps the blank zone choice for a %s", async (kind) => {
     mount(draft(kind));
+    await userEvent.click(screen.getByRole("button", { name: "Set the time zone by hand" }));
     expect(screen.getByPlaceholderText("Work it out from the address")).toBeInTheDocument();
   });
 
   it("still says what to enter when a stay has neither a time zone nor an address", async () => {
     const onsaved = vi.fn();
     mount(draft("hotel"), onsaved);
-    await userEvent.click(screen.getByRole("button", { name: "Add" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Enter the time zone of the stay");
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
+    expect(await screen.findByText(/Enter the time zone of the stay/)).toBeInTheDocument();
     await waitFor(() => expect(onsaved).not.toHaveBeenCalled());
   });
 });
@@ -117,8 +118,8 @@ describe("SegmentForm: the cost", () => {
   it("refuses an amount it can't read, before saving", async () => {
     const onsaved = vi.fn();
     mount(draft("hotel", { start_zone: "Europe/London", cost: "abc" }), onsaved);
-    await userEvent.click(screen.getByRole("button", { name: "Add" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Enter the cost as an amount like 1240.00");
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
+    expect(await screen.findByText(/Enter the cost as an amount like 1240.00/)).toBeInTheDocument();
     expect(onsaved).not.toHaveBeenCalled();
   });
 });
@@ -148,6 +149,7 @@ describe("SegmentForm: a past trip's state", () => {
 describe("SegmentForm: the time zone field", () => {
   it("searches the start zone of a stay and fills it in", async () => {
     mount(draft("hotel"));
+    await userEvent.click(screen.getByRole("button", { name: "Set the time zone by hand" }));
     const field = screen.getByLabelText("Time zone");
     await chooseZone(field, "America/Chicago");
     expect(field).toHaveValue("America/Chicago");
@@ -163,5 +165,79 @@ describe("SegmentForm: the time zone field", () => {
     await userEvent.keyboard("{Enter}");
     expect(port).toHaveValue("America/Nassau");
     expect(screen.queryAllByRole("listbox", { hidden: true })).toHaveLength(0);
+  });
+});
+
+describe("SegmentForm: grouped fields and errors at their fields", () => {
+  const headings = () => screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+
+  it("groups a flight as Booking, When and where, Travelers, with the rest under More details", () => {
+    render(SegmentForm, { props: { initial: draft("flight", { origin: "JFK", destination: "LHR" }), people: [{ id: 1, display_name: "Jane Doe" }] as never, onsaved: vi.fn(), oncancel: vi.fn() } });
+    expect(headings()).toEqual(["Booking", "When and where", "Travelers"]);
+    expect(screen.getByText("More details").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByLabelText("From (airport)")).toBeVisible();
+  });
+
+  it("has no Travelers group for a hotel, and no time zone field until asked for", () => {
+    mount(draft("hotel"));
+    expect(headings()).toEqual(["Booking", "When and where"]);
+    expect(screen.queryByLabelText("Time zone")).toBeNull();
+    expect(screen.getByLabelText("Address")).toBeInTheDocument();
+  });
+
+  it("keeps the ports of a cruise visible and its time zone required", () => {
+    mount(draft("cruise", { start_zone: "America/Nassau" }));
+    expect(screen.getByLabelText("Time zone")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add a port" })).toBeVisible();
+  });
+
+  it("opens More details on an edit that has something in it", () => {
+    mount(draft("hotel", { id: 4, manage_url: "https://example.com/manage" }));
+    expect(screen.getByText("More details").closest("details")).toHaveAttribute("open");
+  });
+
+  it("explains a bad airport at its field, links it with aria, focuses it and keeps what was typed", async () => {
+    const onsaved = vi.fn();
+    render(SegmentForm, { props: { initial: draft("flight", { origin: "New York", destination: "LHR", end_local: "" }), people: [{ id: 1, display_name: "Jane Doe" }] as never, onsaved, oncancel: vi.fn() } });
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
+    const from = screen.getByLabelText("From (airport)");
+    expect(from).toHaveAttribute("aria-invalid", "true");
+    expect(from).toHaveFocus();
+    expect(from).toHaveValue("New York");
+    const described = document.getElementById(from.getAttribute("aria-describedby")!);
+    expect(described).toHaveTextContent(/Choose the airport it leaves from/);
+    const end = screen.getByLabelText(/^Arrives/);
+    expect(end).toHaveAttribute("aria-invalid", "true");
+    expect(document.getElementById(end.getAttribute("aria-describedby")!)).toHaveTextContent("Enter when it ends");
+    expect(onsaved).not.toHaveBeenCalled();
+  });
+
+  it("clears an error once its field is fixed", async () => {
+    mount(draft("hotel", { origin: "" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
+    const name = screen.getByLabelText("Hotel name");
+    expect(name).toHaveAttribute("aria-invalid", "true");
+    await userEvent.type(name, "Harbour Hotel");
+    expect(name).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("opens More details and focuses the manage link when that is what is wrong", async () => {
+    mount(draft("hotel", { start_zone: "Europe/London", manage_url: "ftp://nope" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
+    expect(screen.getByText("More details").closest("details")).toHaveAttribute("open");
+    expect(screen.getByLabelText("Manage link")).toHaveFocus();
+  });
+
+  it("shows the time zone field, with the error, when a stay has neither zone nor address", async () => {
+    mount(draft("hotel"));
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
+    expect(await screen.findByLabelText(/^Time zone/)).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("labels the buttons Add booking and Save changes", () => {
+    mount(draft("hotel"));
+    expect(screen.getByRole("button", { name: "Add booking" })).toBeInTheDocument();
+    mount(draft("hotel", { id: 3 }));
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
   });
 });

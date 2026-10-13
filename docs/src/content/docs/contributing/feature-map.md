@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-94 routes; 0 have no test yet.
+95 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -45,6 +45,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/segments/{id}` | `trips.py:api_segment_edit` | `lib/components/SegmentForm.svelte` | `test_api_contract.py`, `test_gate_codes.py`, `test_logos.py`, `test_mail_scan.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_offline.py`, `test_trip_destination.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `DELETE /api/segments/{id}` | `trips.py:api_segment_remove` | `pages/Trip.svelte` | `test_api_contract.py`, `test_logos.py`, `test_mail_scan.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trip_destination.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/segments/{id}/move` | `trips.py:api_segment_move` | `pages/Trip.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `GET /api/airports` | `trips.py:api_airport_search` | `lib/airport-zones.ts` | `test_api_contract.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/airports/{id}` | `trips.py:api_airport` | `lib/airport-zones.ts` | `test_api_contract.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/import/preview` | `flight_import.py:api_import_preview` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/Waypoint/start/import/) |
 | `POST /api/import` | `flight_import.py:api_import` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/Waypoint/start/import/) |

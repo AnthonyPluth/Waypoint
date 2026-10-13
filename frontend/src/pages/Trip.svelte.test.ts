@@ -568,7 +568,7 @@ describe("Trip", () => {
     expect(screen.getByLabelText("Terminal")).toHaveValue("8");
     await u.clear(screen.getByLabelText("Terminal"));
     await u.type(screen.getByLabelText("Terminal"), "7");
-    await u.click(screen.getByRole("button", { name: "Save" }));
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({
       kind: "flight", origin: "JFK", details: { flight_number: "AA 101", terminal: "7" }, travelers: [{ person_id: 1, seat: null }, { person_id: 2, seat: null }, { person_id: null, name: "DOE/MIA MISS", seat: null }] }) }));
     await waitFor(() => expect(screen.queryByRole("form")).toBeNull());
@@ -649,8 +649,8 @@ describe("Trip", () => {
     await u.clear(screen.getByLabelText(/From \(airport\)/));
     await u.type(screen.getByLabelText(/From \(airport\)/), "N1");
     await u.type(screen.getByLabelText("Seat of Jane Doe"), "12A");
-    await u.click(screen.getByRole("button", { name: "Save" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("A flight’s origin is an airport code like JFK");
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText(/Choose the airport it leaves from/)).toBeInTheDocument();
     expect(api).not.toHaveBeenCalledWith("/api/segments/1", expect.anything());
     expect(screen.getByLabelText("Seat of Jane Doe")).toHaveValue("12A");
   });
@@ -664,10 +664,10 @@ describe("Trip", () => {
       if (opts?.method === "POST") throw new Error("Someone on this isn’t in People");
       return held;
     });
-    await u.click(screen.getByRole("button", { name: "Save" }));
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Someone on this isn’t in People");
     expect(screen.getByLabelText("Seat of Jane Doe")).toHaveValue("12A");
-    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 
   it("adds a booking to this trip", async () => {
@@ -678,9 +678,10 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Hotel name"), "Harbour Hotel");
     await u.type(screen.getByLabelText(/^Check-in/), "2026-11-21T15:00");
     await u.type(screen.getByLabelText(/^Check-out/), "2026-11-27T10:00");
+    await u.click(screen.getByRole("button", { name: "Set the time zone by hand" }));
     await chooseZone(screen.getByLabelText(/^Time zone/), "Europe/London");
     expect(screen.queryByLabelText("Sam Doe")).toBeNull();
-    await u.click(screen.getByRole("button", { name: "Add" }));
+    await u.click(screen.getByRole("button", { name: "Add booking" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({
       trip_id: 1, kind: "hotel", origin: "Harbour Hotel", start_zone: "Europe/London" }) }));
     expect(vi.mocked(api).mock.calls.find((c) => c[0] === "/api/segments")?.[1]?.body).not.toHaveProperty("travelers");
@@ -702,6 +703,7 @@ describe("Trip", () => {
     expect(screen.queryByLabelText(/Time zone at the end/)).toBeNull();
     expect(screen.queryByText(/Leave this empty to work it out from the address/)).toBeNull();
     await u.selectOptions(screen.getByLabelText("What is it"), "Car rental");
+    await u.click(screen.getByRole("button", { name: "Set the time zone by hand" }));
     expect(screen.getByLabelText(/Time zone at the end/)).toBeInTheDocument();
   });
 
@@ -715,11 +717,12 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Lot name"), "Example Long-Term Lot");
     await u.type(screen.getByLabelText(/^Entry/), "2026-11-20T16:00");
     await u.type(screen.getByLabelText(/^Exit/), "2026-11-27T21:00");
+    await u.click(screen.getByRole("button", { name: "Set the time zone by hand" }));
     await chooseZone(screen.getByLabelText(/^Time zone/), "America/New_York");
     await u.type(screen.getByLabelText("Space type (covered, economy, valet)"), "Covered");
     await u.type(screen.getByLabelText("Vehicle (make and colour)"), "Blue hatchback");
     expect(screen.queryByLabelText("Sam Doe")).toBeNull();
-    await u.click(screen.getByRole("button", { name: "Add" }));
+    await u.click(screen.getByRole("button", { name: "Add booking" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({
       trip_id: 1, kind: "parking", origin: "Example Long-Term Lot", start_zone: "America/New_York", details: { space_type: "Covered", vehicle: "Blue hatchback" } }) }));
     expect(vi.mocked(api).mock.calls.find((c) => c[0] === "/api/segments")?.[1]?.body).not.toHaveProperty("travelers");
@@ -754,7 +757,7 @@ describe("Trip", () => {
       expect(screen.getByLabelText("Space type (covered, economy, valet)")).toHaveValue("Covered");
       await u.clear(screen.getByLabelText("Space type (covered, economy, valet)"));
       await u.type(screen.getByLabelText("Space type (covered, economy, valet)"), "Valet");
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/6", { method: "POST", body: expect.objectContaining({
         kind: "parking", origin: "Example Long-Term Lot", start_zone: "America/New_York", details: expect.objectContaining({ space_type: "Valet", vehicle: "Blue hatchback" }) }) }));
     });
@@ -842,7 +845,7 @@ describe("Trip", () => {
       await u.type(screen.getByLabelText("Seat of DOE/MIA MISS"), "32A");
       await u.click(screen.getByRole("checkbox", { name: "Sam Doe" }));
       expect(screen.queryByLabelText("Seat of Sam Doe")).toBeNull();
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({
         travelers: [{ person_id: 1, seat: "31A" }, { person_id: null, name: "DOE/MIA MISS", seat: "32A" }] }) }));
     });
@@ -853,7 +856,7 @@ describe("Trip", () => {
       render(TripPage);
       await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
       expect(screen.getByLabelText("Seat of Jane Doe")).toHaveValue("14C");
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({
         details: { flight_number: "AA 101" }, travelers: [{ person_id: 1, seat: "14C" }] }) }));
     });
@@ -954,7 +957,7 @@ describe("Trip", () => {
       render(TripPage);
       await u.click(await screen.findByRole("button", { name: "Add address to Harbour Hotel" }));
       await u.type(await screen.findByLabelText("Address"), "  7 Mill Lane{Enter}London N1 1AA ");
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       const post = vi.mocked(api).mock.calls.find(([path, o]) => path === "/api/segments/2" && o?.method === "POST")!;
       expect((post[1] as { body: { details: Record<string, string> } }).body.details.address).toBe("7 Mill Lane\nLondon N1 1AA");
     });
@@ -1068,7 +1071,7 @@ describe("Trip", () => {
       await u.click(screen.getByRole("button", { name: "Remove port 1" }));
       expect(screen.getByLabelText("Port 1 name")).toHaveValue("Grand Cayman");
       expect(screen.queryByLabelText("Port 3 name")).toBeNull();
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/5", { method: "POST", body: expect.objectContaining({
         kind: "cruise", itinerary: [{ name: "Grand Cayman", zone: "America/Cancun", arrive_local: null, depart_local: null },
                                     { name: "Cozumel", zone: "America/Cancun", arrive_local: null, depart_local: null }] }) }));
@@ -1080,8 +1083,8 @@ describe("Trip", () => {
       render(TripPage);
       await u.click(await screen.findByRole("button", { name: "Edit Example Voyager · Miami" }));
       await u.clear(screen.getByLabelText("Port 1 name"));
-      await u.click(screen.getByRole("button", { name: "Save" }));
-      expect(await screen.findByRole("alert")).toHaveTextContent("Name port 1");
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
+      expect(await screen.findByText(/Name port 1/)).toBeInTheDocument();
       expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
       await u.click(screen.getByRole("button", { name: "Cancel" }));
       await u.click(await screen.findByRole("button", { name: "Discard changes" }));
@@ -1210,7 +1213,7 @@ describe("Trip on a phone", () => {
     const sheet = await screen.findByRole("dialog");
     await u.clear(within(sheet).getByLabelText("Terminal"));
     await u.type(within(sheet).getByLabelText("Terminal"), "7");
-    await u.click(within(sheet).getByRole("button", { name: "Save" }));
+    await u.click(within(sheet).getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({ details: { flight_number: "AA 101", terminal: "7" } }) }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
@@ -1260,7 +1263,7 @@ describe("Trip on a phone", () => {
     const sheet = await screen.findByRole("dialog");
     await u.clear(within(sheet).getByLabelText("Terminal"));
     await u.type(within(sheet).getByLabelText("Terminal"), "7");
-    await u.click(within(sheet).getByRole("button", { name: "Save" }));
+    await u.click(within(sheet).getByRole("button", { name: "Save changes" }));
     await within(sheet).findByRole("button", { name: "Saving…" });
     await u.keyboard("{Escape}");
     await u.click(within(sheet).getByRole("button", { name: "Close" }));
@@ -1294,11 +1297,11 @@ describe("Trip on a phone", () => {
       if (opts?.method === "POST") throw new Error("Someone on this isn’t in People");
       return held;
     });
-    await u.click(within(sheet).getByRole("button", { name: "Save" }));
+    await u.click(within(sheet).getByRole("button", { name: "Save changes" }));
     expect(await within(sheet).findByRole("alert")).toHaveTextContent("Someone on this isn’t in People");
     expect(screen.getByRole("dialog")).toBe(sheet);
     expect(within(sheet).getByLabelText("Seat of Jane Doe")).toHaveValue("12A");
-    expect(within(sheet).getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(within(sheet).getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 
   it("opens Add address in the sheet too", async () => {
@@ -1382,7 +1385,7 @@ describe("beside a list of trips", () => {
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
     moveOnSave();
-    await u.click(screen.getByRole("button", { name: "Save" }));
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(onchanged).toHaveBeenCalledWith(7));
     expect(location.hash).toBe("#trip/1");
   });
@@ -1450,7 +1453,7 @@ describe("on its own page", () => {
       expect(amount).toHaveValue("1240.00");
       await u.clear(amount);
       await u.type(amount, "1,300.50");
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", expect.objectContaining({
         method: "POST", body: expect.objectContaining({ price: { amount_minor: 130050, currency: "USD" } }) })));
     });
@@ -1461,7 +1464,7 @@ describe("on its own page", () => {
       const u = userEvent.setup();
       await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
       await u.clear(screen.getByLabelText("Cost amount"));
-      await u.click(screen.getByRole("button", { name: "Save" }));
+      await u.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", expect.objectContaining({ body: expect.objectContaining({ price: null }) })));
     });
   });
@@ -1471,7 +1474,7 @@ describe("on its own page", () => {
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1" && opts?.method === "POST" ? segment({ ...flight, trip_id: 7 }) : path === "/api/people" ? { people: [jane, sam] } : path === "/api/loyalty" ? { loyalty, programs: {} } : held) as never);
-    await u.click(screen.getByRole("button", { name: "Save" }));
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(location.hash).toBe("#trip/7"));
   });
   describe("the gate code of a parking booking", () => {
