@@ -50,7 +50,7 @@ function onHashChange(): void {
   const there = (history.state as { wp?: number } | null)?.wp;
   if (!anyDirty() && !anySaving()) { here = entryOf(); readHash(); return; }
   const back = typeof there === "number" ? here - there : -1;
-  if (back !== 0) { undoing = true; history.go(back); }
+  if (back !== 0) { undoing = true; history.go(back); setTimeout(() => { undoing = false; }, 500); }
   leave(() => { location.hash = target; });
 }
 readHash();
