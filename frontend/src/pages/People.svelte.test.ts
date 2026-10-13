@@ -154,9 +154,12 @@ describe("People", () => {
     expect(screen.queryByRole("button", { name: /This is me/ })).toBeNull();
   });
 
-  it("says who can see saved numbers before saving, and reveals nothing until asked", async () => {
+  it("says who can see saved numbers before saving, and keeps the edit and remove buttons 44 px apart from the number", async () => {
     render(People);
     expect(await screen.findByText(/visible to every signed-in household member/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Jane Doe’s TSA PreCheck" }).className).toContain("size-11");
+    expect(screen.getByRole("button", { name: "Remove Jane Doe’s TSA PreCheck" }).className).toContain("size-11");
+    expect(screen.getByRole("button", { name: "Show and copy TSA PreCheck number" })).toHaveTextContent("Show and copy");
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/reveal"), expect.anything());
     await userEvent.click(screen.getAllByRole("button", { name: /Add a loyalty or traveler number for Mia Doe/ })[0]);
     expect(await screen.findByText(/Every signed-in household member can see this number/)).toBeInTheDocument();
@@ -210,7 +213,7 @@ describe("People", () => {
   it("adds a guest, with its aliases one to a line", async () => {
     render(People);
     await userEvent.click(await screen.findByRole("button", { name: /Add a guest/ }));
-    await userEvent.type(screen.getByLabelText("Name"), "Grandpa Joe");
+    await userEvent.type(screen.getByLabelText(/^Display name/), "Grandpa Joe");
     await userEvent.type(screen.getByLabelText(/Name aliases/), "OHARE/JOE MR{Enter}O HARE/JOE MR");
     await userEvent.click(screen.getByRole("button", { name: "Add guest" }));
     expect(api).toHaveBeenCalledWith("/api/people", { method: "POST", body: { display_name: "Grandpa Joe", first_name: "", legal_name: "", aliases: ["OHARE/JOE MR", "O HARE/JOE MR"] } });
@@ -222,7 +225,7 @@ describe("People", () => {
     render(People);
     await userEvent.click(await screen.findByRole("button", { name: "Edit Jane Doe" }));
     expect(screen.getByText(/link to their sign-in stays as it is/)).toBeInTheDocument();
-    const name = screen.getByLabelText("Name");
+    const name = screen.getByLabelText(/^Display name/);
     await userEvent.clear(name);
     await userEvent.type(name, "Janie");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -234,10 +237,10 @@ describe("People", () => {
     render(People);
     await userEvent.click(await screen.findByRole("button", { name: /Add a guest/ }));
     vi.mocked(api).mockRejectedValueOnce(new Error("Enter the name"));
-    await userEvent.type(screen.getByLabelText("Name"), "x");
+    await userEvent.type(screen.getByLabelText(/^Display name/), "x");
     await userEvent.click(screen.getByRole("button", { name: "Add guest" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Enter the name");
-    expect(screen.getByLabelText("Name")).toHaveValue("x");
+    expect(screen.getByLabelText(/^Display name/)).toHaveValue("x");
   });
 
   it("asks before removing a guest, and Cancel keeps them", async () => {
@@ -419,7 +422,7 @@ describe("People on a phone", () => {
     const sheet = await screen.findByRole("dialog", { name: "Add a guest" });
     expect(sheet).toHaveAttribute("data-side", "bottom");
     expect(within(sheet).getAllByRole("heading", { name: "Add a guest" })).toHaveLength(1);
-    await u.type(within(sheet).getByLabelText("Name"), "Sam Doe");
+    await u.type(within(sheet).getByLabelText(/^Display name/), "Sam Doe");
     await u.click(within(sheet).getByRole("button", { name: "Add guest" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(await screen.findByText("Sam Doe")).toBeInTheDocument();
@@ -453,7 +456,7 @@ describe("People on a phone", () => {
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: "Edit Mia Doe" }));
     const sheet = await screen.findByRole("dialog", { name: "Edit Mia Doe" });
-    const name = within(sheet).getByLabelText("Name");
+    const name = within(sheet).getByLabelText(/^Display name/);
     await u.clear(name);
     await u.type(name, "Mia R");
     expect(screen.getByRole("dialog", { name: "Edit Mia Doe" })).toBe(sheet);
@@ -468,7 +471,7 @@ describe("People on a phone", () => {
     expect(screen.getByRole("dialog")).toBe(sheet);
     fail(new Error("Couldn’t save"));
     expect(await within(sheet).findByRole("alert")).toHaveTextContent("Couldn’t save");
-    expect(within(sheet).getByLabelText("Name")).toHaveValue("Mia R");
+    expect(within(sheet).getByLabelText(/^Display name/)).toHaveValue("Mia R");
   });
 
   it("asks before any way of dismissing a changed guest form, keeps what was typed on Keep editing and drops it on Discard changes", async () => {
@@ -476,11 +479,11 @@ describe("People on a phone", () => {
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: /Add a guest/ }));
     const sheet = await screen.findByRole("dialog", { name: "Add a guest" });
-    await u.type(within(sheet).getByLabelText("Name"), "Sam Doe");
+    await u.type(within(sheet).getByLabelText(/^Display name/), "Sam Doe");
     await u.keyboard("{Escape}");
     await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Keep editing" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Discard changes?" })).toBeNull());
-    expect(within(sheet).getByLabelText("Name")).toHaveValue("Sam Doe");
+    expect(within(sheet).getByLabelText(/^Display name/)).toHaveValue("Sam Doe");
     await u.click(within(sheet).getByRole("button", { name: "Close" }));
     await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Keep editing" }));
     await u.click(within(sheet).getByRole("button", { name: "Cancel" }));
@@ -520,7 +523,7 @@ describe("People on a phone", () => {
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: /Add a guest/ }));
     const sheet = await screen.findByRole("dialog", { name: "Add a guest" });
-    await u.type(within(sheet).getByLabelText("Name"), "Sam Doe");
+    await u.type(within(sheet).getByLabelText(/^Display name/), "Sam Doe");
     await u.click(within(sheet).getByRole("button", { name: "Add guest" }));
     await within(sheet).findByRole("button", { name: "Saving…" });
     await u.keyboard("{Escape}");
