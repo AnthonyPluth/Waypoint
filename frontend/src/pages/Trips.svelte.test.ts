@@ -228,6 +228,18 @@ describe("two panes", () => {
     expect(route.query).toBe("who=2&trip=1");
   });
 
+  it("keeps the picked trip when a new filter still includes it", async () => {
+    panes.two = true;
+    serveTrips();
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await user().click(within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[1]);
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" });
+    await user().selectOptions(screen.getByLabelText("Travelling"), "Sam Doe");
+    expect(route.query).toBe("who=2&trip=2");
+    expect(await within(screen.getByRole("region", { name: "Selected trip" })).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
+  });
+
   it("shows the first trip when the address names one that isn’t in the list", async () => {
     panes.two = true;
     serveTrips();
@@ -451,13 +463,14 @@ describe("finding a trip", () => {
     serve(archive);
     render(Trips);
     await screen.findByText("300 trips");
-    await user().type(screen.getByRole("searchbox", { name: "Search" }), "reykjavik");
+    await user().click(screen.getByRole("searchbox", { name: "Search" }));
+    await user().paste("reykjavik");
     expect(route.query).toBe("q=reykjavik");
     expect(screen.getByText("1 of 300 trips")).toBeInTheDocument();
     expect(screen.getAllByRole("link")).toHaveLength(1);
     expect(screen.getByText("Aurora weekend")).toBeInTheDocument();
     await user().clear(screen.getByRole("searchbox", { name: "Search" }));
-    await user().type(screen.getByRole("searchbox", { name: "Search" }), "icelandair");
+    await user().paste("icelandair");
     expect(screen.getByText("Aurora weekend")).toBeInTheDocument();
     expect(screen.getByText("1 of 300 trips")).toBeInTheDocument();
   });
@@ -490,6 +503,18 @@ describe("finding a trip", () => {
     expect(screen.queryByText("Trip to Orlando")).toBeNull();
     await user().selectOptions(screen.getByLabelText("Travelling"), "Jane Doe");
     expect(route.query).toBe("who=1&year=2027");
+    expect(screen.getByText("No trips match.")).toBeInTheDocument();
+  });
+
+  it("keeps the open trip in the address while a filter still shows it, and falls back to the first result when it doesn’t", async () => {
+    route.query = "trip=2";
+    location.hash = "#trips?trip=2";
+    render(Trips);
+    await screen.findByText("3 trips");
+    await user().selectOptions(screen.getByLabelText("Year"), "2027");
+    expect(route.query).toBe("year=2027&trip=2");
+    await user().selectOptions(screen.getByLabelText("Show"), "Past");
+    expect(route.query).toBe("when=past&year=2027&trip=2");
     expect(screen.getByText("No trips match.")).toBeInTheDocument();
   });
 

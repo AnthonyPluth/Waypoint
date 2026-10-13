@@ -7,7 +7,7 @@
   import { Button } from "$lib/components/ui/button";
   import { cn } from "$lib/utils";
 
-  let { label, text, items, size = "default", align = "right" }: { label: string; text: string; items: OptionsMenuItem[]; size?: "default" | "sm"; align?: "left" | "right" } = $props();
+  let { label, text, items, size = "default", align = "right", up = false }: { label: string; text: string; items: OptionsMenuItem[]; size?: "default" | "sm"; align?: "left" | "right"; up?: boolean } = $props();
 
   const id = $props.id();
   let open = $state(false);
@@ -42,9 +42,9 @@
 <svelte:window onkeydown={onKeydown} onpointerdown={onPointerDown} />
 
 <div class="relative" onfocusout={onFocusOut}>
-  <Button bind:ref={button} variant="outline" {size} aria-label={label} aria-expanded={open} aria-controls={id} aria-haspopup="true" onclick={() => (open = !open)}><Ellipsis /> {text}</Button>
+  <Button bind:ref={button} variant="outline" {size} aria-label={label} aria-expanded={open} aria-controls={id} onclick={() => (open = !open)}><Ellipsis /> {text}</Button>
   {#if open}
-    <div bind:this={menu} {id} role="group" aria-label={label} class={cn("absolute top-full z-20 mt-2 flex min-w-48 max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-border bg-surface-2 p-1.5 shadow-elevation-3", align === "right" ? "right-0" : "left-0")}>
+    <div bind:this={menu} {id} role="group" aria-label={label} class={cn("absolute z-20 flex min-w-48 max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-border bg-surface-2 p-1.5 shadow-elevation-3", up ? "bottom-full mb-2" : "top-full mt-2", align === "right" ? "right-0" : "left-0")}>
       {#each items as item (item.label)}
         <button type="button" aria-label={item.name} class={cn("flex min-h-10 phone:min-h-11 w-full items-center break-words rounded-xl px-3 py-2 text-left text-sm font-medium outline-none hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50", item.destructive && "text-destructive")} onclick={() => choose(item)}>{item.label}</button>
       {/each}
