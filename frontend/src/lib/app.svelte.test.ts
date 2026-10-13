@@ -145,7 +145,7 @@ describe("checking in", () => {
     expect(api).toHaveBeenCalledWith("/api/state", { keep: true, background: true });
   });
 
-  it("checks in on coming back to the tab, but not on the timer once signed out", async () => {
+  it("checks in on coming back to the tab, but not once signed out", async () => {
     vi.mocked(api).mockResolvedValue(state());
     await boot();
     vi.mocked(api).mockClear();
