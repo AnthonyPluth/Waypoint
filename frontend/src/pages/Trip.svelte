@@ -15,7 +15,9 @@
   import GateCode from "$lib/components/GateCode.svelte";
   import { isMobile } from "$lib/platform";
   import { viewport } from "$lib/phone.svelte";
+  import { DiscardDialog } from "$lib/components/ui/discard-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
+  import { draftGuard, leave } from "$lib/drafts.svelte";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import { askAboutOffline, offline, refreshOffline, saveTripCopy } from "$lib/offline.svelte";
   import { hasSavedTrip, onLock } from "$lib/offline-vault";
@@ -143,10 +145,18 @@
   }
 
   function edit(s: Segment, field = "") {
-    focus = field;
-    inSheet = viewport.phone;
-    form = draftOf(s, trip?.costs.totals[0]?.currency);
+    leave(() => {
+      focus = field;
+      inSheet = viewport.phone;
+      form = draftOf(s, trip?.costs.totals[0]?.currency);
+    });
   }
+
+  const renameGuard = draftGuard({
+    dirty: () => renaming !== null && renaming.trim() !== (trip?.name ?? ""),
+    saving: () => saving,
+    discard: () => { renaming = null; renameError = ""; },
+  });
 
   const rename = (e: SubmitEvent) => {
     e.preventDefault();
@@ -271,7 +281,7 @@
           <Input class="sm:w-80" aria-label="Trip name" bind:value={renaming} maxlength={100} autocomplete="off" autofocus />
           <div class="flex gap-2">
             <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
-            <Button type="button" variant="outline" disabled={saving} onclick={() => { renaming = null; renameError = ""; }}>Cancel</Button>
+            <Button type="button" variant="outline" disabled={saving} onclick={() => leave(renameGuard.discard, [renameGuard])}>Cancel</Button>
           </div>
         </form>
         {#if renameError}<p class="mt-2 rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{renameError}</p>{/if}
@@ -376,6 +386,8 @@
   </ul>
   <TripDone trip={t} ondone={() => { onchanged?.(); void load(); }} />
 {/if}
+
+<DiscardDialog guard={renameGuard} />
 
 <OfflineSetup bind:open={askOffline} onenabled={() => trip && void saveTripCopy(trip)} />
 

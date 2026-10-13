@@ -3,6 +3,7 @@ import type { AppState } from "./types";
 import { errMsg } from "./act";
 import { dropEarly, startEarly } from "./early";
 import { syncSavedTrip } from "./offline.svelte";
+import { anyDirty, anySaving, leave } from "./drafts.svelte";
 
 export const app = $state({
   state: null as AppState | null,
@@ -32,8 +33,28 @@ export function setQuery(query: string): void {
   history.replaceState(history.state, "", `${location.pathname}${location.search}${path}${query ? `?${query}` : ""}`);
   route.query = query;
 }
+
+let undoing = false;
+const entryOf = (): number => {
+  const n = (history.state as { wp?: number } | null)?.wp;
+  if (typeof n === "number") return n;
+  const index = history.length - 1;
+  history.replaceState({ ...(history.state ?? {}), wp: index }, "");
+  return index;
+};
+let here = entryOf();
+
+function onHashChange(): void {
+  if (undoing) { undoing = false; return; }
+  const target = location.hash;
+  const there = (history.state as { wp?: number } | null)?.wp;
+  if (!anyDirty() && !anySaving()) { here = entryOf(); readHash(); return; }
+  const back = typeof there === "number" ? here - there : -1;
+  if (back !== 0) { undoing = true; history.go(back); }
+  leave(() => { location.hash = target; });
+}
 readHash();
-window.addEventListener("hashchange", readHash);
+window.addEventListener("hashchange", onHashChange);
 
 export function editing(): boolean {
   const f = document.activeElement;
@@ -59,8 +80,15 @@ export async function boot(): Promise<void> {
 }
 window.addEventListener("online", () => { if (!booted) boot(); else void syncSavedTrip(); });
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && booted) { checkIn(); void syncSavedTrip(); }
+  if (document.visibilityState !== "visible" || !booted) return;
+  if (app.sessionExpired) { void signedBackIn(); return; }
+  checkIn();
+  void syncSavedTrip();
 });
+async function signedBackIn(): Promise<void> {
+  try { await refreshState(true); app.sessionExpired = false; }
+  catch (err) { console.error(err); }
+}
 export function checkIn(): void {
   if (app.sessionExpired) return;
   if (booted) refreshState(true).catch((err) => console.error(err)); else boot();

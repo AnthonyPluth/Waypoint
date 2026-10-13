@@ -45,6 +45,8 @@
   import FlightLength from "$lib/components/FlightLength.svelte";
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
   import { Input } from "$lib/components/ui/input";
+  import { DiscardDialog } from "$lib/components/ui/discard-dialog";
+  import { draftGuard, leave } from "$lib/drafts.svelte";
   import { Sheet } from "$lib/components/ui/sheet";
   import { amountText } from "$lib/money";
   import { carAddress, differs, DEFAULT_CURRENCY, DETAILS, KINDS as FORM_KINDS, priceOf, SAME_AS_PICKUP, SEAT_LIMIT, type Kind } from "$lib/segment-form";
@@ -189,12 +191,8 @@
       await settle();
     });
   };
-  let discarding = $state(false);
-  const requestClose = () => {
-    if (saving) return;
-    if (dirty) discarding = true;
-    else closeForm();
-  };
+  const guard = draftGuard({ dirty: () => dirty, saving: () => saving, discard: () => closeForm() });
+  const requestClose = () => { leave(closeForm, [guard]); };
   const focusSheet = (e: Event) => {
     e.preventDefault();
     const sheet = document.querySelector<HTMLElement>("[data-slot='sheet']");
@@ -581,7 +579,7 @@
   {/snippet}
 </ConfirmDialog>
 
-<Sheet bind:open={() => draft !== null, (v) => { if (!v) requestClose(); }} title={draft?.suggested ? (drafts.length > 1 ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"} wide onOpenAutoFocus={focusSheet}>
+<Sheet bind:open={() => draft !== null, (v) => { if (!v) closeForm(); }} {guard} title={draft?.suggested ? (drafts.length > 1 ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"} wide onOpenAutoFocus={focusSheet}>
   {#if draft}
     <div class="flex flex-col gap-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -596,5 +594,4 @@
   {/if}
 </Sheet>
 
-<ConfirmDialog bind:open={discarding} title="Discard this booking?" description="What you typed here won’t be saved." confirmLabel="Discard" cancelLabel="Keep editing" destructive
-  onconfirm={() => { closeForm(); return true; }} />
+<DiscardDialog {guard} />

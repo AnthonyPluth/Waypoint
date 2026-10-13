@@ -626,6 +626,7 @@ describe("Trip", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("The name is too long");
     expect(screen.getByLabelText("Trip name")).toHaveValue("Nope");
     await u.click(screen.getByRole("button", { name: "Cancel" }));
+    await u.click(await screen.findByRole("button", { name: "Discard changes" }));
     expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
   });
 
@@ -1071,6 +1072,7 @@ describe("Trip", () => {
       expect(await screen.findByRole("alert")).toHaveTextContent("Name port 1");
       expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
       await u.click(screen.getByRole("button", { name: "Cancel" }));
+      await u.click(await screen.findByRole("button", { name: "Discard changes" }));
       await u.click(screen.getByRole("button", { name: "Edit JFK → LHR" }));
       expect(screen.queryByText("Ports of call", { selector: "legend" })).toBeNull();
     });
@@ -1198,6 +1200,60 @@ describe("Trip on a phone", () => {
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/1", { method: "POST", body: expect.objectContaining({ details: { flight_number: "AA 101", terminal: "7" } }) }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
+  });
+
+  it("asks before Escape, the close button, the backdrop or a swipe drops a changed booking, and keeps the typing on Keep editing", async () => {
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+    const sheet = await screen.findByRole("dialog", { name: "Edit this booking" });
+    await u.clear(within(sheet).getByLabelText("Terminal"));
+    await u.type(within(sheet).getByLabelText("Terminal"), "7");
+    const keep = async () => {
+      const ask = await screen.findByRole("dialog", { name: "Discard changes?" });
+      await u.click(within(ask).getByRole("button", { name: "Keep editing" }));
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Discard changes?" })).toBeNull());
+      expect(within(sheet).getByLabelText("Terminal")).toHaveValue("7");
+    };
+    await u.keyboard("{Escape}");
+    await keep();
+    await u.click(within(sheet).getByRole("button", { name: "Close" }));
+    await keep();
+    const overlay = document.querySelector("[data-slot='sheet-overlay']") as HTMLElement;
+    overlay.dispatchEvent(new MouseEvent("pointerdown", { clientX: 5, clientY: 5, bubbles: true }));
+    overlay.dispatchEvent(new MouseEvent("pointerup", { clientX: 5, clientY: 5, bubbles: true }));
+    overlay.dispatchEvent(new MouseEvent("click", { clientX: 5, clientY: 5, bubbles: true }));
+    await keep();
+    const handle = sheet.querySelector("[data-sheet-handle]") as Element;
+    handle.dispatchEvent(new MouseEvent("pointerdown", { clientY: 0, bubbles: true }));
+    handle.dispatchEvent(new MouseEvent("pointermove", { clientY: 200, bubbles: true }));
+    handle.dispatchEvent(new MouseEvent("pointerup", { clientY: 200, bubbles: true }));
+    await keep();
+    await u.click(within(sheet).getByRole("button", { name: "Cancel" }));
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Discard changes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
+  });
+
+  it("cannot be dismissed while the booking is saving", async () => {
+    let finish: (v: unknown) => void = () => {};
+    const slow = new Promise((resolve) => { finish = resolve; });
+    const before = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => (opts?.method === "POST" && path === "/api/segments/1" ? slow : before(path, opts)));
+    render(TripPage);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+    const sheet = await screen.findByRole("dialog");
+    await u.clear(within(sheet).getByLabelText("Terminal"));
+    await u.type(within(sheet).getByLabelText("Terminal"), "7");
+    await u.click(within(sheet).getByRole("button", { name: "Save" }));
+    await within(sheet).findByRole("button", { name: "Saving…" });
+    await u.keyboard("{Escape}");
+    await u.click(within(sheet).getByRole("button", { name: "Close" }));
+    expect(screen.getByRole("dialog", { name: "Edit this booking" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Discard changes?" })).toBeNull();
+    finish(held.segments[0]);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("closes the sheet with Escape and its close button, and the booking is untouched", async () => {

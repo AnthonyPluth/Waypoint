@@ -204,6 +204,31 @@ describe("two panes", () => {
     expect(location.hash).toBe("#trips");
   });
 
+  it("asks before another trip is picked, or the filter swaps it, over a changed booking, and stays on the trip on Keep editing", async () => {
+    panes.two = true;
+    serveTrips();
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    const u = user();
+    await u.click(await within(pane).findByRole("button", { name: "Edit JFK → LHR" }));
+    await u.type(within(pane).getByLabelText("Confirmation code"), "Z");
+    const links = within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link");
+    await u.click(links[1]);
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Keep editing" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    document.body.style.pointerEvents = "";
+    expect(within(pane).getByRole("heading", { level: 1, name: "Trip to London" })).toBeInTheDocument();
+    expect((within(pane).getByLabelText("Confirmation code") as HTMLInputElement).value.endsWith("Z")).toBe(true);
+    await u.selectOptions(screen.getByLabelText("Travelling"), "Sam Doe");
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Keep editing" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    document.body.style.pointerEvents = "";
+    expect(screen.getByLabelText("Travelling")).toHaveValue("");
+    await u.click(links[1]);
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Discard changes" }));
+    expect(await within(screen.getByRole("region", { name: "Selected trip" })).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
+  });
+
   it("stays a list that opens the trip page on a phone or tablet", async () => {
     serveTrips();
     render(Trips);

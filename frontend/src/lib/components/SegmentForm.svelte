@@ -5,6 +5,8 @@
   import type { Person, Segment } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
+  import { DiscardDialog } from "$lib/components/ui/discard-dialog";
+  import { baseline, draftGuard, leave } from "$lib/drafts.svelte";
   import FlightLength from "$lib/components/FlightLength.svelte";
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
   import { countryChoices, usStateChoices } from "$lib/countries";
@@ -15,6 +17,8 @@
   let d = $state<Draft>({ ...initial, details: { ...initial.details }, people: [...initial.people], printed: [...initial.printed] });
   let error = $state("");
   let saving = $state(false);
+  const unchanged = baseline(() => d);
+  const guard = draftGuard({ dirty: unchanged.changed, saving: () => saving, discard: () => oncancel() });
 
   const addPort = () => (d.itinerary = [...d.itinerary, { name: "", zone: d.itinerary.at(-1)?.zone ?? d.start_zone, arrive: "", depart: "" }]);
   const movePort = (i: number, by: number) => {
@@ -240,11 +244,13 @@
       {#if error}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{error}</p>{/if}
       <div class="flex flex-wrap gap-2">
         <Button type="submit" disabled={saving}>{saving ? "Saving…" : editing ? "Save" : "Add"}</Button>
-        <Button type="button" variant="outline" disabled={saving} onclick={oncancel}>Cancel</Button>
+        <Button type="button" variant="outline" disabled={saving} onclick={() => leave(oncancel, [guard])}>Cancel</Button>
       </div>
     </div>
   </div>
 </form>
+
+<DiscardDialog {guard} />
 
 {#snippet seat(key: string, name: string, ticked: boolean)}
   {#if ticked && SEATED.includes(d.kind)}

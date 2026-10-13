@@ -3,11 +3,15 @@
   import { Button } from "$lib/components/ui/button";
   import { Dialog } from "bits-ui";
   import X from "@lucide/svelte/icons/x";
+  import { leave, sheetScope, type DraftGuard } from "$lib/drafts.svelte";
   import type { Snippet } from "svelte";
 
-  let { open = $bindable(false), title, description, wide = false, onOpenAutoFocus, children }: {
-    open?: boolean; title: string; description?: string; wide?: boolean; onOpenAutoFocus?: (event: Event) => void; children: Snippet;
+  let { open = $bindable(false), title, description, wide = false, guard, onOpenAutoFocus, children }: {
+    open?: boolean; title: string; description?: string; wide?: boolean; guard?: DraftGuard; onOpenAutoFocus?: (event: Event) => void; children: Snippet;
   } = $props();
+
+  const scope = sheetScope();
+  const dismiss = () => { leave(() => { open = false; }, guard ? [guard, ...scope] : scope); };
 
   const CLOSE_DISTANCE = 96;
   const side = $derived(viewport.phone ? "bottom" : "right");
@@ -26,11 +30,11 @@
     const far = drag >= CLOSE_DISTANCE;
     startY = null;
     drag = 0;
-    if (far) open = false;
+    if (far) dismiss();
   }
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root bind:open={() => open, (v) => { if (v) open = true; else dismiss(); }}>
   <Dialog.Portal>
     <Dialog.Overlay data-slot="sheet-overlay" class="sheet-overlay" />
     <Dialog.Content data-slot="sheet" data-side={side} data-wide={wide ? "" : undefined} {onOpenAutoFocus} class="sheet" style={drag ? `--sheet-drag: ${drag}px` : undefined} data-dragging={drag ? "" : undefined}>
