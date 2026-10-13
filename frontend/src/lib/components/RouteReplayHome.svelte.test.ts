@@ -46,7 +46,7 @@ describe("RouteReplayMap with Home", () => {
     expect(screen.getByLabelText("Map key").textContent).toContain("Home");
     const items = within(screen.getByRole("list", { name: "Stops in order" })).getAllByRole("listitem").map((li) => li.lastElementChild?.textContent?.replace(/\s+/g, " "));
     expect(items[0]).toBe("Springfield, Dec 5");
-    expect(items[3]).toBe("Back in Springfield, Dec 8");
+    expect(items[3]).toBe("Springfield, Dec 8");
   });
 
   it("with reduced motion shows the finished route with both Home stops labelled once each", () => {
@@ -73,7 +73,7 @@ describe("RouteReplay with Home", () => {
     const items = within(screen.getByRole("list", { name: "Stops in order" })).getAllByRole("listitem").map((li) => li.lastElementChild?.textContent?.replace(/\s+/g, " "));
     expect(items).toHaveLength(4);
     expect(items[0]).toBe("Springfield, Dec 5, 2025");
-    expect(items[3]).toBe("Back in Springfield, Dec 8, 2025");
+    expect(items[3]).toBe("Springfield, Dec 8, 2025");
   });
 
   it("is as before with no placed Home", async () => {

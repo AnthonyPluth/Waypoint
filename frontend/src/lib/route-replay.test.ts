@@ -29,7 +29,6 @@ describe("stopsOf", () => {
     expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Bayview Inn", "San Francisco", "Minneapolis"]);
     expect(stops.map((s) => s.kind)).toEqual(["airport", "airport", "stay", "airport", "airport"]);
     expect(stops.map((s) => [s.from.slice(0, 10), s.to.slice(0, 10)])).toEqual([["2025-12-05", "2025-12-05"], ["2025-12-05", "2025-12-05"], ["2025-12-05", "2025-12-11"], ["2025-12-11", "2025-12-11"], ["2025-12-11", "2025-12-11"]]);
-    expect(stops.map((s) => s.back)).toEqual([false, false, false, true, true]);
     expect(stops.map((s) => s.via)).toEqual([null, "flight", null, null, "flight"]);
   });
 
@@ -121,7 +120,7 @@ describe("the text of a stop", () => {
   it("names the city and the dates there, in the place's own days", () => {
     expect(stopLine(stops[0], 2025)).toBe("Minneapolis (MSP), Dec 5");
     expect(stopLine(stops[2], 2025)).toMatch(/^Stay: Bayview Inn, San Francisco, Dec 5\s*[–-]\s*11$/);
-    expect(stopLine(stops[4], 2025)).toBe("Back in Minneapolis (MSP), Dec 11");
+    expect(stopLine(stops[4], 2025)).toBe("Minneapolis (MSP), Dec 11");
   });
 
   it("adds the year only when it is not the current one", () => {
@@ -301,7 +300,6 @@ describe("a past trip made of countries", () => {
     const stops = stopsOf(trip([again, peru, ecuador]), located);
     expect(names(stops)).toEqual(["Ecuador", "Peru", "Ecuador"]);
     expect(stops.map((s) => [s.from.slice(0, 10), s.to.slice(0, 10)])).toEqual([["2005-03-01", "2005-03-10"], ["2005-03-11", "2005-03-20"], ["2005-03-21", "2005-03-25"]]);
-    expect(stops.map((s) => s.back)).toEqual([false, false, true]);
   });
 
   it("is offered at two or more located countries and not at one", () => {

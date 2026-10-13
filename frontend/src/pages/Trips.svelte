@@ -154,7 +154,7 @@
     {/each}
   {/snippet}
   {#if panes.two && selected}
-    <div class="grid grid-cols-[clamp(16rem,28%,22rem)_minmax(0,1fr)] items-start gap-8">
+    <div class="grid grid-cols-[clamp(16rem,28%,24rem)_minmax(0,1fr)] items-start gap-8">
       <div class="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto pr-1">{@render list()}</div>
       <div class="min-w-0" data-testid="trip-pane" aria-label="Selected trip" role="region">{#key selected.id}<TripPane tripId={selected.id} onchanged={reloaded} />{/key}</div>
     </div>
