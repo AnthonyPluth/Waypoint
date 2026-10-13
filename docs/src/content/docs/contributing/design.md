@@ -38,7 +38,7 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 
 ## Route line
 
-`RouteLine.svelte` draws origin, destination and a line between them with a plane placed at `progress`, from 0 (departure) to 1 (arrival). Out-of-range or missing values clamp to 0 and 1 (`clampProgress`). Progress comes from the booked times; Waypoint does not need live data for it. Pass `label` to give the line an accessible description, otherwise it is hidden from assistive tech.
+`RouteLine.svelte` draws origin, destination and an arched dashed line between them with a plane riding the arc at `progress`, from 0 (departure) to 1 (arrival). Out-of-range or missing values clamp to 0 and 1 (`clampProgress`). Progress comes from the booked times; Waypoint does not need live data for it. Pass `label` to give the line an accessible description, otherwise it is hidden from assistive tech.
 
 ## Pass card
 
