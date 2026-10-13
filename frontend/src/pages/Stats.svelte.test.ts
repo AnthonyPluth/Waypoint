@@ -368,7 +368,7 @@ describe("Stats", () => {
     const empty = await screen.findByTestId("stats-empty");
     expect(empty).toHaveTextContent("Nothing finished for Jane Doe in 2024.");
     expect(within(empty).getByRole("link", { name: "Add a trip" })).toHaveAttribute("href", "#trips");
-    expect(within(empty).getByRole("link", { name: "Import past flights" })).toHaveAttribute("href", "#settings/travel");
+    expect(within(empty).getByRole("link", { name: "Import past flights" })).toHaveAttribute("href", "#settings/backup");
     expect(screen.getByRole("option", { name: "2024" })).toBeInTheDocument();
   });
 

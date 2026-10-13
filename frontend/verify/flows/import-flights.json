@@ -3,7 +3,7 @@
   "page": "settings",
   "steps": [
     {
-      "goto": "#settings/travel"
+      "goto": "#settings/backup"
     },
     {
       "upload": {

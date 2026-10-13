@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-**Settings → Mail and AI → AI** is off until you turn it on. When it’s on, you can choose **Ask AI** on an item in [Review](/Waypoint/start/review/) (in Check suggestions or Add missing details), and an AI suggests the booking. A booking Waypoint could already read is never sent. Nothing is sent until someone chooses **Ask AI**, unless you also turn on the second switch below.
+**Settings → Mail & review → AI** is off until you turn it on. When it’s on, you can choose **Ask AI** on an item in [Review](/Waypoint/start/review/) (in Check suggestions or Add missing details), and an AI suggests the booking. A booking Waypoint could already read is never sent. Nothing is sent until someone chooses **Ask AI**, unless you also turn on the second switch below.
 
 ## Choosing where it runs
 

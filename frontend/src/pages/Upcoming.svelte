@@ -177,7 +177,7 @@
         <ul class="mt-2 flex list-disc flex-col gap-1 pl-5 text-muted-foreground" aria-label="Setup checklist">
           <li><a class="underline underline-offset-2" href="#people">Add the people who travel with you</a></li>
           <li><a class="underline underline-offset-2" href="#trips?add=booking">Add your first booking</a></li>
-          <li><a class="underline underline-offset-2" href="#settings">Save your current trip for offline use</a></li>
+          <li><a class="underline underline-offset-2" href="#settings/offline">Save your current trip for offline use</a></li>
         </ul>
       </details>
     </div>

@@ -53,7 +53,7 @@ The saved copy is removed:
 
 - when you sign out, before the session ends;
 - when any request answers that you’re no longer signed in or allowed (401 or 403) while you’re online;
-- when you turn saving off for the device, or choose **Remove from this device**, in Settings → Data → **Offline access**;
+- when you turn saving off for the device, or choose **Remove from this device**, in Settings → Offline & notifications → **Offline access**;
 - 3 days after the trip ends, on the device’s clock, even if you never open it again;
 - when the next online load finds you have no current trip, or can’t see the one you had.
 
@@ -61,7 +61,7 @@ Settings shows what is saved on this device and when it was saved. The switch **
 
 ## Setting it up
 
-The first time a trip loads while you’re online on a device that isn’t set up, Waypoint shows **Keep this trip available offline** and asks for the device’s check. Choose **Not now** to leave offline off on that device; you can set it up later in Settings → Data → **Set up offline access**. Until it is set up, nothing is saved. Once it is, every online load of Waypoint on that device keeps the current trip up to date, with no further prompt.
+The first time a trip loads while you’re online on a device that isn’t set up, Waypoint shows **Keep this trip available offline** and asks for the device’s check. Choose **Not now** to leave offline off on that device; you can set it up later in Settings → Offline & notifications → **Set up offline access**. Until it is set up, nothing is saved. Once it is, every online load of Waypoint on that device keeps the current trip up to date, with no further prompt.
 
 Setting up creates a passkey for this site. Its only job is unlocking the saved trip: signing in to Waypoint still goes through your identity provider, and nothing about the passkey is sent to the server. Waypoint asks for user verification, so the passkey can’t be used without the device’s check.
 
@@ -77,7 +77,7 @@ Setting up creates a passkey for this site. Its only job is unlocking the saved 
 
 ## Devices that can’t do it
 
-The device has to be able to make a passkey with the PRF extension from its built-in authenticator, with user verification. A device or browser that can’t never saves anything for offline use. Settings → Data → **Offline access** says why, and Waypoint works online as always. Waypoint can require the device’s own check but not biometrics specifically, so on a device whose check is a screen lock code, that code is accepted.
+The device has to be able to make a passkey with the PRF extension from its built-in authenticator, with user verification. A device or browser that can’t never saves anything for offline use. Settings → Offline & notifications → **Offline access** says why, and Waypoint works online as always. Waypoint can require the device’s own check but not biometrics specifically, so on a device whose check is a screen lock code, that code is accepted.
 
 ## What the lock protects against, and what it doesn’t
 
