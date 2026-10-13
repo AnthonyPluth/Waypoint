@@ -339,6 +339,9 @@ describe("People", () => {
     await userEvent.selectOptions(screen.getByLabelText("Kind"), "hotel");
     expect(within(screen.getByLabelText(/^Program/)).getByRole("option", { name: "Marriott Bonvoy" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Discard changes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    document.body.style.pointerEvents = "";
     await userEvent.click(screen.getByRole("button", { name: "Edit Jane Doe’s American AAdvantage" }));
     expect(screen.getByLabelText(/^Program/)).toHaveValue("American AAdvantage");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
@@ -458,5 +461,65 @@ describe("People on a phone", () => {
     fail(new Error("Couldn’t save"));
     expect(await within(sheet).findByRole("alert")).toHaveTextContent("Couldn’t save");
     expect(within(sheet).getByLabelText("Name")).toHaveValue("Mia R");
+  });
+
+  it("asks before any way of dismissing a changed guest form, keeps what was typed on Keep editing and drops it on Discard changes", async () => {
+    render(People);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add a guest/ }));
+    const sheet = await screen.findByRole("dialog", { name: "Add a guest" });
+    await u.type(within(sheet).getByLabelText("Name"), "Sam Doe");
+    await u.keyboard("{Escape}");
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Keep editing" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Discard changes?" })).toBeNull());
+    expect(within(sheet).getByLabelText("Name")).toHaveValue("Sam Doe");
+    await u.click(within(sheet).getByRole("button", { name: "Close" }));
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Keep editing" }));
+    await u.click(within(sheet).getByRole("button", { name: "Cancel" }));
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Discard changes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
+  });
+
+  it("asks before dropping a typed membership number, which is kept nowhere but in memory", async () => {
+    render(People);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Add a membership for Mia Doe" }));
+    const sheet = await screen.findByRole("dialog", { name: "Add a membership for Mia Doe" });
+    await u.type(within(sheet).getByLabelText("Number"), "DEMO7654321");
+    await u.keyboard("{Escape}");
+    const ask = await screen.findByRole("dialog", { name: "Discard changes?" });
+    await u.click(within(ask).getByRole("button", { name: "Discard changes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.queryByText("DEMO7654321")).toBeNull();
+  });
+
+  it("closes an unchanged form without asking, and a changed one only once it has been saved", async () => {
+    render(People);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit Mia Doe" }));
+    await screen.findByRole("dialog", { name: "Edit Mia Doe" });
+    await u.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("cannot be dismissed while it is saving", async () => {
+    let finish: (v: unknown) => void = () => {};
+    const slow = new Promise((resolve) => { finish = resolve; });
+    const before = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => (opts?.method === "POST" && path === "/api/people" ? slow : before(path, opts)));
+    render(People);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: /Add a guest/ }));
+    const sheet = await screen.findByRole("dialog", { name: "Add a guest" });
+    await u.type(within(sheet).getByLabelText("Name"), "Sam Doe");
+    await u.click(within(sheet).getByRole("button", { name: "Add guest" }));
+    await within(sheet).findByRole("button", { name: "Saving…" });
+    await u.keyboard("{Escape}");
+    await u.click(within(sheet).getByRole("button", { name: "Close" }));
+    expect(screen.getByRole("dialog", { name: "Add a guest" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Discard changes?" })).toBeNull();
+    finish({ id: 9, display_name: "Sam Doe", first_name: null, legal_name: null, aliases: [], member: false, links: [] });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 });

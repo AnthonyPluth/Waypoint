@@ -8,6 +8,7 @@
   import { Button } from "$lib/components/ui/button";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import TripKinds from "$lib/components/TripKinds.svelte";
+  import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { panes } from "$lib/panes.svelte";
   import { blank } from "$lib/segment-form";
   import { dateLabel, dayIn, splitTrips, viewerZone } from "$lib/trips";
@@ -32,7 +33,12 @@
   $effect(() => { void load(); });
 
   const who = $derived(Number(new URLSearchParams(route.query).get("who")) || null);
-  const pick = (e: Event) => { const v = (e.currentTarget as HTMLSelectElement).value; setQuery(v ? `who=${v}` : ""); };
+  const pick = (e: Event) => {
+    const field = e.currentTarget as HTMLSelectElement;
+    const v = field.value;
+    field.value = who ? String(who) : "";
+    leave(() => setQuery(v ? `who=${v}` : ""));
+  };
   const shown = $derived(trips && splitTrips(trips.filter((t) => !who || t.segments.some((s) => s.travelers.some((x) => x.person_id === who))), dayIn(Date.now(), viewerZone())));
   let picked = $state<number | null>(null);
   const everyTrip = $derived(shown ? [...shown.upcoming, ...shown.past] : []);
@@ -41,7 +47,7 @@
   const choose = (e: MouseEvent, t: Trip) => {
     if (!panes.two || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
-    picked = t.id;
+    leave(() => { picked = t.id; });
   };
   const names = (t: Trip) => [...new Set(t.segments.flatMap((s) => s.travelers.map((x) => x.name)))].join(", ");
   const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
@@ -54,7 +60,7 @@
 </div>
 
 {#if adding}
-  <SegmentForm initial={adding === "past" ? { ...blank(), kind: "visit" } : blank()} {people} oncancel={() => (adding = null)} onsaved={(s) => { adding = null; location.hash = `#trip/${s.trip_id}`; }} />
+  <SegmentForm initial={adding === "past" ? { ...blank(), kind: "visit" } : blank()} {people} oncancel={() => (adding = null)} onsaved={(s) => { adding = null; dropDrafts(); location.hash = `#trip/${s.trip_id}`; }} />
 {/if}
 
 {#if loadError}

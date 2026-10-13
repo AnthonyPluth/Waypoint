@@ -10,7 +10,7 @@
     { "screenshot": "message-with-form" },
     { "fill": { "selector": "[role='dialog'] label:has-text('Provider') input", "text": "Seaside Stays Ltd" } },
     { "press": { "selector": "[role='dialog'] label:has-text('Provider') input", "key": "Escape" } },
-    { "wait_for": "[role='dialog']:has-text('Discard this booking?')" },
+    { "wait_for": "[role='dialog']:has-text('Discard changes?')" },
     { "screenshot": "discard-prompt" },
     { "click": "button:has-text('Keep editing')" },
     { "click": "[role='dialog'] button:has-text('Hide the email')" },

@@ -153,9 +153,20 @@ describe("checking in", () => {
     expect(api).toHaveBeenCalledWith("/api/state", { keep: true, background: true });
     vi.mocked(api).mockClear();
     app.sessionExpired = true;
-    document.dispatchEvent(new Event("visibilitychange"));
     checkIn();
     expect(api).not.toHaveBeenCalled();
+  });
+
+  it("drops the sign-in banner when the tab is shown again after signing in elsewhere, and keeps it while still signed out", async () => {
+    vi.mocked(api).mockResolvedValue(state());
+    await boot();
+    app.sessionExpired = true;
+    vi.mocked(api).mockRejectedValueOnce(new Error("Sign in"));
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+    expect(app.sessionExpired).toBe(true);
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.waitFor(() => expect(app.sessionExpired).toBe(false));
   });
 });
 

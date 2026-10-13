@@ -9,6 +9,7 @@
   import OfflineApp from "$lib/components/OfflineApp.svelte";
   import * as Alert from "$lib/components/ui/alert";
   import * as Card from "$lib/components/ui/card";
+  import { anyDirty } from "$lib/drafts.svelte";
   import { pageFor } from "$lib/nav";
   import Upcoming from "./pages/Upcoming.svelte";
   import { Toaster } from "svelte-sonner";
@@ -56,8 +57,11 @@
       <div class={`mx-auto max-w-3xl ${route.page === "trips" ? "lg:max-w-6xl" : ""}`}>
         {#if app.sessionExpired}
           <Alert.Root class="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-20 mb-4 flex flex-wrap items-center justify-between gap-3 border-signal bg-signal-soft text-signal-ink shadow-lg">
-            <Alert.Description class="text-signal-ink">Your session expired. Sign in again — what you’re editing stays on this page until you do.</Alert.Description>
-            <Button size="sm" onclick={() => { location.href = signInUrl(); }}>Sign in</Button>
+            <Alert.Description class="text-signal-ink">
+              {#if anyDirty()}Your session expired. Sign in opens in a new tab so what you’re editing stays on this page; come back here and save once you have.
+              {:else}Your session expired. Sign in again.{/if}
+            </Alert.Description>
+            <Button size="sm" onclick={() => { if (anyDirty()) window.open(signInUrl(), "_blank", "noopener"); else location.href = signInUrl(); }}>Sign in</Button>
           </Alert.Root>
         {/if}
         {#if app.bootError && !app.state && app.offline}

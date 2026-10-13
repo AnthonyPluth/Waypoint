@@ -452,7 +452,7 @@ describe("Review", () => {
     expect(screen.getByLabelText("From (airport code)")).toHaveValue("BOS");
     expect(calls.some(([p, m]) => p.startsWith("/api/review/") && m === "DELETE")).toBe(false);
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Discard" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Discard changes" }));
     await waitFor(() => expect(screen.queryByRole("form")).toBeNull());
   });
 
@@ -1080,7 +1080,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     overlay.dispatchEvent(new MouseEvent("pointerup", { clientX: 5, clientY: 5, bubbles: true }));
     overlay.dispatchEvent(new MouseEvent("click", { clientX: 5, clientY: 5, bubbles: true }));
     await gone();
-    expect(screen.queryByText("Discard this booking?")).toBeNull();
+    expect(screen.queryByText("Discard changes?")).toBeNull();
   });
 
   it("asks before discarding a changed form, keeps it on Keep editing and closes it on Discard", async () => {
@@ -1090,13 +1090,13 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     const sheet = await screen.findByRole("dialog", { name: "Add this booking by hand" });
     await u.type(within(sheet).getByLabelText("From (airport code)"), "JFK");
     await u.keyboard("{Escape}");
-    const ask = await screen.findByRole("dialog", { name: "Discard this booking?" });
+    const ask = await screen.findByRole("dialog", { name: "Discard changes?" });
     await u.click(within(ask).getByRole("button", { name: "Keep editing" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Discard this booking?" })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Discard changes?" })).toBeNull());
     expect(screen.getByRole("dialog", { name: "Add this booking by hand" })).toBeInTheDocument();
     expect(within(sheet).getByLabelText("From (airport code)")).toHaveValue("JFK");
     await u.click(within(sheet).getByRole("button", { name: "Close" }));
-    await u.click(within(await screen.findByRole("dialog", { name: "Discard this booking?" })).getByRole("button", { name: "Discard" }));
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Discard changes" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(calls.some(([path]) => path === "/api/segments")).toBe(false);
   });
@@ -1347,7 +1347,7 @@ describe("Review: a booking email with several flights", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add 2 flights" }));
     await screen.findByRole("alert");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Discard" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Discard changes" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1?suggestion=1", "DELETE", undefined]));
     expect(calls.some(([p, m]) => m === "DELETE" && p.includes("?segment="))).toBe(false);
     secondSegmentFails = "";
@@ -1422,7 +1422,7 @@ describe("Review: several legs or bookings added by hand from one email", () => 
   };
   const posted = () => calls.filter(([p]) => p === "/api/segments").map(([, , b]) => b);
   const takeOffs = () => calls.filter(([p, m]) => m === "DELETE" && p.startsWith("/api/review/")).map(([p]) => p);
-  const discardAsked = () => screen.queryByRole("dialog", { name: "Discard this booking?" });
+  const discardAsked = () => screen.queryByRole("dialog", { name: "Discard changes?" });
 
   it("offers the button under a single leg without changing the single-leg form", async () => {
     const u = await openByHand();
@@ -1558,11 +1558,11 @@ describe("Review: several legs or bookings added by hand from one email", () => 
     const u = await openByHand();
     await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
     await u.keyboard("{Escape}");
-    await u.click(within(await screen.findByRole("dialog", { name: "Discard this booking?" })).getByRole("button", { name: "Keep editing" }));
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Keep editing" }));
     await waitFor(() => expect(discardAsked()).toBeNull());
     expect(screen.getAllByTestId("leg")).toHaveLength(2);
     await u.keyboard("{Escape}");
-    await u.click(within(await screen.findByRole("dialog", { name: "Discard this booking?" })).getByRole("button", { name: "Discard" }));
+    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Discard changes" }));
     await settled();
     expect(calls.some(([p]) => p === "/api/segments")).toBe(false);
   });
@@ -1574,7 +1574,7 @@ describe("Review: several legs or bookings added by hand from one email", () => 
     await u.click(screen.getByRole("button", { name: "Dismiss Flight 1 of 2" }));
     expect(screen.queryByTestId("leg")).toBeNull();
     await u.keyboard("{Escape}");
-    expect(await screen.findByRole("dialog", { name: "Discard this booking?" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Discard changes?" })).toBeInTheDocument();
   });
 
   it("closes without asking once the added leg is dismissed again", async () => {

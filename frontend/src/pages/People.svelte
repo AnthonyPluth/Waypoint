@@ -9,7 +9,9 @@
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Input } from "$lib/components/ui/input";
+  import { DiscardDialog } from "$lib/components/ui/discard-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
+  import { baseline, draftGuard, leave } from "$lib/drafts.svelte";
   import { viewport } from "$lib/phone.svelte";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
@@ -41,12 +43,18 @@
   let removing = $state<Person | null>(null);
   let asking = $state(false);
 
-  const startAdd = () => { inSheet = viewport.phone; draft = { id: null, member: false, display_name: "", first_name: "", legal_name: "", aliases: "" }; formError = ""; };
-  const startEdit = (p: Person) => {
+  const personBase = baseline(() => draft);
+  const personGuard = draftGuard({ dirty: () => draft !== null && personBase.changed(), saving: () => saving, discard: () => { draft = null; } });
+  const startAdd = () => leave(() => {
+    inSheet = viewport.phone; draft = { id: null, member: false, display_name: "", first_name: "", legal_name: "", aliases: "" }; formError = "";
+    personBase.reset();
+  });
+  const startEdit = (p: Person) => leave(() => {
     inSheet = viewport.phone;
     draft = { id: p.id, member: p.member, display_name: p.display_name, first_name: p.first_name ?? "", legal_name: p.legal_name ?? "", aliases: p.aliases.join("\n") };
     formError = "";
-  };
+    personBase.reset();
+  });
 
   async function save(e: SubmitEvent) {
     e.preventDefault();
@@ -94,12 +102,18 @@
     const held = new Set(memberships.filter((m) => m.person_id === personId && m.kind === kind && m.id !== editing).map((m) => m.program));
     return (programs[kind] ?? []).filter((name) => name === "Other" || name === kept || !held.has(name));
   };
-  const startAddId = (p: Person) => { idInSheet = viewport.phone; idDraft = { id: null, person_id: p.id, kind: "airline", program: choices(p.id, "airline")[0] ?? "", number: "", expiry: "", notes: "", masked: "" }; idError = ""; };
-  const startEditId = (m: LoyaltyEntry) => {
+  const idBase = baseline(() => idDraft);
+  const idGuard = draftGuard({ dirty: () => idDraft !== null && idBase.changed(), saving: () => idSaving, discard: () => { idDraft = null; } });
+  const startAddId = (p: Person) => leave(() => {
+    idInSheet = viewport.phone; idDraft = { id: null, person_id: p.id, kind: "airline", program: choices(p.id, "airline")[0] ?? "", number: "", expiry: "", notes: "", masked: "" }; idError = "";
+    idBase.reset();
+  });
+  const startEditId = (m: LoyaltyEntry) => leave(() => {
     idInSheet = viewport.phone;
     idDraft = { id: m.id, person_id: m.person_id, kind: m.kind, program: m.program, number: "", expiry: m.expiry ?? "", notes: m.notes ?? "", masked: m.masked };
     idError = "";
-  };
+    idBase.reset();
+  });
   const pickKind = (d: IdDraft) => { const open = choices(d.person_id, d.kind, d.id); if (!open.includes(d.program)) d.program = open[0] ?? ""; };
 
   async function saveId(e: SubmitEvent) {
@@ -175,7 +189,7 @@
     {#if formError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{formError}</p>{/if}
     <div class="flex flex-wrap gap-2">
       <Button type="submit" disabled={saving}>{saving ? "Saving…" : d.id === null ? "Add guest" : "Save"}</Button>
-      <Button type="button" variant="outline" disabled={saving} onclick={() => (draft = null)}>Cancel</Button>
+      <Button type="button" variant="outline" disabled={saving} onclick={() => leave(personGuard.discard, [personGuard])}>Cancel</Button>
     </div>
   </div>
   </form>
@@ -206,7 +220,7 @@
         {#if idError}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{idError}</p>{/if}
         <div class="flex flex-wrap gap-2">
           <Button type="submit" disabled={idSaving}>{idSaving ? "Saving…" : d.id === null ? "Add" : "Save"}</Button>
-          <Button type="button" variant="outline" disabled={idSaving} onclick={() => (idDraft = null)}>Cancel</Button>
+          <Button type="button" variant="outline" disabled={idSaving} onclick={() => leave(idGuard.discard, [idGuard])}>Cancel</Button>
         </div>
       </div>
     </div>
@@ -292,10 +306,13 @@
   description="Its saved number is deleted. This can’t be undone."
   onconfirm={async () => { const m = idRemoving; return m ? await removeId(m) : true; }} />
 
-<Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v && !saving) draft = null; }} title={draft ? personSheetTitle(draft) : "Person"}>
+<Sheet bind:open={() => inSheet && draft !== null, (v) => { if (!v) draft = null; }} title={draft ? personSheetTitle(draft) : "Person"} guard={personGuard}>
   {#if draft}{@render personForm(draft, false)}{/if}
 </Sheet>
 
-<Sheet bind:open={() => idInSheet && idDraft !== null, (v) => { if (!v && !idSaving) idDraft = null; }} title={idDraft ? idFormTitle(idDraft) : "Membership"}>
+<Sheet bind:open={() => idInSheet && idDraft !== null, (v) => { if (!v) idDraft = null; }} title={idDraft ? idFormTitle(idDraft) : "Membership"} guard={idGuard}>
   {#if idDraft}{@render idForm(idDraft, false)}{/if}
 </Sheet>
+
+<DiscardDialog guard={personGuard} />
+<DiscardDialog guard={idGuard} />
