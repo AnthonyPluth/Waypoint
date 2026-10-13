@@ -4,7 +4,7 @@ import json
 import os
 import threading
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import UTC, datetime, time, timedelta
 from typing import Literal, TypedDict, cast
 
@@ -14,7 +14,7 @@ from .. import dates, monitoring
 from ..providers import flightstatus as service
 from ..storage import db
 from ..storage import settings_keys as sk
-from ..storage.models import FlightStatus, Segment
+from ..storage.models import FlightCheck, FlightStatus, Segment
 from . import seatmaps, trips, visibility
 from .visibility import Viewer
 
@@ -26,13 +26,15 @@ ONE_HOUR = "1h"
 REFRESH_AFTER = timedelta(minutes=15)
 LATE = timedelta(hours=6)
 PAUSE = timedelta(hours=1)
-KEEP_DAYS = 7
+CHECK_KEEP_DAYS = 7
 OVER = (service.LANDED, service.CANCELLED, service.DIVERTED)
 
 Reason = Literal["limit", "rate", "key"]
 Shown = Literal["scheduled", "delayed", "departed", "landed", "cancelled", "diverted"]
 
 _lock = threading.Lock()
+_held_lock = threading.Lock()
+_held: dict[tuple[str, str], tuple[service.Status, datetime, datetime]] = {}
 
 
 class NotAFlight(ValueError):
@@ -197,24 +199,68 @@ def watching(conn: db.Connection, now: datetime) -> list[Flight]:
     return sorted(found.values(), key=lambda f: f.departs)
 
 
-def _cached(conn: db.Connection, number: str, day: str) -> FlightStatus | None:
+def _final(conn: db.Connection, number: str, day: str) -> FlightStatus | None:
     return conn.orm.get(FlightStatus, (number, day))
+
+
+def _known(row: FlightStatus) -> service.Status:
+    return service.Status(state=row.state, **{f.name: getattr(row, f.name, None) for f in fields(service.Status) if f.name != "state"})
 
 
 def _fetched(row: FlightStatus) -> datetime:
     return datetime.fromtimestamp(row.fetched_at, UTC)
 
 
-def _last_call(row: FlightStatus | None) -> datetime | None:
-    if row is None:
-        return None
-    return datetime.fromtimestamp(max(row.fetched_at, row.attempted_at or 0.0), UTC)
+def hold(number: str, day: str, found: service.Status, fetched: datetime, until: datetime) -> None:
+    with _held_lock:
+        for key in [k for k, (_, _, end) in _held.items() if end <= fetched]:
+            del _held[key]
+        _held[number, day] = (found, fetched, until)
+
+
+def drop_held(number: str | None = None, day: str | None = None) -> None:
+    with _held_lock:
+        if number is None or day is None:
+            _held.clear()
+        else:
+            _held.pop((number, day), None)
+
+
+def _fresh(number: str, day: str, now: datetime) -> tuple[service.Status, datetime] | None:
+    with _held_lock:
+        entry = _held.get((number, day))
+    return (entry[0], entry[1]) if entry and entry[1] <= now < entry[2] else None
+
+
+def _answer(conn: db.Connection, number: str, day: str, now: datetime) -> tuple[service.Status, datetime] | None:
+    if (row := _final(conn, number, day)) is not None:
+        return _known(row), _fetched(row)
+    return _fresh(number, day, now)
+
+
+def _last_call(conn: db.Connection, flight: Flight) -> datetime | None:
+    checked = conn.orm.get(FlightCheck, (flight.number, flight.day))
+    row = _final(conn, flight.number, flight.day)
+    stamps = [t for t in (checked.checked_at if checked else None, row.fetched_at if row else None) if t]
+    return datetime.fromtimestamp(max(stamps), UTC) if stamps else None
+
+
+def _touch(conn: db.Connection, flight: Flight, now: datetime) -> None:
+    db.upsert(conn, FlightCheck, {"flight_number": flight.number, "date": flight.day, "checked_at": now.timestamp()},
+              key=["flight_number", "date"])
 
 
 def _store(conn: db.Connection, flight: Flight, found: service.Status | None, now: datetime) -> None:
-    values = {"flight_number": flight.number, "date": flight.day, "fetched_at": now.timestamp(), "attempted_at": now.timestamp(),
-              **{k: getattr(found or service.Status(service.UNKNOWN), k) for k in service.Status.__dataclass_fields__ if k != "aircraft"}}
-    db.upsert(conn, FlightStatus, values, key=["flight_number", "date"])
+    _touch(conn, flight, now)
+    if found is not None and found.state in OVER:
+        values = {"flight_number": flight.number, "date": flight.day, "fetched_at": now.timestamp(),
+                  **{f.name: getattr(found, f.name) for f in fields(service.Status) if f.name != "aircraft"}}
+        db.upsert(conn, FlightStatus, values, key=["flight_number", "date"])
+        drop_held(flight.number, flight.day)
+    elif found is not None and found.state != service.UNKNOWN:
+        hold(flight.number, flight.day, found, now, now + REFRESH_AFTER)
+    else:
+        drop_held(flight.number, flight.day)
 
 
 def _note_aircraft(conn: db.Connection, flight: Flight, found: service.Status | None) -> None:
@@ -232,16 +278,7 @@ def _note_aircraft(conn: db.Connection, flight: Flight, found: service.Status | 
 
 
 def purge(conn: db.Connection, now: datetime) -> None:
-    conn.execute(delete(FlightStatus).where(FlightStatus.date <= (now.astimezone().date() - timedelta(days=KEEP_DAYS)).isoformat()))
-
-
-def _note_failure(conn: db.Connection, flight: Flight, now: datetime) -> None:
-    if (row := _cached(conn, flight.number, flight.day)) is not None:
-        row.attempted_at = now.timestamp()
-    else:
-        db.upsert(conn, FlightStatus, {"flight_number": flight.number, "date": flight.day, "state": service.UNKNOWN,
-                                       "fetched_at": 0.0, "attempted_at": now.timestamp()}, key=["flight_number", "date"])
-    conn.commit()
+    conn.execute(delete(FlightCheck).where(FlightCheck.date <= (now.astimezone().date() - timedelta(days=CHECK_KEEP_DAYS)).isoformat()))
 
 
 def _check(conn: db.Connection, flight: Flight, now: datetime) -> None:
@@ -249,7 +286,8 @@ def _check(conn: db.Connection, flight: Flight, now: datetime) -> None:
     try:
         found = service.fetch(flight.number, flight.day, flight.origin)
     except service.FlightStatusError as e:
-        _note_failure(conn, flight, now)
+        _touch(conn, flight, now)
+        conn.commit()
         if isinstance(e, service.RateLimited):
             _pause(conn, now, "rate")
         elif isinstance(e, service.Refused):
@@ -269,8 +307,8 @@ def run_due(conn: db.Connection, now: datetime) -> int:
         spent = usage(conn, now)
         if spent.paused:
             break
-        row = _cached(conn, flight.number, flight.day)
-        if not due(flight, now, _last_call(row), row.state if row else None, spent.reduced):
+        row = _final(conn, flight.number, flight.day)
+        if not due(flight, now, _last_call(conn, flight), row.state if row else None, spent.reduced):
             continue
         try:
             _check(conn, flight, now)
@@ -283,35 +321,38 @@ def run_due(conn: db.Connection, now: datetime) -> int:
     return made
 
 
-def _delay(row: FlightStatus) -> int | None:
-    expected = row.dep_actual or row.dep_estimated
-    if not (expected and row.dep_scheduled):
+def _delay(found: service.Status) -> int | None:
+    expected = found.dep_actual or found.dep_estimated
+    if not (expected and found.dep_scheduled):
         return None
-    late = service.minutes_later(expected, row.dep_scheduled)
+    late = service.minutes_later(expected, found.dep_scheduled)
     return late if late > 0 else None
 
 
-def _out(seg: Segment, row: FlightStatus) -> StatusOut:
-    return {"segment_id": seg.id, "state": cast(Shown, row.state), "origin": row.origin, "destination": row.destination,
-            "dep_scheduled": row.dep_scheduled, "dep_estimated": row.dep_estimated, "dep_actual": row.dep_actual,
-            "dep_zone": row.dep_zone or seg.start_zone, "dep_terminal": row.dep_terminal, "dep_gate": row.dep_gate,
-            "arr_scheduled": row.arr_scheduled, "arr_estimated": row.arr_estimated, "arr_actual": row.arr_actual,
-            "arr_zone": row.arr_zone or seg.end_zone, "arr_terminal": row.arr_terminal, "arr_gate": row.arr_gate,
-            "delay_minutes": _delay(row), "fetched_at": _fetched(row).isoformat(timespec="seconds")}
+def _out(seg: Segment, found: service.Status, fetched: datetime) -> StatusOut:
+    return {"segment_id": seg.id, "state": cast(Shown, found.state), "origin": found.origin, "destination": found.destination,
+            "dep_scheduled": found.dep_scheduled, "dep_estimated": found.dep_estimated, "dep_actual": found.dep_actual,
+            "dep_zone": found.dep_zone or seg.start_zone, "dep_terminal": found.dep_terminal, "dep_gate": found.dep_gate,
+            "arr_scheduled": found.arr_scheduled, "arr_estimated": found.arr_estimated, "arr_actual": found.arr_actual,
+            "arr_zone": found.arr_zone or seg.end_zone, "arr_terminal": found.arr_terminal, "arr_gate": found.arr_gate,
+            "delay_minutes": _delay(found), "fetched_at": fetched.isoformat(timespec="seconds")}
 
 
-def _statuses(conn: db.Connection, segs: Sequence[Segment]) -> list[StatusOut]:
+def _statuses(conn: db.Connection, segs: Sequence[Segment], now: datetime) -> list[StatusOut]:
     flights = {s.id: f for s in segs if (f := _flight(s))}
     if not flights:
         return []
     days = {f.day for f in flights.values()}
-    rows = {(r.flight_number, r.date): r for r in conn.orm.scalars(select(FlightStatus).where(FlightStatus.date.in_(days))).all()}
+    finals = {(r.flight_number, r.date): r for r in conn.orm.scalars(select(FlightStatus).where(FlightStatus.date.in_(days))).all()}
     found: list[StatusOut] = []
     for seg in segs:
         f = flights.get(seg.id)
-        row = rows.get((f.number, f.day)) if f else None
-        if row and f and row.state != service.UNKNOWN and (not (row.origin and f.origin) or row.origin.upper() == f.origin.upper()):
-            found.append(_out(seg, row))
+        if f is None:
+            continue
+        row = finals.get((f.number, f.day))
+        answer = (_known(row), _fetched(row)) if row else _fresh(f.number, f.day, now)
+        if answer and answer[0].state != service.UNKNOWN and (not (answer[0].origin and f.origin) or (answer[0].origin or "").upper() == f.origin.upper()):
+            found.append(_out(seg, *answer))
     return found
 
 
@@ -324,7 +365,7 @@ def _overview(conn: db.Connection, now: datetime, statuses: list[StatusOut]) -> 
 
 
 def overview(conn: db.Connection, viewer: Viewer, now: datetime) -> Overview:
-    return _overview(conn, now, _statuses(conn, visibility.visible_segments(conn, viewer)))
+    return _overview(conn, now, _statuses(conn, visibility.visible_segments(conn, viewer), now))
 
 
 def refresh(conn: db.Connection, viewer: Viewer, segment_id: int, now: datetime) -> Overview | None:
@@ -336,8 +377,6 @@ def refresh(conn: db.Connection, viewer: Viewer, segment_id: int, now: datetime)
         raise NotAFlight("Live status is for flights that have a flight number.")
     if not service.configured():
         raise service.NotConfigured("Flight status isn’t set up: RAPIDAPI_KEY isn’t set.")
-    row = _cached(conn, flight.number, flight.day)
-    held = row is not None and (row.state in OVER or now - _fetched(row) < REFRESH_AFTER)
-    if not held and not usage(conn, now).paused:
+    if _answer(conn, flight.number, flight.day, now) is None and not usage(conn, now).paused:
         _check(conn, flight, now)
-    return _overview(conn, now, _statuses(conn, [seg]))
+    return _overview(conn, now, _statuses(conn, [seg], now))

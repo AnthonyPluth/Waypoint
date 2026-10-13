@@ -6,12 +6,17 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, select, update
 
+from ..providers import flightstatus as service
 from ..storage import db, secretbox, stored_mail
 from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentCode, SegmentMessage, SegmentPort,
                               SegmentTraveler, StoredMessage, Trip, TripPerson, User)
-from . import logos, loyalty, people, trips
+from . import flightstatus, logos, loyalty, people, trips
 from .mail import ai, review, scan
 from .visibility import Viewer
+
+DEMO_STATUS_HELD = timedelta(days=30)
+DEMO_DELAYED_FLIGHT = "AA 102"
+DEMO_DELAY_DAYS_AHEAD = 4
 
 MEMBERS = [("demo-jane", "jane.doe@example.com", "Jane Doe", "Jane"),
            ("demo-sam", "sam.doe@example.com", "Sam Doe", "Sam")]
@@ -372,8 +377,21 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     for brand, color in DEMO_LOGO_COLORS.items():
         db.upsert(conn, BrandLogo, {"key": logos.key(brand), "name": brand, "logo": _square(color), "logo_type": "image/png",
                                     "checked": datetime.now(UTC).isoformat(timespec="seconds"), "source": "logodev"}, key=["key"])
-    db.upsert(conn, FlightStatus, {**_flight_status(today), "fetched_at": datetime.now(UTC).timestamp()}, key=["flight_number", "date"])
+    hold_status(today)
     return _rows(conn) - before
+
+
+def hold_status(today: date) -> None:
+    shown = _flight_status(today)
+    fetched = datetime.now(UTC)
+    flightstatus.hold(shown.pop("flight_number"), shown.pop("date"), service.Status(**shown), fetched, fetched + DEMO_STATUS_HELD)
+
+
+def restore_status(conn: db.Connection) -> None:
+    first = conn.orm.scalars(select(Segment.start_local).where(Segment.kind == "flight", Segment.details.like(f'%"{DEMO_DELAYED_FLIGHT}"%'))
+                             .order_by(Segment.start_local)).first()
+    if first:
+        hold_status(date.fromisoformat(first[:10]) - timedelta(days=DEMO_DELAY_DAYS_AHEAD))
 
 
 def _rows(conn: db.Connection) -> int:
