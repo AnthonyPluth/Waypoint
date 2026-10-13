@@ -406,7 +406,6 @@ def upgrade() -> None:
     )
     op.create_index('ix_segment_travelers_person_id', 'segment_travelers', ['person_id'], unique=False)
     op.create_index('ix_segment_travelers_segment_id', 'segment_travelers', ['segment_id'], unique=False)
-    # ### end Alembic commands ###
 
     airports = sa.table('airports', sa.column('code'), sa.column('name'), sa.column('city'), sa.column('country'), sa.column('zone'),
                         sa.column('latitude'), sa.column('longitude'))
