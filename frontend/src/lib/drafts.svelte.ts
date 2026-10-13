@@ -42,6 +42,10 @@ export function leave(proceed: () => void, among: DraftGuard[] = [...guards]): b
   return false;
 }
 
+export function dropDrafts(): void {
+  [...guards].filter((g) => g.dirty()).forEach((g) => g.discard());
+}
+
 export function keepEditing(): void {
   pending = null;
 }

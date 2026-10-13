@@ -35,6 +35,7 @@ export function setQuery(query: string): void {
 }
 
 let undoing = false;
+let undoTimer: ReturnType<typeof setTimeout> | undefined;
 const entryOf = (): number => {
   const n = (history.state as { wp?: number } | null)?.wp;
   if (typeof n === "number") return n;
@@ -45,12 +46,12 @@ const entryOf = (): number => {
 let here = entryOf();
 
 function onHashChange(): void {
-  if (undoing) { undoing = false; return; }
+  if (undoing) { undoing = false; clearTimeout(undoTimer); return; }
   const target = location.hash;
   const there = (history.state as { wp?: number } | null)?.wp;
   if (!anyDirty() && !anySaving()) { here = entryOf(); readHash(); return; }
   const back = typeof there === "number" ? here - there : -1;
-  if (back !== 0) { undoing = true; history.go(back); setTimeout(() => { undoing = false; }, 500); }
+  if (back !== 0) { undoing = true; history.go(back); clearTimeout(undoTimer); undoTimer = setTimeout(() => { undoing = false; }, 500); }
   leave(() => { location.hash = target; });
 }
 readHash();

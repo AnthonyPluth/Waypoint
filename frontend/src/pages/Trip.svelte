@@ -17,7 +17,7 @@
   import { viewport } from "$lib/phone.svelte";
   import { DiscardDialog } from "$lib/components/ui/discard-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
-  import { draftGuard, leave } from "$lib/drafts.svelte";
+  import { draftGuard, dropDrafts, leave } from "$lib/drafts.svelte";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import { askAboutOffline, offline, refreshOffline, saveTripCopy } from "$lib/offline.svelte";
   import { hasSavedTrip, onLock } from "$lib/offline-vault";
@@ -174,7 +174,7 @@
   async function saved(s: Segment) {
     form = null;
     toast.success("Saved");
-    if (trip && s.trip_id !== trip.id) { if (onchanged) onchanged(s.trip_id); else location.hash = `#trip/${s.trip_id}`; return; }
+    if (trip && s.trip_id !== trip.id) { dropDrafts(); if (onchanged) onchanged(s.trip_id); else location.hash = `#trip/${s.trip_id}`; return; }
     onchanged?.();
     await load();
   }
@@ -183,6 +183,7 @@
     if (!trip) return;
     await apiCall<"DELETE /api/trips/{id}">(`/api/trips/${trip.id}`, { method: "DELETE" });
     toast.success("Trip deleted");
+    dropDrafts();
     if (onchanged) onchanged(); else location.hash = "#trips";
   });
 
@@ -228,6 +229,7 @@
       throw e;
     }
     toast.success("Moved");
+    dropDrafts();
     if (onchanged) onchanged(into.id); else location.hash = `#trip/${into.id}`;
   });
 
@@ -235,7 +237,7 @@
     await apiCall<"DELETE /api/segments/{id}">(`/api/segments/${s.id}`, { method: "DELETE" });
     toast.success("Removed");
     onchanged?.();
-    if (trip && trip.segments.length === 1 && trip.auto) { if (!onchanged) location.hash = "#trips"; return; }
+    if (trip && trip.segments.length === 1 && trip.auto) { dropDrafts(); if (!onchanged) location.hash = "#trips"; return; }
     await load();
   });
 </script>

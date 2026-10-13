@@ -179,6 +179,18 @@ describe("Trip", () => {
       await waitFor(() => expect(location.hash).toBe("#trips"));
     });
 
+    it("goes back to Trips after a delete even with a rename half typed, without asking to discard it", async () => {
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Rename trip" }));
+      await u.type(screen.getByLabelText("Trip name"), " again");
+      await u.click(screen.getByRole("button", { name: "Delete trip" }));
+      await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
+      await waitFor(() => expect(route.page).toBe("trips"));
+      expect(location.hash).toBe("#trips");
+      expect(screen.queryByRole("dialog", { name: "Discard changes?" })).toBeNull();
+    });
+
     it("keeps the dialog open when the delete fails", async () => {
       const answer = vi.mocked(api).getMockImplementation()!;
       vi.mocked(api).mockImplementation(async (path, opts) => {

@@ -8,7 +8,7 @@
   import { Button } from "$lib/components/ui/button";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import TripKinds from "$lib/components/TripKinds.svelte";
-  import { leave } from "$lib/drafts.svelte";
+  import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { panes } from "$lib/panes.svelte";
   import { blank } from "$lib/segment-form";
   import { dateLabel, dayIn, splitTrips, viewerZone } from "$lib/trips";
@@ -60,7 +60,7 @@
 </div>
 
 {#if adding}
-  <SegmentForm initial={adding === "past" ? { ...blank(), kind: "visit" } : blank()} {people} oncancel={() => (adding = null)} onsaved={(s) => { adding = null; location.hash = `#trip/${s.trip_id}`; }} />
+  <SegmentForm initial={adding === "past" ? { ...blank(), kind: "visit" } : blank()} {people} oncancel={() => (adding = null)} onsaved={(s) => { adding = null; dropDrafts(); location.hash = `#trip/${s.trip_id}`; }} />
 {/if}
 
 {#if loadError}
