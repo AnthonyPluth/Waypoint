@@ -38,7 +38,7 @@ type Sealed = { iv: string; data: string };
 type StoredKeys = { v: number; credentialId: string; publicKey: string; wrappedKey: Sealed; off?: boolean };
 type StoredTrip = { v: number; ephemeralPublicKey: string; iv: string; data: string; savedAt?: number; expiresAt?: number | null; tripId?: number; order?: number };
 
-export type SavedInfo = { savedAt: number; expiresAt: number | null; tripId?: number };
+export type SavedInfo = { savedAt: number; expiresAt: number | null; tripId?: number; order?: number };
 export type SavedItem = { value: unknown; info?: SavedInfo };
 
 type Bytes = Uint8Array<ArrayBuffer>;
