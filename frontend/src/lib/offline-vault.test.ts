@@ -2,7 +2,7 @@
 import { webcrypto } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installDevice, type Behaviour, type Device } from "../test/webauthn";
-import { clearTrip, hasSavedTrip, isSavingOff, isSetUp, isUnlocked, lock, onLock, remove, save, savedInfo, setSavingOff, setUp, support, unlock, VaultError, WHY_BROWSER, WHY_DEVICE } from "./offline-vault";
+import { clearTrip, hasSavedTrip, isSavingOff, isSetUp, isUnlocked, lock, onLock, remove, save, saveAll, savedInfos, setSavingOff, dropTrips, setUp, support, unlock, VaultError, WHY_BROWSER, WHY_DEVICE } from "./offline-vault";
 
 const CANARY = "CANARY-Hotel-Zebra-4471";
 const TRIP = { id: 7, name: "Trip to Springfield", note: CANARY, segments: [{ id: 1, confirmation: "ZZ9QQ1" }] };
@@ -31,12 +31,12 @@ async function ready() {
 describe("round trip", () => {
   it("encrypts, locks and unlocks again", async () => {
     await ready();
-    expect(await unlock()).toEqual(TRIP);
+    expect(await unlock()).toEqual([TRIP]);
     expect(isUnlocked()).toBe(true);
     lock();
     expect(isUnlocked()).toBe(false);
     const asked = device.calls.get;
-    expect(await unlock()).toEqual(TRIP);
+    expect(await unlock()).toEqual([TRIP]);
     expect(device.calls.get).toBe(asked + 1);
   });
 
@@ -44,14 +44,14 @@ describe("round trip", () => {
     await ready();
     await unlock();
     const asked = device.calls.get;
-    expect(await unlock()).toEqual(TRIP);
+    expect(await unlock()).toEqual([TRIP]);
     expect(device.calls.get).toBe(asked);
   });
 
   it("replaces the saved copy and keeps one", async () => {
     await ready();
     await save({ ...TRIP, name: "Second" });
-    expect((await unlock() as typeof TRIP).name).toBe("Second");
+    expect((await unlock() as (typeof TRIP)[]).map((t) => t.name)).toEqual(["Second"]);
     expect(device.files.size).toBe(2);
   });
 
@@ -60,7 +60,7 @@ describe("round trip", () => {
     await ready();
     expect(device.calls.get).toBe(0);
     lock();
-    expect(await unlock()).toEqual(TRIP);
+    expect(await unlock()).toEqual([TRIP]);
   });
 
   it("derives the same secret each time", async () => {
@@ -280,7 +280,7 @@ describe("when the unlock goes wrong", () => {
     expect(failed.code).toBe("cancelled");
     expect(isUnlocked()).toBe(false);
     device.b.failGet = undefined;
-    expect(await unlock()).toEqual(TRIP);
+    expect(await unlock()).toEqual([TRIP]);
   });
 
   it("treats an aborted check as cancelled", async () => {
@@ -429,24 +429,24 @@ describe("a device that can't do it", () => {
 describe("what the app may see without unlocking", () => {
   it("reports when it was saved and when it runs out, in the clear and nothing else about the trip", async () => {
     await setUp();
-    expect(await savedInfo()).toBeNull();
+    expect(await savedInfos()).toEqual([]);
     await save(TRIP, { savedAt: 1_700_000_000_000, expiresAt: 1_700_300_000_000 });
-    expect(await savedInfo()).toEqual({ savedAt: 1_700_000_000_000, expiresAt: 1_700_300_000_000 });
+    expect(await savedInfos()).toEqual([{ savedAt: 1_700_000_000_000, expiresAt: 1_700_300_000_000 }]);
     expect(Object.keys(device.fields("/offline-vault/trip")).sort()).toEqual(["data", "ephemeralPublicKey", "expiresAt", "iv", "savedAt", "v"]);
     expect(device.appears(CANARY)).toBe(false);
   });
 
   it("reports nothing before it is set up, and a missing time as unknown", async () => {
-    expect(await savedInfo()).toBeNull();
+    expect(await savedInfos()).toEqual([]);
     await setUp();
     await save(TRIP);
-    expect(await savedInfo()).toEqual({ savedAt: 0, expiresAt: null });
+    expect(await savedInfos()).toEqual([{ savedAt: 0, expiresAt: null }]);
   });
 
   it("says a stored time that isn't a number is damaged", async () => {
     await ready();
     device.files.set("/offline-vault/trip", new TextEncoder().encode(JSON.stringify({ ...device.fields("/offline-vault/trip"), savedAt: "soon" })));
-    expect((await failure(savedInfo())).code).toBe("damaged");
+    expect((await failure(savedInfos())).code).toBe("damaged");
   });
 });
 
@@ -486,5 +486,64 @@ describe("clearing only the trip", () => {
   it("does nothing in a browser without the Cache API", async () => {
     vi.stubGlobal("caches", undefined);
     await expect(clearTrip()).resolves.toBeUndefined();
+  });
+});
+
+describe("several saved trips", () => {
+  const trip = (id: number) => ({ ...TRIP, id, name: `Trip ${id}`, note: `${CANARY}-${id}` });
+  const item = (id: number, expiresAt: number | null = null) => ({ value: trip(id), info: { savedAt: 1_000, expiresAt, tripId: id } });
+  const urls = () => [...device.files.keys()].filter((u) => u.startsWith("/offline-vault/trip")).sort();
+
+  it("keeps one encrypted entry per trip and unlocks them all with one device check", async () => {
+    await setUp();
+    expect(await saveAll([item(3), item(5), item(9)])).toBe(true);
+    expect(urls()).toEqual(["/offline-vault/trip/3", "/offline-vault/trip/5", "/offline-vault/trip/9"]);
+    for (const id of [3, 5, 9]) expect(device.appears(`${CANARY}-${id}`)).toBe(false);
+    const asked = device.calls.get;
+    expect(await unlock()).toEqual([trip(3), trip(5), trip(9)]);
+    expect(device.calls.get).toBe(asked + 1);
+  });
+
+  it("lists each trip's own times in the clear", async () => {
+    await setUp();
+    await saveAll([item(3, 1_700_000_000_000), item(5, 1_700_900_000_000)]);
+    expect(await savedInfos()).toEqual([
+      { savedAt: 1_000, expiresAt: 1_700_000_000_000, tripId: 3 },
+      { savedAt: 1_000, expiresAt: 1_700_900_000_000, tripId: 5 },
+    ]);
+  });
+
+  it("replaces the whole set on a save: trips no longer in it are gone, and so is an older single entry", async () => {
+    await ready();
+    expect(urls()).toEqual(["/offline-vault/trip"]);
+    await saveAll([item(3), item(5)]);
+    expect(urls()).toEqual(["/offline-vault/trip/3", "/offline-vault/trip/5"]);
+    await saveAll([item(5), item(6)]);
+    expect(urls()).toEqual(["/offline-vault/trip/5", "/offline-vault/trip/6"]);
+    expect(await unlock()).toEqual([trip(5), trip(6)]);
+  });
+
+  it("drops one trip's entry and leaves the others", async () => {
+    await setUp();
+    await saveAll([item(3), item(5)]);
+    await dropTrips([3]);
+    expect(urls()).toEqual(["/offline-vault/trip/5"]);
+    expect(await unlock()).toEqual([trip(5)]);
+  });
+
+  it("clears every trip, keeping the keys", async () => {
+    await setUp();
+    await saveAll([item(3), item(5)]);
+    await clearTrip();
+    expect(urls()).toEqual([]);
+    expect(await hasSavedTrip()).toBe(false);
+    expect(await isSetUp()).toBe(true);
+  });
+
+  it("saves nothing while saving is off", async () => {
+    await setUp();
+    await setSavingOff(true);
+    expect(await saveAll([item(3)])).toBe(false);
+    expect(urls()).toEqual([]);
   });
 });

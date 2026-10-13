@@ -30,7 +30,7 @@ describe("SavedTripLock", () => {
     expect(screen.getByRole("heading", { name: "Saved trip is locked" })).toBeInTheDocument();
     expect(onunlocked).not.toHaveBeenCalled();
     await userEvent.setup().click(screen.getByRole("button", { name: "Unlock" }));
-    await waitFor(() => expect(onunlocked).toHaveBeenCalledWith(TRIP));
+    await waitFor(() => expect(onunlocked).toHaveBeenCalledWith([TRIP]));
   });
 
   it("stays locked with Try again when the unlock is cancelled, and never gives the data", async () => {
@@ -44,7 +44,7 @@ describe("SavedTripLock", () => {
     expect(screen.getByRole("heading", { name: "Saved trip is locked" })).toBeInTheDocument();
     device.b.failGet = undefined;
     await user.click(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect(onunlocked).toHaveBeenCalledWith(TRIP));
+    await waitFor(() => expect(onunlocked).toHaveBeenCalledWith([TRIP]));
   });
 
   it("stays locked on another failure", async () => {
@@ -67,7 +67,7 @@ describe("SavedTripLock", () => {
     expect(await screen.findByText(/can’t unlock it/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Unlock" })).not.toBeInTheDocument();
     expect(onunlocked).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Remove saved trip" }));
+    await user.click(screen.getByRole("button", { name: "Remove saved trips" }));
     await user.click(await screen.findByRole("button", { name: "Remove" }));
     await waitFor(() => expect(onremoved).toHaveBeenCalled());
     expect(device.files.size).toBe(0);
