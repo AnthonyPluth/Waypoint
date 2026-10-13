@@ -97,20 +97,27 @@ export function bookingCards(segments: Segment[]): Card[] {
   return cards;
 }
 
-export type NextUp = { trip: Trip; segment: Segment; bookings: Segment[]; state: "now" | "next" };
+export type Booked = { trip: Trip; segment: Segment; bookings: Segment[] };
+export type NextUp = Booked & { state: "now" | "next"; alongside: Booked[] };
+
+const BACKGROUND_KINDS: Segment["kind"][] = ["hotel", "car", "parking"];
+export const isBackground = (s: Segment): boolean => BACKGROUND_KINDS.includes(s.kind);
 
 export function nextUp(trips: Trip[], now: number): NextUp | null {
-  const live = trips.flatMap((trip) => bookingCards(trip.segments).flatMap((card) => {
+  const live: Booked[] = trips.flatMap((trip) => bookingCards(trip.segments).flatMap((card) => {
     const bookings = card.segments.filter((s) => s.status !== "cancelled" && !untimed(s) && endAt(s) > now);
     return bookings.length ? [{ trip, segment: bookings[0], bookings }] : [];
   }));
-  const by = (a: { segment: Segment }, b: { segment: Segment }) => startAt(a.segment) - startAt(b.segment);
-  const started = live.filter((x) => startAt(x.segment) <= now).sort(by);
-  const going = started.find((x) => x.segment.kind !== "hotel");
-  if (going) return { ...going, state: "now" };
-  const coming = live.filter((x) => startAt(x.segment) > now).sort(by)[0];
-  if (coming) return { ...coming, state: "next" };
-  return started[0] ? { ...started[0], state: "now" } : null;
+  const byStart = (a: Booked, b: Booked) => startAt(a.segment) - startAt(b.segment) || a.segment.id - b.segment.id;
+  const byEnd = (a: Booked, b: Booked) => endAt(a.segment) - endAt(b.segment) || a.segment.id - b.segment.id;
+  const started = live.filter((x) => startAt(x.segment) <= now);
+  const alongside = started.filter((x) => isBackground(x.segment)).sort(byEnd);
+  const going = started.filter((x) => !isBackground(x.segment)).sort(byStart)[0];
+  if (going) return { ...going, state: "now", alongside };
+  const coming = live.filter((x) => startAt(x.segment) > now).sort(byStart)[0];
+  if (coming) return { ...coming, state: "next", alongside };
+  const [held, ...rest] = alongside;
+  return held ? { ...held, state: "now", alongside: rest } : null;
 }
 
 export const isPast = (trip: Trip, today: string): boolean => !!trip.end_date && trip.end_date < today;
