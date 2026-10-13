@@ -20,7 +20,8 @@
   });
 
   const savedElsewhere = $derived(tripId !== null && offline.tripId !== null && offline.tripId !== tripId);
-  const savedHere = $derived(offline.hasCopy && !savedElsewhere);
+  const unidentified = $derived(tripId !== null && offline.tripId === null);
+  const savedHere = $derived(offline.hasCopy && !savedElsewhere && !unidentified);
   const which = $derived(offline.tripName ? `“${offline.tripName}”` : "your current trip");
 
   async function retry() {
@@ -47,6 +48,9 @@
             <span class="font-medium">Couldn’t save the trip on this device.</span> <span class="text-muted-foreground">{savedHere && offline.savedAt ? `The copy from ${ago(offline.savedAt, now)} is still there.` : "Nothing is saved yet."}</span>
           {:else if savedElsewhere}
             <span class="font-medium">Saved on this device: {which}.</span> <span class="text-muted-foreground">This trip isn’t the one saved: only your current trip is.</span>
+          {:else if offline.hasCopy && unidentified}
+            <span class="font-medium">A trip is saved on this device</span>
+            {#if offline.savedAt}<span class="text-muted-foreground">· updated {ago(offline.savedAt, now)}</span>{/if}
           {:else if savedHere && offline.savedAt}
             <span class="font-medium">Saved on this device</span> <span class="text-muted-foreground">· updated {ago(offline.savedAt, now)}{tripId === null && offline.tripName ? ` · ${which}` : ""}</span>
           {:else if savedHere}

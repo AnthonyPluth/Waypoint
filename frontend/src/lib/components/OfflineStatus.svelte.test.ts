@@ -40,6 +40,13 @@ describe("OfflineStatus", () => {
     expect(line()).toHaveTextContent("Saved on this device: “Trip to Springfield”. This trip isn’t the one saved");
   });
 
+  it("doesn’t claim this trip is saved while the saved copy is still unidentified after a reload", () => {
+    Object.assign(offline, { hasCopy: true, savedAt: Date.now() - 3_600_000, tripId: null, tripName: "" });
+    render(OfflineStatus, { tripId: 9 });
+    expect(line()).toHaveTextContent("A trip is saved on this device · updated 1 h ago");
+    expect(line()).not.toHaveTextContent("Saved on this device ·");
+  });
+
   it("explains what is left out and how it unlocks before anyone relies on it", async () => {
     Object.assign(offline, { hasCopy: true, savedAt: Date.now() });
     render(OfflineStatus, { tripId: 1 });
