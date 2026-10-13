@@ -1,0 +1,31 @@
+{
+  "name": "settings-trip-costs",
+  "page": "trips",
+  "steps": [
+    { "click": "a[href^='#trip/']:has-text('London') >> visible=true" },
+    { "wait_for": "h1:has-text('London')" },
+    { "expect_text": { "selector": "[data-trip-total]", "text": "bookings" } },
+    { "screenshot": "costs-shown" },
+    { "goto": "#settings/travel" },
+    { "wait_for": "#costs-title" },
+    { "scroll_to": "#costs-title" },
+    { "screenshot": "setting" },
+    { "click": "[aria-label='Trip costs'] button:has-text('Hide')" },
+    { "wait_for": "[aria-label='Trip costs'] button[aria-pressed='true']:has-text('Hide')" },
+    { "scroll_to": "#costs-title" },
+    { "screenshot": "setting-hidden" },
+    { "reload": true },
+    { "wait_for": "[aria-label='Trip costs'] button[aria-pressed='true']:has-text('Hide')" },
+    { "goto": "#trips" },
+    { "click": "a[href^='#trip/']:has-text('London') >> visible=true" },
+    { "wait_for": "h1:has-text('London')" },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "screenshot": "costs-hidden" },
+    { "goto": "#settings/travel" },
+    { "wait_for": "#costs-title" },
+    { "click": "[aria-label='Trip costs'] button:has-text('Show')" },
+    { "wait_for": "[aria-label='Trip costs'] button[aria-pressed='true']:has-text('Show')" },
+    { "goto": "#trips" },
+    { "wait_for": "h1:has-text('Trips')" }
+  ]
+}

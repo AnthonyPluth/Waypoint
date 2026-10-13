@@ -1483,6 +1483,17 @@ describe("on its own page", () => {
       expect(shown).toEqual(["Cost $1,240.00", "Cost $50.00"]);
     });
 
+    it("hides the total and every cost when the household has turned costs off, and keeps the edit form's cost field", async () => {
+      app.state = state({ show_costs: false });
+      const twin = segment({ id: 5, confirmation: "ZZ9ZZ9", details: flight.details });
+      held = trip([paid(flight, 124000, "USD"), paid(twin, 5000, "USD")], { costs: { totals: [{ currency: "USD", amount_minor: 129000 }], priced: 2, bookings: 2 } });
+      render(TripPage);
+      await screen.findByRole("list", { name: /Bookings of/ });
+      expect(document.querySelector("[data-trip-total]")).toBeNull();
+      expect(document.querySelector("[data-cost]")).toBeNull();
+      expect(document.body).not.toHaveTextContent(/\$1,240\.00|\$1,290\.00/);
+    });
+
     it("saves the cost typed in the edit form, in the smallest unit", async () => {
       held = trip([paid(flight, 124000, "USD")], { costs: { totals: [{ currency: "USD", amount_minor: 124000 }], priced: 1, bookings: 1 } });
       render(TripPage);

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
-import RouteLine, { clampProgress } from "./RouteLine.svelte";
+import RouteLine, { clampProgress, headingDegrees } from "./RouteLine.svelte";
 
 const line = (container: HTMLElement) => container.firstElementChild as HTMLElement;
 const along = (container: HTMLElement) => (container.querySelector("[style*='--along']") as HTMLElement).style.getPropertyValue("--along");
@@ -19,6 +19,31 @@ describe("RouteLine", () => {
       expect(along(container)).toBe(percent);
       unmount();
     }
+  });
+  it("draws the route as one arch, dashed behind and solid up to the plane", () => {
+    const { container } = render(RouteLine, { progress: 0.3 });
+    const paths = [...container.querySelectorAll("svg[preserveAspectRatio] path")];
+    expect(paths.map((p) => p.getAttribute("d"))).toEqual(["M0 100 Q50 0 100 100", "M0 100 Q50 0 100 100"]);
+    expect(paths[0].getAttribute("stroke-dasharray")).toBe("4 4");
+    expect(paths[1].getAttribute("stroke-dasharray")).toBeNull();
+    expect(paths[1].closest("svg")?.getAttribute("style")).toContain("var(--along)");
+  });
+  it("centres the plane on the arch with one offset, at the start, the top and the end", () => {
+    for (const [progress, top] of [[0, "100%"], [0.5, "50%"], [1, "100%"]] as const) {
+      const { container, unmount } = render(RouteLine, { progress });
+      const plane = container.querySelector("svg.lucide-plane") as SVGElement;
+      expect(plane.getAttribute("style")).toContain(`top: ${top}`);
+      expect(plane.getAttribute("style")).toContain("translate(-50%, -50%) rotate(45deg)");
+      expect(plane.getAttribute("class")).not.toMatch(/translate/);
+      unmount();
+    }
+  });
+  it("turns the plane to the arch's slope in pixels: up on the way out, level at the top, down on the way in", () => {
+    expect(headingDegrees(0, 300, 40)).toBe(-15);
+    expect(headingDegrees(0.5, 300, 40)).toBe(0);
+    expect(headingDegrees(1, 300, 40)).toBe(15);
+    expect(headingDegrees(0, 100, 40)).toBeLessThan(headingDegrees(0, 300, 40));
+    expect(headingDegrees(0, 0, 40)).toBe(0);
   });
   it("keeps the plane on the line", () => {
     expect(clampProgress(-1)).toBe(0);

@@ -5,7 +5,7 @@ from unittest import mock
 from waypoint.storage import db
 from waypoint.storage import settings_keys as sk
 from waypoint.server.api import state
-from waypoint.server.common import _current
+from waypoint.server.common import ApiError, _current
 from tests.shared import DbCase, ServerCase
 
 class StateTests(DbCase):
@@ -23,6 +23,19 @@ class StateTests(DbCase):
         self.assertEqual(state.api_state(self.c, {}, {})["database"], "postgres" if db.using_postgres() else "sqlite")
         with mock.patch.object(db, "using_postgres", return_value=True):
             self.assertEqual(state.api_state(self.c, {}, {})["database"], "postgres")
+
+    def test_costs_show_until_switched_off(self):
+        self.assertTrue(state.api_state(self.c, {}, {})["show_costs"])
+        self.assertEqual(state.api_show_costs_save(self.c, {}, {"show_costs": False}), {"show_costs": False})
+        self.assertFalse(state.api_state(self.c, {}, {})["show_costs"])
+        self.assertEqual(state.api_show_costs_save(self.c, {}, {"show_costs": True}), {"show_costs": True})
+        self.assertTrue(state.api_state(self.c, {}, {})["show_costs"])
+
+    def test_show_costs_wants_a_true_or_false(self):
+        for body in ({}, {"show_costs": "off"}, {"show_costs": None}, {"show_costs": 1}):
+            with self.assertRaises(ApiError):
+                state.api_show_costs_save(self.c, {}, body)  # type: ignore[arg-type]
+        self.assertTrue(state.api_state(self.c, {}, {})["show_costs"])
 
     def test_the_signed_in_person(self):
         _current.user = {"sub": "u1", "name": "Rosa Example", "email": "rosa@example.com"}
@@ -53,4 +66,4 @@ class LocalStateTests(ServerCase):
         self.assertEqual(code, 200)
         self.assertEqual(st, {"version": "v9.8.7", "database": "postgres" if db.using_postgres() else "sqlite",
                               "user": {"name": None, "email": None, "local": True}, "last_backup": None,
-                              "review_count": 0, "person_id": None, "ai": False})
+                              "review_count": 0, "person_id": None, "ai": False, "show_costs": True})

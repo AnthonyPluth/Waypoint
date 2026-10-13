@@ -10,7 +10,8 @@ from ...storage import settings_keys as sk
 from ..common import _current
 from .mailboxes import owner
 from .trips import viewer
-from ..contract import State
+from ..contract import ShowCosts, ShowCostsBody, State
+from ..common import ApiError
 
 
 def api_state(conn, _q, _b) -> State:
@@ -23,7 +24,20 @@ def api_state(conn, _q, _b) -> State:
         "review_count": review.count(conn, owner()) + trips.unmatched_count(conn, viewer(conn)),
         "person_id": viewer(conn).person_id,
         "ai": ai.config(conn) is not None,
+        "show_costs": shows_costs(conn),
     }
+
+
+def shows_costs(conn) -> bool:
+    return db.get_setting(conn, sk.SHOW_COSTS) != "off"
+
+
+def api_show_costs_save(conn, _q, body: ShowCostsBody) -> ShowCosts:
+    show = body.get("show_costs")
+    if not isinstance(show, bool):
+        raise ApiError("Send show_costs as true or false")
+    db.set_setting(conn, sk.SHOW_COSTS, "on" if show else "off")
+    return {"show_costs": show}
 
 
 def with_offset(stamp: str | None, utc: bool = False) -> str | None:

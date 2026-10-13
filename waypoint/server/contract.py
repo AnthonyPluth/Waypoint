@@ -26,6 +26,15 @@ class State(TypedDict):
     review_count: int
     person_id: int | None
     ai: bool
+    show_costs: bool
+
+
+class ShowCosts(TypedDict):
+    show_costs: bool
+
+
+class ShowCostsBody(TypedDict):
+    show_costs: bool
 
 
 class BackupContents(TypedDict):
