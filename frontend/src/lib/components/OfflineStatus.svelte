@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
-  import { ago } from "$lib/offline";
+  import { ago, ONLY_THESE, savedList, WHEN_SAVED } from "$lib/offline";
   import { offline, refreshOffline, syncSavedTrip } from "$lib/offline.svelte";
   import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
   import { onMount } from "svelte";
@@ -17,10 +17,10 @@
     return () => clearInterval(tick);
   });
 
-  const savedElsewhere = $derived(tripId !== null && offline.tripId !== null && offline.tripId !== tripId);
-  const unidentified = $derived(tripId !== null && offline.tripId === null);
-  const savedHere = $derived(offline.hasCopy && !savedElsewhere && !unidentified);
-  const which = $derived(offline.tripName ? `“${offline.tripName}”` : "your current trip");
+  const identified = $derived(offline.trips.every((t) => t.id !== null));
+  const savedHere = $derived(tripId !== null && identified && offline.trips.some((t) => t.id === tripId));
+  const notSaved = $derived(tripId !== null && offline.hasCopy && identified && !savedHere);
+  const others = $derived(offline.trips.filter((t) => t.id !== tripId));
 
   async function retry() {
     retrying = true;
@@ -35,26 +35,26 @@
         <HardDriveDownload class="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span class="min-w-0 break-words" data-testid="offline-status-line">
           {#if offline.damaged}
-            <span class="font-medium">The saved trip can’t be read.</span> <a class="underline underline-offset-2" href="#settings/offline">Remove it in Settings</a>, then set up offline access again.
+            <span class="font-medium">The saved trips can’t be read.</span> <a class="underline underline-offset-2" href="#settings/offline">Remove it in Settings</a>, then set up offline access again.
           {:else if !offline.supported}
             <span class="font-medium">Offline access isn’t available on this device.</span> <span class="text-muted-foreground">{offline.reason}</span>
           {:else if !offline.setUp}
-            <span class="font-medium">Not saved for offline use.</span> <span class="text-muted-foreground">Set up offline access to open your current trip with no connection.</span>
+            <span class="font-medium">Not saved for offline use.</span> <span class="text-muted-foreground">Set up offline access to open your upcoming trips with no connection.</span>
           {:else if offline.off}
             <span class="font-medium">Offline saving is off on this device.</span> <a class="underline underline-offset-2" href="#settings/offline">Turn it on in Settings</a>.
           {:else if offline.failed}
-            <span class="font-medium">Couldn’t save the trip on this device.</span> <span class="text-muted-foreground">{savedHere && offline.savedAt ? `The copy from ${ago(offline.savedAt, now)} is still there.` : "Nothing is saved yet."}</span>
-          {:else if savedElsewhere}
-            <span class="font-medium">Saved on this device: {which}.</span> <span class="text-muted-foreground">This trip isn’t the one saved: only your current trip is.</span>
-          {:else if offline.hasCopy && unidentified}
-            <span class="font-medium">A trip is saved on this device</span>
+            <span class="font-medium">Couldn’t save the trips on this device.</span> <span class="text-muted-foreground">{offline.hasCopy && offline.savedAt ? `The copy from ${ago(offline.savedAt, now)} is still there.` : "Nothing is saved yet."}</span>
+          {:else if notSaved}
+            <span class="font-medium">This trip isn’t saved on this device.</span> <span class="text-muted-foreground">Saved: {savedList(offline.trips)}. {ONLY_THESE}</span>
+          {:else if offline.hasCopy && !savedHere && tripId !== null}
+            <span class="font-medium">Trips are saved on this device</span>
             {#if offline.savedAt}<span class="text-muted-foreground">· updated {ago(offline.savedAt, now)}</span>{/if}
-          {:else if savedHere && offline.savedAt}
-            <span class="font-medium">Saved on this device</span> <span class="text-muted-foreground">· updated {ago(offline.savedAt, now)}{tripId === null && offline.tripName ? ` · ${which}` : ""}</span>
-          {:else if savedHere}
-            <span class="font-medium">A trip is saved on this device.</span>
+          {:else if offline.hasCopy && offline.savedAt}
+            <span class="font-medium">Saved on this device</span> <span class="text-muted-foreground">· updated {ago(offline.savedAt, now)}{tripId === null ? ` · ${savedList(offline.trips)}` : others.length ? ` · also saved: ${savedList(others)}` : ""}</span>
+          {:else if offline.hasCopy}
+            <span class="font-medium">{offline.trips.length === 1 ? "A trip is saved on this device." : "Trips are saved on this device."}</span>
           {:else}
-            <span class="font-medium">Nothing is saved yet.</span> <span class="text-muted-foreground">Your current trip is saved when you open Waypoint online.</span>
+            <span class="font-medium">Nothing is saved yet.</span> <span class="text-muted-foreground">{WHEN_SAVED}</span>
           {/if}
         </span>
       </p>

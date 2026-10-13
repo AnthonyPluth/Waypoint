@@ -311,9 +311,13 @@ class OfflineMessages(TypedDict):
     emails: list[StoredEmail]
 
 
-class Offline(TypedDict):
-    trip: Trip | None
+class OfflineTrip(TypedDict):
+    trip: Trip
     messages: list[OfflineMessages]
+
+
+class Offline(TypedDict):
+    trips: list[OfflineTrip]
 
 
 class WhoBody(TypedDict):

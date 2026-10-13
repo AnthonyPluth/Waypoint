@@ -11,7 +11,7 @@ import type { Trip as TripT } from "$lib/api-types";
 import { route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { offline } from "$lib/offline.svelte";
-import { lock, save, setUp } from "$lib/offline-vault";
+import { lock, save, saveAll, setUp } from "$lib/offline-vault";
 import { installDevice, type Behaviour, type Device } from "../test/webauthn";
 import { segment, trip } from "../test/fixtures";
 import TripPage from "./Trip.svelte";
@@ -25,7 +25,7 @@ function serve() {
   vi.mocked(api).mockImplementation(async (path) => {
     if (path === "/api/people") return { people: [] };
     if (path === "/api/loyalty") return { loyalty: [], programs: {} };
-    if (path === "/api/offline") return { trip: held, messages: [] };
+    if (path === "/api/offline") return { trips: [{ trip: held, messages: [] }] };
     return held;
   });
 }
@@ -39,7 +39,7 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
   vi.mocked(api).mockReset();
   held = { ...trip([flight]), name: "Trip to Springfield" };
-  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, tripId: null, tripName: "" });
+  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, trips: [] });
   route.page = "trip"; route.sub = "1"; route.query = ""; location.hash = "#trip/1";
   withDevice();
   serve();
@@ -101,7 +101,7 @@ describe("Trip: the saved offline copy", () => {
     });
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to Springfield" });
-    expect(await screen.findByText("Couldn’t save the trip on this device.")).toBeInTheDocument();
+    expect(await screen.findByText("Couldn’t save the trips on this device.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
@@ -163,5 +163,43 @@ describe("Trip: the saved offline copy", () => {
     render(TripPage);
     await userEvent.setup().click(await screen.findByRole("button", { name: "Unlock" }));
     expect(await screen.findByText(/That didn’t work/)).toBeInTheDocument();
+  });
+
+  it("opens this trip from several saved copies after one unlock", async () => {
+    await setUp();
+    const other = { ...held, id: 2, name: "Trip to Paris" };
+    const copies = [held, other].map((t) => ({ value: { trip: t, messages: [], savedAt: 1 }, info: { savedAt: 1, expiresAt: null, tripId: t.id } }));
+    await saveAll(copies);
+    goOffline();
+    render(TripPage);
+    const asked = device.calls.get;
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Unlock" }));
+    expect(await screen.findByRole("heading", { name: "Trip to Springfield" })).toBeInTheDocument();
+    expect(device.calls.get).toBe(asked + 1);
+  });
+
+  it("says plainly when this trip isn't one of the saved copies, and offers the saved ones", async () => {
+    await setUp();
+    const other = { ...held, id: 2, name: "Trip to Paris" };
+    await saveAll([{ value: { trip: other, messages: [], savedAt: 1 }, info: { savedAt: 1, expiresAt: null, tripId: 2 } }]);
+    goOffline();
+    render(TripPage);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Unlock" }));
+    expect(await screen.findByRole("heading", { name: "This trip isn’t saved on this device" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Trip to Paris" })).toHaveAttribute("href", "#trip/2");
+    expect(screen.queryByText("QX7R2M")).not.toBeInTheDocument();
+  });
+
+  it("shows which trips are saved, in the header, when several are", async () => {
+    await setUp();
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "/api/people") return { people: [] };
+      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+      if (path === "/api/offline") return { trips: [{ trip: held, messages: [] }, { trip: { ...held, id: 2, name: "Trip to Paris" }, messages: [] }] };
+      return held;
+    });
+    render(TripPage);
+    await screen.findByRole("heading", { name: "Trip to Springfield" });
+    expect(await screen.findByText(/also saved: “Trip to Paris”/)).toBeInTheDocument();
   });
 });

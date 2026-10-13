@@ -290,7 +290,7 @@ class NeverElsewhereTests(Kept):
         self.assertNotIn("gate", feed.lower())
         saved = self.read(lambda conn: offline.projection(conn, self.jane, datetime(2026, 12, 2).date()))
         text = json.dumps(saved)
-        self.assertEqual([s["gate_code"] for s in saved["trip"]["segments"]], [None])
+        self.assertEqual([s["gate_code"] for s in saved["trips"][0]["trip"]["segments"]], [None])
         self.assertNotIn(stamp[:24], text)
         self.assertNotIn("gate_code", json.dumps(mcp_server._without_gate_codes({"trips": [{"segments": [{"id": 1, "gate_code": {"state": "ready"}}]}]})))
         self.assertEqual(mcp_server._without_gate_codes([{"gate_code": 1, "id": 2}, 3]), [{"id": 2}, 3])

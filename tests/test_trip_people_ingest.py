@@ -149,8 +149,8 @@ class ReadingThemNow(IngestCase):
     def test_the_offline_copy_carries_the_travellers_of_a_stay_for_everyone(self):
         out, _ = self.setup_trip()
         saved = offline.projection(self.c, self.jane, datetime(2026, 11, 22).date())
-        self.assertEqual(saved["trip"]["id"], out["trip_id"])
-        hotel = next(s for s in saved["trip"]["segments"] if s["kind"] == "hotel")
+        self.assertEqual(saved["trips"][0]["trip"]["id"], out["trip_id"])
+        hotel = next(s for s in saved["trips"][0]["trip"]["segments"] if s["kind"] == "hotel")
         self.assertEqual([t["person_id"] for t in hotel["travelers"]], [self.jid, self.mia])
 
     def test_splitting_the_stay_off_takes_the_group_and_leaves_the_flights_people(self):

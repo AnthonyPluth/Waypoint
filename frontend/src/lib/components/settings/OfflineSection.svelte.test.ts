@@ -15,7 +15,7 @@ const withDevice = (b: Behaviour = {}) => { device = installDevice(b); };
 
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
-  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, tripId: null, tripName: "" });
+  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, trips: [] });
   withDevice();
 });
 afterEach(() => { lock(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -65,7 +65,7 @@ describe("Settings → Offline access", () => {
     await setUp();
     await save({ id: 1 }, { savedAt: Date.now() - 3 * 3_600_000, expiresAt: null });
     render(OfflineSection);
-    expect(await screen.findByTestId("offline-saved")).toHaveTextContent("Saved 3 h ago.");
+    expect(await screen.findByTestId("offline-saved")).toHaveTextContent("Saved 3 h ago: 1 trip.");
   });
 
   it("turns saving off with the switch, clearing the copy, and back on", async () => {
@@ -73,7 +73,7 @@ describe("Settings → Offline access", () => {
     await save({ id: 1 }, { savedAt: Date.now(), expiresAt: null });
     render(OfflineSection);
     const user = userEvent.setup();
-    const toggle = await screen.findByRole("switch", { name: "Save my current trip on this device" });
+    const toggle = await screen.findByRole("switch", { name: "Save my upcoming trips on this device" });
     expect(toggle).toBeChecked();
     await user.click(toggle);
     await waitFor(() => expect(screen.getByRole("switch")).not.toBeChecked());
@@ -91,7 +91,7 @@ describe("Settings → Offline access", () => {
     device.files.set("/offline-vault/keys", new TextEncoder().encode("garbage"));
     render(OfflineSection);
     const user = userEvent.setup();
-    expect(await screen.findByText("The saved trip can’t be read")).toBeInTheDocument();
+    expect(await screen.findByText("The saved trips can’t be read")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove from this device" }));
     await user.click(await screen.findByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Set up offline access" })).toBeInTheDocument());

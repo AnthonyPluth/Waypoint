@@ -27,7 +27,7 @@
 
   async function removeIt() {
     await removeOffline();
-    toast.success("The saved trip is removed");
+    toast.success("The saved trips are removed");
     onremoved?.();
     return true;
   }
@@ -38,9 +38,9 @@
   <div class="space-y-1">
     <h1 id="locked-title" class="text-heading font-semibold">Saved trip is locked</h1>
     {#if phase === "gone"}
-      <p class="text-sm text-muted-foreground">This device can’t unlock it: the passkey it needs is gone, which happens on a new device or when the passkey is deleted. Remove the saved trip, then reconnect and set up offline access again to save a fresh copy.</p>
+      <p class="text-sm text-muted-foreground">This device can’t unlock it: the passkey it needs is gone, which happens on a new device or when the passkey is deleted. Remove the saved trips, then reconnect and set up offline access again to save a fresh copy.</p>
     {:else}
-      <p class="text-sm text-muted-foreground">Unlock it with {check} to see the trip saved on this device.</p>
+      <p class="text-sm text-muted-foreground">Unlock it with {check} to see the trips saved on this device.</p>
     {/if}
   </div>
   {#if phase === "cancelled"}
@@ -49,7 +49,7 @@
     <Alert class="text-left"><AlertDescription>That didn’t work, so the trip stays locked.</AlertDescription></Alert>
   {/if}
   {#if phase === "gone"}
-    <Button variant="destructive" class="w-full" onclick={() => (asking = true)}>Remove saved trip</Button>
+    <Button variant="destructive" class="w-full" onclick={() => (asking = true)}>Remove saved trips</Button>
   {:else}
     <Button class="w-full" disabled={phase === "working"} onclick={open}>
       {phase === "working" ? "Waiting for your device…" : phase === "cancelled" || phase === "failed" ? "Try again" : "Unlock"}
@@ -57,5 +57,5 @@
   {/if}
 </section>
 
-<ConfirmDialog bind:open={asking} title="Remove the saved trip?" confirmLabel="Remove" busyLabel="Removing…" destructive
+<ConfirmDialog bind:open={asking} title="Remove the saved trips?" confirmLabel="Remove" busyLabel="Removing…" destructive
   description="It’s deleted from this device only. When you’re back online and set up offline access again, a fresh copy is saved." onconfirm={removeIt} />
