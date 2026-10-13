@@ -250,6 +250,16 @@ describe("saving several trips", () => {
     expect(offline.hasCopy).toBe(true);
   });
 
+  it("keeps the server's order after an unlock: the trip under way first, even with a higher number", async () => {
+    await setUp();
+    projection = { trips: [copyOf(tripEnding("2026-11-21", "Under way", 10)), copyOf(tripEnding("2026-11-22", "Soon trip", 2))] };
+    await syncSavedTrip();
+    expect((await savedAll()).map((c) => c.trip.name)).toEqual(["Under way", "Soon trip"]);
+    lock();
+    await refreshOffline();
+    expect(offline.trips.map((t) => t.id)).toEqual([10, 2]);
+  });
+
   it("saves the next upcoming trip however far out it is, alone", async () => {
     await setUp();
     projection = { trips: [copyOf(FAR)] };

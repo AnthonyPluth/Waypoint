@@ -432,7 +432,7 @@ describe("what the app may see without unlocking", () => {
     expect(await savedInfos()).toEqual([]);
     await save(TRIP, { savedAt: 1_700_000_000_000, expiresAt: 1_700_300_000_000 });
     expect(await savedInfos()).toEqual([{ savedAt: 1_700_000_000_000, expiresAt: 1_700_300_000_000 }]);
-    expect(Object.keys(device.fields("/offline-vault/trip")).sort()).toEqual(["data", "ephemeralPublicKey", "expiresAt", "iv", "savedAt", "v"]);
+    expect(Object.keys(device.fields("/offline-vault/trip")).sort()).toEqual(["data", "ephemeralPublicKey", "expiresAt", "iv", "order", "savedAt", "v"]);
     expect(device.appears(CANARY)).toBe(false);
   });
 
@@ -545,5 +545,27 @@ describe("several saved trips", () => {
     await setSavingOff(true);
     expect(await saveAll([item(3)])).toBe(false);
     expect(urls()).toEqual([]);
+  });
+
+  it("keeps the order the server gave, not the order of the trip numbers", async () => {
+    await setUp();
+    await saveAll([item(10), item(2), item(30)]);
+    expect((await unlock() as (typeof TRIP)[]).map((t) => t.id)).toEqual([10, 2, 30]);
+    expect((await savedInfos()).map((i) => i.tripId)).toEqual([10, 2, 30]);
+  });
+
+  it("keeps the old complete set readable when a later write fails, and leaves none of the new one behind", async () => {
+    await setUp();
+    await saveAll([item(1), item(2), item(3)]);
+    const real = device.cacheStorage.open.getMockImplementation()!;
+    let puts = 0;
+    device.cacheStorage.open.mockImplementation((async () => {
+      const cache = await real();
+      return { ...cache, put: async (url: string, response: Response) => { if (++puts === 2) throw new Error("quota"); return cache.put(url, response); } };
+    }) as never);
+    await expect(saveAll([item(3), item(4), item(5)])).rejects.toThrow("quota");
+    device.cacheStorage.open.mockImplementation(real);
+    expect(urls()).toEqual(["/offline-vault/trip/1", "/offline-vault/trip/2", "/offline-vault/trip/3"]);
+    expect(await unlock()).toEqual([trip(1), trip(2), trip(3)]);
   });
 });

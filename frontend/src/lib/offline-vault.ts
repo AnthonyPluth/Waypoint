@@ -36,7 +36,7 @@ export type Support = { ok: true } | { ok: false; reason: string };
 
 type Sealed = { iv: string; data: string };
 type StoredKeys = { v: number; credentialId: string; publicKey: string; wrappedKey: Sealed; off?: boolean };
-type StoredTrip = { v: number; ephemeralPublicKey: string; iv: string; data: string; savedAt?: number; expiresAt?: number | null; tripId?: number };
+type StoredTrip = { v: number; ephemeralPublicKey: string; iv: string; data: string; savedAt?: number; expiresAt?: number | null; tripId?: number; order?: number };
 
 export type SavedInfo = { savedAt: number; expiresAt: number | null; tripId?: number };
 export type SavedItem = { value: unknown; info?: SavedInfo };
@@ -139,7 +139,7 @@ function validTrip(x: StoredTrip | null): StoredTrip | null {
   if (x === null) return null;
   const stamp = (n: unknown) => n === undefined || n === null || Number.isFinite(n);
   if (x.v !== VERSION || !isText(x.ephemeralPublicKey) || !isText(x.iv) || !isText(x.data) || !stamp(x.savedAt) || !stamp(x.expiresAt)
-    || (x.tripId !== undefined && !Number.isInteger(x.tripId))) throw new VaultError("damaged", DAMAGED);
+    || (x.tripId !== undefined && !Number.isInteger(x.tripId)) || (x.order !== undefined && !Number.isInteger(x.order))) throw new VaultError("damaged", DAMAGED);
   return x;
 }
 
@@ -152,13 +152,13 @@ export async function isSetUp(): Promise<boolean> {
 async function storedTrips(): Promise<{ url: string; stored: StoredTrip }[]> {
   if (typeof caches === "undefined") return [];
   const cache = await caches.open(CACHE_NAME);
-  const urls = (await cache.keys()).map((r) => new URL(r.url, "http://waypoint.invalid").pathname).filter((u) => u === TRIP_URL || u.startsWith(`${TRIP_URL}/`)).sort();
+  const urls = (await cache.keys()).map((r) => new URL(r.url, "http://waypoint.invalid").pathname).filter((u) => u === TRIP_URL || u.startsWith(`${TRIP_URL}/`));
   const found: { url: string; stored: StoredTrip }[] = [];
   for (const url of urls) {
     const stored = validTrip(await read<StoredTrip>(url));
     if (stored) found.push({ url, stored });
   }
-  return found;
+  return found.sort((a, b) => (a.stored.order ?? 0) - (b.stored.order ?? 0) || a.url.localeCompare(b.url, "en", { numeric: true }));
 }
 
 export async function hasSavedTrip(): Promise<boolean> {
@@ -326,13 +326,26 @@ export async function saveAll(items: SavedItem[]): Promise<boolean> {
   if (!keys || keys.off) return false;
   const recipientPublic = fromBase64(keys.publicKey);
   const recipient = await crypto.subtle.importKey("raw", recipientPublic, CURVE, false, []);
-  const written = new Set<string>();
-  for (const { value, info } of items) {
-    const url = tripUrl(info?.tripId);
-    await write(url, await seal(recipientPublic, recipient, value, info));
-    written.add(url);
+  const sealed: { url: string; stored: StoredTrip }[] = [];
+  for (const [order, { value, info }] of items.entries()) {
+    sealed.push({ url: tripUrl(info?.tripId), stored: await seal(recipientPublic, recipient, value, info && { ...info, order }) });
   }
-  await deleteTrips((url) => written.has(url));
+  const before = new Map((await storedTrips()).map(({ url, stored }) => [url, stored]));
+  const cache = await caches.open(CACHE_NAME);
+  const written: string[] = [];
+  try {
+    for (const { url, stored } of sealed) {
+      await write(url, stored);
+      written.push(url);
+    }
+  } catch (err) {
+    for (const url of written) {
+      const old = before.get(url);
+      try { if (old) await write(url, old); else await cache.delete(url); } catch { continue; }
+    }
+    throw err;
+  }
+  await deleteTrips((url) => written.includes(url));
   return true;
 }
 

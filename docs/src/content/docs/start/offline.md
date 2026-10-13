@@ -109,6 +109,6 @@ For the curious, and for anyone who wants to check it against the code (`fronten
 - Setting up makes an ECDH P-256 key pair in the browser. The public key is stored in the clear. The private key is wrapped with AES-GCM under a key derived (HKDF) from the passkey’s PRF output, with a fixed, versioned label.
 - Each online save encrypts each trip to the public key (a fresh ephemeral key, ECDH, HKDF, AES-GCM), which is why saving never needs the authenticator.
 - Unlocking asks the authenticator once for the PRF output, unwraps the private key and decrypts every saved trip. The unwrapped key lives in memory only.
-- What is stored on the device is the ciphertext, the public key, the wrapped private key, the passkey’s credential id and the nonces, and, in the clear, the time the copies were saved, the time each trip’s copy runs out, each saved trip’s number and the saving switch. No key, no PRF output and no plaintext of a trip is stored.
+- What is stored on the device is the ciphertext, the public key, the wrapped private key, the passkey’s credential id and the nonces, and, in the clear, the time the copies were saved, the time each trip’s copy runs out, each saved trip’s number and place in the list, and the saving switch. No key, no PRF output and no plaintext of a trip is stored.
 
 See also [Security](https://github.com/AnthonyPluth/Waypoint/blob/main/SECURITY.md).
