@@ -13,6 +13,7 @@ from datetime import date
 from unittest import mock
 
 PHASES: dict[str, float] = {}
+ENDED = [0]
 
 
 @contextmanager
@@ -34,9 +35,10 @@ KEPT_BETWEEN_TESTS = ("alembic_version", "airports", "airlines")
 
 def _terminate_holders(conn, name) -> None:
     from psycopg import sql
-    conn.execute(sql.SQL("SELECT pg_terminate_backend(l.pid) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation "
-                         "JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = {} AND l.pid <> pg_backend_pid()"
-                         ).format(sql.Literal(name)))
+    ended = conn.execute(sql.SQL("SELECT pg_terminate_backend(l.pid) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation "
+                                 "JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = {} AND l.pid <> pg_backend_pid()"
+                                 ).format(sql.Literal(name))).fetchall()
+    ENDED[0] += len(ended)
 
 
 def _with_holders_ended(conn, name, statement) -> None:

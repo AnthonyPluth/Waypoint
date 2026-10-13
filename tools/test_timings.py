@@ -4,18 +4,20 @@ from collections import defaultdict
 from pathlib import Path
 
 
-def load(directory: Path) -> tuple[list[dict], dict[str, float]]:
+def load(directory: Path) -> tuple[list[dict], dict[str, float], int]:
     timed: list[dict] = []
     phases: dict[str, float] = defaultdict(float)
+    ended = 0
     for p in sorted(directory.glob("*.json")):
         data = json.loads(p.read_text())
         timed.extend(data["tests"])
+        ended += data.get("ended", 0)
         for name, seconds in data["phases"].items():
             phases[name] += seconds
-    return timed, phases
+    return timed, phases, ended
 
 
-def report(timed: list[dict], phases: dict[str, float], top: int) -> str:
+def report(timed: list[dict], phases: dict[str, float], top: int, ended: int = 0) -> str:
     total = sum(t["seconds"] for t in timed)
     classes: dict[str, list[float]] = defaultdict(lambda: [0.0, 0])
     for t in timed:
@@ -26,6 +28,7 @@ def report(timed: list[dict], phases: dict[str, float], top: int) -> str:
              "Time spent in the database set-up and clean-up, summed over all workers (set-up and clean-up a whole class shares are included):"]
     for name, seconds in sorted(phases.items()):
         lines.append(f"  {name}: {seconds:.1f}s")
+    lines.append(f"Connections ended to give a schema back (a test left one open): {ended}")
     lines.append("")
     lines.append(f"Slowest {top} tests")
     for t in sorted(timed, key=lambda t: -t["seconds"])[:top]:
@@ -43,8 +46,8 @@ def main() -> None:
     parser.add_argument("directory", type=Path)
     parser.add_argument("--top", type=int, default=25)
     args = parser.parse_args()
-    timed, phases = load(args.directory)
-    print(report(timed, phases, args.top))
+    timed, phases, ended = load(args.directory)
+    print(report(timed, phases, args.top, ended))
 
 
 if __name__ == "__main__":

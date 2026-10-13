@@ -178,6 +178,22 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "isn't one Waypoint made"):
             db.migrate(self.path)
 
+    def test_a_database_last_used_before_the_squash_is_refused_with_a_plain_message_and_left_as_it_was(self):
+        db.init(self.path)
+        with db.session(self.path) as conn:
+            conn.execute(insert(User).values(sub="s1", email="ana@example.com"))
+        for old in ("0001", "0033"):
+            with db.engine(self.path).begin() as c:
+                c.exec_driver_sql("UPDATE alembic_version SET version_num = %s" % repr(old))
+            before = (shape(self.path), rows_of(self.path, "users"))
+            with self.subTest(revision=old):
+                with self.assertRaisesRegex(RuntimeError, "before its database migrations were squashed into one") as raised:
+                    db.migrate(self.path)
+                self.assertIn("last release before the squash", str(raised.exception))
+                self.assertNotIn("Can't locate", str(raised.exception))
+                self.assertEqual((shape(self.path), rows_of(self.path, "users")), before)
+                self.assertEqual(rows_of(self.path, "alembic_version"), [(old,)])
+
     def test_0034_is_the_baseline_that_makes_every_table_and_the_reference_rows_and_takes_them_away(self):
         from alembic import command
         replay(self.path)

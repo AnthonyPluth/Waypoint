@@ -43,6 +43,8 @@ A backup holds saved secrets encrypted with your key: set the same `WAYPOINT_SEC
 
 A backup made before Waypoint’s database migrations were squashed into one can’t be restored by this version, and Waypoint says so. Restore it with the last release before the squash, then take a new backup and restore that one here. Backups made since restore as before, including into a newer version.
 
+The same goes for updating in place: a Waypoint that has not been started since before the squash must first be updated to the last release before the squash and started once, then updated to this version. Starting this version on such a database stops with a message saying so, and changes nothing.
+
 ## Using Postgres (optional)
 
 Set `DATABASE_URL` in `.env` (e.g. `postgresql://waypoint:password@db-host:5432/waypoint`) and restart. Waypoint creates its tables on first start and applies any schema migrations each time a new version starts. To bring your data along, restore a backup into it as above. There’s a commented-out `db` service in `docker-compose.yml` if you want Postgres alongside Waypoint. Without `DATABASE_URL`, Waypoint keeps using its built-in database in `./data`.
