@@ -12,7 +12,7 @@ export function airportInfo(raw: string): Promise<Airport | null> {
   if (!/^[A-Z]{3}$/.test(code)) return Promise.resolve(null);
   let found = known.get(code);
   if (!found) {
-    found = apiCall<"GET /api/airports/{id}">(`/api/airports/${code}`).then((a) => a, () => { known.delete(code); return null; });
+    found = apiCall<"GET /api/airports/{id}">(`/api/airports/${code}`, { keep: true }).then((a) => a, () => { known.delete(code); return null; });
     known.set(code, found);
   }
   return found;

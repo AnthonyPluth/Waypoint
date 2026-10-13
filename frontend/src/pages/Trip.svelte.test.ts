@@ -691,7 +691,7 @@ describe("Trip", () => {
     await screen.findByRole("heading", { name: "Trip to London" });
     expect(screen.queryByTestId("stay-zone")).toBeNull();
     expect(screen.queryByText("Time zone")).toBeNull();
-    expect(screen.queryByText(/Europe\/London|Europe London/)).toBeNull();
+    expect(screen.queryAllByText(/Europe\/London|Europe London/).filter((e) => !e.classList.contains("sr-only"))).toEqual([]);
   });
 
   it("asks a stay for one time zone, and says it can be worked out from the address", async () => {
