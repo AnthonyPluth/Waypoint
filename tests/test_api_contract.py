@@ -198,6 +198,22 @@ class Replies(DbCase):
         with mock.patch.object(gmail, "_post", return_value={}):
             self.check("DELETE /api/mailboxes/{id}", mailboxes.api_mailbox_disconnect(self.c, {}, {}, str(reply["mailboxes"][0]["id"])))
 
+    def test_review_dismiss_trusts_the_sender_only_when_asked(self):
+        _current.user = {"sub": "u1", "name": "Rosa Example", "email": "rosa@example.com"}
+        oidc.remember_user(self.c, "u1", "rosa@example.com", "Rosa Example")
+        box = self.c.execute(insert(Mailbox).values(owner_sub="u1", address="rosa@gmail.example", token=secretbox.encrypt("t"),
+                                                    status="connected", created=1.0)).lastrowid
+        me = Viewer(people_domain.person_for_sub(self.c, "u1"))
+        for n, domain in enumerate(("once.example", "always.example")):
+            review.add(self.c, box, f"t{n}", domain, "2026-01-01", "generic", 1.0)   # type: ignore[arg-type]
+        ids = {i["sender_domain"]: str(i["id"]) for i in review_api.api_review(self.c, {}, {})["items"]}
+        for domain, query in (("once.example", {}), ("always.example", {"trust": ["1"]})):
+            made = trips.add_segment(self.c, me, {"kind": "hotel", "origin": "Seaside Inn", "start_local": "2026-11-21T15:00", "end_local": "2026-11-25T11:00",
+                                           "start_zone": "Europe/London", "end_zone": "Europe/London"}, source="email")
+            review_api.api_review_dismiss(self.c, {"segment": [str(made["id"])], **query}, {}, ids[domain])
+        self.assertFalse(review.trusted(self.c, box, "once.example"))
+        self.assertTrue(review.trusted(self.c, box, "always.example"))
+
     def test_review(self):
         _current.user = {"sub": "u1", "name": "Rosa Example", "email": "rosa@example.com"}
         oidc.remember_user(self.c, "u1", "rosa@example.com", "Rosa Example")
