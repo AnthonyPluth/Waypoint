@@ -38,7 +38,7 @@
   const toAdd = $derived(preview?.rows.filter(included) ?? []);
   const fresh = $derived(toAdd.length);
   const matches = (r: ImportRow, q: string) =>
-    [r.line, r.origin, r.destination, r.flight_number, r.airline, r.day, r.reason, label(r.status)].some((v) => String(v ?? "").toLowerCase().includes(q));
+    [r.line, r.origin, r.destination, r.flight_number, r.airline, r.day, r.day ? day(r.day) : null, r.reason, label(r.status)].some((v) => String(v ?? "").toLowerCase().includes(q));
   const shown = $derived.by(() => {
     const q = query.trim().toLowerCase();
     return (preview?.rows ?? []).filter((r) => (filter === "all" || r.status === filter) && (!q || matches(r, q)));

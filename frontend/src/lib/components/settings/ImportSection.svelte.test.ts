@@ -118,6 +118,9 @@ describe("Settings → Import past flights", () => {
     await userEvent.type(screen.getByLabelText("Search rows"), "as55");
     expect(within(list).getAllByRole("listitem")).toHaveLength(1);
     await userEvent.clear(screen.getByLabelText("Search rows"));
+    await userEvent.type(screen.getByLabelText("Search rows"), "mar 1, 2025");
+    expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+    await userEvent.clear(screen.getByLabelText("Search rows"));
     await userEvent.type(screen.getByLabelText("Search rows"), "nothing like this");
     expect(within(list).getByText("No rows match.")).toBeInTheDocument();
   });
