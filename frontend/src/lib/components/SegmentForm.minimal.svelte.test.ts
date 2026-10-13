@@ -74,6 +74,23 @@ describe("SegmentForm: the minimal flight and hotel", () => {
   });
 });
 
+describe("SegmentForm: zones entered for an unknown airport", () => {
+  it("stay visible, with their values, after the airport changes to a known one", async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => {
+      if (path === "/api/airports/XYZ") throw new Error("No such airport");
+      if (path === "/api/airports/CDG") return { code: "CDG", name: "Charles de Gaulle Airport", city: "Paris", country: "FR", zone: "Europe/Paris" } as never;
+      return (path.startsWith("/api/airports") ? { airports: [] } : segment({ trip_id: 1 })) as never;
+    });
+    mount({ ...blank(1), people: [1], origin: "JFK", destination: "XYZ", start_local: "2026-12-01T19:00", end_local: "2026-12-02T07:00", end_zone: "Asia/Tokyo" });
+    const arrival = await screen.findByLabelText(/^Arrival time zone/);
+    expect(arrival).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText("To (airport)"));
+    await userEvent.type(screen.getByLabelText("To (airport)"), "CDG");
+    await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalledWith("/api/airports/CDG"));
+    expect(screen.getByLabelText(/^Arrival time zone/)).toBeInTheDocument();
+  });
+});
+
 describe("SegmentForm: a long cruise itinerary", () => {
   const ports = (n: number): PortDraft[] => Array.from({ length: n }, (_, i) => ({ name: `Port ${i + 1} name`, zone: "America/Nassau", arrive: "", depart: "" }));
   const cruise = (itinerary: PortDraft[]): Draft => ({ ...blank(1), kind: "cruise", people: [1], origin: "Miami", destination: "Miami", start_local: "2026-03-01T16:00", end_local: "2026-03-20T08:00", start_zone: "America/New_York", itinerary });
