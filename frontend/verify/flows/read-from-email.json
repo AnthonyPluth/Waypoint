@@ -2,10 +2,29 @@
   "name": "read-from-email",
   "page": "review",
   "steps": [
-    { "expect_text": { "selector": "h1", "text": "Review" } },
-    { "wait_for": "text=Read from the email" },
-    { "click": "button:has-text('Check suggestion') >> visible=true" },
-    { "wait_for": "text=Waypoint read this from labelled lines" },
-    { "screenshot": "outlined-fields" }
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Review"
+      }
+    },
+    {
+      "wait_for": "text=Read from the email"
+    },
+    {
+      "click": "button:has-text('Check suggestion') >> visible=true"
+    },
+    {
+      "wait_for": "text=Waypoint read this from labelled lines"
+    },
+    {
+      "expect_text": {
+        "selector": "form",
+        "text": "Also trust"
+      }
+    },
+    {
+      "screenshot": "outlined-fields"
+    }
   ]
 }

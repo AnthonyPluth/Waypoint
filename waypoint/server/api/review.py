@@ -43,7 +43,7 @@ def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
         return {"ok": True}
     added = [a for a in _q.get("segment") or [] if a]
     bookings = (viewer(conn), [row_id(a, "No such segment", 400) for a in added]) if added else None
-    if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), bookings):
+    if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), bookings, trust=(_q.get("trust") or [""])[0] == "1"):
         raise ApiError(NO_ITEM, 404)
     return {"ok": True}
 

@@ -723,12 +723,26 @@ class GenericReaderScanTests(ScanCase):
             "kind": "hotel", "status": "confirmed", "confirmation": "SS48213", "provider": "Seaside Inn", "start_local": "2026-11-21T15:00",
             "start_zone": "Europe/London", "end_local": "2026-11-25T11:00", "end_zone": "Europe/London", "origin": "Seaside Inn",
             "destination": None, "details": {}, "manage_url": None}))
-        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, [seg["id"]]))))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, [seg["id"]]), trust=True)))
         self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, "seaside-stays.example")))
         self.add_mail("second", self.second())
         result = self.scan(now=NOW + 60)
         self.assertEqual((result.bookings, result.review), (1, 0))
         self.assertEqual(sorted(s["confirmation"] for s in self.segments()), ["SS48213", "SS99999"])
+
+    def test_confirming_without_trust_adds_once_and_asks_again_for_the_next(self):
+        self.put("lodging_en")
+        self.scan()
+        [item] = self.items()
+        seg = self.read(lambda conn: trips.add_segment(conn, self.jane, {
+            "kind": "hotel", "status": "confirmed", "confirmation": "SS48213", "provider": "Seaside Inn", "start_local": "2026-11-21T15:00",
+            "start_zone": "Europe/London", "end_local": "2026-11-25T11:00", "end_zone": "Europe/London", "origin": "Seaside Inn",
+            "destination": None, "details": {}, "manage_url": None}))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, [seg["id"]]))))
+        self.assertFalse(self.read(lambda conn: review.trusted(conn, self.mailbox, "seaside-stays.example")))
+        self.add_mail("second", self.second())
+        result = self.scan(now=NOW + 60)
+        self.assertEqual((result.bookings, result.review), (0, 1))
 
     def test_japanese_mail_is_read_too(self):
         self.put("lodging_ja")
@@ -787,7 +801,7 @@ class GenericFlightScanTests(ScanCase):
             "kind": "flight", "status": "confirmed", "confirmation": "ZK4R9T", "provider": "British Airways", "start_local": "2026-11-21T19:00",
             "start_zone": "America/New_York", "end_local": "2026-11-22T07:10", "end_zone": "Europe/London", "origin": "JFK",
             "destination": "LHR", "details": {"flight_number": "BA 9871"}, "manage_url": None}))
-        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, [seg["id"]]))))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, [seg["id"]]), trust=True)))
         self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, "skyline-air.example")))
         self.add_mail("second", self.second())
         with no_leaks(self, *self.CANARIES, database=self.path):
@@ -881,7 +895,7 @@ class RoundTripScanTests(ScanCase):
         ids = [m["id"] for m in made if m]
         self.assertEqual(len(ids), 2)
         self.assertEqual(len({m["trip_id"] for m in made if m}), 1)
-        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, ids))))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, ids), trust=True)))
         self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, "rewards-travel.example")))
         for each in ids:
             emails = self.read(lambda conn, each=each: trips.emails_of(conn, self.jane, each))
