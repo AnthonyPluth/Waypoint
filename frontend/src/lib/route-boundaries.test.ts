@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BOUNDARY_MIN_SCALE, NO_BOUNDARIES, boundariesShown, boundaryShapes, inView, routeProjection, type Boundaries, type Stop } from "./route-replay";
 
 const stopAt = (name: string, latitude: number, longitude: number, kind: Stop["kind"] = "stay"): Stop =>
-  ({ name, city: name, code: null, kind, latitude, longitude, from: "2025-12-05T15:00", to: "2025-12-06T11:00", via: null, back: false });
+  ({ name, city: name, code: null, kind, latitude, longitude, from: "2025-12-05T15:00", to: "2025-12-06T11:00", via: null });
 const denver = stopAt("Denver", 39.74, -104.99), saltLake = stopAt("Salt Lake City", 40.76, -111.89), sydney = stopAt("Sydney", -33.9, 151.2, "airport");
 const lines: Boundaries = [
   { points: [[37.0, -109.05], [41.0, -109.05]] },

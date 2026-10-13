@@ -84,6 +84,7 @@
     if (done <= 0 || done >= 1) return [];
     return [{ i, moving: true, vehicle: leg.vehicle, ...moverAt(leg, done) }];
   }));
+  const RING: Record<Stop["kind"], string> = { airport: "border-map-airport", stay: "border-map-stay", home: "border-map-visited", place: "border-map-visited" };
   const buttonLabel = $derived(progress >= 1 ? "Replay" : playing ? "Pause" : progress > 0 ? "Resume" : "Play");
 </script>
 
@@ -161,7 +162,7 @@
       {#each stops as s, i (i)}
         <div class="col-start-1 row-start-1 w-max max-w-[11rem] self-start rounded-lg transition-opacity duration-500 motion-reduce:transition-none border border-border bg-card px-2 py-1 text-xs leading-tight shadow-elevation-1"
             class:opacity-0={!lit(i)} data-visible={lit(i)} data-label={s.name}>
-          <p class="break-words font-semibold text-foreground">{s.back ? "Back in " : ""}{stopTitle(s)}</p>
+          <p class="break-words font-semibold text-foreground">{stopTitle(s)}</p>
           <p class="text-muted-foreground">{stopDates(s, year)}</p>
         </div>
       {/each}
@@ -187,9 +188,16 @@
         aria-valuetext={stopLine(stops[now], year)} class="h-11 min-w-0 flex-1 accent-primary" />
     </div>
   {/if}
-  <ol class="space-y-1 text-sm" aria-label="Stops in order" data-testid="stop-list">
+  <ol class="text-sm" aria-label="Stops in order" data-testid="stop-list">
     {#each stops as s, i (i)}
-      <li class="flex gap-2"><span class="w-5 shrink-0 text-right text-muted-foreground" aria-hidden="true">{i + 1}.</span><span class="min-w-0 break-words">{stopLine(s, year)}</span></li>
+      <li class="relative flex gap-3 pb-4 last:pb-0">
+        {#if i < stops.length - 1}<span class="absolute bottom-0 left-3 top-7 w-px -translate-x-1/2 bg-border" aria-hidden="true"></span>{/if}
+        <span class={`z-10 flex size-6 shrink-0 items-center justify-center rounded-full border-2 bg-card text-xs font-semibold tabular-nums text-foreground ${RING[s.kind]}`} aria-hidden="true">{i + 1}</span>
+        <div class="min-w-0 pt-0.5">
+          <p class="break-words font-medium text-foreground">{stopTitle(s)}<span class="sr-only">, </span></p>
+          <p class="text-muted-foreground">{stopDates(s, year)}</p>
+        </div>
+      </li>
     {/each}
   </ol>
 </div>

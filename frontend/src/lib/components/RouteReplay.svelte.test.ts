@@ -45,7 +45,7 @@ describe("RouteReplay", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     const items = within(screen.getByRole("list", { name: "Stops in order" })).getAllByRole("listitem").map((li) => li.textContent);
     expect(items[0]).toContain("Minneapolis (MSP), Dec 5, 2025");
-    expect(items.at(-1)).toContain("Back in Minneapolis (MSP), Dec 11, 2025");
+    expect(items.at(-1)).toContain("Minneapolis (MSP), Dec 11, 2025");
   });
 
   it("with reduced motion shows the whole route and the list, with nothing playing", async () => {

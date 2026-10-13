@@ -33,7 +33,6 @@ describe("a road trip with a Home", () => {
     const stops = stopsOf(trip([second, first]), places);
     expect(names(stops)).toEqual(["Springfield", "Arch Inn", "Music Row Inn", "Springfield"]);
     expect(stops.map((s) => s.kind)).toEqual(["home", "stay", "stay", "home"]);
-    expect(stops.map((s) => s.back)).toEqual([false, false, false, true]);
     expect(stops.map((s) => s.via)).toEqual([null, null, null, null]);
   });
 
@@ -42,7 +41,7 @@ describe("a road trip with a Home", () => {
     expect([stops[0].from, stops[0].to].map((d) => d.slice(0, 10))).toEqual(["2025-12-05", "2025-12-05"]);
     expect([stops[3].from, stops[3].to].map((d) => d.slice(0, 10))).toEqual(["2025-12-08", "2025-12-08"]);
     expect(stopTitle(stops[0])).toBe("Springfield");
-    expect(stopLine(stops[3], 2025)).toBe("Back in Springfield, Dec 8");
+    expect(stopLine(stops[3], 2025)).toBe("Springfield, Dec 8");
   });
 
   it("counts Home in the stops and in the replay's length", () => {

@@ -7,7 +7,7 @@ import RouteReplayMap from "./RouteReplayMap.svelte";
 vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [] }));
 
 const stopAt = (name: string, latitude: number, longitude: number, via: Stop["via"] = null, kind: Stop["kind"] = "stay"): Stop =>
-  ({ name, city: name, code: null, kind, latitude, longitude, from: "2025-12-05T15:00", to: "2025-12-06T11:00", via, back: false });
+  ({ name, city: name, code: null, kind, latitude, longitude, from: "2025-12-05T15:00", to: "2025-12-06T11:00", via });
 const denver = stopAt("Denver", 39.74, -104.99), saltLake = stopAt("Salt Lake City", 40.76, -111.89);
 const boundaries: Boundaries = [
   { points: [[37.0, -109.05], [41.0, -109.05]] },

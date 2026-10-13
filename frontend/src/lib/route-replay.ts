@@ -6,7 +6,7 @@ import { instant, isPast } from "./trips";
 
 export type Kind = Segment["kind"];
 export type StopKind = "airport" | "stay" | "place" | "home";
-export type Stop = { name: string; city: string; code: string | null; kind: StopKind; latitude: number; longitude: number; from: string; to: string; via: Kind | null; back: boolean };
+export type Stop = { name: string; city: string; code: string | null; kind: StopKind; latitude: number; longitude: number; from: string; to: string; via: Kind | null };
 export type Spot = { x: number; y: number };
 export type Vehicle = "plane" | "car" | "boat";
 export type Roads = TripPlaces["roads"];
@@ -18,7 +18,7 @@ export type Extent = { left: number; top: number; right: number; bottom: number 
 export type BoundaryShape = Extent & { d: string };
 export type Shield = { ref: string; x: number; y: number };
 export type Box = { x: number; y: number; w: number; h: number };
-type Visit = Omit<Stop, "back"> & { exact?: boolean };
+type Visit = Stop & { exact?: boolean };
 type Point = { name: string; city?: string; code?: string | null; kind?: StopKind; latitude: number; longitude: number; exact?: boolean };
 
 export const MIN_SPAN_DEGREES = 10;
@@ -162,7 +162,7 @@ export function stopsOf(trip: Trip, places: TripPlaces): Stop[] {
     } else merged.push({ ...v });
   }
   wrapAtHome(merged, trip, places);
-  return merged.map((v, i) => ({ ...v, back: i > 0 && merged.slice(0, i).some((e) => e.kind === v.kind && sameStop(e, v)) }));
+  return merged;
 }
 
 export const canReplay = (trip: Trip, today: string, places: TripPlaces | null): boolean =>
@@ -185,7 +185,7 @@ export function stopTitle(stop: Stop): string {
   return stop.name;
 }
 
-export const stopLine = (stop: Stop, year: number): string => `${stop.back ? "Back in " : ""}${stopTitle(stop)}, ${stopDates(stop, year)}`;
+export const stopLine = (stop: Stop, year: number): string => `${stopTitle(stop)}, ${stopDates(stop, year)}`;
 
 const lonLat = (s: Point): [number, number] => [s.longitude, s.latitude];
 

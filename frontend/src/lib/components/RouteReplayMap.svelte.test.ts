@@ -49,7 +49,7 @@ const list = () => within(screen.getByRole("list", { name: "Stops in order" })).
 describe("RouteReplayMap", () => {
   it("lists the stops in order as text, without waiting for any animation", () => {
     render(RouteReplayMap, { stops, year: 2025, still: false });
-    expect(list()).toEqual(["Minneapolis (MSP), Dec 5", "San Francisco (SFO), Dec 5 – 11", "Back in Minneapolis (MSP), Dec 11"]);
+    expect(list()).toEqual(["Minneapolis (MSP), Dec 5", "San Francisco (SFO), Dec 5 – 11", "Minneapolis (MSP), Dec 11"]);
   });
 
   it("does not play until asked, and shows only the first stop", () => {
@@ -97,7 +97,7 @@ describe("RouteReplayMap", () => {
     const slider = screen.getByRole("slider", { name: "Position along the route" }) as HTMLInputElement;
     await fireEvent.input(slider, { target: { value: "4000" } });
     expect(labels(container)).toHaveLength(0);
-    expect(slider.getAttribute("aria-valuetext")).toBe("Back in Minneapolis (MSP), Dec 11");
+    expect(slider.getAttribute("aria-valuetext")).toBe("Minneapolis (MSP), Dec 11");
     await fireEvent.click(screen.getByRole("button", { name: "Replay" }));
     expect(labels(container)).toEqual(["Minneapolis"]);
     expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
@@ -296,7 +296,7 @@ describe("RouteReplayMap", () => {
   });
 
   it("plays a 25-stop trip over fifty seconds, with each town's label lit as the path reaches it", async () => {
-    const towns = Array.from({ length: 25 }, (_, i) => ({ name: `Town ${i}`, city: `Town ${i}`, code: null, kind: "place" as const, latitude: 30 + i * 0.6, longitude: -100 + i * 0.9, from: "2025-12-05", to: "2025-12-05", via: i === 0 ? null : ("car" as const), back: false }));
+    const towns = Array.from({ length: 25 }, (_, i) => ({ name: `Town ${i}`, city: `Town ${i}`, code: null, kind: "place" as const, latitude: 30 + i * 0.6, longitude: -100 + i * 0.9, from: "2025-12-05", to: "2025-12-05", via: i === 0 ? null : ("car" as const) }));
     const { container } = render(RouteReplayMap, { stops: towns, year: 2025, still: false });
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
     advance(25000);
