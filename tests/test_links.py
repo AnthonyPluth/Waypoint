@@ -2,7 +2,7 @@ import unittest
 from unittest import mock
 from urllib.parse import urlsplit
 
-from waypoint.domain import airports, app_links, links
+from waypoint.domain import app_links, links
 from waypoint.domain.mail import query
 
 
@@ -110,7 +110,7 @@ class Others(unittest.TestCase):
         hotel = links.segment_links("hotel", "Hilton", "H1", "Doe", "https://example.com/m", {"address": "1 Quay St", "phone": "+1 555 010 0100"}, "Harbour")
         self.assertEqual(hotel, {"app": "https://example.com/m", "open": None, "open_kind": None, "directions": "https://www.google.com/maps/search/?api=1&query=1%20Quay%20St", "call": "tel:+15550100100"})
         flight = links.segment_links("flight", "Example Air", "ABC123", "Doe", "http://example.com/m", {}, "JFK")
-        self.assertEqual(flight, {"app": None, "open": None, "open_kind": None, "directions": links.directions_link(airports.directions_query("JFK")), "call": None})
+        self.assertEqual(flight, {"app": None, "open": None, "open_kind": None, "directions": links.directions_link(links.airport_query("JFK")), "call": None})
         car = links.segment_links("car", "Hertz", "C1", None, None, {}, "SFO airport")
         self.assertEqual(car["directions"], "https://www.google.com/maps/search/?api=1&query=SFO%20airport")
 
@@ -179,8 +179,8 @@ if __name__ == "__main__":
 class AirportAndAppLinks(unittest.TestCase):
     def test_a_flight_gets_directions_to_its_departure_airport_by_name(self):
         got = links.segment_links("flight", "United Airlines", None, None, None, {}, "MSP")
-        self.assertEqual(got["directions"], "https://www.google.com/maps/search/?api=1&query=" + links.quote(airports.directions_query("MSP") or "", safe=""))
-        self.assertIn("Minneapolis", airports.directions_query("msp") or "")
+        self.assertEqual(got["directions"], "https://www.google.com/maps/search/?api=1&query=" + links.quote(links.airport_query("MSP") or "", safe=""))
+        self.assertIn("Minneapolis", links.airport_query("msp") or "")
 
     def test_an_unknown_airport_or_none_has_no_directions(self):
         self.assertIsNone(links.segment_links("flight", None, None, None, None, {}, "ZZZZ")["directions"])

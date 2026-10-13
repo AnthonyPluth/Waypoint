@@ -61,7 +61,7 @@ class LinkTests(Household):
 
     def test_a_manage_link_that_isnt_https_is_not_offered(self):
         got = self.add(self.jane, {**OUT, "manage_url": "http://example.com/manage"}, None, self.on(self.jane.person_id))
-        self.assertEqual(got["links"], {"app": None, "open": None, "open_kind": None, "directions": links.directions_link(airports.directions_query("JFK")), "call": None})
+        self.assertEqual(got["links"], {"app": None, "open": None, "open_kind": None, "directions": links.directions_link(links.airport_query("JFK")), "call": None})
 
 
 class PrefilledLinkTests(Household):
