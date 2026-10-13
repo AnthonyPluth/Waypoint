@@ -70,6 +70,12 @@ test-timings:
 fix:
 	$(RUFF) check --fix .
 
+# A fresh checkout's dependencies: Poetry's environment (Python and its dev tools) and the web app's packages. The cloud
+# container does this itself (.claude/hooks/session-start.sh); on your own machine it's the first command to run.
+setup:
+	poetry install --no-root --no-interaction
+	cd frontend && $(NPM) ci --no-audit --no-fund
+
 # Reinstalled whenever package-lock.json is newer, so a pull that adds a dependency picks it up.
 frontend/node_modules: frontend/package-lock.json
 	cd frontend && $(NPM) ci --no-audit --no-fund

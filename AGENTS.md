@@ -44,6 +44,13 @@ Python goes through Poetry (Python 3.14).
 - **A correction becomes a check.** When a mistake is pointed out, fix it and add what would have caught it (a lint rule in `.semgrep/` or `frontend/eslint.config.js`, a test, or a check in `tools/fleet_checks.py`). A sentence here is the last resort, for what can't be checked.
 - **Parallel work stays apart.** Agents working at once take separate areas. Two pull requests that change the same files, or both add a migration, land one at a time: the second merges `main` in and re-runs its checks.
 
+## Working in a container
+
+- **Start the session in the repository.** The session-start hook (`.claude/hooks/session-start.sh`) installs Python 3.14, Poetry's environment and the web app's packages, but only for a session whose project directory is this repository. A session started one level up has none of it: the system `python3` has no SQLAlchemy and `unittest` fails on the import.
+- **Run Python through `poetry run` or `make`** (`make test`, `make test-parallel`, or `poetry run python -m unittest tests.test_x`), never the bare `python3`. `make setup` installs the dependencies by hand.
+- **Subagents make their own worktree** under `.claude/worktrees/` (ignored by `.gitignore`), from the session's checkout, and push from there. A session whose working directory isn't a git repository can't create one for them.
+- **Some checks only run in CI.** Locally: ruff, mypy, import-linter, Waypoint's Semgrep rules, the Python tests on SQLite, the web app's checks, the docs build, and the fleet, feature-map and API-contract checks. Only in CI: the Postgres suites (`make test-pg` needs a database of your own), the Docker image build and run, the security scans, and the independent agent review. A push reaches them; a local run doesn't.
+
 ## Start from the feature map
 
 [`docs/feature-map.json`](docs/feature-map.json) (readable as the [Feature map](docs/src/content/docs/contributing/feature-map.md) page) lists every API route with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. Start there to find where a feature lives. It is generated: after changing routes, `api(` calls, tests or docs, run `make feature-map` and commit the result (`make check` and CI fail when it is stale). Every route has a test: `tools/feature_map_allowlist.txt` started empty and stays that way.
