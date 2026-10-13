@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { animationsRunning, auditPage } from "./a11y.mjs";
 
 export const PHONE_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 }, laptop: { width: 1024, height: 768 }, wide: { width: 1440, height: 900 }, zoomed: { width: 853, height: 533 } };
+export const VIEWPORTS = { phone: { width: 390, height: 844 }, narrow: { width: 320, height: 640 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 }, laptop: { width: 1024, height: 768 }, wide: { width: 1440, height: 900 }, zoomed: { width: 853, height: 533 } };
 export const DEFAULT_VIEWPORTS = ["phone", "tablet", "desktop"];
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];
 const OWN_PAGES = ["oauth-approve"];

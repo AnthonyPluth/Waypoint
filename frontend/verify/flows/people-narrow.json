@@ -1,0 +1,11 @@
+{
+  "name": "people-narrow",
+  "page": "people",
+  "viewports": ["narrow"],
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "People" } },
+    { "click": "button[aria-label='Show and copy American AAdvantage number']" },
+    { "wait_for": "button[aria-label='Hide American AAdvantage number']" },
+    { "screenshot": "long-program-name" }
+  ]
+}
