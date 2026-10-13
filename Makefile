@@ -21,7 +21,7 @@ PG_JOBS ?= $(shell tools/test_jobs.sh)
 # so it goes through pipx, on pipx's own Python.
 SEMGREP ?= pipx run semgrep==1.146.0
 
-.PHONY: check lint python-lint frontend-lint semgrep test test-parallel test-pg test-timings fix \
+.PHONY: setup check lint python-lint frontend-lint semgrep test test-parallel test-pg test-timings fix \
 	frontend-check frontend-typecheck frontend-test frontend-build docs docs-build verify feature-map feature-map-check \
 	fleet-checks api-contract api-contract-check pr-screenshots
 
