@@ -1073,6 +1073,8 @@ describe("Trip", () => {
       expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
       await u.click(screen.getByRole("button", { name: "Cancel" }));
       await u.click(await screen.findByRole("button", { name: "Discard changes" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      document.body.style.pointerEvents = "";
       await u.click(screen.getByRole("button", { name: "Edit JFK → LHR" }));
       expect(screen.queryByText("Ports of call", { selector: "legend" })).toBeNull();
     });
