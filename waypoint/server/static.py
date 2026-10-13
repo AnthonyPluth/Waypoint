@@ -39,7 +39,7 @@ STABLE_FILES = {"logo.svg", "logo-180.png", "icon-192.png", "icon-512.png", "ico
 
 def cache_control(full: str) -> str:
     if full.startswith(APP_DIR + os.sep + "assets" + os.sep):
-        return "no-cache" if os.path.basename(full).startswith("maplibre-gl-") else "public, max-age=31536000, immutable"
+        return "public, max-age=31536000, immutable"
     if full.startswith((os.path.join(STATIC, "fonts") + os.sep, os.path.join(STATIC, "map") + os.sep)) or full in {os.path.join(STATIC, name) for name in STABLE_FILES}:
         return WEEK
     return "no-cache"

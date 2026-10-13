@@ -3,25 +3,14 @@ import { codecovVitePlugin } from "@codecov/vite-plugin";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
-import { readFileSync } from "node:fs";
 import path from "node:path";
-import { defineConfig, type Plugin } from "vite";
-
-const WORKER = "maplibre-gl-worker.mjs";
-const maplibreWorker = (): Plugin => ({
-  name: "maplibre-worker",
-  apply: "build",
-  generateBundle() {
-    this.emitFile({ type: "asset", fileName: `assets/${WORKER}`, source: readFileSync(path.resolve("node_modules/maplibre-gl/dist", WORKER)) });
-  },
-});
+import { defineConfig } from "vite";
 
 export default defineConfig({
   base: "/",
   plugins: [
     tailwindcss(),
     svelte(),
-    maplibreWorker(),
     svelteTesting(),
     codecovVitePlugin({
       enableBundleAnalysis: Boolean(process.env.CODECOV_TOKEN),

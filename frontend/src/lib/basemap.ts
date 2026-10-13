@@ -3,6 +3,7 @@ import type { Box } from "$lib/route-replay";
 
 export const MAX_MAP_ZOOM = 10;
 export const MAP_TILE_SIZE = 512;
+export const LOAD_TIMEOUT_MS = 20_000;
 export const TILES_PATH = "/api/map/tiles";
 export const ATTRIBUTION_LINK = "https://www.openstreetmap.org/copyright";
 

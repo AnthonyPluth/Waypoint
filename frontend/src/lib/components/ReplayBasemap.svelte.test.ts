@@ -20,15 +20,17 @@ const lib = vi.hoisted(() => {
     resize() { this.resizes++; }
     remove() { this.removed = true; }
   }
-  return { state, FakeMap, addProtocol: vi.fn(), removeProtocol: vi.fn() };
+  return { state, FakeMap, addProtocol: vi.fn(), removeProtocol: vi.fn(), setWorkerUrl: vi.fn() };
 });
 const made = lib.state.made;
 const { addProtocol, removeProtocol } = lib;
 
-vi.mock("maplibre-gl", () => ({ Map: lib.FakeMap, addProtocol: lib.addProtocol, removeProtocol: lib.removeProtocol }));
+vi.mock("maplibre-gl", () => ({ Map: lib.FakeMap, addProtocol: lib.addProtocol, removeProtocol: lib.removeProtocol, setWorkerUrl: lib.setWorkerUrl }));
+vi.mock("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url", () => ({ default: "/assets/worker.js" }));
 vi.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}));
 vi.mock("pmtiles", () => ({ Protocol: class { tile = () => {}; } }));
 
+import { LOAD_TIMEOUT_MS } from "$lib/basemap";
 import ReplayBasemap from "./ReplayBasemap.svelte";
 
 let observers: { callback: () => void; disconnected: boolean }[] = [];
@@ -36,6 +38,7 @@ beforeEach(() => {
   made.length = 0;
   lib.state.throwOnCreate = false;
   addProtocol.mockClear();
+  lib.setWorkerUrl.mockClear();
   removeProtocol.mockClear();
   observers = [];
   vi.stubGlobal("ResizeObserver", class {
@@ -55,6 +58,32 @@ describe("ReplayBasemap", () => {
     expect([o.interactive, o.attributionControl, o.center, o.zoom, o.maxZoom]).toEqual([false, false, [-93, 45], 4, 10]);
     expect(o.style.sources.protomaps.url).toBe(`pmtiles://${location.origin}/api/map/tiles`);
     expect(addProtocol).toHaveBeenCalledWith("pmtiles", expect.any(Function));
+  });
+
+  it("gives MapLibre the worker the build bundled, from Waypoint's own address", () => {
+    render(ReplayBasemap, { center: [0, 0], zoom: 1, onfail: vi.fn() });
+    expect(lib.setWorkerUrl).toHaveBeenCalledWith("/assets/worker.js");
+  });
+
+  it("gives up and says so when the map never finishes loading, as a worker that fails silently would leave it", () => {
+    vi.useFakeTimers();
+    const onfail = vi.fn();
+    render(ReplayBasemap, { center: [0, 0], zoom: 1, onfail });
+    vi.advanceTimersByTime(LOAD_TIMEOUT_MS - 1);
+    expect(onfail).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(onfail).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("doesn't give up on a map that has loaded", () => {
+    vi.useFakeTimers();
+    const onfail = vi.fn();
+    render(ReplayBasemap, { center: [0, 0], zoom: 1, onfail });
+    made[0].emit("load");
+    vi.advanceTimersByTime(LOAD_TIMEOUT_MS * 2);
+    expect(onfail).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it("moves the camera when the box moves and keeps the map the size of its container", async () => {

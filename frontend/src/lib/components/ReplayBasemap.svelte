@@ -1,9 +1,10 @@
 <script lang="ts">
   import "maplibre-gl/dist/maplibre-gl.css";
   import * as maplibregl from "maplibre-gl";
+  import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
   import { Protocol } from "pmtiles";
   import { onDestroy, onMount } from "svelte";
-  import { ATTRIBUTION_LINK, MAX_MAP_ZOOM } from "$lib/basemap";
+  import { ATTRIBUTION_LINK, LOAD_TIMEOUT_MS, MAX_MAP_ZOOM } from "$lib/basemap";
   import { mapStyle } from "$lib/basemap-style";
 
   let { center, zoom, onfail }: { center: [number, number]; zoom: number; onfail: () => void } = $props();
@@ -12,17 +13,20 @@
   let map = $state.raw<maplibregl.Map | null>(null);
   let watcher: ResizeObserver | null = null;
   let protocol: Protocol | null = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
 
   onMount(() => {
     let loaded = false;
     try {
+      maplibregl.setWorkerUrl(workerUrl);
       protocol = new Protocol();
       maplibregl.addProtocol("pmtiles", protocol.tile);
       const made = new maplibregl.Map({
         container: host, style: mapStyle(location.origin), center, zoom, interactive: false, attributionControl: false,
         fadeDuration: 0, minZoom: -2, maxZoom: MAX_MAP_ZOOM, pitchWithRotate: false, dragRotate: false,
       });
-      made.once("load", () => { loaded = true; });
+      made.once("load", () => { loaded = true; clearTimeout(timer); });
+      timer = setTimeout(() => { if (!loaded) onfail(); }, LOAD_TIMEOUT_MS);
       made.on("error", () => { if (!loaded) onfail(); });
       watcher = new ResizeObserver(() => made.resize());
       watcher.observe(host);
@@ -33,6 +37,7 @@
   });
 
   onDestroy(() => {
+    clearTimeout(timer);
     watcher?.disconnect();
     map?.remove();
     if (protocol) maplibregl.removeProtocol("pmtiles");
