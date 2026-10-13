@@ -1,0 +1,24 @@
+{
+  "name": "first-run-scanning",
+  "page": "upcoming",
+  "steps": [
+    {
+      "fake_first_run": "scanning"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "#empty-title"
+    },
+    {
+      "expect_text": {
+        "selector": "#empty-title",
+        "text": "Scanning your mailbox"
+      }
+    },
+    {
+      "screenshot": "first-run-scanning"
+    }
+  ]
+}

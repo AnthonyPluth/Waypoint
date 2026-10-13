@@ -1,0 +1,24 @@
+{
+  "name": "first-run-connect",
+  "page": "upcoming",
+  "steps": [
+    {
+      "fake_first_run": "connect"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "#empty-title"
+    },
+    {
+      "expect_text": {
+        "selector": "#empty-title",
+        "text": "Connect Gmail"
+      }
+    },
+    {
+      "screenshot": "first-run-connect"
+    }
+  ]
+}

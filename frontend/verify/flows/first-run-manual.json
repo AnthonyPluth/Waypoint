@@ -1,0 +1,24 @@
+{
+  "name": "first-run-manual",
+  "page": "upcoming",
+  "steps": [
+    {
+      "fake_first_run": "manual"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "#empty-title"
+    },
+    {
+      "expect_text": {
+        "selector": "#empty-title",
+        "text": "No trips yet"
+      }
+    },
+    {
+      "screenshot": "first-run-manual"
+    }
+  ]
+}

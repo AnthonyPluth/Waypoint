@@ -24,7 +24,7 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", fake_merge_warning: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -119,6 +119,17 @@ async function runStep(page, step, shot, saveDownload) {
       await route.fulfill({ response, json: { ...(await response.json()), ai: true } });
     });
     await page.route("**/api/trips/*/destination/suggest", (route) => route.fulfill({ json: { suggestion: step.fake_destination } }));
+  } else if ("fake_first_run" in step) {
+    const mailbox = { id: 1, address: "jane@example.test", status: "connected", last_error: null, last_scan: null, scan_error: null, scanning: step.fake_first_run === "scanning", scan_notice: null,
+      scan_summary: null, reading_again: null, labels_picked: 0, share_review: false };
+    const mailboxes = step.fake_first_run === "connect" ? [] : [mailbox];
+    await page.route("**/api/trips", (route) => route.fulfill({ json: { trips: [] } }));
+    await page.route("**/api/people/claim-suggestions", (route) => route.fulfill({ json: { guests: [] } }));
+    await page.route("**/api/mailboxes", (route) => route.fulfill({ json: { configured: true, mailboxes } }));
+    await page.route("**/api/state", async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: { ...(await response.json()), review_count: step.fake_first_run === "review" ? 3 : 0 } });
+    });
   } else if ("fake_merge_warning" in step) {
     const [first, second] = step.fake_merge_warning.split("|").map((part) => part.split(",").map((n) => n.trim()).filter(Boolean));
     const named = (names = []) => names.map((name, i) => ({ id: i + 1, name }));

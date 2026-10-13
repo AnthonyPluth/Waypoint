@@ -1,0 +1,27 @@
+{
+  "name": "add-booking-direct",
+  "page": "upcoming",
+  "steps": [
+    {
+      "fake_first_run": "manual"
+    },
+    {
+      "reload": true
+    },
+    {
+      "click": "a:has-text('Add a booking') >> visible=true"
+    },
+    {
+      "wait_for": "form"
+    },
+    {
+      "expect_text": {
+        "selector": "main",
+        "text": "Cancel"
+      }
+    },
+    {
+      "screenshot": "add-booking-direct"
+    }
+  ]
+}
