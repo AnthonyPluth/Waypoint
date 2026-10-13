@@ -20,6 +20,24 @@ describe("RouteLine", () => {
       unmount();
     }
   });
+  it("draws the route as one arch, dashed behind and solid up to the plane", () => {
+    const { container } = render(RouteLine, { progress: 0.3 });
+    const paths = [...container.querySelectorAll("svg[preserveAspectRatio] path")];
+    expect(paths.map((p) => p.getAttribute("d"))).toEqual(["M0 100 Q50 0 100 100", "M0 100 Q50 0 100 100"]);
+    expect(paths[0].getAttribute("stroke-dasharray")).toBe("4 4");
+    expect(paths[1].getAttribute("stroke-dasharray")).toBeNull();
+    expect(paths[1].closest("svg")?.getAttribute("style")).toContain("var(--along)");
+  });
+  it("lifts the plane along the arch and tilts it up on the way out and down on the way in", () => {
+    const seen = [[0, "100%", 15], [0.5, "50%", 45], [1, "100%", 75]] as const;
+    for (const [progress, top, rotate] of seen) {
+      const { container, unmount } = render(RouteLine, { progress });
+      const plane = container.querySelector("svg.lucide, svg.lucide-plane") as SVGElement;
+      expect(plane.getAttribute("style")).toContain(`top: ${top}`);
+      expect(plane.getAttribute("style")).toContain(`rotate(${rotate}deg)`);
+      unmount();
+    }
+  });
   it("keeps the plane on the line", () => {
     expect(clampProgress(-1)).toBe(0);
     expect(clampProgress(2)).toBe(1);
