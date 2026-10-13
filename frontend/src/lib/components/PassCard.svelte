@@ -18,10 +18,10 @@
 
   type Props = {
     segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
-    as?: "section" | "li"; id?: string; highlight?: boolean; label?: string; showCode?: boolean; showApp?: boolean; omit?: string[]; condensed?: boolean; showCost?: boolean;
+    as?: "section" | "li"; id?: string; highlight?: boolean; label?: string; showCode?: boolean; showApp?: boolean; omit?: string[]; condensed?: boolean; compact?: boolean; showCost?: boolean;
     live?: Snippet; footer?: Snippet; times?: Snippet; details?: Snippet;
   };
-  let { segment: s, bookings = [s], now = Date.now(), eyebrow = "", pulse = false, level = 3, class: cls = "", as: tag = "section", id, highlight = false, label, showCode = true, showApp = true, omit = [], condensed = false, showCost = true,
+  let { segment: s, bookings = [s], now = Date.now(), eyebrow = "", pulse = false, level = 3, class: cls = "", as: tag = "section", id, highlight = false, label, showCode = true, showApp = true, omit = [], condensed = false, compact = false, showCost = true,
     live: liveArea, footer, times: timesArea, details }: Props = $props();
 
   const flight = $derived(s.kind === "flight");
@@ -55,17 +55,19 @@
             : [["Seat", seat], ["Cabin", s.details.cabin]],
   );
   const cost = $derived(showCost && bookings.length === 1 && s.price ? formatMoney(s.price.amount_minor, s.price.currency) : "");
-  const facts = $derived([...rows, ["Cost", cost] as [string, string]].filter((f): f is [string, string] => !!f[1] && !omit.includes(f[0])));
+  const COMPACT_OMIT = ["Cost", "Room", "Cabin", "Notes", "Vehicle", "Space", "Car", "Deck", "Ship"];
+  const facts = $derived([...rows, ["Cost", cost] as [string, string]].filter((f): f is [string, string] => !!f[1] && !omit.includes(f[0]) && !(compact && COMPACT_OMIT.includes(f[0]))));
+  const pad = $derived(compact ? "p-4 md:p-6" : "p-6 md:p-8");
 </script>
 
 <svelte:element this={tag} {id} class={`pass scroll-mt-20 ${cls}`} class:ring-2={highlight} class:ring-ring={highlight} class:opacity-80={cancelled} aria-label={label ?? (tag === "section" ? headline(s) : undefined)} data-kind={s.kind} data-progress={flight ? progress : undefined}>
-  <div class="flex flex-col gap-4 p-6 md:p-8">
+  <div class={`flex flex-col ${compact ? "gap-3" : "gap-4"} ${pad}`}>
     {#if eyebrow}<p class="eyebrow flex items-center gap-2">{#if pulse}<span class="size-2 animate-pulse rounded-full bg-primary motion-reduce:animate-none" aria-hidden="true"></span>{/if}{eyebrow}</p>{/if}
     {#if !noHeadline}{#key headlineText}<p class="countdown text-heading font-semibold" class:text-primary={!bad} class:text-destructive={bad} data-headline data-countdown>{headlineText}</p>{/key}{/if}
     {#if flight}<svelte:element this={`h${level}`} class="sr-only">{headline(s)}</svelte:element>{/if}
 
     {#if showCode && codes.length}
-      <div class="flex flex-col gap-1">
+      <div class={compact ? "flex flex-wrap items-baseline gap-x-3 gap-y-1" : "flex flex-col gap-1"}>
         <p class="eyebrow">{codes.length > 1 ? "Confirmations" : "Confirmation"}</p>
         <p class="flex flex-wrap gap-x-4">{#each codes as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="w-fit text-display" />{/each}</p>
       </div>
@@ -127,9 +129,9 @@
     {#if details}{@render details()}{/if}
   </div>
 
-  <div class="pass-tear" aria-hidden="true"></div>
+  {#if !compact}<div class="pass-tear" aria-hidden="true"></div>{/if}
 
-  <div class="flex flex-col gap-3 p-6 md:p-8">
+  <div class={`flex flex-col gap-3 ${compact ? "px-4 pb-4 md:px-6 md:pb-6" : pad}`}>
     {#if facts.length}
       <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
         {#each facts as [label, value] (label)}
@@ -141,8 +143,9 @@
     <div class="flex flex-wrap items-center gap-2">
       <StatusChip chip={chips.booking} />
       {#if !liveArea && chips.live}<StatusChip chip={chips.live} small />{/if}
+      {#if compact && footer}<div class="contents">{@render footer()}</div>{/if}
     </div>
     {#if liveArea}{@render liveArea()}{:else if status && chips.live}<p class="text-sm text-muted-foreground" data-live-line>{quiet}</p>{/if}
-    {#if footer}<div>{@render footer()}</div>{/if}
+    {#if footer && !compact}<div>{@render footer()}</div>{/if}
   </div>
 </svelte:element>

@@ -12,7 +12,7 @@
   import { takeEarlyTrips } from "$lib/early";
   import { flightStatus, loadFlightStatus, statusFor } from "$lib/flightstatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
-  import { dateLabel, dayIn, dayLabel, END_WORD, featuredTrip, flightEvidence, headline, nextUp, subline, timesDiffer, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
+  import { type Day, type DayItem, dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, startAt, subline, timesDiffer, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
@@ -89,6 +89,10 @@
   const next = $derived(trips ? nextUp(trips, now) : null);
   const featured = $derived(trips ? featuredTrip(trips, next, today) : null);
   const days = $derived(featured ? tripDays(featured) : []);
+  const happened = (i: DayItem) => dayIn(i.role === "end" ? endAt(i.segment) : startAt(i.segment), viewerZone()) < today;
+  const firstAhead = $derived(days.findIndex((d) => !d.items.every(happened)));
+  const earlier = $derived(firstAhead < 0 ? days : days.slice(0, firstAhead));
+  const ahead = $derived(firstAhead < 0 ? [] : days.slice(firstAhead));
   const waiting = $derived(app.state?.review_count ?? 0);
   const boxes = $derived(mail?.mailboxes ?? []);
   const scanning = $derived(boxes.some((m) => m.scanning));
@@ -102,7 +106,31 @@
     : { id: "manual", title: "No trips yet", text: "Add your first booking by hand: a flight, a stay, a rental car." });
 </script>
 
-<h1 class="mb-6 text-display">Upcoming</h1>
+{#snippet dayBlock(day: Day)}
+  <li>
+    <h3 class="eyebrow mb-2">{dayLabel(`${day.date}T00:00`)}{day.date === today ? " · Today" : ""}</h3>
+    <ul class="rows">
+      {#each day.items as item (`${item.segment.id}-${item.role}`)}
+        {@const seg = item.segment}
+        <li class="row row-tap items-start" class:opacity-60={seg.status === "cancelled"}>
+          <BrandLogo src={seg.logo} label={seg.logo_label} size={32} class="mt-0.5" />
+          <div class="min-w-0 flex-1">
+            <p class="break-words text-body font-medium" class:line-through={seg.status === "cancelled"}>
+              <a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}
+              title={upcomingTitle(seg) === headline(seg) ? undefined : headline(seg)} onclick={(e) => openDetail(e, seg, item.bookings)}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${upcomingTitle(seg)}` : upcomingTitle(seg)}</a></p>
+            {#if item.role === "start" && subline(seg, true)}<p class="break-words text-caption text-muted-foreground">{subline(seg, true)}</p>{/if}
+            {#if item.role === "start" && item.bookings.length > 1}<p class="text-caption text-muted-foreground">{item.bookings.length} bookings{timesDiffer(item.bookings) ? " · times differ between bookings" : ""}</p>{/if}
+          </div>
+          <p class="text-body font-medium">
+            <DayTime segment={seg} end={item.role === "end"} />
+          </p>
+        </li>
+      {/each}
+    </ul>
+  </li>
+{/snippet}
+
+<h1 class="mb-3 text-title md:mb-6 md:text-display">Upcoming</h1>
 
 {#if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">
@@ -159,12 +187,15 @@
     {@const proof = s.kind === "flight" && flightStatus.list?.enabled ? flightEvidence(statusFor(s.id), now, typeof navigator === "undefined" || navigator.onLine !== false) : "scheduled"}
     {@const grounded = proof === "landed" || proof === "cancelled" || proof === "diverted"}
     {@const eyebrow = next.state !== "now" ? "Next up" : s.kind !== "flight" ? "Under way" : grounded ? "Latest flight" : proof === "departed" ? "In the air" : proof === "delayed" ? "Delayed" : "In the air, by schedule"}
-    <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-8" condensed {eyebrow} pulse={next.state === "now" && !grounded}>
+    <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-6" condensed compact showApp={!(s.links.directions || s.links.call)} {eyebrow} pulse={next.state === "now" && !grounded}>
       {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
-      {#snippet footer()}<span class="flex flex-wrap gap-2"><GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm">Open {next.trip.name}</Button></span>{/snippet}
+      {#snippet footer()}<span class="contents">
+        {#if s.status !== "cancelled" && s.links.directions}<Button href={s.links.directions} target="_blank" rel="noopener noreferrer" variant="outline" size="sm">Directions</Button>{/if}
+        {#if s.status !== "cancelled" && s.links.call}<Button href={s.links.call} variant="outline" size="sm">Call</Button>{/if}
+        <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm">Open trip<span class="sr-only">: {next.trip.name}</span></Button></span>{/snippet}
     </PassCard>
     {#if next.alongside.length}
-      <section class="-mt-4 mb-8" aria-label="Also under way">
+      <section class="-mt-2 mb-6" aria-label="Also under way">
         <p class="eyebrow mb-2">Also under way</p>
         <ul class="rows">
           {#each next.alongside as item (item.segment.id)}
@@ -188,28 +219,20 @@
     <h2 class="mb-1 text-title"><a class="inline-flex items-center phone:min-h-11 underline-offset-2 hover:underline" href={`#trip/${featured.id}`}>{featured.name}</a></h2>
     {#if featured.start_date && featured.end_date}<p class="mb-4 text-caption text-muted-foreground">{dateLabel(featured.start_date)} – {dateLabel(featured.end_date)}</p>{/if}
     <ol class="flex flex-col gap-6" aria-label={`${featured.name}, day by day`}>
-      {#each days as day (day.date)}
+      {#if earlier.length}
         <li>
-          <h3 class="eyebrow mb-2">{dayLabel(`${day.date}T00:00`)}{day.date === today ? " · Today" : ""}</h3>
-          <ul class="rows">
-            {#each day.items as item (`${item.segment.id}-${item.role}`)}
-              {@const seg = item.segment}
-              <li class="row row-tap items-start" class:opacity-60={seg.status === "cancelled"}>
-                <BrandLogo src={seg.logo} label={seg.logo_label} size={32} class="mt-0.5" />
-                <div class="min-w-0 flex-1">
-                  <p class="break-words text-body font-medium" class:line-through={seg.status === "cancelled"}>
-                    <a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}
-                    title={upcomingTitle(seg) === headline(seg) ? undefined : headline(seg)} onclick={(e) => openDetail(e, seg, item.bookings)}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${upcomingTitle(seg)}` : upcomingTitle(seg)}</a></p>
-                  {#if item.role === "start" && subline(seg, true)}<p class="break-words text-caption text-muted-foreground">{subline(seg, true)}</p>{/if}
-                  {#if item.role === "start" && item.bookings.length > 1}<p class="text-caption text-muted-foreground">{item.bookings.length} bookings{timesDiffer(item.bookings) ? " · times differ between bookings" : ""}</p>{/if}
-                </div>
-                <p class="text-body font-medium">
-                  <DayTime segment={seg} end={item.role === "end"} />
-                </p>
-              </li>
-            {/each}
-          </ul>
+          <details class="group">
+            <summary class="inline-flex min-h-11 cursor-pointer items-center rounded-md font-medium text-muted-foreground underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Earlier in this trip · {earlier.length} {earlier.length === 1 ? "day" : "days"}</summary>
+            <ol class="mt-3 flex flex-col gap-6" aria-label={`${featured.name}, earlier days`}>
+              {#each earlier as day (day.date)}
+                {@render dayBlock(day)}
+              {/each}
+            </ol>
+          </details>
         </li>
+      {/if}
+      {#each ahead as day (day.date)}
+        {@render dayBlock(day)}
       {/each}
     </ol>
   {/if}
