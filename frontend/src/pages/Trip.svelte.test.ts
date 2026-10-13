@@ -93,6 +93,15 @@ describe("Trip", () => {
       expect(card).toHaveTextContent("Sam Doe · Seat 31B");
     });
 
+    it("keeps a booking-level seat that no traveller holds", async () => {
+      const odd = segment({ id: 1, details: { seat: "99Z" }, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: "12A" }, { id: 2, person_id: 2, name: "Sam Doe", seat: null }] });
+      held = trip([odd, car]);
+      render(TripPage);
+      const card = await cardOf(odd);
+      expect(card).toHaveTextContent("99Z");
+      expect(card).toHaveTextContent("Jane Doe · Seat 12A");
+    });
+
     it("lists each seat once on a flight, beside its traveller", async () => {
       held = trip([flightFor, car]);
       render(TripPage);

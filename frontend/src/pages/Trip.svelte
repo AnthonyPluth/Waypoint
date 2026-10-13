@@ -143,7 +143,12 @@
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
   const everyone = $derived(trip ? tripTravellers(trip.segments) : []);
   const eyebrowOf = (s: Segment) => `${kindName(s)} · ${dayLabel(s.start_local)}`;
-  const omitted = (s: Segment) => ["Address", "Pick-up address", ...(showBookingTravellers(s, everyone) && s.travelers.some((t) => t.seat) ? ["Seat"] : [])];
+  const omitted = (s: Segment) => ["Address", "Pick-up address", ...(seatsListed(s) ? ["Seat"] : [])];
+  const seatsListed = (s: Segment) => {
+    const named = new Set(s.travelers.map((t) => t.seat?.trim()).filter(Boolean));
+    const shown = (s.details.seat || [...named].join(",")).split(",").map((x) => x.trim()).filter(Boolean);
+    return showBookingTravellers(s, everyone) && named.size > 0 && shown.every((x) => named.has(x));
+  };
   const kindName = (s: Segment) => KINDS.find(([k]) => k === s.kind)?.[1] ?? s.kind;
   const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
 
