@@ -112,7 +112,7 @@ describe("Trips", () => {
     await u.type(screen.getByLabelText(/^Departs/), "2026-12-01T19:00");
     await u.type(screen.getByLabelText(/^Arrives/), "2026-12-02T07:10");
     await u.click(screen.getByLabelText("Jane Doe"));
-    await u.click(screen.getByRole("button", { name: "Add" }));
+    await u.click(screen.getByRole("button", { name: "Add booking" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments", { method: "POST", body: expect.objectContaining({ kind: "flight", origin: "JFK", destination: "LHR", start_local: "2026-12-01T19:00", travelers: [{ person_id: 1, seat: null }], trip_id: null }) }));
     await waitFor(() => expect(location.hash).toBe("#trip/5"));
   });
@@ -140,8 +140,8 @@ describe("Trips", () => {
     await u.type(screen.getByLabelText(/^Departs/), "2026-12-01T19:00");
     await u.type(screen.getByLabelText(/^Arrives/), "2026-12-02T07:10");
     await u.click(screen.getByLabelText("Jane Doe"));
-    await u.click(screen.getByRole("button", { name: "Add" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("This ends before it starts");
+    await u.click(screen.getByRole("button", { name: "Add booking" }));
+    expect(await screen.findByText(/This ends before it starts/)).toBeInTheDocument();
     expect(screen.getByLabelText(/From \(airport\)/)).toHaveValue("JFK");
     expect(screen.getByLabelText(/^Departs/)).toHaveValue("2026-12-01T19:00");
     expect(screen.getByLabelText("Jane Doe")).toBeChecked();
@@ -151,8 +151,8 @@ describe("Trips", () => {
     render(Trips);
     const u = user();
     await u.click(await screen.findByRole("button", { name: /Add a booking/ }));
-    await u.click(screen.getByRole("button", { name: "Add" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("A flight’s origin is an airport code like JFK");
+    await u.click(screen.getByRole("button", { name: "Add booking" }));
+    expect(await screen.findByText(/Choose the airport it leaves from/)).toBeInTheDocument();
     expect(api).not.toHaveBeenCalledWith("/api/segments", expect.anything());
     await u.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("form")).toBeNull();
@@ -211,7 +211,49 @@ describe("two panes", () => {
     expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
     expect(links[1]).toHaveAttribute("aria-current", "true");
     expect(links[0]).not.toHaveAttribute("aria-current");
-    expect(location.hash).toBe("#trips");
+    expect(location.hash).toBe("#trips?trip=2");
+    expect(route.query).toBe("trip=2");
+  });
+
+  it("opens the trip the address names, and keeps the filter beside it", async () => {
+    panes.two = true;
+    serveTrips();
+    route.query = "who=2&trip=2";
+    location.hash = "#trips?who=2&trip=2";
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
+    await user().click(within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[0]);
+    expect(route.query).toBe("who=2&trip=1");
+  });
+
+  it("keeps the picked trip when a new filter still includes it", async () => {
+    panes.two = true;
+    serveTrips();
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await user().click(within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[1]);
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" });
+    await user().selectOptions(screen.getByLabelText("Travelling"), "Sam Doe");
+    expect(route.query).toBe("who=2&trip=2");
+    expect(await within(screen.getByRole("region", { name: "Selected trip" })).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
+  });
+
+  it("shows the first trip when the address names one that isn’t in the list", async () => {
+    panes.two = true;
+    serveTrips();
+    route.query = "trip=999";
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to London" })).toBeInTheDocument();
+  });
+
+  it("stays a plain list where the address names a trip but the screen is narrow", async () => {
+    serveTrips();
+    route.query = "trip=2";
+    render(Trips);
+    await screen.findByRole("list", { name: "Upcoming trips" });
+    expect(screen.queryByRole("region", { name: "Selected trip" })).toBeNull();
   });
 
   it("asks before another trip is picked, or the filter swaps it, over a changed booking, and stays on the trip on Keep editing", async () => {
@@ -365,10 +407,10 @@ describe("changing a trip in the pane", () => {
     const pane = await screen.findByRole("region", { name: "Selected trip" });
     const u = user();
     await u.click(await within(pane).findByRole("button", { name: "Edit Harbour Hotel" }));
-    await u.click(within(pane).getByRole("button", { name: "Save" }));
+    await u.click(within(pane).getByRole("button", { name: "Save changes" }));
     expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
     expect(within(pane).getByRole("button", { name: "Edit Harbour Hotel" })).toBeInTheDocument();
-    expect(location.hash).toBe("#trips");
+    expect(location.hash).toBe("#trips?trip=2");
     expect(within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[1]).toHaveAttribute("aria-current", "true");
   });
 });

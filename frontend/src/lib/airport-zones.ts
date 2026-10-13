@@ -19,3 +19,8 @@ export function airportInfo(raw: string): Promise<Airport | null> {
 }
 
 export const airportZone = (raw: string): Promise<string | null> => airportInfo(raw).then((a) => a?.zone ?? null);
+
+export const searchAirports = (text: string): Promise<Airport[]> =>
+  text.trim().length < 2
+    ? Promise.resolve([])
+    : apiCall<"GET /api/airports">(`/api/airports?q=${encodeURIComponent(text.trim())}`).then((r) => r.airports, () => []);

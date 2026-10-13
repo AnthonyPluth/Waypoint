@@ -652,6 +652,10 @@ class Airport(TypedDict):
     zone: str
 
 
+class AirportMatches(TypedDict):
+    airports: list[Airport]
+
+
 class ImportRow(TypedDict):
     line: int
     status: Literal["new", "exists", "unreadable"]

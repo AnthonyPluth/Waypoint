@@ -1052,6 +1052,27 @@
         }
       }
     },
+    "/api/airports": {
+      "get": {
+        "operationId": "api_airport_search",
+        "x-handler": "waypoint/server/api/trips.py:api_airport_search",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AirportMatches"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/airports/{id}": {
       "get": {
         "operationId": "api_airport",
@@ -3363,6 +3384,21 @@
           "city",
           "country",
           "zone"
+        ],
+        "additionalProperties": false
+      },
+      "AirportMatches": {
+        "type": "object",
+        "properties": {
+          "airports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Airport"
+            }
+          }
+        },
+        "required": [
+          "airports"
         ],
         "additionalProperties": false
       },

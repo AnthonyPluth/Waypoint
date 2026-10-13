@@ -981,6 +981,20 @@ class AirportTests(DbCase):
         self.assertIsNone(airports.lookup(self.c, "ZZZ"))
         self.assertEqual(airports.zones(self.c, ["jfk", "LHR", "ZZZ"]), {"JFK": "America/New_York", "LHR": "Europe/London"})
 
+    def test_search_by_code_city_or_name_puts_the_code_first(self):
+        self.assertEqual(airports.search(self.c, "akl")[0]["code"], "AKL")
+        self.assertIn("AKL", [a["code"] for a in airports.search(self.c, "Auckland")])
+        self.assertIn("LHR", [a["code"] for a in airports.search(self.c, "heathrow")])
+        self.assertEqual(airports.search(self.c, "x"), [])
+        self.assertEqual(airports.search(self.c, "%%"), [])
+        self.assertLessEqual(len(airports.search(self.c, "ai")), 8)
+
+    def test_the_search_route_answers_matches_and_nothing_for_nothing(self):
+        from waypoint.server.api import trips as trips_api
+        found = trips_api.api_airport_search(self.c, {"q": ["new york"]}, {})
+        self.assertIn("JFK", [a["code"] for a in found["airports"]])
+        self.assertEqual(trips_api.api_airport_search(self.c, {}, {}), {"airports": []})
+
     def test_every_airports_zone_is_a_real_one(self):
         from zoneinfo import ZoneInfo
         for _code, zone in self.c.execute(select(db_airports.code, db_airports.zone)).fetchall():

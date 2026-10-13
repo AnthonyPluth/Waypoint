@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import { animationsRunning, auditPage } from "./a11y.mjs";
 
 export const PHONE_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 } };
+export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 }, laptop: { width: 1024, height: 768 }, wide: { width: 1440, height: 900 }, zoomed: { width: 853, height: 533 } };
+export const DEFAULT_VIEWPORTS = ["phone", "tablet", "desktop"];
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];
 const OWN_PAGES = ["oauth-approve"];
 
@@ -245,7 +246,7 @@ async function main() {
   }
 
   for (const name of pages) {
-    for (const viewport of Object.keys(VIEWPORTS)) {
+    for (const viewport of DEFAULT_VIEWPORTS) {
       await visit(name, viewport, async (page, shot) => {
         if (OWN_PAGES.includes(name)) {
           if (!approveUrl) throw new Error("no approval page: seeding the demo assistants failed");
@@ -258,7 +259,7 @@ async function main() {
   }
   for (const flow of flows) {
     if (args.length && !args.includes(flow.page ?? "upcoming")) continue;
-    for (const viewport of flow.viewports ?? Object.keys(VIEWPORTS)) {
+    for (const viewport of flow.viewports ?? DEFAULT_VIEWPORTS) {
       await visit(`flow ${flow.name}`, viewport, async (page, shot, saveDownload) => {
         await page.goto(`${flow.host ? base.replace("127.0.0.1", flow.host) : base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
         for (const [i, step] of flow.steps.entries()) {
