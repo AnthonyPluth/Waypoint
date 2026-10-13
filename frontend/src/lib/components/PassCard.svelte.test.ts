@@ -341,9 +341,10 @@ describe("airports and days on a flight pass", () => {
     const east = render(PassCard, goes({ origin: "LAX", destination: "SYD", start_local: "2026-11-20T22:00", start_zone: "America/Los_Angeles", end_local: "2026-11-22T06:00", end_zone: "Australia/Sydney" }));
     expect(east.container.querySelector("[data-day-shift]")).toHaveTextContent("+2 days");
   });
-  it("says the times are local to each airport and names each zone for a screen reader", () => {
+  it("names each zone for a screen reader and no longer prints a local-times note", () => {
     const { container } = render(PassCard, goes());
-    expect(screen.getByText("Times are local to each airport")).toBeInTheDocument();
+    expect(container.textContent).not.toContain("Times are local to each airport");
+    expect(container.querySelector("[data-zone-note]")).toBeNull();
     expect(container.textContent).toContain(`(${NY})`);
     expect(container.textContent).toContain(`(${LON})`);
   });
@@ -352,11 +353,11 @@ describe("airports and days on a flight pass", () => {
     render(PassCard, goes());
     expect(screen.getByText(/as of \d?\d:\d\d [AP]M/)).toBeInTheDocument();
   });
-  it("keeps the day marker, the local-times note and the zones when the page supplies its own time rows", () => {
+  it("keeps the day marker and the zones when the page supplies its own time rows", () => {
     const { container } = render(PassCard, { ...goes(), times });
     const mark = container.querySelector("[data-day-shift]") as HTMLElement;
     expect(mark).toHaveTextContent("+1 day");
-    expect(screen.getByText(/Times are local to each airport/)).toBeInTheDocument();
+    expect(container.textContent).not.toContain("Times are local to each airport");
     expect(container.textContent).toContain(`departs ${NY}, arrives ${LON}`);
     expect(screen.getByText("custom rows")).toBeInTheDocument();
   });
