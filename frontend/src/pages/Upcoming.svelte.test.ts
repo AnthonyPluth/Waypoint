@@ -159,6 +159,32 @@ describe("Upcoming", () => {
     expect(within(card).getByText("Scheduled arrival in 10 min")).toBeInTheDocument();
   });
 
+  it("doesn’t call a flight in the air by schedule once live status says it landed", async () => {
+    at("2026-11-21T02:00:00-05:00");
+    const landed = { ...delayed, statuses: [{ ...delayed.statuses[0], state: "landed", arr_actual: "2026-11-21T01:50" }] };
+    vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? landed : { trips: [london] }) as never);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
+    expect(await within(card).findByText("Latest flight")).toBeInTheDocument();
+    expect(within(card).queryByText("In the air, by schedule")).toBeNull();
+    expect(within(card).getByText("Landed", { selector: "[data-headline]" })).toBeInTheDocument();
+  });
+
+  it("does not call a flight in the air by schedule once live status says it landed or was cancelled", async () => {
+    at("2026-11-21T02:00:00-05:00");
+    for (const state of ["landed", "cancelled"]) {
+      const live = { ...delayed, statuses: [{ ...delayed.statuses[0], state, fetched_at: "2026-11-21T06:30:00+00:00" }] };
+      vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? live : { trips: [london] }) as never);
+      const { unmount } = render(Upcoming);
+      const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
+      await within(card).findByTestId("flight-status");
+      expect(within(card).getByText("Latest flight")).toBeInTheDocument();
+      expect(within(card).queryByText("In the air, by schedule")).toBeNull();
+      unmount();
+      flightStatus.list = null;
+    }
+  });
+
   it("leads with a hotel's address and check-in time once the flight is behind", async () => {
     at("2026-11-21T08:00:00Z");
     serve([trip([outbound, stay])]);
