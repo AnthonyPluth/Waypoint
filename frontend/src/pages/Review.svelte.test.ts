@@ -137,12 +137,18 @@ describe("Review", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await settled();
     await userEvent.click(within(row).getByRole("button", { name: /Dismiss/ }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Dismiss" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/4", "DELETE", undefined]));
   });
 
   it("dismisses an item", async () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Dismiss .Mail from example-air.example/ }));
+    expect(calls.filter(([, method]) => method === "DELETE")).toEqual([]);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/deletes its stored copy of this email/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/can’t be undone/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Dismiss" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
     expect(toast.success).toHaveBeenCalledWith("Dismissed");
     await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
@@ -178,9 +184,30 @@ describe("Review", () => {
       { id: 3, subject: "Your reminder", has_email: true, received: "2026-10-10" }] })] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: "Dismiss all 3 emails about “Online check-in is open”" }));
+    expect(within(await screen.findByRole("dialog")).getByText(/all 3 emails about this reservation/)).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Dismiss all" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
     expect(toast.success).toHaveBeenCalledWith("Dismissed 3 emails");
     await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+  });
+
+  it("adds a generic suggestion once by default, and trusts the sender only when asked", async () => {
+    const read = { kind: "hotel" as const, provider: "Seaside Inn", confirmation: "SS48213", origin: "Seaside Inn", start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London", sources: {} };
+    held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check what Waypoint read/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42", "DELETE", undefined]));
+  });
+
+  it("sends trust only when its box is ticked", async () => {
+    const read = { kind: "hotel" as const, provider: "Seaside Inn", confirmation: "SS48213", origin: "Seaside Inn", start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London", sources: {} };
+    held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check what Waypoint read/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Also trust seaside-stays.example/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42&trust=1", "DELETE", undefined]));
   });
 
   it("adds a booking from a grouped row through the newest item alone", async () => {
@@ -1153,7 +1180,8 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     expect(screen.queryByText("AI suggestion")).toBeNull();
     expect(screen.queryByRole("button", { name: /Ask AI/ })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /Check what Waypoint read/ }));
-    expect(screen.getByText(/Adding it also trusts seaside-stays.example/)).toBeInTheDocument();
+    expect(screen.getByText(/later mail from seaside-stays.example is still checked with you first/)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /Also trust seaside-stays.example/ })).not.toBeChecked();
     const checkin = screen.getByLabelText(/^Check-in/);
     expect(checkin).toHaveValue("2026-11-21T15:00");
     expect(checkin).toHaveClass("ring-2");

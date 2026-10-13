@@ -12,7 +12,7 @@ class GenericKindCase(ScanCase):
 
     def confirm(self, item, **fields):
         seg = self.read(lambda conn: trips.add_segment(conn, self.jane, {"status": "confirmed", "manage_url": None, "details": {}, **fields}))
-        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, [seg["id"]]))))
+        self.assertTrue(self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"], (self.jane, [seg["id"]]), trust=True)))
         self.assertTrue(self.read(lambda conn: review.trusted(conn, self.mailbox, self.DOMAIN)))
         return seg
 

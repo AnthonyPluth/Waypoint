@@ -183,6 +183,7 @@
     addedPicks = [];
     if (open && viewing !== open.item.id) delete peeks[open.item.id];
     drafts = [];
+    trustSender = false;
     joining = null;
     if (open && picks.length) void act(async () => {
       await apiCall<"DELETE /api/review/{id}">(`/api/review/${open.item.id}?${picks.map((n) => `suggestion=${n}`).join("&")}`, { method: "DELETE" });
@@ -241,6 +242,8 @@
     if (open) void save(open.legs, open.bodies, open.found, attach);
   };
 
+  let trustSender = $state(false);
+
   async function save(legs: Draft[], bodies: SegmentBody[], found: (ReviewCandidate | null)[], attach: boolean) {
     const first = legs[0];
     if (!first) return;
@@ -264,7 +267,7 @@
         if (n < bodies.length - 1) drafts = drafts.filter((d) => d !== leg);
       }
       listed = true;
-      await apiCall<"DELETE /api/review/{id}">(`/api/review/${first.item.id}?${added.map((id) => `segment=${id}`).join("&")}`, { method: "DELETE" });
+      await apiCall<"DELETE /api/review/{id}">(`/api/review/${first.item.id}?${added.map((id) => `segment=${id}`).join("&")}${trustSender && first.item.reason === "generic" ? "&trust=1" : ""}`, { method: "DELETE" });
     }, { busy: (on) => (saving = on), onError: (m) => {
       if (listed) toast.error(`Added, but couldn’t take it off this list: ${m}`);
       else formError = added.length ? `Added ${added.length} of ${before + bodies.length}, but couldn’t add the rest: ${m}` : m;
@@ -276,6 +279,8 @@
     await settle();
   }
 
+  let dismissing = $state<ReviewItem | null>(null);
+  let dismissAsking = $state(false);
   const dismiss = (i: ReviewItem) => act(async () => {
     await apiCall<"DELETE /api/review/{id}">(`/api/review/${i.id}`, { method: "DELETE" });
     toast.success(i.count > 1 ? `Dismissed ${i.count} emails` : "Dismissed");
@@ -395,7 +400,9 @@
   {@const lead = drafts[0]}
   {@const many = drafts.length > 1}
   <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-label={lead?.suggested ? (many ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"}>
-    {#if lead?.suggested && item.reason === "generic"}<p class="text-sm text-muted-foreground">Waypoint read this from labelled lines in the email, not from the vendor’s own booking data. The fields it found are outlined: check each against the booking, change what’s off, then add it. Adding it also trusts {sender(item)}, so later mail from there is added without asking.</p>
+    {#if lead?.suggested && item.reason === "generic"}<p class="text-sm text-muted-foreground">Waypoint read this from labelled lines in the email, not from the vendor’s own booking data. The fields it found are outlined: check each against the booking, change what’s off, then add it. Adding it adds this booking only; later mail from {sender(item)} is still checked with you first.</p>
+      <label class="flex items-start gap-2 text-sm"><input type="checkbox" class="mt-0.5 size-5 shrink-0 accent-primary" bind:checked={trustSender} />
+        <span class="min-w-0 break-words">Also trust {sender(item)}: add its later mail to your trips without asking.</span></label>
     {/if}
     {#if many}
       {#each drafts as leg, n (leg)}
@@ -494,7 +501,7 @@
                 {#if item.suggestions.length}<Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : item.suggestions.length > 1 ? `Check the AI’s ${item.suggestions.length} suggestions for “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>{item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}</Button>{/if}
                 <Button variant="outline" size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
                 {#if item.sender_domain && item.mine}<Button variant="outline" size="sm" onclick={() => { ignoring = item; asking = true; }} aria-label={`Not travel: ignore ${item.sender_domain}`}>Not travel: ignore this sender</Button>{/if}
-                <Button variant="outline" size="sm" onclick={() => dismiss(item)} aria-label={item.count > 1 ? `Dismiss all ${item.count} emails about “${subject(item)}”` : `Dismiss “${subject(item)}”`}>{item.count > 1 ? "Dismiss all" : "Dismiss"}</Button>
+                <Button variant="outline" size="sm" onclick={() => { dismissing = item; dismissAsking = true; }} aria-label={item.count > 1 ? `Dismiss all ${item.count} emails about “${subject(item)}”` : `Dismiss “${subject(item)}”`}>{item.count > 1 ? "Dismiss all" : "Dismiss"}</Button>
               </div>
             </li>
             {#if viewing === item.id && peeks[item.id]}
@@ -578,6 +585,14 @@
     {#if ignoring?.known_sender}<p class="text-signal-ink" data-testid="known-sender-warning">This sender is a travel company Waypoint knows. Ignoring it means its bookings won’t be added.</p>{/if}
     <p>Not travel: Waypoint stops looking at mail from this sender in that mailbox, and {goingCount === 1 ? "this item leaves" : `${goingCount} items from them (this one included) leave`} this list. Bookings already made from their emails stay. Other mailboxes aren’t affected.</p>
     <p>You can undo this in Settings → Mail and AI → Gmail.</p>
+  {/snippet}
+</ConfirmDialog>
+
+<ConfirmDialog bind:open={dismissAsking} title={dismissing && dismissing.count > 1 ? `Dismiss ${dismissing.count} emails?` : "Dismiss this email?"} confirmLabel={dismissing && dismissing.count > 1 ? "Dismiss all" : "Dismiss"} busyLabel="Dismissing…" destructive
+  onconfirm={async () => { const i = dismissing; return i ? await dismiss(i) : true; }}>
+  {#snippet description()}
+    <p>{dismissing && dismissing.count > 1 ? `Waypoint deletes its stored copy of all ${dismissing.count} emails about this reservation` : "Waypoint deletes its stored copy of this email"} and takes {dismissing && dismissing.count > 1 ? "them" : "it"} off this list. Nothing is added to your trips, and this can’t be undone.</p>
+    <p>Your mailbox isn’t touched. Waypoint won’t look at {dismissing && dismissing.count > 1 ? "these messages" : "this message"} again, and later mail from the same sender is still read as usual. Bookings you already added from {dismissing && dismissing.count > 1 ? "them" : "it"} stay.</p>
   {/snippet}
 </ConfirmDialog>
 
