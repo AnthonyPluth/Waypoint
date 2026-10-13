@@ -92,6 +92,8 @@ def _family_road_trip(today: date) -> list[trips.SegmentIn]:
          "start_zone": mountain, "end_zone": mountain, "confirmation": "H31550", "provider": "Example Stays", "details": {"room": "Two queens"}},
         {"kind": "hotel", "origin": "Salt Flat Inn", "destination": "Salt Lake City", "start_local": _at(today, -117, "15:00"), "end_local": _at(today, -114, "11:00"),
          "start_zone": mountain, "end_zone": mountain, "confirmation": "H31551", "provider": "Example Stays", "details": {"room": "Two queens"}},
+        {"kind": "hotel", "origin": "Foothills Lodge", "destination": "Denver", "start_local": _at(today, -114, "15:00"), "end_local": _at(today, -112, "11:00"),
+         "start_zone": mountain, "end_zone": mountain, "confirmation": "H31552", "provider": "Example Stays", "details": {"room": "Two queens"}},
     ]
 
 

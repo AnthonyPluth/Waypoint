@@ -124,5 +124,61 @@ class RoadLegRuleTests(unittest.TestCase):
             self.assertEqual(tripmap.road_legs(live, located)["legs"][0]["refs"], ["I-25"])
 
 
+class BacktrackingRuleTests(unittest.TestCase):
+    DENVER = (39.74, -104.99)
+    SALT_LAKE = (40.76, -111.89)
+    PARK_CITY = (40.65, -111.50)
+    BOISE = (43.6, -116.2)
+
+    def stays(self, *where):
+        live = [{"id": n + 1, "kind": "hotel", "start_local": f"2026-06-{n + 2:02d}T15:00", "start_zone": "America/Denver"} for n in range(len(where))]
+        return live, {n + 1: at for n, at in enumerate(where)}
+
+    def legs(self, *where):
+        return tripmap.road_legs(*self.stays(*where))["legs"]
+
+    def test_the_way_back_to_where_the_trip_started_retraces_the_line_already_drawn(self):
+        out, back = self.legs(self.DENVER, self.SALT_LAKE, (39.70, -104.95))
+        self.assertEqual((back["from_segment_id"], back["to_segment_id"]), (2, 3))
+        self.assertEqual(back["points"][1:-1], out["points"][-2:0:-1])
+        self.assertEqual(back["refs"], list(reversed(out["refs"])))
+
+    def test_a_short_hop_after_a_long_drive_follows_the_road_it_just_drove(self):
+        out, hop = self.legs(self.DENVER, self.SALT_LAKE, self.PARK_CITY)
+        self.assertEqual((hop["from_segment_id"], hop["to_segment_id"]), (2, 3))
+        self.assertGreater(len(hop["points"]), 2)
+        self.assertTrue(all(p in out["points"] for p in hop["points"][1:-1]))
+        self.assertEqual(hop["refs"], ["I-80"])
+
+    def test_a_stop_back_along_the_road_is_reached_by_the_section_between_the_two_points(self):
+        rock_springs = (41.59, -109.2)
+        out, back, onward = self.legs(self.DENVER, self.SALT_LAKE, rock_springs, self.PARK_CITY)
+        self.assertEqual([(g["from_segment_id"], g["to_segment_id"]) for g in (out, back, onward)], [(1, 2), (2, 3), (3, 4)])
+        self.assertTrue(all(p in out["points"] for p in back["points"][1:-1]))
+        self.assertTrue(all(p in out["points"] for p in onward["points"][1:-1]))
+        self.assertEqual(onward["refs"], ["I-80"])
+
+    def test_a_return_judged_too_winding_to_route_still_uses_the_line_already_drawn(self):
+        direct = roads.Route([(39.8, -105.0), (40.2, -108.0), (40.7, -111.8)], ["I-25"], 600.0, 1.0, 1.0, ["I-25", "I-25", "I-25"])
+        winding = roads.Route([(40.7, -111.8), (39.8, -105.0)], ["I-25"], 3000.0, 1.0, 1.0, ["I-25", "I-25"])
+        route = mock.Mock(side_effect=[direct, winding])
+        live, located = self.stays(self.DENVER, self.SALT_LAKE, self.DENVER)
+        with mock.patch.object(tripmap.roads, "interstates", return_value=mock.Mock(route=route, near=mock.Mock(return_value=[]))):
+            out, back = tripmap.road_legs(live, located)["legs"]
+        self.assertEqual(route.call_count, 1)
+        self.assertEqual(back["points"][1:-1], out["points"][-2:0:-1])
+        self.assertEqual(back["refs"], ["I-25"])
+
+    def test_a_new_stretch_is_still_routed_and_a_far_stop_is_not_retraced(self):
+        out, onward = self.legs(self.DENVER, self.SALT_LAKE, self.BOISE)
+        self.assertFalse(all(p in out["points"] for p in onward["points"][1:-1]))
+        self.assertEqual(len(self.legs(self.DENVER, self.SALT_LAKE, (40.23, -111.66))), 1)
+
+    def test_a_line_without_marks_is_not_retraced(self):
+        bare = roads.Route([(39.8, -105.0), (40.7, -111.8)], ["I-25"], 600.0, 1.0, 1.0)
+        self.assertIsNone(tripmap._section(bare, self.DENVER, self.SALT_LAKE))
+        self.assertIsNone(tripmap._retrace([], self.DENVER, self.SALT_LAKE))
+
+
 if __name__ == "__main__":
     unittest.main()

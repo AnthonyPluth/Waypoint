@@ -1,6 +1,6 @@
 import importlib.util
 import io
-from itertools import pairwise
+from itertools import groupby, pairwise
 import socket
 import struct
 import tempfile
@@ -86,6 +86,23 @@ class FixtureGraphTests(unittest.TestCase):
         got = graph().route((40.0, -104.9), (41.4, -103.0))
         assert got is not None
         self.assertEqual(got.refs, ["I-1", "I-2"])
+
+    def test_each_point_of_a_route_says_which_road_the_stretch_before_it_follows(self):
+        got = graph().route((40.0, -104.9), (41.4, -103.0))
+        assert got is not None
+        self.assertEqual(len(got.marks), len(got.points))
+        self.assertEqual(got.marks[0], got.marks[1])
+        self.assertEqual([ref for ref, _ in groupby(got.marks)], ["I-1", "I-2"])
+
+    def test_a_point_is_located_on_the_nearest_stretch_of_a_line(self):
+        line = [(40.0, -105.0), (40.0, -104.0), (41.0, -104.0)]
+        found = roads.locate(line, (40.5, -103.9))
+        assert found is not None
+        self.assertEqual(found.index, 1)
+        self.assertAlmostEqual(found.share, 0.5, delta=0.01)
+        self.assertAlmostEqual(found.point[1], -104.0, places=3)
+        self.assertLess(found.gap, 10)
+        self.assertIsNone(roads.locate([(40.0, -105.0)], (40.0, -105.0)))
 
     def test_a_short_stretch_of_a_road_is_not_named(self):
         got = graph().route((40.02, -103.0), (40.0, -104.9))

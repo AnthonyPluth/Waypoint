@@ -36,6 +36,9 @@ export const LABEL_HOLD_MS = 1750;
 export const SCRUB_STEPS = 4000;
 export const NO_ROADS: Roads = { legs: [], interstates: [] };
 export const ROAD_MATCH_KM = 90;
+export const RETRACE_KM = 48.3;
+export const RETRACE_MIN_SHARE = 0.5;
+export const RETRACE_WHOLE_SHARE = 0.9;
 export const ROAD_MIN_SCALE = 800;
 export const NO_BOUNDARIES: Boundaries = [];
 export const BOUNDARY_MIN_SCALE = 500;
@@ -204,6 +207,51 @@ export function roadFor(from: Stop, to: Stop, roads: Roads): Roads["legs"][numbe
   return best;
 }
 
+type Drawn = { points: number[][]; refs: string[] };
+type Located = { index: number; share: number; km: number; at: number[] };
+type Retraced = { points: number[][]; refs: string[]; gap: number };
+
+const KM_PER_DEGREE = 111.195;
+
+function locate(points: number[][], stop: Stop): Located | null {
+  const scale = Math.cos((stop.latitude * Math.PI) / 180);
+  let best: Located | null = null;
+  for (let k = 0; k < points.length - 1; k++) {
+    const [lat1, lon1] = points[k], [lat2, lon2] = points[k + 1];
+    const ax = (lon1 - stop.longitude) * scale, ay = lat1 - stop.latitude, dx = (lon2 - lon1) * scale, dy = lat2 - lat1;
+    const span = dx * dx + dy * dy;
+    const share = span === 0 ? 0 : Math.min(1, Math.max(0, -(ax * dx + ay * dy) / span));
+    const km = Math.hypot(ax + dx * share, ay + dy * share) * KM_PER_DEGREE;
+    if (!best || km < best.km) best = { index: k, share, km, at: [lat1 + (lat2 - lat1) * share, lon1 + (lon2 - lon1) * share] };
+  }
+  return best;
+}
+
+const lengthKm = (points: number[][]): number => points.slice(1).reduce((sum, p, i) => sum + geoDistance([points[i][1], points[i][0]], [p[1], p[0]]) * EARTH_KM, 0);
+
+function sectionOf(line: Drawn, from: Stop, to: Stop): Retraced | null {
+  const a = locate(line.points, from), b = locate(line.points, to);
+  if (!a || !b || Math.max(a.km, b.km) > RETRACE_KM) return null;
+  const forward = a.index < b.index || (a.index === b.index && a.share <= b.share);
+  const [low, high] = forward ? [a, b] : [b, a];
+  const walk = [low.at, ...line.points.slice(low.index + 1, high.index + 1), high.at];
+  const points = (forward ? walk : walk.reverse()).filter((p, i, all) => i === 0 || p[0] !== all[i - 1][0] || p[1] !== all[i - 1][1]);
+  const km = lengthKm(points);
+  if (km <= 0 || km < RETRACE_MIN_SHARE * distanceKm(from, to)) return null;
+  const whole = km >= RETRACE_WHOLE_SHARE * lengthKm(line.points);
+  return { points, refs: whole ? (forward ? line.refs : [...line.refs].reverse()) : [], gap: a.km + b.km };
+}
+
+export function retraceFor(from: Stop, to: Stop, drawn: Drawn[]): Retraced | null {
+  if (to.via !== null) return null;
+  let best: Retraced | null = null;
+  for (const line of drawn) {
+    const found = sectionOf(line, from, to);
+    if (found && (!best || found.gap < best.gap)) best = found;
+  }
+  return best;
+}
+
 function trackOf(from: Spot, road: number[][], to: Spot, projection: GeoProjection): Track {
   const points = [from];
   for (const [lat, lon] of road) {
@@ -221,6 +269,7 @@ const polyline = (points: Spot[]): string => points.map((p, i) => `${i === 0 ? "
 export function legsOf(stops: Stop[], projection: GeoProjection, roads: Roads = NO_ROADS): Leg[] {
   const spots = positions(stops, projection);
   const out: Leg[] = [];
+  const drawn: Drawn[] = [];
   for (let i = 1; i < stops.length; i++) {
     const from = spots[i - 1], to = spots[i];
     const flight = stops[i].via === "flight";
@@ -229,9 +278,11 @@ export function legsOf(stops: Stop[], projection: GeoProjection, roads: Roads = 
     const control = length === 0 ? from : { x: (from.x + to.x) / 2 + ((to.y - from.y) / length) * bow, y: (from.y + to.y) / 2 - ((to.x - from.x) / length) * bow };
     const vehicle: Vehicle = flight ? "plane" : stops[i].via === "cruise" ? "boat" : "car";
     const found = roadFor(stops[i - 1], stops[i], roads);
-    const road = found ? trackOf(from, found.points, to, projection) : null;
+    if (found) drawn.push({ points: found.points, refs: found.refs });
+    const line = found ?? retraceFor(stops[i - 1], stops[i], drawn);
+    const road = line ? trackOf(from, line.points, to, projection) : null;
     const curve = `M${from.x.toFixed(1)},${from.y.toFixed(1)} Q${control.x.toFixed(1)},${control.y.toFixed(1)} ${to.x.toFixed(1)},${to.y.toFixed(1)}`;
-    out.push({ vehicle, d: road ? polyline(road.points) : curve, flight, from, control, to, road, refs: road && found ? found.refs : [] });
+    out.push({ vehicle, d: road ? polyline(road.points) : curve, flight, from, control, to, road, refs: line ? line.refs : [] });
   }
   return out;
 }

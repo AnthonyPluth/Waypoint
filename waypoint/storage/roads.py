@@ -6,7 +6,7 @@ import math
 from collections import defaultdict
 from itertools import pairwise
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 
@@ -70,6 +70,15 @@ class Route:
     miles: float
     start_link_miles: float
     end_link_miles: float
+    marks: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Located:
+    index: int
+    share: float
+    point: Point
+    gap: float
 
 
 class Graph:
@@ -137,10 +146,15 @@ class Graph:
         if arcs is None:
             return None
         points: list[Point] = []
+        names: list[str] = []
         for arc in arcs:
-            points.extend(arc.points if not points or points[-1] != arc.points[0] else arc.points[1:])
-        points = simplified(points, ROUTE_FLAT_DEGREES)
-        return Route(points, _long_runs([(arc.ref, arc.miles) for arc in arcs]), sum(arc.miles for arc in arcs), a.link_miles, b.link_miles)
+            added = arc.points if not points or points[-1] != arc.points[0] else arc.points[1:]
+            points.extend(added)
+            names.extend([arc.ref] * len(added))
+        kept = _kept(points, ROUTE_FLAT_DEGREES)
+        marks = [_main_ref(points, names, first, last) for first, last in pairwise(kept)]
+        marks.insert(0, marks[0] if marks else names[0])
+        return Route([points[i] for i in kept], long_runs([(arc.ref, arc.miles) for arc in arcs]), sum(arc.miles for arc in arcs), a.link_miles, b.link_miles, marks)
 
     def _cheapest(self, a: Snap, b: Snap) -> list[Arc] | None:
         ea, eb = self.edges[a.edge], self.edges[b.edge]
@@ -205,6 +219,20 @@ class Graph:
 
 
 def simplified(points: list[Point], tolerance: float) -> list[Point]:
+    return [points[i] for i in _kept(points, tolerance)]
+
+
+def locate(points: list[Point], point: Point) -> Located | None:
+    best: Located | None = None
+    for k in range(len(points) - 1):
+        near, share = _nearest_on(point, points[k], points[k + 1])
+        gap = miles_between(point, near)
+        if best is None or gap < best.gap:
+            best = Located(k, share, near, gap)
+    return best
+
+
+def _kept(points: list[Point], tolerance: float) -> list[int]:
     keep = {0, len(points) - 1}
     stack = [(0, len(points) - 1)]
     while stack:
@@ -222,7 +250,14 @@ def simplified(points: list[Point], tolerance: float) -> list[Point]:
         if farthest > tolerance:
             keep.add(far)
             stack += [(first, far), (far, last)]
-    return [points[i] for i in sorted(keep)]
+    return sorted(keep)
+
+
+def _main_ref(points: list[Point], names: list[str], first: int, last: int) -> str:
+    miles: dict[str, float] = defaultdict(float)
+    for i in range(first + 1, last + 1):
+        miles[names[i]] += miles_between(points[i - 1], points[i])
+    return max(miles, key=lambda ref: miles[ref])
 
 
 def _cell(value: float) -> int:
@@ -250,7 +285,7 @@ def _between(edge: Edge, a: Snap, b: Snap) -> list[Point]:
     return points if low is a else points[::-1]
 
 
-def _long_runs(runs: list[tuple[str, float]]) -> list[str]:
+def long_runs(runs: list[tuple[str, float]]) -> list[str]:
     names: list[str] = []
     totals: list[float] = []
     for ref, miles in runs:
