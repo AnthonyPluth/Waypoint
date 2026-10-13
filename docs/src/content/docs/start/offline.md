@@ -35,7 +35,6 @@ Upcoming and each trip’s page show a small **Offline access** panel, so you ca
 - **Saved on this device · updated 2 h ago** says the copy is there and how fresh it is. On Upcoming it also names the trip. On a trip that isn’t the one saved, it says which trip is.
 - **Set up offline access** appears when the device isn’t set up; it opens the same sheet as Settings. A device that can’t do it says so and why, and a saved trip that can’t be read links to Settings to remove it.
 - **Couldn’t save the trip on this device** appears when the last save failed, with **Try again** and the age of the copy still on the device.
-- **What offline includes** says that opening it offline asks for the device’s check, and lists what a connection is still needed for: loyalty and Known Traveler numbers, a parking booking’s gate-code image, live flight status and every trip but the current one.
 
 Which trip is saved is known only while the app is open: it isn’t written to the device in the clear, so after a reload the panel shows the age until the next online save names the trip again.
 

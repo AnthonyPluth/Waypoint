@@ -3,13 +3,11 @@
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
   import { ago } from "$lib/offline";
   import { offline, refreshOffline, syncSavedTrip } from "$lib/offline.svelte";
-  import { deviceCheckName } from "$lib/platform";
   import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
   import { onMount } from "svelte";
 
   let { tripId = null }: { tripId?: number | null } = $props();
 
-  const check = deviceCheckName();
   let setting = $state(false);
   let retrying = $state(false);
   let now = $state(Date.now());
@@ -68,16 +66,6 @@
         {/if}
       {/if}
     </div>
-    {#if offline.supported && !offline.damaged && (!offline.setUp || !offline.off)}
-      <details class="mt-2">
-        <summary class="inline-flex min-h-8 cursor-pointer items-center font-medium underline-offset-2 hover:underline">What offline includes</summary>
-        <ul class="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
-          <li>Opening it with no connection asks for {check}. It stays locked until you unlock it.</li>
-          <li>Bookings, confirmation codes, times, places and the booking emails’ text are saved, encrypted on this device.</li>
-          <li>Not saved, so you need a connection for them: loyalty and Known Traveler numbers, a parking booking’s gate-code image, live flight status, and every trip but your current one.</li>
-        </ul>
-      </details>
-    {/if}
   </section>
   <OfflineSetup bind:open={setting} title="Set up offline access" />
 {/if}

@@ -47,14 +47,6 @@ describe("OfflineStatus", () => {
     expect(line()).not.toHaveTextContent("Saved on this device ·");
   });
 
-  it("explains what is left out and how it unlocks before anyone relies on it", async () => {
-    Object.assign(offline, { hasCopy: true, savedAt: Date.now() });
-    render(OfflineStatus, { tripId: 1 });
-    await userEvent.setup().click(screen.getByText("What offline includes"));
-    expect(screen.getByText(/loyalty and Known Traveler numbers, a parking booking’s gate-code image/)).toBeInTheDocument();
-    expect(screen.getByText(/It stays locked until you unlock it/)).toBeInTheDocument();
-  });
-
   it("offers setup when it is not set up", () => {
     offline.setUp = false;
     render(OfflineStatus, { tripId: 1 });
@@ -67,7 +59,6 @@ describe("OfflineStatus", () => {
     render(OfflineStatus, { tripId: 1 });
     expect(line()).toHaveTextContent("Offline access isn’t available on this device. No passkeys here.");
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    expect(screen.queryByText("What offline includes")).not.toBeInTheDocument();
   });
 
   it("shows a failed save, keeps the older copy’s age and retries", async () => {
