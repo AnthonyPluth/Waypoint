@@ -1,0 +1,23 @@
+{
+  "name": "trips-search",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "wait_for": "a[href^='#trip/'] >> visible=true" },
+    { "screenshot": "small-archive" },
+    { "fake_archive": 400 },
+    { "reload": true },
+    { "expect_text": { "selector": "[role=status]", "text": "4" } },
+    { "screenshot": "several-hundred" },
+    { "fill": { "selector": "input[type=search]", "text": "Lisbon" } },
+    { "expect_text": { "selector": "[role=status]", "text": " of " } },
+    { "screenshot": "searched" },
+    { "select": { "selector": "label:has-text('Show') select", "index": 2 } },
+    { "select": { "selector": "label:has-text('Year') select", "index": 1 } },
+    { "screenshot": "filtered" },
+    { "reload": true },
+    { "expect_text": { "selector": "[role=status]", "text": " of " } },
+    { "click": "button:has-text('Clear filters')" },
+    { "screenshot": "cleared" }
+  ]
+}

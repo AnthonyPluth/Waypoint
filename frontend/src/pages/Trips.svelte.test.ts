@@ -441,3 +441,61 @@ describe("overlapping loads", () => {
     expect(screen.queryByText("First name")).toBeNull();
   });
 });
+
+describe("finding a trip", () => {
+  const archive = Array.from({ length: 300 }, (_, i) => trip([segment({ id: 1000 + i, trip_id: 100 + i, provider: i === 123 ? "Icelandair" : "Delta Air Lines", start_local: `${2018 + (i % 8)}-03-10T09:00`, end_local: `${2018 + (i % 8)}-03-12T09:00` })],
+    { id: 100 + i, name: i === 123 ? "Aurora weekend" : `Trip ${i}`, destination: i === 123 ? "Reykjavik" : "Atlanta", start_date: `${2018 + (i % 8)}-03-10`, end_date: `${2018 + (i % 8)}-03-12` }));
+
+  it("narrows a long archive by name, destination or airline, and keeps the search in the address", async () => {
+    serve(archive);
+    render(Trips);
+    await screen.findByText("300 trips");
+    await user().type(screen.getByRole("searchbox", { name: "Search" }), "reykjavik");
+    expect(route.query).toBe("q=reykjavik");
+    expect(screen.getByText("1 of 300 trips")).toBeInTheDocument();
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.getByText("Aurora weekend")).toBeInTheDocument();
+    await user().clear(screen.getByRole("searchbox", { name: "Search" }));
+    await user().type(screen.getByRole("searchbox", { name: "Search" }), "icelandair");
+    expect(screen.getByText("Aurora weekend")).toBeInTheDocument();
+    expect(screen.getByText("1 of 300 trips")).toBeInTheDocument();
+  });
+
+  it("opens with the filters from the address, and says when nothing matches", async () => {
+    serve(archive);
+    route.query = "q=nowhere&when=past&year=2019";
+    render(Trips);
+    expect(await screen.findByText("No trips match.")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search" })).toHaveValue("nowhere");
+    expect(screen.getByLabelText("Show")).toHaveValue("past");
+    expect(screen.getByLabelText("Year")).toHaveValue("2019");
+    await user().click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(route.query).toBe("");
+    expect(await screen.findByText("300 trips")).toBeInTheDocument();
+  });
+
+  it("filters by year and by upcoming or past, together with the traveller", async () => {
+    serve();
+    render(Trips);
+    await screen.findByText("3 trips");
+    await user().selectOptions(screen.getByLabelText("Show"), "Past");
+    expect(route.query).toBe("when=past");
+    expect(screen.queryByRole("list", { name: "Upcoming trips" })).toBeNull();
+    expect(screen.getByText("Trip to Orlando")).toBeInTheDocument();
+    await user().selectOptions(screen.getByLabelText("Show"), "All trips");
+    await user().selectOptions(screen.getByLabelText("Year"), "2027");
+    expect(route.query).toBe("year=2027");
+    expect(screen.getByText("Trip to Auckland")).toBeInTheDocument();
+    expect(screen.queryByText("Trip to Orlando")).toBeNull();
+    await user().selectOptions(screen.getByLabelText("Travelling"), "Jane Doe");
+    expect(route.query).toBe("who=1&year=2027");
+    expect(screen.getByText("No trips match.")).toBeInTheDocument();
+  });
+
+  it("shows no filters before there is a trip to find", async () => {
+    serve([]);
+    render(Trips);
+    await screen.findByText(/No trips yet/);
+    expect(screen.queryByRole("searchbox")).toBeNull();
+  });
+});

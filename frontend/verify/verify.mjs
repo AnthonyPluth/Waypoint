@@ -25,7 +25,7 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 
 export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
 
-const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -33,6 +33,25 @@ export function lengthenNames(value, suffix) {
   if (value === null || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, LONG_NAME_KEYS.has(k) && typeof v === "string" ? v + suffix : lengthenNames(v, suffix)]));
 }
+const ARCHIVE_PLACES = [["Lisbon", "TAP Air Portugal"], ["Denver", "United Airlines"], ["Tokyo", "All Nippon Airways"], ["Chicago", "American Airlines"], ["Reykjavik", "Icelandair"], ["Mexico City", "Delta Air Lines"], ["Sydney", "Qantas"], ["Seattle", "Alaska Airlines"], ["Rome", "ITA Airways"], ["Vancouver", "Air Canada"]];
+
+export function fakeArchive(trips, count) {
+  const model = trips.find((t) => t.segments.length) ?? trips[0];
+  if (!model) return [];
+  const first = Math.max(0, ...trips.map((t) => t.id)) + 1;
+  return Array.from({ length: count }, (_, i) => {
+    const [city, airline] = ARCHIVE_PLACES[i % ARCHIVE_PLACES.length];
+    const year = 2025 - Math.floor(i / 60);
+    const month = String(1 + (i % 12)).padStart(2, "0");
+    const day = String(1 + (i % 27)).padStart(2, "0");
+    const start = `${year}-${month}-${day}`;
+    const end = `${year}-${month}-${String(Number(day) + 1).padStart(2, "0")}`;
+    const id = first + i;
+    const segments = model.segments.slice(0, 1).map((s) => ({ ...s, id: id * 10, trip_id: id, provider: airline, destination: city, start_local: `${start}T09:00`, end_local: `${end}T12:00` }));
+    return { ...model, id, name: `Trip to ${city} ${i + 1}`, destination: city, start_date: start, end_date: end, segments, emails: 0, can_clear_emails: false };
+  });
+}
+
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const unknownPages = (names) => names.filter((n) => !PAGES.includes(n));
 
@@ -130,6 +149,12 @@ async function runStep(page, step, shot, saveDownload) {
     await page.route("**/api/state", async (route) => {
       const response = await route.fetch();
       await route.fulfill({ response, json: { ...(await response.json()), review_count: step.fake_first_run === "review" ? 3 : 0 } });
+    });
+  } else if ("fake_archive" in step) {
+    await page.route("**/api/trips", async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      await route.fulfill({ response, json: { ...body, trips: [...body.trips, ...fakeArchive(body.trips, step.fake_archive)] } });
     });
   } else if ("fake_merge_warning" in step) {
     const [first, second] = step.fake_merge_warning.split("|").map((part) => part.split(",").map((n) => n.trim()).filter(Boolean));

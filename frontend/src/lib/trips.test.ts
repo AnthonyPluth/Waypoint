@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
 import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
 
@@ -664,5 +664,23 @@ describe("dayShift", () => {
   it("is not moved by a daylight-saving change on the night", () => {
     expect(dayShift("2026-03-07T23:30", "2026-03-08T07:00")).toBe("+1 day");
     expect(dayShift("2026-11-01T00:30", "2026-11-01T07:00")).toBe("");
+  });
+});
+
+describe("finding a trip", () => {
+  const lisbon = trip([segment({ provider: "TAP Air Portugal" })], { name: "Spring in Lisbon", destination: "Lisbon, Portugal", start_date: "2024-12-28", end_date: "2025-01-03" });
+  it("matches every word against the name, the destination and the providers, ignoring case", () => {
+    expect(matchesText(lisbon, "")).toBe(true);
+    expect(matchesText(lisbon, "  spring LISBON ")).toBe(true);
+    expect(matchesText(lisbon, "portugal tap")).toBe(true);
+    expect(matchesText(lisbon, "lisbon paris")).toBe(false);
+    expect(matchesText(trip([segment({ provider: null })], { name: "Home", destination: null }), "null")).toBe(false);
+  });
+  it("counts a trip in each year it spans, and lists the years newest first", () => {
+    expect(inYear(lisbon, 2024)).toBe(true);
+    expect(inYear(lisbon, 2025)).toBe(true);
+    expect(inYear(lisbon, 2023)).toBe(false);
+    expect(inYear(trip([], { start_date: null, end_date: null }), 2025)).toBe(false);
+    expect(tripYears([lisbon, trip([], { start_date: null, end_date: null }), trip([], { start_date: "2022-05-01", end_date: null })])).toEqual([2025, 2024, 2022]);
   });
 });
