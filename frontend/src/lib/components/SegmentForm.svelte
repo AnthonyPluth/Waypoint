@@ -78,7 +78,7 @@
   const shown = $derived(Object.fromEntries([...found].reverse().map((i) => [i.field, i.message])) as Record<string, string | undefined>);
   const zoneFailed = $derived(found.some((i) => i.field === "start_zone" || i.field === "end_zone"));
   const airportUnknown = $derived(flight && [d.origin, d.destination].some((c) => unknownAirports.includes(c.trim().toUpperCase())));
-  const showZones = $derived(d.kind !== "cruise" && (zonesRequested || zoneFailed || airportUnknown));
+  const showZones = $derived(d.kind !== "cruise" && (zonesRequested || zoneFailed || airportUnknown || !!d.start_zone.trim() || !!d.end_zone.trim()));
   const fieldId = (field: string) => `${uid}-${field}`;
   const aria = (field: string) => (shown[field] ? { "aria-invalid": "true" as const, "aria-describedby": fieldId(field) } : {});
 
