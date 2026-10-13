@@ -24,6 +24,9 @@
       "screenshot": "message-with-form"
     },
     {
+      "click": "[role='dialog'] button:has-text('Booking'), [role='dialog'] label:has-text('Provider') input"
+    },
+    {
       "fill": {
         "selector": "[role='dialog'] label:has-text('Provider') input",
         "text": "Seaside Stays Ltd"

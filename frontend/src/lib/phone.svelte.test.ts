@@ -17,7 +17,7 @@ describe("isPhone", () => {
   it("asks the browser the one phone query, once", async () => {
     const m = media(false);
     const { PHONE_QUERY } = await load();
-    expect(m.matchMedia.mock.calls.filter(([q]) => q === PHONE_QUERY)).toEqual([[PHONE_QUERY]]);
+    expect((m.matchMedia.mock.calls as unknown as string[][]).filter(([q]) => q === PHONE_QUERY)).toEqual([[PHONE_QUERY]]);
   });
 
   it("counts a narrow screen and a short touch screen (a phone turned sideways), and nothing else", async () => {

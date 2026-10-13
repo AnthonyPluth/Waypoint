@@ -9,6 +9,9 @@
       "click": "button:has-text('Add by hand') >> visible=true >> nth=0"
     },
     {
+      "click": "[role='dialog'] button:has-text('Booking'), [role='dialog'] label:has-text('Provider') input"
+    },
+    {
       "wait_for": "[role='dialog'] label:has-text('What is it?') select"
     },
     {
