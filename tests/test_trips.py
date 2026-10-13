@@ -989,6 +989,44 @@ class AirportTests(DbCase):
         self.assertEqual(airports.search(self.c, "%%"), [])
         self.assertLessEqual(len(airports.search(self.c, "ai")), 8)
 
+    def codes(self, text):
+        return [a["code"] for a in airports.search(self.c, text)]
+
+    def test_a_city_prefix_finds_the_airport_near_the_top(self):
+        self.assertIn("MSP", self.codes("Minne")[:3])
+        self.assertIn("MSP", self.codes("minneapolis"))
+
+    def test_a_name_word_prefix_finds_the_airport(self):
+        self.assertIn("LHR", self.codes("Heath"))
+        self.assertIn("LHR", self.codes("heathr"))
+
+    def test_an_exact_code_comes_first_in_any_case(self):
+        for text in ("jfk", "JFK", " Jfk "):
+            self.assertEqual(self.codes(text)[0], "JFK")
+
+    def test_exact_code_then_city_prefix_then_name_prefix_then_other_words(self):
+        found = airports.search(self.c, "london")
+        self.assertTrue(all(a["city"].lower().startswith("london") for a in found[:3]))
+        by_name = self.codes("heathrow")
+        self.assertEqual(by_name[0], "LHR")
+
+    def test_accents_and_case_do_not_matter(self):
+        self.assertEqual(self.codes("zürich"), self.codes("ZURICH"))
+        self.assertIn("ZRH", self.codes("Zürich"))
+        self.assertIn("GRU", self.codes("são paulo"))
+
+    def test_several_words_all_have_to_match(self):
+        self.assertEqual(self.codes("london heathrow"), ["LHR"])
+        self.assertIn("MSP", self.codes("saint paul"))
+        self.assertIn("MSP", self.codes("minneapolis st paul"))
+        self.assertEqual(self.codes("london qqqq"), [])
+
+    def test_the_list_is_capped_and_has_no_duplicates(self):
+        found = self.codes("international")
+        self.assertEqual(len(found), 8)
+        self.assertEqual(len(set(found)), 8)
+        self.assertEqual(len(airports.search(self.c, "international", 3)), 3)
+
     def test_the_search_route_answers_matches_and_nothing_for_nothing(self):
         from waypoint.server.api import trips as trips_api
         found = trips_api.api_airport_search(self.c, {"q": ["new york"]}, {})

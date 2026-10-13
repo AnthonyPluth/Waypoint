@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import math
-from typing import TypedDict
+from functools import cache
+from typing import NamedTuple, TypedDict
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 
-from ..storage import db
+from ..storage import db, reference
 from ..storage.models import Airport
+
+
+MAX_MATCHES = 8
 
 
 class Found(TypedDict):
@@ -22,22 +26,49 @@ def lookup(conn: db.Connection, code: str) -> Found | None:
     return {"code": a.code, "name": a.name, "city": a.city, "country": a.country, "zone": a.zone} if a else None
 
 
-def search(conn: db.Connection, text: str, limit: int = 8) -> list[Found]:
-    wanted = " ".join(text.split())[:60]
-    if len(wanted) < 2:
+class _Entry(NamedTuple):
+    found: Found
+    code: str
+    city: str
+    name: str
+    words: tuple[str, ...]
+
+
+def _key(text: str) -> str:
+    return " ".join("st" if word == "saint" else word for word in reference.place_key(text).split())
+
+
+@cache
+def _index() -> tuple[_Entry, ...]:
+    entries = []
+    for row in reference.airport_rows():
+        city, name = _key(row["city"]), _key(row["name"])
+        found: Found = {"code": row["code"], "name": row["name"], "city": row["city"], "country": row["country"], "zone": row["zone"]}
+        entries.append(_Entry(found, row["code"].casefold(), city, name, tuple(dict.fromkeys(f"{city} {name}".split()))))
+    return tuple(entries)
+
+
+def _tier(entry: _Entry, query: str, tokens: list[str]) -> int | None:
+    if entry.code == query:
+        return 0
+    if entry.city.startswith(query):
+        return 1
+    if entry.name.startswith(query):
+        return 2
+    if all(any(word.startswith(token) for word in entry.words) for token in tokens):
+        return 3
+    if len(tokens) == 1 and entry.code.startswith(query):
+        return 4
+    return None
+
+
+def search(conn: db.Connection, text: str, limit: int = MAX_MATCHES) -> list[Found]:
+    query = _key(" ".join(text.split())[:60])
+    if len(query) < 2:
         return []
-    code = wanted.upper()
-    rows = conn.orm.scalars(
-        select(Airport).where(or_(Airport.code == code, func.lower(Airport.city).contains(wanted.lower(), autoescape=True),
-                                  func.lower(Airport.name).contains(wanted.lower(), autoescape=True)))
-    ).all()
-
-    def rank(a: Airport) -> tuple[int, str, str]:
-        low = wanted.lower()
-        tier = 0 if a.code == code else 1 if a.city.lower().startswith(low) else 2 if a.name.lower().startswith(low) else 3
-        return (tier, a.city.lower(), a.code)
-
-    return [{"code": a.code, "name": a.name, "city": a.city, "country": a.country, "zone": a.zone} for a in sorted(rows, key=rank)[:limit]]
+    tokens = query.split()
+    ranked = [(tier, entry.city, entry.code, entry.found) for entry in _index() if (tier := _tier(entry, query, tokens)) is not None]
+    return [found for _tier_, _city, _code, found in sorted(ranked, key=lambda r: r[:3])[:limit]]
 
 
 def zones(conn: db.Connection, codes: list[str]) -> dict[str, str]:
