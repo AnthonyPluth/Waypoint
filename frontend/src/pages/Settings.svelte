@@ -57,7 +57,7 @@
 
 {#if group}
   <nav aria-label="Settings sections" class="mb-6">
-    <a href="#settings" class="inline-flex items-center gap-1 rounded-md py-2 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"><ChevronLeft class="size-4" aria-hidden="true" />All settings</a>
+    <a href="#settings" class="inline-flex min-h-11 items-center gap-1 rounded-md py-2 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"><ChevronLeft class="size-4" aria-hidden="true" />All settings</a>
   </nav>
 {:else}
   <nav aria-label="Settings sections" class="mb-6">
