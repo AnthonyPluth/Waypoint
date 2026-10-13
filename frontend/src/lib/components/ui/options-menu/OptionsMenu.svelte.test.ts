@@ -12,6 +12,8 @@ describe("OptionsMenu", () => {
     expect(screen.queryByRole("button", { name: "Delete trip" })).toBeNull();
     await userEvent.click(trigger);
     expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(trigger).not.toHaveAttribute("aria-haspopup");
+    expect(trigger).toHaveAttribute("aria-controls", screen.getByRole("group", { name: "Trip options" }).id);
     expect(screen.getByRole("button", { name: "Merge another trip" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete trip" })).toBeInTheDocument();
   });

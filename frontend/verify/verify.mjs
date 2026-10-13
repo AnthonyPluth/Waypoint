@@ -151,10 +151,19 @@ async function runStep(page, step, shot, saveDownload) {
       await route.fulfill({ response, json: { ...(await response.json()), review_count: step.fake_first_run === "review" ? 3 : 0 } });
     });
   } else if ("fake_archive" in step) {
+    const made = new Map();
     await page.route("**/api/trips", async (route) => {
       const response = await route.fetch();
       const body = await response.json();
-      await route.fulfill({ response, json: { ...body, trips: [...body.trips, ...fakeArchive(body.trips, step.fake_archive)] } });
+      const added = fakeArchive(body.trips, step.fake_archive);
+      for (const t of added) made.set(String(t.id), t);
+      await route.fulfill({ response, json: { ...body, trips: [...body.trips, ...added] } });
+    });
+    await page.route(/\/api\/trips\/\d+(\/places)?$/, (route) => {
+      const [, id, places] = /\/api\/trips\/(\d+)(\/places)?$/.exec(new URL(route.request().url()).pathname) ?? [];
+      const t = made.get(id);
+      if (!t || route.request().method() !== "GET") return route.fallback();
+      return route.fulfill({ json: places ? { home: null, airports: [], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] } : t });
     });
   } else if ("fake_merge_warning" in step) {
     const [first, second] = step.fake_merge_warning.split("|").map((part) => part.split(",").map((n) => n.trim()).filter(Boolean));

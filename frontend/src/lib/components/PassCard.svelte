@@ -115,10 +115,14 @@
           <p><DayTime segment={s} /><span class="sr-only"> ({s.start_zone})</span></p>
           <p class="text-right"><DayTime segment={s} end />{#if shift}<span class="ml-1.5 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground" data-day-shift><span aria-hidden="true">{shift}</span><span class="sr-only">, {dayShiftWords(s.start_local, s.end_local)}</span></span>{/if}<span class="sr-only"> ({s.end_zone})</span></p>
         </div>
-        {#if !unknown}<p class="col-span-3 text-xs text-muted-foreground" data-zone-note>Times are local to each airport</p>{/if}
         {/if}
       </div>
-      {#if timesArea}{@render timesArea()}{/if}
+      {#if timesArea}
+        {@render timesArea()}
+        {#if !unknown}
+          <p class="text-xs text-muted-foreground">{#if shift}Arrives <span class="rounded-full bg-secondary px-2 py-0.5 font-medium text-secondary-foreground" data-day-shift><span aria-hidden="true">{shift}</span><span class="sr-only">{dayShiftWords(s.start_local, s.end_local)}</span></span>{/if}<span class="sr-only"> (departs {s.start_zone}, arrives {s.end_zone})</span></p>
+        {/if}
+      {/if}
     {:else if timesArea}
       {@render timesArea()}
     {:else}
