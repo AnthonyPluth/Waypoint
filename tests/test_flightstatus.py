@@ -786,6 +786,26 @@ class DemoTests(Household):
         self.assertEqual(self.stored(), [])
 
 
+    def test_a_server_started_on_a_database_seeded_by_another_process_shows_the_demo_delay(self):
+        demo.seed(self.c)
+        self.c.commit()
+        flightstatus.drop_held()
+        self.assertEqual(flightstatus.overview(self.c, Viewer(None, household=True), datetime.now(UTC))["statuses"], [])
+        from waypoint.server import handler
+        with mock.patch.object(handler, "Server"), mock.patch.object(handler.jobs, "start"), mock.patch.object(handler.db, "init"), \
+                mock.patch.object(handler.db, "session", lambda real=db.session: real(self.path)), \
+                mock.patch.object(handler.monitoring, "log"), mock.patch.dict(os.environ, {"WAYPOINT_SECRET_KEY": "k" * 32}):
+            handler.serve()
+        got = flightstatus.overview(self.c, Viewer(None, household=True), datetime.now(UTC))["statuses"]
+        self.assertEqual([(s["state"], s["delay_minutes"]) for s in got], [("delayed", 50)] * 2)
+        self.assertEqual(self.stored(), [])
+
+    def test_a_server_on_a_database_without_the_demo_holds_nothing(self):
+        self.book(self.jane)
+        demo.restore_status(self.c)
+        self.assertEqual(flightstatus._held, {})
+
+
 class JobTests(Household):
     def test_the_scheduler_round_checks_the_flights_due_and_reports_a_failure_without_its_text(self):
         self.book(self.jane)

@@ -14,6 +14,7 @@ from collections.abc import Generator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from ..domain import demo
 from ..storage import db, secretbox
 from .. import monitoring, oidc
 from . import feed, jobs, mcp_http, mcp_oauth, mcp_server, oauth_http, routes, static
@@ -543,6 +544,8 @@ def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
                          "Set OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, WAYPOINT_PUBLIC_URL and OIDC_ALLOWED_EMAILS\n"
                          "(or WAYPOINT_ALLOW_NO_AUTH=1 if a proxy in front of Waypoint already handles sign-in).")
     db.init()
+    with db.session() as conn:
+        demo.restore_status(conn)
     httpd = Server((host, port), Handler)
     jobs.start(httpd._closed)
     where = f"http://localhost:{port}" if host in ("127.0.0.1", "localhost") else f"port {port} on all network addresses"
