@@ -184,7 +184,7 @@ class MigrationTests(unittest.TestCase):
             conn.execute(insert(User).values(sub="s1", email="ana@example.com"))
         for old in ("0001", "0033"):
             with db.engine(self.path).begin() as c:
-                c.exec_driver_sql("UPDATE alembic_version SET version_num = %s" % repr(old))
+                c.exec_driver_sql(f"UPDATE alembic_version SET version_num = '{old}'")
             before = (shape(self.path), rows_of(self.path, "users"))
             with self.subTest(revision=old):
                 with self.assertRaisesRegex(RuntimeError, "before its database migrations were squashed into one") as raised:
