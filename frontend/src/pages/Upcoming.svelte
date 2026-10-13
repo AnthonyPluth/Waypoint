@@ -50,7 +50,7 @@
       const found = await apiCall<"GET /api/mailboxes">("/api/mailboxes");
       mail = Array.isArray(found?.mailboxes) ? found : null;
     }
-    catch { mail = null; }
+    catch { return; }
   }
   $effect(() => {
     void load();
@@ -61,6 +61,13 @@
     if (!mail?.mailboxes.some((m) => m.scanning)) return;
     const poll = setInterval(() => { void loadMail(); void refreshState(true); }, 5_000);
     return () => clearInterval(poll);
+  });
+
+  let wasScanning = false;
+  $effect(() => {
+    const isScanning = scanning;
+    if (wasScanning && !isScanning) void load();
+    wasScanning = isScanning;
   });
 
   const connect = () => act(async () => {

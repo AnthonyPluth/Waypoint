@@ -42,10 +42,15 @@ name: Agent review
 # plugins or CLAUDE.md (the pull request's included) and holds no GitHub token. Branches from forks aren't reviewed
 # (that would spend the secret on anyone's pull request): an agent's from a fork fails, for a maintainer to push to a
 # branch here. Posting the comment and the status happens in a second job that never sees the code or the secrets.
-on:  # zizmor: ignore[dangerous-triggers] -- runs main's workflow; the pull request's code is only read, never run
-  pull_request_target:
-    branches: [main]
-    types: [opened, synchronize, reopened]
+# DISABLED: Codex reviews pull requests now, so this review no longer runs. The trigger below is commented out (the
+# workflow, its scripts and prompts are kept so it can be turned back on: restore it, and REQUIRED_STATUSES in
+# .github/scripts/merge-gate.sh). With only workflow_dispatch left, nothing starts it on its own.
+# on:  # zizmor: ignore[dangerous-triggers] -- runs main's workflow; the pull request's code is only read, never run
+#   pull_request_target:
+#     branches: [main]
+#     types: [opened, synchronize, reopened]
+on:
+  workflow_dispatch:
 
 permissions: {}
 

@@ -64,6 +64,36 @@ describe("Upcoming", () => {
     expect(screen.queryByRole("button", { name: "Connect Gmail" })).toBeNull();
   });
 
+  it("reloads the trips when the scan ends, so found trips replace the empty state", async () => {
+    let scanned = false;
+    vi.mocked(api).mockImplementation(async (path) => (path === "/api/mailboxes" ? { configured: true, mailboxes: [box({ scanning: !scanned })] }
+      : path === "/api/people/claim-suggestions" ? { guests: [] } : path === "/api/state" ? { review_count: 0 } : { trips: scanned ? [london] : [] }));
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: "Scanning your mailbox" })).toBeInTheDocument();
+    scanned = true;
+    await vi.advanceTimersByTimeAsync(5_000);
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Scanning your mailbox" })).toBeNull());
+    expect(screen.queryByRole("heading", { name: "No trips yet" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Connect Gmail" })).toBeNull();
+  });
+
+  it("keeps polling the scan when one mailbox poll fails", async () => {
+    let calls = 0, scanned = false;
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "/api/mailboxes") { calls++; if (calls === 2) throw new Error("offline"); return { configured: true, mailboxes: [box({ scanning: !scanned })] }; }
+      return path === "/api/people/claim-suggestions" ? { guests: [] } : path === "/api/state" ? { review_count: 0 } : { trips: scanned ? [london] : [] };
+    });
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: "Scanning your mailbox" })).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(calls).toBe(2);
+    expect(screen.getByRole("heading", { name: "Scanning your mailbox" })).toBeInTheDocument();
+    scanned = true;
+    await vi.advanceTimersByTimeAsync(5_000);
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Scanning your mailbox" })).toBeNull());
+    expect(screen.queryByRole("heading", { name: "No trips yet" })).toBeNull();
+  });
+
   it("asks to reconnect a mailbox Waypoint can’t read", async () => {
     serve([], [], { configured: true, mailboxes: [box({ status: "reconnect" })] });
     render(Upcoming);

@@ -12,7 +12,7 @@
       "wait_for": "text=Read from the email"
     },
     {
-      "click": "button:has-text('Check suggestion') >> visible=true"
+      "click": "button[aria-label^='Check what Waypoint read']:visible"
     },
     {
       "wait_for": "text=Waypoint read this from labelled lines"

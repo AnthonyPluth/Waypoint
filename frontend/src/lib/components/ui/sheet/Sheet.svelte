@@ -6,8 +6,8 @@
   import { leave, sheetScope, type DraftGuard } from "$lib/drafts.svelte";
   import type { Snippet } from "svelte";
 
-  let { open = $bindable(false), title, description, wide = false, guard, onOpenAutoFocus, children }: {
-    open?: boolean; title: string; description?: string; wide?: boolean; guard?: DraftGuard; onOpenAutoFocus?: (event: Event) => void; children: Snippet;
+  let { open = $bindable(false), title, description, wide = false, split = false, guard, onOpenAutoFocus, children }: {
+    open?: boolean; title: string; description?: string; wide?: boolean; split?: boolean; guard?: DraftGuard; onOpenAutoFocus?: (event: Event) => void; children: Snippet;
   } = $props();
 
   const scope = sheetScope();
@@ -37,7 +37,7 @@
 <Dialog.Root bind:open={() => open, (v) => { if (v) open = true; else dismiss(); }}>
   <Dialog.Portal>
     <Dialog.Overlay data-slot="sheet-overlay" class="sheet-overlay" />
-    <Dialog.Content data-slot="sheet" data-side={side} data-wide={wide ? "" : undefined} {onOpenAutoFocus} class="sheet" style={drag ? `--sheet-drag: ${drag}px` : undefined} data-dragging={drag ? "" : undefined}>
+    <Dialog.Content data-slot="sheet" data-side={side} data-wide={wide ? "" : undefined} data-split={split ? "" : undefined} {onOpenAutoFocus} class="sheet" style={drag ? `--sheet-drag: ${drag}px` : undefined} data-dragging={drag ? "" : undefined}>
       {#if side === "bottom"}
         <div class="sheet-handle" data-sheet-handle onpointerdown={grab} onpointermove={pull} onpointerup={release} onpointercancel={release} role="presentation">
           <span class="sheet-grip" aria-hidden="true"></span>
