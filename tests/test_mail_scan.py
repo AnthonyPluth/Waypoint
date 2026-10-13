@@ -2889,6 +2889,7 @@ class MailScanApiTests(GoogleCase):
         self.scan_now()
         [item] = self.call("ana", "GET", "/api/review")[1]["items"]
         self.assertFalse(self.call("ana", "GET", "/api/review")[1]["ai"])
+        self.assertNotIn("ai_mode", self.call("ana", "GET", "/api/review")[1])
         status, body = self.call("ana", "POST", f"/api/review/{item['id']}/suggest", {})
         self.assertEqual((status, body["error"]), (400, "Turn on AI suggestions in Settings first."))
         self.assertEqual(self.call("ben", "POST", f"/api/review/{item['id']}/suggest", {})[0], 404)
@@ -2910,6 +2911,11 @@ class MailScanApiTests(GoogleCase):
     def ai_off(self):
         with db.session() as conn:
             db.set_setting(conn, sk.AI_MODE, "off")
+
+    def test_review_says_which_ai_mode_would_read_the_mail(self):
+        self.ai_on()
+        reply = self.call("ana", "GET", "/api/review")[1]
+        self.assertEqual((reply["ai"], reply["ai_mode"]), (True, "local"))
 
     def asked(self, who, item_id):
         with mock.patch.object(scan.ai, "suggest", return_value=ai.Reading([self.SUGGESTED])) as asked:

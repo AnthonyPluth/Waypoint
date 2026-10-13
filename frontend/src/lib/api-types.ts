@@ -637,6 +637,7 @@ export interface Review {
   matches: ReviewMatch[];
   who: WhoIsThis[];
   ai: boolean;
+  ai_mode?: "local" | "openrouter";
 }
 
 export interface ReviewBooking {
