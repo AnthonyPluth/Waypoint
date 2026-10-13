@@ -32,7 +32,7 @@ describe("Settings flight status", () => {
     expect(screen.getByText("Flight status")).toBeInTheDocument();
   });
 
-  it("says in plain words that the administrator hasn’t enabled it", async () => {
+  it("says it’s off without the key", async () => {
     vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? usage({ enabled: false, used: 0 }) : {}) as never);
     render(Settings);
     expect(await screen.findByText(/Live flight status has not been enabled by your administrator/)).toBeInTheDocument();
