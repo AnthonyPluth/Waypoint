@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cameraAt, inView, legsOf, moverAt, planeAt, positions, roadFor, roadShapes, roadsShown, routeProjection, shieldsOf, MAX_SHIELDS, type Roads, type Stop } from "./route-replay";
+import { cameraAt, inView, legsOf, moverAt, planeAt, positions, retraceFor, roadFor, roadShapes, roadsShown, routeProjection, shieldsOf, MAX_SHIELDS, type Roads, type Stop } from "./route-replay";
 
 const stopAt = (name: string, latitude: number, longitude: number, via: Stop["via"] = null, kind: Stop["kind"] = "stay"): Stop =>
   ({ name, city: name, code: null, kind, latitude, longitude, from: "2025-12-05T15:00", to: "2025-12-06T11:00", via, back: false });
@@ -134,5 +134,83 @@ describe("the interstate layer", () => {
     const many = Array.from({ length: 30 }, (_, i) => ({ ...shapes[0], ref: `I-${i}`, mid: { x: 20 + i * 30, y: 20 + (i % 3) * 200 } }));
     expect(shieldsOf(many, box, 1).length).toBeLessThanOrEqual(MAX_SHIELDS);
     expect(shieldsOf([{ ...shapes[0], mid: { x: 2, y: 2 } }], box, 1)).toEqual([]);
+  });
+});
+
+describe("legs that go back over a road already drawn", () => {
+  const parkCity = stopAt("Park City", 40.65, -111.5);
+  const again = stopAt("Denver", 39.7, -104.95);
+  const house = (latitude: number, longitude: number) => stopAt("Springfield", latitude, longitude, null, "home");
+  const inner = (points: { x: number; y: number }[]) => points.slice(1, -1).map((p) => [p.x, p.y]);
+
+  it("goes back over the line of the way out, reversed, instead of a curve", () => {
+    const set = [denver, saltLake, again];
+    const [out, back] = legsOf(set, project(set), roads);
+    expect(back.road).not.toBeNull();
+    expect(back.d).not.toContain("Q");
+    expect(back.vehicle).toBe("car");
+    expect(back.refs).toEqual(["I-80", "I-25"]);
+    expect(inner(back.road!.points)).toEqual(inner(out.road!.points).reverse());
+  });
+
+  it("drives the reused line in the other direction, ending at the stop it returns to", () => {
+    const set = [denver, saltLake, again];
+    const [out, back] = legsOf(set, project(set), roads);
+    const there = moverAt(out, 0.5), here = moverAt(back, 0.5);
+    expect(Math.cos(((there.angle - here.angle) * Math.PI) / 180)).toBeLessThan(-0.9);
+    expect(moverAt(back, 0)).toMatchObject({ x: back.from.x, y: back.from.y });
+    expect(moverAt(back, 1).x).toBeCloseTo(back.to.x);
+    expect(moverAt(back, 1).y).toBeCloseTo(back.to.y);
+    expect(distanceToPath(here, back.road!.points)).toBeLessThan(0.01);
+  });
+
+  it("follows just the stretch of the line between a nearby stop and where the trip was", () => {
+    const set = [denver, saltLake, parkCity];
+    const [out, hop] = legsOf(set, project(set), roads);
+    expect(hop.road).not.toBeNull();
+    expect(hop.d).not.toContain("Q");
+    expect(hop.refs).toEqual([]);
+    expect(hop.road!.along.at(-1)).toBeLessThan(out.road!.along.at(-1)! / 3);
+    for (const p of inner(hop.road!.points)) expect(distanceToPath({ x: p[0], y: p[1] }, out.road!.points)).toBeLessThan(0.01);
+  });
+
+  it("returns home over the way out when home sits beside it, and still curves the way there", () => {
+    const set = [house(39.9, -104.7), denver, saltLake, house(39.9, -104.7)];
+    const [first, , last] = legsOf(set, project(set), roads);
+    expect(first.road).toBeNull();
+    expect(first.d).toContain("Q");
+    expect(last.road).not.toBeNull();
+    expect(last.d).not.toContain("Q");
+    expect(last.refs).toEqual(["I-80", "I-25"]);
+  });
+
+  it("prefers a road the server sent for the leg over retracing", () => {
+    const sent = { from_segment_id: 2, to_segment_id: 3, refs: ["I-70"], points: [[40.75, -111.85], [41.5, -108.0], [39.77, -105.0]] };
+    const set = [denver, saltLake, again];
+    const [, back] = legsOf(set, project(set, { legs: [drive, sent], interstates: [] }), { legs: [drive, sent], interstates: [] });
+    expect(back.refs).toEqual(["I-70"]);
+    expect(back.road!.points).toHaveLength(5);
+  });
+
+  it("keeps a curve for a new route, a faraway stop, a flight, a train and a cruise", () => {
+    const far = stopAt("Boise", 43.6, -116.2), off = stopAt("Wichita", 37.7, -97.3);
+    for (const [stop, via] of [[far, null], [off, null], [parkCity, "flight"], [parkCity, "train"], [parkCity, "cruise"]] as const) {
+      const set = [denver, saltLake, { ...stop, via }];
+      const last = legsOf(set, project(set), roads)[1];
+      expect(last.road, `${stop.name} ${via}`).toBeNull();
+      expect(last.d, `${stop.name} ${via}`).toContain("Q");
+    }
+  });
+
+  it("finds nothing to retrace when nothing has been drawn, when the stops are too close together or on different lines", () => {
+    expect(retraceFor(saltLake, denver, [])).toBeNull();
+    expect(retraceFor(denver, { ...denver, name: "Next door" }, [{ points: drive.points, refs: [] }])).toBeNull();
+    expect(retraceFor(saltLake, denver, [{ points: [[10, 10], [11, 11]], refs: [] }])).toBeNull();
+    expect(retraceFor(saltLake, denver, [{ points: [[39.77, -105.0], [39.77, -105.0]], refs: [] }])).toBeNull();
+  });
+
+  it("takes the closer of two lines to retrace", () => {
+    const near = { points: [[39.74, -104.99], [40.0, -108.0], [40.76, -111.89]], refs: ["I-70"] };
+    expect(retraceFor(saltLake, denver, [{ points: drive.points, refs: ["I-25"] }, near])?.refs).toEqual(["I-70"]);
   });
 });

@@ -1,0 +1,12 @@
+{
+  "name": "trip-route-replay-backtrack",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Denver') >> visible=true" },
+    { "wait_for": "section[aria-label='Route replay'] [data-testid='replay-map']" },
+    { "press": { "selector": "input[aria-label='Position along the route']", "key": "End" } },
+    { "wait_for": "[data-road-leg]" },
+    { "screenshot": "backtrack-end" }
+  ]
+}

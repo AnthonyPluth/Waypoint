@@ -72,6 +72,7 @@ MIN_ROAD_TRIP_MILES = 50.0
 MAX_DETOUR = 2.5
 ROAD_KINDS = ("hotel", "car")
 BREAKING_KINDS = ("flight", "train", "cruise")
+MIN_RETRACE_SHARE = 0.5
 
 
 def _drive(point: roads.Point, other: roads.Point) -> roads.Route | None:
@@ -82,6 +83,36 @@ def _drive(point: roads.Point, other: roads.Point) -> roads.Route | None:
     if found is None or found.miles > MAX_DETOUR * straight:
         return None
     return found
+
+
+def _section(line: roads.Route, point: roads.Point, other: roads.Point) -> roads.Route | None:
+    if len(line.marks) != len(line.points):
+        return None
+    a, b = roads.locate(line.points, point), roads.locate(line.points, other)
+    if a is None or b is None or max(a.gap, b.gap) > roads.MAX_LINK_MILES:
+        return None
+    forward = (a.index, a.share) <= (b.index, b.share)
+    low, high = (a, b) if forward else (b, a)
+    inner = line.points[low.index + 1:high.index + 1]
+    walk = [low.point, *inner, high.point]
+    marks = [line.marks[low.index + 1], *line.marks[low.index + 1:high.index + 1], line.marks[high.index + 1]]
+    if not forward:
+        walk, marks = walk[::-1], [marks[-1], *marks[:0:-1]]
+    kept = [k for k in range(len(walk)) if k == 0 or walk[k] != walk[k - 1]]
+    points = [walk[k] for k in kept]
+    names = [marks[k] for k in kept]
+    if len(names) > 1:
+        names[0] = names[1]
+    runs = [(names[k], roads.miles_between(points[k - 1], points[k])) for k in range(1, len(points))]
+    miles = sum(miles for _, miles in runs)
+    if miles <= 0 or miles < MIN_RETRACE_SHARE * roads.miles_between(point, other):
+        return None
+    return roads.Route(points, roads.long_runs(runs), miles, a.gap, b.gap, names)
+
+
+def _retrace(followed: list[roads.Route], point: roads.Point, other: roads.Point) -> roads.Route | None:
+    sections = [found for line in followed if (found := _section(line, point, other)) is not None]
+    return min(sections, key=lambda r: r.start_link_miles + r.end_link_miles, default=None)
 
 
 def _pairs(live: list[trips.SegmentOut], located: dict[int, roads.Point]) -> list[tuple[int, int]]:
@@ -107,13 +138,16 @@ def _round(points: list[roads.Point]) -> list[list[float]]:
 
 def road_legs(live: list[trips.SegmentOut], located: dict[int, roads.Point]) -> Roads:
     legs: list[RoadLeg] = []
-    followed: list[list[roads.Point]] = []
+    followed: list[roads.Route] = []
     for first, second in _pairs(live, located):
-        found = _drive(located[first], located[second])
+        found = _retrace(followed, located[first], located[second])
+        if found is None:
+            found = _drive(located[first], located[second])
+            if found is not None:
+                followed.append(found)
         if found is not None:
             legs.append({"from_segment_id": first, "to_segment_id": second, "refs": found.refs, "points": _round(found.points)})
-            followed.append(found.points)
-    nearby = roads.interstates().near(followed) if followed else []
+    nearby = roads.interstates().near([line.points for line in followed]) if followed else []
     return {"legs": legs, "interstates": [{"ref": ref, "points": _round(line)} for ref, line in nearby]}
 
 
