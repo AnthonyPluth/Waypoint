@@ -78,6 +78,7 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, phone_agent: true })).toEqual([]);
     expect(flowProblems({ ...ok, phone_agent: "yes" })).toEqual(["phone_agent is true or false"]);
   });
+  it("takes the laptop, wide and zoomed viewports a flow asks for", () => expect(flowProblems({ ...ok, viewports: ["laptop", "wide", "zoomed"] })).toEqual([]));
   it("rejects a viewport it doesn't know", () => expect(flowProblems({ ...ok, viewports: ["watch"] })).toEqual(["unknown viewport watch"]));
 
   it("rejects a page the app doesn't have, so a typo can't pass for a clean run", () => {
