@@ -36,9 +36,9 @@
 
   const who = $derived(Number(new URLSearchParams(route.query).get("who")) || null);
   const tripParam = $derived(Number(new URLSearchParams(route.query).get("trip")) || null);
-  const queryFor = (id: number | null) => {
+  const queryFor = (id: number | null, person: number | null = who) => {
     const q = new URLSearchParams();
-    if (who) q.set("who", String(who));
+    if (person) q.set("who", String(person));
     if (id) q.set("trip", String(id));
     return q.toString();
   };
@@ -46,7 +46,9 @@
     const field = e.currentTarget as HTMLSelectElement;
     const v = field.value;
     field.value = who ? String(who) : "";
-    leave(() => setQuery(v ? `who=${v}` : ""));
+    const person = Number(v) || null;
+    const keep = trips?.find((t) => t.id === selected?.id && (!person || t.segments.some((s) => s.travelers.some((x) => x.person_id === person))));
+    leave(() => setQuery(queryFor(panes.two && keep ? keep.id : null, person)));
   };
   const shown = $derived(trips && splitTrips(trips.filter((t) => !who || t.segments.some((s) => s.travelers.some((x) => x.person_id === who))), dayIn(Date.now(), viewerZone())));
   const everyTrip = $derived(shown ? [...shown.upcoming, ...shown.past] : []);

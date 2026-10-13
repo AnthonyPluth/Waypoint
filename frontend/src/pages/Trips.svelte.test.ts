@@ -227,6 +227,18 @@ describe("two panes", () => {
     expect(route.query).toBe("who=2&trip=1");
   });
 
+  it("keeps the picked trip when a new filter still includes it", async () => {
+    panes.two = true;
+    serveTrips();
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await user().click(within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[1]);
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" });
+    await user().selectOptions(screen.getByLabelText("Travelling"), "Sam Doe");
+    expect(route.query).toBe("who=2&trip=2");
+    expect(await within(screen.getByRole("region", { name: "Selected trip" })).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
+  });
+
   it("shows the first trip when the address names one that isn’t in the list", async () => {
     panes.two = true;
     serveTrips();
