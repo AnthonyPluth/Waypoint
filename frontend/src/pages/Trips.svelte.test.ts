@@ -462,13 +462,14 @@ describe("finding a trip", () => {
     serve(archive);
     render(Trips);
     await screen.findByText("300 trips");
-    await user().type(screen.getByRole("searchbox", { name: "Search" }), "reykjavik");
+    await user().click(screen.getByRole("searchbox", { name: "Search" }));
+    await user().paste("reykjavik");
     expect(route.query).toBe("q=reykjavik");
     expect(screen.getByText("1 of 300 trips")).toBeInTheDocument();
     expect(screen.getAllByRole("link")).toHaveLength(1);
     expect(screen.getByText("Aurora weekend")).toBeInTheDocument();
     await user().clear(screen.getByRole("searchbox", { name: "Search" }));
-    await user().type(screen.getByRole("searchbox", { name: "Search" }), "icelandair");
+    await user().paste("icelandair");
     expect(screen.getByText("Aurora weekend")).toBeInTheDocument();
     expect(screen.getByText("1 of 300 trips")).toBeInTheDocument();
   });
