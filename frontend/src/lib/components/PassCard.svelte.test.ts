@@ -48,7 +48,7 @@ afterEach(() => { flightStatus.list = null; });
 describe("a flight pass", () => {
   it("leads with the headline, then the code as the largest element, then the flight", () => {
     render(PassCard, goes());
-    expect(screen.getByText("Check-in usually open, scheduled departure in 3 h")).toBeInTheDocument();
+    expect(screen.getByText("Check-in is open, departs in 3 h")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toHaveClass("text-display");
     expect(screen.getByText("American Airlines AA 101")).toBeInTheDocument();
     expect(screen.getByText("JFK")).toBeInTheDocument();
@@ -135,11 +135,12 @@ describe("the plane on a pass", () => {
     flightStatus.list = list();
     const { container } = render(PassCard, { segment: flight, now: dep + (arr - dep) / 2 });
     expect(progressOf(container)).toBe("0.5");
-    expect(screen.getByText("Scheduled arrival in 3 h 35 min")).toBeInTheDocument();
+    expect(screen.getByText("Under way, arrives in 3 h 35 min")).toBeInTheDocument();
   });
-  it("says it is worked out from the booked times", () => {
-    render(PassCard, goes());
-    expect(screen.getByRole("img", { name: /booked times/ })).toBeInTheDocument();
+  it("labels the route line plainly, with no schedule caveat", () => {
+    const { container } = render(PassCard, goes());
+    expect(screen.getByRole("img", { name: "Route" })).toBeInTheDocument();
+    expect(container.querySelector("[data-schedule-label]")).toBeNull();
   });
   it("handles a flight across the date line", () => {
     const over = segment({ origin: "SYD", destination: "LAX", start_local: "2026-11-20T10:00", start_zone: "Australia/Sydney", end_local: "2026-11-20T06:00", end_zone: "America/Los_Angeles" });
@@ -154,7 +155,7 @@ describe("live status on a pass", () => {
     flightStatus.list = list();
     render(PassCard, goes());
     expect(screen.getByText("Delayed 50 min")).toBeInTheDocument();
-    expect(screen.getByText("Check-in usually open, scheduled departure in 3 h")).toBeInTheDocument();
+    expect(screen.getByText("Check-in is open, departs in 3 h")).toBeInTheDocument();
     expect(screen.getByText(/50 min late · Gate B24 · as of/)).toBeInTheDocument();
     expect(screen.getByText("Gate")).toBeInTheDocument();
   });
@@ -272,21 +273,44 @@ describe("evidence on a pass", () => {
   const fresh = (extra: Partial<FlightStatus> = {}) => list({ statuses: [status({ fetched_at: new Date(dep + HOUR).toISOString(), ...extra })] });
   const midway = dep + 2 * HOUR;
 
-  it("labels the plane as based on the schedule", () => {
-    render(PassCard, { segment: flight, now: midway });
-    expect(screen.getByText("Based on schedule")).toBeInTheDocument();
+  it("puts the plane on the full-width route line between the codes, with the names in a row of their own", () => {
+    const { container } = render(PassCard, { segment: flight, now: midway });
+    const grid = screen.getByRole("img", { name: "Route" }).parentElement as HTMLElement;
+    const [from, line, to, names] = [...grid.children];
+    expect(from.textContent).toBe("JFK");
+    expect(line).toHaveAttribute("role", "img");
+    expect(to.textContent).toBe("LHR");
+    expect(names).toHaveClass("col-span-3");
+    expect(container.querySelector("[data-schedule-label]")).toBeNull();
+    expect(screen.queryByText("Based on schedule")).toBeNull();
   });
-  it("never calls a flight landed or under way from the clock, with live status unavailable, stale or offline", () => {
+  it("reads landed and under way from the clock when live status is unavailable, stale or offline", () => {
     const offline = vi.spyOn(navigator, "onLine", "get");
     for (const [setup, list_] of [["none", null], ["stale", list({ statuses: [status({ state: "departed", fetched_at: new Date(dep - 6 * HOUR).toISOString() })] })], ["offline", fresh({ state: "departed" })]] as const) {
       flightStatus.list = list_;
       offline.mockReturnValue(setup !== "offline");
       const { container, unmount } = render(PassCard, { segment: flight, now: arr + HOUR });
       const text = container.querySelector("[data-headline]")?.textContent;
-      expect(text, setup).toBe("Scheduled arrival time passed");
+      expect(text, setup).toBe("Landed");
       unmount();
     }
     offline.mockRestore();
+  });
+  it("keeps the plane at the destination for a landed status however old, and at the clock's place for a stale non-terminal one", () => {
+    const old = new Date(dep - 30 * 24 * HOUR).toISOString();
+    flightStatus.list = list({ statuses: [status({ state: "landed", fetched_at: old })] });
+    const landed = render(PassCard, { segment: flight, now: dep - HOUR });
+    expect(progressOf(landed.container)).toBe("1");
+    landed.unmount();
+    flightStatus.list = list({ statuses: [status({ state: "departed", fetched_at: old })] });
+    const stale = render(PassCard, { segment: flight, now: midway });
+    expect(progressOf(stale.container)).not.toBe("1");
+    expect(stale.container.querySelector("[data-headline]")?.textContent).toMatch(/^Under way/);
+  });
+  it("parks a past flight with a cancelled booking at the start, with no airline status", () => {
+    const { container } = render(PassCard, { segment: { ...flight, status: "cancelled" }, now: arr + 40 * 24 * HOUR });
+    expect(container.querySelector("[data-headline]")?.textContent).toBe("Cancelled");
+    expect(progressOf(container)).toBe("0");
   });
   it("leads with a delay instead of under way", () => {
     flightStatus.list = fresh();
@@ -299,14 +323,12 @@ describe("evidence on a pass", () => {
     const { container } = render(PassCard, { segment: flight, now: midway });
     expect(screen.getByText("Cancelled by the airline")).toHaveClass("text-destructive");
     expect(progressOf(container)).toBe("0");
-    expect(screen.queryByText("Based on schedule")).toBeNull();
   });
-  it("says landed, with the plane at the end and no schedule label, only when live status does", () => {
+  it("says landed, with the plane at the end, when live status does", () => {
     flightStatus.list = fresh({ state: "landed", arr_actual: "2026-11-21T07:03" });
     const { container } = render(PassCard, { segment: flight, now: arr - 2 * HOUR });
     expect(container.querySelector("[data-headline]")?.textContent).toBe("Landed");
     expect(progressOf(container)).toBe("1");
-    expect(screen.queryByText("Based on schedule")).toBeNull();
   });
 });
 

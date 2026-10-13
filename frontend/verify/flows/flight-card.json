@@ -7,6 +7,7 @@
     { "wait_for": "[data-kind='flight'] [data-airport-name]" },
     { "expect_text": { "selector": "[data-kind='flight']", "text": "Heathrow" } },
     { "expect_text": { "selector": "[data-kind='flight']", "text": "+1 day" } },
+    { "wait_for": "[data-kind='flight'] [role='img'][data-progress]" },
     { "scroll_to": "[data-kind='flight'] >> nth=0" },
     { "screenshot": "trip-flight" }
   ]

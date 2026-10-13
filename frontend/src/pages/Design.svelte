@@ -39,7 +39,7 @@
   const type = [
     { name: "Display", cls: "text-display", sample: "K7Q2ZM" },
     { name: "Title", cls: "text-title", sample: "Upcoming" },
-    { name: "Heading", cls: "text-heading", sample: "Scheduled departure in 3 h" },
+    { name: "Heading", cls: "text-heading", sample: "Check-in is open" },
     { name: "Body", cls: "text-body", sample: "Departs at 7:05 AM from Terminal 1." },
     { name: "Caption", cls: "text-caption text-muted-foreground", sample: "As of 6:42 AM" },
     { name: "Eyebrow", cls: "text-eyebrow uppercase text-muted-foreground", sample: "Next up" },
@@ -81,7 +81,7 @@
 
   <section class="flex flex-col gap-3" aria-labelledby="design-pass">
     <h2 id="design-pass" class="text-heading">Pass card</h2>
-    <p class="text-caption text-muted-foreground">One card for a booking you are planning or checking in for. The headline and the plane come from the booked times only.</p>
+    <p class="text-caption text-muted-foreground">One card for a booking you are planning or checking in for. The headline and the plane come from the booked times unless live flight status says otherwise.</p>
     <div class="grid gap-4 lg:grid-cols-2">
       <PassCard segment={flight} now={flightNow} />
       <PassCard segment={flight} now={underWayNow} />

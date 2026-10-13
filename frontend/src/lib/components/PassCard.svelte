@@ -97,12 +97,13 @@
 
     {#if flight}
       <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
-        <div class="min-w-0 max-w-36 md:max-w-56"><AirportCode code={s.origin ?? "—"} size="medium" /><AirportName code={s.origin ?? ""} /></div>
-        <span title="The plane’s place is worked out from the booked times, not live data" class="min-w-0">
-          <RouteLine progress={grounded ? 0 : progress} label={evidence === "landed" ? "Route, with the plane at the destination" : "Route, with the plane placed from the booked times"} />
-          {#if evidence !== "landed" && !grounded}<span class="block text-center text-xs text-muted-foreground" data-schedule-label>Based on schedule</span>{/if}
-        </span>
-        <div class="min-w-0 max-w-36 text-right md:max-w-56"><AirportCode code={s.destination ?? "—"} size="medium" /><AirportName code={s.destination ?? ""} /></div>
+        <AirportCode code={s.origin ?? "—"} size="medium" />
+        <RouteLine progress={grounded ? 0 : progress} label={evidence === "landed" ? "Route, with the plane at the destination" : "Route"} />
+        <AirportCode code={s.destination ?? "—"} size="medium" class="text-right" />
+        <div class="col-span-3 grid grid-cols-2 gap-x-3">
+          <div class="min-w-0"><AirportName code={s.origin ?? ""} /></div>
+          <div class="min-w-0 text-right"><AirportName code={s.destination ?? ""} /></div>
+        </div>
         {#if timesArea}{:else if differ}
           <div class="col-span-3 mt-2 flex flex-col gap-1 text-sm">
             <span><Badge variant="secondary">Times differ between bookings</Badge></span>
