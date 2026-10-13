@@ -35,14 +35,14 @@ afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 const list = () => within(screen.getByRole("list", { name: "Stops in order" })).getAllByRole("listitem").map((li) => li.lastElementChild?.textContent?.replace(/\s+/g, " "));
 const ground = (c: HTMLElement) => c.querySelector("path[data-leg='ground']")!;
 
-describe("RouteReplayMap on the interstates", () => {
+describe("RouteReplayMap on the highways", () => {
   it("draws a road leg along the road, with the roads behind it, and names the roads in the text list", () => {
     const { container } = render(RouteReplayMap, { stops: [denver, saltLake], year: 2025, roads, still: true });
     expect(ground(container).getAttribute("d")).not.toContain("Q");
     expect(ground(container).getAttribute("data-road-leg")).toBe("I-25 I-80");
     expect([...container.querySelectorAll("[data-road]")].map((p) => p.getAttribute("data-road"))).toEqual(["I-25", "I-80"]);
     expect(list()).toEqual(["Stay in Denver, Dec 5 – 6", "Stay in Salt Lake City, Dec 5 – 6"]);
-    expect(screen.getByLabelText("Map key").textContent).toContain("Interstate");
+    expect(screen.getByLabelText("Map key").textContent).toContain("Highway");
   });
 
   it("hides the roads and their labels from assistive technology", () => {
@@ -62,7 +62,7 @@ describe("RouteReplayMap on the interstates", () => {
     expect(container.querySelector("[data-testid='interstates']")).toBeNull();
     expect(container.querySelector("[data-testid='shields']")).toBeNull();
     expect(list()[1]).toBe("Stay in Salt Lake City, Dec 5 – 6");
-    expect(screen.getByLabelText("Map key").textContent).not.toContain("Interstate");
+    expect(screen.getByLabelText("Map key").textContent).not.toContain("Highway");
   });
 
   it("works without being given any roads at all", () => {

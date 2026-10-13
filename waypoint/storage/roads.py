@@ -21,6 +21,8 @@ NETWORK_RINGS = 2
 NETWORK_POINTS = 4000
 NETWORK_FLAT_DEGREES = 0.01
 ROUTE_FLAT_DEGREES = 0.004
+US_COST = 1.35
+STATE_COST = 1.7
 START = -1
 END = -2
 
@@ -55,12 +57,26 @@ class Snap:
     link_miles: float
 
 
+def cost_factor(ref: str) -> float:
+    if ref.startswith("I-"):
+        return 1.0
+    return US_COST if ref.startswith("US-") else STATE_COST
+
+
+def rank(ref: str) -> int:
+    return 0 if ref.startswith("I-") else 1 if ref.startswith("US-") else 2
+
+
 @dataclass(frozen=True)
 class Arc:
     to: int
     miles: float
     ref: str
     points: list[Point]
+
+    @property
+    def cost(self) -> float:
+        return self.miles * cost_factor(self.ref)
 
 
 @dataclass(frozen=True)
@@ -86,7 +102,10 @@ class Graph:
         self.edges = edges
         self.joined: dict[int, list[int]] = defaultdict(list)
         self.cells: dict[tuple[int, int], list[tuple[int, int]]] = defaultdict(list)
+        self.nodes: dict[int, Point] = {}
         for i, edge in enumerate(edges):
+            self.nodes.setdefault(edge.a, edge.points[0])
+            self.nodes.setdefault(edge.b, edge.points[-1])
             self.joined[edge.a].append(i)
             if edge.b != edge.a:
                 self.joined[edge.b].append(i)
@@ -164,26 +183,29 @@ class Graph:
         extra[eb.b].append(Arc(END, eb.miles - b.offset, eb.ref, _reach(eb, b, False)[::-1]))
         if a.edge == b.edge:
             extra[START].append(Arc(END, abs(a.offset - b.offset), ea.ref, _between(ea, a, b)))
-        settled: dict[int, tuple[float, int | None, Arc | None]] = {}
-        heap: list[tuple[float, int, int, int | None, Arc | None]] = [(0.0, 0, START, None, None)]
+        goal = b.point
+        settled: dict[int, tuple[int | None, Arc | None]] = {}
+        heap: list[tuple[float, int, float, int, int | None, Arc | None]] = [(0.0, 0, 0.0, START, None, None)]
         tick = 0
         while heap:
-            cost, _, node, came, arc = heapq.heappop(heap)
+            _, _, cost, node, came, arc = heapq.heappop(heap)
             if node in settled:
                 continue
-            settled[node] = (cost, came, arc)
+            settled[node] = (came, arc)
             if node == END:
                 break
             for step in [*extra.get(node, ()), *(self._arc(node, i) for i in self.joined.get(node, ()))]:
                 if step.to not in settled:
                     tick += 1
-                    heapq.heappush(heap, (cost + step.miles, tick, step.to, node, step))
+                    total = cost + step.cost
+                    ahead = 0.0 if step.to < 0 else miles_between(self.nodes[step.to], goal)
+                    heapq.heappush(heap, (total + ahead, tick, total, step.to, node, step))
         if END not in settled:
             return None
         arcs: list[Arc] = []
         back: int | None = END
         while back is not None:
-            _, back, arc = settled[back]
+            back, arc = settled[back]
             if arc is not None:
                 arcs.append(arc)
         return arcs[::-1]
@@ -202,7 +224,7 @@ class Graph:
         for ring in range(rings + 1):
             ring_cells = {(r + dr, c + dc) for r, c in seeds for dr in range(-ring, ring + 1) for dc in range(-ring, ring + 1)} - reached
             reached |= ring_cells
-            for i in sorted({i for cell in ring_cells for i, _ in self.cells.get(cell, ())} - taken):
+            for i in sorted({i for cell in ring_cells for i, _ in self.cells.get(cell, ())} - taken, key=lambda i: (rank(self.edges[i].ref), i)):
                 line = simplified(list(self.edges[i].points), NETWORK_FLAT_DEGREES)
                 if spent + len(line) > budget:
                     continue
@@ -328,5 +350,5 @@ def load(name: str = FILE) -> Graph:
 
 
 @cache
-def interstates() -> Graph:
+def highways() -> Graph:
     return load()

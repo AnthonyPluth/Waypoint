@@ -189,7 +189,7 @@
     {#if stops.some((s) => s.kind === "place")}<li class="flex items-center gap-2"><span class="size-2 rounded-full bg-map-visited" aria-hidden="true"></span>Other stop</li>{/if}
     <li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Flight</li>
     {#if stateLines.length}<li class="flex items-center gap-2"><span class="w-4 border-t border-dashed border-map-border" aria-hidden="true"></span>State line</li>{/if}
-    {#if !gl && roads.interstates.length}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-border" aria-hidden="true"></span>Interstate</li>{/if}
+    {#if !gl && roads.interstates.length}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-border" aria-hidden="true"></span>Highway</li>{/if}
     {#if legs.some((l) => !l.flight)}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
   </ul>
   {#if !calm}

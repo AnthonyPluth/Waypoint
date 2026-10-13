@@ -31,7 +31,7 @@ class TripRoadsRouteTests(RouteCase):
         self.assertTrue(got["interstates"])
         for line in got["interstates"]:
             self.assertEqual(sorted(line), ["points", "ref"])
-            self.assertTrue(line["ref"].startswith("I-"))
+            self.assertRegex(line["ref"], r"^(I|US|[A-Z]{2})-\d+[A-Z]?$")
 
     def test_a_flight_between_stays_is_not_a_road_leg(self):
         first = self.book("ana", DENVER)
@@ -117,10 +117,10 @@ class RoadLegRuleTests(unittest.TestCase):
         live = [self.stay(1), self.stay(2, "2026-06-04T15:00")]
         located = {1: (39.74, -104.99), 2: (40.76, -111.89)}
         winding = roads.Route([(39.8, -105.0), (40.7, -111.8)], ["I-25"], 3000.0, 1.0, 1.0)
-        with mock.patch.object(tripmap.roads, "interstates", return_value=mock.Mock(route=mock.Mock(return_value=winding), near=mock.Mock(return_value=[]))):
+        with mock.patch.object(tripmap.roads, "highways", return_value=mock.Mock(route=mock.Mock(return_value=winding), near=mock.Mock(return_value=[]))):
             self.assertEqual(tripmap.road_legs(live, located)["legs"], [])
         direct = roads.Route([(39.8, -105.0), (40.7, -111.8)], ["I-25"], 600.0, 1.0, 1.0)
-        with mock.patch.object(tripmap.roads, "interstates", return_value=mock.Mock(route=mock.Mock(return_value=direct), near=mock.Mock(return_value=[]))):
+        with mock.patch.object(tripmap.roads, "highways", return_value=mock.Mock(route=mock.Mock(return_value=direct), near=mock.Mock(return_value=[]))):
             self.assertEqual(tripmap.road_legs(live, located)["legs"][0]["refs"], ["I-25"])
 
 
@@ -163,7 +163,7 @@ class BacktrackingRuleTests(unittest.TestCase):
         winding = roads.Route([(40.7, -111.8), (39.8, -105.0)], ["I-25"], 3000.0, 1.0, 1.0, ["I-25", "I-25"])
         route = mock.Mock(side_effect=[direct, winding])
         live, located = self.stays(self.DENVER, self.SALT_LAKE, self.DENVER)
-        with mock.patch.object(tripmap.roads, "interstates", return_value=mock.Mock(route=route, near=mock.Mock(return_value=[]))):
+        with mock.patch.object(tripmap.roads, "highways", return_value=mock.Mock(route=route, near=mock.Mock(return_value=[]))):
             out, back = tripmap.road_legs(live, located)["legs"]
         self.assertEqual(route.call_count, 1)
         self.assertEqual(back["points"][1:-1], out["points"][-2:0:-1])

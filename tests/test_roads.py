@@ -4,6 +4,7 @@ from itertools import groupby, pairwise
 import socket
 import struct
 import tempfile
+import time
 import unittest
 import zipfile
 from pathlib import Path
@@ -134,6 +135,22 @@ class FixtureGraphTests(unittest.TestCase):
         self.assertLessEqual(sum(len(p) for _, p in g.near([route.points], rings=1, budget=3)), 3)
         self.assertEqual(g.near([[(40.0, -102.0)]], rings=0)[0][0], "I-1")
 
+    def test_a_route_prefers_an_interstate_unless_the_other_road_is_much_shorter(self):
+        def drive(shortcut_lat):
+            rows = [row("I-1", 0, 1, (40.0, -105.0), (43.0, -103.0)), row("I-1", 1, 2, (43.0, -103.0), (40.0, -101.0)),
+                    row("US-9", 0, 3, (40.0, -105.0), (shortcut_lat, -103.0)), row("MN-5", 3, 2, (shortcut_lat, -103.0), (40.0, -101.0))]
+            found = roads.parse(rows).route((40.0, -104.99), (40.0, -101.01))
+            assert found is not None
+            return found.refs
+        self.assertEqual(drive(42.5), ["I-1"])
+        self.assertEqual(drive(40.0), ["US-9", "MN-5"])
+
+    def test_the_network_near_a_route_lists_interstates_before_other_roads(self):
+        rows = [row("MN-5", 0, 1, (40.0, -104.4), (40.0, -104.35)), row("US-9", 1, 2, (40.0, -104.35), (40.0, -104.3)), row("I-1", 2, 3, (40.0, -104.3), (40.0, -104.28))]
+        g = roads.parse(rows)
+        self.assertEqual([ref for ref, _ in g.near([[(40.0, -104.3)]], rings=0)], ["I-1", "US-9", "MN-5"])
+        self.assertEqual([ref for ref, _ in g.near([[(40.0, -104.3)]], rings=0, budget=2)], ["I-1"])
+
     def test_simplifying_keeps_the_ends_and_the_bends(self):
         line = [(40.0, -105.0), (40.0001, -104.5), (40.0, -104.0), (40.5, -103.5)]
         self.assertEqual(roads.simplified(line, 0.01), [(40.0, -105.0), (40.0, -104.0), (40.5, -103.5)])
@@ -142,39 +159,54 @@ class FixtureGraphTests(unittest.TestCase):
 
 class BundledRoadsTests(unittest.TestCase):
     def test_the_bundled_interstates_load_once(self):
-        g = roads.interstates()
-        self.assertIs(g, roads.interstates())
+        g = roads.highways()
+        self.assertIs(g, roads.highways())
         self.assertGreater(len(g.edges), 5000)
-        self.assertTrue({"I-5", "I-10", "I-80", "I-95"} <= {e.ref for e in g.edges})
-        self.assertGreater(sum(e.miles for e in g.edges), 40000)
+        self.assertTrue({"I-5", "I-10", "I-80", "I-95", "US-20", "US-287", "MN-55", "CA-1"} <= {e.ref for e in g.edges})
+        self.assertGreater(sum(e.miles for e in g.edges), 100000)
+        self.assertTrue(all(e.ref.startswith("I-") or e.ref.startswith("US-") or (len(e.ref) > 3 and e.ref[2] == "-") for e in g.edges))
+
+    def test_a_route_can_use_a_state_route_or_a_us_highway(self):
+        got = roads.highways().route((44.98, -93.27), (45.55, -94.15))
+        assert got is not None
+        self.assertTrue(got.refs)
+        local = roads.highways().route((45.68, -111.04), (44.43, -110.58))
+        assert local is not None
+        self.assertTrue(any(ref.startswith("US-") for ref in local.refs))
+
+    def test_a_long_search_over_the_whole_network_stays_fast(self):
+        began = time.monotonic()
+        got = roads.highways().route((39.74, -104.99), (41.88, -87.63))
+        assert got is not None
+        self.assertLess(time.monotonic() - began, 1.0)
 
     def test_a_cross_country_route_follows_interstates_in_order(self):
-        got = roads.interstates().route((39.74, -104.99), (40.76, -111.89))
+        got = roads.highways().route((39.74, -104.99), (40.76, -111.89))
         assert got is not None
         self.assertEqual(got.refs, ["I-25", "I-80"])
         self.assertAlmostEqual(got.miles, 520, delta=60)
-        coast = roads.interstates().route((47.61, -122.33), (34.05, -118.24))
+        coast = roads.highways().route((47.61, -122.33), (34.05, -118.24))
         assert coast is not None
         self.assertEqual(coast.refs, ["I-5"])
         self.assertAlmostEqual(coast.miles, 1135, delta=60)
 
     def test_outside_the_united_states_there_is_no_route(self):
-        self.assertIsNone(roads.interstates().route((51.5, -0.12), (48.85, 2.35)))
-        self.assertIsNone(roads.interstates().route((43.65, -79.38), (45.5, -73.57)))
+        self.assertIsNone(roads.highways().route((51.5, -0.12), (48.85, 2.35)))
+        self.assertIsNone(roads.highways().route((43.65, -79.38), (45.5, -73.57)))
 
     def test_the_lookup_opens_no_connection(self):
         with mock.patch.object(socket.socket, "connect", side_effect=AssertionError("network")), \
                 mock.patch.object(socket, "create_connection", side_effect=AssertionError("network")), \
                 mock.patch.object(socket, "getaddrinfo", side_effect=AssertionError("network")):
-            roads.interstates.cache_clear()
-            got = roads.interstates().route((39.74, -104.99), (41.88, -87.63))
+            roads.highways.cache_clear()
+            got = roads.highways().route((39.74, -104.99), (41.88, -87.63))
             assert got is not None
-            self.assertTrue(roads.interstates().near([got.points]))
-        roads.interstates.cache_clear()
+            self.assertTrue(roads.highways().near([got.points]))
+        roads.highways.cache_clear()
 
 
 def dbf(rows):
-    fields = [("SIGN1", 6), ("SIGNT1", 6), ("FCLASS", 12)]
+    fields = [("SIGN1", 6), ("SIGNT1", 6), ("FCLASS", 12), ("STFIPS", 2)]
     head = b"".join(name.encode().ljust(11, b"\0") + b"C" + b"\0" * 4 + bytes([size]) + b"\0" * 15 for name, size in fields)
     length = 1 + sum(size for _, size in fields)
     out = struct.pack("<BBBBIHH", 3, 0, 0, 0, len(rows), 32 + len(head) + 1, length) + b"\0" * 20 + head + b"\r"
@@ -194,20 +226,35 @@ def shp(lines):
 
 class BuildToolTests(unittest.TestCase):
     def test_signs_become_route_refs(self):
-        refs = {s: tool.ref_of(s) for s in ("I80", "I35W", "IH1", "i5", "I20B", "US40", "", "I")}
+        refs = {s: tool.ref_of("I", s) for s in ("I80", "I35W", "IH1", "i5", "I20B", "US40", "", "I")}
         self.assertEqual(refs, {"I80": "I-80", "I35W": "I-35W", "IH1": "I-H1", "i5": "I-5", "I20B": None, "US40": None, "": None, "I": None})
 
+    def test_us_and_state_signs_become_route_refs(self):
+        self.assertEqual(tool.ref_of("U", "U20", "", "3"), "US-20")
+        self.assertEqual(tool.ref_of("U", "u0287", "", "2"), "US-287")
+        self.assertEqual(tool.ref_of("S", "S55", "27", "3"), "MN-55")
+        self.assertEqual(tool.ref_of("S", "S1", "6", "3"), "CA-1")
+        self.assertEqual(tool.ref_of("S", "S101A", "27", "3"), None)
+        self.assertEqual(tool.ref_of("U", "U20B", "", "3"), None)
+        self.assertEqual(tool.ref_of("S", "S55", "99", "3"), None)
+        self.assertEqual(tool.ref_of("S", "U55", "27", "3"), None)
+        self.assertEqual(tool.ref_of("C", "C12", "27", "3"), None)
+        self.assertEqual(tool.ref_of("U", "U20", "", "4"), None)
+        self.assertEqual(tool.ref_of("U", "U20", "", ""), None)
+        self.assertEqual(tool.ref_of("I", "I80", "", "3"), None)
+
     def test_only_signed_interstates_are_read_from_the_shapefile(self):
-        rows = [("I80", "I", "1"), ("I80", "I", "3"), ("US40", "U", "1"), ("I25", "I", "1")]
-        lines = [[(41.0, -100.0), (41.0, -99.0)], [(1.0, 1.0), (2.0, 2.0)], [(3.0, 3.0), (4.0, 4.0)], [(40.0, -105.0), (40.5, -105.0), (41.0, -105.0)]]
+        rows = [("I80", "I", "1", "31"), ("I80", "I", "3", "31"), ("U40", "U", "2", "08"), ("S55", "S", "3", "27"), ("U40B", "U", "3", "08"), ("S9", "S", "4", "27"), ("I25", "I", "1", "08")]
+        lines = [[(41.0, -100.0), (41.0, -99.0)], [(1.0, 1.0), (2.0, 2.0)], [(3.0, 3.0), (4.0, 4.0)], [(5.0, 5.0), (6.0, 6.0)],
+                 [(7.0, 7.0), (8.0, 8.0)], [(9.0, 9.0), (10.0, 10.0)], [(40.0, -105.0), (40.5, -105.0), (41.0, -105.0)]]
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / "nhs.zip"
             with zipfile.ZipFile(archive, "w") as z:
                 z.writestr("NHS/nhs.dbf", dbf(rows))
                 z.writestr("NHS/nhs.shp", shp(lines))
-            found = tool.interstates(archive)
-        self.assertEqual([ref for ref, _ in found], ["I-80", "I-25"])
-        self.assertEqual(found[1][1], [(40.0, -105.0), (40.5, -105.0), (41.0, -105.0)])
+            found = tool.highways(archive)
+        self.assertEqual([ref for ref, _ in found], ["I-80", "US-40", "MN-55", "I-25"])
+        self.assertEqual(found[3][1], [(40.0, -105.0), (40.5, -105.0), (41.0, -105.0)])
 
     def test_pieces_meeting_at_a_point_share_a_node_and_a_crossing_road_is_cut(self):
         lines = [("I-1", [(40.0, -105.0), (40.0, -104.0)]), ("I-1", [(40.0, -104.0), (40.0, -103.0)]),

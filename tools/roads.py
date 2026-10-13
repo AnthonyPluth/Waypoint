@@ -23,14 +23,35 @@ Point = tuple[float, float]
 Line = tuple[str, list[Point]]
 Edge = tuple[str, int, int, list[Point]]
 
-INTERSTATE_CLASS = "1"
-WANTED = ("SIGN1", "SIGNT1", "FCLASS")
-SIGN = re.compile(r"^I(H?)(\d{1,3})([CEW]?)$")
+INTERSTATE_CLASSES = frozenset("1")
+HIGHWAY_CLASSES = frozenset("123")
+WANTED = ("SIGN1", "SIGNT1", "FCLASS", "STFIPS")
+INTERSTATE_SIGN = re.compile(r"^I(H?)(\d{1,3})([CEW]?)$")
+NUMBERED_SIGN = re.compile(r"^[US](\d{1,4})$")
+STATES = {
+    "01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO", "09": "CT", "10": "DE",
+    "11": "DC", "12": "FL", "13": "GA", "15": "HI", "16": "ID", "17": "IL", "18": "IN", "19": "IA",
+    "20": "KS", "21": "KY", "22": "LA", "23": "ME", "24": "MD", "25": "MA", "26": "MI", "27": "MN",
+    "28": "MS", "29": "MO", "30": "MT", "31": "NE", "32": "NV", "33": "NH", "34": "NJ", "35": "NM",
+    "36": "NY", "37": "NC", "38": "ND", "39": "OH", "40": "OK", "41": "OR", "42": "PA", "44": "RI",
+    "45": "SC", "46": "SD", "47": "TN", "48": "TX", "49": "UT", "50": "VT", "51": "VA", "53": "WA",
+    "54": "WV", "55": "WI", "56": "WY",
+}
 
 
-def ref_of(sign: str) -> str | None:
-    found = SIGN.match(sign.strip().upper())
-    return f"I-{found.group(1)}{found.group(2)}{found.group(3)}" if found else None
+def ref_of(kind: str, sign: str, state: str = "", fclass: str = "1") -> str | None:
+    text = sign.strip().upper()
+    if kind == "I":
+        found = INTERSTATE_SIGN.match(text)
+        return f"I-{found.group(1)}{found.group(2)}{found.group(3)}" if found and fclass in INTERSTATE_CLASSES else None
+    found = NUMBERED_SIGN.match(text)
+    if not found or fclass not in HIGHWAY_CLASSES or text[0] != kind:
+        return None
+    number = int(found.group(1))
+    if kind == "U":
+        return f"US-{number}"
+    postal = STATES.get(state.zfill(2))
+    return f"{postal}-{number}" if postal else None
 
 
 def dbf_header(f: IO[bytes]) -> tuple[int, int, dict[str, tuple[int, int]]]:
@@ -63,7 +84,7 @@ def shapes(f: IO[bytes]) -> Iterator[list[list[Point]]]:
         yield shape_parts(f.read(words * 2))
 
 
-def interstates(archive: Path) -> list[Line]:
+def highways(archive: Path) -> list[Line]:
     found: list[Line] = []
     with zipfile.ZipFile(archive) as z:
         stem = next(n[:-4] for n in z.namelist() if n.endswith(".shp"))
@@ -71,7 +92,7 @@ def interstates(archive: Path) -> list[Line]:
             count, length, columns = dbf_header(table)
             for parts, record in zip(shapes(geometry), (table.read(length) for _ in range(count)), strict=False):
                 values = {name: record[at:at + size].decode("latin-1").strip() for name, (at, size) in columns.items() if name in WANTED}
-                ref = ref_of(values["SIGN1"]) if values["SIGNT1"] == "I" and values["FCLASS"] == INTERSTATE_CLASS else None
+                ref = ref_of(values["SIGNT1"], values["SIGN1"], values["STFIPS"], values["FCLASS"])
                 if ref:
                     found.extend((ref, part) for part in parts if len(part) >= 2)
     return found
@@ -194,7 +215,7 @@ def main(argv: list[str]) -> int:
     if len(argv) != 2:
         print("usage: roads.py NHS_2025-08-08.zip", file=sys.stderr)
         return 2
-    edges = build(interstates(Path(argv[1])))
+    edges = build(highways(Path(argv[1])))
     with OUT.open("wb") as f, gzip.GzipFile(fileobj=f, mode="wb", mtime=0, filename="", compresslevel=9) as z:
         z.write(encode(edges).encode("utf-8"))
     print(f"{len(edges)} road pieces -> {OUT} ({OUT.stat().st_size} bytes)")
