@@ -207,8 +207,8 @@ describe("Trip", () => {
     it("goes back to Trips after a delete even with a rename half typed, without asking to discard it", async () => {
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Rename trip" }));
-      await u.type(screen.getByLabelText("Trip name"), " again");
+      await u.click(await screen.findByRole("button", { name: "Edit trip details" }));
+      await u.type(screen.getByLabelText("Name"), " again");
       await tripOptions(u, "Delete trip");
       await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
       await waitFor(() => expect(route.page).toBe("trips"));
@@ -623,24 +623,24 @@ describe("Trip", () => {
     expect(bookings.previousElementSibling?.tagName).toBe("FORM");
   });
 
-  it("renames the trip from its title, sending only the name, and shows the new name", async () => {
+  it("edits the name in the trip’s form, sending only the name, and shows the new name", async () => {
     render(TripPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Rename trip" }));
-    expect(screen.getByLabelText("Trip name")).toHaveValue("Trip to London");
-    await u.clear(screen.getByLabelText("Trip name"));
-    await u.type(screen.getByLabelText("Trip name"), "  Lisbon in spring ");
+    await u.click(await screen.findByRole("button", { name: "Edit trip details" }));
+    expect(screen.getByLabelText("Name")).toHaveValue("Trip to London");
+    await u.clear(screen.getByLabelText("Name"));
+    await u.type(screen.getByLabelText("Name"), "  Lisbon in spring ");
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST" ? { ...held, name: (opts.body as { name: string }).name } : held) as never);
     await u.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "POST", body: { name: "Lisbon in spring" } }));
     expect(await screen.findByRole("heading", { name: "Lisbon in spring" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Trip name")).toBeNull();
+    expect(screen.queryByLabelText("Name")).toBeNull();
   });
 
-  it("edits the destination under the dates, sending only the destination, and shows the new one", async () => {
+  it("edits the destination in the same form, sending only the destination, and shows the new one", async () => {
     render(TripPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Edit destination" }));
+    await u.click(await screen.findByRole("button", { name: "Edit trip details" }));
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST"
       ? { ...held, destination: "Colorado & Texas", destination_manual: true } : held) as never);
     await u.type(screen.getByLabelText("Destination"), "Colorado & Texas");
@@ -652,16 +652,16 @@ describe("Trip", () => {
   it("won't save an empty trip name, says why when the server refuses, and Cancel keeps the old name", async () => {
     render(TripPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Rename trip" }));
-    await u.clear(screen.getByLabelText("Trip name"));
+    await u.click(await screen.findByRole("button", { name: "Edit trip details" }));
+    await u.clear(screen.getByLabelText("Name"));
     await u.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Enter a name for the trip");
     expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
-    await u.type(screen.getByLabelText("Trip name"), "Nope");
+    await u.type(screen.getByLabelText("Name"), "Nope");
     vi.mocked(api).mockImplementation(async (_p, opts) => { if (opts?.method === "POST") throw new Error("The name is too long"); return held; });
     await u.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The name is too long");
-    expect(screen.getByLabelText("Trip name")).toHaveValue("Nope");
+    expect(screen.getByLabelText("Name")).toHaveValue("Nope");
     await u.click(screen.getByRole("button", { name: "Cancel" }));
     await u.click(await screen.findByRole("button", { name: "Discard changes" }));
     expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
@@ -1377,9 +1377,9 @@ describe("beside a list of trips", () => {
     const onchanged = vi.fn();
     render(TripPage, { tripId: 1, onchanged });
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Rename trip" }));
-    await u.clear(screen.getByLabelText("Trip name"));
-    await u.type(screen.getByLabelText("Trip name"), "Lisbon");
+    await u.click(await screen.findByRole("button", { name: "Edit trip details" }));
+    await u.clear(screen.getByLabelText("Name"));
+    await u.type(screen.getByLabelText("Name"), "Lisbon");
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST" ? { ...held, name: "Lisbon" } : held) as never);
     await u.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onchanged).toHaveBeenCalledTimes(1));

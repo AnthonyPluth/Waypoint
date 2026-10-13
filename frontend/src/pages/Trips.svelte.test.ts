@@ -346,9 +346,9 @@ describe("changing a trip in the pane", () => {
     render(Trips);
     const pane = await screen.findByRole("region", { name: "Selected trip" });
     const u = user();
-    await u.click(await within(pane).findByRole("button", { name: "Rename trip" }));
-    await u.clear(within(pane).getByLabelText("Trip name"));
-    await u.type(within(pane).getByLabelText("Trip name"), "Lisbon");
+    await u.click(await within(pane).findByRole("button", { name: "Edit trip details" }));
+    await u.clear(within(pane).getByLabelText("Name"));
+    await u.type(within(pane).getByLabelText("Name"), "Lisbon");
     await u.click(within(pane).getByRole("button", { name: "Save" }));
     const upcoming = screen.getByRole("list", { name: "Upcoming trips" });
     await waitFor(() => expect(within(upcoming).getByText("Lisbon")).toBeInTheDocument());
@@ -437,9 +437,9 @@ describe("overlapping loads", () => {
     const pane = await screen.findByRole("region", { name: "Selected trip" });
     const u = user();
     const rename = async (name: string) => {
-      await u.click(await within(pane).findByRole("button", { name: "Rename trip" }));
-      await u.clear(within(pane).getByLabelText("Trip name"));
-      await u.type(within(pane).getByLabelText("Trip name"), name);
+      await u.click(await within(pane).findByRole("button", { name: "Edit trip details" }));
+      await u.clear(within(pane).getByLabelText("Name"));
+      await u.type(within(pane).getByLabelText("Name"), name);
       await u.click(within(pane).getByRole("button", { name: "Save" }));
     };
     holdNext = true;
