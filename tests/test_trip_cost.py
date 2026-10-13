@@ -295,11 +295,11 @@ class VisibilityTests(CostCase):
     def test_a_saved_copy_for_offline_carries_the_costs_of_the_trip(self):
         got = self.stay(price={"amount_minor": 124000, "currency": "USD"})
         saved = offline.projection(self.c, self.jane, date(2026, 6, 3))
-        assert saved["trip"] is not None
-        self.assertEqual(saved["trip"]["costs"]["totals"], [{"currency": "USD", "amount_minor": 124000}])
-        self.assertEqual(saved["trip"]["segments"][0]["price"]["amount_minor"], 124000)
-        self.assertEqual(saved["trip"]["id"], got["trip_id"])
-        self.assertIsNone(offline.projection(self.c, self.sam, date(2026, 6, 3))["trip"])
+        [mine] = saved["trips"]
+        self.assertEqual(mine["trip"]["costs"]["totals"], [{"currency": "USD", "amount_minor": 124000}])
+        self.assertEqual(mine["trip"]["segments"][0]["price"]["amount_minor"], 124000)
+        self.assertEqual(mine["trip"]["id"], got["trip_id"])
+        self.assertEqual(offline.projection(self.c, self.sam, date(2026, 6, 3))["trips"], [])
 
 
 class ApiFieldTests(unittest.TestCase):
