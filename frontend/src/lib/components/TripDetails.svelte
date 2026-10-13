@@ -12,9 +12,8 @@
   import { tick } from "svelte";
   import { toast } from "svelte-sonner";
 
-  let { trip, dates, onsaved }: { trip: Trip; dates: string; onsaved: (next: Trip) => void } = $props();
+  let { trip, dates, onsaved, editing = $bindable(false) }: { trip: Trip; dates: string; onsaved: (next: Trip) => void; editing?: boolean } = $props();
 
-  let editing = $state(false);
   let name = $state("");
   let destination = $state("");
   let notes = $state("");
@@ -24,6 +23,7 @@
   let error = $state("");
   let pencil = $state<HTMLButtonElement | null>(null);
   let nameField = $state<HTMLInputElement | null>(null);
+  let formEl = $state<HTMLFormElement | null>(null);
 
   const typed = $derived(destination.trim());
   const helper = $derived(typed
@@ -37,7 +37,13 @@
   const back = async () => { close(); await tick(); pencil?.focus(); };
   const guard = draftGuard({ dirty: () => editing && changed(), saving: () => saving, discard: back });
   const cancel = () => leave(back, [guard]);
-  const escape = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); cancel(); } };
+  $effect(() => {
+    const form = formEl;
+    if (!form) return;
+    const escape = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); cancel(); } };
+    form.addEventListener("keydown", escape);
+    return () => form.removeEventListener("keydown", escape);
+  });
 
   async function open() {
     name = trip.name;
@@ -70,7 +76,7 @@
   };
 
   const suggest = () => act(async () => {
-    destination = (await apiCall<"POST /api/trips/{id}/destination/suggest">(`/api/trips/${trip.id}/destination/suggest`, { method: "POST" })).suggestion;
+    destination = (await apiCall<"POST /api/trips/{id}/destination/suggest">(`/api/trips/${trip.id}/destination/suggest`, { method: "POST", body: { name: name.trim() } })).suggestion;
     error = "";
   }, { busy: (on) => (suggesting = on) });
 </script>
@@ -82,15 +88,15 @@
   </div>
   <p class="min-w-0 break-words text-muted-foreground">{dates}{trip.destination ? ` · ${trip.destination}` : ""}</p>
 {:else}
-  <form class="mt-1 flex max-w-xl flex-col gap-4" onsubmit={save} aria-label="Edit trip details">
+  <form class="mt-1 flex max-w-xl flex-col gap-4" onsubmit={save} aria-label="Edit trip details" bind:this={formEl}>
     <div class="flex flex-col gap-1.5">
       <label class="text-sm font-medium" for="trip-name">Name</label>
-      <Input id="trip-name" bind:ref={nameField} bind:value={name} maxlength={100} autocomplete="off" onkeydown={escape} />
+      <Input id="trip-name" bind:ref={nameField} bind:value={name} maxlength={100} autocomplete="off" />
     </div>
     <div class="flex flex-col gap-1.5">
       <label class="text-sm font-medium" for="trip-destination">Destination</label>
       <div class="flex items-center gap-2">
-        <Input id="trip-destination" class="min-w-0 flex-1" bind:value={destination} maxlength={100} autocomplete="off" onkeydown={escape}
+        <Input id="trip-destination" class="min-w-0 flex-1" bind:value={destination} maxlength={100} autocomplete="off"
           placeholder={(!trip.destination_manual && trip.destination) || "Chosen from your bookings"} aria-describedby="trip-destination-help" />
         {#if app.state?.ai}
           <Button type="button" variant="outline" size="icon" class="shrink-0" aria-label="Suggest a destination with AI" title="Suggest a destination with AI"
@@ -105,7 +111,7 @@
     {#if hasNotes}
       <div class="flex flex-col gap-1.5">
         <label class="text-sm font-medium" for="trip-notes">Notes</label>
-        <textarea id="trip-notes" rows="3" maxlength={4000} bind:value={notes} autocomplete="off" onkeydown={escape}
+        <textarea id="trip-notes" rows="3" maxlength={4000} bind:value={notes} autocomplete="off"
           class="border-input bg-secondary placeholder:text-muted-foreground w-full min-w-0 rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"></textarea>
       </div>
     {/if}

@@ -218,6 +218,48 @@ describe("TripDetails", () => {
     expect(posts()).toEqual([["/api/trips/1", { method: "POST", body: { name: "Trip to London!" } }]]);
   });
 
+  it("Escape closes an untouched form from Save and from Cancel, not only from its fields", async () => {
+    show();
+    const u = await openForm();
+    await fireEvent.keyDown(saveButton(), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("form", { name: "Edit trip details" })).toBeNull());
+    await u.click(editButton());
+    await fireEvent.keyDown(cancelButton(), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("form", { name: "Edit trip details" })).toBeNull());
+    expect(screen.queryByRole("dialog", { name: "Discard changes?" })).toBeNull();
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it("Escape from Save asks before discarding a change", async () => {
+    show();
+    const u = await openForm();
+    await u.type(screen.getByLabelText("Name"), " again");
+    await fireEvent.keyDown(saveButton(), { key: "Escape" });
+    expect(await screen.findByRole("dialog", { name: "Discard changes?" })).toBeInTheDocument();
+    await u.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(screen.getByLabelText("Name")).toHaveValue("Trip to London again");
+  });
+
+  describe("Escape from the sparkle button", () => {
+    beforeEach(() => { app.state = state({ ai: true }); });
+
+    it("closes an untouched form without asking", async () => {
+      show();
+      await openForm();
+      await fireEvent.keyDown(screen.getByRole("button", { name: "Suggest a destination with AI" }), { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("form", { name: "Edit trip details" })).toBeNull());
+      expect(screen.queryByRole("dialog", { name: "Discard changes?" })).toBeNull();
+    });
+
+    it("asks before discarding a change", async () => {
+      show();
+      const u = await openForm();
+      await u.type(screen.getByLabelText("Name"), " again");
+      await fireEvent.keyDown(screen.getByRole("button", { name: "Suggest a destination with AI" }), { key: "Escape" });
+      expect(await screen.findByRole("dialog", { name: "Discard changes?" })).toBeInTheDocument();
+    });
+  });
+
   describe("the sparkle button", () => {
     it("is hidden, with its note, while the AI fallback is off", async () => {
       show();
@@ -242,9 +284,21 @@ describe("TripDetails", () => {
         await userEvent.click(screen.getByRole("button", { name: "Suggest a destination with AI" }));
         await waitFor(() => expect(screen.getByLabelText("Destination")).toHaveValue("Colorado & Texas"));
         expect(api).toHaveBeenCalledTimes(1);
-        expect(api).toHaveBeenCalledWith("/api/trips/1/destination/suggest", { method: "POST" });
+        expect(api).toHaveBeenCalledWith("/api/trips/1/destination/suggest", { method: "POST", body: { name: "Trip to London" } });
         expect(onsaved).not.toHaveBeenCalled();
         expect(screen.getByText(/You set this, so Waypoint won’t change it/)).toBeInTheDocument();
+      });
+
+      it("sends the name in the form, not the saved one, so the suggestion uses what is on screen", async () => {
+        vi.mocked(api).mockResolvedValue({ suggestion: "Utah" });
+        show();
+        const u = await openForm();
+        await u.clear(screen.getByLabelText("Name"));
+        await u.type(screen.getByLabelText("Name"), "  Summer in Utah ");
+        await u.click(screen.getByRole("button", { name: "Suggest a destination with AI" }));
+        await waitFor(() => expect(screen.getByLabelText("Destination")).toHaveValue("Utah"));
+        expect(api).toHaveBeenCalledWith("/api/trips/1/destination/suggest", { method: "POST", body: { name: "Summer in Utah" } });
+        expect(api).not.toHaveBeenCalledWith("/api/trips/1", expect.anything());
       });
 
       it("is disabled and busy while it asks", async () => {

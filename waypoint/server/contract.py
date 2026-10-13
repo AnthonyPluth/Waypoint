@@ -583,6 +583,10 @@ class TripBody(TypedDict):
     confirm: NotRequired[bool]
 
 
+class DestinationBody(TypedDict):
+    name: NotRequired[str]
+
+
 class DestinationSuggestion(TypedDict):
     suggestion: str
 

@@ -45,6 +45,7 @@
   let loyalty = $state<LoyaltyEntry[]>([]);
   let loadError = $state("");
   let form = $state<Draft | null>(null);
+  let editingTrip = $state(false);
   let focus = $state("");
   let inSheet = $state(false);
   let removing = $state<Segment | null>(null);
@@ -118,7 +119,7 @@
       await offerSavedCopy();
     }
   }
-  $effect(() => { void id; form = null; savedCopy = null; void load(); });
+  $effect(() => { void id; form = null; editingTrip = false; savedCopy = null; void load(); });
 
   const wanted = $derived(new URLSearchParams(route.query).get("segment"));
   $effect(() => {
@@ -256,7 +257,7 @@
   <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
       {#key id}
-        <TripDetails trip={t} dates={dates(t)} onsaved={(next) => { trip = next; onchanged?.(); }} />
+        <TripDetails bind:editing={editingTrip} trip={t} dates={dates(t)} onsaved={(next) => { trip = next; onchanged?.(); }} />
       {/key}
       {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
         <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
@@ -265,7 +266,7 @@
         <p class="mt-1 text-sm" data-trip-total><span class="eyebrow">Total</span> <span class="break-words font-medium">{formatTotals(t.costs.totals)}</span>
           {#if countNote(t.costs)}<span class="text-muted-foreground"> · {countNote(t.costs)}</span>{/if}</p>
       {/if}
-      {#if t.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
+      {#if t.notes && !editingTrip}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
       <OfflineStatus tripId={t.id} />
     </div>
     {#if !form}

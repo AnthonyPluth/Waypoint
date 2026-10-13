@@ -637,6 +637,18 @@ describe("Trip", () => {
     expect(screen.queryByLabelText("Name")).toBeNull();
   });
 
+  it("hides the trip’s saved notes while its form is open, and shows them again after Cancel", async () => {
+    held = trip([flight, stay], { notes: "Pack light for the trip" });
+    render(TripPage);
+    const u = userEvent.setup();
+    expect(await screen.findByText("Pack light for the trip")).toBeInTheDocument();
+    await u.click(screen.getByRole("button", { name: "Edit trip details" }));
+    expect(screen.getByLabelText("Notes")).toHaveValue("Pack light for the trip");
+    expect(screen.queryByText("Pack light for the trip")).toBeNull();
+    await u.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(await screen.findByText("Pack light for the trip")).toBeInTheDocument();
+  });
+
   it("edits the destination in the same form, sending only the destination, and shows the new one", async () => {
     render(TripPage);
     const u = userEvent.setup();
