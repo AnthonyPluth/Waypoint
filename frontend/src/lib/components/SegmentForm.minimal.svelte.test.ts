@@ -86,7 +86,7 @@ describe("SegmentForm: zones entered for an unknown airport", () => {
     expect(arrival).toBeInTheDocument();
     await userEvent.clear(screen.getByLabelText("To (airport)"));
     await userEvent.type(screen.getByLabelText("To (airport)"), "CDG");
-    await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalledWith("/api/airports/CDG"));
+    await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalledWith("/api/airports/CDG", { keep: true }));
     expect(screen.getByLabelText(/^Arrival time zone/)).toBeInTheDocument();
   });
 });
