@@ -25,15 +25,15 @@ Linking can’t be undone in Waypoint; restoring a [backup](/Waypoint/start/dock
 
 ## Adding and editing
 
-**Add a guest** and the pencil beside a person open the name form at the top of the page on a computer, and in a sheet that slides up over the dimmed page on a phone. **+ ID** on a person (and the pencil beside a membership) opens the [membership](/Waypoint/start/loyalty/) form under that person on a computer and in a sheet on a phone. Either way a save that fails keeps what you typed and says why inside the form, and **Cancel**, swiping the sheet down, tapping outside it or Escape closes it without saving. If you changed anything, it first asks **Discard changes?** (also before Back, another page or another form replaces it), and **Keep editing** returns to the form; nothing closes it while it is saving. What you type is kept in the page only, never in the browser’s storage, so a loyalty number typed here is gone if you discard it. Which one it is is decided when the form opens, so a form being filled in doesn’t jump if the window is resized.
+**Add a guest** and the pencil beside a person open the name form at the top of the page on a computer, and in a sheet that slides up over the dimmed page on a phone. **Add loyalty or traveler number** on a person (and the pencil beside a membership) opens the [membership](/Waypoint/start/loyalty/) form under that person on a computer and in a sheet on a phone. Either way a save that fails keeps what you typed and says why inside the form, and **Cancel**, swiping the sheet down, tapping outside it or Escape closes it without saving. If you changed anything, it first asks **Discard changes?** (also before Back, another page or another form replaces it), and **Keep editing** returns to the form; nothing closes it while it is saving. What you type is kept in the page only, never in the browser’s storage, so a loyalty number typed here is gone if you discard it. Which one it is is decided when the form opens, so a form being filled in doesn’t jump if the window is resized.
 
 ## Names
 
 Each person has:
 
-- a **name** (how Waypoint shows them) and a **first name**;
-- a **legal name**, as it appears on their ID;
-- **name aliases**, the ways an airline prints their name on a booking, such as `DOE/JANE MS`. Add one per line; Waypoint will match bookings against them. When a name matches both a member and a guest, the booking goes to the member; when it matches two members, or two guests, Waypoint doesn’t guess and asks in Review.
+- a **display name** (how Waypoint shows them) and a **first name**;
+- a **legal name**, the name on their ID and bookings, used to match them;
+- **name aliases**, under **Advanced matching**: the ways an airline prints their name on a booking, such as `DOE/JANE MS`. Add one per line; Waypoint will match bookings against them. When a name matches both a member and a guest, the booking goes to the member; when it matches two members, or two guests, Waypoint doesn’t guess and asks in Review.
 
 ## In a backup
 
