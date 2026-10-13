@@ -8,7 +8,8 @@
 #     REQUIRED_WORKFLOWS ran at all. CodeQL counts as one of them: GitHub's default setup runs it as a "dynamic" workflow
 #     (not a pull_request one), under the name "PR #<n>";
 #   - every other app's check run (CodeQL, Semgrep, Trivy, zizmor, ...) succeeded, and every commit status did, and the
-#     ones in REQUIRED_STATUSES were set at all: "Agent review" (.github/workflows/agent-review.yml) is the independent
+#     ones in REQUIRED_STATUSES were set at all (none now: "Agent review" (.github/workflows/agent-review.yml) is
+#     disabled, and described here for when it is turned back on). It is the independent
 #     review, which fails on an agent's pull request with a blocking finding and passes on anyone else's. It must be on
 #     the head commit itself: when the review copies a passing verdict forward (a push that only merged main in), it
 #     sets the status on the new head, and a head without one waits.

@@ -1,5 +1,7 @@
 name: Agent review
 
+# DISABLED (see the note above `on:`): the comments below describe the review for when it is turned back on, and the merge
+# gate does not require its status while it is off.
 # An independent review of every pull request an AI agent wrote: a fresh Claude Code session, with no access to the
 # session that wrote it, reads the change against main's AGENTS.md and posts its findings as a comment. Its verdict is
 # the "Agent review" commit status on the pull request's head, which the merge gate requires (.github/scripts/
