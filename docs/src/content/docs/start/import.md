@@ -28,15 +28,17 @@ Airports are read as three-letter IATA codes (or an airport’s name with its co
 
 ## The preview
 
-Nothing is saved when you choose the file. Each row is shown as a flight and marked:
+Nothing is saved when you choose the file. Each row is shown as a flight, fifty to a page, and marked:
 
 - **New**: it will be added.
 - **Already in Waypoint**: you already have a flight with the same flight number on that day, or the same route on that day (a flight repeated in the file counts once). A cancelled segment doesn’t count.
 - **Can’t read**: with why (an unknown airport, a date that isn’t a day, a flight the app marks cancelled).
 
+Every row can be reviewed, however long the file: page through them, search by airport, flight number, airline, date or line number, or use **Problems only** to jump to the rows that can’t be read. The buttons show the totals for each status. Untick a new flight to leave it out; the button and the line above it say exactly how many will be added.
+
 Then you choose **who was on these flights**: you by default, or anyone in [People](/Waypoint/start/people/). The new flights become segments from an import, booked by you, and grouped into trips by the usual [grouping](/Waypoint/start/trips/#how-segments-are-grouped). As with any trip, you and the people you chose see them, and nobody else.
 
-Importing the same file again adds nothing.
+Importing the same file again adds nothing. If saving stops part-way, the flights already added are marked **Added**, the message says how many are left, and pressing the button again sends only those, so a retry never duplicates a flight.
 
 ## Times
 

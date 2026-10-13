@@ -274,6 +274,21 @@ describe("Upcoming", () => {
     expect(card).not.toHaveTextContent("[");
   });
 
+  it("keeps a parking booking and a rental under way beside the flight that leads, with when each ends", async () => {
+    const parking = segment({ id: 40, kind: "parking", provider: "Lot A", origin: "Lot A", destination: null, start_local: "2026-11-15T06:00", start_zone: NY, end_local: "2026-11-22T20:00", end_zone: NY, details: {} });
+    const rental = segment({ id: 41, kind: "car", provider: "Hertz", origin: "JFK", destination: null, start_local: "2026-11-16T09:00", start_zone: NY, end_local: "2026-11-24T09:00", end_zone: NY, details: {} });
+    serve([trip([parking, rental, segment({ id: 42, start_local: "2026-11-18T11:00", end_local: "2026-11-18T14:00", end_zone: NY })])]);
+    at("2026-11-18T09:00:00-05:00");
+    render(Upcoming);
+    const also = await screen.findByRole("region", { name: "Also under way" });
+    const links = within(also).getAllByRole("link");
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute("href", "#trip/1?segment=40");
+    expect(links[1]).toHaveAttribute("href", "#trip/1?segment=41");
+    expect(also).toHaveTextContent(/Exit/);
+    expect(also).toHaveTextContent(/Drop-off/);
+  });
+
   it("says nothing is coming up when every trip is over", async () => {
     at("2027-03-01T09:00:00Z");
     serve([london]);

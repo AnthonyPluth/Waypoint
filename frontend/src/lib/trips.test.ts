@@ -76,6 +76,35 @@ describe("nextUp", () => {
     expect(nextUp([london], at("2026-12-01T09:00", NY))).toBeNull();
     expect(nextUp([], Date.now())).toBeNull();
   });
+  describe("with parking and a rental under way", () => {
+    const parking = segment({ id: 40, kind: "parking", provider: "Lot A", origin: "Lot A", destination: null, start_local: "2026-11-15T06:00", start_zone: NY, end_local: "2026-11-22T20:00", end_zone: NY, details: {} });
+    const rental = segment({ id: 41, kind: "car", provider: "Hertz", origin: "JFK", destination: null, start_local: "2026-11-16T09:00", start_zone: NY, end_local: "2026-11-24T09:00", end_zone: NY, details: {} });
+    const flight = segment({ id: 42, start_local: "2026-11-18T11:00", start_zone: NY, end_local: "2026-11-18T14:00", end_zone: LA, origin: "JFK", destination: "LAX" });
+    const household = trip([parking, rental, flight], { id: 5 });
+    const now = at("2026-11-18T09:00", NY);
+    it("leads with the imminent flight and keeps both reservations alongside, returning soonest first", () => {
+      const next = nextUp([household], now);
+      expect(next).toMatchObject({ state: "next", segment: { id: 42 } });
+      expect(next?.alongside.map((x) => x.segment.id)).toEqual([40, 41]);
+    });
+    it("leads with a flight under way, whatever started earlier", () => {
+      const next = nextUp([household], at("2026-11-18T12:00", NY));
+      expect(next).toMatchObject({ state: "now", segment: { id: 42 } });
+      expect(next?.alongside.map((x) => x.segment.id)).toEqual([40, 41]);
+    });
+    it("does not let a reservation that started first hide a flight that departs sooner in another zone", () => {
+      const other = trip([segment({ id: 50, trip_id: 6, start_local: "2026-11-18T15:00", start_zone: LON, end_local: "2026-11-18T17:00", end_zone: LON, origin: "LHR", destination: "CDG" })], { id: 6 });
+      expect(nextUp([household, other], now)).toMatchObject({ state: "next", segment: { id: 50 } });
+    });
+    it("falls back to the reservation ending soonest once nothing else is left", () => {
+      const next = nextUp([trip([parking, rental])], now);
+      expect(next).toMatchObject({ state: "now", segment: { id: 40 } });
+      expect(next?.alongside.map((x) => x.segment.id)).toEqual([41]);
+    });
+    it("lets a reservation that has not started count as coming, in order of start", () => {
+      expect(nextUp([trip([parking, rental, flight])], at("2026-11-14T09:00", NY))).toMatchObject({ state: "next", segment: { id: 40 }, alongside: [] });
+    });
+  });
   it("looks across every trip", () => {
     const later = trip([segment({ id: 20, trip_id: 2, start_local: "2027-01-14T21:00", end_local: "2027-01-16T06:30" })], { id: 2, name: "Trip to Auckland" });
     expect(nextUp([later, london], at("2026-11-18T09:00", NY))?.trip.id).toBe(1);
