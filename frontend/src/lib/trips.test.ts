@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
 
 const NY = "America/New_York", LON = "Europe/London", AKL = "Pacific/Auckland", LA = "America/Los_Angeles";
@@ -418,23 +419,23 @@ describe("the pass headline", () => {
   const dep = at("2026-11-20T19:00", NY), arr = at("2026-11-21T07:10", LON), HOUR = 3_600_000;
   it("uses the same 24 hours as the check-in reminder", () => { expect(CHECK_IN_WINDOW_HOURS).toBe(24); });
   it("counts down to check-in more than 24 hours out", () => {
-    expect(passHeadline(flight, dep - 30 * HOUR)).toBe("Check-in opens in 6 h");
-    expect(passHeadline(flight, dep - 24 * HOUR - 60_000)).toBe("Check-in opens in 1 min");
+    expect(passHeadline(flight, dep - 30 * HOUR)).toBe("Check-in usually opens in 6 h");
+    expect(passHeadline(flight, dep - 24 * HOUR - 60_000)).toBe("Check-in usually opens in 1 min");
   });
   it("is open from exactly 24 hours before departure", () => {
-    expect(passHeadline(flight, dep - 24 * HOUR)).toBe("Check-in is open, departs in 1 day");
-    expect(passHeadline(flight, dep - 24 * HOUR + 60_000)).toBe("Check-in is open, departs in 23 h 59 min");
-    expect(passHeadline(flight, dep - 3 * HOUR)).toBe("Check-in is open, departs in 3 h");
+    expect(passHeadline(flight, dep - 24 * HOUR)).toBe("Check-in usually open, scheduled departure in 1 day");
+    expect(passHeadline(flight, dep - 24 * HOUR + 60_000)).toBe("Check-in usually open, scheduled departure in 23 h 59 min");
+    expect(passHeadline(flight, dep - 3 * HOUR)).toBe("Check-in usually open, scheduled departure in 3 h");
   });
   it("says now rather than in now in the last minute", () => {
-    expect(passHeadline(flight, dep - 20_000)).toBe("Check-in is open, departing now");
-    expect(passHeadline(flight, arr - 20_000)).toBe("Under way, arriving now");
+    expect(passHeadline(flight, dep - 20_000)).toBe("Check-in usually open, scheduled departure now");
+    expect(passHeadline(flight, arr - 20_000)).toBe("Scheduled arrival now");
   });
   it("is under way from departure and landed from arrival", () => {
-    expect(passHeadline(flight, dep)).toBe("Under way, arrives in 7 h 10 min");
-    expect(passHeadline(flight, arr - 70 * 60_000)).toBe("Under way, arrives in 1 h 10 min");
-    expect(passHeadline(flight, arr)).toBe("Landed");
-    expect(passHeadline(flight, arr + 5 * HOUR)).toBe("Landed");
+    expect(passHeadline(flight, dep)).toBe("Scheduled arrival in 7 h 10 min");
+    expect(passHeadline(flight, arr - 70 * 60_000)).toBe("Scheduled arrival in 1 h 10 min");
+    expect(passHeadline(flight, arr)).toBe("Scheduled arrival time passed");
+    expect(passHeadline(flight, arr + 5 * HOUR)).toBe("Scheduled arrival time passed");
   });
   it("says so for a flight with no times, and never reads a cancelled one as current", () => {
     expect(passHeadline(segment({ details: { time_unknown: "yes" } }), dep)).toBe("Time not recorded");
@@ -587,5 +588,60 @@ describe("a rental car's address beside its pick-up", () => {
     expect(extraAddress(car("Example Rental"))).toBeUndefined();
     expect(extraAddress(car("1 Rental Way"))).toBe("1 Rental Way");
     expect(extraAddress({ kind: "hotel", origin: "Example Rental", details: { address: "Example Rental" } })).toBe("Example Rental");
+  });
+});
+
+
+describe("a flight headline by evidence", () => {
+  const flight = segment({ id: 9, start_local: "2026-11-20T19:00", start_zone: NY, end_local: "2026-11-21T07:10", end_zone: LON });
+  const dep = at("2026-11-20T19:00", NY), arr = at("2026-11-21T07:10", LON), HOUR = 3_600_000;
+  const live = (extra: Partial<FlightStatus> = {}): FlightStatus => ({
+    segment_id: 1, state: "delayed", origin: "JFK", destination: "LHR",
+    dep_scheduled: "2026-11-20T19:00", dep_estimated: "2026-11-20T19:50", dep_actual: null, dep_zone: NY, dep_terminal: null, dep_gate: null,
+    arr_scheduled: "2026-11-21T07:10", arr_estimated: "2026-11-21T08:05", arr_actual: null, arr_zone: LON, arr_terminal: null, arr_gate: null,
+    delay_minutes: 50, fetched_at: new Date(dep - HOUR).toISOString(), ...extra,
+  });
+  const afterDeparture = dep + HOUR;
+
+  it("never says landed or under way from the clock alone", () => {
+    for (const now of [dep + HOUR, arr - HOUR, arr + HOUR]) {
+      const words = passHeadline(flight, now);
+      expect(words).not.toMatch(/^(Landed|Under way)/);
+    }
+    expect(passHeadline(flight, arr + HOUR)).toBe("Scheduled arrival time passed");
+  });
+  it("qualifies a delayed flight instead of calling it under way", () => {
+    expect(passHeadline(flight, dep - 2 * HOUR, live())).toBe("Delayed 50 min, expected to leave in 2 h 50 min");
+    expect(passHeadline(flight, dep + 60_000 * 55, live({ fetched_at: new Date(dep + 60_000 * 50).toISOString() }))).toBe("Delayed 50 min, not yet confirmed as departed");
+    expect(passHeadline(flight, afterDeparture, live({ dep_estimated: null, fetched_at: new Date(dep).toISOString() }))).toBe("Delayed 50 min, not yet confirmed as departed");
+  });
+  it("shows a live cancellation or diversion over the booked times", () => {
+    expect(passHeadline(flight, arr + HOUR, live({ state: "cancelled" }))).toBe("Cancelled by the airline");
+    expect(passHeadline(flight, dep - 2 * HOUR, live({ state: "cancelled" }))).toBe("Cancelled by the airline");
+    expect(passHeadline(flight, afterDeparture, live({ state: "diverted", fetched_at: new Date(dep).toISOString() }))).toBe("Diverted");
+  });
+  it("says landed or departed only when live status does", () => {
+    expect(passHeadline(flight, arr + HOUR, live({ state: "landed" }))).toBe("Landed");
+    expect(passHeadline(flight, arr + 24 * HOUR, live({ state: "landed", fetched_at: new Date(arr).toISOString() }))).toBe("Landed");
+    expect(passHeadline(flight, afterDeparture, live({ state: "departed", fetched_at: new Date(dep).toISOString() }))).toBe("Departed, expected to arrive in 7 h 5 min");
+    expect(passHeadline(flight, arr + 2 * HOUR, live({ state: "departed", arr_estimated: null, fetched_at: new Date(arr + HOUR).toISOString() }))).toBe("Departed, arrival not yet confirmed");
+  });
+  it("falls back to the schedule when live status is stale, unavailable or offline", () => {
+    const stale = live({ state: "departed", fetched_at: new Date(dep - 4 * HOUR).toISOString() });
+    expect(flightEvidence(stale, dep + HOUR)).toBe("scheduled");
+    expect(passHeadline(flight, dep + HOUR, stale)).toBe(`Scheduled arrival in ${until(arr - dep - HOUR)}`);
+    expect(passHeadline(flight, arr + HOUR, undefined)).toBe("Scheduled arrival time passed");
+    expect(passHeadline(flight, arr + HOUR, null)).toBe("Scheduled arrival time passed");
+    const fresh = live({ state: "departed", fetched_at: new Date(dep).toISOString() });
+    expect(passHeadline(flight, dep + HOUR, fresh, false)).toBe(passHeadline(flight, dep + HOUR));
+    expect(passHeadline(flight, arr + HOUR, live({ state: "landed" }), false)).toBe("Scheduled arrival time passed");
+    expect(flightEvidence(live({ fetched_at: "not a date" }), dep)).toBe("scheduled");
+  });
+  it("treats an on-time live status as no more than the schedule", () => {
+    expect(passHeadline(flight, arr + HOUR, live({ state: "scheduled", fetched_at: new Date(arr).toISOString() }))).toBe("Scheduled arrival time passed");
+  });
+  it("pins the wording before and during the check-in reminder window", () => {
+    expect(passHeadline(flight, dep - 30 * HOUR)).toBe("Check-in usually opens in 6 h");
+    expect(passHeadline(flight, dep - 3 * HOUR)).toBe("Check-in usually open, scheduled departure in 3 h");
   });
 });

@@ -9,9 +9,9 @@
   import DayTime from "$lib/components/DayTime.svelte";
   import GateCode from "$lib/components/GateCode.svelte";
   import { takeEarlyTrips } from "$lib/early";
-  import { loadFlightStatus } from "$lib/flightstatus.svelte";
+  import { flightStatus, loadFlightStatus, statusFor } from "$lib/flightstatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
-  import { dateLabel, dayIn, dayLabel, END_WORD, featuredTrip, headline, nextUp, subline, timesDiffer, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
+  import { dateLabel, dayIn, dayLabel, END_WORD, featuredTrip, flightEvidence, headline, nextUp, subline, timesDiffer, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
@@ -104,7 +104,10 @@
 {:else}
   {#if next}
     {@const s = next.segment}
-    <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-8" condensed eyebrow={next.state === "now" ? "Under way" : "Next up"} pulse={next.state === "now"}>
+    {@const proof = s.kind === "flight" && flightStatus.list?.enabled ? flightEvidence(statusFor(s.id), now, typeof navigator === "undefined" || navigator.onLine !== false) : "scheduled"}
+    {@const grounded = proof === "landed" || proof === "cancelled" || proof === "diverted"}
+    {@const eyebrow = next.state !== "now" ? "Next up" : s.kind !== "flight" ? "Under way" : grounded ? "Latest flight" : proof === "departed" ? "In the air" : proof === "delayed" ? "Delayed" : "In the air, by schedule"}
+    <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-8" condensed {eyebrow} pulse={next.state === "now" && !grounded}>
       {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
       {#snippet footer()}<span class="flex flex-wrap gap-2"><GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm">Open {next.trip.name}</Button></span>{/snippet}
     </PassCard>

@@ -23,8 +23,8 @@ describe("Design", () => {
   it("shows the pass card for a flight before and during the flight, and for a stay", () => {
     render(Design);
     const pass = screen.getByRole("heading", { name: "Pass card" }).closest("section") as HTMLElement;
-    expect(within(pass).getByText("Check-in is open, departs in 3 h")).toBeTruthy();
-    expect(within(pass).getByText("Under way, arrives in 2 h 45 min")).toBeTruthy();
+    expect(within(pass).getByText("Check-in usually open, scheduled departure in 3 h")).toBeTruthy();
+    expect(within(pass).getByText("Scheduled arrival in 2 h 45 min")).toBeTruthy();
     expect(within(pass).getByText("Check-in in 7 h")).toBeTruthy();
   });
   it("is reachable at #design, under Settings in the navigation", () => {

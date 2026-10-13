@@ -14,7 +14,7 @@
   import { isMobile } from "$lib/platform";
   import { formatMoney } from "$lib/money";
   import { segmentChips } from "$lib/status";
-  import { appWord, dayLabel, extraAddress, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
+  import { appWord, dayLabel, extraAddress, flightEvidence, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
 
   type Props = {
     segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
@@ -32,7 +32,12 @@
   const chips = $derived(segmentChips(s.status, status, !!flightStatus.list?.enabled));
   const codes = $derived(bookings.filter((b) => b.confirmation));
   const differ = $derived(bookings.length > 1 && timesDiffer(bookings));
-  const progress = $derived(routeProgress(s, now));
+  const online = $derived(typeof navigator === "undefined" || navigator.onLine !== false);
+  const evidence = $derived(flight ? flightEvidence(status, now, online) : "scheduled");
+  const grounded = $derived(cancelled || evidence === "cancelled");
+  const progress = $derived(evidence === "landed" ? 1 : routeProgress(s, now));
+  const headlineText = $derived(passHeadline(s, now, status, online));
+  const bad = $derived(grounded || evidence === "diverted");
   const seat = $derived(seatsInOrder(s.details.seat || s.travelers.map((t) => t.seat).filter(Boolean).join(", ")));
   const number = $derived(s.details.flight_number ?? "");
   const app = $derived(s.links.app ?? s.manage_url);
@@ -56,7 +61,7 @@
 <svelte:element this={tag} {id} class={`pass scroll-mt-20 ${cls}`} class:ring-2={highlight} class:ring-ring={highlight} class:opacity-80={cancelled} aria-label={label ?? (tag === "section" ? headline(s) : undefined)} data-kind={s.kind} data-progress={flight ? progress : undefined}>
   <div class="flex flex-col gap-4 p-6 md:p-8">
     {#if eyebrow}<p class="eyebrow flex items-center gap-2">{#if pulse}<span class="size-2 animate-pulse rounded-full bg-primary motion-reduce:animate-none" aria-hidden="true"></span>{/if}{eyebrow}</p>{/if}
-    {#if !noHeadline}{#key passHeadline(s, now)}<p class="countdown text-heading font-semibold" class:text-primary={!cancelled} class:text-destructive={cancelled} data-headline data-countdown>{passHeadline(s, now)}</p>{/key}{/if}
+    {#if !noHeadline}{#key headlineText}<p class="countdown text-heading font-semibold" class:text-primary={!bad} class:text-destructive={bad} data-headline data-countdown>{headlineText}</p>{/key}{/if}
     {#if flight}<svelte:element this={`h${level}`} class="sr-only">{headline(s)}</svelte:element>{/if}
 
     {#if showCode && codes.length}
@@ -90,7 +95,8 @@
       <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
         <AirportCode code={s.origin ?? "—"} size="medium" />
         <span title="The plane’s place is worked out from the booked times, not live data" class="min-w-0">
-          <RouteLine progress={cancelled ? 0 : progress} label="Route, with the plane placed from the booked times" />
+          <RouteLine progress={grounded ? 0 : progress} label={evidence === "landed" ? "Route, with the plane at the destination" : "Route, with the plane placed from the booked times"} />
+          {#if evidence !== "landed" && !grounded}<span class="block text-center text-xs text-muted-foreground" data-schedule-label>Based on schedule</span>{/if}
         </span>
         <AirportCode code={s.destination ?? "—"} size="medium" class="text-right" />
         {#if timesArea}{:else if differ}

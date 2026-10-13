@@ -1,4 +1,4 @@
-import type { LoyaltyEntry, Segment, Trip } from "./api-types";
+import type { FlightStatus, LoyaltyEntry, Segment, Trip } from "./api-types";
 import { countryName } from "./stats";
 
 export type Traveler = Segment["travelers"][number];
@@ -337,7 +337,22 @@ export function routeProgress(s: Segment, now: number): number {
   return Math.min(1, Math.max(0, (now - from) / (to - from)));
 }
 
-export function passHeadline(s: Segment, now: number): string {
+export const LIVE_STALE_HOURS = 3;
+const LIVE_STALE_MS = LIVE_STALE_HOURS * 3_600_000;
+
+export type FlightEvidence = "landed" | "cancelled" | "diverted" | "delayed" | "departed" | "scheduled";
+
+export function flightEvidence(live: Pick<FlightStatus, "state" | "fetched_at"> | null | undefined, now: number, online = true): FlightEvidence {
+  if (!live || !online) return "scheduled";
+  if (live.state === "landed" || live.state === "cancelled") return live.state;
+  const fetched = Date.parse(live.fetched_at);
+  if (Number.isNaN(fetched) || now - fetched > LIVE_STALE_MS) return "scheduled";
+  return live.state === "scheduled" ? "scheduled" : live.state;
+}
+
+const lead = (word: string, ms: number, soon: string): string => (ms >= 60_000 ? `${word} ${until(ms)}` : soon);
+
+export function passHeadline(s: Segment, now: number, live?: FlightStatus | null, online = true): string {
   if (s.status === "cancelled") return "Cancelled";
   const from = startAt(s), to = endAt(s);
   if (untimed(s) || Number.isNaN(from) || Number.isNaN(to)) return "Time not recorded";
@@ -345,8 +360,24 @@ export function passHeadline(s: Segment, now: number): string {
     if (now < from) return when(START_WORD[s.kind], from - now);
     return now < to ? when(END_WORD[s.kind], to - now) : PAST_WORD[s.kind];
   }
-  if (now < from - CHECK_IN_WINDOW_MS) return `Check-in opens in ${until(from - CHECK_IN_WINDOW_MS - now)}`;
-  if (now < from) return `Check-in is open, ${from - now >= 60_000 ? `departs in ${until(from - now)}` : "departing now"}`;
-  if (now >= to) return PAST_WORD.flight;
-  return `Under way, ${to - now >= 60_000 ? `arrives in ${until(to - now)}` : "arriving now"}`;
+  const evidence = flightEvidence(live, now, online);
+  if (evidence === "landed") return "Landed";
+  if (evidence === "cancelled") return "Cancelled by the airline";
+  if (evidence === "diverted") return "Diverted";
+  if (live && evidence === "delayed") {
+    const late = live.delay_minutes ? `Delayed ${live.delay_minutes} min` : "Delayed";
+    const expected = live.dep_estimated ? instant(live.dep_estimated, live.dep_zone) : NaN;
+    if (!Number.isNaN(expected) && expected > now) return `${late}, ${lead("expected to leave in", expected - now, "expected to leave now")}`;
+    if (now < from) return `${late}, ${lead("scheduled departure in", from - now, "scheduled departure now")}`;
+    return `${late}, not yet confirmed as departed`;
+  }
+  if (live && evidence === "departed") {
+    const expected = live.arr_estimated ? instant(live.arr_estimated, live.arr_zone) : to;
+    const arrival = Number.isNaN(expected) ? to : expected;
+    return arrival > now ? `Departed, ${lead("expected to arrive in", arrival - now, "expected to arrive now")}` : "Departed, arrival not yet confirmed";
+  }
+  if (now < from - CHECK_IN_WINDOW_MS) return `Check-in usually opens in ${until(from - CHECK_IN_WINDOW_MS - now)}`;
+  if (now < from) return `Check-in usually open, ${lead("scheduled departure in", from - now, "scheduled departure now")}`;
+  if (now < to) return lead("Scheduled arrival in", to - now, "Scheduled arrival now");
+  return "Scheduled arrival time passed";
 }

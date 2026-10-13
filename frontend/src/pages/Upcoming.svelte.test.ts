@@ -75,7 +75,7 @@ describe("Upcoming", () => {
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(within(card).getByText("Next up")).toBeInTheDocument();
-    expect(within(card).getByText("Check-in is open, departs in 10 h")).toBeInTheDocument();
+    expect(within(card).getByText("Check-in usually open, scheduled departure in 10 h")).toBeInTheDocument();
     expect(within(card).getByText("American Airlines AA 101")).toBeInTheDocument();
     expect(within(card).getAllByText("7:00 PM")).toHaveLength(2);
     expect(within(card).getByText("8")).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe("Upcoming", () => {
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(within(card).getByText("Next up")).toBeInTheDocument();
-    expect(within(card).getByText("Check-in opens in 1 day 10 h")).toBeInTheDocument();
+    expect(within(card).getByText("Check-in usually opens in 1 day 10 h")).toBeInTheDocument();
   });
 
   it("puts the plane on the route line from the booked times when the flight is under way", async () => {
@@ -97,9 +97,9 @@ describe("Upcoming", () => {
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
-    expect(within(card).getByText("Under way")).toBeInTheDocument();
+    expect(within(card).getByText("In the air, by schedule")).toBeInTheDocument();
     expect(within(card).getByRole("img", { name: /booked times/ }).dataset.progress).toBe("0.5");
-    expect(within(card).getByText("Under way, arrives in 3 h 35 min")).toBeInTheDocument();
+    expect(within(card).getByText("Scheduled arrival in 3 h 35 min")).toBeInTheDocument();
   });
 
   it("leads with the card’s code first, then the route and the times at each airport", async () => {
@@ -147,7 +147,7 @@ describe("Upcoming", () => {
     at("2026-11-20T18:59:40-05:00");
     serve([london]);
     render(Upcoming);
-    expect(await screen.findByText("Check-in is open, departing now")).toBeInTheDocument();
+    expect(await screen.findByText("Check-in usually open, scheduled departure now")).toBeInTheDocument();
   });
 
   it("calls a flight in the air under way, and counts down to landing", async () => {
@@ -155,8 +155,34 @@ describe("Upcoming", () => {
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
-    expect(within(card).getByText("Under way")).toBeInTheDocument();
-    expect(within(card).getByText("Under way, arrives in 10 min")).toBeInTheDocument();
+    expect(within(card).getByText("In the air, by schedule")).toBeInTheDocument();
+    expect(within(card).getByText("Scheduled arrival in 10 min")).toBeInTheDocument();
+  });
+
+  it("doesn’t call a flight in the air by schedule once live status says it landed", async () => {
+    at("2026-11-21T02:00:00-05:00");
+    const landed = { ...delayed, statuses: [{ ...delayed.statuses[0], state: "landed", arr_actual: "2026-11-21T01:50" }] };
+    vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? landed : { trips: [london] }) as never);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
+    expect(await within(card).findByText("Latest flight")).toBeInTheDocument();
+    expect(within(card).queryByText("In the air, by schedule")).toBeNull();
+    expect(within(card).getByText("Landed", { selector: "[data-headline]" })).toBeInTheDocument();
+  });
+
+  it("does not call a flight in the air by schedule once live status says it landed or was cancelled", async () => {
+    at("2026-11-21T02:00:00-05:00");
+    for (const state of ["landed", "cancelled"]) {
+      const live = { ...delayed, statuses: [{ ...delayed.statuses[0], state, fetched_at: "2026-11-21T06:30:00+00:00" }] };
+      vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? live : { trips: [london] }) as never);
+      const { unmount } = render(Upcoming);
+      const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
+      await within(card).findByTestId("flight-status");
+      expect(within(card).getByText("Latest flight")).toBeInTheDocument();
+      expect(within(card).queryByText("In the air, by schedule")).toBeNull();
+      unmount();
+      flightStatus.list = null;
+    }
   });
 
   it("leads with a hotel's address and check-in time once the flight is behind", async () => {
