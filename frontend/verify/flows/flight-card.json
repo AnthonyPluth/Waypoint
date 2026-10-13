@@ -1,0 +1,14 @@
+{
+  "name": "flight-card",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('London') >> visible=true" },
+    { "wait_for": "[data-kind='flight'] [data-airport-name]" },
+    { "expect_text": { "selector": "[data-kind='flight']", "text": "Heathrow" } },
+    { "expect_text": { "selector": "[data-kind='flight']", "text": "+1 day" } },
+    { "expect_text": { "selector": "[data-kind='flight']", "text": "Times are local to each airport" } },
+    { "scroll_to": "[data-kind='flight'] >> nth=0" },
+    { "screenshot": "trip-flight" }
+  ]
+}
