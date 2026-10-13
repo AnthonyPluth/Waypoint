@@ -83,6 +83,30 @@
     },
     {
       "method": "GET",
+      "path": "/api/map",
+      "handler": "waypoint/server/api/map.py:api_map",
+      "web": [],
+      "tests": [
+        "tests/test_map.py"
+      ],
+      "docs": [
+        "reference/configuration"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/map/tiles",
+      "handler": "waypoint/server/api/map.py:api_map_tiles",
+      "web": [],
+      "tests": [
+        "tests/test_map.py"
+      ],
+      "docs": [
+        "reference/configuration"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/people",
       "handler": "waypoint/server/api/people.py:api_people",
       "web": [
@@ -230,6 +254,7 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_map.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_offline.py",
@@ -251,6 +276,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_logos.py",
+        "tests/test_map.py",
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_routes.py",

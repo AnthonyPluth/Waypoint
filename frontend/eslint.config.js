@@ -28,6 +28,10 @@ const RESTRICTED = {
     message: "The app is dark only: write the dark values directly, with no `dark:` variant and no light palette (tokens in src/app.css).",
   },
 };
+RESTRICTED.remoteMap = {
+  selector: "Literal[value=/^(https?:)?\\/\\/(?!www\\.openstreetmap\\.org\\/copyright$)/], TemplateElement[value.raw=/^(https?:)?\\/\\//]",
+  message: "The trip map draws only from Waypoint's own address (/api/map/tiles, /map/fonts, /map/sprites): a remote tile, style, font or sprite address would send every viewer's requests to an outside provider (AGENTS.md, \"Waypoint's promises\"). Only the OpenStreetMap credit link is allowed.",
+};
 const restrict = (...names) => ["error", ...names.map((n) => RESTRICTED[n])];
 
 const waypoint = {
@@ -82,6 +86,10 @@ export default defineConfig(
       "no-console": ["error", { allow: ["error", "warn"] }],
     },
     plugins: { waypoint },
+  },
+  {
+    files: ["frontend/src/lib/basemap.ts", "frontend/src/lib/basemap-style.ts", "frontend/src/lib/components/ReplayBasemap.svelte", "frontend/src/lib/components/RouteReplayMap.svelte"],
+    rules: { "no-restricted-syntax": restrict("errorCast", "fetch", "storage", "cache", "darkOnly", "remoteMap") },
   },
   { files: ["frontend/src/lib/api.ts"], rules: { "no-restricted-syntax": restrict("errorCast", "storage", "cache", "darkOnly") } },
   { files: ["frontend/src/lib/offline-vault.ts"], rules: { "no-restricted-syntax": restrict("errorCast", "fetch", "storage", "darkOnly") } },

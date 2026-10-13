@@ -164,6 +164,18 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/logodev.py"]
 
+  - id: waypoint-protomaps-hosts
+    message: >-
+      Only waypoint/providers/protomaps.py talks to Protomaps, so what a request carries (a byte range of a public map file,
+      never anything about a trip or a person) stays in one place (AGENTS.md, "Waypoint's promises"): call it rather than
+      naming its hosts elsewhere.
+    severity: ERROR
+    languages: [python]
+    pattern-regex: (?i)protomaps\.(com|dev|github)
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/providers/protomaps.py"]
+
   - id: waypoint-wikimedia-hosts
     message: >-
       Only waypoint/providers/wikimedia.py talks to Wikidata and Wikimedia Commons, so what a request carries (a hotel brand's

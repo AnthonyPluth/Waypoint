@@ -1,5 +1,7 @@
 <script lang="ts">
   import { geoPath } from "d3-geo";
+  import type { Component } from "svelte";
+  import { look } from "$lib/basemap";
   import { Button } from "$lib/components/ui/button";
   import { loadCountries, type Country } from "$lib/map";
   import { viewport } from "$lib/phone.svelte";
@@ -8,7 +10,7 @@
   import Play from "@lucide/svelte/icons/play";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
-  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false }: { stops: Stop[]; year: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean } = $props();
+  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, basemap = false, still = null, autoplay = false }: { stops: Stop[]; year: number; roads?: Roads; boundaries?: Boundaries; basemap?: boolean; still?: boolean | null; autoplay?: boolean } = $props();
 
   const query = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
   let observed = $state(query?.matches ?? false);
@@ -22,7 +24,14 @@
 
   const width = $derived(viewport.phone ? 600 : 960);
   const height = $derived(viewport.phone ? 640 : 520);
-  const projection = $derived(routeProjection(stops, width, height, undefined, roads));
+  let failed = $state(false);
+  let Basemap = $state.raw<Component<{ center: [number, number]; zoom: number; onfail: () => void }> | null>(null);
+  const gl = $derived(basemap && !failed);
+  $effect(() => {
+    if (gl && !Basemap) import("$lib/components/ReplayBasemap.svelte").then((m) => { Basemap = m.default as typeof Basemap; }, () => { failed = true; });
+  });
+  let mapWidth = $state(0);
+  const projection = $derived(routeProjection(stops, width, height, undefined, roads, gl));
   const path = $derived(geoPath(projection));
   const legs = $derived(legsOf(stops, projection, roads));
   const shapes = $derived(roadShapes(roads.interstates, projection));
@@ -73,10 +82,12 @@
 
   const showing = (i: number) => calm || reached(i, stops.length, progress);
   const lit = (i: number) => calm || (i === stops.length - 1 ? progress >= 1 && playing && tail < LABEL_HOLD_MS : labelLit(i, stops.length, progress, !playing));
-  const box = $derived(calm ? { x: 0, y: 0, w: width, h: height } : cameraAt(stops, spots, width, height, progress, legs));
+  const view = $derived(calm ? { x: 0, y: 0, w: width, h: height } : cameraAt(stops, spots, width, height, progress, legs));
+  const seen = $derived(gl ? look(view, projection, mapWidth || width) : null);
+  const box = $derived(seen?.box ?? view);
   const zoom = $derived(box.w / width);
-  const drawn = $derived(roadsShown(projection, zoom) ? shapes.filter((r) => inView(r, box)) : []);
-  const stateLines = $derived(boundariesShown(projection, zoom) ? lines.filter((l) => inView(l, box)) : []);
+  const drawn = $derived(!gl && roadsShown(projection, zoom) ? shapes.filter((r) => inView(r, box)) : []);
+  const stateLines = $derived(!gl && boundariesShown(projection, zoom) ? lines.filter((l) => inView(l, box)) : []);
   const shields = $derived(shieldsOf(drawn, box, zoom));
   const zoomed = $derived(box.w < width - 0.5);
   const movers = $derived(legs.flatMap((leg, i) => {
@@ -89,12 +100,15 @@
 </script>
 
 <div class="space-y-3">
-  <div class="relative overflow-hidden rounded-2xl border border-border bg-map-sea" style="aspect-ratio: {width} / {height}" data-testid="replay-map">
-    <svg viewBox="{box.x} {box.y} {box.w} {box.h}" data-zoomed={zoomed} role="img" aria-label="Map of the route, stop by stop; the stops are listed below" class="block h-full w-full">
-      <path d={sphere} class="fill-map-sea" />
-      <g class="fill-map-land stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke">
-        {#each land as c (c.id)}<path d={c.d} />{/each}
-      </g>
+  <div bind:clientWidth={mapWidth} class="relative overflow-hidden rounded-2xl border border-border bg-map-sea" style="aspect-ratio: {width} / {height}" data-testid="replay-map" data-basemap={gl ? "detailed" : "bundled"}>
+    {#if gl && Basemap && seen}<Basemap center={seen.center} zoom={seen.zoom} onfail={() => { failed = true; }} />{/if}
+    <svg viewBox="{box.x} {box.y} {box.w} {box.h}" data-zoomed={zoomed} role="img" aria-label="Map of the route, stop by stop; the stops are listed below" class="relative z-[1] block h-full w-full">
+      {#if !gl}
+        <path d={sphere} class="fill-map-sea" />
+        <g class="fill-map-land stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke">
+          {#each land as c (c.id)}<path d={c.d} />{/each}
+        </g>
+      {/if}
       {#if stateLines.length}
         <g aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" opacity="0.8" data-testid="state-lines">
           {#each stateLines as l, i (i)}<path d={l.d} class="stroke-map-border" stroke-width="1" vector-effect="non-scaling-stroke" />{/each}
@@ -175,7 +189,7 @@
     {#if stops.some((s) => s.kind === "place")}<li class="flex items-center gap-2"><span class="size-2 rounded-full bg-map-visited" aria-hidden="true"></span>Other stop</li>{/if}
     <li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Flight</li>
     {#if stateLines.length}<li class="flex items-center gap-2"><span class="w-4 border-t border-dashed border-map-border" aria-hidden="true"></span>State line</li>{/if}
-    {#if roads.interstates.length}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-border" aria-hidden="true"></span>Interstate</li>{/if}
+    {#if !gl && roads.interstates.length}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-border" aria-hidden="true"></span>Interstate</li>{/if}
     {#if legs.some((l) => !l.flight)}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
   </ul>
   {#if !calm}

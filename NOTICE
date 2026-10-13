@@ -31,3 +31,11 @@ of Commerce (https://www.census.gov/geographies/mapping-files/time-series/geo/ca
 government data; its metadata states "Access constraints: None". The file keeps only the lines two states share, joins them
 from one tripoint to the next, simplifies their shapes to about a kilometre and rounds the coordinates; the Census Bureau
 gives no warranty for it, and neither does Waypoint.
+
+Map labels and icons: waypoint/static/map/ holds the glyph files (Noto Sans Regular, Medium and Italic; Basic Latin, Latin-1
+Supplement, Latin Extended-A and general punctuation) and the dark sprite of icons and road shields that the detailed trip
+map draws with, taken from Protomaps' basemaps-assets (https://github.com/protomaps/basemaps-assets). Noto Sans is
+Copyright 2022 The Noto Project Authors, licensed under the SIL Open Font License 1.1, https://openfontlicense.org/. The
+sprites are derived from the MIT-licensed icons of Tangram/Mapzen (https://github.com/tangrams/icons); the licences are
+beside the files (fonts/OFL.txt, sprites/LICENSE.md). The map's data is (c) OpenStreetMap contributors under the ODbL, https://www.openstreetmap.org/copyright.
+

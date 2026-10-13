@@ -33,6 +33,19 @@ Waypoint has no error-reporting service: errors go to its own log. See [Errors a
 
 With no `OIDC_ISSUER`, Waypoint refuses to listen beyond `localhost` unless `WAYPOINT_ALLOW_NO_AUTH` is set. See [Install with Docker](/Waypoint/start/docker/) and [SECURITY.md](https://github.com/AnthonyPluth/waypoint/blob/main/SECURITY.md).
 
+## The detailed trip map
+
+A past trip’s route replay can draw on a detailed OpenStreetMap basemap (highways with their shields, cities, water, borders) instead of the bundled outline. The tiles come from one file, `map.pmtiles`, that Waypoint serves itself to signed-in members, so your browser never contacts a map provider.
+
+On its first start, Waypoint downloads that file in the background into `WAYPOINT_DATA` (`/data` in Docker): world tiles for zoom levels 0 to 9, about 1.6 GB, taken as byte ranges from [Protomaps’ public daily build](https://maps.protomaps.com/builds/). The download resumes if it is interrupted and is tried again every few hours if it fails. Until it is there, the bundled map is used, and nothing else changes. The request carries nothing about you or your trips: it asks a public file for a range of bytes, and Protomaps can see the address Waypoint connects from. Make sure the data folder has about 2 GB free. The file isn’t part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine).
+
+| Variable | Default | What it does |
+|---|---|---|
+| `WAYPOINT_MAP_DOWNLOAD` | on | `0` (or `off`, `no`, `false`) stops the download, and Waypoint never contacts Protomaps. The bundled map is used. |
+| `WAYPOINT_MAP_FILE` | | The path of a PMTiles file of your own (for example one cut with `pmtiles extract --maxzoom=9`). It is served as it is and never downloaded over; if it is missing, the bundled map is used. |
+
+The map is credited to © OpenStreetMap contributors on the map itself; see [Data sources](/Waypoint/reference/data-sources/#map-tiles).
+
 ## Advanced
 
 Rarely needed, so `.env.example` leaves them out. They work when set in `.env` (Docker passes everything in it to Waypoint) or in the environment.

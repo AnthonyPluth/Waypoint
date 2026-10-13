@@ -19,6 +19,7 @@ const places: TripPlaces = {
   ],
   roads: { legs: [], interstates: [] },
   boundaries: [],
+  basemap: false,
 };
 const zone = "America/Chicago";
 const first = segment({ id: 1, kind: "hotel", origin: "Arch Inn", destination: "St. Louis", start_local: "2025-12-05T15:00", start_zone: zone, end_local: "2025-12-06T11:00", end_zone: zone });

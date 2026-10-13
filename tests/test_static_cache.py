@@ -8,6 +8,13 @@ class CacheControl(unittest.TestCase):
     def test_hashed_assets_are_cached_for_good(self):
         self.assertEqual(static.cache_control(os.path.join(static.APP_DIR, "assets", "index-abc.js")), "public, max-age=31536000, immutable")
 
+    def test_the_maps_worker_keeps_its_name_so_it_is_revalidated_not_cached_for_good(self):
+        self.assertEqual(static.cache_control(os.path.join(static.APP_DIR, "assets", "maplibre-gl-worker.mjs")), "no-cache")
+
+    def test_the_maps_labels_and_icons_are_cached_for_a_week(self):
+        for name in ("map/fonts/Noto Sans Regular/0-255.pbf", "map/sprites/dark.png"):
+            self.assertEqual(static.cache_control(os.path.join(static.STATIC, name)), "public, max-age=604800", name)
+
     def test_fonts_and_icons_are_cached_for_a_week(self):
         for name in ("fonts/Geist-Variable.woff2", "logo.svg", "logo-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"):
             self.assertEqual(static.cache_control(os.path.join(static.STATIC, name)), "public, max-age=604800", name)

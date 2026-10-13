@@ -5,6 +5,7 @@ import hashlib
 import os
 import secrets
 import threading
+import urllib.parse
 from typing import TYPE_CHECKING
 
 from .common import header_value
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
 
 CONTENT_TYPES = {
     ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json",
-    ".webmanifest": "application/manifest+json", ".txt": "text/plain", ".xml": "application/xml",
+    ".webmanifest": "application/manifest+json", ".pbf": "application/x-protobuf", ".txt": "text/plain", ".xml": "application/xml",
     ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
     ".webp": "image/webp", ".ico": "image/vnd.microsoft.icon",
     ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".wasm": "application/wasm",
@@ -38,8 +39,8 @@ STABLE_FILES = {"logo.svg", "logo-180.png", "icon-192.png", "icon-512.png", "ico
 
 def cache_control(full: str) -> str:
     if full.startswith(APP_DIR + os.sep + "assets" + os.sep):
-        return "public, max-age=31536000, immutable"
-    if full.startswith(os.path.join(STATIC, "fonts") + os.sep) or full in {os.path.join(STATIC, name) for name in STABLE_FILES}:
+        return "no-cache" if os.path.basename(full).startswith("maplibre-gl-") else "public, max-age=31536000, immutable"
+    if full.startswith((os.path.join(STATIC, "fonts") + os.sep, os.path.join(STATIC, "map") + os.sep)) or full in {os.path.join(STATIC, name) for name in STABLE_FILES}:
         return WEEK
     return "no-cache"
 
@@ -47,13 +48,17 @@ def cache_control(full: str) -> str:
 def serve(h: Handler, path: str) -> None:
     if path == "/next" or path.startswith("/next/"):
         return h._redirect("/")
-    rel = path.lstrip("/")
+    rel = urllib.parse.unquote(path).lstrip("/")
     full = None
+    if "\0" in rel:
+        rel = ""
     for base in (APP_DIR, STATIC):
         cand = os.path.realpath(os.path.join(base, rel))
         if rel and cand.startswith(base + os.sep) and os.path.isfile(cand):
             full = cand
             break
+    if full is None and rel.startswith("map/"):
+        return h._send(404, b"", "text/plain")
     if full is None or full == APP_INDEX:
         full = APP_INDEX
         if not os.path.isfile(full):

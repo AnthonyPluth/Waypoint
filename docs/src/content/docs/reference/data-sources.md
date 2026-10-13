@@ -46,3 +46,13 @@ The state lines are the faint dashed borders between US states that the route re
 - The edges between each pair of states are joined into lines that run from tripoint to tripoint (or to the coast), then each is simplified to within 0.012 degrees (about a kilometre) and its coordinates are rounded to four decimals, written as the first point and the steps from each point to the next.
 
 The file has one row per line: the two states’ postal codes and its points. The app loads it once, the first time a trip’s map needs it, and keeps it in memory. What the trip map receives is only coordinates: the pieces of those lines inside the area the replay map can show for that trip (the box around all its places, flights and drives, widened to what the map shows around it, so the borders under a long flight are included), at most 1,500 steps (when more would be needed, the points are thinned, never a whole line dropped) and rounded to about a hundred metres, never a state’s name, anything about who travels or what was booked. A trip with no place in the United States gets none. The lines are coarse: a state line looks right at the replay’s zoom but is not a survey, and a river border can be off by a mile or so.
+
+## Map tiles
+
+The detailed trip map ([The detailed trip map](/Waypoint/reference/configuration/#the-detailed-trip-map)) is drawn from OpenStreetMap data in a single vector-tile file, `map.pmtiles`, that Waypoint downloads on its first start and serves to its members itself.
+
+- **Data:** © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, available under the [Open Database Licence](https://opendatacommons.org/licenses/odbl/1-0/). The credit is shown on the map and can’t be turned off.
+- **Tiles:** the [Protomaps](https://protomaps.com/) daily planet build (`build.protomaps.com`), cut to zoom 0–9 by Waypoint itself with byte-range requests (`waypoint/providers/protomaps.py`), about 1.6 GB. Only zoom levels 0–9 are kept, so the map never shows a stretched, blurry tile past zoom 10.
+- **Style and labels:** the dark flavor of Protomaps’ basemap style ([`@protomaps/basemaps`](https://github.com/protomaps/basemaps), BSD-3-Clause), bundled with the web app, with the map’s label fonts (Noto Sans, SIL Open Font Licence) bundled as well, so no style, font or sprite is fetched from anywhere.
+- **Not stored in a backup:** the file is the same for every Waypoint and is downloaded again if it is missing.
+

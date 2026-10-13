@@ -357,6 +357,13 @@ class LogoDevStatus(TypedDict):
     last_error: str | None
 
 
+class MapStatus(TypedDict):
+    state: Literal["ready", "downloading", "waiting", "failed", "off", "missing"]
+    bytes: int
+    total: int | None
+    error: str | None
+
+
 class LogoDevFetch(TypedDict):
     started: bool
 
@@ -584,6 +591,7 @@ class TripPlaces(TypedDict):
     stays: list[TripStayPoint]
     roads: TripRoads
     boundaries: list[TripStateLine]
+    basemap: bool
 
 
 class TripBody(TypedDict):
