@@ -148,6 +148,23 @@ export function splitTrips(trips: Trip[], today: string): { upcoming: Trip[]; pa
   return { upcoming, past };
 }
 
+export type TripWhen = "upcoming" | "past";
+
+export function matchesText(trip: Trip, text: string): boolean {
+  const terms = text.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const haystack = [trip.name, trip.destination, ...trip.segments.map((s) => s.provider)].filter(Boolean).join("\n").toLowerCase();
+  return terms.every((t) => haystack.includes(t));
+}
+
+const yearsOf = (trip: Trip): number[] => (trip.start_date ? [Number(trip.start_date.slice(0, 4)), Number((trip.end_date ?? trip.start_date).slice(0, 4))] : []);
+export const inYear = (trip: Trip, year: number): boolean => { const [from, to] = yearsOf(trip); return from !== undefined && year >= from && year <= Math.max(from, to); };
+export function tripYears(trips: Trip[]): number[] {
+  const years = new Set<number>();
+  for (const t of trips) { const [from, to] = yearsOf(t); if (from !== undefined) for (let y = from; y <= Math.max(from, to); y++) years.add(y); }
+  return [...years].sort((a, b) => b - a);
+}
+
 export const featuredTrip = (trips: Trip[], next: NextUp | null, today: string): Trip | null =>
   next?.trip ?? splitTrips(trips, today).upcoming[0] ?? null;
 

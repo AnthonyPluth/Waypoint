@@ -1,0 +1,32 @@
+{
+  "name": "settings-groups",
+  "page": "settings",
+  "steps": [
+    { "goto": "#settings" },
+    { "expect_text": { "selector": "h1", "text": "Settings" } },
+    { "expect_text": { "selector": "nav[aria-label='Settings sections']", "text": "Calendar subscription" } },
+    { "screenshot": "index" },
+    { "click": "h2 a[href='#settings/account']" },
+    { "expect_text": { "selector": "h1", "text": "Account & household" } },
+    { "expect_text": { "selector": "main", "text": "Database" } },
+    { "screenshot": "account" },
+    { "click": "a:has-text('All settings')" },
+    { "click": "h2 a[href='#settings/mail']" },
+    { "expect_text": { "selector": "h1", "text": "Mail & review" } },
+    { "screenshot": "mail" },
+    { "goto": "#settings/travel" },
+    { "expect_text": { "selector": "h1", "text": "Travel preferences" } },
+    { "screenshot": "travel" },
+    { "goto": "#settings/offline" },
+    { "expect_text": { "selector": "h1", "text": "Offline & notifications" } },
+    { "expect_text": { "selector": "main", "text": "Calendar feed" } },
+    { "screenshot": "offline" },
+    { "goto": "#settings/assistants" },
+    { "expect_text": { "selector": "h1", "text": "Connected assistants" } },
+    { "screenshot": "assistants" },
+    { "goto": "#settings/data" },
+    { "expect_text": { "selector": "h1", "text": "Backup & import" } },
+    { "expect_text": { "selector": "main", "text": "IMPORT PAST FLIGHTS" } },
+    { "screenshot": "backup" }
+  ]
+}

@@ -39,7 +39,7 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
   vi.mocked(api).mockReset();
   held = { ...trip([flight]), name: "Trip to Springfield" };
-  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false });
+  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, tripId: null, tripName: "" });
   route.page = "trip"; route.sub = "1"; route.query = ""; location.hash = "#trip/1";
   withDevice();
   serve();
@@ -80,6 +80,29 @@ describe("Trip: the saved offline copy", () => {
     expect(device.calls).toEqual(before);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(device.appears("Springfield")).toBe(false);
+  });
+
+  it("says in the header that this trip is saved on the device, and when", async () => {
+    await setUp();
+    render(TripPage);
+    await screen.findByRole("heading", { name: "Trip to Springfield" });
+    expect(await screen.findByText(/updated just now/)).toBeInTheDocument();
+    expect(screen.getByTestId("offline-status-line")).toHaveTextContent("Saved on this device · updated just now");
+  });
+
+  it("says in the header when the save failed", async () => {
+    await setUp();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "/api/people") return { people: [] };
+      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+      if (path === "/api/offline") throw new Error("Server error");
+      return held;
+    });
+    render(TripPage);
+    await screen.findByRole("heading", { name: "Trip to Springfield" });
+    expect(await screen.findByText("Couldn’t save the trip on this device.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   it("neither asks nor saves on a device that can't do it", async () => {

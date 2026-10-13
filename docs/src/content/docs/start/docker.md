@@ -36,8 +36,8 @@ Then open `WAYPOINT_PUBLIC_URL`. You’re sent to your provider to sign in, then
 
 ## Moving your data from another machine
 
-1. On the old machine: Settings → Data → Backup → **Download a backup** (or `poetry run python run.py backup`).
-2. Start the container on the server, sign in, and go to Settings → Data → Backup → **Restore**, choosing that file. (Or copy the file into `./data`, stop the running container, and run `docker compose run --rm waypoint python run.py restore /data/<file> --yes`.)
+1. On the old machine: Settings → Backup & import → Backup → **Download a backup** (or `poetry run python run.py backup`).
+2. Start the container on the server, sign in, and go to Settings → Backup & import → Backup → **Restore**, choosing that file. (Or copy the file into `./data`, stop the running container, and run `docker compose run --rm waypoint python run.py restore /data/<file> --yes`.)
 
 A backup holds saved secrets encrypted with your key: set the same `WAYPOINT_SECRET_KEY` on the server (or copy `secret.key` into its `./data`) before restoring. Restored under another key, they can’t be read: put the key the backup was made with in `WAYPOINT_SECRET_KEY_OLD` and restart once, and Waypoint re-encrypts them with the current key. Delete stray copies of the file once you’ve restored it.
 
@@ -89,7 +89,7 @@ Waypoint is built to be reachable from anywhere, as long as it’s set up like t
 
 - Update to the newest image: `docker compose pull && docker compose up -d` (or let Watchtower do it). If you pinned a version, change the tag first. Database changes are applied automatically when the new version starts; take a backup first if you like to be careful.
 - Stop: `docker compose down` (data stays in `./data`).
-- Back up: Settings → Data → Backup → Download a backup (works for either database), or `run.py backup`.
+- Back up: Settings → Backup & import → Backup → Download a backup (works for either database), or `run.py backup`.
 - Health check: `<WAYPOINT_PUBLIC_URL>/healthz` answers without signing in.
 
 ## Errors and logs

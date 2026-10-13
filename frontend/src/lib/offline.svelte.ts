@@ -12,7 +12,15 @@ export const offline = $state({
   supported: true,
   reason: "",
   declined: false,
+  failed: false,
+  tripId: null as number | null,
+  tripName: "",
 });
+
+function forgetTrip(): void {
+  offline.tripId = null;
+  offline.tripName = "";
+}
 
 export async function refreshOffline(): Promise<void> {
   const found = await support();
@@ -26,21 +34,23 @@ export async function refreshOffline(): Promise<void> {
     watchExpiry(info);
     offline.hasCopy = info !== null;
     offline.savedAt = info ? info.savedAt : null;
+    if (!info) forgetTrip();
     offline.damaged = false;
   } catch {
     offline.setUp = false;
     offline.off = false;
     offline.hasCopy = false;
     offline.savedAt = null;
+    forgetTrip();
     offline.damaged = true;
   }
   offline.checked = true;
 }
 
-whenExpired(() => { offline.hasCopy = false; offline.savedAt = null; });
+whenExpired(() => { offline.hasCopy = false; offline.savedAt = null; forgetTrip(); });
 
 export function clearOnDenied(): void {
-  onDenied(async () => { await clearSaved(); offline.hasCopy = false; offline.savedAt = null; });
+  onDenied(async () => { await clearSaved(); offline.hasCopy = false; offline.savedAt = null; forgetTrip(); });
 }
 
 export async function turnOnOffline(): Promise<VaultError | null> {
@@ -59,9 +69,10 @@ export async function turnOnOffline(): Promise<VaultError | null> {
 export async function syncSavedTrip(): Promise<void> {
   try {
     const info = await saveCurrentTrip();
-    if (info) { offline.hasCopy = true; offline.savedAt = info.savedAt; }
-    else await refreshOffline();
+    if (info) { offline.hasCopy = true; offline.savedAt = info.savedAt; offline.tripId = info.tripId; offline.tripName = info.tripName; offline.failed = false; }
+    else { offline.failed = false; await refreshOffline(); }
   } catch {
+    offline.failed = true;
     console.error("Couldn’t save the offline copy");
   }
 }
@@ -74,10 +85,13 @@ export async function switchSaving(on: boolean): Promise<void> {
   offline.off = true;
   offline.hasCopy = false;
   offline.savedAt = null;
+  offline.failed = false;
+  forgetTrip();
 }
 
 export async function removeOffline(): Promise<void> {
   await remove();
+  offline.failed = false;
   await refreshOffline();
 }
 

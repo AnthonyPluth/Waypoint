@@ -329,7 +329,7 @@
   const ignore = (i: ReviewItem) => act(async () => {
     const r = await apiCall<"POST /api/review/{id}/ignore">(`/api/review/${i.id}/ignore`, { method: "POST" });
     toast.success(`Ignoring ${r.domain}`, {
-      description: "You can undo this in Settings → Mail and AI → Gmail",
+      description: "You can undo this in Settings → Mail & review → Gmail",
       duration: UNDO_MS,
       action: { label: "Undo", onClick: () => { void undoIgnore(r.mailbox_id, r.domain); } },
     });
@@ -551,7 +551,7 @@
       <details class="px-1 text-sm text-muted-foreground" data-testid="review-privacy">
         <summary class="cursor-pointer">How Waypoint handles these emails</summary>
         <div class="mt-2 max-w-prose space-y-2">
-          <p>Waypoint looked at these because they seemed to be about a booking, and couldn’t make one from them, or made one that needs your check. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Mail and AI → Gmail), and then you can add those by hand or dismiss them.</p>
+          <p>Waypoint looked at these because they seemed to be about a booking, and couldn’t make one from them, or made one that needs your check. Only you see the ones from your own mailboxes, unless someone shares theirs (Settings → Mail & review → Gmail), and then you can add those by hand or dismiss them.</p>
           <p>Waypoint keeps each message here, encrypted, so you can read it without Gmail: until the item is dismissed or added, and for as long as a booking you add from it exists.</p>
         </div>
       </details>
@@ -670,7 +670,7 @@
   {#snippet description()}
     {#if ignoring?.known_sender}<p class="text-signal-ink" data-testid="known-sender-warning">This sender is a travel company Waypoint knows. Ignoring it means its bookings won’t be added.</p>{/if}
     <p>Not travel: Waypoint stops looking at mail from this sender in that mailbox, and {goingCount === 1 ? "this item leaves" : `${goingCount} items from them (this one included) leave`} this list. Bookings already made from their emails stay. Other mailboxes aren’t affected.</p>
-    <p>You can undo this in Settings → Mail and AI → Gmail.</p>
+    <p>You can undo this in Settings → Mail & review → Gmail.</p>
   {/snippet}
 </ConfirmDialog>
 

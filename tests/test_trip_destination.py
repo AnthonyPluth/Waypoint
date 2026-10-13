@@ -391,7 +391,7 @@ class SuggestRouteTests(RouteCase):
     def test_it_refuses_while_the_ai_fallback_is_off_and_asks_nothing(self):
         trip_id = self.trip()
         status, got = self.suggest("ana", trip_id)
-        self.assertEqual((status, got), (400, {"error": "Suggestions need the AI fallback, which is off. Turn it on under Settings, in Mail and AI."}))
+        self.assertEqual((status, got), (400, {"error": "Suggestions need the AI fallback, which is off. Turn it on under Settings, in Mail & review."}))
         self.assertEqual(self.fake.requests, [])
 
     def test_a_trip_with_no_places_is_refused_before_anything_is_sent(self):

@@ -127,7 +127,7 @@
     }, { busy: (on) => (idSaving = on), onError: (m) => (idError = m) });
     if (!ok) return;
     idDraft = null;
-    toast.success(d.id === null ? "Membership added" : "Saved");
+    toast.success(d.id === null ? "Number added" : "Saved");
     await load();
   }
 
@@ -156,7 +156,7 @@
   const personFormTitle = (d: Draft) => (d.id === null ? "Add a guest" : `Edit ${d.display_name || "person"}`);
 
   const personSheetTitle = (d: Draft) => (d.id === null ? "Add a guest" : `Edit ${people?.find((p) => p.id === d.id)?.display_name ?? "person"}`);
-  const idFormTitle = (d: IdDraft) => `${d.id === null ? "Add a membership" : "Edit membership"} for ${people?.find((p) => p.id === d.person_id)?.display_name ?? "this person"}`;
+  const idFormTitle = (d: IdDraft) => `${d.id === null ? "Add a loyalty or traveler number" : "Edit loyalty or traveler number"} for ${people?.find((p) => p.id === d.person_id)?.display_name ?? "this person"}`;
 
   const details = (p: Person) => [p.legal_name && `Legal name ${p.legal_name}`, p.aliases.length && `Printed as ${p.aliases.join(", ")}`].filter(Boolean).join(" · ");
 </script>
@@ -211,6 +211,7 @@
           {#if d.program === "Other"}<span class="text-muted-foreground">Say which program in the notes.</span>{/if}</label>
         <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Number</span>
           <Input bind:value={d.number} required={d.id === null} maxlength={64} autocomplete="off" spellcheck={false} placeholder={d.id === null ? "" : `Leave empty to keep ${d.masked}`} /></label>
+        <p class="-mt-2 text-sm text-muted-foreground">Every signed-in household member can see this number once they ask to show it. It’s encrypted and stays hidden until someone asks.</p>
         {#if EXPIRES.includes(d.kind)}
           <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Expiry</span>
             <Input type="date" bind:value={d.expiry} autocomplete="off" /></label>
@@ -236,6 +237,7 @@
 {:else if people.length === 0}
   <p class="text-muted-foreground">Nobody yet. Household members appear here when they sign in; add a guest for someone who travels with you but has no login.</p>
 {:else}
+  <p class="mb-3 text-sm text-muted-foreground">Saved loyalty and Known Traveler numbers are visible to every signed-in household member. They stay hidden until someone asks to show them.</p>
   <ul class="rows" aria-label="People">
     {#each people as p (p.id)}
       <li class="row items-start">
@@ -285,7 +287,7 @@
           {/each}
         </div>
         <div class="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" aria-label={`Add a membership for ${p.display_name}`} onclick={() => startAddId(p)}><Plus /> ID</Button>
+          <Button variant="outline" size="sm" aria-label={`Add a loyalty or traveler number for ${p.display_name}`} onclick={() => startAddId(p)}><Plus /> Add loyalty or traveler number</Button>
           {#if !p.member && canClaim}<Button variant="outline" size="sm" aria-label={`This is me: ${p.display_name}`} onclick={() => { claiming = p; claimAsking = true; }}>This is me</Button>{/if}
         </div>
         {#if idDraft && idDraft.person_id === p.id && !idInSheet}<div class="basis-full">{@render idForm(idDraft, true)}</div>{/if}
@@ -310,7 +312,7 @@
   {#if draft}{@render personForm(draft, false)}{/if}
 </Sheet>
 
-<Sheet bind:open={() => idInSheet && idDraft !== null, (v) => { if (!v) idDraft = null; }} title={idDraft ? idFormTitle(idDraft) : "Membership"} guard={idGuard}>
+<Sheet bind:open={() => idInSheet && idDraft !== null, (v) => { if (!v) idDraft = null; }} title={idDraft ? idFormTitle(idDraft) : "Loyalty or traveler number"} guard={idGuard}>
   {#if idDraft}{@render idForm(idDraft, false)}{/if}
 </Sheet>
 

@@ -9,6 +9,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
+  import { OptionsMenu } from "$lib/components/ui/options-menu";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import DayTime from "$lib/components/DayTime.svelte";
@@ -24,6 +25,7 @@
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
   import MessageView from "$lib/components/MessageView.svelte";
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
+  import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
@@ -302,12 +304,15 @@
           {#if countNote(t.costs)}<span class="text-muted-foreground"> · {countNote(t.costs)}</span>{/if}</p>
       {/if}
       {#if t.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
+      <OfflineStatus tripId={t.id} />
     </div>
     {#if !form}
       <div class="flex flex-wrap gap-2">
         <Button onclick={() => { focus = ""; form = blank(t.id, t.costs.totals[0]?.currency); }}><Plus /> Add a booking</Button>
-        <Button variant="outline" onclick={() => { deleting = true; }}>Delete trip</Button>
-        <Button variant="outline" onclick={() => { mergeWith = ""; merging = true; void loadOthers(); }}>Merge another trip</Button>
+        <OptionsMenu label="Trip options" text="Trip options" items={[
+          { label: "Merge another trip", onselect: () => { mergeWith = ""; merging = true; void loadOthers(); } },
+          { label: "Delete trip", destructive: true, onselect: () => { deleting = true; } },
+        ]} />
       </div>
     {/if}
   </div>
@@ -508,8 +513,10 @@
   {#if !done}
     <div class="flex flex-wrap gap-2">
       <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => edit(s)}>Edit</Button>
-      <Button variant="outline" size="sm" aria-label={`Move ${name}`} onclick={() => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); }}>Move</Button>
-      <Button variant="outline" size="sm" aria-label={`Remove ${name}`} onclick={() => { removing = s; asking = true; }}>Remove</Button>
+      <OptionsMenu size="sm" up align="left" label={`More options for ${name}`} text="More" items={[
+        { label: "Move", name: `Move ${name}`, onselect: () => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); } },
+        { label: "Remove", name: `Remove ${name}`, destructive: true, onselect: () => { removing = s; asking = true; } },
+      ]} />
     </div>
   {/if}
 {/snippet}

@@ -26,7 +26,7 @@ NO_TRIP = "No such trip"
 NO_SEGMENT = "No such segment"
 NO_CODE = NO_IMAGE
 MAX_PICTURE_POSITION = 999
-NO_AI = "Suggestions need the AI fallback, which is off. Turn it on under Settings, in Mail and AI."
+NO_AI = "Suggestions need the AI fallback, which is off. Turn it on under Settings, in Mail & review."
 NO_PLACES = "Add a booking to this trip first, so there are places to describe."
 TEXTS = {"confirmation": ("confirmation code", 50), "provider": ("provider", 100), "origin": ("origin", 100),
          "destination": ("destination", 100), "start_zone": ("start time zone", 64), "end_zone": ("end time zone", 64)}
