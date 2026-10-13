@@ -11,6 +11,7 @@ import type { Person, Trip } from "$lib/api-types";
 import { route } from "$lib/app.svelte";
 import { panes } from "$lib/panes.svelte";
 import { segment, trip } from "../test/fixtures";
+import { bookingOptions } from "../test/menu";
 import Trips from "./Trips.svelte";
 
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
@@ -333,7 +334,7 @@ describe("changing a trip in the pane", () => {
   }
 
   const confirmRemove = async (u: ReturnType<typeof user>, name: string) => {
-    await u.click(await screen.findByRole("button", { name }));
+    await bookingOptions(u, name);
     await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     document.body.style.pointerEvents = "";
@@ -360,8 +361,8 @@ describe("changing a trip in the pane", () => {
     const pane = await screen.findByRole("region", { name: "Selected trip" });
     await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
     await confirmRemove(user(), "Remove Harbour Hotel");
-    await waitFor(() => expect(within(pane).queryByRole("button", { name: "Remove Harbour Hotel" })).toBeNull());
-    expect(within(pane).getByRole("button", { name: "Remove JFK → LHR" })).toBeInTheDocument();
+    await waitFor(() => expect(within(pane).queryByRole("button", { name: "Edit Harbour Hotel" })).toBeNull());
+    expect(within(pane).getByRole("button", { name: "Edit JFK → LHR" })).toBeInTheDocument();
     expect(within(screen.getByRole("list", { name: "Upcoming trips" })).getByText("Trip to London")).toBeInTheDocument();
   });
 

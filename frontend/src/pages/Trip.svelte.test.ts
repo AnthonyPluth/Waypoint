@@ -13,6 +13,7 @@ import { app, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { membership, segment, state, trip } from "../test/fixtures";
+import { bookingOptions, tripOptions } from "../test/menu";
 import TripPage from "./Trip.svelte";
 
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
@@ -151,11 +152,35 @@ describe("Trip", () => {
     });
   });
 
+  describe("what the header and each booking put first", () => {
+    it("leads with Add a booking and keeps Merge and Delete under Trip options", async () => {
+      render(TripPage);
+      const u = userEvent.setup();
+      expect(await screen.findByRole("button", { name: "Add a booking" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Delete trip" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Merge another trip" })).toBeNull();
+      await u.click(screen.getByRole("button", { name: "Trip options" }));
+      expect(screen.getByRole("button", { name: "Merge another trip" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Delete trip" })).toBeInTheDocument();
+    });
+
+    it("keeps Edit on each booking and Move and Remove under that booking’s More menu", async () => {
+      render(TripPage);
+      const u = userEvent.setup();
+      expect(await screen.findByRole("button", { name: "Edit Harbour Hotel" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Move Harbour Hotel" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Remove Harbour Hotel" })).toBeNull();
+      await u.click(screen.getByRole("button", { name: "More options for Harbour Hotel" }));
+      expect(screen.getByRole("button", { name: "Move Harbour Hotel" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove Harbour Hotel" })).toBeInTheDocument();
+    });
+  });
+
   describe("deleting a trip", () => {
     it("names the trip and how many bookings go with it, and does nothing until confirmed", async () => {
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await tripOptions(u, "Delete trip");
       const dialog = await screen.findByRole("dialog");
       expect(dialog).toHaveTextContent(/Delete .*\?/);
       expect(dialog).toHaveTextContent("Its 2 bookings are removed too. This can’t be undone.");
@@ -166,14 +191,14 @@ describe("Trip", () => {
     it("says it in the singular for one booking", async () => {
       held = trip([flight]);
       render(TripPage);
-      await userEvent.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await tripOptions(userEvent, "Delete trip");
       expect(await screen.findByRole("dialog")).toHaveTextContent("Its 1 booking is removed too.");
     });
 
     it("deletes the trip once confirmed and goes back to Trips", async () => {
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await tripOptions(u, "Delete trip");
       await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "DELETE" }));
       await waitFor(() => expect(location.hash).toBe("#trips"));
@@ -184,7 +209,7 @@ describe("Trip", () => {
       const u = userEvent.setup();
       await u.click(await screen.findByRole("button", { name: "Rename trip" }));
       await u.type(screen.getByLabelText("Trip name"), " again");
-      await u.click(screen.getByRole("button", { name: "Delete trip" }));
+      await tripOptions(u, "Delete trip");
       await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
       await waitFor(() => expect(route.page).toBe("trips"));
       expect(location.hash).toBe("#trips");
@@ -199,7 +224,7 @@ describe("Trip", () => {
       });
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Delete trip" }));
+      await tripOptions(u, "Delete trip");
       await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "DELETE" }));
       expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -223,7 +248,7 @@ describe("Trip", () => {
       withOthers();
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Merge another trip" }));
+      await tripOptions(u, "Merge another trip");
       const dialog = await screen.findByRole("dialog");
       const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
       await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(2));
@@ -246,7 +271,7 @@ describe("Trip", () => {
       });
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Merge another trip" }));
+      await tripOptions(u, "Merge another trip");
       let dialog = await screen.findByRole("dialog");
       const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
@@ -269,7 +294,7 @@ describe("Trip", () => {
       });
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Merge another trip" }));
+      await tripOptions(u, "Merge another trip");
       const choose = await within(await screen.findByRole("dialog")).findByRole("combobox", { name: "Trip to merge in" });
       await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(5));
       const names = within(choose).getAllByRole("option").slice(1).map((o) => o.textContent?.split(" · ")[0]);
@@ -281,7 +306,7 @@ describe("Trip", () => {
       withOthers();
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: /^Move / }));
+      await bookingOptions(u, /^Move /);
       const choose = within(await screen.findByRole("dialog")).getByRole("combobox", { name: "Move it to" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
       expect(within(choose).queryByRole("option", { name: "A new trip of its own" })).toBeNull();
@@ -291,7 +316,7 @@ describe("Trip", () => {
       withOthers();
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      await bookingOptions(u, "Move Harbour Hotel");
       let dialog = await screen.findByRole("dialog");
       const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
       expect(within(dialog).getByRole("button", { name: "Move" })).toBeDisabled();
@@ -302,7 +327,7 @@ describe("Trip", () => {
       expect(location.hash).toBe("#trip/7");
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       await waitFor(() => expect(getComputedStyle(document.body).pointerEvents).not.toBe("none"));
-      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      await bookingOptions(u, "Move Harbour Hotel");
       dialog = await screen.findByRole("dialog");
       await u.selectOptions(within(dialog).getByRole("combobox", { name: "Move it to" }), "new");
       await u.click(within(dialog).getByRole("button", { name: "Move" }));
@@ -320,7 +345,7 @@ describe("Trip", () => {
       });
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      await bookingOptions(u, "Move Harbour Hotel");
       const choose = within(await screen.findByRole("dialog")).getByRole("combobox", { name: "Move it to" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Newest trip/ })).toBeInTheDocument());
       const names = within(choose).getAllByRole("option").map((o) => o.textContent ?? "");
@@ -340,7 +365,7 @@ describe("Trip", () => {
       });
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Move Harbour Hotel" }));
+      await bookingOptions(u, "Move Harbour Hotel");
       let dialog = await screen.findByRole("dialog");
       const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
@@ -545,7 +570,7 @@ describe("Trip", () => {
     render(TripPage);
     const u = userEvent.setup();
     await screen.findByRole("heading", { name: "Trip to London" });
-    await u.click(screen.getByRole("button", { name: "Remove Harbour Hotel" }));
+    await bookingOptions(u, "Remove Harbour Hotel");
     vi.mocked(api).mockImplementation(async (path, opts) => {
       if (opts?.method === "DELETE") return { ok: true };
       throw new Error("Waypoint is unreachable");
@@ -772,7 +797,7 @@ describe("Trip", () => {
   it("removes a booking after asking", async () => {
     render(TripPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Remove Harbour Hotel" }));
+    await bookingOptions(u, "Remove Harbour Hotel");
     await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2", { method: "DELETE" }));
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Harbour Hotel" })).toBeNull());
@@ -807,7 +832,7 @@ describe("Trip", () => {
     it("removes the one booking whose Remove was pressed, and keeps the flight", async () => {
       render(TripPage);
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name: "Remove JFK → LHR booking BBBBBB" }));
+      await bookingOptions(u, "Remove JFK → LHR booking BBBBBB");
       await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/5", { method: "DELETE" }));
       expect(api).not.toHaveBeenCalledWith("/api/segments/1", expect.anything());
@@ -1118,7 +1143,9 @@ describe("Trip", () => {
       held = past({ done_at: null });
       render(TripPage);
       const card = await cardOf(hotel);
-      for (const verb of ["Edit", "Move", "Remove"]) expect(within(card).getByRole("button", { name: `${verb} Harbour Hotel` })).toBeInTheDocument();
+      expect(within(card).getByRole("button", { name: "Edit Harbour Hotel" })).toBeInTheDocument();
+      await userEvent.click(within(card).getByRole("button", { name: "More options for Harbour Hotel" }));
+      for (const verb of ["Move", "Remove"]) expect(within(card).getByRole("button", { name: `${verb} Harbour Hotel` })).toBeInTheDocument();
     });
 
     it("hides Edit, Move and Remove once the trip is Done, and keeps the booking's details", async () => {
@@ -1126,7 +1153,7 @@ describe("Trip", () => {
       render(TripPage);
       const card = await cardOf(hotel);
       expect(card).toHaveTextContent("H88231");
-      for (const verb of ["Edit", "Move", "Remove"]) expect(within(card).queryByRole("button", { name: new RegExp(`^${verb}`) })).toBeNull();
+      for (const verb of ["Edit", "Move", "Remove", "More options"]) expect(within(card).queryByRole("button", { name: new RegExp(`^${verb}`) })).toBeNull();
     });
 
     it("hides them on each booking of a combined flight card once the trip is Done", async () => {
@@ -1331,7 +1358,7 @@ describe("Trip on a phone", () => {
 
 describe("beside a list of trips", () => {
   const removeFlightAndConfirm = async (u: ReturnType<typeof userEvent.setup>) => {
-    await u.click(await screen.findByRole("button", { name: "Remove JFK → LHR" }));
+    await bookingOptions(u, "Remove JFK → LHR");
     await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   };
@@ -1363,7 +1390,7 @@ describe("beside a list of trips", () => {
     const onchanged = vi.fn();
     render(TripPage, { tripId: 1, onchanged });
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Remove Harbour Hotel" }));
+    await bookingOptions(u, "Remove Harbour Hotel");
     await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(onchanged).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
@@ -1396,7 +1423,7 @@ describe("on its own page", () => {
     held = trip([flight], { auto: true });
     render(TripPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Remove JFK → LHR" }));
+    await bookingOptions(u, "Remove JFK → LHR");
     await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(location.hash).toBe("#trips"));
   });
