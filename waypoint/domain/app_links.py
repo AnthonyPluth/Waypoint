@@ -5,7 +5,7 @@ from typing import Literal, TypedDict
 from . import chains
 
 ALL = ("flight", "hotel", "car", "train", "cruise")
-CHECKED = "2026-10-10"
+CHECKED = "2026-10-13"
 
 
 class Vendor(TypedDict):
@@ -52,7 +52,10 @@ VENDORS: tuple[Vendor, ...] = (
     _app(("booking.com",), ("booking.com",), ALL, "https://www.booking.com/mybookings", "claims /mybookings"),
     _app(("expedia",), ("expedia.com",), ALL, "https://www.expedia.com/", "claims /: the home page"),
     _app(("airbnb",), ("airbnb.com",), HOTEL, "https://www.airbnb.com/trips", "claims /trips"),
+    _app(("wyndham", "wyndham hotels & resorts"), ("wyndhamhotels.com",), HOTEL, "https://www.wyndhamhotels.com/", "claims /: the home page"),
+    _app(("best western",), ("bestwestern.com",), HOTEL, "https://www.bestwestern.com/mobile/", "claims /mobile/ and /mobile/*"),
     _site(("amtrak",), "amtrak.com", TRAIN, "no app claims a path on the vendor's site (no file): the vendor's home page"),
+    _app(("holland america line", "holland america"), ("hollandamerica.com",), CRUISE, "https://www.hollandamerica.com/", "claims every path: the home page"),
     _site(("carnival cruise line", "carnival"), "carnival.com", CRUISE, "no app claims a path on the vendor's site (no file): the vendor's home page"),
     _site(("royal caribbean", "royal caribbean international"), "royalcaribbean.com", CRUISE,
           "the vendor's app claims only account and check-in paths: the vendor's home page"),
@@ -71,8 +74,8 @@ TAIL: tuple[tuple[tuple[str, ...], str, tuple[str, ...]], ...] = (
     (("singapore airlines",), "singaporeair.com", FLIGHT), (("cathay pacific",), "cathaypacific.com", FLIGHT),
     (("all nippon airways", "ana"), "ana.co.jp", FLIGHT), (("japan airlines", "jal"), "jal.co.jp", FLIGHT),
     (("qantas",), "qantas.com", FLIGHT), (("air new zealand",), "airnewzealand.com", FLIGHT),
-    (("wyndham", "wyndham hotels & resorts"), "wyndhamhotels.com", HOTEL), (("accor",), "accor.com", HOTEL),
-    (("choice hotels",), "choicehotels.com", HOTEL), (("best western",), "bestwestern.com", HOTEL),
+    (("accor",), "accor.com", HOTEL),
+    (("choice hotels",), "choicehotels.com", HOTEL),
     (("radisson",), "radissonhotels.com", HOTEL), (("sixt",), "sixt.com", CAR), (("national", "national car rental"), "nationalcar.com", CAR),
     (("alamo", "alamo rent a car"), "alamo.com", CAR), (("eurostar",), "eurostar.com", TRAIN), (("trainline",), "trainline.com", TRAIN),
     (("sncf connect", "sncf"), "sncf-connect.com", TRAIN), (("rail europe",), "raileurope.com", TRAIN),
@@ -83,7 +86,7 @@ TAIL: tuple[tuple[tuple[str, ...], str, tuple[str, ...]], ...] = (
     (("tripactions",), "tripactions.com", ALL), (("egencia",), "egencia.com", ALL), (("costco travel",), "costcotravel.com", ALL),
     (("cheapoair",), "cheapoair.com", ALL), (("onetravel",), "onetravel.com", ALL), (("hopper",), "hopper.com", ALL),
     (("celebrity cruises", "celebrity"), "celebritycruises.com", CRUISE), (("norwegian cruise line", "ncl"), "ncl.com", CRUISE),
-    (("princess cruises", "princess"), "princess.com", CRUISE), (("holland america line", "holland america"), "hollandamerica.com", CRUISE),
+    (("princess cruises", "princess"), "princess.com", CRUISE), 
     (("msc cruises", "msc"), "msccruises.com", CRUISE), (("virgin voyages",), "virginvoyages.com", CRUISE),
     (("viking", "viking cruises"), "vikingcruises.com", CRUISE), (("disney cruise line",), "disneycruise.com", CRUISE),
     (("cunard",), "cunard.com", CRUISE), (("seabourn",), "seabourn.com", CRUISE), (("azamara",), "azamara.com", CRUISE),

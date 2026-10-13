@@ -64,6 +64,16 @@ def _tier(entry: _Entry, query: str, tokens: list[str]) -> int | None:
     return None
 
 
+@cache
+def _names() -> dict[str, str]:
+    return {row["code"]: row["name"] for row in reference.airport_rows()}
+
+
+def directions_query(code: str | None) -> str | None:
+    name = _names().get((code or "").strip().upper())
+    return f"{name} ({code.strip().upper()})" if name and code else None
+
+
 def search(conn: db.Connection, text: str, limit: int = MAX_MATCHES) -> list[Found]:
     query = _key(" ".join(text.split())[:60])
     if len(query) < 2:

@@ -60,11 +60,11 @@
   const cost = $derived(showCost && appState.state?.show_costs !== false && bookings.length === 1 && s.price ? formatMoney(s.price.amount_minor, s.price.currency) : "");
   const COMPACT_OMIT = ["Cost", "Room", "Cabin", "Notes", "Vehicle", "Space", "Car", "Deck", "Ship"];
   const facts = $derived([...rows, ["Cost", cost] as [string, string]].filter((f): f is [string, string] => !!f[1] && !omit.includes(f[0]) && !(compact && COMPACT_OMIT.includes(f[0]))));
-  const pad = $derived(compact ? "p-4 md:p-6" : "p-6 md:p-8");
+  const pad = $derived(compact ? "p-4 md:p-5" : "p-5 md:p-6");
 </script>
 
 <svelte:element this={tag} {id} class={`pass scroll-mt-20 ${cls}`} class:ring-2={highlight} class:ring-ring={highlight} class:opacity-80={cancelled} aria-label={label ?? (tag === "section" ? headline(s) : undefined)} data-kind={s.kind} data-progress={flight ? progress : undefined}>
-  <div class={`flex flex-col ${compact ? "gap-3" : "gap-4"} ${pad}`}>
+  <div class={`flex flex-col gap-3 ${pad}`}>
     {#if eyebrow}<p class="eyebrow flex items-center gap-2">{#if pulse}<span class="size-2 animate-pulse rounded-full bg-primary motion-reduce:animate-none" aria-hidden="true"></span>{/if}{eyebrow}</p>{/if}
     {#if !noHeadline}{#key headlineText}<p class="countdown text-heading font-semibold" class:text-primary={!bad} class:text-destructive={bad} data-headline data-countdown>{headlineText}</p>{/key}{/if}
     {#if flight}<svelte:element this={`h${level}`} class="sr-only">{headline(s)}</svelte:element>{/if}
@@ -140,7 +140,7 @@
 
   {#if !compact}<div class="pass-tear" aria-hidden="true"></div>{/if}
 
-  <div class={`flex flex-col gap-3 ${compact ? "px-4 pb-4 md:px-6 md:pb-6" : pad}`}>
+  <div class={`flex flex-col gap-3 ${compact ? "px-4 pb-4 md:px-5 md:pb-5" : pad}`}>
     {#if facts.length}
       <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
         {#each facts as [label, value] (label)}

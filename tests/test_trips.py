@@ -56,12 +56,12 @@ class LinkTests(Household):
     def test_a_card_carries_its_actions_built_by_the_server(self):
         got = self.add(self.jane, {**HOTEL, "details": {"address": "1 Quay Street, London", "phone": "+44 20 7946 0000"},
                                    "manage_url": "https://example.com/manage"}, None, self.on(self.jane.person_id))
-        self.assertEqual(got["links"], {"app": "https://example.com/manage", "open": None, "open_kind": None, "directions": "https://maps.apple.com/?q=1%20Quay%20Street%2C%20London",
+        self.assertEqual(got["links"], {"app": "https://example.com/manage", "open": None, "open_kind": None, "directions": "https://www.google.com/maps/search/?api=1&query=1%20Quay%20Street%2C%20London",
                                         "call": "tel:+442079460000"})
 
     def test_a_manage_link_that_isnt_https_is_not_offered(self):
         got = self.add(self.jane, {**OUT, "manage_url": "http://example.com/manage"}, None, self.on(self.jane.person_id))
-        self.assertEqual(got["links"], {"app": None, "open": None, "open_kind": None, "directions": None, "call": None})
+        self.assertEqual(got["links"], {"app": None, "open": None, "open_kind": None, "directions": links.directions_link(airports.directions_query("JFK")), "call": None})
 
 
 class PrefilledLinkTests(Household):
@@ -654,7 +654,7 @@ class ParkingTests(Household):
         self.assertEqual((seg["kind"], seg["origin"], seg["start_zone"], seg["end_zone"]), ("parking", "Example Long-Term Lot", "America/New_York", "America/New_York"))
         self.assertEqual((seg["start_local"], seg["end_local"]), ("2026-06-01T08:00", "2026-06-04T21:00"))
         self.assertEqual(seg["details"], PARKING["details"])
-        self.assertEqual(seg["links"]["directions"], "https://maps.apple.com/?q=1%20Terminal%20Road%2C%20Jamaica%2C%20NY")
+        self.assertEqual(seg["links"]["directions"], "https://www.google.com/maps/search/?api=1&query=1%20Terminal%20Road%2C%20Jamaica%2C%20NY")
         self.assertEqual(seg["links"]["app"], "https://example.com/manage/PK1234")
 
     def test_the_zone_comes_from_the_address_and_is_asked_for_when_it_cannot_be_told(self):

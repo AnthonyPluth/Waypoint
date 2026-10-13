@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Literal, TypedDict
 from urllib.parse import quote, urlsplit
 
-from . import app_links
+from . import airports, app_links
 
 UNITED = ("www.united.com", "/en/us/manageres/mytrips")
 DELTA = ("www.delta.com", "/my-trips/search")
@@ -62,7 +62,7 @@ def https_only(url: str | None) -> str | None:
 
 def directions_link(place: str | None) -> str | None:
     place = " ".join((place or "").split())
-    return f"https://maps.apple.com/?q={quote(place, safe='')}" if place else None
+    return f"https://www.google.com/maps/search/?api=1&query={quote(place, safe='')}" if place else None
 
 
 def call_link(phone: str | None) -> str | None:
@@ -80,6 +80,7 @@ def segment_links(kind: str, provider: str | None, confirmation: str | None, las
     mine = https_only(manage_url) or airline_page
     vendor = None if mine else app_links.vendor_for(kind, provider, origin if kind == "hotel" else None)
     opening = https_only(vendor["url"]) if vendor else None
+    where = airports.directions_query(origin) if kind == "flight" else details.get("address") or origin if stay else None
     return {"app": mine, "open": opening, "open_kind": vendor["kind"] if opening and vendor else None,
-            "directions": directions_link(details.get("address") or origin) if stay else None,
+            "directions": directions_link(where),
             "call": call_link(details.get("phone"))}
