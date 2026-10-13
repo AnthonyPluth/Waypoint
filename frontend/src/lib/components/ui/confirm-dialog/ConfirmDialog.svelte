@@ -6,9 +6,9 @@
   import type { Snippet } from "svelte";
 
   let { open = $bindable(false), title, description, confirmLabel = "Confirm", cancelLabel = "Cancel", busyLabel, destructive = false,
-    typeToConfirm, disabled = false, onconfirm }: {
+    typeToConfirm, disabled = false, returnFocus, onconfirm }: {
     open?: boolean; title: string; description?: string | Snippet; confirmLabel?: string; cancelLabel?: string; busyLabel?: string;
-    destructive?: boolean; typeToConfirm?: string; disabled?: boolean; onconfirm: () => unknown;
+    destructive?: boolean; typeToConfirm?: string; disabled?: boolean; returnFocus?: () => HTMLElement | null | undefined; onconfirm: () => unknown;
   } = $props();
 
   let typed = $state("");
@@ -32,6 +32,7 @@
     <Dialog.Overlay data-slot="confirm-overlay"
       class="fixed inset-0 z-[60] bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
     <Dialog.Content data-slot="confirm-dialog" onOpenAutoFocus={(e) => { e.preventDefault(); (box ?? cancel)?.focus(); }}
+      onCloseAutoFocus={(e) => { const target = returnFocus?.(); if (target?.isConnected) { e.preventDefault(); target.focus(); } }}
       class="bg-card text-card-foreground fixed top-1/2 left-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border p-5 shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 duration-150">
       <form class="flex flex-col gap-4" onsubmit={confirm}>
         <Dialog.Title class="text-foreground text-base font-semibold">{title}</Dialog.Title>

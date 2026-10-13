@@ -6,6 +6,9 @@
       "wait_for": "[data-testid='review-item']"
     },
     {
+      "click": "[data-testid='action-menu'] summary >> nth=0"
+    },
+    {
       "click": "button[aria-label^='Dismiss']:visible >> nth=0"
     },
     {

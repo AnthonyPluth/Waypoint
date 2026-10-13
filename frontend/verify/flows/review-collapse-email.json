@@ -1,0 +1,36 @@
+{
+  "name": "review-collapse-email",
+  "page": "review",
+  "viewports": [
+    "tablet"
+  ],
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Review"
+      }
+    },
+    {
+      "wait_for": "[data-testid='review-item']"
+    },
+    {
+      "click": "button:has-text('Add by hand') >> visible=true >> nth=0"
+    },
+    {
+      "wait_for": "[role='dialog'] [data-testid='preview-html'][aria-busy='false']"
+    },
+    {
+      "click": "[role='dialog'] button:has-text('Hide the email')"
+    },
+    {
+      "expect_text": {
+        "selector": "[role='dialog']",
+        "text": "Show the email"
+      }
+    },
+    {
+      "screenshot": "email-collapsed"
+    }
+  ]
+}
