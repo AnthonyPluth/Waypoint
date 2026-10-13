@@ -7,6 +7,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
+import { app } from "$lib/app.svelte";
 import { dropEarly, startEarly } from "$lib/early";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { viewport } from "$lib/phone.svelte";
@@ -27,8 +28,9 @@ const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: 
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] }); vi.mocked(api).mockReset(); });
 afterEach(() => { vi.useRealTimers(); flightStatus.list = null; dropEarly(); });
 
-const serve = (trips: unknown[], guests: unknown[] = []) =>
-  vi.mocked(api).mockImplementation(async (path) => (path === "/api/people/claim-suggestions" ? { guests } : { trips }));
+const box = (over: Record<string, unknown> = {}) => ({ id: 1, address: "me@example.test", status: "connected", scanning: false, ...over });
+const serve = (trips: unknown[], guests: unknown[] = [], mail: unknown = { configured: true, mailboxes: [] }) =>
+  vi.mocked(api).mockImplementation(async (path) => (path === "/api/people/claim-suggestions" ? { guests } : path === "/api/mailboxes" ? mail : path === "/api/state" ? { review_count: 0 } : path === "/api/mailboxes/connect" ? { url: "#upcoming" } : { trips }));
 const at = (iso: string) => vi.setSystemTime(new Date(iso));
 
 describe("Upcoming", () => {
@@ -36,7 +38,89 @@ describe("Upcoming", () => {
     serve([]);
     render(Upcoming);
     expect(screen.getByRole("heading", { name: "Upcoming" })).toBeInTheDocument();
-    expect(await screen.findByText(/No trips yet — they’ll appear here once Waypoint can read your confirmation emails, or when you add one\./)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Connect Gmail" })).toBeInTheDocument();
+  });
+
+  it("offers to connect Gmail, starting the connection directly, next to adding a booking by hand", async () => {
+    serve([]);
+    render(Upcoming);
+    await userEvent.click(await screen.findByRole("button", { name: "Connect Gmail" }));
+    expect(api).toHaveBeenCalledWith("/api/mailboxes/connect", { method: "POST" });
+    expect(screen.getByRole("link", { name: "Add a booking" })).toHaveAttribute("href", "#trips?add=booking");
+  });
+
+  it("offers only adding a booking when Gmail isn’t set up on the server", async () => {
+    serve([], [], { configured: false, mailboxes: [] });
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: "No trips yet" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Gmail/ })).toBeNull();
+    expect(screen.getByRole("link", { name: "Add a booking" })).toHaveAttribute("href", "#trips?add=booking");
+  });
+
+  it("says the mailbox is being scanned", async () => {
+    serve([], [], { configured: true, mailboxes: [box({ scanning: true })] });
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: "Scanning your mailbox" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Gmail" })).toBeNull();
+  });
+
+  it("reloads the trips when the scan ends, so found trips replace the empty state", async () => {
+    let scanned = false;
+    vi.mocked(api).mockImplementation(async (path) => (path === "/api/mailboxes" ? { configured: true, mailboxes: [box({ scanning: !scanned })] }
+      : path === "/api/people/claim-suggestions" ? { guests: [] } : path === "/api/state" ? { review_count: 0 } : { trips: scanned ? [london] : [] }));
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: "Scanning your mailbox" })).toBeInTheDocument();
+    scanned = true;
+    await vi.advanceTimersByTimeAsync(5_000);
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Scanning your mailbox" })).toBeNull());
+    expect(screen.queryByRole("heading", { name: "No trips yet" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Connect Gmail" })).toBeNull();
+  });
+
+  it("keeps polling the scan when one mailbox poll fails", async () => {
+    let calls = 0, scanned = false;
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "/api/mailboxes") { calls++; if (calls === 2) throw new Error("offline"); return { configured: true, mailboxes: [box({ scanning: !scanned })] }; }
+      return path === "/api/people/claim-suggestions" ? { guests: [] } : path === "/api/state" ? { review_count: 0 } : { trips: scanned ? [london] : [] };
+    });
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: "Scanning your mailbox" })).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(calls).toBe(2);
+    expect(screen.getByRole("heading", { name: "Scanning your mailbox" })).toBeInTheDocument();
+    scanned = true;
+    await vi.advanceTimersByTimeAsync(5_000);
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Scanning your mailbox" })).toBeNull());
+    expect(screen.queryByRole("heading", { name: "No trips yet" })).toBeNull();
+  });
+
+  it("asks to reconnect a mailbox Waypoint can’t read", async () => {
+    serve([], [], { configured: true, mailboxes: [box({ status: "reconnect" })] });
+    render(Upcoming);
+    expect(await screen.findByRole("button", { name: "Reconnect Gmail" })).toBeInTheDocument();
+  });
+
+  it("links to Review when emails are waiting", async () => {
+    serve([], [], { configured: true, mailboxes: [box()] });
+    app.state = { review_count: 3 } as never;
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: "3 emails are waiting for your review" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review 3 emails" })).toHaveAttribute("href", "#review");
+    app.state = null;
+  });
+
+  it("falls back to adding a booking by hand once a mailbox is connected and nothing is waiting", async () => {
+    serve([], [], { configured: true, mailboxes: [box()] });
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: "No trips yet" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Add a booking" })).toHaveAttribute("href", "#trips?add=booking");
+  });
+
+  it("still shows the manual path when the mailbox list can’t be read", async () => {
+    vi.mocked(api).mockImplementation(async (path) => { if (path === "/api/mailboxes") throw new Error("Down."); return (path === "/api/people/claim-suggestions" ? { guests: [] } : { trips: [] }) as never; });
+    render(Upcoming);
+    expect(await screen.findByRole("link", { name: "Add a booking" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("asks a member with no trips whether they are one of the matching guests, and links the one they pick", async () => {
@@ -59,13 +143,13 @@ describe("Upcoming", () => {
     await userEvent.click(await screen.findByRole("button", { name: "None of these" }));
     expect(api).toHaveBeenCalledWith("/api/people/claim-suggestions/dismiss", { method: "POST" });
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Are you one of these?" })).toBeNull());
-    expect(screen.getByRole("heading", { name: "No trips yet" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Connect Gmail" })).toBeInTheDocument();
   });
 
   it("offers nothing when no guest matches, or when there are trips", async () => {
     serve([]);
     render(Upcoming);
-    await screen.findByRole("heading", { name: "No trips yet" });
+    await screen.findByRole("heading", { name: "Connect Gmail" });
     expect(screen.queryByRole("heading", { name: "Are you one of these?" })).toBeNull();
   });
 

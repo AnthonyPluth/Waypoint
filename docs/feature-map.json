@@ -882,7 +882,8 @@
       "path": "/api/mailboxes",
       "handler": "waypoint/server/api/mailboxes.py:api_mailboxes",
       "web": [
-        "frontend/src/lib/components/settings/GmailSection.svelte"
+        "frontend/src/lib/components/settings/GmailSection.svelte",
+        "frontend/src/pages/Upcoming.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -897,7 +898,8 @@
       "path": "/api/mailboxes/connect",
       "handler": "waypoint/server/api/mailboxes.py:api_mailbox_connect",
       "web": [
-        "frontend/src/lib/components/settings/GmailSection.svelte"
+        "frontend/src/lib/components/settings/GmailSection.svelte",
+        "frontend/src/pages/Upcoming.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",

@@ -117,6 +117,16 @@ describe("Trips", () => {
     await waitFor(() => expect(location.hash).toBe("#trip/5"));
   });
 
+  it("opens the add form directly when sent here to add a booking, and cancel clears the link", async () => {
+    route.query = "add=booking";
+    render(Trips);
+    expect(await screen.findByLabelText(/From \(airport\)/)).toBeInTheDocument();
+    await user().click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByLabelText(/From \(airport\)/)).toBeNull();
+    expect(route.query).toBe("");
+    expect(screen.getByRole("button", { name: /Add a booking/ })).toBeInTheDocument();
+  });
+
   it("keeps what was typed and says why when a save fails", async () => {
     vi.mocked(api).mockImplementation(async (path, opts) => {
       if (path === "/api/segments" && opts?.method === "POST") throw new Error("This ends before it starts");

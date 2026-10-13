@@ -1,0 +1,24 @@
+{
+  "name": "first-run-review",
+  "page": "upcoming",
+  "steps": [
+    {
+      "fake_first_run": "review"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "#empty-title"
+    },
+    {
+      "expect_text": {
+        "selector": "#empty-title",
+        "text": "3 emails are waiting"
+      }
+    },
+    {
+      "screenshot": "first-run-review"
+    }
+  ]
+}

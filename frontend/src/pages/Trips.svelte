@@ -18,7 +18,9 @@
   let trips = $state<Trip[] | null>(null);
   let people = $state<Person[]>([]);
   let loadError = $state("");
-  let adding = $state<"booking" | "past" | null>(null);
+  const addQuery = new URLSearchParams(route.query).get("add");
+  let adding = $state<"booking" | "past" | null>(addQuery === "booking" || addQuery === "past" ? addQuery : null);
+  const closeForm = () => { adding = null; if (addQuery) setQuery(""); };
 
   let latest = 0;
   async function load() {
@@ -59,8 +61,8 @@
   {#if trips && !adding}<div class="flex flex-wrap gap-2"><Button onclick={() => (adding = "booking")}><Plus /> Add a booking</Button><Button variant="outline" onclick={() => (adding = "past")}>Add a past trip</Button></div>{/if}
 </div>
 
-{#if adding}
-  <SegmentForm initial={adding === "past" ? { ...blank(), kind: "visit" } : blank()} {people} oncancel={() => (adding = null)} onsaved={(s) => { adding = null; dropDrafts(); location.hash = `#trip/${s.trip_id}`; }} />
+{#if adding && trips}
+  <SegmentForm initial={adding === "past" ? { ...blank(), kind: "visit" } : blank()} {people} oncancel={closeForm} onsaved={(s) => { adding = null; dropDrafts(); location.hash = `#trip/${s.trip_id}`; }} />
 {/if}
 
 {#if loadError}

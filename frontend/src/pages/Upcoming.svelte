@@ -1,7 +1,8 @@
 <script lang="ts">
   import { act, errMsg } from "$lib/act";
+  import { app, refreshState } from "$lib/app.svelte";
   import { apiCall } from "$lib/contract";
-  import type { Person, Segment, Trip } from "$lib/api-types";
+  import type { MailboxList, Person, Segment, Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
@@ -23,6 +24,8 @@
   let guests = $state<Person[]>([]);
   let claiming = $state<Person | null>(null);
   let asking = $state(false);
+  let mail = $state<MailboxList | null>(null);
+  let connecting = $state(false);
   let detail = $state<{ segment: Segment; bookings: Segment[] } | null>(null);
 
   function openDetail(e: MouseEvent, segment: Segment, bookings: Segment[]) {
@@ -35,16 +38,42 @@
     loadError = "";
     try {
       const early = takeEarlyTrips("upcoming");
-      trips = (await (early ?? apiCall<"GET /api/trips">("/api/trips"))).trips;
+      const loaded = (await (early ?? apiCall<"GET /api/trips">("/api/trips"))).trips;
       if (!early) void loadFlightStatus();
-      guests = trips.length ? [] : (await apiCall<"GET /api/people/claim-suggestions">("/api/people/claim-suggestions")).guests;
+      guests = loaded.length ? [] : (await apiCall<"GET /api/people/claim-suggestions">("/api/people/claim-suggestions")).guests;
+      if (!loaded.length) await loadMail();
+      trips = loaded;
     } catch (err) { trips = null; guests = []; loadError = errMsg(err); }
+  }
+  async function loadMail() {
+    try {
+      const found = await apiCall<"GET /api/mailboxes">("/api/mailboxes");
+      mail = Array.isArray(found?.mailboxes) ? found : null;
+    }
+    catch { return; }
   }
   $effect(() => {
     void load();
     const tick = setInterval(() => (now = Date.now()), 30_000);
     return () => clearInterval(tick);
   });
+  $effect(() => {
+    if (!mail?.mailboxes.some((m) => m.scanning)) return;
+    const poll = setInterval(() => { void loadMail(); void refreshState(true); }, 5_000);
+    return () => clearInterval(poll);
+  });
+
+  let wasScanning = false;
+  $effect(() => {
+    const isScanning = scanning;
+    if (wasScanning && !isScanning) void load();
+    wasScanning = isScanning;
+  });
+
+  const connect = () => act(async () => {
+    const r = await apiCall<"POST /api/mailboxes/connect">("/api/mailboxes/connect", { method: "POST" });
+    location.href = r.url;
+  }, { busy: (on) => (connecting = on) });
 
   const claim = (g: Person) => act(async () => {
     await apiCall<"POST /api/people/{id}/claim">(`/api/people/${g.id}/claim`, { method: "POST" });
@@ -60,6 +89,17 @@
   const next = $derived(trips ? nextUp(trips, now) : null);
   const featured = $derived(trips ? featuredTrip(trips, next, today) : null);
   const days = $derived(featured ? tripDays(featured) : []);
+  const waiting = $derived(app.state?.review_count ?? 0);
+  const boxes = $derived(mail?.mailboxes ?? []);
+  const scanning = $derived(boxes.some((m) => m.scanning));
+  const broken = $derived(boxes.find((m) => m.status !== "connected"));
+  const canConnect = $derived(!!mail?.configured && (boxes.length === 0 || !!broken));
+  const setup = $derived(
+    waiting > 0 ? { id: "review", title: `${waiting} ${waiting === 1 ? "email is" : "emails are"} waiting for your review`, text: "Waypoint found what look like bookings but needs you to check them before adding them to a trip." }
+    : scanning ? { id: "scanning", title: "Scanning your mailbox", text: "Waypoint is reading your confirmation emails now. Trips appear here as soon as it finds them." }
+    : broken ? { id: "reconnect", title: "Reconnect Gmail", text: "Waypoint can’t read your mailbox right now, so no trips can be found in it." }
+    : canConnect ? { id: "connect", title: "Connect Gmail", text: "Waypoint reads your confirmation emails privately, on this server, and adds the trips it finds." }
+    : { id: "manual", title: "No trips yet", text: "Add your first booking by hand: a flight, a stay, a rental car." });
 </script>
 
 <h1 class="mb-6 text-display">Upcoming</h1>
@@ -94,11 +134,23 @@
     <div class="flex flex-col items-start gap-4 p-6 md:p-8">
       <span class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary"><PlaneTakeoff class="size-6" aria-hidden="true" /></span>
       <div class="space-y-1.5">
-        <p class="eyebrow">Next trip</p>
-        <h2 id="empty-title" class="text-title">No trips yet</h2>
-        <p class="max-w-prose text-body text-muted-foreground">No trips yet — they’ll appear here once Waypoint can read your confirmation emails, or when you add one.</p>
+        <p class="eyebrow">Get started</p>
+        <h2 id="empty-title" class="text-title" data-state={setup.id}>{setup.title}</h2>
+        <p class="max-w-prose text-body text-muted-foreground">{setup.text}</p>
       </div>
-      <Button href="#trips" variant="outline">Add a booking</Button>
+      <div class="flex flex-wrap gap-2">
+        {#if setup.id === "review"}<Button href="#review">Review {waiting === 1 ? "the email" : `${waiting} emails`}</Button>{/if}
+        {#if setup.id === "connect" || setup.id === "reconnect"}<Button disabled={connecting} onclick={connect}>{connecting ? "Opening Google…" : setup.id === "reconnect" ? "Reconnect Gmail" : "Connect Gmail"}</Button>{/if}
+        <Button href="#trips?add=booking" variant={setup.id === "manual" ? "default" : "outline"}>Add a booking</Button>
+      </div>
+      <details class="w-full text-body">
+        <summary class="inline-flex min-h-11 cursor-pointer items-center font-medium underline-offset-2 hover:underline">Setup checklist (optional)</summary>
+        <ul class="mt-2 flex list-disc flex-col gap-1 pl-5 text-muted-foreground" aria-label="Setup checklist">
+          <li><a class="underline underline-offset-2" href="#people">Add the people who travel with you</a></li>
+          <li><a class="underline underline-offset-2" href="#trips?add=booking">Add your first booking</a></li>
+          <li><a class="underline underline-offset-2" href="#settings">Save your current trip for offline use</a></li>
+        </ul>
+      </details>
     </div>
   </section>
 {:else}
