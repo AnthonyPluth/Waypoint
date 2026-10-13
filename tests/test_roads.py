@@ -78,7 +78,7 @@ class FixtureGraphTests(unittest.TestCase):
         assert island is not None
         self.assertEqual(island.refs, ["I-9"])
 
-    def test_a_stub_too_short_to_matter_is_not_snapped_to(self):
+    def test_a_road_cut_off_from_the_main_network_is_not_snapped_to(self):
         rows = [row("I-1", 0, 1, (40.0, -105.0), (40.0, -103.0)), row("US-9", 5, 6, (40.2, -104.0), (40.2, -103.9))]
         g = roads.parse(rows)
         got = g.snap((40.19, -103.95))
