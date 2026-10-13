@@ -7,7 +7,6 @@
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { OptionsMenu } from "$lib/components/ui/options-menu";
   import CopyCode from "$lib/components/CopyCode.svelte";
@@ -16,9 +15,8 @@
   import GateCode from "$lib/components/GateCode.svelte";
   import { isMobile } from "$lib/platform";
   import { viewport } from "$lib/phone.svelte";
-  import { DiscardDialog } from "$lib/components/ui/discard-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
-  import { draftGuard, dropDrafts, leave } from "$lib/drafts.svelte";
+  import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { loadFlightStatus } from "$lib/flightstatus.svelte";
   import { isSavedCopy } from "$lib/offline";
   import { askAboutOffline, offline, refreshOffline, saveTripCopy } from "$lib/offline.svelte";
@@ -32,13 +30,12 @@
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import RouteReplay from "$lib/components/RouteReplay.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
-  import TripDestination from "$lib/components/TripDestination.svelte";
+  import TripDetails from "$lib/components/TripDetails.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
   import { countNote, formatMoney, formatTotals } from "$lib/money";
   import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
   import { appWord, bookingCards, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, samePlace, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
-  import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
   import { toast } from "svelte-sonner";
 
@@ -49,11 +46,9 @@
   let loyalty = $state<LoyaltyEntry[]>([]);
   let loadError = $state("");
   let form = $state<Draft | null>(null);
+  let editingTrip = $state(false);
   let focus = $state("");
   let inSheet = $state(false);
-  let renaming = $state<string | null>(null);
-  let renameError = $state("");
-  let saving = $state(false);
   let removing = $state<Segment | null>(null);
   let asking = $state(false);
   let askOffline = $state(false);
@@ -133,7 +128,7 @@
       await offerSavedCopy();
     }
   }
-  $effect(() => { void id; form = null; renaming = null; savedCopy = null; savedTrips = []; void load(); });
+  $effect(() => { void id; form = null; editingTrip = false; savedCopy = null; savedTrips = []; void load(); });
 
   const wanted = $derived(new URLSearchParams(route.query).get("segment"));
   $effect(() => {
@@ -162,25 +157,6 @@
       form = draftOf(s, trip?.costs.totals[0]?.currency);
     });
   }
-
-  const renameGuard = draftGuard({
-    dirty: () => renaming !== null && renaming.trim() !== (trip?.name ?? ""),
-    saving: () => saving,
-    discard: () => { renaming = null; renameError = ""; },
-  });
-
-  const rename = (e: SubmitEvent) => {
-    e.preventDefault();
-    const name = (renaming ?? "").trim();
-    if (!trip || !name) { renameError = "Enter a name for the trip"; return; }
-    return act(async () => {
-      if (!trip) return;
-      trip = await apiCall<"POST /api/trips/{id}">(`/api/trips/${trip.id}`, { method: "POST", body: { name } });
-      renaming = null; renameError = "";
-      toast.success("Saved");
-      onchanged?.();
-    }, { busy: (on) => (saving = on), onError: (m) => (renameError = m) });
-  };
 
   async function saved(s: Segment) {
     form = null;
@@ -297,22 +273,9 @@
   {@const t = trip}
   <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
-      {#if renaming !== null}
-        <form class="flex flex-col gap-2 sm:flex-row sm:items-center" onsubmit={rename} aria-label="Rename trip">
-          <Input class="sm:w-80" aria-label="Trip name" bind:value={renaming} maxlength={100} autocomplete="off" autofocus />
-          <div class="flex gap-2">
-            <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
-            <Button type="button" variant="outline" disabled={saving} onclick={() => leave(renameGuard.discard, [renameGuard])}>Cancel</Button>
-          </div>
-        </form>
-        {#if renameError}<p class="mt-2 rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{renameError}</p>{/if}
-      {:else}
-        <div class="flex items-start gap-2">
-          <h1 class="break-words text-display">{t.name}</h1>
-          <Button variant="ghost" size="icon" class="mt-1 shrink-0" aria-label="Rename trip" onclick={() => { renaming = t.name; renameError = ""; }}><Pencil /></Button>
-        </div>
-      {/if}
-      <TripDestination trip={t} dates={dates(t)} onsaved={(next) => { trip = next; onchanged?.(); }} />
+      {#key id}
+        <TripDetails bind:editing={editingTrip} trip={t} dates={dates(t)} onsaved={(next) => { trip = next; onchanged?.(); }} />
+      {/key}
       {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
         <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
       {/if}
@@ -320,7 +283,7 @@
         <p class="mt-1 text-sm" data-trip-total><span class="eyebrow">Total</span> <span class="break-words font-medium">{formatTotals(t.costs.totals)}</span>
           {#if countNote(t.costs)}<span class="text-muted-foreground"> · {countNote(t.costs)}</span>{/if}</p>
       {/if}
-      {#if t.notes}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
+      {#if t.notes && !editingTrip}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
       <OfflineStatus tripId={t.id} />
     </div>
     {#if !form}
@@ -410,8 +373,6 @@
   </ul>
   <TripDone trip={t} ondone={() => { onchanged?.(); void load(); }} />
 {/if}
-
-<DiscardDialog guard={renameGuard} />
 
 <OfflineSetup bind:open={askOffline} onenabled={() => trip && void saveTripCopy(trip)} />
 

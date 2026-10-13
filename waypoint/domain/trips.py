@@ -796,7 +796,7 @@ def auto_destination(conn: db.Connection, segs: Sequence[Segment]) -> str | None
     return named or _headline(conn, {"kind": first.kind, "origin": first.origin, "destination": first.destination, "details": first.details})
 
 
-def destination_facts(conn: db.Connection, viewer: Viewer, trip_id: int) -> regions.Facts | None:
+def destination_facts(conn: db.Connection, viewer: Viewer, trip_id: int, name: str | None = None) -> regions.Facts | None:
     trip = visibility.visible_trip(conn, viewer, trip_id)
     if trip is None:
         return None
@@ -809,7 +809,7 @@ def destination_facts(conn: db.Connection, viewer: Viewer, trip_id: int) -> regi
         place = f"{city['city']}, {region}" if city and city["city"] != region else region
         if {"kind": seg.kind, "place": place} not in stops:
             stops.append({"kind": seg.kind, "place": place})
-    return {"name": trip.name, "stops": stops}
+    return {"name": name or trip.name, "stops": stops}
 
 
 def refresh(conn: db.Connection, trip: Trip) -> None:

@@ -12,7 +12,7 @@ from ...domain.mail import ai
 from ...domain.visibility import Viewer
 from ...storage import db
 from ..common import NO_IMAGE, ApiError, Response, _current, image_response, own_session, position, row_id
-from ..contract import (Airport, AirportMatches, DestinationSuggestion, EmailsCleared, GateCodeBody, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
+from ..contract import (Airport, AirportMatches, DestinationBody, DestinationSuggestion, EmailsCleared, GateCodeBody, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
                         TripList, TripPlaces)
 
 NAME_LIMIT = 100
@@ -246,10 +246,11 @@ def api_trip_split(conn, _q, body: SplitBody, trip_id) -> Trip:
 
 
 @own_session
-def api_trip_destination_suggest(_conn, _q, _b, trip_id) -> DestinationSuggestion:
+def api_trip_destination_suggest(_conn, _q, body: DestinationBody, trip_id) -> DestinationSuggestion:
     this = row_id(trip_id, NO_TRIP)
+    draft = _text(body, "name", "name", NAME_LIMIT)
     with db.session() as conn:
-        facts = trips.destination_facts(conn, viewer(conn), this)
+        facts = trips.destination_facts(conn, viewer(conn), this, draft)
         cfg = ai.config(conn)
         known = tuple(loyalty.known_numbers(conn)) if cfg else ()
     if facts is None:

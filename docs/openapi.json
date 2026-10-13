@@ -745,6 +745,16 @@
             "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DestinationBody"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -4255,6 +4265,16 @@
           "depart_local",
           "recorded"
         ],
+        "additionalProperties": false
+      },
+      "DestinationBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [],
         "additionalProperties": false
       },
       "DestinationSuggestion": {

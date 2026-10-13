@@ -287,8 +287,7 @@
       "path": "/api/trips/{id}",
       "handler": "waypoint/server/api/trips.py:api_trip_edit",
       "web": [
-        "frontend/src/lib/components/TripDestination.svelte",
-        "frontend/src/pages/Trip.svelte"
+        "frontend/src/lib/components/TripDetails.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -377,7 +376,7 @@
       "path": "/api/trips/{id}/destination/suggest",
       "handler": "waypoint/server/api/trips.py:api_trip_destination_suggest",
       "web": [
-        "frontend/src/lib/components/TripDestination.svelte"
+        "frontend/src/lib/components/TripDetails.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",

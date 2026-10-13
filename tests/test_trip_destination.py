@@ -380,8 +380,8 @@ class SuggestRouteTests(RouteCase):
         self.ok("ana", "POST", f"/api/trips/{first['trip_id']}", {"name": "Fall trip for canary.person@leak.example", "notes": "CANARYNOTE4471"})
         return first["trip_id"]
 
-    def suggest(self, who, trip_id):
-        return self.call(who, "POST", f"/api/trips/{trip_id}/destination/suggest")
+    def suggest(self, who, trip_id, body=None):
+        return self.call(who, "POST", f"/api/trips/{trip_id}/destination/suggest", body)
 
     def test_the_state_says_whether_the_ai_fallback_is_on(self):
         self.assertIs(self.ok("ana", "GET", "/api/state")["ai"], False)
@@ -458,6 +458,25 @@ class SuggestRouteTests(RouteCase):
         self.assertEqual(self.ok("ana", "GET", f"/api/trips/{first['trip_id']}")["name"], "Trip to Denver (Oct 2026)")
         self.suggest("ana", first["trip_id"])
         self.assertEqual(self.fake.requests[0][2]["messages"][1]["content"], "Trip name: Trip to Denver\nBookings, in order:\n- flight to Denver, Colorado")
+
+    def test_the_name_in_the_form_is_the_one_sent_before_it_is_saved(self):
+        self.set_mode("local")
+        first = self.book("ana", leg("JFK", "DEN", 1))
+        self.assertEqual(self.suggest("ana", first["trip_id"], {"name": "Summer in Denver"})[0], 200)
+        sent = self.fake.requests[0][2]["messages"][1]["content"]
+        self.assertTrue(sent.startswith("Trip name: Summer in Denver\n"), sent)
+        self.assertNotIn("Trip to Denver", sent)
+        self.assertEqual(self.ok("ana", "GET", f"/api/trips/{first['trip_id']}")["name"], "Trip to Denver (Oct 2026)")
+
+    def test_a_draft_name_is_checked_and_redacted_like_a_saved_one(self):
+        self.set_mode("local")
+        trip_id = self.trip()
+        self.assertEqual(self.suggest("ana", trip_id, {"name": "x" * 101})[0], 400)
+        self.assertEqual(self.suggest("ana", trip_id, {"name": 5})[0], 400)
+        self.assertEqual(self.suggest("ana", trip_id, {"name": "Trip for canary.person@leak.example"})[0], 200)
+        sent = json.dumps(self.fake.requests[-1][2])
+        self.assertNotIn("canary.person@leak.example", sent)
+        self.assertIn("Trip for [email]", sent)
 
     def test_a_cancelled_booking_is_not_sent(self):
         self.set_mode("local")
