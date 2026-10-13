@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
 import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
 
@@ -643,5 +643,26 @@ describe("a flight headline by evidence", () => {
   it("pins the wording before and during the check-in reminder window", () => {
     expect(passHeadline(flight, dep - 30 * HOUR)).toBe("Check-in usually opens in 6 h");
     expect(passHeadline(flight, dep - 3 * HOUR)).toBe("Check-in usually open, scheduled departure in 3 h");
+  });
+});
+
+describe("dayShift", () => {
+  it("is empty on the same calendar day, however late the clock", () => {
+    expect(dayShift("2026-11-20T06:00", "2026-11-20T23:59")).toBe("");
+    expect(dayShift(null, "2026-11-20T19:00")).toBe("");
+    expect(dayShift("2026-11-20T19:00", null)).toBe("");
+  });
+  it("counts overnight arrivals as +1 and +2 days by the dates at each place", () => {
+    expect(dayShift("2026-11-20T22:00", "2026-11-21T06:00")).toBe("+1 day");
+    expect(dayShift("2026-11-20T22:00", "2026-11-22T06:00")).toBe("+2 days");
+    expect(dayShiftWords("2026-11-20T22:00", "2026-11-22T06:00")).toBe("2 days later on the calendar than departure");
+  });
+  it("counts a date-line crossing that lands on an earlier date as −1 day", () => {
+    expect(dayShift("2026-11-21T01:00", "2026-11-20T19:00")).toBe("−1 day");
+    expect(dayShiftWords("2026-11-21T01:00", "2026-11-20T19:00")).toBe("1 day earlier on the calendar than departure");
+  });
+  it("is not moved by a daylight-saving change on the night", () => {
+    expect(dayShift("2026-03-07T23:30", "2026-03-08T07:00")).toBe("+1 day");
+    expect(dayShift("2026-11-01T00:30", "2026-11-01T07:00")).toBe("");
   });
 });

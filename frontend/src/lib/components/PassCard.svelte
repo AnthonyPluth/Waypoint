@@ -2,6 +2,7 @@
   import type { Snippet } from "svelte";
   import type { Segment } from "$lib/api-types";
   import AirportCode from "$lib/components/AirportCode.svelte";
+  import AirportName from "$lib/components/AirportName.svelte";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import DayTime from "$lib/components/DayTime.svelte";
@@ -14,7 +15,7 @@
   import { isMobile } from "$lib/platform";
   import { formatMoney } from "$lib/money";
   import { segmentChips } from "$lib/status";
-  import { appWord, dayLabel, extraAddress, flightEvidence, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
+  import { appWord, dayLabel, dayShift, dayShiftWords, extraAddress, flightEvidence, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
 
   type Props = {
     segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
@@ -43,7 +44,8 @@
   const app = $derived(s.links.app ?? s.manage_url);
   const appLabel = $derived(appWord(s, now, isMobile()));
   const vendor = $derived(vendorLink(s, isMobile()));
-  const asOf = (t: string) => new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t));
+  const asOf = (t: string) => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(t));
+  const shift = $derived(flight ? dayShift(s.start_local, s.end_local) : "");
   const where = $derived([status?.dep_gate && `Gate ${status.dep_gate}`].filter(Boolean).join(" · "));
   const quiet = $derived(status ? [status.delay_minutes ? `${status.delay_minutes} min late` : "", where, `as of ${asOf(status.fetched_at)}`].filter(Boolean).join(" · ") : "");
   const rows = $derived<[string, string | null | undefined][]>(
@@ -95,12 +97,12 @@
 
     {#if flight}
       <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
-        <AirportCode code={s.origin ?? "—"} size="medium" />
+        <div class="min-w-0 max-w-36 md:max-w-56"><AirportCode code={s.origin ?? "—"} size="medium" /><AirportName code={s.origin ?? ""} /></div>
         <span title="The plane’s place is worked out from the booked times, not live data" class="min-w-0">
           <RouteLine progress={grounded ? 0 : progress} label={evidence === "landed" ? "Route, with the plane at the destination" : "Route, with the plane placed from the booked times"} />
           {#if evidence !== "landed" && !grounded}<span class="block text-center text-xs text-muted-foreground" data-schedule-label>Based on schedule</span>{/if}
         </span>
-        <AirportCode code={s.destination ?? "—"} size="medium" class="text-right" />
+        <div class="min-w-0 max-w-36 text-right md:max-w-56"><AirportCode code={s.destination ?? "—"} size="medium" /><AirportName code={s.destination ?? ""} /></div>
         {#if timesArea}{:else if differ}
           <div class="col-span-3 mt-2 flex flex-col gap-1 text-sm">
             <span><Badge variant="secondary">Times differ between bookings</Badge></span>
@@ -110,9 +112,10 @@
           </div>
         {:else}
         <div class="col-span-3 flex flex-wrap justify-between gap-x-4 text-sm">
-          <p><DayTime segment={s} /></p>
-          <p class="text-right"><DayTime segment={s} end /></p>
+          <p><DayTime segment={s} /><span class="sr-only"> ({s.start_zone})</span></p>
+          <p class="text-right"><DayTime segment={s} end />{#if shift}<span class="ml-1.5 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground" data-day-shift><span aria-hidden="true">{shift}</span><span class="sr-only">, {dayShiftWords(s.start_local, s.end_local)}</span></span>{/if}<span class="sr-only"> ({s.end_zone})</span></p>
         </div>
+        {#if !unknown}<p class="col-span-3 text-xs text-muted-foreground" data-zone-note>Times are local to each airport</p>{/if}
         {/if}
       </div>
       {#if timesArea}{@render timesArea()}{/if}
