@@ -511,7 +511,7 @@
   {#if !done}
     <div class="flex flex-wrap gap-2">
       <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => edit(s)}>Edit</Button>
-      <OptionsMenu size="sm" label={`More options for ${name}`} text="More" items={[
+      <OptionsMenu size="sm" up align="left" label={`More options for ${name}`} text="More" items={[
         { label: "Move", name: `Move ${name}`, onselect: () => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); } },
         { label: "Remove", name: `Remove ${name}`, destructive: true, onselect: () => { removing = s; asking = true; } },
       ]} />
