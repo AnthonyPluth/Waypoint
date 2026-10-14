@@ -343,9 +343,9 @@ def suggest_now(owner: str, item_id: int, now: float) -> None:
         _suggest(mailbox_id, message_id, _again(owner, item_id)[2], now)
 
 
-def _read(cfg: ai.Config, text: str, known: tuple[str, ...]) -> tuple[list[ai.Suggestion], str | None, bool]:
+def _read(cfg: ai.Config, text: str, known: tuple[str, ...], timeout: float | None = None) -> tuple[list[ai.Suggestion], str | None, bool]:
     try:
-        reading = ai.suggest(cfg, text, known)
+        reading = ai.suggest(cfg, text, known, timeout)
         return reading.bookings, reading.error, False
     except ai.AiError as e:
         return [], str(e), str(e) != ai.NO_BOOKING
@@ -370,7 +370,7 @@ def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> None:
         review.set_suggestions(conn, mailbox_id, message_id, suggestions, error, auto=False)
 
 
-def _ask_waiting(mailbox_id: int, token: Callable[[], str]) -> int:
+def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> int:
     asked = 0
     passed: set[str] = set()
     while True:
@@ -391,8 +391,11 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str]) -> int:
             continue
         except gmail.GmailError:
             continue
+        left = BUDGET - (_clock() - started)   # a slow local model must not hold the scan past its budget
+        if left <= 0:
+            return asked
         asked += 1
-        suggestions, error, failed = _read(cfg, extract.plain_text(raw), known)
+        suggestions, error, failed = _read(cfg, extract.plain_text(raw), known, left)
         with db.session() as conn:
             review.set_suggestions(conn, mailbox_id, message_id, suggestions, error, auto=None if failed else True)
             if failed:
@@ -535,7 +538,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             attached += bool(joined) and not a
             read, made, queued, handled = read + 1, made + a, queued + b, handled + 1
         if not capped:
-            asked_by_ai = _ask_waiting(mailbox_id, current)
+            asked_by_ai = _ask_waiting(mailbox_id, current, started)
         if not again and not backfill:
             with db.session() as conn:
                 conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(
