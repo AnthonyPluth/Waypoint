@@ -37,7 +37,7 @@ An AI assistant (Claude and the like) can connect to Waypoint's `/mcp` endpoint 
 
 ## One household, not one account per person
 
-Waypoint has no accounts of its own: sign-in decides who gets in, and everyone who gets in (`OIDC_ALLOWED_EMAILS`,
+Waypoint has no accounts of its own. In local mode, everyone who can reach it has household access. The default Compose port is bound to localhost. With optional OIDC enabled, sign-in decides who gets in, and everyone who gets in (`OIDC_ALLOWED_EMAILS`,
 `OIDC_ALLOWED_GROUPS`) can change settings and saved keys, download the backup (which
 holds the household’s data and its encrypted secrets, mailbox tokens included) and restore one. Which trips a person sees follows who is on them,
 booked them or got a booking’s confirmation in their own mailbox; that is about what the app shows, not a boundary between people with access to the server or its backups.

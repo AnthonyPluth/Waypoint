@@ -411,26 +411,6 @@ export interface LabelsBody {
   labels: string[];
 }
 
-export interface LogoDevBody {
-  token?: string;
-  secret?: string;
-  clear?: boolean;
-  clear_secret?: boolean;
-}
-
-export interface LogoDevFetch {
-  started: boolean;
-}
-
-export interface LogoDevStatus {
-  configured: boolean;
-  searchable: boolean;
-  with_logo: number;
-  unknown: number;
-  waiting: number;
-  last_error: string | null;
-}
-
 export interface LoyaltyBody {
   person_id: number;
   kind: string;
@@ -1217,9 +1197,6 @@ export interface Endpoints {
   "DELETE /api/home": { body: never; reply: Home };
   "GET /api/flight-status": { body: never; reply: FlightStatusList };
   "POST /api/flight-status/{id}": { body: never; reply: FlightStatusList };
-  "GET /api/logodev": { body: never; reply: LogoDevStatus };
-  "POST /api/logodev": { body: LogoDevBody; reply: LogoDevStatus };
-  "POST /api/logodev/fetch": { body: never; reply: LogoDevFetch };
   "GET /api/loyalty": { body: never; reply: LoyaltyList };
   "POST /api/loyalty": { body: LoyaltyBody; reply: LoyaltyEntry };
   "POST /api/loyalty/{id}": { body: LoyaltyBody; reply: LoyaltyEntry };

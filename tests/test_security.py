@@ -45,6 +45,12 @@ class PublicUrlTests(unittest.TestCase):
             self.assertEqual(self.problems(home), [], home)
         self.assertEqual(self.problems("http://waypoint.example.com", WAYPOINT_ALLOW_INSECURE_HTTP="1"), [])
 
+    def test_oidc_requires_an_explicit_public_url(self):
+        self.assertIn("WAYPOINT_PUBLIC_URL is not set", self.problems(""))
+        self.assertEqual(oidc.config()["redirect_uri"], "")
+        os.environ.pop("WAYPOINT_PUBLIC_URL")
+        self.assertIn("WAYPOINT_PUBLIC_URL is not set", oidc.check_config())
+
 
 class SecretsTests(unittest.TestCase):
     def setUp(self):

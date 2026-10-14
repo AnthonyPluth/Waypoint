@@ -111,16 +111,10 @@ type = "independence"
 modules = ["waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
 
 [[tool.importlinter.contracts]]
-id = "logodev-alone"
-name = "The Logo.dev and Wikimedia providers import no other provider, and none imports them"
-type = "independence"
-modules = ["waypoint.providers.logodev", "waypoint.providers.wikimedia", "waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
-
-[[tool.importlinter.contracts]]
 id = "mailimages-alone"
 name = "The mail image fetcher imports no other provider, and none imports it"
 type = "independence"
-modules = ["waypoint.providers.mailimages", "waypoint.providers.logodev", "waypoint.providers.wikimedia", "waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
+modules = ["waypoint.providers.mailimages", "waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
 
 [[tool.importlinter.contracts]]
 id = "storage-at-the-bottom"

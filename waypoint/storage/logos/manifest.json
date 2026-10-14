@@ -1,0 +1,1113 @@
+[
+  {
+    "name": "American Airlines",
+    "file": "american-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/american-airlines.svg",
+    "upstream_path": "svg/a/american-airlines.svg",
+    "sha": "a01ff502674d839fff1eeb763d4bb8007b06e21f"
+  },
+  {
+    "name": "Delta Air Lines",
+    "file": "delta-air-lines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/d/delta-air-lines.svg",
+    "upstream_path": "svg/d/delta-air-lines.svg",
+    "sha": "356a716a8ace270da7eaa0b9798831cf7a711eae"
+  },
+  {
+    "name": "United Airlines",
+    "file": "ual.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/UAL.png",
+    "sha": "eb91098a91a9c91fc18bd03d4d028164205e3a7f"
+  },
+  {
+    "name": "Southwest Airlines",
+    "file": "swa.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/SWA.png",
+    "sha": "18bfe9b270b5afbf9bcb4175041f69632880ed9d"
+  },
+  {
+    "name": "Alaska Airlines",
+    "file": "alaska-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/alaska-airlines.svg",
+    "upstream_path": "svg/a/alaska-airlines.svg",
+    "sha": "1fdd77cf0c364c5f3b717c05632d75f216d73958"
+  },
+  {
+    "name": "Frontier Airlines",
+    "file": "frontier-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/f/frontier-airlines.svg",
+    "upstream_path": "svg/f/frontier-airlines.svg",
+    "sha": "88988a5be9db027af6687b7431003dc7badc1548"
+  },
+  {
+    "name": "Hawaiian Airlines",
+    "file": "hawaiian-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hawaiian-airlines.svg",
+    "upstream_path": "svg/h/hawaiian-airlines.svg",
+    "sha": "618e7e1eccdd04b9a0682cde6a2a6fde681c603d"
+  },
+  {
+    "name": "Air Canada",
+    "file": "air-canada.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-canada.svg",
+    "upstream_path": "svg/a/air-canada.svg",
+    "sha": "646c0ca9977f8d4a2d493c2551e08ecb8a52cef6"
+  },
+  {
+    "name": "WestJet",
+    "file": "westjet.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/westjet.svg",
+    "upstream_path": "svg/w/westjet.svg",
+    "sha": "a3d9425ad00c14cacc316dd7115545955c40d0aa"
+  },
+  {
+    "name": "British Airways",
+    "file": "british-airways.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/b/british-airways.svg",
+    "upstream_path": "svg/b/british-airways.svg",
+    "sha": "561f59fa071f6a2406b3b5dce824b9dbc5a2a427"
+  },
+  {
+    "name": "Air France",
+    "file": "air-france.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-france.svg",
+    "upstream_path": "svg/a/air-france.svg",
+    "sha": "e9f994906319df31c8839345faefcd783bc6a537"
+  },
+  {
+    "name": "KLM",
+    "file": "klm.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/k/klm.svg",
+    "upstream_path": "svg/k/klm.svg",
+    "sha": "862aa604f96c147a5f72a8a7e1070a16024d638e"
+  },
+  {
+    "name": "Lufthansa",
+    "file": "lufthansa.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/l/lufthansa.svg",
+    "upstream_path": "svg/l/lufthansa.svg",
+    "sha": "555ab1694da666262880d64619ae804a81b703f8"
+  },
+  {
+    "name": "Austrian Airlines",
+    "file": "austrian-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/austrian-airlines.svg",
+    "upstream_path": "svg/a/austrian-airlines.svg",
+    "sha": "247591e99a752982f38c74f713473c63b2463cd7"
+  },
+  {
+    "name": "Aer Lingus",
+    "file": "aer-lingus.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/aer-lingus.svg",
+    "upstream_path": "svg/a/aer-lingus.svg",
+    "sha": "6629040f0d9b1d82915458cc83a131e89c7395c4"
+  },
+  {
+    "name": "Ryanair",
+    "file": "ryanair.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/ryanair.svg",
+    "upstream_path": "svg/r/ryanair.svg",
+    "sha": "8e51afc15861066a00d7ae310a3b63f774f9e822"
+  },
+  {
+    "name": "Emirates",
+    "file": "emirates.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/emirates-1.svg",
+    "upstream_path": "svg/e/emirates-1.svg",
+    "sha": "ea7459f131157dc38b421aa7574070bc79ea44de"
+  },
+  {
+    "name": "Qatar Airways",
+    "file": "qatar-airways.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/q/qatar-airways.svg",
+    "upstream_path": "svg/q/qatar-airways.svg",
+    "sha": "df349868ef0b6ea0daa2897d84285033ac9b84cd"
+  },
+  {
+    "name": "Etihad Airways",
+    "file": "etihad-airways.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/etihad-airways-1.svg",
+    "upstream_path": "svg/e/etihad-airways-1.svg",
+    "sha": "34eb5cb863b3d56a82e76f4c6537876ce9f57f19"
+  },
+  {
+    "name": "Singapore Airlines",
+    "file": "singapore-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/singapore-airlines.svg",
+    "upstream_path": "svg/s/singapore-airlines.svg",
+    "sha": "c6b4c09b9f332d1cdb71c491cd21af4602d546ea"
+  },
+  {
+    "name": "Cathay Pacific",
+    "file": "cathay-pacific.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/cathay-pacific.svg",
+    "upstream_path": "svg/c/cathay-pacific.svg",
+    "sha": "ea7f8cdd98d5286207ca777f003014b5cd5c8017"
+  },
+  {
+    "name": "Japan Airlines",
+    "file": "japan-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/j/japan-airlines.svg",
+    "upstream_path": "svg/j/japan-airlines.svg",
+    "sha": "b0a1c5405f6363597167926a5b77857cfe168843"
+  },
+  {
+    "name": "All Nippon Airways",
+    "file": "all-nippon-airways.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/ana.svg",
+    "upstream_path": "svg/a/ana.svg",
+    "sha": "1f24e248d7e3119baa9b0f73ab337316117e4aaf"
+  },
+  {
+    "name": "Korean Air",
+    "file": "korean-air.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/k/korean-air.svg",
+    "upstream_path": "svg/k/korean-air.svg",
+    "sha": "a7885618483ed0dad74850aeb7cf4e5ea7bfa7a6"
+  },
+  {
+    "name": "Qantas",
+    "file": "qantas.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/q/qantas.svg",
+    "upstream_path": "svg/q/qantas.svg",
+    "sha": "6162167b2321200ea489aae7d1b9abee3d9038ce"
+  },
+  {
+    "name": "Air New Zealand",
+    "file": "air-new-zealand.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-new-zealand.svg",
+    "upstream_path": "svg/a/air-new-zealand.svg",
+    "sha": "6fba5728c0f433762e406411966701dee36570bd"
+  },
+  {
+    "name": "Turkish Airlines",
+    "file": "turkish-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/t/turkish-airlines-1.svg",
+    "upstream_path": "svg/t/turkish-airlines-1.svg",
+    "sha": "96dc1081e89ab8f79123e031317bf3eb11c02cf2"
+  },
+  {
+    "name": "Aeromexico",
+    "file": "aeromexico.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/aeromexico.svg",
+    "upstream_path": "svg/a/aeromexico.svg",
+    "sha": "dc2a7f7d4bbecdbc8517ca8a28f4cdeddf6cf8cd"
+  },
+  {
+    "name": "Copa Airlines",
+    "file": "copa-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/copa-airlines.svg",
+    "upstream_path": "svg/c/copa-airlines.svg",
+    "sha": "1d0bd234565c853d547c9ca41424a96359bba46e"
+  },
+  {
+    "name": "Air India",
+    "file": "air-india.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-india.svg",
+    "upstream_path": "svg/a/air-india.svg",
+    "sha": "2c8cac583e0ceb356b97fb2ec2773922e8261b3e"
+  },
+  {
+    "name": "Ethiopian Airlines",
+    "file": "ethiopian-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/ethiopian-airlines.svg",
+    "upstream_path": "svg/e/ethiopian-airlines.svg",
+    "sha": "a7e069b6396f4e26af44b6c11921b3b5864de5fc"
+  },
+  {
+    "name": "SAS",
+    "file": "sas.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/sas.svg",
+    "upstream_path": "svg/s/sas.svg",
+    "sha": "3ff262c72505d0dff146eb2aa3514179b1188b71"
+  },
+  {
+    "name": "Hilton",
+    "file": "hilton.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hilton.svg",
+    "upstream_path": "svg/h/hilton.svg",
+    "sha": "f544eb9b903c2d6a7944bdd01930fc2279c2d502"
+  },
+  {
+    "name": "Hyatt",
+    "file": "hyatt.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hyatt.svg",
+    "upstream_path": "svg/h/hyatt.svg",
+    "sha": "6c9e50e856a3830d37b56b6787c92abe1fe73376"
+  },
+  {
+    "name": "Marriott",
+    "file": "marriott.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/m/marriott.svg",
+    "upstream_path": "svg/m/marriott.svg",
+    "sha": "a59c6e8993b059bce1f8ce485b060b9264359778"
+  },
+  {
+    "name": "IHG Hotels & Resorts",
+    "file": "ihg-hotels-resorts.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/i/intercontinental-hotels-group-1.svg",
+    "upstream_path": "svg/i/intercontinental-hotels-group-1.svg",
+    "sha": "19533fe71e8c61ac58a27ab576455573548d2ae7"
+  },
+  {
+    "name": "Wyndham Hotels & Resorts",
+    "file": "wyndham-hotels-resorts.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/wyndham-hotels-resorts.svg",
+    "upstream_path": "svg/w/wyndham-hotels-resorts.svg",
+    "sha": "0ceb058c2413d18ac2001419feebd5b7bdce9e9c"
+  },
+  {
+    "name": "Choice Hotels",
+    "file": "choice-hotels.png",
+    "source": "https://github.com/cocdeshijie/PointLens/blob/master/pointlens/assets/choice.png",
+    "sha": "1506441123fcb1396de87ab00668471f0293b685"
+  },
+  {
+    "name": "Best Western",
+    "file": "best-western.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/b/best-western.svg",
+    "upstream_path": "svg/b/best-western.svg",
+    "sha": "ae0c1ce0e324909afb7b86f38e604179fd8638f6"
+  },
+  {
+    "name": "Radisson Hotel Group",
+    "file": "radisson-hotel-group.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/radisson.svg",
+    "upstream_path": "svg/r/radisson.svg",
+    "sha": "54a318f2bd592a8ddff07085723a2129cc6a1ee1"
+  },
+  {
+    "name": "Accor",
+    "file": "accor.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/accor.svg",
+    "upstream_path": "svg/a/accor.svg",
+    "sha": "4175183d406e2130a16b1d2704e28d50bd7096a7"
+  },
+  {
+    "name": "Hertz",
+    "file": "hertz.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hertz.svg",
+    "upstream_path": "svg/h/hertz.svg",
+    "sha": "44eff7b48085c19abcabe4b69b30d5684aa767e8"
+  },
+  {
+    "name": "Avis",
+    "file": "avis.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/avis.svg",
+    "upstream_path": "svg/a/avis.svg",
+    "sha": "8f4310300c29bcc66885709a050cb7e5252d7da2"
+  },
+  {
+    "name": "Budget",
+    "file": "budget.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/b/budget-rent-a-car-1.svg",
+    "upstream_path": "svg/b/budget-rent-a-car-1.svg",
+    "sha": "9f2121187f054a4029cf134ecb187a30d2e3e245"
+  },
+  {
+    "name": "Enterprise",
+    "file": "enterprise.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/enterprise-rent-a-car.svg",
+    "upstream_path": "svg/e/enterprise-rent-a-car.svg",
+    "sha": "e52eabdb45a15f3ebc59b867638de53964c48eb7"
+  },
+  {
+    "name": "National",
+    "file": "national.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/n/national-car-rental.svg",
+    "upstream_path": "svg/n/national-car-rental.svg",
+    "sha": "8bed5eed3d03e8e6b53edbb2f7ff0021d3648a2a"
+  },
+  {
+    "name": "Alamo",
+    "file": "alamo.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/alamo-rent-a-car-1.svg",
+    "upstream_path": "svg/a/alamo-rent-a-car-1.svg",
+    "sha": "c4cbbd07c66736166cb6687c0461b259724fd7ac"
+  },
+  {
+    "name": "Sixt",
+    "file": "sixt.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/sixt.svg",
+    "upstream_path": "svg/s/sixt.svg",
+    "sha": "30b1f9bb6c8e7832b2ee01e2450679a7bdba08ca"
+  },
+  {
+    "name": "Dollar",
+    "file": "dollar.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/d/dollar-rent-a-car.svg",
+    "upstream_path": "svg/d/dollar-rent-a-car.svg",
+    "sha": "adc465cfd7d43a2b74aa7c2eb15d4e0fa9f7aa64"
+  },
+  {
+    "name": "Thrifty",
+    "file": "thrifty.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/t/thrifty-car-rental.svg",
+    "upstream_path": "svg/t/thrifty-car-rental.svg",
+    "sha": "3b1f63ef4a8c06366f717df5b491d845e0dcaaf0"
+  },
+  {
+    "name": "Europcar",
+    "file": "europcar.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/europcar.svg",
+    "upstream_path": "svg/e/europcar.svg",
+    "sha": "dd0467a105946d357117d6bbc9301d215b0e3fd4"
+  },
+  {
+    "name": "Carnival Cruise Line",
+    "file": "carnival-cruise-line.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/carnival.svg",
+    "upstream_path": "svg/c/carnival.svg",
+    "sha": "fc67fe6c6cd315d7c1748e199a6864dd54a02392"
+  },
+  {
+    "name": "Royal Caribbean",
+    "file": "royal-caribbean.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/royal-caribbean.svg",
+    "upstream_path": "svg/r/royal-caribbean.svg",
+    "sha": "5d195d1e9fddee0e924f78f877b3a1f2260d8fec"
+  },
+  {
+    "name": "Norwegian Cruise Line",
+    "file": "norwegian-cruise-line.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/n/norwegian-cruise-line.svg",
+    "upstream_path": "svg/n/norwegian-cruise-line.svg",
+    "sha": "406bfd5197f003cbfca9cc1bb446a2c6b36b7fcf"
+  },
+  {
+    "name": "Princess Cruises",
+    "file": "princess-cruises.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/p/princess-cruises.svg",
+    "upstream_path": "svg/p/princess-cruises.svg",
+    "sha": "e94ae01daae58a56f48a133350b5acc81470e266"
+  },
+  {
+    "name": "Celebrity Cruises",
+    "file": "celebrity-cruises.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/celebrity-cruises.svg",
+    "upstream_path": "svg/c/celebrity-cruises.svg",
+    "sha": "f9a0a50505c758c4c8cbbe60996ad370f9e68346"
+  },
+  {
+    "name": "MSC Cruises",
+    "file": "msc-cruises.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/m/msc-cruises-1.svg",
+    "upstream_path": "svg/m/msc-cruises-1.svg",
+    "sha": "0bc4dd9fae595966400ce99eaf143e7c70e91643"
+  },
+  {
+    "name": "Viking",
+    "file": "viking.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/v/viking-river-cruises.svg",
+    "upstream_path": "svg/v/viking-river-cruises.svg",
+    "sha": "3beb96dbdf179c2820d68f9db5a81ad6a64ab4e7"
+  },
+  {
+    "name": "Costa Cruises",
+    "file": "costa-cruises.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/costa-cruises.svg",
+    "upstream_path": "svg/c/costa-cruises.svg",
+    "sha": "3ccab156794c6af933b1a5ee543df2aded26a0f9"
+  },
+  {
+    "name": "Cunard",
+    "file": "cunard.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/cunard.svg",
+    "upstream_path": "svg/c/cunard.svg",
+    "sha": "3bf5622a4d479331cfbfd2f05bc3fee75fdbf369"
+  },
+  {
+    "name": "Seabourn",
+    "file": "seabourn.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/seabourn-cruise-line.svg",
+    "upstream_path": "svg/s/seabourn-cruise-line.svg",
+    "sha": "290cf5231bf3fb5934a2e8ab7d1d06b0e3120460"
+  },
+  {
+    "name": "Windstar Cruises",
+    "file": "windstar-cruises.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/windstar-cruises.svg",
+    "upstream_path": "svg/w/windstar-cruises.svg",
+    "sha": "17a6fe7a1a8ac34a80f9f61c8adfe717debf510a"
+  },
+  {
+    "name": "Swiss International Air Lines",
+    "file": "swr.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/SWR.png",
+    "sha": "4363fcb309a1d9e7c976935ce95f6c0b5e3d47b4"
+  },
+  {
+    "name": "Iberia",
+    "file": "iberia.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/i/iberia-airlines.svg",
+    "upstream_path": "svg/i/iberia-airlines.svg",
+    "sha": "578fd729b781d2f1ff85621815b15e055e57da45"
+  },
+  {
+    "name": "easyJet",
+    "file": "easyjet.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/easyjet-airline.svg",
+    "upstream_path": "svg/e/easyjet-airline.svg",
+    "sha": "910f32cae82f2ffb948d9714939e10fa37650011"
+  },
+  {
+    "name": "LATAM Airlines",
+    "file": "latam-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/l/latam-1.svg",
+    "upstream_path": "svg/l/latam-1.svg",
+    "sha": "8e3ce34d8b63e5a972eda31715a1c74b2f617af6"
+  },
+  {
+    "name": "Avianca",
+    "file": "avianca.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/avianca-55542.svg",
+    "upstream_path": "svg/a/avianca-55542.svg",
+    "sha": "5b5910b7ed5340b4726230614318b688144b4edc"
+  },
+  {
+    "name": "Holland America Line",
+    "file": "holland-america-line.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/holland-america-cruises.svg",
+    "upstream_path": "svg/h/holland-america-cruises.svg",
+    "sha": "7e2dd4bb49e6e6906af9a4eef8c9a089f44d222f"
+  },
+  {
+    "name": "Hyatt Regency",
+    "file": "hyatt-regency.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hyatt-regency.svg",
+    "upstream_path": "svg/h/hyatt-regency.svg",
+    "sha": "ab4c25aeb9f34c3e3f535d1d9dbfaaaf0c22b89b"
+  },
+  {
+    "name": "Hyatt Place",
+    "file": "hyatt-place.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hyatt-place-1.svg",
+    "upstream_path": "svg/h/hyatt-place-1.svg",
+    "sha": "9b4dca726cc2ebc17167971bd343f59bc7841bc2"
+  },
+  {
+    "name": "Hyatt House",
+    "file": "hyatt-house.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hyatt-house-1.svg",
+    "upstream_path": "svg/h/hyatt-house-1.svg",
+    "sha": "f13d4fa447484c44adb1f6ad304b75d8363111ca"
+  },
+  {
+    "name": "Courtyard by Marriott",
+    "file": "courtyard-by-marriott.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/courtyard-by-marriott.svg",
+    "upstream_path": "svg/c/courtyard-by-marriott.svg",
+    "sha": "4238aa1f3ac27f24972c7cee1857177afe09d2d3"
+  },
+  {
+    "name": "Residence Inn by Marriott",
+    "file": "residence-inn-by-marriott.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/residence-inn.svg",
+    "upstream_path": "svg/r/residence-inn.svg",
+    "sha": "318968e5b0c590c236d2c3440bbdb93b6defe51f"
+  },
+  {
+    "name": "Fairfield by Marriott",
+    "file": "fairfield-by-marriott.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/f/fairfield-inn.svg",
+    "upstream_path": "svg/f/fairfield-inn.svg",
+    "sha": "512111a940ca98b5f4c08b0841525cc191a6dad3"
+  },
+  {
+    "name": "SpringHill Suites by Marriott",
+    "file": "springhill-suites-by-marriott.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/springhill-suites.svg",
+    "upstream_path": "svg/s/springhill-suites.svg",
+    "sha": "3ecc4a0a96bc20660c479d96c2ed8f9ef4307920"
+  },
+  {
+    "name": "TownePlace Suites by Marriott",
+    "file": "towneplace-suites-by-marriott.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/t/towneplace-suites.svg",
+    "upstream_path": "svg/t/towneplace-suites.svg",
+    "sha": "183751af8f4dc9f39b598b7d2590cfed7179969e"
+  },
+  {
+    "name": "Westin",
+    "file": "westin.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/westin.svg",
+    "upstream_path": "svg/w/westin.svg",
+    "sha": "16a71148334cf94921fd542b940bde76e18ad3a3"
+  },
+  {
+    "name": "Renaissance Hotels",
+    "file": "renaissance-hotels.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/renaissance-hotels.svg",
+    "upstream_path": "svg/r/renaissance-hotels.svg",
+    "sha": "2db50f25b3ae3579edc985ab6b704e16bf813f00"
+  },
+  {
+    "name": "Le Méridien",
+    "file": "le-meridien.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/l/le-meridien.svg",
+    "upstream_path": "svg/l/le-meridien.svg",
+    "sha": "da72d3d238aad26700998c852d6addd24c158315"
+  },
+  {
+    "name": "The St. Regis",
+    "file": "the-st-regis.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/st-regis.svg",
+    "upstream_path": "svg/s/st-regis.svg",
+    "sha": "9e3157a9e0bb48d7d9e6b37dd596ad3097bfc63f"
+  },
+  {
+    "name": "Gaylord Hotels",
+    "file": "gaylord-hotels.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/g/gaylord-hotels.svg",
+    "upstream_path": "svg/g/gaylord-hotels.svg",
+    "sha": "c8f61efe7fc0163fd00a95b07c62aa5e3b7879d9"
+  },
+  {
+    "name": "W Hotels",
+    "file": "w-hotels.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/w-hotels.svg",
+    "upstream_path": "svg/w/w-hotels.svg",
+    "sha": "9046b7205ad38ca486b2c9befeaa30244b936d4d"
+  },
+  {
+    "name": "Delta Hotels by Marriott",
+    "file": "delta-hotels-by-marriott.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/d/delta-hotels.svg",
+    "upstream_path": "svg/d/delta-hotels.svg",
+    "sha": "ff2c94dc0181d7b06248464a5ca8e7525c727ba4"
+  },
+  {
+    "name": "City Express by Marriott",
+    "file": "city-express-by-marriott.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/city-express.svg",
+    "upstream_path": "svg/c/city-express.svg",
+    "sha": "8103338668e270fa16c8e4d7a1568b983119772e"
+  },
+  {
+    "name": "Bvlgari Hotels & Resorts",
+    "file": "bvlgari-hotels-resorts.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/b/bvlgari-hotels-resorts.svg",
+    "upstream_path": "svg/b/bvlgari-hotels-resorts.svg",
+    "sha": "e3566b7f329d5a453e39c20d669b1100410cce0a"
+  },
+  {
+    "name": "Marriott Executive Apartments",
+    "file": "marriott-executive-apartments.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/m/marriott-executive-apartments.svg",
+    "upstream_path": "svg/m/marriott-executive-apartments.svg",
+    "sha": "09c891f0e9c5815eea4b9d6fdaebbf32f02de9f1"
+  },
+  {
+    "name": "Hampton by Hilton",
+    "file": "hampton-by-hilton.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hampton-inn.svg",
+    "upstream_path": "svg/h/hampton-inn.svg",
+    "sha": "3800fc386b72ff509f7d9042bf00ab506a076904"
+  },
+  {
+    "name": "Hilton Garden Inn",
+    "file": "hilton-garden-inn.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hilton-garden-inn.svg",
+    "upstream_path": "svg/h/hilton-garden-inn.svg",
+    "sha": "3b2b6078086a95936e8e4d3db82aa7951712cede"
+  },
+  {
+    "name": "DoubleTree by Hilton",
+    "file": "doubletree-by-hilton.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/d/doubletree.svg",
+    "upstream_path": "svg/d/doubletree.svg",
+    "sha": "a35d3bd27b56d1ba0bd857cdadc4c8a74b626126"
+  },
+  {
+    "name": "Embassy Suites by Hilton",
+    "file": "embassy-suites-by-hilton.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/embassy-suites.svg",
+    "upstream_path": "svg/e/embassy-suites.svg",
+    "sha": "4609d149b54bed0a70079b7de43884b2b6024941"
+  },
+  {
+    "name": "Homewood Suites by Hilton",
+    "file": "homewood-suites-by-hilton.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/homewood-suites.svg",
+    "upstream_path": "svg/h/homewood-suites.svg",
+    "sha": "b2b1d8527ca6284c4ccb487946f6812b6236bdb6"
+  },
+  {
+    "name": "Conrad Hotels",
+    "file": "conrad-hotels.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/conrad-hotels.svg",
+    "upstream_path": "svg/c/conrad-hotels.svg",
+    "sha": "dda88a8625d5cf32a959eb8c11be442011ece50d"
+  },
+  {
+    "name": "Holiday Inn Express",
+    "file": "holiday-inn-express.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/holiday-inn-express.svg",
+    "upstream_path": "svg/h/holiday-inn-express.svg",
+    "sha": "f2d19877ae0dd15fcea2713d1b021dd005bb7e56"
+  },
+  {
+    "name": "Holiday Inn",
+    "file": "holiday-inn.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/holiday-inn-1.svg",
+    "upstream_path": "svg/h/holiday-inn-1.svg",
+    "sha": "3240a33c1d81c7dd1e9c408e1d44e974cedd1ebd"
+  },
+  {
+    "name": "Crowne Plaza",
+    "file": "crowne-plaza.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/crowne-plaza.svg",
+    "upstream_path": "svg/c/crowne-plaza.svg",
+    "sha": "41e37483ac3fc6fcc1918ab54f278865932b1bcc"
+  },
+  {
+    "name": "Staybridge Suites",
+    "file": "staybridge-suites.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/staybridge-suites.svg",
+    "upstream_path": "svg/s/staybridge-suites.svg",
+    "sha": "003ff491d611536979f140e4d5be2db82c9e9a9a"
+  },
+  {
+    "name": "Candlewood Suites",
+    "file": "candlewood-suites.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/candlewood-suites.svg",
+    "upstream_path": "svg/c/candlewood-suites.svg",
+    "sha": "c45ce70da5202bca561cf677c71d3d8dd63c6a9a"
+  },
+  {
+    "name": "voco Hotels",
+    "file": "voco-hotels.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/v/voco.svg",
+    "upstream_path": "svg/v/voco.svg",
+    "sha": "911f0dabf99000fa1950be95ba9c7ee91b092326"
+  },
+  {
+    "name": "Ramada by Wyndham",
+    "file": "ramada-by-wyndham.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/ramada.svg",
+    "upstream_path": "svg/r/ramada.svg",
+    "sha": "10f4e3ab4fff5389bc61f164c87e55890ca8901e"
+  },
+  {
+    "name": "Days Inn by Wyndham",
+    "file": "days-inn-by-wyndham.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/d/days-inn.svg",
+    "upstream_path": "svg/d/days-inn.svg",
+    "sha": "306045a0f58986316bda07a46cfe70182cb68ce2"
+  },
+  {
+    "name": "Hawthorn Suites by Wyndham",
+    "file": "hawthorn-suites-by-wyndham.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hawthorn-suites.svg",
+    "upstream_path": "svg/h/hawthorn-suites.svg",
+    "sha": "7b1ec1603e37ccd39d1d8ece877d4b74c2bfd13a"
+  },
+  {
+    "name": "Howard Johnson by Wyndham",
+    "file": "howard-johnson-by-wyndham.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/howard-johnson.svg",
+    "upstream_path": "svg/h/howard-johnson.svg",
+    "sha": "3a051b19c73f27b917c5729fa0bc2f560d700874"
+  },
+  {
+    "name": "AmericInn by Wyndham",
+    "file": "americinn-by-wyndham.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/americinn.svg",
+    "upstream_path": "svg/a/americinn.svg",
+    "sha": "1d568aad4b1af2189f821e5b8172969567d8a10a"
+  },
+  {
+    "name": "Knights Inn",
+    "file": "knights-inn.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/k/knights-inn.svg",
+    "upstream_path": "svg/k/knights-inn.svg",
+    "sha": "798156a487d93dd9158c69c57d12a2fe7239accf"
+  },
+  {
+    "name": "Comfort Inn",
+    "file": "comfort-inn.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/comfort-inn.svg",
+    "upstream_path": "svg/c/comfort-inn.svg",
+    "sha": "ef942d2a8d470ec7c7c752a46ed6464f988f2abc"
+  },
+  {
+    "name": "Comfort Suites",
+    "file": "comfort-suites.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/comfort-suites.svg",
+    "upstream_path": "svg/c/comfort-suites.svg",
+    "sha": "0b619f3361668aafad0fbf9681dca18070efda0c"
+  },
+  {
+    "name": "Sleep Inn",
+    "file": "sleep-inn.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/sleep-inn.svg",
+    "upstream_path": "svg/s/sleep-inn.svg",
+    "sha": "95fa13de450fbb24cab6f87c863fa85b0c98cf03"
+  },
+  {
+    "name": "MainStay Suites",
+    "file": "mainstay-suites.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/m/mainstay-suites.svg",
+    "upstream_path": "svg/m/mainstay-suites.svg",
+    "sha": "4fa3f281dd5ea3bb45c1248cdfda00f453228873"
+  },
+  {
+    "name": "Econo Lodge",
+    "file": "econo-lodge.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/econo-lodge.svg",
+    "upstream_path": "svg/e/econo-lodge.svg",
+    "sha": "215c1c76bbb5b86ce1c527c7d22badc34be858f5"
+  },
+  {
+    "name": "Rodeway Inn",
+    "file": "rodeway-inn.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/rodeway-inn.svg",
+    "upstream_path": "svg/r/rodeway-inn.svg",
+    "sha": "0be4a06edf1b75c67607de8591eec1ef68416c04"
+  },
+  {
+    "name": "Park Plaza",
+    "file": "park-plaza.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/p/park-plaza.svg",
+    "upstream_path": "svg/p/park-plaza.svg",
+    "sha": "ba0b442798c1ffba4561eab4dd5d8659238de7b4"
+  },
+  {
+    "name": "Park Inn by Radisson",
+    "file": "park-inn-by-radisson.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/p/park-inn.svg",
+    "upstream_path": "svg/p/park-inn.svg",
+    "sha": "0a5ff919b338b42e25a61bfa4df65c19c2502904"
+  },
+  {
+    "name": "Fairmont Hotels",
+    "file": "fairmont-hotels.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/f/fairmont.svg",
+    "upstream_path": "svg/f/fairmont.svg",
+    "sha": "f8042a1829a066b57cb9bed64da5cb2be596cf88"
+  },
+  {
+    "name": "Sofitel",
+    "file": "sofitel.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/sofitel.svg",
+    "upstream_path": "svg/s/sofitel.svg",
+    "sha": "81dddc374bbcdf4bba928a2c6165dc3180fb646e"
+  },
+  {
+    "name": "Novotel",
+    "file": "novotel.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/n/novotel.svg",
+    "upstream_path": "svg/n/novotel.svg",
+    "sha": "7e4eccf6ef2f761b213a54a5ba4af7a721ed7d2c"
+  },
+  {
+    "name": "Mercure Hotels",
+    "file": "mercure-hotels.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/m/mercure-hotels.svg",
+    "upstream_path": "svg/m/mercure-hotels.svg",
+    "sha": "70753bb9b1ddfa64b182e93ab8c0a60230358dff"
+  },
+  {
+    "name": "Swissôtel",
+    "file": "swissotel.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/swissotel.svg",
+    "upstream_path": "svg/s/swissotel.svg",
+    "sha": "cf211e2481718be88d8005731aa51878d1db6b25"
+  },
+  {
+    "name": "Sheraton",
+    "file": "sheraton.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/sheraton-hotels-resorts.svg",
+    "upstream_path": "svg/s/sheraton-hotels-resorts.svg",
+    "sha": "f21b394084a7775b4038d1a25229f95b44728d0f"
+  },
+  {
+    "name": "The Ritz-Carlton",
+    "file": "the-ritz-carlton.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/t/the-ritz-carlton.svg",
+    "upstream_path": "svg/t/the-ritz-carlton.svg",
+    "sha": "be6ed2e0a052f37fcd65c1495f84597b5f3116fd"
+  },
+  {
+    "name": "Four Points by Sheraton",
+    "file": "four-points-by-sheraton.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/f/four-points-sheraton.svg",
+    "upstream_path": "svg/f/four-points-sheraton.svg",
+    "sha": "261736164df280d6adc0e0bd5a20e7d53612f5b6"
+  },
+  {
+    "name": "JetBlue Airways",
+    "file": "jbu.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/JBU.png",
+    "sha": "50622351800cec6b1e5d8476a783b54d9ea85ac2"
+  },
+  {
+    "name": "Spirit Airlines",
+    "file": "nks.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/NKS.png",
+    "sha": "c4d39d9e11b1e92dae1734a27840ea654e607a57"
+  },
+  {
+    "name": "Allegiant Air",
+    "file": "aay.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/AAY.png",
+    "sha": "7624844b2a00fc58b087015517108a4592248318"
+  },
+  {
+    "name": "Disney Cruise Line",
+    "file": "disney.svg",
+    "source": "https://github.com/kaliartistry/cruisekit/blob/main/apps/web/public/images/cruise-lines/disney.svg",
+    "sha": "0c0883a3da83702fe0a65bfed07500571979c729"
+  },
+  {
+    "name": "Virgin Voyages",
+    "file": "virgin-voyages.svg",
+    "source": "https://github.com/kaliartistry/cruisekit/blob/main/apps/web/public/images/cruise-lines/virgin-voyages.svg",
+    "sha": "57f1858c480c814785b113c62a80043477155c9a"
+  },
+  {
+    "name": "Azamara",
+    "file": "azamara.svg",
+    "source": "https://github.com/kaliartistry/cruisekit/blob/main/apps/web/public/images/cruise-lines/azamara.svg",
+    "sha": "34631a6995b9749c71bbb275487a2ffd04d42426"
+  },
+  {
+    "name": "Finnair",
+    "file": "finnair.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/f/finnair.svg",
+    "upstream_path": "svg/f/finnair.svg",
+    "sha": "ecd687d15e09dafa80fac0e6167cf6c81ac65cb7"
+  },
+  {
+    "name": "Wizz Air",
+    "file": "wizz-air.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/wizz-air.svg",
+    "upstream_path": "svg/w/wizz-air.svg",
+    "sha": "2ddbaf1b7055d355ddf45c01c36dc740cbeae793"
+  },
+  {
+    "name": "Air Europa",
+    "file": "air-europa.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-europa-1.svg",
+    "upstream_path": "svg/a/air-europa-1.svg",
+    "sha": "44831501bed7a531a81609ef2759b849079561f3"
+  },
+  {
+    "name": "LOT Polish Airlines",
+    "file": "lot-polish-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/l/lot-polish-airlines.svg",
+    "upstream_path": "svg/l/lot-polish-airlines.svg",
+    "sha": "2c2af1d08a49cea60a7cc595ac92512465752822"
+  },
+  {
+    "name": "ITA Airways",
+    "file": "ita-airways.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/i/ita-airways.svg",
+    "upstream_path": "svg/i/ita-airways.svg",
+    "sha": "dd5b3cf543d875953eb417966ca833b651a2c1e0"
+  },
+  {
+    "name": "Air Transat",
+    "file": "air-transat.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-transat.svg",
+    "upstream_path": "svg/a/air-transat.svg",
+    "sha": "dd9c26b20a7e83b9db3e884149e9dec4823c11b4"
+  },
+  {
+    "name": "Air China",
+    "file": "air-china.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-china.svg",
+    "upstream_path": "svg/a/air-china.svg",
+    "sha": "19117a8571f4f8741262d3465656b2c253c614fe"
+  },
+  {
+    "name": "China Eastern Airlines",
+    "file": "china-eastern-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/china-eastern-airlines.svg",
+    "upstream_path": "svg/c/china-eastern-airlines.svg",
+    "sha": "e49d0ff622fbed2df41ad852d8bbdbe83f2b0ad1"
+  },
+  {
+    "name": "China Airlines",
+    "file": "china-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/china-airlines.svg",
+    "upstream_path": "svg/c/china-airlines.svg",
+    "sha": "99c32cee3a3d90f9398347c810c521e279e898d0"
+  },
+  {
+    "name": "EVA Air",
+    "file": "eva-air.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/eva-air.svg",
+    "upstream_path": "svg/e/eva-air.svg",
+    "sha": "a81214c7cd155388c70d228c1e78f1101275d616"
+  },
+  {
+    "name": "Asiana Airlines",
+    "file": "asiana-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/asiana-airlines.svg",
+    "upstream_path": "svg/a/asiana-airlines.svg",
+    "sha": "3b723f6f8b6b2e2f06cf7eac2b5be5c24d5a29c8"
+  },
+  {
+    "name": "Thai Airways",
+    "file": "thai-airways.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/t/thai-airways.svg",
+    "upstream_path": "svg/t/thai-airways.svg",
+    "sha": "edec31ab7c67c280939f6a993f0dbc6e7fa40c5c"
+  },
+  {
+    "name": "Malaysia Airlines",
+    "file": "malaysia-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/m/malaysia-airlines-1.svg",
+    "upstream_path": "svg/m/malaysia-airlines-1.svg",
+    "sha": "1b9fb3128e65c2272866c5e1168d2e151af8f8c3"
+  },
+  {
+    "name": "Garuda Indonesia",
+    "file": "garuda-indonesia.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/g/garuda-indonesia.svg",
+    "upstream_path": "svg/g/garuda-indonesia.svg",
+    "sha": "e9951ce62a11f99d3652a704aff9a8241c23a915"
+  },
+  {
+    "name": "Vietnam Airlines",
+    "file": "vietnam-airlines.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/v/vietnam-airlines.svg",
+    "upstream_path": "svg/v/vietnam-airlines.svg",
+    "sha": "b807ff9d54464b078514e79254fe5876ea830561"
+  },
+  {
+    "name": "AirAsia",
+    "file": "airasia.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/airasia.svg",
+    "upstream_path": "svg/a/airasia.svg",
+    "sha": "0c6c2b0abd1f98560cd8fb5e9952916d62d5d5fa"
+  },
+  {
+    "name": "IndiGo",
+    "file": "indigo.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/i/indigo.svg",
+    "upstream_path": "svg/i/indigo.svg",
+    "sha": "2abb6dd2f0d8a090973dc23970008b0ee50ff36f"
+  },
+  {
+    "name": "Saudia",
+    "file": "saudia.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/saudia-1.svg",
+    "upstream_path": "svg/s/saudia-1.svg",
+    "sha": "62b1203e0e7d75e295d25dc491b7c77c1808a606"
+  },
+  {
+    "name": "Royal Air Maroc",
+    "file": "royal-air-maroc.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/royal-air-maroc.svg",
+    "upstream_path": "svg/r/royal-air-maroc.svg",
+    "sha": "bcd7bc6e6a7e23e655baa67086d20647a904c5c3"
+  },
+  {
+    "name": "Kenya Airways",
+    "file": "kenya-airways.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/k/kenya-airways.svg",
+    "upstream_path": "svg/k/kenya-airways.svg",
+    "sha": "edad3472fcece0ec4c9b06f999fed1d247c43506"
+  },
+  {
+    "name": "South African Airways",
+    "file": "south-african-airways.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/south-african-airways.svg",
+    "upstream_path": "svg/s/south-african-airways.svg",
+    "sha": "1551ce13656030d41582931166be028c4dda7f78"
+  },
+  {
+    "name": "Virgin Atlantic",
+    "file": "virgin-atlantic.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/v/virgin-atlantic.svg",
+    "upstream_path": "svg/v/virgin-atlantic.svg",
+    "sha": "3cb3be8229d81dab282f8c62472490a5137d9aff"
+  },
+  {
+    "name": "GOL",
+    "file": "gol.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/g/gol-1.svg",
+    "upstream_path": "svg/g/gol-1.svg",
+    "sha": "b71d94d0a995ea874ca28ceab605a66e333f45ac"
+  },
+  {
+    "name": "TAP Air Portugal",
+    "file": "tap.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/TAP.png",
+    "sha": "95d6f2d03a35ec4d939bd372ed9c2eaa9d563041"
+  },
+  {
+    "name": "Vueling",
+    "file": "vlg.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/VLG.png",
+    "sha": "946173ec1c84842a9a7e4da5512bc1f066553cb6"
+  },
+  {
+    "name": "Pegasus Airlines",
+    "file": "pgt.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/PGT.png",
+    "sha": "c74164c31f74dbb6b04cb1ed95f8ed6a4729a1f6"
+  },
+  {
+    "name": "Aegean Airlines",
+    "file": "aee.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/AEE.png",
+    "sha": "286612fba86a2199480a216c36192e9674bdc647"
+  },
+  {
+    "name": "China Southern Airlines",
+    "file": "csn.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/CSN.png",
+    "sha": "3eb65d00572ae370daafcb1b21cc50c8baf054b9"
+  },
+  {
+    "name": "Philippine Airlines",
+    "file": "pal.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/PAL.png",
+    "sha": "a214bf9b8d8017bb7faed1f4e38d3cd13e431ab6"
+  },
+  {
+    "name": "EgyptAir",
+    "file": "msr.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/MSR.png",
+    "sha": "05f86f41025da7555ea5bf0b5bcf38a5b7bd4141"
+  },
+  {
+    "name": "Jetstar",
+    "file": "jst.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/JST.png",
+    "sha": "c9ec401bb286f123bea1b34b3ac1480fdd382189"
+  },
+  {
+    "name": "Virgin Australia",
+    "file": "voz.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/VOZ.png",
+    "sha": "15c30d2202fb176712f0302a8b9d96479c8fe0fe"
+  },
+  {
+    "name": "Azul",
+    "file": "azu.png",
+    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/AZU.png",
+    "sha": "fb949b85f8862468930282f59100259bd7a29263"
+  },
+  {
+    "name": "Sonesta",
+    "file": "sonesta.png",
+    "source": "https://github.com/cocdeshijie/PointLens/blob/master/pointlens/assets/sonesta.png",
+    "sha": "ea158e5c68a983c690db25e2eb1f6cdeb1d601ea"
+  },
+  {
+    "name": "Regent Seven Seas Cruises",
+    "file": "regent-seven-seas-cruises.png",
+    "source": "https://github.com/davidllano95/sdlive-show/blob/main/assets/brands/regent-seven-seas.png",
+    "sha": "e9899cbbec98d64678ca137eaf1e61a0e7664310"
+  },
+  {
+    "name": "Oceania Cruises",
+    "file": "oceania-cruises.svg",
+    "source": "https://github.com/razielgaitan/double-g-proyect/blob/master/src/assets/logo/cruceros/logo-oceania-cruises.svg",
+    "sha": "75eee29776f47c7c55067dea78bee0bbbec2b232"
+  }
+]

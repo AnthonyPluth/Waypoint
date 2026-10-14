@@ -18,7 +18,7 @@
     { "wait_for": "[data-label='Kansas City'][data-visible='true']" },
     { "screenshot": "start" },
     { "press": { "selector": "input[aria-label='Position along the route']", "key": "End" } },
-    { "expect_text": { "selector": "[data-testid='stop-list']", "text": "Back in Kansas City" } },
+    { "expect_text": { "selector": "[data-testid='stop-list'] li:last-child[aria-current='step']", "text": "Kansas City" } },
     { "screenshot": "end" },
     { "goto": "#settings/travel" },
     { "wait_for": "button:has-text('Clear'):not([disabled])" },

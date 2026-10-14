@@ -1,6 +1,5 @@
 import inspect
 import os
-from datetime import UTC, datetime
 from unittest import mock
 
 from sqlalchemy import select
@@ -9,9 +8,7 @@ from waypoint import oidc
 from waypoint.domain import demo, logos, loyalty, people
 from waypoint.server.api import loyalty as api
 from waypoint.server.common import ApiError
-from waypoint.providers import logodev, wikimedia
-from waypoint.storage import db, secretbox
-from waypoint.storage import settings_keys as sk
+from waypoint.storage import bundled_logos, db, secretbox
 from waypoint.storage.models import BrandLogo, LoyaltyId
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase, fetch
@@ -220,53 +217,15 @@ class LogoBrandTests(DbCase):
             with self.subTest(program=program):
                 self.assertEqual(loyalty.logo_brand(kind, program), brand)
 
-    def test_memberships_of_every_kind_queue_their_brands_for_fetching(self):
+    def test_known_memberships_have_logos_without_keys_or_network_requests(self):
         who = guest(self.c)
         for kind, programs in loyalty.PROGRAMS.items():
             for program in programs:
-                loyalty.add(self.c, membership(who, kind=kind, program=program))
-        wanted = {logos.key(b) for b in loyalty.PROGRAM_BRANDS.values() if b}
-        self.assertEqual(logos.note(self.c), len(wanted))
-        self.assertEqual({k for (k,) in self.c.execute(select(BrandLogo.key)).fetchall()}, wanted)
-        self.assertEqual(logos.note(self.c), 0)
-
-    def test_other_is_not_queued(self):
-        who = guest(self.c)
-        loyalty.add(self.c, membership(who, program="Delta SkyMiles"))
-        loyalty.add(self.c, membership(who, kind="hotel", program="Hilton Honors"))
-        loyalty.add(self.c, membership(who, program=loyalty.OTHER))
-        self.assertEqual(logos.note(self.c), 2)
-        self.assertEqual(sorted(k for (k,) in self.c.execute(select(BrandLogo.key)).fetchall()), ["delta air lines", "hilton"])
-
-    def test_a_logo_request_carries_only_a_brand_name(self):
-        who = guest(self.c, "Canary Q. Traveller")
-        for kind, programs in loyalty.PROGRAMS.items():
-            for program in programs:
-                loyalty.add(self.c, membership(who, kind=kind, program=program, number=CANARY, notes=CANARY))
-        db.set_setting(self.c, sk.LOGODEV_TOKEN, "pk_demo")
-        db.set_setting(self.c, sk.LOGODEV_SECRET, "sk_demo")
-        asked = []
-
-        def search(secret, name):
-            asked.append(("search", secret, name))
-            return []
-
-        def fetch_logo(token, **kw):
-            asked.append(("fetch", token, kw))
-            return None
-
-        with mock.patch.object(logodev, "search", side_effect=search), mock.patch.object(logodev, "fetch", side_effect=fetch_logo), \
-                mock.patch.object(wikimedia, "find_logo", side_effect=lambda name: asked.append(("wikimedia", name))):
-            logos.fetch_due(self.c, datetime(2026, 10, 12, 12, 0, tzinfo=UTC), limit=100)
-        self.assertTrue(asked)
-        brands = {b for b in loyalty.PROGRAM_BRANDS.values() if b}
-        names = {entry[2] for entry in asked if entry[0] == "search"}
-        self.assertLessEqual(names, brands)
-        for entry in asked:
-            self.assertNotIn(CANARY, str(entry))
-            self.assertNotIn("Canary", str(entry))
-            self.assertNotIn("Traveller", str(entry))
-            self.assertNotIn("@", str(entry))
+                loyalty.add(self.c, membership(who, kind=kind, program=program, number=CANARY))
+        with no_leaks(self, CANARY), mock.patch("waypoint.tls.urlopen", side_effect=AssertionError("No logo may require the network")):
+            found = logos.with_logo(self.c, [("airline", "Delta SkyMiles"), ("hotel", "Hilton Honors"), ("car", "Hertz Gold Plus Rewards"), ("cruise", "Disney Castaway Club")])
+        self.assertEqual(len(found), 4)
+        self.assertEqual(logos.with_logo(self.c, [("airline", loyalty.OTHER)]), set())
 
 
 class RouteTests(ServerCase):
@@ -320,20 +279,21 @@ class RouteTests(ServerCase):
         _, united = self.save(kind="airline", program="United MileagePlus")
         _, hotel = self.save()
         self.assertEqual(delta["logo"], f"/api/loyalty/{delta['id']}/logo")
-        self.assertEqual([other["logo"], united["logo"], hotel["logo"]], [None, None, None])
+        self.assertIsNone(other["logo"])
+        self.assertEqual(united["logo"], f"/api/loyalty/{united['id']}/logo")
+        self.assertEqual(hotel["logo"], f"/api/loyalty/{hotel['id']}/logo")
         ours = {delta["id"], other["id"], united["id"], hotel["id"]}
         listed = {m["id"]: m["logo"] for m in self.req("GET", "/api/loyalty")[1]["loyalty"] if m["id"] in ours}
-        self.assertEqual(listed, {delta["id"]: delta["logo"], other["id"]: None, united["id"]: None, hotel["id"]: None})
+        self.assertEqual(listed, {delta["id"]: delta["logo"], other["id"]: None, united["id"]: united["logo"], hotel["id"]: hotel["logo"]})
         status, headers, body = fetch(self.base, "GET", delta["logo"], headers={"X-Waypoint": "1"})
-        self.assertEqual((status, headers["Content-Type"], body), (200, "image/png", PNG))
+        self.assertEqual((status, headers["Content-Type"], body), (200, "image/svg+xml", bundled_logos.read("Delta Air Lines")[0]))
         self.assertIn("private", headers["Cache-Control"])
         edited = self.req("POST", f"/api/loyalty/{delta['id']}", {"person_id": self.guest["id"], "kind": "airline", "program": "Delta SkyMiles"})[1]
         self.assertEqual(edited["logo"], delta["logo"])
 
     def test_a_membership_without_a_logo_is_a_404_on_the_logo_route(self):
-        _, united = self.save(kind="airline", program="United MileagePlus")
-        _, hotel = self.save()
-        for who in (united["id"], hotel["id"], 999, "abc"):
+        _, unknown = self.save(kind="airline", program=loyalty.OTHER)
+        for who in (unknown["id"], 999, "abc"):
             with self.subTest(who=who):
                 status, reply = self.req("GET", f"/api/loyalty/{who}/logo")
                 self.assertEqual((status, reply["error"]), (404, "No such membership"))

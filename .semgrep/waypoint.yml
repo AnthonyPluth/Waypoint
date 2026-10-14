@@ -152,30 +152,6 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/flightstatus.py"]
 
-  - id: waypoint-logodev-hosts
-    message: >-
-      Only waypoint/providers/logodev.py talks to Logo.dev, so what a request carries (a brand's name, never a traveller, a
-      date or a confirmation code) and the keys stay in one place (AGENTS.md, "Email stays on the server"): call it rather
-      than naming its hosts elsewhere.
-    severity: ERROR
-    languages: [python]
-    pattern-regex: (?i)(img|api)\.logo\.dev
-    paths:
-      include: ["/waypoint/", "/run.py"]
-      exclude: ["/waypoint/providers/logodev.py"]
-
-  - id: waypoint-wikimedia-hosts
-    message: >-
-      Only waypoint/providers/wikimedia.py talks to Wikidata and Wikimedia Commons, so what a request carries (a hotel brand's
-      name, never a traveller, a date, a confirmation code or the rest of a hotel's name) stays in one place (AGENTS.md, "Email
-      stays on the server"): call it rather than naming its hosts elsewhere.
-    severity: ERROR
-    languages: [python]
-    pattern-regex: (?i)(wikidata|wikimedia)\.org
-    paths:
-      include: ["/waypoint/", "/run.py"]
-      exclude: ["/waypoint/providers/wikimedia.py"]
-
   - id: waypoint-mail-image-fetch
     message: >-
       Only waypoint/providers/mailimages.py downloads the images of a kept email, once, when the message is kept, with

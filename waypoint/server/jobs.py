@@ -4,18 +4,16 @@ import threading
 from datetime import UTC, date, datetime
 
 from .. import monitoring, oidc
-from ..domain import flightstatus, logos, reminders
+from ..domain import flightstatus, reminders
 from ..domain.mail import scan
 from ..providers import gmail
 from ..storage import db
 
 SUBJECT = "mailto:waypoint@localhost"
-_fetching = threading.Lock()
 SWEEP_EVERY = 3600
 FLIGHT_STATUS_EVERY = 300
 REMINDERS_EVERY = 300
 SCAN_EVERY = 4 * 3600
-LOGOS_EVERY = 900
 SCAN_FIRST = 300
 
 
@@ -46,26 +44,6 @@ def check_flights() -> None:
             flightstatus.run_due(conn, datetime.now(UTC))
     except Exception as e:
         monitoring.report(e, values=False)
-
-
-def fetch_logos() -> bool:
-    if not _fetching.acquire(blocking=False):
-        return False
-    try:
-        with db.session() as conn:
-            logos.fetch_due(conn, datetime.now(UTC))
-    except Exception as e:
-        monitoring.report(e, values=False)
-    finally:
-        _fetching.release()
-    return True
-
-
-def fetch_logos_now() -> bool:
-    if _fetching.locked():
-        return False
-    threading.Thread(target=fetch_logos, daemon=True, name="logos-now").start()
-    return True
 
 
 def scan_mailboxes() -> None:
@@ -106,7 +84,6 @@ def start(stop: threading.Event) -> list[threading.Thread]:
     threads = [threading.Thread(target=every, args=(SWEEP_EVERY, sweep_lapsed), daemon=True, name="gmail-lapse-sweep"),
                threading.Thread(target=every, args=(FLIGHT_STATUS_EVERY, check_flights), daemon=True, name="flight-status"),
                threading.Thread(target=every, args=(REMINDERS_EVERY, send_reminders), daemon=True, name="reminders"),
-               threading.Thread(target=every, args=(LOGOS_EVERY, fetch_logos, 60), daemon=True, name="logos"),
                threading.Thread(target=every, args=(SCAN_EVERY, scan_mailboxes, SCAN_FIRST), daemon=True, name="mail-scan")]
     for t in threads:
         t.start()

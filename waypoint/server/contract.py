@@ -348,26 +348,6 @@ class AiSettings(TypedDict):
     auto: bool
 
 
-class LogoDevStatus(TypedDict):
-    configured: bool
-    searchable: bool
-    with_logo: int
-    unknown: int
-    waiting: int
-    last_error: str | None
-
-
-class LogoDevFetch(TypedDict):
-    started: bool
-
-
-class LogoDevBody(TypedDict):
-    token: NotRequired[str]
-    secret: NotRequired[str]
-    clear: NotRequired[bool]
-    clear_secret: NotRequired[bool]
-
-
 class AiBody(TypedDict):
     mode: Literal["off", "local", "openrouter"]
     ollama_url: NotRequired[str]
