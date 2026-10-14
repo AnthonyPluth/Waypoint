@@ -108,9 +108,16 @@
   }
   $effect(() => {
     const index = now;
-    if (!following || !listBox || performance.now() < quietUntil) return;
-    const item = listBox.querySelector<HTMLElement>(`[data-stop-item="${index}"]`);
-    if (item) listBox.scrollTo({ top: Math.max(0, item.offsetTop - (listBox.clientHeight - item.offsetHeight) / 2), behavior: "smooth" });
+    const box = listBox;
+    if (!following || !box) return;
+    const centre = () => {
+      const item = box.querySelector<HTMLElement>(`[data-stop-item="${index}"]`);
+      if (item) box.scrollTo({ top: Math.max(0, item.offsetTop - (box.clientHeight - item.offsetHeight) / 2), behavior: "smooth" });
+    };
+    const wait = quietUntil - performance.now();
+    if (wait <= 0) { centre(); return; }
+    const timer = setTimeout(centre, wait);
+    return () => clearTimeout(timer);
   });
   const buttonLabel = $derived(progress >= 1 ? "Replay" : playing ? "Pause" : progress > 0 ? "Resume" : "Play");
 </script>

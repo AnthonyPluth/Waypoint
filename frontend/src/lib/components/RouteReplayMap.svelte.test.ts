@@ -43,7 +43,7 @@ beforeEach(() => {
   vi.stubGlobal("cancelAnimationFrame", () => { frames = []; });
   vi.spyOn(performance, "now").mockImplementation(() => clock);
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 const labels = (container: HTMLElement) => [...container.querySelectorAll("[data-label][data-visible='true']")].map((l) => l.getAttribute("data-label"));
 const list = () => within(screen.getByRole("list", { name: "Stops in order" })).getAllByRole("listitem").map((li) => li.lastElementChild?.textContent?.replace(/\s+/g, " "));
@@ -387,15 +387,34 @@ describe("RouteReplayMap", () => {
     });
 
     it("leaves the list alone for a few seconds after the person scrolls it themselves", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       render(RouteReplayMap, { stops, year: 2025 });
       await slide(0);
       scrollTo.mockClear();
       await fireEvent.wheel(screen.getByRole("region", { name: "Stops list" }));
       await slide(0.5 * SCRUB_STEPS);
       expect(scrollTo).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(3999);
+      expect(scrollTo).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+      expect(current()).toEqual(["1"]);
+      scrollTo.mockClear();
       clock += 4001;
       await slide(SCRUB_STEPS);
-      expect(scrollTo).toHaveBeenCalled();
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+    });
+
+    it("drops a pending catch-up when the replay moves on first", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      render(RouteReplayMap, { stops, year: 2025 });
+      await slide(0);
+      await fireEvent.wheel(screen.getByRole("region", { name: "Stops list" }));
+      await slide(0.5 * SCRUB_STEPS);
+      await slide(SCRUB_STEPS);
+      scrollTo.mockClear();
+      vi.advanceTimersByTime(4000);
+      expect(scrollTo).toHaveBeenCalledTimes(1);
     });
 
     it("keeps a long list in a scrollable box the keyboard can reach", () => {
