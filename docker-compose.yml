@@ -18,7 +18,7 @@ services:
         required: false
     environment:         # what needs a default or a check, and what's costly to lose; .env fills in the rest
       TZ: ${TZ:-America/New_York}                       # decides "today" for forecasts and budgets
-      WAYPOINT_PUBLIC_URL: ${WAYPOINT_PUBLIC_URL:-http://localhost:8765}
+      WAYPOINT_PUBLIC_URL: ${WAYPOINT_PUBLIC_URL:-}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       # Also passed through by name, so they arrive even when your settings aren't in a .env file here (a stack.env,

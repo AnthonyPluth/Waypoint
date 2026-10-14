@@ -29,7 +29,6 @@ A self-hosted travel app for a household. Waypoint shows everyone the trips they
 ```bash
 git clone https://github.com/AnthonyPluth/waypoint.git
 cd waypoint
-cp .env.example .env      # set WAYPOINT_PUBLIC_URL, OIDC_ISSUER, OIDC_CLIENT_ID/SECRET, OIDC_ALLOWED_EMAILS
 docker compose up -d
 ```
 

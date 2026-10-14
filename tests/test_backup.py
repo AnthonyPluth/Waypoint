@@ -296,9 +296,10 @@ class BackupTests(unittest.TestCase):
         from tests.test_migrations import with_next_migration
         src = self.fill(self.a)
         raw = backup.dump(src)
+        previous = backup.head()
         probe = with_next_migration(self)
         data = backup.load(raw)
-        self.assertEqual((data["revision"], backup.head()), ("0035", probe))
+        self.assertEqual((data["revision"], backup.head()), (previous, probe))
         dst = db.connect(self.b)
         dst.execute(insert(User).values(sub="old", email="old@example.com"))
         backup.restore(dst, data)

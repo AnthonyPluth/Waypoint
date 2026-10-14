@@ -12,3 +12,5 @@ A flight with no airline named uses its flight number’s airline code. Hotel na
 Booking logos are served through the booking’s visibility-checked route. A person who cannot see a booking cannot fetch its logo. Loyalty logos follow the same household access as the membership itself.
 
 The catalog lives in `waypoint/storage/logos/manifest.json`, with each asset’s source and upstream content hash. Logos ship in the application and Docker image, so a fresh installation and a restored backup get them automatically. Adding a logo requires a catalog entry and a bundled image; it never adds a runtime download.
+
+Upgrading removes saved credentials and error settings for the retired Logo.dev service. Restoring a backup from an older release also removes them. Existing backup files are unchanged.

@@ -107,6 +107,18 @@ class RouteTests(RouteCase):
         self.assertIsNone(seg["logo"])
         self.assertEqual(self.call("ana", "GET", f"/api/segments/{seg['id']}/logo")[0], 404)
 
+    def test_flight_number_fallback_matches_airline_table_names_to_bundled_logos(self):
+        for number, brand in (("TP 101", "TAP Air Portugal"), ("JQ 202", "Jetstar"), ("KL 303", "KLM"),
+                              ("AI 404", "Air India"), ("IB 505", "Iberia"), ("AV 606", "Avianca"),
+                              ("TG 707", "Thai Airways"), ("6E 808", "IndiGo"), ("VS 909", "Virgin Atlantic"), ("SK 111", "SAS")):
+            with self.subTest(number=number):
+                seg = self.book("ana", OUT, provider="", confirmation=f"DEMO-{number.replace(' ', '')}",
+                                details={"flight_number": number}, travelers=[{"person_id": self.person["ana"]}])
+                self.assertEqual(seg["logo"], f"/api/segments/{seg['id']}/logo")
+                status, _, body = fetch(self.base, "GET", seg["logo"], headers={"X-Waypoint": "1", **self.who["ana"]})
+                self.assertEqual(status, 200)
+                self.assertEqual(body, bundled_logos.read(brand)[0])
+
     def test_a_stranger_gets_the_same_404_as_for_a_segment_that_isnt_there(self):
         self.keep()
         seg = self.book("ana", HOTEL, provider="Harbour Hotels", travelers=[{"person_id": self.person["ana"]}])
