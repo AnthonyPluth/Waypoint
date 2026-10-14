@@ -24,7 +24,7 @@ describe("standalone demo transport", () => {
 
   it("provides a synthetic source email and populated details for every booking", async () => {
     const bookings = data.trips.flatMap(trip=>trip.segments);
-    expect(bookings).toHaveLength(32);
+    expect(bookings).toHaveLength(31);
     expect(new Set(bookings.map(booking=>booking.kind))).toEqual(new Set(["flight","hotel","car","cruise","parking"]));
     for (const booking of bookings) {
       const reply = await api<SegmentEmails>(`/api/segments/${booking.id}/emails`);
@@ -36,6 +36,22 @@ describe("standalone demo transport", () => {
       expect(booking.price).not.toBeNull();
       expect(Object.keys(booking.details).length).toBeGreaterThan(1);
     }
+  });
+
+  it("contains one shared Camden stay with one price and consistent source details", async () => {
+    const london = data.trips.find(trip=>trip.id === 4)!;
+    const stays = london.segments.filter(booking=>booking.origin === "Camden Guesthouse");
+    expect(stays).toHaveLength(1);
+    expect(stays[0].travelers.map(traveler=>traveler.name)).toEqual(["Jane Doe", "Sam Doe", "Mia Doe", "Grandma Joan"]);
+    expect(stays[0].price).toMatchObject({amount_minor:31000,currency:"GBP"});
+    const email = (await api<SegmentEmails>(`/api/segments/${stays[0].id}/emails`)).emails[0];
+    expect(email.text).toContain(stays[0].details.address);
+    expect(email.text).toContain("Family suite");
+    expect(email.text).toContain("310.00 GBP");
+    expect(london.costs.totals.find(total=>total.currency === "GBP")?.amount_minor).toBe(125800);
+    const bookings = data.trips.flatMap(trip=>trip.segments).filter(booking=>booking.kind === "hotel");
+    const keys = bookings.map(booking=>[booking.origin,booking.confirmation,booking.start_local,booking.end_local].join("|"));
+    expect(new Set(keys).size).toBe(bookings.length);
   });
 
   it("includes populated flight, road-trip and cruise suggestions with simulated emails in Review", async () => {

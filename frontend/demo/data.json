@@ -1271,7 +1271,7 @@
         "totals": [
           {
             "currency": "USD",
-            "amount_minor": 238140
+            "amount_minor": 202140
           },
           {
             "currency": "GBP",
@@ -1488,7 +1488,7 @@
           "details": {
             "address": "9 Parkway, Camden, London NW1 7AA",
             "phone": "+1 202-555-0101",
-            "room": "King room",
+            "room": "Family suite",
             "notes": "board: Breakfast included; cancellation: Free cancellation until seven days before arrival"
           },
           "manage_url": null,
@@ -1501,25 +1501,25 @@
               "id": 0,
               "person_id": 1,
               "name": "Jane Doe",
-              "seat": "King room"
+              "seat": "Family suite"
             },
             {
               "id": 0,
               "person_id": 2,
               "name": "Sam Doe",
-              "seat": "King room"
+              "seat": "Family suite"
             },
             {
               "id": 0,
               "person_id": 3,
               "name": "Mia Doe",
-              "seat": "King room"
+              "seat": "Family suite"
             },
             {
               "id": 0,
               "person_id": 4,
               "name": "Grandma Joan",
-              "seat": "King room"
+              "seat": "Family suite"
             }
           ],
           "itinerary": [],
@@ -1533,76 +1533,6 @@
             "amount_minor": 31000,
             "currency": "GBP",
             "source": "manual"
-          },
-          "links": {
-            "app": null,
-            "open": null,
-            "open_kind": null,
-            "directions": null,
-            "call": null
-          }
-        },
-        {
-          "id": 22,
-          "trip_id": 4,
-          "kind": "hotel",
-          "status": "confirmed",
-          "confirmation": "G20417",
-          "provider": "Example Stays",
-          "start_local": "2026-10-16T15:00",
-          "start_zone": "Europe/London",
-          "end_local": "2026-10-18T10:00",
-          "end_zone": "Europe/London",
-          "origin": "Camden Guesthouse",
-          "destination": null,
-          "details": {
-            "address": "32 Fictional Stay Lane",
-            "phone": "+1 202-555-0101",
-            "room": "King room",
-            "notes": "board: Breakfast included; cancellation: Free cancellation until seven days before arrival"
-          },
-          "manage_url": null,
-          "source": "email",
-          "booked_by": 1,
-          "locked_fields": [],
-          "check_times": false,
-          "travelers": [
-            {
-              "id": 0,
-              "person_id": 1,
-              "name": "Jane Doe",
-              "seat": "King room"
-            },
-            {
-              "id": 0,
-              "person_id": 2,
-              "name": "Sam Doe",
-              "seat": "King room"
-            },
-            {
-              "id": 0,
-              "person_id": 3,
-              "name": "Mia Doe",
-              "seat": "King room"
-            },
-            {
-              "id": 0,
-              "person_id": 4,
-              "name": "Grandma Joan",
-              "seat": "King room"
-            }
-          ],
-          "itinerary": [],
-          "days": [],
-          "logo": null,
-          "logo_label": null,
-          "hotel_brand": null,
-          "has_email": true,
-          "gate_code": null,
-          "price": {
-            "amount_minor": 36000,
-            "currency": "USD",
-            "source": "email"
           },
           "links": {
             "app": null,
@@ -2380,9 +2310,9 @@
           "origin": "Quay Street Lodge",
           "destination": null,
           "details": {
-            "address": "40 Fictional Stay Lane",
+            "address": "40 Fictional Stay Lane, London",
             "phone": "+1 202-555-0101",
-            "room": "King room",
+            "room": "Twin room",
             "notes": "board: Breakfast included; cancellation: Free cancellation until seven days before arrival"
           },
           "manage_url": null,
@@ -2395,7 +2325,13 @@
               "id": 0,
               "person_id": 1,
               "name": "Jane Doe",
-              "seat": "King room"
+              "seat": "Twin room"
+            },
+            {
+              "id": 0,
+              "person_id": 3,
+              "name": "Mia Doe",
+              "seat": "Twin room"
             }
           ],
           "itinerary": [],
@@ -2432,9 +2368,9 @@
           "origin": "Quay Street Lodge",
           "destination": null,
           "details": {
-            "address": "41 Fictional Stay Lane",
+            "address": "40 Fictional Stay Lane, London",
             "phone": "+1 202-555-0101",
-            "room": "King room",
+            "room": "Single room",
             "notes": "board: Breakfast included; cancellation: Free cancellation until seven days before arrival"
           },
           "manage_url": null,
@@ -2445,9 +2381,9 @@
           "travelers": [
             {
               "id": 0,
-              "person_id": 1,
-              "name": "Jane Doe",
-              "seat": "King room"
+              "person_id": 2,
+              "name": "Sam Doe",
+              "seat": "Single room"
             }
           ],
           "itinerary": [],
@@ -78596,7 +78532,7 @@
         "subject": "Simulated hotel confirmation: G20417",
         "sender_domain": "travel.example",
         "received": "2026-10-10",
-        "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Stays\nConfirmation: G20417\nTravelers: Jane Doe (King room), Sam Doe (King room), Mia Doe (King room), Grandma Joan (King room)\nFrom: Camden Guesthouse\nTo: Camden Guesthouse\nStarts: 2026-10-16T15:00\nEnds: 2026-10-18T10:00\nStart time zone: Europe/London\nEnd time zone: Europe/London\nTotal: 310.00 GBP\nAddress: 9 Parkway, Camden, London NW1 7AA\nPhone: +1 202-555-0101\nRoom: King room\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
+        "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Stays\nConfirmation: G20417\nTravelers: Jane Doe (Family suite), Sam Doe (Family suite), Mia Doe (Family suite), Grandma Joan (Family suite)\nFrom: Camden Guesthouse\nTo: Camden Guesthouse\nStarts: 2026-10-16T15:00\nEnds: 2026-10-18T10:00\nStart time zone: Europe/London\nEnd time zone: Europe/London\nTotal: 310.00 GBP\nAddress: 9 Parkway, Camden, London NW1 7AA\nPhone: +1 202-555-0101\nRoom: Family suite\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
         "original": false,
@@ -78681,18 +78617,6 @@
         "sender_domain": "travel.example",
         "received": "2026-10-10",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: American Airlines\nConfirmation: MW5T9Z\nTravelers: Grandma Joan (12A)\nFrom: JFK\nTo: LHR\nStarts: 2026-10-12T19:00\nEnds: 2026-10-13T07:10\nStart time zone: America/New_York\nEnd time zone: Europe/London\nTotal: 245.00 USD\nFlight Number: AA 101\nCabin: Economy\nTerminal: 8\nAircraft: Boeing 777\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-21\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
-        "html": null,
-        "truncated": false,
-        "original": false,
-        "images": 0
-      }
-    ],
-    "22": [
-      {
-        "subject": "Simulated hotel confirmation: G20417",
-        "sender_domain": "travel.example",
-        "received": "2026-10-10",
-        "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Stays\nConfirmation: G20417\nTravelers: Jane Doe (King room), Sam Doe (King room), Mia Doe (King room), Grandma Joan (King room)\nFrom: Camden Guesthouse\nTo: Camden Guesthouse\nStarts: 2026-10-16T15:00\nEnds: 2026-10-18T10:00\nStart time zone: Europe/London\nEnd time zone: Europe/London\nTotal: 360.00 USD\nAddress: 32 Fictional Stay Lane\nPhone: +1 202-555-0101\nRoom: King room\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
         "original": false,
@@ -78788,7 +78712,7 @@
         "subject": "Simulated hotel confirmation: DEMO-030",
         "sender_domain": "travel.example",
         "received": "2026-10-10",
-        "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Travel\nConfirmation: DEMO-030\nTravelers: Jane Doe (King room)\nFrom: Quay Street Lodge\nTo: Quay Street Lodge\nStarts: 2027-01-12T15:00\nEnds: 2027-01-17T10:00\nStart time zone: Europe/London\nEnd time zone: Europe/London\nTotal: 360.00 USD\nAddress: 40 Fictional Stay Lane\nPhone: +1 202-555-0101\nRoom: King room\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
+        "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Travel\nConfirmation: DEMO-030\nTravelers: Jane Doe (Twin room), Mia Doe (Twin room)\nFrom: Quay Street Lodge\nTo: Quay Street Lodge\nStarts: 2027-01-12T15:00\nEnds: 2027-01-17T10:00\nStart time zone: Europe/London\nEnd time zone: Europe/London\nTotal: 360.00 USD\nAddress: 40 Fictional Stay Lane, London\nPhone: +1 202-555-0101\nRoom: Twin room\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
         "original": false,
@@ -78800,7 +78724,7 @@
         "subject": "Simulated hotel confirmation: DEMO-031",
         "sender_domain": "travel.example",
         "received": "2026-10-10",
-        "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Travel\nConfirmation: DEMO-031\nTravelers: Jane Doe (King room)\nFrom: Quay Street Lodge\nTo: Quay Street Lodge\nStarts: 2027-01-12T15:00\nEnds: 2027-01-17T10:00\nStart time zone: Europe/London\nEnd time zone: Europe/London\nTotal: 360.00 USD\nAddress: 41 Fictional Stay Lane\nPhone: +1 202-555-0101\nRoom: King room\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
+        "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Travel\nConfirmation: DEMO-031\nTravelers: Sam Doe (Single room)\nFrom: Quay Street Lodge\nTo: Quay Street Lodge\nStarts: 2027-01-12T15:00\nEnds: 2027-01-17T10:00\nStart time zone: Europe/London\nEnd time zone: Europe/London\nTotal: 360.00 USD\nAddress: 40 Fictional Stay Lane, London\nPhone: +1 202-555-0101\nRoom: Single room\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
         "original": false,
