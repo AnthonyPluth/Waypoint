@@ -495,13 +495,6 @@ export interface MailboxList {
   mailboxes: Mailbox[];
 }
 
-export interface MapStatus {
-  state: "ready" | "downloading" | "waiting" | "failed" | "off" | "missing";
-  bytes: number;
-  total: number | null;
-  error: string | null;
-}
-
 export interface MatchBody {
   entry: number;
   segment_id: number | null;
@@ -1131,7 +1124,6 @@ export interface TripPlaces {
   stays: TripStayPoint[];
   roads: TripRoads;
   boundaries: TripStateLine[];
-  basemap: boolean;
 }
 
 export interface TripRoadLeg {
@@ -1189,7 +1181,6 @@ export interface Endpoints {
   "POST /api/ai": { body: AiBody; reply: AiSettings };
   "POST /api/backup/inspect": { body: never; reply: BackupContents };
   "POST /api/restore": { body: never; reply: Restored };
-  "GET /api/map": { body: never; reply: MapStatus };
   "GET /api/people": { body: never; reply: People };
   "POST /api/people": { body: PersonBody; reply: Person };
   "POST /api/people/{id}": { body: PersonBody; reply: Person };

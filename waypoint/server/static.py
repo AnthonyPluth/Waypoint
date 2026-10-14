@@ -5,7 +5,6 @@ import hashlib
 import os
 import secrets
 import threading
-import urllib.parse
 from typing import TYPE_CHECKING
 
 from .common import header_value
@@ -40,7 +39,7 @@ STABLE_FILES = {"logo.svg", "logo-180.png", "icon-192.png", "icon-512.png", "ico
 def cache_control(full: str) -> str:
     if full.startswith(APP_DIR + os.sep + "assets" + os.sep):
         return "public, max-age=31536000, immutable"
-    if full.startswith((os.path.join(STATIC, "fonts") + os.sep, os.path.join(STATIC, "map") + os.sep)) or full in {os.path.join(STATIC, name) for name in STABLE_FILES}:
+    if full.startswith(os.path.join(STATIC, "fonts") + os.sep) or full in {os.path.join(STATIC, name) for name in STABLE_FILES}:
         return WEEK
     return "no-cache"
 
@@ -48,17 +47,13 @@ def cache_control(full: str) -> str:
 def serve(h: Handler, path: str) -> None:
     if path == "/next" or path.startswith("/next/"):
         return h._redirect("/")
-    rel = urllib.parse.unquote(path).lstrip("/")
+    rel = path.lstrip("/")
     full = None
-    if "\0" in rel:
-        rel = ""
     for base in (APP_DIR, STATIC):
         cand = os.path.realpath(os.path.join(base, rel))
         if rel and cand.startswith(base + os.sep) and os.path.isfile(cand):
             full = cand
             break
-    if full is None and rel.startswith("map/"):
-        return h._send(404, b"", "text/plain")
     if full is None or full == APP_INDEX:
         full = APP_INDEX
         if not os.path.isfile(full):

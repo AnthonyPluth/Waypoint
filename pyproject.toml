@@ -123,12 +123,6 @@ type = "independence"
 modules = ["waypoint.providers.mailimages", "waypoint.providers.logodev", "waypoint.providers.wikimedia", "waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
 
 [[tool.importlinter.contracts]]
-id = "protomaps-alone"
-name = "The Protomaps map downloader imports no other provider, and none imports it"
-type = "independence"
-modules = ["waypoint.providers.protomaps", "waypoint.providers.mailimages", "waypoint.providers.logodev", "waypoint.providers.wikimedia", "waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
-
-[[tool.importlinter.contracts]]
 id = "storage-at-the-bottom"
 name = "Storage imports nothing from the domain, the providers or the server"
 type = "forbidden"
