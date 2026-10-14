@@ -19,6 +19,13 @@
   import { flightStatus, loadFlightStatus } from "$lib/flightstatus.svelte";
   import { onMount } from "svelte";
   import ChevronLeft from "@lucide/svelte/icons/chevron-left";
+  import ChevronRight from "@lucide/svelte/icons/chevron-right";
+  import UserRound from "@lucide/svelte/icons/user-round";
+  import Mail from "@lucide/svelte/icons/mail";
+  import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
+  import Bell from "@lucide/svelte/icons/bell";
+  import Bot from "@lucide/svelte/icons/bot";
+  import Archive from "@lucide/svelte/icons/archive";
 
   const s = $derived(app.state);
   const user = $derived(s?.user);
@@ -34,12 +41,12 @@
   });
 
   const GROUPS = [
-    { id: "account", label: "Account & household", about: "Who’s signed in, your household and the version.", tasks: ["Sign out", "Household members", "Version and advanced"] },
-    { id: "mail", label: "Mail & review", about: "Connect Gmail, reconnect it, choose what is read and set up AI suggestions.", tasks: ["Connect or reconnect Gmail", "Choose labels", "Ignored senders", "AI suggestions"] },
-    { id: "travel", label: "Travel preferences", about: "Where home is, miles or kilometres, trip costs and brand logos.", tasks: ["Home", "Distances", "Trip costs", "Brand logos"] },
-    { id: "offline", label: "Offline & notifications", about: "Keep your trip on this device, reminders and your calendar.", tasks: ["Offline access", "Reminders", "Calendar subscription"] },
-    { id: "assistants", label: "Connected assistants", about: "The AI assistants that can reach Waypoint, and what they may do.", tasks: ["Connect an assistant", "Disconnect an assistant", "Let an assistant read email"] },
-    { id: "backup", label: "Backup & import", about: "Download or restore a backup and import past flights.", tasks: ["Download a backup", "Restore a backup", "Import past flights"] },
+    { id: "account", label: "Account & household", icon: UserRound, about: "Your profile, household members and app information." },
+    { id: "mail", label: "Mail & review", icon: Mail, about: "Connected mailboxes, email preferences and AI booking extraction." },
+    { id: "travel", label: "Travel preferences", icon: SlidersHorizontal, about: "Your home, distance units, trip costs and booking logos." },
+    { id: "offline", label: "Offline & notifications", icon: Bell, about: "Saved trips, travel reminders and your calendar subscription." },
+    { id: "assistants", label: "Connected assistants", icon: Bot, about: "Manage your assistants and choose what they can access." },
+    { id: "backup", label: "Backup & import", icon: Archive, about: "Keep a backup, restore your data or bring in past flights." },
   ] as const;
   type Group = (typeof GROUPS)[number]["id"];
   const OLD_LINKS: Record<string, Group> = { data: "backup" };
@@ -54,30 +61,43 @@
   }, { busy: (on) => (signingOut = on) });
 </script>
 
-<h1 class="mb-4 text-display">{group ? group.label : "Settings"}</h1>
+<div class="mb-8">
+  <p class="eyebrow mb-2 text-primary">Make Waypoint yours</p>
+  <h1 class="text-display">{group ? group.label : "Settings"}</h1>
+  <p class="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{group ? group.about : "A few preferences for smoother travels. Manage your household, connections and the details that make Waypoint work for you."}</p>
+</div>
+
+<div class={group ? "grid min-w-0 gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8" : ""}>
+  <nav aria-label="Settings sections" class={group ? "min-w-0 lg:sticky lg:top-6 lg:self-start" : ""}>
+    {#if group}
+      <a href="#settings" class="mb-3 inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"><ChevronLeft class="size-4" aria-hidden="true" />All settings</a>
+      <ul class="hidden space-y-1 rounded-2xl border border-border bg-card p-2 lg:block">
+        {#each GROUPS as g (g.id)}
+          {@const Icon = g.icon}
+          <li><a href={`#settings/${g.id}`} aria-current={group.id === g.id ? "page" : undefined} class={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 ${group.id === g.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}><Icon class="size-4 shrink-0" aria-hidden="true" />{g.label}</a></li>
+        {/each}
+      </ul>
+    {:else}
+      <ul class="grid gap-4 md:grid-cols-2">
+        {#each GROUPS as g (g.id)}
+          {@const Icon = g.icon}
+          <li>
+            <a href={`#settings/${g.id}`} aria-labelledby={`settings-${g.id}`} aria-describedby={`settings-${g.id}-about`} class="group flex h-full items-start gap-4 rounded-2xl border border-border bg-card p-5 shadow-card outline-none transition-colors hover:border-primary/40 hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:p-6">
+              <span class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon class="size-5" aria-hidden="true" /></span>
+              <div class="min-w-0 flex-1">
+                <h2 id={`settings-${g.id}`} class="font-medium">{g.label}</h2>
+                <p id={`settings-${g.id}-about`} class="mt-2 text-sm leading-relaxed text-muted-foreground">{g.about}</p>
+              </div>
+              <ChevronRight class="mt-3 size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" aria-hidden="true" />
+            </a>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </nav>
 
 {#if group}
-  <nav aria-label="Settings sections" class="mb-6">
-    <a href="#settings" class="inline-flex min-h-11 items-center gap-1 rounded-md py-2 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"><ChevronLeft class="size-4" aria-hidden="true" />All settings</a>
-  </nav>
-{:else}
-  <nav aria-label="Settings sections" class="mb-6">
-    <ul class="grid gap-3 md:grid-cols-2">
-      {#each GROUPS as g (g.id)}
-        <li class="rounded-2xl bg-card p-4 shadow-card">
-          <h2 class="font-medium"><a href={`#settings/${g.id}`} class="rounded-md underline-offset-2 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50">{g.label}</a></h2>
-          <p class="text-sm text-muted-foreground">{g.about}</p>
-          <ul class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
-            {#each g.tasks as task (task)}<li><a href={`#settings/${g.id}`} class="rounded-md underline underline-offset-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">{task}</a></li>{/each}
-          </ul>
-        </li>
-      {/each}
-    </ul>
-  </nav>
-{/if}
-
-{#if group}
-<div class="space-y-8">
+<div class="min-w-0 space-y-8">
   {#if group.id === "account"}
   <section aria-labelledby="account-title" class="space-y-2">
     <h2 id="account-title" class="eyebrow px-1">Account</h2>
@@ -150,3 +170,4 @@
   {/if}
 </div>
 {/if}
+</div>

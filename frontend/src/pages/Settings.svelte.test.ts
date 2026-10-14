@@ -106,16 +106,16 @@ describe("Settings index", () => {
   it("opens on an index of task groups, each linked by its address", () => {
     render(Settings);
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => [h.textContent, h.querySelector("a")?.getAttribute("href")])).toEqual([
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => [h.textContent, h.closest("a")?.getAttribute("href")])).toEqual([
       ["Account & household", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
       ["Offline & notifications", "#settings/offline"], ["Connected assistants", "#settings/assistants"], ["Backup & import", "#settings/backup"]]);
     expect(screen.queryByText("Signed in as")).toBeNull();
   });
 
   it.each([
-    ["Offline access", "#settings/offline"], ["Calendar subscription", "#settings/offline"], ["Import past flights", "#settings/backup"],
-    ["Connect or reconnect Gmail", "#settings/mail"], ["Download a backup", "#settings/backup"], ["Connect an assistant", "#settings/assistants"],
-  ])("lists %s where it lives", (task, href) => {
+    ["Account & household", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
+    ["Offline & notifications", "#settings/offline"], ["Connected assistants", "#settings/assistants"], ["Backup & import", "#settings/backup"],
+  ])("opens %s from one clearly named category link", (task, href) => {
     render(Settings);
     expect(index().getByRole("link", { name: task })).toHaveAttribute("href", href);
   });
@@ -143,6 +143,14 @@ describe("Settings index", () => {
     for (const name of ["Data", "Import past flights"]) expect(heading(name)).not.toBeNull();
     expect(screen.getByRole("heading", { level: 1, name: "Backup & import" })).toBeInTheDocument();
     view.unmount();
+  });
+
+  it("marks the current category and keeps the other sections within reach", () => {
+    route.sub = "travel";
+    render(Settings);
+    expect(index().getByRole("link", { name: "Travel preferences" })).toHaveAttribute("aria-current", "page");
+    expect(index().getByRole("link", { name: "Mail & review" })).toHaveAttribute("href", "#settings/mail");
+    expect(index().getByRole("link", { name: "Mail & review" })).not.toHaveAttribute("aria-current");
   });
 
   it("keeps the database and flight status under an advanced heading, with a link to People", () => {
