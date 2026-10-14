@@ -475,11 +475,17 @@ def _answer(cfg: Config, body: Any) -> Any:
     return message.get("content") if isinstance(message, dict) else None
 
 
-def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY) -> Any:
+def _wait(cfg: Config, limit: float | None) -> float:
+    """How long to wait for the AI: the mode's own limit, or less when the caller (a scan) has only so much time left."""
+    own = LOCAL_TIMEOUT if cfg.mode == LOCAL else TIMEOUT
+    return own if limit is None else max(1.0, min(own, limit))
+
+
+def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY, timeout: float | None = None) -> Any:
     url, headers, body, allow_http = request(cfg, text, system)
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
     try:
-        with tls.urlopen(req, LOCAL_TIMEOUT if cfg.mode == LOCAL else TIMEOUT, allow_http=allow_http) as resp:
+        with tls.urlopen(req, _wait(cfg, timeout), allow_http=allow_http) as resp:
             raw = resp.read(MAX_REPLY)
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
@@ -502,11 +508,11 @@ def prepare(cfg: Config, text: str, known: tuple[str, ...] = ()) -> str:
     return text if cfg.mode == LOCAL else redact(text, known)
 
 
-def suggest(cfg: Config, text: str, known: tuple[str, ...] = ()) -> Reading:
+def suggest(cfg: Config, text: str, known: tuple[str, ...] = (), timeout: float | None = None) -> Reading:
     sent = prepare(cfg, text, known)
     if not sent.strip():
         raise AiError(NO_BOOKING)
-    return parse(_ask(cfg, sent, system_for(cfg)), sent, cfg.mode == LOCAL)
+    return parse(_ask(cfg, sent, system_for(cfg), timeout=timeout), sent, cfg.mode == LOCAL)
 
 
 SYSTEM_DESTINATION = (
