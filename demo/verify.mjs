@@ -58,6 +58,7 @@ try {
         assert.equal(await page.getByText('Nothing coming up:',{exact:false}).count(),0,'Upcoming itinerary expired');
         await page.locator('section.pass[data-kind]').first().waitFor();
         assert.ok(await page.locator('section.pass[data-kind] a[href^="#trip/"]').count(),'Upcoming trip action missing');
+        assert.equal(await page.getByRole('link',{name:'Camden Guesthouse',exact:true}).count(),1,'Duplicate Camden stay');
       }
       assert.ok(await page.locator('main').evaluate(element=>parseFloat(getComputedStyle(element).paddingLeft) >= 16),`${route}: app styles missing`);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`${width}: ${route} overflow`);
@@ -108,7 +109,7 @@ try {
     if (await selects.count()) {assert.equal(await selects.first().isDisabled(),false,'Stats filter disabled');await selects.first().selectOption({index:0});}
     assert.equal(await page.evaluate(()=>navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(items=>items.length) : 0),0);
     assert.equal(await page.evaluate(()=>localStorage.length),0);
-    console.log(`${width}px: main app views, 32 booking emails, review and animated past replay passed; ${new Set(requests).size} bundled URLs`);
+    console.log(`${width}px: main app views, ${data.trips.reduce((count,trip)=>count+trip.segments.length,0)} booking emails, review and animated past replay passed; ${new Set(requests).size} bundled URLs`);
     await context.close();
   }
   assert.deepEqual(failures,[]);

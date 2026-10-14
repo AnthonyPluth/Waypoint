@@ -501,6 +501,24 @@ class SuggestTests(unittest.TestCase):
         self.assertEqual((path, body["model"], body["stream"], body["format"]), ("/api/chat", "llama3", False, "json"))
         self.assertNotIn("Authorization", headers)
 
+    def test_a_local_request_asks_the_model_not_to_think_and_waits_far_longer_than_openrouter(self):
+        ai.suggest(self.local, "Confirmation code: QW4R7T flight BOS DEN")
+        self.assertIs(self.fake.requests[0][2]["think"], False)
+        ai.suggest(self.router, "Confirmation code: QW4R7T flight BOS DEN")
+        self.assertNotIn("think", self.fake.requests[1][2])
+        for cfg, expected in ((self.local, ai.LOCAL_TIMEOUT), (self.router, ai.TIMEOUT)):
+            with mock.patch.object(ai.tls, "urlopen", side_effect=OSError) as opened:
+                with self.assertRaises(ai.AiError):
+                    ai.suggest(cfg, "Confirmation code: QW4R7T flight BOS DEN")
+            self.assertEqual(opened.call_args.args[1], expected)
+        self.assertGreater(ai.LOCAL_TIMEOUT, ai.TIMEOUT)
+
+    def test_a_scan_with_little_time_left_shortens_the_wait_but_never_lengthens_it(self):
+        self.assertEqual(ai._wait(self.local, None), ai.LOCAL_TIMEOUT)
+        self.assertEqual(ai._wait(self.local, 90.0), 90.0)
+        self.assertEqual(ai._wait(self.local, 10 * ai.LOCAL_TIMEOUT), ai.LOCAL_TIMEOUT)
+        self.assertEqual(ai._wait(self.router, 600.0), ai.TIMEOUT)
+
     def test_an_openrouter_request_denies_data_collection_and_allows_only_zero_retention(self):
         ai.suggest(self.router, "Confirmation code: QW4R7T flight BOS DEN")
         path, headers, body = self.fake.requests[0]
@@ -967,7 +985,7 @@ class ScanAddressTests(ScanAiCase):
         item = self.ask()
         self.assertEqual(item["details"], self.PROPERTY)
         sent = self.fake.requests[0][2]
-        self.assertEqual(set(sent), {"model", "messages", "stream", "format", "options"})
+        self.assertEqual(set(sent), {"model", "messages", "stream", "format", "think", "options"})
         self.assertEqual([m["role"] for m in sent["messages"]], ["system", "user"])
         self.assertIn("1 Quay Road,\nBristol BS1 4AA, UK", sent["messages"][1]["content"])
 

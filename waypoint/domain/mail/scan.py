@@ -336,9 +336,9 @@ def suggest_now(owner: str, item_id: int, now: float) -> None:
         _suggest(mailbox_id, message_id, _again(owner, item_id)[2], now)
 
 
-def _read(cfg: ai.Config, text: str, known: tuple[str, ...]) -> tuple[list[ai.Suggestion], str | None, bool]:
+def _read(cfg: ai.Config, text: str, known: tuple[str, ...], timeout: float | None = None) -> tuple[list[ai.Suggestion], str | None, bool]:
     try:
-        reading = ai.suggest(cfg, text, known)
+        reading = ai.suggest(cfg, text, known, timeout)
         return reading.bookings, reading.error, False
     except ai.AiError as e:
         return [], str(e), str(e) != ai.NO_BOOKING
@@ -436,7 +436,7 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
         return added, 1
 
 
-def _ask_waiting(mailbox_id: int, token: Callable[[], str]) -> tuple[int, int, int]:
+def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> tuple[int, int, int]:
     asked = made = cleared = 0
     passed: set[str] = set()
     while True:
@@ -457,8 +457,11 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str]) -> tuple[int, int, i
             continue
         except gmail.GmailError:
             continue
+        left = BUDGET - (_clock() - started)
+        if left <= 0:
+            return asked, made, cleared
         asked += 1
-        suggestions, error, failed = _read(cfg, extract.plain_text(raw), known)
+        suggestions, error, failed = _read(cfg, extract.plain_text(raw), known, left)
         with db.session() as conn:
             added, removed = _file_ai(conn, mailbox_id, message_id, suggestions, error, None if failed else True, time.time())
             made, cleared = made + added, cleared + removed
@@ -611,7 +614,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             attached += bool(joined) and not a
             read, made, queued, handled = read + 1, made + a, queued + b, handled + 1
         if not capped:
-            asked_by_ai, ai_made, ai_cleared = _ask_waiting(mailbox_id, current)
+            asked_by_ai, ai_made, ai_cleared = _ask_waiting(mailbox_id, current, started)
             made, queued = made + ai_made, max(0, queued - ai_cleared)
         if not again and not backfill:
             with db.session() as conn:

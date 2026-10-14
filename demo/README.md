@@ -8,6 +8,8 @@ The build substitutes the network transport with `frontend/demo/api.ts`, which r
 
 The demo allows source emails to be inspected on past bookings as well as upcoming ones. These are synthetic text, without remote images or message links. The production app's past trips do not show offline-saving notices or setup prompts.
 
+Shared hotel reservations appear once with everyone on the booking and one price. The two reservations used to demonstrate Review matching have distinct rooms and travelers at the same property.
+
 The demo clock stays at noon UTC on the snapshot's `asOf` date. It is installed before the shared frontend loads, so upcoming itineraries, active travel and past-trip replay stay available regardless of the visitor's current date. Explicit booking dates and animation timers keep their normal behavior. Production time handling is unchanged.
 
 ## Build and verify
