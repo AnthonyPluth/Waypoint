@@ -10,10 +10,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && tsc -p tsconfig.demo.json",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
-    "lint": "cd .. && eslint -c frontend/eslint.config.js frontend waypoint/static"
+    "lint": "cd .. && eslint -c frontend/eslint.config.js frontend waypoint/static",
+    "build:demo": "vite build --mode demo --config vite.demo.config.ts"
   },
   "devDependencies": {
     "@codecov/vite-plugin": "^2.0.1",

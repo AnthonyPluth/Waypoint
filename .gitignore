@@ -35,3 +35,5 @@ artifacts/
 
 # Subagents' git worktrees (AGENTS.md, "Working in a container")
 .claude/worktrees/
+
+frontend/demo-dist/

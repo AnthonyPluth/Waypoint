@@ -67,7 +67,7 @@ const waypoint = {
 };
 
 export default defineConfig(
-  { ignores: ["waypoint/static/app/**", "**/node_modules/**"] },
+  { ignores: ["waypoint/static/app/**", "frontend/demo-dist/**", "**/node_modules/**"] },
   js.configs.recommended,
   ts.configs.recommended,
   ...svelte.configs.recommended.map((c) => (c.files ? c : { ...c, files: [FRONTEND] })),
