@@ -78232,10 +78232,10 @@
         "sender_domain": "travel.example",
         "known_sender": false,
         "holds_bookings": false,
-        "subject": "Simulated flight booking awaiting review",
+        "subject": "Simulated incomplete flight booking awaiting review",
         "has_email": true,
         "received": "2026-10-12",
-        "reason": "generic",
+        "reason": "incomplete",
         "suggestions": [
           {
             "kind": "flight",
@@ -78244,7 +78244,7 @@
             "origin": "JFK",
             "destination": "CDG",
             "start_local": "2024-08-05T18:30",
-            "end_local": "2024-08-06T08:00",
+            "end_local": "",
             "start_zone": "America/New_York",
             "end_zone": "Europe/Paris",
             "flight_number": "AF 7",
@@ -78284,10 +78284,10 @@
         "sender_domain": "travel.example",
         "known_sender": false,
         "holds_bookings": false,
-        "subject": "Simulated road trip rental booking awaiting review",
+        "subject": "Simulated incomplete road trip rental booking awaiting review",
         "has_email": true,
         "received": "2026-10-12",
-        "reason": "generic",
+        "reason": "incomplete",
         "suggestions": [
           {
             "kind": "car",
@@ -78296,7 +78296,7 @@
             "origin": "Denver",
             "destination": "Fort Collins",
             "start_local": "2026-06-16T09:00",
-            "end_local": "2026-06-24T17:00",
+            "end_local": "",
             "start_zone": "America/Denver",
             "end_zone": "America/Denver",
             "address": "20 Fictional Rental Lane, Denver, CO",
@@ -78327,10 +78327,10 @@
         "sender_domain": "travel.example",
         "known_sender": false,
         "holds_bookings": false,
-        "subject": "Simulated cruise booking awaiting review",
+        "subject": "Simulated incomplete cruise booking awaiting review",
         "has_email": true,
         "received": "2026-10-12",
-        "reason": "generic",
+        "reason": "incomplete",
         "suggestions": [
           {
             "kind": "cruise",
@@ -78339,7 +78339,7 @@
             "origin": "Miami",
             "destination": "Miami",
             "start_local": "2026-02-06T16:30",
-            "end_local": "2026-02-13T07:00",
+            "end_local": "",
             "start_zone": "America/New_York",
             "end_zone": "America/New_York",
             "address": "40 Fictional Pier Avenue",
@@ -78830,24 +78830,24 @@
       "images": 0
     },
     "101": {
-      "subject": "Simulated flight booking awaiting review",
-      "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: Air France\nConfirmation: DEMO-REVIEW-101\nTravelers: Jane Doe (12A), Sam Doe (12B), Mia Doe (12C)\nFrom: JFK\nTo: CDG\nStarts: 2024-08-05T18:30\nEnds: 2024-08-06T08:00\nStart time zone: America/New_York\nEnd time zone: Europe/Paris\nTotal: 245.00 USD\nFlight Number: AF 7\nCabin: Business\nTerminal: 1\nAircraft: Example aircraft\nSeat: Jane Doe: 12A; Sam Doe: 12B; Mia Doe: 12C\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-1\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
+      "subject": "Simulated incomplete flight booking awaiting review",
+      "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: Air France\nConfirmation: DEMO-REVIEW-101\nTravelers: Jane Doe (12A), Sam Doe (12B), Mia Doe (12C)\nFrom: JFK\nTo: CDG\nStarts: 2024-08-05T18:30\nEnds: Not provided in this simulated email\nStart time zone: America/New_York\nEnd time zone: Europe/Paris\nTotal: 245.00 USD\nFlight Number: AF 7\nCabin: Business\nTerminal: 1\nAircraft: Example aircraft\nSeat: Jane Doe: 12A; Sam Doe: 12B; Mia Doe: 12C\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-1\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
       "html": null,
       "truncated": false,
       "original": false,
       "images": 0
     },
     "102": {
-      "subject": "Simulated road trip rental booking awaiting review",
-      "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: car\nProvider: Example Rentals\nConfirmation: DEMO-REVIEW-102\nTravelers: Jane Doe\nFrom: Denver\nTo: Fort Collins\nStarts: 2026-06-16T09:00\nEnds: 2026-06-24T17:00\nStart time zone: America/Denver\nEnd time zone: America/Denver\nTotal: 180.00 USD\nAddress: 20 Fictional Rental Lane, Denver, CO\nPhone: +1 202-555-0102\nVehicle: Example hybrid SUV\nCar Class: SUV\nNotes: driver: Jane Doe; fuel policy: Full to full; insurance: Synthetic collision cover included\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
+      "subject": "Simulated incomplete road trip rental booking awaiting review",
+      "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: car\nProvider: Example Rentals\nConfirmation: DEMO-REVIEW-102\nTravelers: Jane Doe\nFrom: Denver\nTo: Fort Collins\nStarts: 2026-06-16T09:00\nEnds: Not provided in this simulated email\nStart time zone: America/Denver\nEnd time zone: America/Denver\nTotal: 180.00 USD\nAddress: 20 Fictional Rental Lane, Denver, CO\nPhone: +1 202-555-0102\nVehicle: Example hybrid SUV\nCar Class: SUV\nNotes: driver: Jane Doe; fuel policy: Full to full; insurance: Synthetic collision cover included\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
       "html": null,
       "truncated": false,
       "original": false,
       "images": 0
     },
     "103": {
-      "subject": "Simulated cruise booking awaiting review",
-      "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: cruise\nProvider: Example Cruise Line\nConfirmation: DEMO-REVIEW-103\nTravelers: Jane Doe (Balcony 9214), Sam Doe (Balcony 9214)\nFrom: Miami\nTo: Miami\nStarts: 2026-02-06T16:30\nEnds: 2026-02-13T07:00\nStart time zone: America/New_York\nEnd time zone: America/New_York\nTotal: 1800.00 USD\nAddress: 40 Fictional Pier Avenue\nPhone: +1 202-555-0103\nShip: Example Voyager\nRoom: Balcony 9214\nDeck: 9\nNotes: dining: 18:30 · Vegetarian meals; boarding: 12:00–14:00 local time; package: Meals included\nItinerary:\nNassau: arrive 2026-02-07T08:00, depart 2026-02-07T17:00 (America/Nassau)\nGrand Cayman: arrive 2026-02-10T07:00, depart 2026-02-10T16:00 (America/Cayman)\nCozumel: arrive 2026-02-11T08:00, depart 2026-02-11T17:00 (America/Cancun)\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
+      "subject": "Simulated incomplete cruise booking awaiting review",
+      "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: cruise\nProvider: Example Cruise Line\nConfirmation: DEMO-REVIEW-103\nTravelers: Jane Doe (Balcony 9214), Sam Doe (Balcony 9214)\nFrom: Miami\nTo: Miami\nStarts: 2026-02-06T16:30\nEnds: Not provided in this simulated email\nStart time zone: America/New_York\nEnd time zone: America/New_York\nTotal: 1800.00 USD\nAddress: 40 Fictional Pier Avenue\nPhone: +1 202-555-0103\nShip: Example Voyager\nRoom: Balcony 9214\nDeck: 9\nNotes: dining: 18:30 · Vegetarian meals; boarding: 12:00–14:00 local time; package: Meals included\nItinerary:\nNassau: arrive 2026-02-07T08:00, depart 2026-02-07T17:00 (America/Nassau)\nGrand Cayman: arrive 2026-02-10T07:00, depart 2026-02-10T16:00 (America/Cayman)\nCozumel: arrive 2026-02-11T08:00, depart 2026-02-11T17:00 (America/Cancun)\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
       "html": null,
       "truncated": false,
       "original": false,

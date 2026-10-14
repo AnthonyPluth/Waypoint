@@ -15,11 +15,12 @@ from sqlalchemy import delete, select, update
 from ... import dates, monitoring
 from ...providers import gmail, mailimages
 from ...storage import db, gate_codes, stored_mail
-from ...storage.models import Mailbox, ScannedMessage
+from ...storage.models import Mailbox, ReviewItem, ScannedMessage
 from ...storage.stored_mail import Content
-from .. import loyalty, people
+from .. import airports, loyalty, people, trips
 from ..visibility import Viewer
 from . import ai, autoask, extract, followup, glance, ingest, query, review, triage
+from .booking import Passenger
 
 State = Literal["done", "failed", "not_started", "busy"]
 BOOKING, UNREADABLE, SKIPPED, FOLLOW_UP = "booking", "unreadable", "skipped", "follow-up"
@@ -240,15 +241,13 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     if _ignores(ignored, message.sender_domain):
         _record(conn, mailbox_id, message_id, IGNORED, now, message.sender_domain)
         return 0, 0, None, None
+    conn.execute(delete(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id,
+                                         ReviewItem.reason == "generic"))
     made, failed = 0, 0
     touched: list[int] = []
     held: list[ingest.Held] = []
     lacks: list[str] = []
-    proposed: list[extract.Booking] = []
     for booking in message.bookings:
-        if booking.generic and not review.trusted(conn, mailbox_id, message.sender_domain):
-            proposed.append(booking)
-            continue
         filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill, held)
         if filed is None:
             failed += 1
@@ -259,12 +258,6 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
                 joined.append(1)
         elif filed not in ("unchanged", "ambiguous"):
             made += 1
-    if proposed:
-        if review.asked(conn, mailbox_id, message.sender_domain):
-            return made, 0, list(dict.fromkeys(touched)) if touched else None, None
-        review.add_generic(conn, mailbox_id, message_id, message.sender_domain, message.received,
-                           [ingest.suggestion(conn, b) for b in proposed], now, UNREAD_WITH_SUGGESTION if message.unread else None)
-        return made, 1, [], UNREADABLE
     usable = len(message.bookings) - failed
     queued = 0
     if failed or message.unread or not usable:
@@ -367,21 +360,94 @@ def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> None:
         return
     suggestions, error, _ = _read(cfg, text, known)
     with db.session() as conn:
-        review.set_suggestions(conn, mailbox_id, message_id, suggestions, error, auto=False)
+        _file_ai(conn, mailbox_id, message_id, suggestions, error, False, now)
 
 
-def _ask_waiting(mailbox_id: int, token: Callable[[], str]) -> int:
-    asked = 0
+def _ai_fields(conn: db.Connection, s: ai.Suggestion) -> trips.SegmentIn | None:
+    kind = s.get("kind")
+    if not kind or not all(s.get(key) for key in ("confirmation", "origin", "start_local", "end_local")):
+        return None
+    if kind in ("flight", "train", "car") and not s.get("destination"):
+        return None
+    first, last = s.get("start_zone"), s.get("end_zone")
+    if kind == "flight":
+        if not s.get("flight_number"):
+            return None
+        a, b = airports.lookup(conn, s["origin"]), airports.lookup(conn, s["destination"])
+        first, last = a["zone"] if a else None, b["zone"] if b else None
+    if not first or not (last or kind in ("hotel", "parking")):
+        return None
+    fields: trips.SegmentIn = {"kind": kind, "status": "confirmed", "provider": s.get("provider"), "confirmation": s["confirmation"],
+                              "origin": s["origin"], "destination": s.get("destination"), "start_local": s["start_local"],
+                              "end_local": s["end_local"], "start_zone": first, "end_zone": last or first,
+                              "details": {k: s[k] for k in ("address", "phone", "room", "ship", "deck", "flight_number", "cabin") if s.get(k)}}
+    if travelers := s.get("travelers"):
+        fields["travelers"] = [{**person, "seat": traveler["seat"]} for person, traveler in
+                               zip(ingest.travelers(conn, tuple(Passenger(t["name"]) for t in travelers)), travelers, strict=True)]
+    if s.get("price_minor") is not None and s.get("price_currency"):
+        fields["price"] = {"amount_minor": s["price_minor"], "currency": s["price_currency"]}
+    try:
+        trips.check(conn, fields)
+        trips.check_price(fields.get("price"))
+    except trips.Invalid:
+        return None
+    return fields
+
+
+def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions: list[ai.Suggestion], error: str | None,
+             auto: bool | None, now: float) -> tuple[int, int]:
+    row = conn.execute(select(ReviewItem.id, ReviewItem.sender_domain, ReviewItem.received, ReviewItem.matches, Mailbox.owner_sub)
+                       .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
+                       .where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).fetchone()
+    viewer = _viewer(row["owner_sub"], conn) if row else None
+    if row is None or viewer is None or row["matches"]:
+        return 0, 0
+    pending: list[ai.Suggestion] = []
+    touched: list[int] = []
+    held: list[ingest.Held] = []
+    added = 0
+    for suggestion in suggestions:
+        fields = _ai_fields(conn, suggestion)
+        if fields is None:
+            pending.append(suggestion)
+            continue
+        candidates: list[int] = []
+        try:
+            outcome = trips.merge_email_segment(conn, viewer, fields, touched=touched, candidates=candidates)
+        except trips.Invalid:
+            pending.append(suggestion)
+            continue
+        if outcome == "ambiguous":
+            held.append((fields, candidates))
+        elif outcome != "unchanged":
+            added += 1
+    for segment_id in touched:
+        stored_mail.link(conn, segment_id, mailbox_id, message_id)
+    if held:
+        matches = json.dumps([{"id": n, "booking": b, "candidates": c} for n, (b, c) in enumerate(held, 1)], separators=(",", ":"))
+        conn.execute(update(ReviewItem).where(ReviewItem.id == row["id"]).values(reason="incomplete" if pending or error else "match", matches=matches))
+    if pending or error or held or not suggestions:
+        review.set_suggestions(conn, mailbox_id, message_id, pending, error, auto=auto)
+        return added, 0
+    else:
+        review.dismiss(conn, row["owner_sub"], row["id"], (viewer, touched))
+        conn.execute(update(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id)
+                     .values(outcome=BOOKING, scanned=now, segment_id=touched[0] if touched else None))
+        return added, 1
+
+
+def _ask_waiting(mailbox_id: int, token: Callable[[], str]) -> tuple[int, int, int]:
+    asked = made = cleared = 0
     passed: set[str] = set()
     while True:
         with db.session() as conn:
             cfg = ai.config(conn)
             if cfg is None or not autoask.chosen(conn):
-                return asked
+                return asked, made, cleared
             message_id = autoask.next_waiting(conn, mailbox_id, passed)
             known = tuple(loyalty.known_numbers(conn))
         if message_id is None:
-            return asked
+            return asked, made, cleared
         passed.add(message_id)
         try:
             raw = gmail.fetch(token(), message_id)
@@ -394,7 +460,8 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str]) -> int:
         asked += 1
         suggestions, error, failed = _read(cfg, extract.plain_text(raw), known)
         with db.session() as conn:
-            review.set_suggestions(conn, mailbox_id, message_id, suggestions, error, auto=None if failed else True)
+            added, removed = _file_ai(conn, mailbox_id, message_id, suggestions, error, None if failed else True, time.time())
+            made, cleared = made + added, cleared + removed
             if failed:
                 autoask.failed(conn, mailbox_id, message_id)
             else:
@@ -478,6 +545,15 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 with db.session() as conn:
                     conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.outcome == SKIPPED,
                                                               ScannedMessage.message_id.in_(forced)))
+            with db.session() as conn:
+                legacy = list(conn.execute(select(ReviewItem.message_id).where(ReviewItem.mailbox_id == mailbox_id,
+                                   ReviewItem.reason == "generic", ReviewItem.sender_domain.not_in(ignored))).scalars())
+                if legacy:
+                    conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id,
+                                                              ScannedMessage.message_id.in_(legacy)))
+            if legacy:
+                forced.update(legacy)
+                pages = itertools.chain(pages, [legacy])
         for message_id in _unread(mailbox_id, pages, not again, tally):
             if handled and _clock() - started > BUDGET:
                 capped = True
@@ -535,7 +611,8 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             attached += bool(joined) and not a
             read, made, queued, handled = read + 1, made + a, queued + b, handled + 1
         if not capped:
-            asked_by_ai = _ask_waiting(mailbox_id, current)
+            asked_by_ai, ai_made, ai_cleared = _ask_waiting(mailbox_id, current)
+            made, queued = made + ai_made, max(0, queued - ai_cleared)
         if not again and not backfill:
             with db.session() as conn:
                 conn.execute(update(Mailbox).where(Mailbox.id == mailbox_id).values(

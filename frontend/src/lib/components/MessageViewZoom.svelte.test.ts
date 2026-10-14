@@ -149,7 +149,7 @@ describe("fitting and zooming the email", () => {
     const old = render(MessageView, { text: "Gate B12", html: "<p>Gate B12</p>", original: false });
     expect(screen.queryByRole("button", { name: "Zoom in" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Larger view/ })).toBeNull();
-    expect(screen.getByTestId("message-old")).toBeInTheDocument();
+    expect(screen.queryByTestId("message-old")).toBeNull();
     old.unmount();
     render(MessageView, { text: "Gate B12" });
     expect(screen.queryByRole("button", { name: "Zoom in" })).toBeNull();

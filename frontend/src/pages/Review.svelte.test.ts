@@ -192,7 +192,7 @@ describe("Review", () => {
     await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
   });
 
-  it("adds a generic suggestion once by default, and trusts the sender only when asked", async () => {
+  it("adds a legacy generic suggestion without a sender-trust prompt", async () => {
     const read = { kind: "hotel" as const, provider: "Seaside Inn", confirmation: "SS48213", origin: "Seaside Inn", start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London", sources: {} };
     held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [], ai: false };
     render(ReviewPage);
@@ -201,14 +201,14 @@ describe("Review", () => {
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42", "DELETE", undefined]));
   });
 
-  it("sends trust only when its box is ticked", async () => {
+  it("does not offer sender trust or send a trust flag", async () => {
     const read = { kind: "hotel" as const, provider: "Seaside Inn", confirmation: "SS48213", origin: "Seaside Inn", start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London", sources: {} };
     held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [], ai: false };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check what Waypoint read/ }));
-    await userEvent.click(screen.getByRole("checkbox", { name: /Also trust seaside-stays.example/ }));
+    expect(screen.queryByRole("checkbox", { name: /Also trust/ })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
-    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42&trust=1", "DELETE", undefined]));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42", "DELETE", undefined]));
   });
 
   it("adds a booking from a grouped row through the newest item alone", async () => {
@@ -1254,8 +1254,8 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     expect(screen.queryByText("AI suggestion")).toBeNull();
     expect(screen.queryByRole("button", { name: /Ask AI/ })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /Check what Waypoint read/ }));
-    expect(screen.getByText(/later mail from seaside-stays.example is still checked with you first/)).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: /Also trust seaside-stays.example/ })).not.toBeChecked();
+    expect(screen.queryByText(/later mail from seaside-stays.example is still checked with you first/)).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: /Also trust/ })).toBeNull();
     const checkin = screen.getByLabelText(/^Check-in/);
     expect(checkin).toHaveValue("2026-11-21T15:00");
     expect(checkin).toHaveClass("ring-2");
@@ -1688,7 +1688,7 @@ describe("Review: the form's explanatory text is gone", () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check what Waypoint read/ }));
     expect(screen.getByPlaceholderText("Work it out from the address")).toBeInTheDocument();
-    expect(screen.getByText(/Waypoint read this from labelled lines in the email/)).toBeInTheDocument();
+    expect(screen.queryByText(/Waypoint read this from labelled lines in the email/)).toBeNull();
     expect(screen.getByLabelText(/^Address/)).toHaveClass("ring-2");
   });
 
