@@ -378,7 +378,7 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
                            "expiry": expiry, "notes": notes})
     for brand, color in DEMO_LOGO_COLORS.items():
         db.upsert(conn, BrandLogo, {"key": logos.key(brand), "name": brand, "logo": _square(color), "logo_type": "image/png",
-                                    "checked": datetime.now(UTC).isoformat(timespec="seconds"), "source": "logodev"}, key=["key"])
+                                    "checked": datetime.now(UTC).isoformat(timespec="seconds"), "source": "demo"}, key=["key"])
     hold_status(today)
     return _rows(conn) - before
 

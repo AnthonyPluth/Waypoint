@@ -250,9 +250,9 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_logos.py",
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
+        "tests/test_onboarding.py",
         "tests/test_routes.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
@@ -401,6 +401,7 @@
         "tests/test_mail_scan.py",
         "tests/test_mcp_routes.py",
         "tests/test_offline.py",
+        "tests/test_onboarding.py",
         "tests/test_reminders.py",
         "tests/test_trip_emails_clear.py",
         "tests/test_trips.py"
@@ -764,51 +765,6 @@
     },
     {
       "method": "GET",
-      "path": "/api/logodev",
-      "handler": "waypoint/server/api/logos.py:api_logodev",
-      "web": [
-        "frontend/src/lib/components/settings/LogosSection.svelte"
-      ],
-      "tests": [
-        "tests/test_api_contract.py",
-        "tests/test_logos.py"
-      ],
-      "docs": [
-        "start/logos"
-      ]
-    },
-    {
-      "method": "POST",
-      "path": "/api/logodev",
-      "handler": "waypoint/server/api/logos.py:api_logodev_save",
-      "web": [
-        "frontend/src/lib/components/settings/LogosSection.svelte"
-      ],
-      "tests": [
-        "tests/test_api_contract.py",
-        "tests/test_logos.py"
-      ],
-      "docs": [
-        "start/logos"
-      ]
-    },
-    {
-      "method": "POST",
-      "path": "/api/logodev/fetch",
-      "handler": "waypoint/server/api/logos.py:api_logodev_fetch",
-      "web": [
-        "frontend/src/lib/components/settings/LogosSection.svelte"
-      ],
-      "tests": [
-        "tests/test_api_contract.py",
-        "tests/test_logos.py"
-      ],
-      "docs": [
-        "start/logos"
-      ]
-    },
-    {
-      "method": "GET",
       "path": "/api/loyalty",
       "handler": "waypoint/server/api/loyalty.py:api_loyalty",
       "web": [
@@ -902,7 +858,8 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_gmail.py"
+        "tests/test_gmail.py",
+        "tests/test_onboarding.py"
       ],
       "docs": [
         "start/gmail"
@@ -1495,6 +1452,7 @@
         "tests/test_http_server.py",
         "tests/test_mail_scan.py",
         "tests/test_monitoring.py",
+        "tests/test_onboarding.py",
         "tests/test_security.py",
         "tests/test_server.py",
         "tests/test_server_errors.py",

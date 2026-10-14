@@ -88,20 +88,6 @@ OTHER = "https://example-api.rapidapi.com/status"
 # ok: waypoint-flightstatus-hosts
 flightstatus.fetch("EX101", "2026-11-20")
 
-# ruleid: waypoint-logodev-hosts
-LOGO_URL = "https://img.logo.dev/name/Example%20Hotels?token=pk_example"
-# ruleid: waypoint-logodev-hosts
-LOGO_SEARCH = "https://api.logo.dev/search?q=Example"
-# ok: waypoint-logodev-hosts
-logos.fetch_due(conn, now)
-
-# ruleid: waypoint-wikimedia-hosts
-BRAND_SEARCH = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=Hyatt"
-# ruleid: waypoint-wikimedia-hosts
-BRAND_FILE = "https://commons.wikimedia.org/wiki/Special:FilePath/Example.png"
-# ok: waypoint-wikimedia-hosts
-logos.fetch_due(conn, now)
-
 # ruleid: waypoint-mail-image-fetch
 picture = tls.urlopen(request, 5, public_only=True)
 # ok: waypoint-mail-image-fetch

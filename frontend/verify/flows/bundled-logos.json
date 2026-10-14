@@ -1,0 +1,11 @@
+{
+  "name": "bundled-logos",
+  "page": "settings",
+  "steps": [
+    { "goto": "#settings/travel" },
+    { "wait_for": "#logos-title" },
+    { "expect_text": { "selector": "section[aria-labelledby='logos-title']", "text": "included with Waypoint" } },
+    { "expect_text": { "selector": "section[aria-labelledby='logos-title']", "text": "no account or API key" } },
+    { "screenshot": "included" }
+  ]
+}

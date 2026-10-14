@@ -1,15 +1,32 @@
 ---
 title: Install with Docker
-description: Register Waypoint with your sign-in provider, start it, move your data over and put it on the internet.
+description: Start locally with no accounts or API keys, optionally add sign-in, move your data over and put it on the internet.
 sidebar:
   order: 1
 ---
 
-Waypoint signs you in through your OpenID Connect provider (Authentik, Authelia, Keycloak, Pocket ID, Google, Microsoft Entra, …). The image holds Python, Waypoint’s dependencies and Waypoint itself. It uses SQLite in `/data`, or Postgres if you set `DATABASE_URL`.
+Waypoint starts locally with no account, sign-in provider or third-party credentials. The image holds Python, Waypoint’s dependencies, the web app and travel brand logos. It uses SQLite in `/data`, or Postgres if you set `DATABASE_URL`.
 
-## 1. Register Waypoint with your provider
+## First start
 
-Create an OIDC / OAuth2 application (a “confidential” client, authorization code flow):
+```bash
+git clone https://github.com/AnthonyPluth/waypoint.git
+cd waypoint
+docker compose up -d
+docker compose logs -f waypoint
+```
+
+Open `http://localhost:8765`. You can add household members and bookings by hand straight away. No `.env` file is needed. The database and its generated encryption key are saved in `./data`; keep that folder when updating or restarting.
+
+The default Compose file publishes port 8765 only on localhost. Without sign-in, anyone who can reach the app sees the household’s trips and can change its settings. For other devices, explicitly change the published address and use a trusted private network or enable sign-in first. Do not publish an unauthenticated instance to the internet.
+
+Gmail, AI suggestions, live flight status, connected assistants and push notifications are optional. [Brand logos](/Waypoint/start/logos/) and the basic trip map work without any connection.
+
+The image is `ghcr.io/anthonypluth/waypoint:latest` (Intel/AMD and ARM). To stay on a version, set `image: ghcr.io/anthonypluth/waypoint:1.2` in `docker-compose.yml`.
+
+## Optional sign-in
+
+To use your OpenID Connect provider (Authentik, Authelia, Keycloak, Pocket ID, Google, Microsoft Entra, …), create an OIDC / OAuth2 application (a “confidential” client, authorization code flow):
 
 | Setting | Value |
 |---|---|
@@ -18,21 +35,9 @@ Create an OIDC / OAuth2 application (a “confidential” client, authorization 
 | Scopes | `openid email profile` (+ `groups` if you use group-based access) |
 | ID token signing | RS256 (the usual default); PS256, ES256 and EdDSA work too |
 
-Note the issuer URL, client ID and client secret.
+Copy `.env.example` to `.env` and fill in `WAYPOINT_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` and `OIDC_ALLOWED_EMAILS` or `OIDC_ALLOWED_GROUPS`. Then restart with `docker compose up -d`. Setting `OIDC_ISSUER` enables sign-in; incomplete settings stop startup with a message in the logs. Leave the issuer empty to keep local mode.
 
-## 2. First start
-
-```bash
-git clone https://github.com/AnthonyPluth/waypoint.git
-cd waypoint
-cp .env.example .env        # fill in WAYPOINT_PUBLIC_URL, OIDC_* and OIDC_ALLOWED_EMAILS
-docker compose up -d
-docker compose logs -f waypoint
-```
-
-The image is `ghcr.io/anthonypluth/waypoint:latest` (Intel/AMD and ARM). To stay on a version, set `image: ghcr.io/anthonypluth/waypoint:1.2` in `docker-compose.yml`.
-
-Then open `WAYPOINT_PUBLIC_URL`. You’re sent to your provider to sign in, then back to Waypoint. If a setting is missing, the container stops with a message saying which one (see the logs).
+Everyone who can sign in belongs to one household and shares settings and loyalty IDs. Authenticated members see the trips they travel on, book or receive; local mode shows the whole household’s trips.
 
 ## Moving your data from another machine
 
@@ -96,7 +101,7 @@ Waypoint is built to be reachable from anywhere, as long as it’s set up like t
 
 Waypoint sends nothing about itself anywhere: there's no error-reporting or analytics service. Its log (`docker logs waypoint`) has a line per request (the path, never the query string) and the details of any error. An error the app shows has a reference (`reference 1a2b3c4d`); search the log for it. Credentials, query strings and the values a database error would quote are blanked in the log.
 
-## Notes
+## Notes about sign-in
 
 - Only people in `OIDC_ALLOWED_EMAILS` / `OIDC_ALLOWED_GROUPS` get in, even if your provider lets others sign in.
 - A session ends after 14 days without using Waypoint (`WAYPOINT_SESSION_DAYS`); using it keeps you signed in, for up to 90 days after you signed in. If you’re let in by `OIDC_ALLOWED_GROUPS` rather than by email, it ends 14 days after signing in, so leaving the group takes effect.

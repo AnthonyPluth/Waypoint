@@ -20,7 +20,7 @@ from .api.assistant import (api_assistant_review, api_assistant_review_create, a
 from .api.mcp import api_mcp_mail, api_mcp_revoke, api_mcp_settings, api_mcp_writes
 from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, api_person_add, api_person_claim,
                           api_person_edit, api_person_remove)
-from .api.logos import api_logodev, api_logodev_fetch, api_logodev_save, api_loyalty_logo, api_segment_logo
+from .api.logos import api_loyalty_logo, api_segment_logo
 from .api.mailboxes import api_mailbox_backfill, api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_ignored, api_mailbox_labels, api_mailbox_labels_save, api_mailbox_reread, api_mailbox_review_glance, api_mailbox_scan, api_mailbox_share, api_mailbox_unignore, api_mailboxes
 from .api.reminders import (api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
                             api_reminders_set)
@@ -78,9 +78,6 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/flight-status", api_flight_statuses),
     ("POST", "/api/flight-status/{id}", api_flight_status_refresh),
     ("GET", "/api/loyalty/{id}/logo", api_loyalty_logo),
-    ("GET", "/api/logodev", api_logodev),
-    ("POST", "/api/logodev", api_logodev_save),
-    ("POST", "/api/logodev/fetch", api_logodev_fetch),
     ("GET", "/api/loyalty", api_loyalty),
     ("POST", "/api/loyalty", api_loyalty_add),
     ("POST", "/api/loyalty/{id}", api_loyalty_edit),
