@@ -8,11 +8,13 @@ The build substitutes the network transport with `frontend/demo/api.ts`, which r
 
 The demo allows source emails to be inspected on past bookings as well as upcoming ones. These are synthetic text, without remote images or message links. The production app's past trips do not show offline-saving notices or setup prompts.
 
+The demo clock stays at noon UTC on the snapshot's `asOf` date. It is installed before the shared frontend loads, so upcoming itineraries, active travel and past-trip replay stay available regardless of the visitor's current date. Explicit booking dates and animation timers keep their normal behavior. Production time handling is unchanged.
+
 ## Build and verify
 
 Run `npm ci` and `npm run build:demo` from `frontend/`. The standalone output is `frontend/demo-dist/` and can be served by any static HTTP server. Run `node demo/verify.mjs` from the repository root to check the compiled payload at phone, tablet and desktop widths, including requests, blocked controls, source emails, filters and animated replay. Screenshots are written to `artifacts/static-demo/`.
 
-The browser verification accepts only requests for bundled files under the demo directory and fails on any API, external-service, fetch/XHR, worker or websocket request. A Content Security Policy also denies all connections.
+The browser verification sets the visitor's clock to 2040 and checks that the shared Upcoming page still shows its itinerary and pass card. It accepts only requests for bundled files under the demo directory and fails on any API, external-service, fetch/XHR, worker or websocket request. A Content Security Policy also denies all connections.
 
 ## GitHub Pages
 

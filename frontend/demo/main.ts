@@ -1,3 +1,4 @@
+import "./clock-bootstrap";
 import { mount } from "svelte";
 import "../src/app.css";
 import "./demo.css";
