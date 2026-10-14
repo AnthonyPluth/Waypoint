@@ -2,7 +2,7 @@
 
 `index.html`, `app.js`, `style.css` and `map.svg` are the complete public payload. All content was invented for this demo, independently of the backend demo generator, uploaded files and databases. No build or backend is needed. Serve this directory with any static HTTP server.
 
-Browse upcoming and past trips, individual itineraries, the illustrative SVG map and demo settings. Editing, imports, authentication, mailbox connections and integrations are disabled. There is no persistence, service worker, analytics, remote font or tile service. The Content Security Policy denies all connections.
+Browse upcoming and past trips (including a flight journey, road trip and cruise), three pending review items, individual itineraries, complete booking details and simulated source emails for every booking, the illustrative SVG map and demo settings. Editing, imports, authentication, mailbox connections and integrations are disabled. There is no persistence, service worker, analytics, remote font or tile service. The Content Security Policy denies all connections.
 
 ## GitHub Pages
 
