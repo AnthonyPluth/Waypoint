@@ -1,13 +1,23 @@
-# Standalone static demo
+# Standalone read-only demo
 
-`index.html`, `app.js`, `style.css` and `map.svg` are the complete public payload. All content was invented for this demo, independently of the backend demo generator, uploaded files and databases. No build or backend is needed. Serve this directory with any static HTTP server.
+The demo builds the same Svelte screens and components as the main application: Upcoming, Trips, booking details, Review, People and loyalty numbers, Stats and travel maps, year-in-review cards, Settings, and animated route replays with pause, speed and scrubbing controls. It uses the application's dark theme and bundled Geist font.
 
-Browse upcoming and past trips (including a flight journey, road trip and cruise), three pending review items, individual itineraries, complete booking details and simulated source emails for every booking, the illustrative SVG map and demo settings. Editing, imports, authentication, mailbox connections and integrations are disabled. There is no persistence, service worker, analytics, remote font or tile service. The Content Security Policy denies all connections.
+All records are invented. `frontend/demo/data.json` was generated from the repository's synthetic demo seed in a new, temporary database, with network access denied. That database was discarded. The snapshot includes an explicit Colorado road trip with a rental car. Every booking was supplemented with fictional details, a price and a simulated source email. The bundle contains no database, mailbox token, credentials, uploaded images or user data. Live flight updates are unavailable. Three review examples cover a flight, road-trip rental and cruise; booking-match and unmatched traveler examples are also included.
+
+The build substitutes the network transport with `frontend/demo/api.ts`, which returns copies of bundled synthetic responses. Changes are rejected and controls for editing, importing, authentication, mailbox connections, notifications, offline setup and external integrations are disabled. Revealing a fictional loyalty number is a read operation against bundled data. The app's service-worker entry point is replaced. There are no runtime API calls, storage writes, external fonts or tiles, analytics, or backend services. Map geography is bundled and drawn in SVG, using the application's vector replay/map components; no OpenStreetMap is used.
+
+The demo allows source emails to be inspected on past bookings as well as upcoming ones. These are synthetic text, without remote images or message links. The production app's past trips do not show offline-saving notices or setup prompts.
+
+The demo clock stays at noon UTC on the snapshot's `asOf` date. It is installed before the shared frontend loads, so upcoming itineraries, active travel and past-trip replay stay available regardless of the visitor's current date. Explicit booking dates and animation timers keep their normal behavior. Production time handling is unchanged.
+
+## Build and verify
+
+Run `npm ci` and `npm run build:demo` from `frontend/`. The standalone output is `frontend/demo-dist/` and can be served by any static HTTP server. Run `node demo/verify.mjs` from the repository root to check the compiled payload at phone, tablet and desktop widths, including requests, blocked controls, source emails, filters and animated replay. Screenshots are written to `artifacts/static-demo/`.
+
+The browser verification sets the visitor's clock to 2040 and checks that the shared Upcoming page still shows its itinerary and pass card. It accepts only requests for bundled files under the demo directory and fails on any API, external-service, fetch/XHR, worker or websocket request. A Content Security Policy also denies all connections.
 
 ## GitHub Pages
 
-The existing `Docs` workflow builds documentation into `docs/dist`, then copies only the four demo payload files under `docs/dist/demo/`. It publishes a single combined artifact from `main`. Documentation remains at `/Waypoint/`; the demo is at `/Waypoint/demo/`. Changes to either docs or demo trigger the same workflow. Pull requests build both without publishing. There is no separate deployment from the `demo` branch, so no environment branch exception is needed.
+The main-only `Docs` workflow builds documentation and the demo, then copies the demo output under `docs/dist/demo/`. One artifact preserves documentation at `/Waypoint/` and adds the demo at `/Waypoint/demo/`. Both frontend and docs changes trigger this workflow. Pull requests build both without publishing.
 
-Settings → Pages → Build and deployment → Source must be **GitHub Actions**. Keep the `github-pages` environment allowing `main`. Do not use **Deploy from a branch**: that serves repository source rather than the built documentation site. Nothing has been published by preparing or pushing an integration branch; publication requires merging into main and a successful Docs deploy job.
-
-Run `node demo/verify.mjs` for browser checks at phone, tablet and desktop sizes. It serves only this directory, visits all demo routes and itineraries, fails on external or API requests, browser errors or horizontal overflow, checks disabled controls and records local screenshots under `artifacts/static-demo/`.
+Pages Source must be **GitHub Actions**. The `github-pages` environment only needs to allow `main`. Preparing or pushing code is not publication: merging and a successful Docs deployment from main are required.
