@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TripPlaces } from "$lib/api-types";
-import { SCRUB_STEPS, stopsOf } from "$lib/route-replay";
+import { replayMs, SCRUB_STEPS, stopsOf } from "$lib/route-replay";
 import { segment, trip } from "../../test/fixtures";
 import RouteReplayMap from "./RouteReplayMap.svelte";
 
@@ -299,6 +299,7 @@ describe("RouteReplayMap", () => {
 
   it("plays a 25-stop trip over a minute and a half, with each town's label lit as the path reaches it", async () => {
     const towns = Array.from({ length: 25 }, (_, i) => ({ name: `Town ${i}`, city: `Town ${i}`, code: null, kind: "place" as const, latitude: 30 + i * 0.6, longitude: -100 + i * 0.9, from: "2025-12-05", to: "2025-12-05", via: i === 0 ? null : ("car" as const) }));
+    expect(replayMs(towns.length)).toBe(88000);
     const { container } = render(RouteReplayMap, { stops: towns, year: 2025, still: false });
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
     advance(44000);
