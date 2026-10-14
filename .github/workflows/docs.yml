@@ -7,10 +7,10 @@ name: Docs
 on:
   push:
     branches: [main]
-    paths: [docs/**, demo/**, .github/workflows/docs.yml]
+    paths: [docs/**, demo/**, frontend/**, waypoint/static/fonts/**, waypoint/static/logo.svg, .github/workflows/docs.yml]
   pull_request:
     branches: [main]
-    paths: [docs/**, demo/**, .github/workflows/docs.yml]
+    paths: [docs/**, demo/**, frontend/**, waypoint/static/fonts/**, waypoint/static/logo.svg, .github/workflows/docs.yml]
   workflow_dispatch:
 
 permissions:
@@ -37,13 +37,24 @@ jobs:
       - uses: ./.github/actions/setup-node-app   # zizmor: ignore[self-repository] -- GitHub's documented form for a local action
         with:
           directory: docs
+      - uses: ./.github/actions/setup-node-app   # zizmor: ignore[self-repository] -- local action
+        with:
+          directory: frontend
+      - name: Build the standalone demo from the app frontend
+        working-directory: frontend
+        run: npm run build:demo
+      - name: Install the demo verification browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Verify the standalone demo without runtime connections
+        run: node demo/verify.mjs
       - name: Build the site
         working-directory: docs
         run: npm run build
       - name: Bundle the standalone static demo
         run: |
           mkdir -p docs/dist/demo
-          cp demo/index.html demo/app.js demo/style.css demo/map.svg docs/dist/demo/
+          cp -R frontend/demo-dist/. docs/dist/demo/
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9   # v5.0.0
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:

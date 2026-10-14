@@ -39,6 +39,8 @@
   import Plus from "@lucide/svelte/icons/plus";
   import { toast } from "svelte-sonner";
 
+  const staticDemo = import.meta.env.MODE === "demo";
+
   let { tripId = null, onchanged = null }: { tripId?: number | null; onchanged?: ((movedTo?: number) => void) | null } = $props();
 
   let trip = $state<Trip | null>(null);
@@ -83,6 +85,7 @@
   }
 
   async function afterOnlineLoad(t: Trip) {
+    if (isPast(t, dayIn(now, viewerZone()))) return;
     await refreshOffline();
     if (offline.setUp) await saveTripCopy(t);
     else if (askAboutOffline()) askOffline = true;
@@ -291,7 +294,7 @@
           {#if countNote(t.costs)}<span class="text-muted-foreground"> · {countNote(t.costs)}</span>{/if}</p>
       {/if}
       {#if t.notes && !editingTrip}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
-      <OfflineStatus tripId={t.id} />
+      {#if !over}<OfflineStatus tripId={t.id} />{/if}
     </div>
     {#if !form}
       <div class="flex flex-wrap gap-2">
@@ -408,7 +411,7 @@
     {/if}
   {/if}
   {@const vendor = vendorLink(s, isMobile())}
-  {#if !over && (s.links.app || vendor || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email || s.gate_code)}
+  {#if (!over || staticDemo) && (s.links.app || vendor || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email || s.gate_code)}
     <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
       {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>
       {:else if vendor}<Button variant="outline" size="sm" href={vendor.href}>{vendor.label}</Button>{/if}
@@ -421,7 +424,7 @@
       {/if}
     </div>
   {/if}
-  {#if !over && s.has_email}
+  {#if (!over || staticDemo) && s.has_email}
     {@const mail = mails[s.id]}
     {#if mail}
       <div class="mt-2 space-y-4" role="region" aria-label={`The email for ${headline(s)}`}>

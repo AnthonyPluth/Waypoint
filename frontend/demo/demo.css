@@ -1,0 +1,1 @@
+.demo-banner{padding:10px 16px;text-align:center;font-size:12px;background:#11233d;color:#8fc2ff;border-bottom:1px solid #343c52}button[data-demo-disabled],a[data-demo-disabled]{opacity:.5;cursor:not-allowed}a[data-demo-disabled]{pointer-events:none}[data-demo-disabled] input,[data-demo-disabled] textarea{cursor:not-allowed}
