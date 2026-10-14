@@ -1,0 +1,54 @@
+name: Static demo
+on:
+  push:
+    branches: [demo]
+    paths: [demo/**, .github/workflows/demo.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.ref == 'refs/heads/demo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: documentation
+          persist-credentials: false
+      - uses: ./documentation/.github/actions/setup-node-app # zizmor: ignore[self-repository] -- local action from main
+        with:
+          directory: documentation/docs
+      - name: Build current documentation
+        working-directory: documentation/docs
+        run: npm run build
+      - name: Bundle demo alongside documentation
+        run: |
+          mkdir -p documentation/docs/dist/demo
+          cp demo/index.html demo/app.js demo/style.css demo/map.svg documentation/docs/dist/demo/
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: documentation/docs/dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        id: deploy

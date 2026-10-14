@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: docs-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.event.pull_request.number && format('docs-pr-{0}', github.event.pull_request.number) || 'github-pages' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # bash, which runs each step with -eo pipefail: a command that fails inside a pipeline fails the step (without it, only
@@ -40,6 +40,17 @@ jobs:
       - name: Build the site
         working-directory: docs
         run: npm run build
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          ref: demo
+          path: static-demo
+          persist-credentials: false
+      - name: Retain the static demo
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          mkdir -p docs/dist/demo
+          cp static-demo/demo/index.html static-demo/demo/app.js static-demo/demo/style.css static-demo/demo/map.svg docs/dist/demo/
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9   # v5.0.0
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
