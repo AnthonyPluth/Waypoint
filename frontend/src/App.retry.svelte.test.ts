@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
+vi.mock("$lib/api", async (importOriginal) => ({ ...(await importOriginal<typeof import("$lib/api")>()), api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
 vi.mock("svelte-sonner", () => ({ Toaster: vi.fn(), toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { ApiError, api } from "$lib/api";
@@ -32,6 +32,7 @@ describe("trying again after the first load failed", () => {
     render(App);
     await boot();
     expect(app.state).toBeNull();
+    expect(app.bootError).toBe("Can’t reach Waypoint. Check your connection and try again.");
     online = true;
     await boot();
     expect((await screen.findAllByText("LHR")).length).toBeGreaterThan(0);

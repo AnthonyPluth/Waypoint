@@ -32,6 +32,6 @@
 
 {#if stops.length >= 2}
   <section class="mb-6" aria-label="Route replay">
-    {#key trip.id}<RouteReplayMap {stops} {year} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} basemap={places?.basemap === true} autoplay />{/key}
+    {#key trip.id}<RouteReplayMap {stops} {year} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} autoplay />{/key}
   </section>
 {/if}

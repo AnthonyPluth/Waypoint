@@ -47,6 +47,16 @@ beforeEach(() => {
 afterEach(() => { lock(); vi.restoreAllMocks(); vi.unstubAllGlobals(); flightStatus.list = null; });
 
 describe("Trip: the saved offline copy", () => {
+  it("does not show an offline notice or setup prompt for a past trip", async () => {
+    held = trip([segment({ start_local: "2020-04-08T10:00", end_local: "2020-04-08T11:30" })], { name: "Past journey" });
+    Object.assign(offline, { checked: true, setUp: true, hasCopy: true, trips: [{ id: 9, name: "Next cruise" }] });
+    render(TripPage);
+    await screen.findByRole("heading", { name: "Past journey" });
+    expect(screen.queryByTestId("offline-status")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Keep this trip available offline" })).not.toBeInTheDocument();
+    expect(device.writes).toEqual([]);
+  });
+
   it("asks once, after the trip loads online, and saves nothing until the person says yes", async () => {
     render(TripPage);
     expect(await screen.findByRole("dialog", { name: "Keep this trip available offline" })).toBeInTheDocument();

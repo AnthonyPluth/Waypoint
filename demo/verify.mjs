@@ -1,74 +1,108 @@
 import { chromium } from '../frontend/node_modules/@playwright/test/index.mjs';
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import assert from 'node:assert/strict';
-const files = new Map([['/demo/','index.html'],['/demo/index.html','index.html'],['/demo/app.js','app.js'],['/demo/style.css','style.css'],['/demo/map.svg','map.svg']]);
-const types = {html:'text/html',js:'text/javascript',css:'text/css',svg:'image/svg+xml'};
-const server = createServer(async (request,response) => {
-  const file = files.get(request.url);
-  if (!file) {response.writeHead(404);response.end();return;}
-  response.setHeader('Content-Type',types[file.split('.').pop()]);
-  response.end(await readFile(new URL(file,import.meta.url)));
+const root = path.resolve('frontend/demo-dist');
+const data = JSON.parse(await readFile('frontend/demo/data.json','utf8'));
+const prefix = '/Waypoint/demo/';
+const types = {html:'text/html',js:'text/javascript',css:'text/css',svg:'image/svg+xml',woff2:'font/woff2'};
+const server = createServer(async (request,response)=>{
+  const url = new URL(request.url,'http://localhost');
+  const file = path.resolve(root,url.pathname.slice(prefix.length) || 'index.html');
+  if (!url.pathname.startsWith(prefix) || !file.startsWith(`${root}/`)) {response.writeHead(404);response.end();return;}
+  try {response.setHeader('Content-Type',types[file.split('.').pop()] || 'application/octet-stream');response.end(await readFile(file));}
+  catch {response.writeHead(404);response.end();}
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
-const browser = await chromium.launch({executablePath:process.env.DEMO_CHROMIUM || '/usr/bin/chromium',args:['--no-sandbox']});
+const executablePath = process.env.DEMO_CHROMIUM || (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined);
+const browser = await chromium.launch({executablePath,args:['--no-sandbox']});
 const failures = [];
 try {
   await mkdir('artifacts/static-demo',{recursive:true});
   for (const width of [390,768,1440]) {
-    const page = await browser.newPage({viewport:{width,height:900}});
-    const requests = [];
-    await page.route('**/*',route=>{
-      const request = route.request();
-      requests.push(request.url());
-      if (!request.url().startsWith(`${origin}/demo/`) || ['fetch','xhr','websocket','eventsource'].includes(request.resourceType())) {
-        failures.push(request.url());return route.abort();
+    const context = await browser.newContext({viewport:{width,height:900},reducedMotion:'no-preference'});
+    await context.addInitScript(()=>{
+      window.fetch = ()=>{throw new Error("Runtime fetch attempted in static demo");};
+      if (navigator.credentials) {
+        navigator.credentials.get = ()=>{throw new Error("Authentication attempted in static demo");};
+        navigator.credentials.create = ()=>{throw new Error("Authentication attempted in static demo");};
       }
+    });
+    const page = await context.newPage();
+    const requests = [];
+    await context.route('**/*',route=>{
+      const request = route.request();requests.push(request.url());
+      if (!request.url().startsWith(`${origin}${prefix}`) || /\/api\//.test(request.url()) || ['fetch','xhr','websocket','eventsource'].includes(request.resourceType())) {failures.push(request.url());return route.abort();}
       return route.continue();
     });
     page.on('pageerror',error=>failures.push(error.message));
-    const bookingIds = ['coast-flight','coast-hotel','coast-car','road-drive','road-hotel','road-car','cruise-sailing','city-flight','review-flight','review-road','review-cruise'];
-    for (const route of ['upcoming','past','review','map','settings','trip/coast','trip/mountains','trip/cruise','trip/city',...bookingIds.flatMap(id=>[`booking/${id}`,`email/${id}`])]) {
-      await page.goto(`${origin}/demo/#${route}`);
-      await page.locator('h1').waitFor();
-      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`${width}: ${route} overflow`);
-      assert.equal(await page.locator('button:not([disabled])').count(),0);
-      assert.equal(await page.locator('input,form,iframe').count(),0);
-      if (route.startsWith('booking/')) {
-        const fields = await page.locator('.booking-details div').evaluateAll(elements=>elements.map(element=>({key:element.querySelector('dt').textContent,value:element.querySelector('dd').textContent})));
-        assert.ok(fields.length >= 15, `${route}: booking details must be complete`);
-        assert.ok(fields.every(field=>field.value.trim().length > 0),`${route}: empty field`);
-        await page.locator('summary').click();
-        const email = await page.locator('.source-email pre').textContent();
-        for (const field of fields.filter(field=>field.key !== 'Status')) assert.ok(email.includes(`${field.key}: ${field.value}`),`${route}: email mismatch for ${field.key}`);
-        assert.ok(email.includes('SIMULATED EMAIL'));
-        assert.equal(await page.locator('.email-headers dd').count(),4);
+    page.on('console',message=>{if (message.type() === 'error') failures.push(message.text());});
+    page.on('requestfailed',request=>failures.push(`Failed request: ${request.url()}`));
+    page.on('response',response=>{if (response.status() >= 400) failures.push(`${response.status()}: ${response.url()}`);});
+    const routes = ['upcoming','trips','review','people','stats','settings',...['account','mail','travel','offline','assistants','backup'].map(group=>`settings/${group}`),...data.trips.map(trip=>`trip/${trip.id}`)];
+    for (const route of routes) {
+      await page.goto(`${origin}${prefix}#${route}`);
+      await page.locator('h1').first().waitFor();
+      try { await page.waitForFunction(()=>!document.querySelector('[aria-busy="true"]'),null,{timeout:5000}); } catch (error) {
+        console.log(route,failures,await page.locator('body').innerText());
+        await page.screenshot({path:'artifacts/static-demo/parity-failure.png',fullPage:true});
+        throw error;
       }
-      if (route === 'review') {
-        assert.equal(await page.locator('.reservations article').count(),3);
-        assert.deepEqual(await page.locator('.reservations .badge').allTextContents(),['Flight','Road trip','Cruise']);
+      assert.deepEqual(failures,[],`${route}: browser requests or errors`);
+      assert.ok(await page.locator('main').evaluate(element=>parseFloat(getComputedStyle(element).paddingLeft) >= 16),`${route}: app styles missing`);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`${width}: ${route} overflow`);
+      assert.equal(await page.locator('input[type="file"]:not([disabled])').count(),0,`${route}: import enabled`);
+      assert.equal(await page.locator('button[data-demo-disabled]:not([disabled])').count(),0,`${route}: mutation enabled`);
+      assert.equal(await page.locator('a[href]:not([href^="#"])').count(),0,`${route}: external navigation enabled`);
+      if (route.startsWith('trip/')) {
+        assert.equal(await page.getByRole('button',{name:'Add a booking',exact:true}).isDisabled(),true,'Trip editing enabled');
+        const trip = data.trips.find(item=>item.id === Number(route.slice(5)));
+        const buttons = page.getByRole('button',{name:/^View the email for/});
+        assert.equal(await buttons.count(),trip.segments.length,`${route}: missing source emails`);
+        for (let index = 0; index < trip.segments.length; index++) await buttons.first().click();
+        await page.getByText('SIMULATED BOOKING EMAIL',{exact:false}).first().waitFor();
+        assert.equal(await page.getByText('SIMULATED BOOKING EMAIL',{exact:false}).count(),trip.segments.length);
+        if (trip.end_date < data.asOf) assert.equal(await page.locator('[data-testid="offline-status"]').count(),0);
       }
       await page.screenshot({path:`artifacts/static-demo/${route.replace('/','-')}-${width}.png`,fullPage:true});
     }
-    await page.goto(`${origin}/demo/`);
-    await page.getByRole('link',{name:/View itinerary/}).first().click();
-    await page.getByRole('heading',{name:'A week by the coast'}).waitFor();
-    await page.getByRole('link',{name:'View all booking details →'}).first().click();
-    await page.locator('.booking-details').waitFor();
-    await page.locator('summary').click();
-    await page.locator('.source-email pre').waitFor({state:'visible'});
-    await page.getByRole('link',{name:'Review · 3',exact:true}).click();
-    await page.getByRole('link',{name:'Read simulated email →'}).first().click();
-    await page.getByRole('heading',{name:'Simulated booking email'}).waitFor();
-    await page.getByRole('link',{name:'Travel map',exact:true}).click();
-    await page.getByRole('heading',{name:'Travel map',exact:true}).waitFor();
-    assert.equal(await page.evaluate(()=>document.querySelector('.map img').naturalWidth > 0),true);
-    console.log(`${width}px: all routes passed; requests limited to bundled static files (${new Set(requests).size} unique URLs)`);
-    await page.close();
+    const past = data.trips.find(trip=>trip.end_date < data.asOf && trip.segments.some(segment=>segment.kind === 'flight'));
+    await page.goto(`${origin}${prefix}#trip/${past.id}`);
+    const replay = page.getByRole('region',{name:'Route replay'});await replay.waitFor();
+    const scrubber = page.getByRole('slider',{name:'Position along the route'});
+    const before = await scrubber.inputValue();
+    await page.waitForFunction(value=>document.querySelector('input[aria-label="Position along the route"]')?.value !== value,before);
+    await replay.getByRole('button',{name:'Pause',exact:true}).click();
+    assert.equal(await replay.getByRole('button',{name:'Resume',exact:true}).count(),1);
+    await replay.getByRole('button',{name:/Playback speed/}).click();
+    await page.goto(`${origin}${prefix}#review`);
+    await page.getByRole('button',{name:/View email/}).first().click();
+    await page.getByText('SIMULATED BOOKING EMAIL',{exact:false}).first().waitFor();
+    assert.equal(await page.locator('[data-testid="match-item"] button:not([disabled]), [data-testid="who-item"] button:not([disabled])').count(),0,'Review matching enabled');
+    const suggestions = page.getByRole('button',{name:/^Check (?:the AI|what Waypoint)/});
+    assert.equal(await suggestions.count(),3);
+    for (let index=0; index<3; index++) {
+      await suggestions.nth(index).click();
+      const dialog = page.getByRole('dialog');await dialog.waitFor();
+      const bookingTab = dialog.getByRole('button',{name:'Booking',exact:true});
+      if (await bookingTab.isVisible()) await bookingTab.click();
+      const cost = dialog.getByRole('textbox',{name:'Cost amount'});
+      assert.ok(await cost.inputValue(),'Review booking cost missing');
+      assert.equal(await cost.isDisabled(),true,'Review booking editing enabled');
+      assert.equal(await dialog.locator('input:not([disabled]),textarea:not([disabled]),select:not([disabled])').count(),0,'Review editing enabled');
+      await dialog.getByRole('button',{name:'Close',exact:true}).click();
+      await dialog.waitFor({state:'hidden'});
+    }
+    await page.goto(`${origin}${prefix}#stats`);await page.locator('h1').waitFor();
+    const selects = page.locator('select');
+    if (await selects.count()) {assert.equal(await selects.first().isDisabled(),false,'Stats filter disabled');await selects.first().selectOption({index:0});}
+    assert.equal(await page.evaluate(()=>navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(items=>items.length) : 0),0);
+    assert.equal(await page.evaluate(()=>localStorage.length),0);
+    console.log(`${width}px: main app views, 32 booking emails, review and animated past replay passed; ${new Set(requests).size} bundled URLs`);
+    await context.close();
   }
   assert.deepEqual(failures,[]);
-} finally {
-  await browser.close();
-  await new Promise(resolve=>server.close(resolve));
-}
+} finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

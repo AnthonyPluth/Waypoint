@@ -43,7 +43,9 @@ describe("leaving a changed form", () => {
   it("goes where it was heading, and drops the form, on Discard changes", async () => {
     render(Harness, { dirty: true });
     visit("#people");
-    await userEvent.click(await screen.findByRole("button", { name: "Discard changes" }));
+    const discard = await screen.findByRole("button", { name: "Discard changes" });
+    await waitFor(() => expect(location.hash).toBe("#trips"));
+    await userEvent.click(discard);
     await waitFor(() => expect(screen.getByTestId("discarded")).toHaveTextContent("1"));
     await waitFor(() => expect(route.page).toBe("people"));
   });
