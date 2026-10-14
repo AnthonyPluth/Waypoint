@@ -1100,6 +1100,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
     const sheet = await screen.findByRole("dialog", { name: "Add this booking by hand" });
+    if (phone) await u.click(within(sheet).getByRole("button", { name: "Booking" }));
     await u.type(within(sheet).getByLabelText("From (airport code)"), "JFK");
     await u.keyboard("{Escape}");
     const ask = await screen.findByRole("dialog", { name: "Discard changes?" });
@@ -1118,6 +1119,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
     const sheet = await screen.findByRole("dialog");
+    if (phone) await u.click(within(sheet).getByRole("button", { name: "Booking" }));
     await u.type(within(sheet).getByLabelText("From (airport code)"), "J");
     await u.clear(within(sheet).getByLabelText("From (airport code)"));
     await u.keyboard("{Escape}");
@@ -1200,6 +1202,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
     const sheet = await screen.findByRole("dialog");
+    if (phone) await u.click(within(sheet).getByRole("button", { name: "Booking" }));
     await u.type(within(sheet).getByLabelText("From (airport code)"), "JFK");
     await u.type(within(sheet).getByLabelText("To (airport code)"), "SFO");
     await u.type(within(sheet).getByLabelText("Departs"), "2026-12-08T08:00");
@@ -1214,6 +1217,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
     const sheet = await screen.findByRole("dialog");
+    if (phone) await u.click(within(sheet).getByRole("button", { name: "Booking" }));
     await u.type(within(sheet).getByLabelText("From (airport code)"), "JFK");
     await u.type(within(sheet).getByLabelText("To (airport code)"), "SFO");
     await u.type(within(sheet).getByLabelText("Departs"), "2026-12-08T08:00");
