@@ -24,7 +24,8 @@ LOCAL: Mode = "local"
 OPENROUTER: Mode = "openrouter"
 MODES: tuple[Mode, ...] = (OFF, LOCAL, OPENROUTER)
 KEY_ENV = "OPENROUTER_API_KEY"
-TIMEOUT = 30
+TIMEOUT = 30            # seconds to wait on OpenRouter
+LOCAL_TIMEOUT = 3600    # seconds to wait on your own Ollama server: a big model on modest hardware can take many minutes
 MAX_SENT = 12_000
 MAX_REPLY = 1_000_000
 MAX_BOOKINGS = 10
@@ -201,7 +202,8 @@ def request(cfg: Config, text: str, system: str = SYSTEM) -> tuple[str, dict[str
     messages = [{"role": "system", "content": system}, {"role": "user", "content": text}]
     if cfg.mode == LOCAL:
         return (cfg.url.rstrip("/") + "/api/chat", {"Content-Type": "application/json"},
-                {"model": cfg.model, "messages": messages, "stream": False, "format": "json", "options": {"temperature": 0}}, True)
+                {"model": cfg.model, "messages": messages, "stream": False, "format": "json", "think": False,   # a model that thinks first can spend its whole reply on it and answer nothing
+                 "options": {"temperature": 0}}, True)
     return (HOSTS.openrouter.rstrip("/") + "/chat/completions",
             {"Content-Type": "application/json", "Authorization": f"Bearer {cfg.key}"},
             {"model": cfg.model, "messages": messages, "temperature": 0, "response_format": {"type": "json_object"},
@@ -477,7 +479,7 @@ def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY) -> Any:
     url, headers, body, allow_http = request(cfg, text, system)
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
     try:
-        with tls.urlopen(req, TIMEOUT, allow_http=allow_http) as resp:
+        with tls.urlopen(req, LOCAL_TIMEOUT if cfg.mode == LOCAL else TIMEOUT, allow_http=allow_http) as resp:
             raw = resp.read(MAX_REPLY)
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
