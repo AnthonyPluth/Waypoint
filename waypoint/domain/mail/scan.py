@@ -348,7 +348,7 @@ def _read(cfg: ai.Config, text: str, known: tuple[str, ...], timeout: float | No
         reading = ai.suggest(cfg, text, known, timeout)
         return reading.bookings, reading.error, False
     except ai.AiError as e:
-        return [], str(e), str(e) != ai.NO_BOOKING
+        return [], str(e), str(e) != ai.NO_BOOKING and not e.retried
     except Exception as e:
         monitoring.report(e, values=False)
         return [], SUGGESTION_FAILED, True
@@ -391,7 +391,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> i
             continue
         except gmail.GmailError:
             continue
-        left = BUDGET - (_clock() - started)   # a slow local model must not hold the scan past its budget
+        left = BUDGET - (_clock() - started)
         if left <= 0:
             return asked
         asked += 1

@@ -526,22 +526,22 @@ class SuggestTests(unittest.TestCase):
     def test_a_local_reply_with_fewer_flights_than_the_email_lists_is_asked_again_and_the_fuller_answer_wins(self):
         back = {**GOOD, "origin": "DEN", "destination": "BOS", "start_local": "2026-12-09T12:00", "end_local": "2026-12-09T17:30"}
         self.answers(json.dumps({"bookings": [GOOD]}), json.dumps({"bookings": [GOOD, back]}))
-        reading = ai.suggest(self.local, "Confirmation code: QW4R7T\nAB 123 BOS DEN\nAB 456 DEN BOS")
+        reading = ai.suggest(self.local, "Confirmation code: QW4R7T\nFlight AB 123 BOS DEN\nFlight AB 456 DEN BOS")
         self.assertEqual((reading.bookings, self.asked_to_think()), ([GOOD, back], [False, True]))
 
     def test_a_second_answer_that_is_no_better_leaves_the_first_in_place(self):
         both = json.dumps({"bookings": [GOOD]})
         self.answers(both, both)
-        reading = ai.suggest(self.local, "Confirmation code: QW4R7T\nAB 123 BOS DEN\nAB 456 DEN BOS")
+        reading = ai.suggest(self.local, "Confirmation code: QW4R7T\nFlight AB 123 BOS DEN\nFlight AB 456 DEN BOS")
         self.assertEqual((reading.bookings, self.asked_to_think()), ([GOOD], [False, True]))
 
     def test_a_second_answer_that_fails_leaves_the_first_in_place(self):
         self.answers(json.dumps({"bookings": [GOOD]}), "not json")
-        reading = ai.suggest(self.local, "Confirmation code: QW4R7T\nAB 123 BOS DEN\nAB 456 DEN BOS")
+        reading = ai.suggest(self.local, "Confirmation code: QW4R7T\nFlight AB 123 BOS DEN\nFlight AB 456 DEN BOS")
         self.assertEqual((reading.bookings, self.asked_to_think()), ([GOOD], [False, True]))
 
     def test_a_complete_local_answer_is_not_asked_again(self):
-        ai.suggest(self.local, "Confirmation code: QW4R7T\nAB 123 BOS DEN")
+        ai.suggest(self.local, "Confirmation code: QW4R7T\nFlight AB 123 BOS DEN\nAircraft A320 B737")
         self.assertEqual(self.asked_to_think(), [False])
 
     def test_no_booking_or_an_unreachable_server_is_not_asked_again(self):

@@ -165,11 +165,13 @@ class WhoIsAskedTests(AutoCase):
         self.google.mailbox_labels.append({"id": "Label_1", "name": "Trips", "type": "user"})
         with db.session() as conn:
             conn.execute(Mailbox.__table__.update().values(scan_labels=scan.encode_labels(["Label_1"])))
+        self.fake.content = json.dumps({"bookings": []})
         self.scan()
         self.assertEqual(len(self.fake.requests), 1)
 
     def test_a_message_with_travel_markup_but_no_booking_is_sent(self):
         self.turn_on()
+        self.fake.content = json.dumps({"bookings": []})
         self.put("incomplete")
         self.assertEqual(self.scan().review, 1)
         self.assertEqual(len(self.fake.requests), 1)
@@ -197,6 +199,15 @@ class EveryMessageTests(AutoCase):
 
 
 class FailureTests(AutoCase):
+    def test_a_reply_that_stays_unusable_after_thinking_is_not_asked_for_again_by_later_scans(self):
+        self.turn_on()
+        self.fake.content = "not json"
+        self.put("no_markup_ids")
+        self.scan()
+        self.assertEqual((len(self.fake.requests), self.waiting()), (2, []))
+        self.scan(now=NOW + 60)
+        self.assertEqual(len(self.fake.requests), 2)
+
     def test_a_failed_request_leaves_the_item_with_the_note_and_is_retried_at_most_twice(self):
         self.turn_on()
         self.fake.status = 500

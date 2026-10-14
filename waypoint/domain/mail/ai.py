@@ -25,8 +25,8 @@ LOCAL: Mode = "local"
 OPENROUTER: Mode = "openrouter"
 MODES: tuple[Mode, ...] = (OFF, LOCAL, OPENROUTER)
 KEY_ENV = "OPENROUTER_API_KEY"
-TIMEOUT = 30            # seconds to wait on OpenRouter
-LOCAL_TIMEOUT = 3600    # seconds to wait on your own Ollama server: a big model on modest hardware can take many minutes
+TIMEOUT = 30
+LOCAL_TIMEOUT = 3600
 MAX_SENT = 12_000
 MAX_REPLY = 1_000_000
 MAX_BOOKINGS = 10
@@ -45,7 +45,7 @@ HOSTS = Hosts()
 
 
 class AiError(Exception):
-    pass
+    retried = False
 
 
 class SuggestedTraveler(TypedDict):
@@ -225,7 +225,7 @@ FIELDS = ("kind", "provider", "confirmation", "origin", "destination", "start_lo
 LIMITS = {"provider": 100, "confirmation": 50, "origin": 100, "destination": 100, "start_zone": 64, "end_zone": 64}
 IATA = re.compile(r"[A-Z]{3}")
 FLIGHT_NUMBER = re.compile(r"[A-Z][A-Z0-9] ?\d{1,4}|\d[A-Z] ?\d{1,4}")
-LISTED_FLIGHT = re.compile(r"\b(?!AM\b|PM\b)[A-Z][A-Z0-9] ?\d{2,4}\b")
+LISTED_FLIGHT = re.compile(r"(?i)\bflight\s*(?:no\.?|number|#)?\s*:?\s*([A-Z][A-Z0-9]|\d[A-Z])\s?(\d{1,4})\b")
 CABIN_LIMIT = 50
 ADDRESS_LIMIT = 200
 ADDRESS_KINDS = ("hotel", "car", "train", "cruise", "parking")
@@ -521,7 +521,10 @@ def suggest(cfg: Config, text: str, known: tuple[str, ...] = (), timeout: float 
     left = None if timeout is None else timeout - (time.monotonic() - began)
     if left is not None and left <= 0:
         return _reading(first)
-    return _reading(_better(first, _attempt(cfg, sent, left, thinking=True)))
+    final = _better(first, _attempt(cfg, sent, left, thinking=True))
+    if isinstance(final, AiError):
+        final.retried = True
+    return _reading(final)
 
 
 def _attempt(cfg: Config, sent: str, timeout: float | None, thinking: bool = False) -> Reading | AiError:
@@ -538,7 +541,7 @@ def _reading(outcome: Reading | AiError) -> Reading:
 
 
 def _flight_numbers(sent: str) -> int:
-    return len({"".join(m.split()) for m in LISTED_FLIGHT.findall(sent)})
+    return len({(airline.upper(), number) for airline, number in LISTED_FLIGHT.findall(sent)})
 
 
 def _doubtful(outcome: Reading | AiError, sent: str) -> bool:

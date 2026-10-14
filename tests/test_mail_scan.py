@@ -2305,7 +2305,7 @@ class KeptPictureTests(ScanCase):
         asked = []
         config = scan.ai.Config("local", "llama3", url="http://ollama.example:1234")
         with remote_pictures(), mock.patch.object(scan.ai, "config", return_value=config), mock.patch.object(scan.autoask, "chosen", return_value=True), \
-                mock.patch.object(scan.ai, "suggest", side_effect=lambda cfg, text, known: asked.append(text) or None):
+                mock.patch.object(scan.ai, "suggest", side_effect=lambda cfg, text, known, timeout=None: asked.append(text) or None):
             self.scan()
         self.assertTrue(asked)
         for text in asked:
