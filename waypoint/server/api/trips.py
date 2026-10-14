@@ -10,7 +10,7 @@ from ... import monitoring, validate
 from ...domain import airports, loyalty, money, people, tripmap, trips
 from ...domain.mail import ai
 from ...domain.visibility import Viewer
-from ...storage import db, mapfile
+from ...storage import db
 from ..common import NO_IMAGE, ApiError, Response, _current, image_response, own_session, position, row_id
 from ..contract import (Airport, AirportMatches, DestinationBody, DestinationSuggestion, EmailsCleared, GateCodeBody, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
                         TripList, TripPlaces)
@@ -196,8 +196,7 @@ def api_trip(conn, _q, _b, trip_id) -> Trip:
 
 def api_trip_places(conn, _q, _b, trip_id) -> TripPlaces:
     who = viewer(conn)
-    found = _run(lambda: tripmap.places(conn, who, row_id(trip_id, NO_TRIP)), NO_TRIP)
-    return {**found, "basemap": mapfile.usable()}
+    return _run(lambda: tripmap.places(conn, who, row_id(trip_id, NO_TRIP)), NO_TRIP)
 
 
 def api_trip_edit(conn, _q, body: TripBody, trip_id) -> Trip:

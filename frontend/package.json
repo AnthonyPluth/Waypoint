@@ -46,12 +46,9 @@
   },
   "dependencies": {
     "@lucide/svelte": "^1.48.0",
-    "@protomaps/basemaps": "^5.7.2",
     "bits-ui": "^2.19.3",
     "clsx": "^2.1.1",
     "d3-geo": "^3.1.1",
-    "maplibre-gl": "^6.14.0",
-    "pmtiles": "^4.5.0",
     "svelte-sonner": "^1.2.1",
     "tailwind-merge": "^3.7.0",
     "tailwind-variants": "^3.3.1",
