@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -198,11 +199,11 @@ def system_for(cfg: Config) -> str:
     return SYSTEM + SYSTEM_SEATS if cfg.mode == LOCAL else SYSTEM
 
 
-def request(cfg: Config, text: str, system: str = SYSTEM) -> tuple[str, dict[str, str], dict[str, Any], bool]:
+def request(cfg: Config, text: str, system: str = SYSTEM, thinking: bool = False) -> tuple[str, dict[str, str], dict[str, Any], bool]:
     messages = [{"role": "system", "content": system}, {"role": "user", "content": text}]
     if cfg.mode == LOCAL:
         return (cfg.url.rstrip("/") + "/api/chat", {"Content-Type": "application/json"},
-                {"model": cfg.model, "messages": messages, "stream": False, "format": "json", "think": False,   # a model that thinks first can spend its whole reply on it and answer nothing
+                {"model": cfg.model, "messages": messages, "stream": False, "format": "json", "think": thinking,
                  "options": {"temperature": 0}}, True)
     return (HOSTS.openrouter.rstrip("/") + "/chat/completions",
             {"Content-Type": "application/json", "Authorization": f"Bearer {cfg.key}"},
@@ -224,6 +225,7 @@ FIELDS = ("kind", "provider", "confirmation", "origin", "destination", "start_lo
 LIMITS = {"provider": 100, "confirmation": 50, "origin": 100, "destination": 100, "start_zone": 64, "end_zone": 64}
 IATA = re.compile(r"[A-Z]{3}")
 FLIGHT_NUMBER = re.compile(r"[A-Z][A-Z0-9] ?\d{1,4}|\d[A-Z] ?\d{1,4}")
+LISTED_FLIGHT = re.compile(r"\b(?!AM\b|PM\b)[A-Z][A-Z0-9] ?\d{2,4}\b")
 CABIN_LIMIT = 50
 ADDRESS_LIMIT = 200
 ADDRESS_KINDS = ("hotel", "car", "train", "cruise", "parking")
@@ -481,8 +483,8 @@ def _wait(cfg: Config, limit: float | None) -> float:
     return own if limit is None else max(1.0, min(own, limit))
 
 
-def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY, timeout: float | None = None) -> Any:
-    url, headers, body, allow_http = request(cfg, text, system)
+def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY, timeout: float | None = None, thinking: bool = False) -> Any:
+    url, headers, body, allow_http = request(cfg, text, system, thinking)
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
     try:
         with tls.urlopen(req, _wait(cfg, timeout), allow_http=allow_http) as resp:
@@ -512,7 +514,50 @@ def suggest(cfg: Config, text: str, known: tuple[str, ...] = (), timeout: float 
     sent = prepare(cfg, text, known)
     if not sent.strip():
         raise AiError(NO_BOOKING)
-    return parse(_ask(cfg, sent, system_for(cfg), timeout=timeout), sent, cfg.mode == LOCAL)
+    began = time.monotonic()
+    first = _attempt(cfg, sent, timeout)
+    if cfg.mode != LOCAL or not _doubtful(first, sent):
+        return _reading(first)
+    left = None if timeout is None else timeout - (time.monotonic() - began)
+    if left is not None and left <= 0:
+        return _reading(first)
+    return _reading(_better(first, _attempt(cfg, sent, left, thinking=True)))
+
+
+def _attempt(cfg: Config, sent: str, timeout: float | None, thinking: bool = False) -> Reading | AiError:
+    try:
+        return parse(_ask(cfg, sent, system_for(cfg), timeout=timeout, thinking=thinking), sent, cfg.mode == LOCAL)
+    except AiError as e:
+        return e
+
+
+def _reading(outcome: Reading | AiError) -> Reading:
+    if isinstance(outcome, AiError):
+        raise outcome
+    return outcome
+
+
+def _flight_numbers(sent: str) -> int:
+    return len({"".join(m.split()) for m in LISTED_FLIGHT.findall(sent)})
+
+
+def _doubtful(outcome: Reading | AiError, sent: str) -> bool:
+    if isinstance(outcome, AiError):
+        return str(outcome) in (BAD_REPLY, TOO_LONG)
+    flights = sum(1 for b in outcome.bookings if b.get("kind") == "flight")
+    return outcome.error is not None or 0 < flights < _flight_numbers(sent)
+
+
+def _score(outcome: Reading) -> tuple[int, bool]:
+    return len(outcome.bookings), outcome.error is None
+
+
+def _better(first: Reading | AiError, second: Reading | AiError) -> Reading | AiError:
+    if isinstance(second, AiError):
+        return first
+    if isinstance(first, AiError) or _score(second) > _score(first):
+        return second
+    return first
 
 
 SYSTEM_DESTINATION = (
