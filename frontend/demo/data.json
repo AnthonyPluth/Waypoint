@@ -1258,7 +1258,7 @@
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
       "auto": true,
       "booked_by": 1,
-      "emails": 7,
+      "emails": 6,
       "can_clear_emails": false,
       "done_at": null,
       "people": [
@@ -2283,7 +2283,9 @@
       "can_clear_emails": false,
       "done_at": null,
       "people": [
-        1
+        1,
+        2,
+        3
       ],
       "costs": {
         "totals": [

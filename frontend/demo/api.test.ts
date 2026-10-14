@@ -67,4 +67,17 @@ describe("standalone demo transport", () => {
       }
     }
   });
+
+  it("keeps trip people and email aggregates consistent with the bundled bookings", () => {
+    expect(data.trips.find(trip=>trip.id === 11)?.people).toEqual([1, 2, 3]);
+    expect(data.trips.find(trip=>trip.id === 4)?.emails).toBe(6);
+    for (const trip of data.trips) {
+      for (const booking of trip.segments) {
+        for (const traveler of booking.travelers) {
+          if (traveler.person_id !== null) expect(trip.people).toContain(traveler.person_id);
+        }
+      }
+      expect(trip.emails).toBe(trip.segments.reduce((count,booking)=>count+(data.emails[String(booking.id)]?.length ?? 0),0));
+    }
+  });
 });
