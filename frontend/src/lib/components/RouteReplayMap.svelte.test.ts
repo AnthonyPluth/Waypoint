@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TripPlaces } from "$lib/api-types";
-import { stopsOf } from "$lib/route-replay";
+import { replayMs, SCRUB_STEPS, stopsOf } from "$lib/route-replay";
 import { segment, trip } from "../../test/fixtures";
 import RouteReplayMap from "./RouteReplayMap.svelte";
 
@@ -43,7 +43,7 @@ beforeEach(() => {
   vi.stubGlobal("cancelAnimationFrame", () => { frames = []; });
   vi.spyOn(performance, "now").mockImplementation(() => clock);
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 const labels = (container: HTMLElement) => [...container.querySelectorAll("[data-label][data-visible='true']")].map((l) => l.getAttribute("data-label"));
 const list = () => within(screen.getByRole("list", { name: "Stops in order" })).getAllByRole("listitem").map((li) => li.lastElementChild?.textContent?.replace(/\s+/g, " "));
@@ -297,18 +297,19 @@ describe("RouteReplayMap", () => {
     expect([normal, double, quadruple]).toEqual([1000, 2000, 4000]);
   });
 
-  it("plays a 25-stop trip over fifty seconds, with each town's label lit as the path reaches it", async () => {
+  it("plays a 25-stop trip over a minute and a half, with each town's label lit as the path reaches it", async () => {
     const towns = Array.from({ length: 25 }, (_, i) => ({ name: `Town ${i}`, city: `Town ${i}`, code: null, kind: "place" as const, latitude: 30 + i * 0.6, longitude: -100 + i * 0.9, from: "2025-12-05", to: "2025-12-05", via: i === 0 ? null : ("car" as const) }));
+    expect(replayMs(towns.length)).toBe(88000);
     const { container } = render(RouteReplayMap, { stops: towns, year: 2025, still: false });
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
-    advance(25000);
+    advance(44000);
     await Promise.resolve();
     expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
     expect(labels(container)).toEqual(["Town 12"]);
-    advance(24000);
+    advance(40400);
     await Promise.resolve();
     expect(labels(container)).toEqual(["Town 23"]);
-    advance(1000);
+    advance(3700);
     await Promise.resolve();
     advance(2500);
     await Promise.resolve();
@@ -346,6 +347,81 @@ describe("RouteReplayMap", () => {
       await waitFor(() => expect(screen.getByTestId("replay-map")).toHaveAttribute("data-basemap", "bundled"));
       expect(screen.queryByTestId("basemap-stub")).toBeNull();
       expect(container.querySelector(".fill-map-land")).not.toBeNull();
+    });
+  });
+
+  describe("following the replay in the stop list", () => {
+    let scrollTo: ReturnType<typeof vi.fn>;
+    beforeEach(() => {
+      scrollTo = vi.fn();
+      Element.prototype.scrollTo = scrollTo as never;
+    });
+    const current = () => screen.getAllByRole("listitem").filter((li) => li.getAttribute("aria-current") === "step").map((li) => li.getAttribute("data-stop-item"));
+    const slide = (to: number) => fireEvent.input(screen.getByRole("slider", { name: "Position along the route" }), { target: { value: String(to) } });
+
+    it("highlights no stop before the replay has begun, and none in a still map", () => {
+      render(RouteReplayMap, { stops, year: 2025 });
+      expect(current()).toEqual([]);
+      cleanup();
+      render(RouteReplayMap, { stops, year: 2025, still: true });
+      expect(current()).toEqual([]);
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
+
+    it("marks the stop the replay is at, and moves the mark along as it goes", async () => {
+      render(RouteReplayMap, { stops, year: 2025 });
+      await slide(0.5 * SCRUB_STEPS);
+      expect(current()).toEqual(["1"]);
+      await slide(SCRUB_STEPS);
+      expect(current()).toEqual(["2"]);
+      await fireEvent.click(screen.getByRole("button", { name: "Replay" }));
+      advance(100);
+      expect(current()).toEqual(["0"]);
+    });
+
+    it("scrolls the list, not the page, to keep that stop in view", async () => {
+      render(RouteReplayMap, { stops, year: 2025 });
+      await slide(0.5 * SCRUB_STEPS);
+      expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "smooth" }));
+      expect(scrollTo.mock.contexts.at(-1)).toBe(screen.getByRole("region", { name: "Stops list" }));
+    });
+
+    it("leaves the list alone for a few seconds after the person scrolls it themselves", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      render(RouteReplayMap, { stops, year: 2025 });
+      await slide(0);
+      scrollTo.mockClear();
+      await fireEvent.wheel(screen.getByRole("region", { name: "Stops list" }));
+      await slide(0.5 * SCRUB_STEPS);
+      expect(scrollTo).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(3999);
+      expect(scrollTo).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+      expect(current()).toEqual(["1"]);
+      scrollTo.mockClear();
+      clock += 4001;
+      await slide(SCRUB_STEPS);
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+    });
+
+    it("drops a pending catch-up when the replay moves on first", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      render(RouteReplayMap, { stops, year: 2025 });
+      await slide(0);
+      await fireEvent.wheel(screen.getByRole("region", { name: "Stops list" }));
+      await slide(0.5 * SCRUB_STEPS);
+      await slide(SCRUB_STEPS);
+      scrollTo.mockClear();
+      vi.advanceTimersByTime(4000);
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps a long list in a scrollable box the keyboard can reach", () => {
+      render(RouteReplayMap, { stops, year: 2025 });
+      const box = screen.getByRole("region", { name: "Stops list" });
+      expect(box).toHaveAttribute("tabindex", "0");
+      expect(box.className).toContain("overflow-y-auto");
     });
   });
 });

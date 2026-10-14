@@ -96,6 +96,29 @@
     return [{ i, moving: true, vehicle: leg.vehicle, ...moverAt(leg, done) }];
   }));
   const RING: Record<Stop["kind"], string> = { airport: "border-map-airport", stay: "border-map-stay", home: "border-map-visited", place: "border-map-visited" };
+  const following = $derived(!calm && (playing || progress > 0));
+  let listBox = $state<HTMLElement | null>(null);
+  let quietUntil = 0;
+  const QUIET_MS = 4000;
+  const handsOff = () => { quietUntil = performance.now() + QUIET_MS; };
+  function quiet(node: HTMLElement) {
+    const events = ["wheel", "touchmove", "pointerdown", "keydown"];
+    events.forEach((e) => node.addEventListener(e, handsOff, { passive: true }));
+    return { destroy: () => events.forEach((e) => node.removeEventListener(e, handsOff)) };
+  }
+  $effect(() => {
+    const index = now;
+    const box = listBox;
+    if (!following || !box) return;
+    const centre = () => {
+      const item = box.querySelector<HTMLElement>(`[data-stop-item="${index}"]`);
+      if (item) box.scrollTo({ top: Math.max(0, item.offsetTop - (box.clientHeight - item.offsetHeight) / 2), behavior: "smooth" });
+    };
+    const wait = quietUntil - performance.now();
+    if (wait <= 0) { centre(); return; }
+    const timer = setTimeout(centre, wait);
+    return () => clearTimeout(timer);
+  });
   const buttonLabel = $derived(progress >= 1 ? "Replay" : playing ? "Pause" : progress > 0 ? "Resume" : "Play");
 </script>
 
@@ -202,16 +225,20 @@
         aria-valuetext={stopLine(stops[now], year)} class="h-11 min-w-0 flex-1 accent-primary" />
     </div>
   {/if}
-  <ol class="text-sm" aria-label="Stops in order" data-testid="stop-list">
-    {#each stops as s, i (i)}
-      <li class="relative flex gap-3 pb-4 last:pb-0">
-        {#if i < stops.length - 1}<span class="absolute bottom-0 left-3 top-7 w-px -translate-x-1/2 bg-border" aria-hidden="true"></span>{/if}
-        <span class={`z-10 flex size-6 shrink-0 items-center justify-center rounded-full border-2 bg-card text-xs font-semibold tabular-nums text-foreground ${RING[s.kind]}`} aria-hidden="true">{i + 1}</span>
-        <div class="min-w-0 pt-0.5">
-          <p class="break-words font-medium text-foreground">{stopTitle(s)}<span class="sr-only">, </span></p>
-          <p class="text-muted-foreground">{stopDates(s, year)}</p>
-        </div>
-      </li>
-    {/each}
-  </ol>
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <div bind:this={listBox} use:quiet class="relative max-h-[24rem] overflow-y-auto overscroll-contain rounded-xl" tabindex="0" role="region" aria-label="Stops list">
+    <ol class="text-sm" aria-label="Stops in order" data-testid="stop-list">
+      {#each stops as s, i (i)}
+        {@const current = following && i === now}
+        <li class="relative flex gap-3 rounded-xl px-2 py-2 transition-colors duration-300 motion-reduce:transition-none" class:bg-secondary={current} aria-current={current ? "step" : undefined} data-stop-item={i} data-current={current}>
+          {#if i < stops.length - 1}<span class="absolute -bottom-2 left-5 top-8 w-px -translate-x-1/2 bg-border" aria-hidden="true"></span>{/if}
+          <span class={`z-10 flex size-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold tabular-nums ${RING[s.kind]} ${current ? "bg-foreground text-background" : "bg-card text-foreground"}`} aria-hidden="true">{i + 1}</span>
+          <div class="min-w-0 pt-0.5">
+            <p class="break-words font-medium text-foreground">{stopTitle(s)}<span class="sr-only">, </span></p>
+            <p class="text-muted-foreground">{stopDates(s, year)}</p>
+          </div>
+        </li>
+      {/each}
+    </ol>
+  </div>
 </div>

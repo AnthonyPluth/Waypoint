@@ -229,7 +229,7 @@ describe("the camera and the timeline", () => {
   });
 
   it("plays for between six seconds and a minute, two seconds a stop", () => {
-    expect([2, 3, 4, 6, 9, 12, 20, 30, 40].map(replayMs)).toEqual([6000, 6000, 8000, 12000, 18000, 24000, 40000, 60000, 60000]);
+    expect([2, 3, 4, 6, 9, 12, 20, 30, 40].map(replayMs)).toEqual([6000, 6000, 8000, 12000, 24000, 36000, 68000, 108000, 120000]);
   });
 
   it("gives a 25-stop trip's labels their full hold, one at a time", () => {
@@ -237,8 +237,8 @@ describe("the camera and the timeline", () => {
     const lit = (p: number) => Array.from({ length: stops - 1 }, (_, i) => labelLit(i, stops, p, false));
     for (let i = 0; i < stops - 1; i++) {
       expect(labelLit(i, stops, (i + 0.01) / (stops - 1), false)).toBe(true);
-      expect(labelLit(i, stops, (i + 0.82) / (stops - 1), false)).toBe(true);
-      expect(labelLit(i, stops, (i + 0.86) / (stops - 1), false)).toBe(false);
+      expect(labelLit(i, stops, (i + 0.45) / (stops - 1), false)).toBe(true);
+      expect(labelLit(i, stops, (i + 0.5) / (stops - 1), false)).toBe(false);
     }
     for (let step = 0; step < 1000; step++) expect(lit(step / 1000).filter(Boolean).length).toBeLessThanOrEqual(1);
   });

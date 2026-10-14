@@ -30,8 +30,10 @@ export const LOCAL_BOW = 0.1;
 export const ZOOM_UNITS = 0.35;
 export const MIN_ZOOM_SHARE = 0.25;
 export const MIN_MS = 6000;
-export const MAX_MS = 60000;
+export const MAX_MS = 120000;
 export const PER_STOP_MS = 2000;
+export const SLOW_AFTER_STOPS = 6;
+export const SLOW_PER_STOP_MS = 4000;
 export const LABEL_HOLD_MS = 1750;
 export const SCRUB_STEPS = 4000;
 export const NO_ROADS: Roads = { legs: [], interstates: [] };
@@ -50,7 +52,7 @@ const EARTH_KM = 6371;
 const key = (text: string | null | undefined): string => (text ?? "").trim().toLowerCase();
 const head = (text: string): string => text.split(",")[0].trim();
 
-export const replayMs = (stops: number): number => Math.min(MAX_MS, Math.max(MIN_MS, stops * PER_STOP_MS));
+export const replayMs = (stops: number): number => Math.min(MAX_MS, Math.max(MIN_MS, Math.min(stops, SLOW_AFTER_STOPS) * PER_STOP_MS + Math.max(0, stops - SLOW_AFTER_STOPS) * SLOW_PER_STOP_MS));
 
 export const distanceKm = (a: Point, b: Point): number => geoDistance([a.longitude, a.latitude], [b.longitude, b.latitude]) * EARTH_KM;
 
