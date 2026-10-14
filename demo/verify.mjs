@@ -32,6 +32,7 @@ try {
       }
     });
     const page = await context.newPage();
+    await page.clock.setFixedTime(new Date('2040-01-01T00:00:00Z'));
     const requests = [];
     await context.route('**/*',route=>{
       const request = route.request();requests.push(request.url());
@@ -52,6 +53,12 @@ try {
         throw error;
       }
       assert.deepEqual(failures,[],`${route}: browser requests or errors`);
+      assert.equal(await page.evaluate(()=>Date.now()),Date.parse(`${data.asOf}T12:00:00Z`),`${route}: demo clock drifted`);
+      if (route === 'upcoming') {
+        assert.equal(await page.getByText('Nothing coming up:',{exact:false}).count(),0,'Upcoming itinerary expired');
+        await page.locator('section.pass[data-kind]').first().waitFor();
+        assert.ok(await page.locator('section.pass[data-kind] a[href^="#trip/"]').count(),'Upcoming trip action missing');
+      }
       assert.ok(await page.locator('main').evaluate(element=>parseFloat(getComputedStyle(element).paddingLeft) >= 16),`${route}: app styles missing`);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`${width}: ${route} overflow`);
       assert.equal(await page.locator('input[type="file"]:not([disabled])').count(),0,`${route}: import enabled`);
