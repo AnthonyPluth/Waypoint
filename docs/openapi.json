@@ -131,27 +131,6 @@
         }
       }
     },
-    "/api/map": {
-      "get": {
-        "operationId": "api_map",
-        "x-handler": "waypoint/server/api/map.py:api_map",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MapStatus"
-                }
-              }
-            }
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
-      }
-    },
     "/api/people": {
       "get": {
         "operationId": "api_people",
@@ -5437,43 +5416,6 @@
         ],
         "additionalProperties": false
       },
-      "MapStatus": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "enum": [
-              "ready",
-              "downloading",
-              "waiting",
-              "failed",
-              "off",
-              "missing"
-            ]
-          },
-          "bytes": {
-            "type": "integer"
-          },
-          "total": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "error": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "state",
-          "bytes",
-          "total",
-          "error"
-        ],
-        "additionalProperties": false
-      },
       "MatchBody": {
         "type": "object",
         "properties": {
@@ -8300,9 +8242,6 @@
             "items": {
               "$ref": "#/components/schemas/TripStateLine"
             }
-          },
-          "basemap": {
-            "type": "boolean"
           }
         },
         "required": [
@@ -8311,8 +8250,7 @@
           "cities",
           "stays",
           "roads",
-          "boundaries",
-          "basemap"
+          "boundaries"
         ],
         "additionalProperties": false
       },

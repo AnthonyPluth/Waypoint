@@ -36,24 +36,6 @@ describe("no fetch() outside lib/api.ts", () => {
   });
 });
 
-describe("the trip map stays on Waypoint's own address", () => {
-  const map = "frontend/src/lib/basemap-style.ts";
-  it("flags a remote tile, style, font or sprite address", async () => {
-    const remote = "export const a = ";
-    expect(await flagged(`${remote}"https://tiles.example.com/{z}/{x}/{y}.pbf";`, map)).toEqual(["no-restricted-syntax"]);
-    expect(await flagged(`${remote}"//tiles.example.com/a";`, map)).toEqual(["no-restricted-syntax"]);
-    expect(await flagged(`${remote}\`https://${"${host}"}/glyphs\`;`, map)).toEqual(["no-restricted-syntax"]);
-    expect(await flagged('<script lang="ts">\n  export const a = "https://tiles.example.com/a";\n</script>\n', "frontend/src/lib/components/ReplayBasemap.svelte")).toEqual(["no-restricted-syntax"]);
-  });
-  it("leaves the origin's own paths and the OpenStreetMap credit link alone", async () => {
-    expect(await flagged("export const a = (origin: string) => `${origin}/map/fonts/{fontstack}/{range}.pbf`;", map)).toEqual([]);
-    expect(await flagged('export const a = "https://www.openstreetmap.org/copyright";', map)).toEqual([]);
-  });
-  it("is not applied to the rest of the app", async () => {
-    expect(await flagged('export const a = "https://example.com/a";')).toEqual([]);
-  });
-});
-
 describe("no .catch(() => {})", () => {
   it("flags an empty handler", async () => {
     expect(await flagged("export const p = work().catch(() => {});")).toEqual(["waypoint/no-silent-catch"]);

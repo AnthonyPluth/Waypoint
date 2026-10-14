@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TripPlaces } from "$lib/api-types";
 import { replayMs, SCRUB_STEPS, stopsOf } from "$lib/route-replay";
 import { segment, trip } from "../../test/fixtures";
 import RouteReplayMap from "./RouteReplayMap.svelte";
 
-vi.mock("$lib/components/ReplayBasemap.svelte", async () => ({ default: (await import("../../test/BasemapStub.svelte")).default }));
 vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [] }));
 
 const places: TripPlaces = {
@@ -19,7 +18,6 @@ const places: TripPlaces = {
   stays: [],
   roads: { legs: [], interstates: [] },
   boundaries: [],
-  basemap: false,
 };
 const flights = [
   segment({ id: 1, origin: "MSP", destination: "SFO", start_local: "2025-12-05T08:00", start_zone: "America/Chicago", end_local: "2025-12-05T10:30", end_zone: "America/Los_Angeles" }),
@@ -316,40 +314,6 @@ describe("RouteReplayMap", () => {
     expect(screen.getByRole("button", { name: "Replay" })).toBeTruthy();
   });
 
-  describe("with the detailed basemap", () => {
-    const centre = (): number[] => (screen.getByTestId("basemap-stub").getAttribute("data-center") ?? "").split(",").map(Number);
-
-    it("is the bundled outline map unless the server has the detailed one", () => {
-      render(RouteReplayMap, { stops, year: 2025, still: true });
-      expect(screen.getByTestId("replay-map")).toHaveAttribute("data-basemap", "bundled");
-      expect(screen.queryByTestId("basemap-stub")).toBeNull();
-    });
-
-    it("loads the basemap and leaves the drawing of land, state lines and highways to it, keeping the trip's own stops and legs on top", async () => {
-      const { container } = render(RouteReplayMap, { stops, year: 2025, still: true, basemap: true });
-      await screen.findByTestId("basemap-stub");
-      expect(screen.getByTestId("replay-map")).toHaveAttribute("data-basemap", "detailed");
-      expect(container.querySelector(".fill-map-land")).toBeNull();
-      expect(screen.queryByText("Interstate")).toBeNull();
-      expect(container.querySelectorAll("[data-stop]").length).toBeGreaterThan(0);
-      expect(container.querySelectorAll("[data-leg]").length).toBeGreaterThan(0);
-      const [lon, lat] = centre();
-      expect(lon).toBeGreaterThan(-125);
-      expect(lon).toBeLessThan(-95);
-      expect(lat).toBeGreaterThan(38);
-      expect(lat).toBeLessThan(46);
-      expect(Number(screen.getByTestId("basemap-stub").getAttribute("data-zoom"))).toBeGreaterThan(0);
-    });
-
-    it("goes back to the bundled map when the basemap can't be drawn", async () => {
-      const { container } = render(RouteReplayMap, { stops, year: 2025, still: true, basemap: true });
-      await fireEvent.click(await screen.findByRole("button", { name: "fail the basemap" }));
-      await waitFor(() => expect(screen.getByTestId("replay-map")).toHaveAttribute("data-basemap", "bundled"));
-      expect(screen.queryByTestId("basemap-stub")).toBeNull();
-      expect(container.querySelector(".fill-map-land")).not.toBeNull();
-    });
-  });
-
   describe("following the replay in the stop list", () => {
     let scrollTo: ReturnType<typeof vi.fn>;
     beforeEach(() => {
@@ -425,3 +389,4 @@ describe("RouteReplayMap", () => {
     });
   });
 });
+
