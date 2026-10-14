@@ -21,10 +21,7 @@ AI_AUTO = "ai_auto"
 
 MCP_ALLOW_WRITES = "mcp_allow_writes"
 
-LOGODEV_TOKEN = "logodev_token"
-LOGODEV_SECRET = "logodev_secret"
-LOGODEV_LAST_ERROR = "logodev_last_error"
 
 VAPID_PRIVATE_KEY = "vapid_private_key"
 
-SECRETS = frozenset({VAPID_PRIVATE_KEY, AI_OPENROUTER_KEY, LOGODEV_TOKEN, LOGODEV_SECRET})
+SECRETS = frozenset({VAPID_PRIVATE_KEY, AI_OPENROUTER_KEY})

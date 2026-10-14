@@ -9,7 +9,7 @@ from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import delete, insert, select
 
-from waypoint.storage import db, schema
+from waypoint.storage import backup, db, schema, secretbox
 from waypoint.storage.models import Setting, User
 from tests.shared import database_path, scratch_dir
 
@@ -228,6 +228,27 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0034")
         self.assertEqual(len(rows_of(self.path, "flight_status")), 3)
         self.assertIn("attempted_at", [col[0] for col in shape(self.path)["flight_status"]["columns"]])
+
+    def test_0036_removes_retired_logo_credentials_on_upgrade_and_backup_restore(self):
+        from alembic import command
+        with mock.patch.dict(os.environ, {"WAYPOINT_SECRET_KEY": "synthetic-key-for-retired-logo-migration"}):
+            settings = {"logodev_token": "fictional-token", "logodev_secret": secretbox.encrypt("fictional-secret"),
+                        "logodev_last_error": "fictional-error", "distance_unit": "km"}
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0035")
+            c.execute(insert(Setting), [{"key": key, "value": value} for key, value in settings.items()])
+        with db.session(self.path) as conn:
+            old = backup.export(conn)
+        db.init(self.path)
+        self.assertEqual(rows_of(self.path, "settings"), [("distance_unit", "km")])
+        self.assertEqual(drift(self.path), [])
+        with db.session(self.path) as conn:
+            backup.restore(conn, old)
+            self.assertEqual(backup.export(conn)["tables"]["settings"]["rows"], [["distance_unit", "km"]])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0035")
+        db.init(self.path)
+        self.assertEqual(rows_of(self.path, "settings"), [("distance_unit", "km")])
 
     def test_a_cruises_ports_go_with_the_cruise(self):
         db.init(self.path)

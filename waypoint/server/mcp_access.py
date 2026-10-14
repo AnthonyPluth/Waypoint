@@ -20,7 +20,7 @@ SWITCHES = {WRITE: sk.MCP_ALLOW_WRITES}
 
 BLOCKED = (
     "/api/mcp-settings", "/api/mailboxes", "/api/review", "/api/ai", "/api/backup", "/api/restore", "/api/state", "/api/show-costs", "/api/feed",
-    "/api/reminders", "/api/flight-status/{id}", "/api/import", "/api/loyalty", "/api/logodev", "/api/segments/{id}/emails", "/api/segments/{id}/code",
+    "/api/reminders", "/api/flight-status/{id}", "/api/import", "/api/loyalty", "/api/segments/{id}/emails", "/api/segments/{id}/code",
     "/api/trips/{id}/emails",
     "/api/offline", "/api/trips/{id}/destination", "/api/home",
 )

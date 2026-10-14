@@ -1,44 +1,18 @@
 from __future__ import annotations
 
-import difflib
 import json
 import re
 import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import datetime, timedelta
-from typing import TypedDict
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import select
 
-from ..providers import logodev, wikimedia
-from ..storage import db
-from ..storage import settings_keys as sk
+from ..storage import bundled_logos, db
 from ..storage.models import Airline, BrandLogo, LoyaltyId, Segment
 from . import loyalty, visibility
 from .visibility import Viewer
 
-PER_ROUND = 20
-REFRESH_DAYS = 30
-RETRY_AFTER = timedelta(hours=1)
-WIKIMEDIA_DOWN = "Wikimedia couldn't be reached, so hotel brand logos will be tried again in an hour"
 FLIGHT_NUMBER = re.compile(r"\s*([A-Za-z0-9]{2})\s*\d{1,4}[A-Za-z]?\s*")
-
-
-class Status(TypedDict):
-    configured: bool
-    searchable: bool
-    with_logo: int
-    unknown: int
-    waiting: int
-    last_error: str | None
-
-
-def configured(conn: db.Connection) -> bool:
-    return bool(db.get_setting(conn, sk.LOGODEV_TOKEN))
-
-
-def searchable(conn: db.Connection) -> bool:
-    return configured(conn) and bool(db.get_setting(conn, sk.LOGODEV_SECRET))
 
 
 def key(name: str | None) -> str:
@@ -179,7 +153,8 @@ def have(conn: db.Connection, brands: Iterable[str | None]) -> set[str]:
     keys = sorted({key(b) for b in brands if b})
     if not keys:
         return set()
-    return {k for (k,) in conn.execute(select(BrandLogo.key).where(BrandLogo.key.in_(keys), BrandLogo.logo.is_not(None))).fetchall()}
+    return {k for k in keys if bundled_logos.has(k)} | {
+        k for (k,) in conn.execute(select(BrandLogo.key).where(BrandLogo.key.in_(keys), BrandLogo.logo.is_not(None))).fetchall()}
 
 
 def segment_logo(conn: db.Connection, viewer: Viewer, segment_id: int) -> tuple[bytes, str] | None:
@@ -203,36 +178,10 @@ def with_logo(conn: db.Connection, kind_programs: Iterable[tuple[str, str]]) -> 
 def logo(conn: db.Connection, brand: str | None) -> tuple[bytes, str] | None:
     if not brand:
         return None
+    if bundled := bundled_logos.read(brand):
+        return bundled
     row = conn.execute(select(BrandLogo.logo, BrandLogo.logo_type).where(BrandLogo.key == key(brand))).fetchone()
     return (bytes(row[0]), row[1]) if row and row[0] and row[1] else None
-
-
-_FILLER = re.compile(r"\b(inc|llc|ltd|co|corp|corporation|company|the|hotel|hotels|resort|resorts|airlines|airline|air lines|airways)\b")
-
-
-def _norm(s: str | None) -> str:
-    s = (s or "").lower().replace("&", " and ").replace("'", "").replace("’", "")
-    return " ".join(_FILLER.sub(" ", re.sub(r"[^a-z0-9 ]+", " ", s)).split())
-
-
-def best_match(name: str, candidates: Sequence[Mapping[str, str]]) -> Mapping[str, str] | None:
-    n = _norm(name)
-    squashed = n.replace(" ", "")
-    if len(squashed) < 3:
-        return None
-    best: Mapping[str, str] | None = None
-    score = 0.0
-    for c in candidates:
-        cn = _norm(c.get("name"))
-        dom = (c.get("domain") or "").split(".")[0].replace("-", "")
-        s = difflib.SequenceMatcher(None, n, cn).ratio() if cn else 0.0
-        if cn.replace(" ", "") == squashed or dom == squashed:
-            s = 1.0
-        elif cn and len(cn) >= 5 and n.startswith(cn + " "):
-            s = max(s, 0.9)
-        if s > score:
-            best, score = c, s
-    return best if score >= 0.85 else None
 
 
 def _flight_number(details: str | None) -> str | None:
@@ -242,116 +191,3 @@ def _flight_number(details: str | None) -> str | None:
         return None
     number = found.get("flight_number") if isinstance(found, dict) else None
     return number if isinstance(number, str) else None
-
-
-def note(conn: db.Connection) -> int:
-    rows = conn.execute(select(Segment.kind, Segment.provider, Segment.details, Segment.origin)).fetchall()
-    numbers = [_flight_number(r[2]) for r in rows]
-    airlines = _airlines(conn, numbers)
-    found: dict[str, str] = {}
-    for r, n in zip(rows, numbers, strict=True):
-        for brand in _candidates(r[0], r[1], n, r[3], airlines):
-            found.setdefault(key(brand), brand)
-    for kind, program in conn.execute(select(LoyaltyId.kind, LoyaltyId.program).distinct()).fetchall():
-        if program_brand := loyalty.logo_brand(kind, program):
-            found.setdefault(key(program_brand), program_brand)
-    if not found:
-        return 0
-    known = {k for (k,) in conn.execute(select(BrandLogo.key).where(BrandLogo.key.in_(sorted(found)))).fetchall()}
-    new = {k: n for k, n in found.items() if k not in known}
-    for k, n in new.items():
-        conn.execute(insert(BrandLogo).values(key=k, name=n))
-    return len(new)
-
-
-def _due(conn: db.Connection, now: datetime, limit: int) -> list[tuple[str, str, str | None]]:
-    stale = (now - timedelta(days=REFRESH_DAYS)).isoformat(timespec="seconds")
-    rows = conn.execute(select(BrandLogo.key, BrandLogo.name, BrandLogo.source).where(BrandLogo.checked.is_(None) | (BrandLogo.checked < stale))
-                        .order_by(BrandLogo.checked.is_not(None), BrandLogo.key).limit(limit)).fetchall()
-    return [(r[0], r[1], r[2]) for r in rows]
-
-
-def _providers(conn: db.Connection) -> set[str]:
-    return {key(n) for (p,) in conn.execute(select(Segment.provider).distinct()).fetchall() if (n := _name(p))}
-
-
-def _from_logodev(token: str, secret: str | None, name: str, search_refused: bool) -> tuple[tuple[bytes, str] | None, bool]:
-    found = None
-    if secret and not search_refused:
-        try:
-            candidates: list[dict[str, str]] | None = logodev.search(secret, name)
-        except logodev.Refused:
-            candidates, search_refused = None, True
-        if candidates is not None:
-            picked = best_match(name, candidates)
-            found = logodev.fetch(token, domain=picked["domain"]) if picked else None
-    if not secret or search_refused:
-        found = logodev.fetch(token, name=name)
-    return found, search_refused
-
-
-def _kept_elsewhere(conn: db.Connection, k: str, image: bytes) -> bool:
-    return conn.execute(select(BrandLogo.key).where(BrandLogo.logo == image, BrandLogo.key != k).limit(1)).fetchone() is not None
-
-
-def fetch_due(conn: db.Connection, now: datetime, limit: int = PER_ROUND) -> int:
-    token = db.get_setting(conn, sk.LOGODEV_TOKEN)
-    if not token:
-        return 0
-    note(conn)
-    secret = db.get_setting(conn, sk.LOGODEV_SECRET)
-    stamp = now.isoformat(timespec="seconds")
-    retry = (now - timedelta(days=REFRESH_DAYS) + RETRY_AFTER).isoformat(timespec="seconds")
-    providers = _providers(conn)
-    got = 0
-    search_refused = False
-    wikimedia_down = False
-    wikimedia_asked = False
-    for k, name, source in _due(conn, now, limit):
-        sub = k in SUB_KEYS
-        found: tuple[bytes, str] | None = None
-        via = None
-        try:
-            if sub and not wikimedia_down:
-                try:
-                    found = wikimedia.find_logo(name)
-                    wikimedia_asked = True
-                except wikimedia.Unavailable:
-                    wikimedia_down = True
-                if found and _kept_elsewhere(conn, k, found[0]):
-                    found = None
-                via = "wikimedia"
-            if sub and wikimedia_down:
-                conn.execute(update(BrandLogo).where(BrandLogo.key == k).values(checked=retry))
-                continue
-            if found is None and (not sub or k in providers):
-                found, search_refused = _from_logodev(token, secret, name, search_refused)
-                via = "logodev"
-        except logodev.LogoError as e:
-            db.set_setting(conn, sk.LOGODEV_LAST_ERROR, f"{now:%b %d %H:%M}: {e}")
-            return got
-        if found:
-            conn.execute(update(BrandLogo).where(BrandLogo.key == k).values(logo=found[0], logo_type=found[1], checked=stamp, source=via))
-            got += 1
-        elif sub and k not in providers and source == "logodev":
-            conn.execute(update(BrandLogo).where(BrandLogo.key == k).values(logo=None, logo_type=None, source=None, checked=stamp))
-        else:
-            conn.execute(update(BrandLogo).where(BrandLogo.key == k).values(checked=stamp))
-    if search_refused:
-        error: str | None = (f"{now:%b %d %H:%M}: Logo.dev refused the secret key for Brand Search (or your plan doesn't include it), so brands "
-                             "were looked up by name instead")
-    elif wikimedia_down:
-        error = f"{now:%b %d %H:%M}: {WIKIMEDIA_DOWN}"
-    elif not wikimedia_asked and WIKIMEDIA_DOWN in (db.get_setting(conn, sk.LOGODEV_LAST_ERROR) or ""):
-        return got
-    else:
-        error = None
-    db.set_setting(conn, sk.LOGODEV_LAST_ERROR, error)
-    return got
-
-
-def status(conn: db.Connection) -> Status:
-    rows = conn.execute(select(BrandLogo.logo.is_not(None), BrandLogo.checked.is_not(None))).fetchall()
-    return {"configured": configured(conn), "searchable": searchable(conn),
-            "with_logo": sum(1 for logo_, _ in rows if logo_), "unknown": sum(1 for logo_, checked in rows if checked and not logo_),
-            "waiting": sum(1 for _, checked in rows if not checked), "last_error": db.get_setting(conn, sk.LOGODEV_LAST_ERROR)}

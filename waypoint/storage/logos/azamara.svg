@@ -1,0 +1,7 @@
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <ns0:title id="title">Azamara</ns0:title>
+  <ns0:rect width="128" height="128" rx="24" fill="#ffffff" />
+  <ns0:circle cx="64" cy="64" r="42" fill="none" stroke="#5A2A82" stroke-width="8" />
+  <ns0:path d="M42 84 64 34l22 50h-9l-5-12H56l-5 12h-9Zm17-20h10l-5-13-5 13Z" fill="#5A2A82" />
+  <ns0:path d="M37 96h54" stroke="#D39B2A" stroke-width="6" stroke-linecap="round" />
+</ns0:svg>

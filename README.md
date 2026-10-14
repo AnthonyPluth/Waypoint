@@ -22,18 +22,17 @@ A self-hosted travel app for a household. Waypoint shows everyone the trips they
 - **Before and during a trip.** Upcoming shows what’s next, with live flight status (optional), push reminders and a private calendar feed. Your upcoming trips open offline, kept encrypted on the device.
 - **Stats.** Flights, distance, airlines, hotel nights, rental days, cruises, parking days and places, with a map.
 - **AI assistants (MCP).** Connect Claude or another assistant to read your trips and, if you allow it, change them. It sees what the member who approved it sees, never email text or loyalty numbers.
-- **Backups and sign-in.** OpenID Connect sign-in with your own provider (Authentik, Keycloak, Google, …); downloadable, restorable backups; SQLite or Postgres.
+- **Backups and sign-in.** Optional OpenID Connect sign-in with your own provider (Authentik, Keycloak, Google, …); downloadable, restorable backups; SQLite or Postgres.
 
 ## Quick start
 
 ```bash
 git clone https://github.com/AnthonyPluth/waypoint.git
 cd waypoint
-cp .env.example .env      # set WAYPOINT_PUBLIC_URL, OIDC_ISSUER, OIDC_CLIENT_ID/SECRET, OIDC_ALLOWED_EMAILS
 docker compose up -d
 ```
 
-The image is `ghcr.io/anthonypluth/waypoint` (Intel/AMD and ARM). One deployment serves one household. [Install with Docker](https://anthonypluth.github.io/Waypoint/start/docker/) walks through registering Waypoint with your sign-in provider, first start, moving data over and putting it on the internet safely.
+The image is `ghcr.io/anthonypluth/waypoint` (Intel/AMD and ARM). One deployment serves one household. [Install with Docker](https://anthonypluth.github.io/Waypoint/start/docker/) walks through a local first start, optional sign-in, moving data over and putting it on the internet safely. Open `http://localhost:8765` after `docker compose up -d`: no `.env` file, account or API key is required. Add bookings manually and connect Gmail, AI or live flight status only if you want them. Travel brand logos and the basic map are bundled.
 
 ## Privacy
 

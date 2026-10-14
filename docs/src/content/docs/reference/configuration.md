@@ -23,7 +23,7 @@ Settings that belong to the app live in **Settings** and are stored in the datab
 | `WAYPOINT_SECRET_KEY` | | Encrypts the secrets Waypoint saves (at least 32 characters: `openssl rand -base64 32`). Without it, Waypoint makes `secret.key` in `WAYPOINT_DATA`. |
 | `WAYPOINT_SECRET_KEY_OLD` | | The previous key, for one start after changing `WAYPOINT_SECRET_KEY`; everything is re-encrypted with the new one. Also the way to restore a backup made under an earlier key. |
 | `WAYPOINT_ALLOW_INSECURE_HTTP` | | `1` allows an `http://` `WAYPOINT_PUBLIC_URL` on an internet address. Don’t. |
-| `WAYPOINT_ALLOW_NO_AUTH` | | `1` runs without sign-in on the network, for when a proxy in front already handles it. |
+| `WAYPOINT_ALLOW_NO_AUTH` | `1` in Compose | Allows the container to listen without sign-in; Compose publishes it on localhost only. Also usable behind a proxy that handles sign-in. OIDC takes precedence when configured. |
 | `DATABASE_URL` | | `postgresql://user:password@host:5432/db` to use Postgres instead of the built-in SQLite file. |
 | `WAYPOINT_DATA` | `./data` (`/data` in Docker) | Where the SQLite database lives. |
 | `WAYPOINT_HOST` / `WAYPOINT_PORT` | `127.0.0.1` / `8765` | Address and port to listen on (`0.0.0.0` in Docker). |
@@ -31,7 +31,7 @@ Settings that belong to the app live in **Settings** and are stored in the datab
 
 Waypoint has no error-reporting service: errors go to its own log. See [Errors and logs](/Waypoint/start/docker/#errors-and-logs).
 
-With no `OIDC_ISSUER`, Waypoint refuses to listen beyond `localhost` unless `WAYPOINT_ALLOW_NO_AUTH` is set. See [Install with Docker](/Waypoint/start/docker/) and [SECURITY.md](https://github.com/AnthonyPluth/waypoint/blob/main/SECURITY.md).
+With no `OIDC_ISSUER`, a source checkout refuses to listen beyond `localhost` unless `WAYPOINT_ALLOW_NO_AUTH` is set. Compose sets it for the container’s internal listener and publishes the port only on localhost. See [Install with Docker](/Waypoint/start/docker/) and [SECURITY.md](https://github.com/AnthonyPluth/waypoint/blob/main/SECURITY.md).
 
 ## Advanced
 

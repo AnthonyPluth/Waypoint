@@ -224,8 +224,6 @@ LOYALTY_LABEL = "loyalty numbers (enter them again on People)"
 SECRET_LABELS = {
     sk.VAPID_PRIVATE_KEY: "notifications' signing key (devices sign up for notifications again)",
     sk.AI_OPENROUTER_KEY: "OpenRouter key (enter it again in Settings → AI)",
-    sk.LOGODEV_TOKEN: "Logo.dev publishable key (enter it again in Settings → Brand logos)",
-    sk.LOGODEV_SECRET: "Logo.dev secret key (enter it again in Settings → Brand logos)",
 }
 
 
