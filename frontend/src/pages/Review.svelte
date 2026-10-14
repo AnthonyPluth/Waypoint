@@ -424,7 +424,7 @@
   {/if}
 {/snippet}
 
-{#snippet addForm(item: ReviewItem)}
+{#snippet addForm()}
   {@const lead = drafts[0]}
   {@const many = drafts.length > 1}
   <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-label={lead?.suggested ? (many ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"}>
@@ -695,7 +695,7 @@
           {#if peeks[draft.item.id]}<div data-testid="preview">{@render messagePeek(draft.item)}</div>{/if}
         </div>
       </div>
-      <div class="review-form-col">{@render addForm(draft.item)}</div>
+      <div class="review-form-col">{@render addForm()}</div>
     </div>
   {/if}
 </Sheet>
