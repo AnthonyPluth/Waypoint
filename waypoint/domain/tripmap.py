@@ -79,7 +79,7 @@ def _drive(point: roads.Point, other: roads.Point) -> roads.Route | None:
     straight = roads.miles_between(point, other)
     if straight < MIN_ROAD_TRIP_MILES:
         return None
-    found = roads.interstates().route(point, other)
+    found = roads.highways().route(point, other)
     if found is None or found.miles > MAX_DETOUR * straight:
         return None
     return found
@@ -147,7 +147,7 @@ def road_legs(live: list[trips.SegmentOut], located: dict[int, roads.Point]) -> 
                 followed.append(found)
         if found is not None:
             legs.append({"from_segment_id": first, "to_segment_id": second, "refs": found.refs, "points": _round(found.points)})
-    nearby = roads.interstates().near([line.points for line in followed]) if followed else []
+    nearby = roads.highways().near([line.points for line in followed]) if followed else []
     return {"legs": legs, "interstates": [{"ref": ref, "points": _round(line)} for ref, line in nearby]}
 
 
