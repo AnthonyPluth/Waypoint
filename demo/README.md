@@ -13,3 +13,7 @@ Pages must use GitHub Actions, and the `github-pages` environment must permit de
 The existing `main` documentation deployment publishes its own artifact and can remove `/demo/` on its next run. Until the prepared documentation workflow change is applied to main, rerun `Static demo` after documentation deployments to restore the demo. Both deployments preserve the documentation root. Do not switch Pages to branch hosting or publish only the demo artifact over the documentation site.
 
 Run `node demo/verify.mjs` for browser checks at phone, tablet and desktop sizes. It serves only this directory, visits all demo routes and itineraries, fails on external or API requests, browser errors or horizontal overflow, checks disabled controls and records local screenshots under `artifacts/static-demo/`.
+
+## Publication status
+
+The first deployment built the combined documentation/demo artifact successfully, but GitHub rejected its deploy job because the `github-pages` environment does not allow the `demo` branch. The demo is prepared and pushed, not published. Add `demo` to the environment's allowed deployment branches while retaining `main`, then rerun the latest `Static demo` workflow. The expected demo URL is `https://anthonypluth.github.io/Waypoint/demo/`; it is not evidence of publication until the deploy job succeeds.
