@@ -66,6 +66,5 @@
   {:else}
     <pre class="max-h-96 overflow-auto rounded-lg bg-muted p-3 font-sans text-sm leading-relaxed break-words whitespace-pre-wrap">{text || "(This message has no text.)"}</pre>
   {/if}
-  {#if !original}<p class="text-sm text-muted-foreground" data-testid="message-old">This email was kept before Waypoint could show the original, so its layout and pictures can’t be shown.</p>{/if}
   {#if truncated}<p class="text-sm text-muted-foreground">This email was cut short.</p>{/if}
 </div>

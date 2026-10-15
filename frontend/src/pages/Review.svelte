@@ -202,7 +202,6 @@
     addedPicks = [];
     if (open && viewing !== open.item.id) delete peeks[open.item.id];
     drafts = [];
-    trustSender = false;
     joining = null;
     if (open && picks.length) void act(async () => {
       await apiCall<"DELETE /api/review/{id}">(`/api/review/${open.item.id}?${picks.map((n) => `suggestion=${n}`).join("&")}`, { method: "DELETE" });
@@ -257,7 +256,6 @@
     if (open) void save(open.legs, open.bodies, open.found, attach);
   };
 
-  let trustSender = $state(false);
 
   async function save(legs: Draft[], bodies: SegmentBody[], found: (ReviewCandidate | null)[], attach: boolean) {
     const first = legs[0];
@@ -282,7 +280,7 @@
         if (n < bodies.length - 1) drafts = drafts.filter((d) => d !== leg);
       }
       listed = true;
-      await apiCall<"DELETE /api/review/{id}">(`/api/review/${first.item.id}?${added.map((id) => `segment=${id}`).join("&")}${trustSender && first.item.reason === "generic" ? "&trust=1" : ""}`, { method: "DELETE" });
+      await apiCall<"DELETE /api/review/{id}">(`/api/review/${first.item.id}?${added.map((id) => `segment=${id}`).join("&")}`, { method: "DELETE" });
     }, { busy: (on) => (saving = on), onError: (m) => {
       if (listed) toast.error(`Added, but couldn’t take it off this list: ${m}`);
       else formError = added.length ? `Added ${added.length} of ${before + bodies.length}, but couldn’t add the rest: ${m}` : m;
@@ -426,14 +424,10 @@
   {/if}
 {/snippet}
 
-{#snippet addForm(item: ReviewItem)}
+{#snippet addForm()}
   {@const lead = drafts[0]}
   {@const many = drafts.length > 1}
   <form class="flex w-full flex-col gap-4" data-editor onsubmit={add} aria-label={lead?.suggested ? (many ? "Check these suggestions" : "Check this suggestion") : "Add this booking by hand"}>
-    {#if lead?.suggested && item.reason === "generic"}<p class="text-sm text-muted-foreground">Waypoint read this from labelled lines in the email, not from the vendor’s own booking data. The fields it found are outlined: check each against the booking, change what’s off, then add it. Adding it adds this booking only; later mail from {sender(item)} is still checked with you first.</p>
-      <label class="flex items-start gap-2 text-sm"><input type="checkbox" class="mt-0.5 size-5 shrink-0 accent-primary" bind:checked={trustSender} />
-        <span class="min-w-0 break-words">Also trust {sender(item)}: add its later mail to your trips without asking.</span></label>
-    {/if}
     <div class="flex flex-col gap-4" hidden={!showFields} data-testid="booking-fields">
     {#if many}
       {#each drafts as leg, n (leg)}
@@ -701,7 +695,7 @@
           {#if peeks[draft.item.id]}<div data-testid="preview">{@render messagePeek(draft.item)}</div>{/if}
         </div>
       </div>
-      <div class="review-form-col">{@render addForm(draft.item)}</div>
+      <div class="review-form-col">{@render addForm()}</div>
     </div>
   {/if}
 </Sheet>

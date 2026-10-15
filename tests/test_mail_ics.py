@@ -217,22 +217,20 @@ class CalendarScanTests(GenericKindCase):
         later = FLIGHT.replace("20261121T190000", "20261201T190000").replace("20261122T071000", "20261202T071000").replace("ZK4R9T", "ZK0000")
         return mime(BODY, calendar(later))
 
-    def test_a_calendar_flight_from_a_new_sender_is_a_suggestion_with_its_read_fields_outlined(self):
-        s = self.suggestion(self.first())["suggestions"][0]
+    def test_a_calendar_flight_from_a_new_sender_is_filed_automatically(self):
+        s = self.filed(self.first())
         self.assertEqual((s["kind"], s["confirmation"], s["origin"], s["destination"], s["start_local"], s["end_local"], s["start_zone"]),
                          ("flight", "ZK4R9T", "JFK", "LHR", "2026-11-21T19:00", "2026-11-22T07:10", "America/New_York"))
-        self.assertEqual(s["sources"]["start_local"], "DTSTART")
 
-    def test_it_asks_once_per_sender_until_confirmed(self):
-        self.suggestion(self.first())
+    def test_each_complete_email_is_filed_without_sender_confirmation(self):
+        self.filed(self.first())
         self.add_mail("second", self.second())
         self.scan(now=NOW + 30)
-        self.assertEqual(len(self.items()), 1)
+        self.assertEqual(self.items(), [])
+        self.assertEqual(len(self.segments()), 2)
 
-    def test_confirming_trusts_the_sender_and_later_calendar_mail_is_filed_directly(self):
-        item = self.suggestion(self.first())
-        self.confirm(item, kind="flight", confirmation="ZK4R9T", provider="British Airways", start_local="2026-11-21T19:00", start_zone="America/New_York",
-                     end_local="2026-11-22T07:10", end_zone="Europe/London", origin="JFK", destination="LHR", details={"flight_number": "BA 9871"})
+    def test_without_sender_trust_later_calendar_mail_is_filed_directly(self):
+        self.filed(self.first())
         self.add_mail("second", self.second())
         with no_leaks(self, *CANARIES, database=self.path):
             result = self.scan(now=NOW + 60)

@@ -15,6 +15,8 @@ sidebar:
 
 The OpenRouter key is saved encrypted with `WAYPOINT_SECRET_KEY` (and encrypted in backups), or read from the `OPENROUTER_API_KEY` environment variable, which wins. It never shows again once saved, and is never logged.
 
+Complete AI results are added to trips automatically. Partial results stay in Review. Automatic filing requires a confirmation code, places, local departure/check-in and arrival/check-out dates and times, and resolvable time zones; flights also need a flight number. No facts are invented to complete a booking. Turning on AI or its automatic-reading switch still controls whether email is sent to the chosen AI service.
+
 ## Reading unreadable mail automatically
 
 Below the choice of where the AI runs, **Read unreadable mail with AI automatically** is a second, separate switch. It is off until you turn it on, and it is offered only while the AI is set to Local or OpenRouter. Turning it on shows a warning: “Waypoint will send the text of travel emails it couldn’t read to the AI you chose, without asking each time.” Choosing **Off** for the AI turns this switch off with it.

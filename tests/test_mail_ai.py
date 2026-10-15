@@ -12,10 +12,11 @@ from tests.privacy import no_leaks
 from tests.test_mail_scan import ScanCase, eml
 from tests.test_trips import RouteCase
 from waypoint import monitoring
-from waypoint.domain.mail import ai, extract, review
+from waypoint.domain import trips
+from waypoint.domain.mail import ai, extract, review, scan
 from waypoint.storage import db
 from waypoint.storage import settings_keys as sk
-from waypoint.storage.models import ReviewItem, Setting
+from waypoint.storage.models import ReviewItem, Setting, StoredMessage
 
 BODY = "CANARY-BODY-AI-5J2K"
 IDS = ("TT87654321", "4111 1111 1111 1111", "2207781905", "FXLOY-4400123")
@@ -849,14 +850,12 @@ class RoundTripScanTests(ScanAiCase):
             raw = raw.replace(left, right)
         return raw
 
-    def ask(self, reply) -> review.ItemOut:
+    def ask(self, reply):
         self.turn_on()
         self.add_mail("round-trip", self.unreadable())
         self.fake.content = json.dumps(reply)
         with no_leaks(self, self.CANARY, database=self.path, sent_ok=True):
-            self.assertEqual(self.scan().review, 1)
-        [item] = self.items()
-        return item
+            return self.scan()
 
     def test_the_generic_reader_leaves_a_round_trip_with_no_times_to_the_ai(self):
         self.add_mail("round-trip", self.unreadable())
@@ -864,29 +863,84 @@ class RoundTripScanTests(ScanAiCase):
         self.assertEqual(self.segments(), [])
         self.assertEqual(self.fake.requests, [])
 
-    def test_a_reply_with_two_flights_is_two_suggestions_in_order(self):
-        item = self.ask({"bookings": [OUTBOUND, RETURN]})
-        self.assertEqual((item["suggestions"], item["suggestion_error"]), ([OUTBOUND, RETURN], None))
-        self.assertEqual(self.segments(), [])
-        with db.session() as conn:
-            kept = conn.execute(select(ReviewItem.suggestion)).scalar()
-        self.assertEqual(json.loads(kept), [OUTBOUND, RETURN])
+    def test_a_complete_ai_round_trip_is_filed_automatically(self):
+        result = self.ask({"bookings": [OUTBOUND, RETURN]})
+        self.assertEqual((result.bookings, result.review), (2, 0))
+        self.assertEqual(self.items(), [])
+        made = self.segments()
+        self.assertEqual({s["details"]["flight_number"] for s in made}, {"DL 1204", "DL 1377"})
+        self.assertEqual(len({s["trip_id"] for s in made}), 1)
+        for segment in made:
+            self.assertEqual(len(self.read(lambda conn, segment=segment: trips.emails_of(conn, self.jane, segment["id"]))), 1)
 
     def test_the_old_single_booking_reading_of_the_round_trip_is_refused(self):
-        item = self.ask({**JOINED, "destination": "BOS"})
+        self.ask({**JOINED, "destination": "BOS"})
+        [item] = self.items()
         self.assertEqual((item["suggestions"], item["suggestion_error"]), ([], ai.BAD_REPLY))
+        self.assertEqual(self.segments(), [])
 
-    def test_one_good_leg_is_kept_and_the_other_reported(self):
-        item = self.ask({"bookings": [OUTBOUND, {**RETURN, "end_local": "2026-12-30T21:50"}]})
+    def test_a_complete_ai_leg_is_filed_while_the_unreadable_leg_stays_in_review(self):
+        result = self.ask({"bookings": [OUTBOUND, {**RETURN, "end_local": "2026-12-30T21:50"}]})
+        self.assertEqual((result.bookings, result.review), (1, 1))
+        [item] = self.items()
         self.assertEqual((item["suggestions"], item["suggestion_error"]),
-                         ([OUTBOUND], f"Only 1 of the AI’s 2 bookings could be used. {ai.TOO_LONG}"))
+                         ([], f"Only 1 of the AI’s 2 bookings could be used. {ai.TOO_LONG}"))
+        self.assertEqual(self.segments()[0]["details"]["flight_number"], "DL 1204")
 
-    def test_an_item_stored_with_one_booking_before_still_reads(self):
-        item = self.ask({"bookings": [OUTBOUND]})
+    def test_an_incomplete_legacy_single_suggestion_still_reads(self):
+        partial = {k:v for k,v in OUTBOUND.items() if k != "flight_number"}
+        self.ask({"bookings": [partial]})
         with db.session() as conn:
-            conn.execute(ReviewItem.__table__.update().values(suggestion=json.dumps(OUTBOUND)))
-        self.assertEqual(self.items()[0]["suggestions"], [OUTBOUND])
-        self.assertEqual(item["suggestions"], [OUTBOUND])
+            conn.execute(ReviewItem.__table__.update().values(suggestion=json.dumps(partial)))
+        self.assertEqual(self.items()[0]["suggestions"], [partial])
+        self.assertEqual(self.segments(), [])
+
+    def test_asking_ai_manually_adds_a_complete_booking_and_keeps_its_email(self):
+        self.turn_on(auto=False)
+        self.add_mail("manual-ai", self.unreadable())
+        self.scan()
+        [item] = self.items()
+        self.fake.content = json.dumps({"bookings": [OUTBOUND]})
+        with no_leaks(self, self.CANARY, database=self.path, sent_ok=True):
+            scan.suggest_now("u-jane", item["id"], 1000000000)
+        self.assertEqual(self.items(), [])
+        [booking] = self.segments()
+        self.assertEqual(booking["details"]["flight_number"], "DL 1204")
+        self.assertEqual(len(self.read(lambda conn: trips.emails_of(conn, self.jane, booking["id"]))), 1)
+
+    def test_manual_ai_keeps_fetched_legacy_mail_before_filing(self):
+        self.turn_on(auto=False)
+        self.add_mail("legacy-ai", self.unreadable())
+        self.scan()
+        [item] = self.items()
+        self.read(lambda conn: conn.execute(StoredMessage.__table__.delete()))
+        self.fake.content = json.dumps({"bookings": [OUTBOUND]})
+        with no_leaks(self, self.CANARY, database=self.path, sent_ok=True):
+            scan.suggest_now("u-jane", item["id"], 1000000000)
+        self.assertEqual(self.items(), [])
+        [booking] = self.segments()
+        emails = self.read(lambda conn: trips.emails_of(conn, self.jane, booking["id"]))
+        self.assertEqual(len(emails), 1)
+        self.assertIn(self.CANARY, emails[0]["text"])
+
+    def test_dismissing_an_item_while_ai_reads_it_does_not_create_a_booking(self):
+        self.turn_on(auto=False)
+        self.add_mail("dismissed-ai", self.unreadable())
+        self.scan()
+        [item] = self.items()
+        def dismissed(*_args):
+            self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"]))
+            return ai.Reading([OUTBOUND])
+        with mock.patch.object(ai, "suggest", side_effect=dismissed):
+            scan.suggest_now("u-jane", item["id"], 1000000000)
+        self.assertEqual(self.items(), [])
+        self.assertEqual(self.segments(), [])
+
+    def test_missing_or_invalid_ai_fields_are_not_filed(self):
+        for changed in ({"confirmation": ""}, {"flight_number": ""}, {"origin": "???"}, {"end_local": "not a date"}):
+            with self.subTest(changed=changed):
+                self.assertIsNone(self.read(lambda conn, changed=changed: scan._ai_fields(conn, {**OUTBOUND, **changed})))
+        self.assertEqual(self.segments(), [])
 
 
 class AiApiTests(RouteCase):
@@ -1000,13 +1054,13 @@ class ScanAddressTests(ScanAiCase):
         self.turn_on()
         self.put("no_markup_stay")
         with no_leaks(self, *self.BOOKER, REPLY_CANARY, database=self.path, sent_ok=True):
-            self.assertEqual(self.scan().review, 1)
-        return self.items()[0]
+            self.assertEqual((self.scan().bookings, self.items()), (1, []))
+        return self.segments()[0]
 
     def test_the_propertys_address_and_phone_reach_the_suggestion_not_the_bookers(self):
         self.reply(**self.PROPERTY, note=REPLY_CANARY)
         item = self.ask()
-        self.assertEqual((item["suggestions"], item["suggestion_error"]), ([{**STAY, **self.PROPERTY}], None))
+        self.assertEqual(item["details"], self.PROPERTY)
         sent = self.fake.requests[0][2]
         self.assertEqual(set(sent), {"model", "messages", "stream", "format", "think", "options"})
         self.assertEqual([m["role"] for m in sent["messages"]], ["system", "user"])
@@ -1015,12 +1069,12 @@ class ScanAddressTests(ScanAiCase):
     def test_the_bookers_address_is_dropped_and_never_stored_or_logged(self):
         self.reply(address="CANARY-BOOKER-ADDR-2R6F Elm Street, Springfield 12345", phone="555 010 0199 CANARY-BOOKER-PHONE-4T8N")
         item = self.ask()
-        self.assertEqual((item["suggestions"], item["suggestion_error"]), ([STAY], None))
+        self.assertEqual(item["details"], {})
 
     def test_an_address_that_is_not_in_the_email_leaves_the_rest_of_the_suggestion(self):
         self.reply(address="9 Invented Street, Nowhere")
         item = self.ask()
-        self.assertEqual((item["suggestions"], item["suggestion_error"]), ([STAY], None))
+        self.assertEqual(item["details"], {})
 
 
 SEAT_SENT = "Confirmation code: QW4R7T\nFlight BOS to DEN\nPassengers\nAda Example   Seat 23A\nBen Sample   Seat 23B\nCy Invented   no seat yet\n"
@@ -1119,12 +1173,12 @@ class ScanSeatTests(ScanAiCase):
         self.add_mail("seats", self.unreadable())
         self.fake.content = json.dumps({"bookings": [{**OUTBOUND, "travelers": self.TRAVELERS}]})
         with no_leaks(self, self.CANARY, database=self.path, sent_ok=True):
-            self.assertEqual(self.scan().review, 1)
-        return self.items()[0]
+            self.assertEqual((self.scan().bookings, self.items()), (1, []))
+        return self.segments()[0]
 
     def test_with_ollama_the_seats_reach_the_stored_suggestion_for_a_person_to_check(self):
         item = self.ask_with("local")
-        self.assertEqual(item["suggestions"], [{**OUTBOUND, "travelers": self.TRAVELERS}])
+        self.assertEqual([{k:t[k] for k in ("name", "seat")} for t in item["travelers"]], self.TRAVELERS)
         self.assertIn(ai.SYSTEM_SEATS, self.fake.requests[0][2]["messages"][0]["content"])
 
     def test_with_openrouter_nothing_about_seats_is_asked_or_kept(self):
@@ -1133,7 +1187,8 @@ class ScanSeatTests(ScanAiCase):
             db.set_setting(conn, sk.AI_OPENROUTER_KEY, KEY)
         with mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True)):
             item = self.ask_with("openrouter")
-        self.assertEqual(item["suggestions"], [OUTBOUND])
+        self.assertEqual(item["details"]["flight_number"], OUTBOUND["flight_number"])
+        self.assertFalse(any(t["seat"] for t in item["travelers"]))
         self.assertNotIn("travelers", json.dumps(self.fake.requests[0][2]))
 
 

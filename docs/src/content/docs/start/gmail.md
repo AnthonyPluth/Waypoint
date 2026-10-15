@@ -45,6 +45,8 @@ Each member opens **Settings → Mail & review → Gmail** and chooses **Connect
 
 ## Scanning
 
+Complete bookings are added automatically, even from a sender Waypoint has not seen before. Messages with missing booking details or ambiguous matches stay in Review. Sender trust is not required.
+
 Waypoint scans each connected mailbox in the background, every few hours (by the server’s own clock, `TZ`), and when you choose **Scan now** under the mailbox in Settings. A scan:
 
 1. **Lists on Google’s side** all your mail, newest first, leaving out spam, trash and any sender you chose to ignore (Promotions is included, since booking sites’ mail often lands there). There is no search for words: every message is looked at, so a trip email that never says “confirmation” is still found, whoever sent it. The first scan looks back 18 months; later ones ask Gmail’s history what arrived since the last one ended. **Look back through all mail** (below) is the one search with no date limit.

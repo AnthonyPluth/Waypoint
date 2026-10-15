@@ -32,7 +32,7 @@ What the download will and won’t do:
 - Only PNG, JPEG, GIF and WebP, decided by the file’s contents. SVG is refused, since it can carry script.
 - The images are kept encrypted with the message and deleted with it. They are shown only to those who can see the booking or review item, through Waypoint’s own sign-in-protected addresses, and are never reachable by an AI assistant over MCP or sent to the optional AI below. A parking booking also keeps a copy of the one picture chosen as its gate code, sealed the same way, which goes with the booking and with the mailbox, is never decoded, and is never in the offline copy.
 
-Messages kept before this was added show as before (their text and simple formatting), with a line saying the original can’t be shown; Waypoint doesn’t fetch them again on its own.
+Messages kept before this was added show their text and simple formatting without a missing-original notice; Waypoint doesn’t fetch them again on its own.
 
 ## How a booking is read
 

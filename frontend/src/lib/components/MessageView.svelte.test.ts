@@ -147,9 +147,9 @@ describe("MessageView", () => {
     expect(apiImage).not.toHaveBeenCalled();
   });
 
-  it("says when an email was kept before the original could be shown", () => {
+  it("shows older emails without the obsolete original-layout notice", () => {
     render(MessageView, { text: "Gate B12", html: "<p>Gate B12</p>", original: false });
-    expect(screen.getByTestId("message-old")).toHaveTextContent("can’t be shown");
+    expect(screen.queryByTestId("message-old")).toBeNull();
     expect(pageOf()).toContain("<p>Gate B12</p>");
   });
 

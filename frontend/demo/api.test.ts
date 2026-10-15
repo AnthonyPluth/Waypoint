@@ -54,12 +54,14 @@ describe("standalone demo transport", () => {
     expect(new Set(keys).size).toBe(bookings.length);
   });
 
-  it("includes populated flight, road-trip and cruise suggestions with simulated emails in Review", async () => {
+  it("keeps only incomplete flight, road-trip and cruise examples in Review", async () => {
     expect(data.review.items.flatMap(item=>item.suggestions ?? []).map(item=>item.kind)).toEqual(["flight", "car", "cruise"]);
     for (const item of data.review.items) {
+      expect(item.reason).toBe("incomplete");
       const preview = await api<Preview>(`/api/review/${item.id}/preview`);
       expect(preview.text).toContain("SIMULATED BOOKING EMAIL");
       for (const booking of item.suggestions ?? []) {
+        expect(booking.end_local).toBe("");
         expect(preview.text).toContain(booking.confirmation);
         expect(booking.price_minor).toBeGreaterThan(0);
         expect(booking.price_currency).toBe("USD");
