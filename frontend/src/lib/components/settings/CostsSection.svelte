@@ -19,7 +19,7 @@
   <h2 id="costs-title" class="eyebrow px-1">Trip costs</h2>
   <div class="rows">
     <div class="row">
-      <div><p class="font-medium">Show trip costs</p><p class="text-sm text-muted-foreground">Totals and booking costs on trips, for everyone in the household. Hiding them keeps them stored.</p></div>
+      <div><p class="font-medium">Show trip costs</p><p class="text-sm text-muted-foreground">Applies to the household. Hidden costs stay saved.</p></div>
       <div class="flex gap-2" role="group" aria-label="Trip costs">
         <Button variant={shown ? "default" : "outline"} aria-pressed={shown} disabled={saving} onclick={() => choose(true)}>Show</Button>
         <Button variant={!shown ? "default" : "outline"} aria-pressed={!shown} disabled={saving} onclick={() => choose(false)}>Hide</Button>

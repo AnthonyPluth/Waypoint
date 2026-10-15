@@ -94,7 +94,7 @@
       <label class="row cursor-pointer flex-nowrap">
         <span class="min-w-0">
           <span class="block font-medium">Let assistants change trips</span>
-          <span id="mcp-writes-help" class="block text-sm text-muted-foreground">Add, change and remove trips, bookings and people. The assistant is told to ask before each change. Never mailboxes, email, loyalty numbers, AI settings, backups or sign-in.</span>
+          <span id="mcp-writes-help" class="block text-sm text-muted-foreground">Allows changes to trips, bookings and people. The assistant is told to ask first.</span>
         </span>
         <input type="checkbox" class="size-5 shrink-0" aria-describedby="mcp-writes-help" checked={list.allow_writes} disabled={saving} onchange={choose} />
       </label>
@@ -115,9 +115,10 @@
               <input type="checkbox" class="mt-1 size-5 shrink-0" aria-describedby={`mcp-mail-help-${c.id}`} checked={c.scope.includes("mail")} disabled={savingMail === c.id} onchange={(e) => chooseMail(c, e)} />
               <span class="min-w-0">
                 <span class="block font-medium">Read email text</span>
-                <span id={`mcp-mail-help-${c.id}`} class="block text-sm text-muted-foreground">This sends the email’s text and markup to the assistant you connected: the subject, text and kept markup (never images) of the emails Waypoint keeps for the Review queue and for bookings, of the member who connected it. Only that member can switch this on or off. Off unless you turn it on. Never mailboxes or other mail.</span>
+                <span id={`mcp-mail-help-${c.id}`} class="block text-sm text-muted-foreground">Sends saved booking and Review emails to this assistant. No images or other mail.</span>
               </span>
             </label>
+            <details class="mt-2 text-sm text-muted-foreground"><summary class="cursor-pointer py-1">Email access details</summary><p class="mt-1">Shares the subject, text and saved formatting of emails you can access. Off by default; only the member who connected this assistant can change it.</p></details>
           </div>
           <Button variant="outline" onclick={() => { leaving = c; asking = true; }}>Disconnect</Button>
         </div>

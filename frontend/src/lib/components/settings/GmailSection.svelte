@@ -186,11 +186,11 @@
             {/if}
             <label class="mt-2 flex items-start gap-2 text-sm">
               <input type="checkbox" class="mt-0.5 size-4 shrink-0" checked={m.share_review} onchange={(e) => share(m, e.currentTarget)} />
-              <span>Show this mailbox’s unread mail to the household<span class="block text-muted-foreground">Anyone in the household sees each one’s subject, who it is from and its day in Review, can read the message (Waypoint keeps it, encrypted, until it’s dismissed or added) and can add it by hand or dismiss it. Only you can open it in Gmail. Off until you turn it on.</span></span>
+              <span>Show this mailbox’s unread mail to the household<span class="block text-muted-foreground">Household members can read, add or dismiss this mailbox’s Review items.</span></span>
             </label>
             {#if m.status === "connected"}
               <p class="mt-2 text-sm text-muted-foreground">
-                {m.labels_picked ? `Reading everything in ${plural(m.labels_picked, "label", "labels")} you picked.` : "Waypoint reads mail that looks like a booking. You can also pick your own labels to read in full."}
+                {m.labels_picked ? `Reading everything in ${plural(m.labels_picked, "label", "labels")} you picked.` : "Read booking emails, or all mail in selected labels."}
                 <button type="button" class="underline underline-offset-2" aria-expanded={choosing === m.id} onclick={() => openLabels(m)}>{choosing === m.id ? "Close" : "Choose labels"}</button>
               </p>
               {#if choosing === m.id}
@@ -217,7 +217,7 @@
                   <h3 class="text-sm font-medium">Ignored senders</h3>
                   <p class="text-sm text-muted-foreground">Couldn’t load the list.</p>
                 {:else if ignored[m.id]}
-                  <h3 class="text-sm font-medium">Ignored senders ({ignored[m.id]!.length})</h3>
+                  <details><summary class="cursor-pointer py-2 text-sm font-medium">Ignored senders ({ignored[m.id]!.length})</summary>
                   {#if !ignored[m.id]!.length}
                     <p class="text-sm text-muted-foreground">None</p>
                   {:else}
@@ -230,6 +230,7 @@
                       {/each}
                     </ul>
                   {/if}
+                  </details>
                 {/if}
               </div>
             {/if}

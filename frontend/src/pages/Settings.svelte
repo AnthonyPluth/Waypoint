@@ -10,7 +10,6 @@
   import DataSection from "$lib/components/settings/DataSection.svelte";
   import HomeSection from "$lib/components/settings/HomeSection.svelte";
   import GmailSection from "$lib/components/settings/GmailSection.svelte";
-  import LogosSection from "$lib/components/settings/LogosSection.svelte";
   import ImportSection from "$lib/components/settings/ImportSection.svelte";
   import McpSection from "$lib/components/settings/McpSection.svelte";
   import { clearSaved } from "$lib/offline";
@@ -43,7 +42,7 @@
   const GROUPS = [
     { id: "account", label: "Account", icon: UserRound, about: "Your profile and app information." },
     { id: "mail", label: "Mail & review", icon: Mail, about: "Connected mailboxes, email preferences and AI booking extraction." },
-    { id: "travel", label: "Travel preferences", icon: SlidersHorizontal, about: "Your home, distance units, trip costs and booking logos." },
+    { id: "travel", label: "Travel preferences", icon: SlidersHorizontal, about: "Home, distances and trip costs." },
     { id: "offline", label: "Offline & notifications", icon: Bell, about: "Saved trips, travel reminders and your calendar subscription." },
     { id: "assistants", label: "Connected assistants", icon: Bot, about: "Manage your assistants and choose what they can access." },
     { id: "backup", label: "Backup & import", icon: Archive, about: "Keep a backup, restore your data or bring in past flights." },
@@ -64,7 +63,7 @@
 <div class="mb-8">
   <p class="eyebrow mb-2 text-primary">Make Waypoint yours</p>
   <h1 class="text-display">{group ? group.label : "Settings"}</h1>
-  <p class="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{group ? group.about : "A few preferences for smoother travels. Manage your account, connections and the details that make Waypoint work for you."}</p>
+  <p class="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{group ? group.about : "Your account, connections and travel preferences."}</p>
 </div>
 
 <div class={group ? "grid min-w-0 gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8" : ""}>
@@ -146,7 +145,6 @@
 
     <CostsSection />
 
-    <LogosSection />
   {:else if group.id === "offline"}
     <OfflineSection />
 

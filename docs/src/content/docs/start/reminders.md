@@ -16,7 +16,7 @@ Waypoint sends two kinds of notification, and each person chooses which they get
 
 Reminders cover only the trips you can see: the ones you’re on and the ones you booked. They never carry a loyalty or Known Traveler number, and a confirmation code isn’t in them either.
 
-To get them on a phone or computer, open Settings there and choose **Turn on**; your browser asks for permission. On an iPhone or iPad, add Waypoint to the Home Screen first (iOS 16.4 or later). Turn a device off from the same list. A person can have up to 10 devices.
+To get them on a phone or computer, open Settings there and choose **Register this device**; your browser asks for permission. On an iPhone or iPad, add Waypoint to the Home Screen first (iOS 16.4 or later). Use **Remove device** to unregister it. To add it again, open Waypoint on that device and register there. A person can have up to 10 devices.
 
 Notifications go through your browser’s own push service (Google’s, Apple’s or Mozilla’s; Settings lists each device by the browser or device it is, such as “Chrome or Android (Google)” or “Safari on an Apple device”), which sees that a notification was sent to that browser and its text, encrypted so only your browser can read it.
 

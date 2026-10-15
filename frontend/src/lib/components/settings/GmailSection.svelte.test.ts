@@ -33,8 +33,11 @@ describe("Settings → Gmail → Ignored senders", () => {
     serve(list([box()]), undefined, { 1: ["example-air.example", "mail.seaside-stays.example"] });
     render(GmailSection);
     const section = await screen.findByTestId("ignored-senders");
-    expect(await within(section).findByRole("heading", { name: "Ignored senders (2)" })).toBeInTheDocument();
+    expect(await within(section).findByText("Ignored senders (2)")).toBeInTheDocument();
     expect(within(section).getByText("example-air.example")).toBeInTheDocument();
+    expect(section.querySelector("details")).not.toHaveAttribute("open");
+    await userEvent.click(within(section).getByText("Ignored senders (2)"));
+    expect(section.querySelector("details")).toHaveAttribute("open");
     expect(within(section).getByRole("button", { name: "Stop ignoring example-air.example" })).toBeInTheDocument();
     expect(within(section).getByRole("button", { name: "Stop ignoring mail.seaside-stays.example" })).toBeInTheDocument();
   });
@@ -43,7 +46,7 @@ describe("Settings → Gmail → Ignored senders", () => {
     serve(list([box()]));
     render(GmailSection);
     const section = await screen.findByTestId("ignored-senders");
-    expect(await within(section).findByRole("heading", { name: "Ignored senders (0)" })).toBeInTheDocument();
+    expect(await within(section).findByText("Ignored senders (0)")).toBeInTheDocument();
     expect(within(section).getByText("None")).toBeInTheDocument();
     expect(within(section).queryByRole("button")).toBeNull();
   });
@@ -75,6 +78,7 @@ describe("Settings → Gmail → Ignored senders", () => {
       return {};
     }) as never);
     render(GmailSection);
+    await userEvent.click(await screen.findByText("Ignored senders (1)"));
     await userEvent.click(await screen.findByRole("button", { name: "Stop ignoring example-air.example" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Stop ignoring example-air.example?")).toBeInTheDocument();
@@ -90,6 +94,7 @@ describe("Settings → Gmail → Ignored senders", () => {
   it("leaves the row alone when the confirm is cancelled", async () => {
     serve(list([box()]), undefined, { 1: ["example-air.example"] });
     render(GmailSection);
+    await userEvent.click(await screen.findByText("Ignored senders (1)"));
     await userEvent.click(await screen.findByRole("button", { name: "Stop ignoring example-air.example" }));
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }));
     expect(api).not.toHaveBeenCalledWith("/api/mailboxes/1/unignore", expect.anything());
@@ -104,6 +109,7 @@ describe("Settings → Gmail → Ignored senders", () => {
       return {};
     }) as never);
     render(GmailSection);
+    await userEvent.click(await screen.findByText("Ignored senders (1)"));
     await userEvent.click(await screen.findByRole("button", { name: "Stop ignoring example-air.example" }));
     await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
     await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("Look back through all mail")));

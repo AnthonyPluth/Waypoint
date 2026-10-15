@@ -32,7 +32,7 @@
 
   const keyBytes = (b64u: string) => Uint8Array.from(atob(b64u.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 
-  const turnOn = () => act(async () => {
+  const registerDevice = () => act(async () => {
     if (!list) return;
     if ((await Notification.requestPermission()) !== "granted") {
       toast.error("Notifications are blocked for Waypoint in this browser. Allow them in its site settings, then try again.");
@@ -41,14 +41,14 @@
     const reg = await navigator.serviceWorker.ready;
     const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(list.public_key) }));
     const json = sub.toJSON();
-    await apiCall<"POST /api/reminders/devices">("/api/reminders/devices", { method: "POST", failed: "Couldn’t turn notifications on",
+    await apiCall<"POST /api/reminders/devices">("/api/reminders/devices", { method: "POST", failed: "Couldn’t register this device",
       body: { endpoint: json.endpoint ?? "", p256dh: json.keys?.p256dh ?? "", auth: json.keys?.auth ?? "" } });
-    toast.success("Notifications are on for this device");
+    toast.success("This device is registered for notifications");
     await load();
   }, { busy: (on) => (busy = on) });
 
   const removeDevice = (id: number) => act(async () => {
-    await apiCall<"DELETE /api/reminders/devices/{id}">(`/api/reminders/devices/${id}`, { method: "DELETE", failed: "Couldn’t turn that off" });
+    await apiCall<"DELETE /api/reminders/devices/{id}">(`/api/reminders/devices/${id}`, { method: "DELETE", failed: "Couldn’t remove that device" });
     await load();
   }, { busy: (on) => (busy = on) });
 
@@ -89,32 +89,32 @@
         <input type="checkbox" class="size-5 shrink-0" checked={list.check_in} disabled={busy} onchange={(e) => choose({ check_in: e.currentTarget.checked })} />
       </label>
       <label class="row cursor-pointer flex-nowrap">
-        <span class="min-w-0"><span class="block font-medium">Day-of summary</span><span class="block text-sm text-muted-foreground">What starts today, from 7:00 on Waypoint’s clock.</span></span>
+        <span class="min-w-0"><span class="block font-medium">Day-of summary</span><span class="block text-sm text-muted-foreground">Today’s bookings at 7:00 (server time).</span></span>
         <input type="checkbox" class="size-5 shrink-0" checked={list.day_of} disabled={busy} onchange={(e) => choose({ day_of: e.currentTarget.checked })} />
       </label>
 
       {#each devices as d (d.id)}
         <div class="row" data-testid="device">
-          <div class="min-w-0"><p class="truncate font-medium">{d.service}</p><p class="text-sm text-muted-foreground">Turned on {when(d.created)}.</p></div>
-          <Button variant="outline" disabled={busy} onclick={() => removeDevice(d.id)}>Turn off</Button>
+          <div class="min-w-0"><p class="truncate font-medium">{d.service}</p><p class="text-sm text-muted-foreground">Added {when(d.created)}.</p></div>
+          <Button variant="outline" disabled={busy} onclick={() => removeDevice(d.id)}>Remove device</Button>
         </div>
       {/each}
       <div class="row">
         <div class="min-w-0">
-          <p class="font-medium">{devices.length ? "Notify another device" : "Get notifications on this device"}</p>
+          <p class="font-medium">Notifications on this device</p>
           <p class="text-sm text-muted-foreground">
-            {#if canPush}They show your own trips only, never a loyalty number.{:else}This browser can’t show notifications. On an iPhone, add Waypoint to the Home Screen first.{/if}
+            {#if canPush}Register here to receive trip reminders on this device.{:else}This browser can’t show notifications. On an iPhone, add Waypoint to the Home Screen first.{/if}
           </p>
         </div>
-        <Button disabled={busy || !canPush} onclick={turnOn}>Turn on</Button>
+        <Button disabled={busy || !canPush} onclick={registerDevice}>Register this device</Button>
       </div>
 
       <div class="row" data-testid="calendar-feed">
         <div class="min-w-0">
           <p class="font-medium">Calendar feed</p>
           <p class="text-sm text-muted-foreground">
-            {#if list.feed}Your trips, as a private address your calendar app subscribes to. Waypoint can’t show the address again: make a new one if you’ve lost it.
-            {:else}Subscribe your calendar app to your trips, at an address only you have.{/if}
+            {#if list.feed}Subscribe to your trips. Lost the address? Create a new one.
+            {:else}Subscribe your calendar app to your trips.{/if}
           </p>
         </div>
         <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">

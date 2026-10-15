@@ -50,7 +50,7 @@ describe("Settings → Reminders", () => {
     render(RemindersSection);
     expect(await screen.findByText("Notifications to push.example.com")).toBeInTheDocument();
     expect(screen.getByText("Chrome or Android (Google)")).toBeInTheDocument();
-    await userEvent.click(screen.getAllByRole("button", { name: "Turn off" })[0]!);
+    await userEvent.click(screen.getByRole("button", { name: "Remove device" }));
     expect(api).toHaveBeenCalledWith("/api/reminders/devices/7", expect.objectContaining({ method: "DELETE" }));
     await waitFor(() => expect(screen.getAllByTestId("device")).toHaveLength(1));
   });
@@ -59,7 +59,7 @@ describe("Settings → Reminders", () => {
     serve(() => view());
     render(RemindersSection);
     expect(await screen.findByText(/can’t show notifications/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Turn on" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Register this device" })).toBeDisabled();
   });
 
   it("subscribes this browser with the server’s key and sends the subscription", async () => {
@@ -70,11 +70,11 @@ describe("Settings → Reminders", () => {
     Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { ready: Promise.resolve({ pushManager }) } });
     serve(() => view(), () => ({ id: 1, service: "Notifications to push.example.com", created: 1 }));
     render(RemindersSection);
-    await userEvent.click(await screen.findByRole("button", { name: "Turn on" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Register this device" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/reminders/devices", expect.objectContaining({
       method: "POST", body: { endpoint: "https://push.example.com/send/a", p256dh: "pk", auth: "ak" } })));
     expect(pushManager.subscribe).toHaveBeenCalledWith(expect.objectContaining({ userVisibleOnly: true }));
-    expect(toast.success).toHaveBeenCalledWith("Notifications are on for this device");
+    expect(toast.success).toHaveBeenCalledWith("This device is registered for notifications");
     // @ts-expect-error: put back what jsdom has
     delete navigator.serviceWorker;
   });
@@ -85,7 +85,7 @@ describe("Settings → Reminders", () => {
     Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { ready: new Promise(() => {}) } });
     serve(() => view());
     render(RemindersSection);
-    await userEvent.click(await screen.findByRole("button", { name: "Turn on" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Register this device" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/blocked/)));
     expect(api).not.toHaveBeenCalledWith("/api/reminders/devices", expect.anything());
     // @ts-expect-error: put back what jsdom has
