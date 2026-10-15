@@ -106,16 +106,16 @@ describe("Settings index", () => {
   it("opens on an index of task groups, each linked by its address", () => {
     render(Settings);
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => [h.textContent, h.querySelector("a")?.getAttribute("href")])).toEqual([
-      ["Account & household", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => [h.textContent, h.closest("a")?.getAttribute("href")])).toEqual([
+      ["Account", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
       ["Offline & notifications", "#settings/offline"], ["Connected assistants", "#settings/assistants"], ["Backup & import", "#settings/backup"]]);
     expect(screen.queryByText("Signed in as")).toBeNull();
   });
 
   it.each([
-    ["Offline access", "#settings/offline"], ["Calendar subscription", "#settings/offline"], ["Import past flights", "#settings/backup"],
-    ["Connect or reconnect Gmail", "#settings/mail"], ["Download a backup", "#settings/backup"], ["Connect an assistant", "#settings/assistants"],
-  ])("lists %s where it lives", (task, href) => {
+    ["Account", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
+    ["Offline & notifications", "#settings/offline"], ["Connected assistants", "#settings/assistants"], ["Backup & import", "#settings/backup"],
+  ])("opens %s from one clearly named category link", (task, href) => {
     render(Settings);
     expect(index().getByRole("link", { name: task })).toHaveAttribute("href", href);
   });
@@ -145,11 +145,20 @@ describe("Settings index", () => {
     view.unmount();
   });
 
-  it("keeps the database and flight status under an advanced heading, with a link to People", () => {
+  it("marks the current category and keeps the other sections within reach", () => {
+    route.sub = "travel";
+    render(Settings);
+    expect(index().getByRole("link", { name: "Travel preferences" })).toHaveAttribute("aria-current", "page");
+    expect(index().getByRole("link", { name: "Mail & review" })).toHaveAttribute("href", "#settings/mail");
+    expect(index().getByRole("link", { name: "Mail & review" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("keeps advanced app information without duplicating People navigation", () => {
     route.sub = "account";
     render(Settings);
     expect(screen.getByRole("heading", { name: "Advanced: for whoever runs Waypoint" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open People" })).toHaveAttribute("href", "#people");
+    expect(screen.queryByRole("link", { name: "Open People" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Household" })).toBeNull();
   });
 
   it("opens an old Data link on Backup & import", () => {
