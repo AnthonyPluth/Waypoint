@@ -107,13 +107,13 @@ describe("Settings index", () => {
     render(Settings);
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 2 }).map((h) => [h.textContent, h.closest("a")?.getAttribute("href")])).toEqual([
-      ["Account & household", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
+      ["Account", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
       ["Offline & notifications", "#settings/offline"], ["Connected assistants", "#settings/assistants"], ["Backup & import", "#settings/backup"]]);
     expect(screen.queryByText("Signed in as")).toBeNull();
   });
 
   it.each([
-    ["Account & household", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
+    ["Account", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
     ["Offline & notifications", "#settings/offline"], ["Connected assistants", "#settings/assistants"], ["Backup & import", "#settings/backup"],
   ])("opens %s from one clearly named category link", (task, href) => {
     render(Settings);
@@ -153,11 +153,12 @@ describe("Settings index", () => {
     expect(index().getByRole("link", { name: "Mail & review" })).not.toHaveAttribute("aria-current");
   });
 
-  it("keeps the database and flight status under an advanced heading, with a link to People", () => {
+  it("keeps advanced app information without duplicating People navigation", () => {
     route.sub = "account";
     render(Settings);
     expect(screen.getByRole("heading", { name: "Advanced: for whoever runs Waypoint" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open People" })).toHaveAttribute("href", "#people");
+    expect(screen.queryByRole("link", { name: "Open People" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Household" })).toBeNull();
   });
 
   it("opens an old Data link on Backup & import", () => {
