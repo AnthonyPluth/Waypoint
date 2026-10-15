@@ -16,7 +16,7 @@ from waypoint.domain import trips
 from waypoint.domain.mail import ai, extract, review, scan
 from waypoint.storage import db
 from waypoint.storage import settings_keys as sk
-from waypoint.storage.models import ReviewItem, Setting
+from waypoint.storage.models import ReviewItem, Setting, StoredMessage
 
 BODY = "CANARY-BODY-AI-5J2K"
 IDS = ("TT87654321", "4111 1111 1111 1111", "2207781905", "FXLOY-4400123")
@@ -845,6 +845,21 @@ class RoundTripScanTests(ScanAiCase):
         [booking] = self.segments()
         self.assertEqual(booking["details"]["flight_number"], "DL 1204")
         self.assertEqual(len(self.read(lambda conn: trips.emails_of(conn, self.jane, booking["id"]))), 1)
+
+    def test_manual_ai_keeps_fetched_legacy_mail_before_filing(self):
+        self.turn_on(auto=False)
+        self.add_mail("legacy-ai", self.unreadable())
+        self.scan()
+        [item] = self.items()
+        self.read(lambda conn: conn.execute(StoredMessage.__table__.delete()))
+        self.fake.content = json.dumps({"bookings": [OUTBOUND]})
+        with no_leaks(self, self.CANARY, database=self.path, sent_ok=True):
+            scan.suggest_now("u-jane", item["id"], 1000000000)
+        self.assertEqual(self.items(), [])
+        [booking] = self.segments()
+        emails = self.read(lambda conn: trips.emails_of(conn, self.jane, booking["id"]))
+        self.assertEqual(len(emails), 1)
+        self.assertIn(self.CANARY, emails[0]["text"])
 
     def test_dismissing_an_item_while_ai_reads_it_does_not_create_a_booking(self):
         self.turn_on(auto=False)

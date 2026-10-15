@@ -348,7 +348,8 @@ def _read(cfg: ai.Config, text: str, known: tuple[str, ...], timeout: float | No
 
 
 def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) -> None:
-    _ask(mailbox_id, message_id, extract.plain_text(raw), now)
+    content = keep_message(mailbox_id, message_id, raw, [], now)
+    _ask(mailbox_id, message_id, content["text"], now)
 
 
 def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> None:
