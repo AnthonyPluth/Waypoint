@@ -50,6 +50,7 @@ describe("the shell", () => {
   });
 
   it("switches page when the route changes, and marks the page you're on", async () => {
+    await import("./pages/Trips.svelte");
     render(App);
     await go("#trips");
     expect(await screen.findByRole("heading", { name: "Trips" })).toBeInTheDocument();
