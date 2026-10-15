@@ -478,7 +478,6 @@ def _answer(cfg: Config, body: Any) -> Any:
 
 
 def _wait(cfg: Config, limit: float | None) -> float:
-    """How long to wait for the AI: the mode's own limit, or less when the caller (a scan) has only so much time left."""
     own = LOCAL_TIMEOUT if cfg.mode == LOCAL else TIMEOUT
     return own if limit is None else max(1.0, min(own, limit))
 
