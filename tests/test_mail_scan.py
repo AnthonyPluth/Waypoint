@@ -2279,7 +2279,7 @@ class KeptPictureTests(ScanCase):
         asked = []
         config = scan.ai.Config("local", "llama3", url="http://ollama.example:1234")
         with remote_pictures(), mock.patch.object(scan.ai, "config", return_value=config), mock.patch.object(scan.autoask, "chosen", return_value=True), \
-                mock.patch.object(scan.ai, "suggest", side_effect=lambda cfg, text, known, **kwargs: asked.append(text) or None):
+                mock.patch.object(scan.ai, "suggest", side_effect=lambda cfg, text, known, timeout=None: asked.append(text) or ai.Reading([])):
             self.scan()
         self.assertTrue(asked)
         for text in asked:
@@ -2922,6 +2922,13 @@ class MailScanApiTests(GoogleCase):
         self.assertIn("CANARY-BODY-NOMARKUP-6H9C", asked.call_args.args[1])
         self.assertEqual(self.call("ben", "GET", "/api/review")[1]["items"][0]["suggestions"], [self.SUGGESTED])
         del self.google.mail["m-no_markup"]
+        fetched = len(self.google.fetched)
+        (status, body), asked = self.asked("ben", item["id"])
+        self.assertEqual((status, body), (200, {"ok": True}))
+        self.assertIn("CANARY-BODY-NOMARKUP-6H9C", asked.call_args.args[1])
+        self.assertEqual(len(self.google.fetched), fetched)
+        with db.session() as conn:
+            conn.execute(StoredMessage.__table__.delete())
         (status, body), _ = self.asked("ben", item["id"])
         self.assertEqual((status, body["error"]), (404, "That message is no longer in Gmail."))
 
