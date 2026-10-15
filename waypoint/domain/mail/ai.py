@@ -24,8 +24,8 @@ LOCAL: Mode = "local"
 OPENROUTER: Mode = "openrouter"
 MODES: tuple[Mode, ...] = (OFF, LOCAL, OPENROUTER)
 KEY_ENV = "OPENROUTER_API_KEY"
-TIMEOUT = 30            # seconds to wait on OpenRouter
-LOCAL_TIMEOUT = 3600    # seconds to wait on your own Ollama server: a big model on modest hardware can take many minutes
+TIMEOUT = 30
+LOCAL_TIMEOUT = 3600
 MAX_SENT = 12_000
 MAX_REPLY = 1_000_000
 MAX_BOOKINGS = 10
@@ -202,7 +202,7 @@ def request(cfg: Config, text: str, system: str = SYSTEM) -> tuple[str, dict[str
     messages = [{"role": "system", "content": system}, {"role": "user", "content": text}]
     if cfg.mode == LOCAL:
         return (cfg.url.rstrip("/") + "/api/chat", {"Content-Type": "application/json"},
-                {"model": cfg.model, "messages": messages, "stream": False, "format": "json", "think": False,   # a model that thinks first can spend its whole reply on it and answer nothing
+                {"model": cfg.model, "messages": messages, "stream": False, "format": "json", "think": False,
                  "options": {"temperature": 0}}, True)
     return (HOSTS.openrouter.rstrip("/") + "/chat/completions",
             {"Content-Type": "application/json", "Authorization": f"Bearer {cfg.key}"},
@@ -476,7 +476,6 @@ def _answer(cfg: Config, body: Any) -> Any:
 
 
 def _wait(cfg: Config, limit: float | None) -> float:
-    """How long to wait for the AI: the mode's own limit, or less when the caller (a scan) has only so much time left."""
     own = LOCAL_TIMEOUT if cfg.mode == LOCAL else TIMEOUT
     return own if limit is None else max(1.0, min(own, limit))
 
