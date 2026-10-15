@@ -513,6 +513,68 @@ class SuggestTests(unittest.TestCase):
             self.assertEqual(opened.call_args.args[1], expected)
         self.assertGreater(ai.LOCAL_TIMEOUT, ai.TIMEOUT)
 
+    def answers(self, *contents):
+        self.fake.on_request = lambda n: setattr(self.fake, "content", contents[min(n, len(contents)) - 1])
+
+    def asked_to_think(self):
+        return [body["think"] for _, _, body in self.fake.requests]
+
+    def test_a_local_reply_that_is_not_a_booking_is_asked_again_with_thinking_on(self):
+        self.answers("not json", json.dumps(GOOD))
+        self.assertEqual(ai.suggest(self.local, "Confirmation code: QW4R7T flight BOS DEN").bookings, [GOOD])
+        self.assertEqual(self.asked_to_think(), [False, True])
+
+    def test_a_local_reply_with_fewer_flights_than_the_email_lists_is_asked_again_and_the_fuller_answer_wins(self):
+        back = {**GOOD, "origin": "DEN", "destination": "BOS", "start_local": "2026-12-09T12:00", "end_local": "2026-12-09T17:30"}
+        self.answers(json.dumps({"bookings": [GOOD]}), json.dumps({"bookings": [GOOD, back]}))
+        reading = ai.suggest(self.local, "Confirmation code: QW4R7T\nFlight AB 123 BOS DEN\nFlight AB 456 DEN BOS")
+        self.assertEqual((reading.bookings, self.asked_to_think()), ([GOOD, back], [False, True]))
+
+    def test_a_second_answer_that_is_no_better_leaves_the_first_in_place(self):
+        both = json.dumps({"bookings": [GOOD]})
+        self.answers(both, both)
+        reading = ai.suggest(self.local, "Confirmation code: QW4R7T\nFlight AB 123 BOS DEN\nFlight AB 456 DEN BOS")
+        self.assertEqual((reading.bookings, self.asked_to_think()), ([GOOD], [False, True]))
+
+    def test_a_second_answer_that_fails_leaves_the_first_in_place(self):
+        self.answers(json.dumps({"bookings": [GOOD]}), "not json")
+        reading = ai.suggest(self.local, "Confirmation code: QW4R7T\nFlight AB 123 BOS DEN\nFlight AB 456 DEN BOS")
+        self.assertEqual((reading.bookings, self.asked_to_think()), ([GOOD], [False, True]))
+
+    def test_a_complete_local_answer_is_not_asked_again(self):
+        ai.suggest(self.local, "Confirmation code: QW4R7T\nFlight AB 123 BOS DEN\nAircraft A320 B737")
+        self.assertEqual(self.asked_to_think(), [False])
+
+    def test_no_booking_or_an_unreachable_server_is_not_asked_again(self):
+        self.answers(json.dumps({"bookings": []}))
+        with self.assertRaises(ai.AiError) as caught:
+            ai.suggest(self.local, "Confirmation code: QW4R7T flight BOS DEN")
+        self.assertEqual((str(caught.exception), self.asked_to_think()), (ai.NO_BOOKING, [False]))
+        self.fake.reset()
+        self.fake.status = 500
+        with self.assertRaises(ai.AiError):
+            ai.suggest(self.local, "Confirmation code: QW4R7T flight BOS DEN")
+        self.assertEqual(self.asked_to_think(), [False])
+
+    def test_openrouter_is_not_asked_a_second_time(self):
+        self.answers("not json")
+        with self.assertRaises(ai.AiError):
+            ai.suggest(self.router, "Confirmation code: QW4R7T flight BOS DEN")
+        self.assertEqual(len(self.fake.requests), 1)
+
+    def test_the_second_ask_gets_only_the_time_a_scan_has_left(self):
+        self.answers("not json", json.dumps(GOOD))
+        clock = mock.Mock(monotonic=mock.Mock(side_effect=[0.0, 40.0]))
+        with mock.patch.object(ai, "time", clock), mock.patch.object(ai, "_wait", wraps=ai._wait) as waited:
+            ai.suggest(self.local, "Confirmation code: QW4R7T flight BOS DEN", timeout=100.0)
+        self.assertEqual([call.args[1] for call in waited.call_args_list], [100.0, 60.0])
+        self.answers("not json", json.dumps(GOOD))
+        self.fake.requests.clear()
+        with mock.patch.object(ai, "time", mock.Mock(monotonic=mock.Mock(side_effect=[0.0, 100.0]))):
+            with self.assertRaises(ai.AiError):
+                ai.suggest(self.local, "Confirmation code: QW4R7T flight BOS DEN", timeout=100.0)
+        self.assertEqual(self.asked_to_think(), [False])
+
     def test_a_scan_with_little_time_left_shortens_the_wait_but_never_lengthens_it(self):
         self.assertEqual(ai._wait(self.local, None), ai.LOCAL_TIMEOUT)
         self.assertEqual(ai._wait(self.local, 90.0), 90.0)
