@@ -79,7 +79,7 @@ describe("Settings → AI assistants (MCP)", () => {
     render(McpSection);
     const writes = await screen.findByRole("checkbox", { name: /Let assistants change trips/ });
     expect(writes).not.toBeChecked();
-    expect(writes).toHaveAccessibleDescription(/ask before each change/);
+    expect(writes).toHaveAccessibleDescription(/ask first/);
     expect(screen.getAllByRole("checkbox")).toHaveLength(1);
     expect(screen.queryByText(/full ID numbers/i)).toBeNull();
   });

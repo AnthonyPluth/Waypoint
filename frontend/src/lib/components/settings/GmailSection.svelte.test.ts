@@ -441,7 +441,7 @@ describe("Settings → Gmail", () => {
     it("picks none by default and lists only the user's own labels, with counts", async () => {
       serveLabels();
       render(GmailSection);
-      expect(await screen.findByText(/pick your own labels to read in full/)).toBeInTheDocument();
+      expect(await screen.findByText(/Read booking emails, or all mail in selected labels/)).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: "Choose labels" }));
       const group = await screen.findByRole("group", { name: /Labels to read in full/ });
       expect(within(group).getAllByRole("checkbox").map((c) => (c as HTMLInputElement).checked)).toEqual([false, false]);
