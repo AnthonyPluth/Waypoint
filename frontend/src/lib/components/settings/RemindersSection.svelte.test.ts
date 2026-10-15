@@ -50,7 +50,7 @@ describe("Settings → Reminders", () => {
     render(RemindersSection);
     expect(await screen.findByText("Notifications to push.example.com")).toBeInTheDocument();
     expect(screen.getByText("Chrome or Android (Google)")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Remove device" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Remove device" })[0]!);
     expect(api).toHaveBeenCalledWith("/api/reminders/devices/7", expect.objectContaining({ method: "DELETE" }));
     await waitFor(() => expect(screen.getAllByTestId("device")).toHaveLength(1));
   });
