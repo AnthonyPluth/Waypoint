@@ -41,7 +41,7 @@
   });
 
   const GROUPS = [
-    { id: "account", label: "Account & household", icon: UserRound, about: "Your profile, household members and app information." },
+    { id: "account", label: "Account", icon: UserRound, about: "Your profile and app information." },
     { id: "mail", label: "Mail & review", icon: Mail, about: "Connected mailboxes, email preferences and AI booking extraction." },
     { id: "travel", label: "Travel preferences", icon: SlidersHorizontal, about: "Your home, distance units, trip costs and booking logos." },
     { id: "offline", label: "Offline & notifications", icon: Bell, about: "Saved trips, travel reminders and your calendar subscription." },
@@ -64,7 +64,7 @@
 <div class="mb-8">
   <p class="eyebrow mb-2 text-primary">Make Waypoint yours</p>
   <h1 class="text-display">{group ? group.label : "Settings"}</h1>
-  <p class="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{group ? group.about : "A few preferences for smoother travels. Manage your household, connections and the details that make Waypoint work for you."}</p>
+  <p class="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{group ? group.about : "A few preferences for smoother travels. Manage your account, connections and the details that make Waypoint work for you."}</p>
 </div>
 
 <div class={group ? "grid min-w-0 gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8" : ""}>
@@ -119,16 +119,6 @@
       {:else}
         <div class="row"><p class="font-medium">Not signed in</p></div>
       {/if}
-    </div>
-  </section>
-
-  <section aria-labelledby="household-title" class="space-y-2">
-    <h2 id="household-title" class="eyebrow px-1">Household</h2>
-    <div class="rows">
-      <div class="row">
-        <div><p class="font-medium">Household members</p><p class="text-sm text-muted-foreground">Who travels, and their loyalty and Known Traveler numbers.</p></div>
-        <Button variant="outline" href="#people">Open People</Button>
-      </div>
     </div>
   </section>
 

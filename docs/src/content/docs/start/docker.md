@@ -39,7 +39,7 @@ Copy `.env.example` to `.env` and fill in `WAYPOINT_PUBLIC_URL`, `OIDC_ISSUER`, 
 
 Everyone who can sign in belongs to one household and shares settings and loyalty IDs. Authenticated members see the trips they travel on, book or receive; local mode shows the whole household’s trips.
 
-**Settings** groups preferences into six cards: Account & household, Mail & review, Travel preferences, Offline & notifications, Connected assistants, and Backup & import. Open a card to see its controls. On wider screens, the section navigation stays beside the controls; **All settings** returns to the overview.
+**Settings** groups preferences into six cards: Account, Mail & review, Travel preferences, Offline & notifications, Connected assistants, and Backup & import. Open a card to see its controls. On wider screens, the section navigation stays beside the controls; **All settings** returns to the overview.
 
 ## Moving your data from another machine
 
