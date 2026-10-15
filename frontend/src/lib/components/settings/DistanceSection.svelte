@@ -32,7 +32,7 @@
       <div class="row"><p class="text-sm text-muted-foreground">Loading…</p></div>
     {:else}
       <div class="row">
-        <div><p class="font-medium">Show distances in</p><p class="text-sm text-muted-foreground">On the Stats page, for everyone in the household.</p></div>
+        <div><p class="font-medium">Show distances in</p><p class="text-sm text-muted-foreground">Household distance units.</p></div>
         <div class="flex gap-2" role="group" aria-label="Distance unit">
           <Button variant={unit === "mi" ? "default" : "outline"} aria-pressed={unit === "mi"} disabled={saving} onclick={() => choose("mi")}>Miles</Button>
           <Button variant={unit === "km" ? "default" : "outline"} aria-pressed={unit === "km"} disabled={saving} onclick={() => choose("km")}>Kilometres</Button>

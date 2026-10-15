@@ -79,7 +79,7 @@ describe("Settings → AI assistants (MCP)", () => {
     render(McpSection);
     const writes = await screen.findByRole("checkbox", { name: /Let assistants change trips/ });
     expect(writes).not.toBeChecked();
-    expect(writes).toHaveAccessibleDescription(/ask before each change/);
+    expect(writes).toHaveAccessibleDescription(/ask first/);
     expect(screen.getAllByRole("checkbox")).toHaveLength(1);
     expect(screen.queryByText(/full ID numbers/i)).toBeNull();
   });
@@ -138,7 +138,7 @@ describe("Settings → AI assistants (MCP)", () => {
     expect(first).not.toHaveTextContent("Change trips");
     expect(second).toHaveTextContent(/Last used .*2026.*\./);
     expect(second).toHaveTextContent("Change trips");
-    expect(second).not.toHaveTextContent("by ");
+    expect(second).not.toHaveTextContent("Approved by ");
   });
 
   it("says on a read-only connection that it can’t make changes and what to do, and on a writing one why it still can’t while the switch is off", async () => {
@@ -166,7 +166,8 @@ describe("Settings → AI assistants (MCP)", () => {
     render(McpSection);
     const [first, second] = await screen.findAllByRole("checkbox", { name: /Read email text/ });
     expect(first).not.toBeChecked();
-    expect(screen.getAllByText(/This sends the email’s text and markup to the assistant you connected/)).toHaveLength(2);
+    for (const section of screen.getAllByTestId("assistant")) expect(section.querySelector("details")).not.toHaveAttribute("open");
+    expect(screen.getAllByText(/Sends saved booking and Review emails to this assistant/)).toHaveLength(2);
     await userEvent.click(second);
     await waitFor(() => expect(posts("/api/mcp-settings/connections/2/mail")).toEqual([{ allow: true }]));
     await waitFor(() => expect(second).toBeChecked());

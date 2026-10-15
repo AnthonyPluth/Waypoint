@@ -130,8 +130,9 @@ describe("Settings index", () => {
     expect(index().getByRole("link", { name: "All settings" })).toHaveAttribute("href", "#settings");
     view.unmount();
     view = open("travel");
-    for (const name of ["Home", "Distances", "Brand logos"]) expect(heading(name)).not.toBeNull();
+    for (const name of ["Home", "Distances"]) expect(heading(name)).not.toBeNull();
     expect(heading("Gmail")).toBeNull();
+    expect(heading("Brand logos")).toBeNull();
     view.unmount();
     view = open("offline");
     for (const name of ["Offline access", "Reminders and calendar"]) expect(heading(name)).not.toBeNull();

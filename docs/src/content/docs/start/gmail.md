@@ -81,3 +81,5 @@ What Waypoint can’t do yet: read mail with no booking markup from a sender tha
 ## What Waypoint keeps
 
 Per connection: the Gmail address, a **refresh token** and where its scans had got to (the point in Gmail’s history, and when the last scan finished or what stopped it), plus the ids of the messages already read (for one from an ignored sender, also the sender’s domain, deleted when you stop ignoring it) and the [Review](/Waypoint/start/review/) items. The refresh token is encrypted with `WAYPOINT_SECRET_KEY` (in backups too), is decrypted only to refresh or revoke it, and never appears in logs or error pages. Access tokens are used for the one call that needs them and aren’t kept. A backup holds the connections, so restoring one needs the same key; otherwise the connections turn to **Reconnect**.
+
+The **Ignored senders** list starts collapsed. Expand its count to manage individual senders.

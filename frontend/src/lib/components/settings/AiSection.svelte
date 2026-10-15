@@ -51,7 +51,8 @@
 
 <section aria-labelledby="ai-title" class="space-y-2">
   <h2 id="ai-title" class="eyebrow px-1">AI</h2>
-  <p class="px-1 text-sm text-muted-foreground">Optional. When it’s on, you can ask an AI about mail Waypoint couldn’t read (an item on the Review page, under Check suggestions or Add missing details) and it suggests the booking. You confirm or edit it; nothing is saved without you. The setting is the household’s, so it covers every member’s connected mailbox. Nothing is sent until someone chooses Ask AI, unless you also choose to read unreadable mail automatically. With OpenRouter, quoted replies, footers and numbers that look like loyalty, Known Traveler or card numbers are removed first; with Local they are sent as written. A booking Waypoint could read is never sent.</p>
+  <p class="px-1 text-sm text-muted-foreground">Use AI to extract bookings from emails Waypoint couldn’t read.</p>
+  <details class="px-1 text-sm text-muted-foreground"><summary class="cursor-pointer py-1">How email is shared</summary><p class="mt-2">Applies to all household mailboxes. Emails are sent only when you choose Ask AI or enable automatic reading. OpenRouter removes quoted replies, footers and sensitive numbers first; Local receives the original text. Complete bookings are added automatically; missing details stay in Review.</p></details>
   <div class="rows">
     {#if problem}
       <div class="row"><p class="text-sm text-signal-ink" role="status">{problem}</p><Button variant="outline" onclick={load}>Try again</Button></div>

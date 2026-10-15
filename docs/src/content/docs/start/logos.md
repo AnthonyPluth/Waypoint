@@ -5,7 +5,7 @@ sidebar:
   order: 12
 ---
 
-Waypoint includes logos for major airlines, hotel groups and brands, car rental companies and cruise lines. They appear automatically on bookings and loyalty memberships. No account, key or connection is needed, and neither the server nor your browser contacts a logo service.
+Waypoint includes logos for major airlines, hotel groups and brands, car rental companies and cruise lines. They appear automatically on bookings and loyalty memberships, with no Settings section to configure. No account, key or connection is needed, and neither the server nor your browser contacts a logo service.
 
 A flight with no airline named uses its flight number’s airline code. Hotel names such as “Hyatt Place Chicago” or “Courtyard Denver” match their brand. When a hotel brand has no bundled logo, Waypoint uses its group’s logo and labels it with the brand’s name. Unlisted brands keep their name or initial.
 
