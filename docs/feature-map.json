@@ -269,7 +269,8 @@
       "path": "/api/trips/{id}/places",
       "handler": "waypoint/server/api/trips.py:api_trip_places",
       "web": [
-        "frontend/src/lib/components/RouteReplay.svelte"
+        "frontend/src/lib/components/RouteReplay.svelte",
+        "frontend/src/pages/Upcoming.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
