@@ -3,7 +3,8 @@
   "page": "trips",
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
-    { "click": "button:has-text('Add a booking')" },
+    { "click": "button:has-text('Add a booking'), button[aria-label='Add a booking']" },
+    { "click_if_present": "[role='group'][aria-label='Add a booking'] button" },
     { "wait_for": "form[data-editor]" },
     { "click": "input[placeholder^='JFK']" },
     { "fill": { "selector": "input[placeholder^='JFK']", "text": "lond" } },

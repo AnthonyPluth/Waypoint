@@ -30,6 +30,11 @@ describe("flowProblems", () => {
     expect(bad[2]).toMatch(/step 3 must have exactly one of/);
   });
 
+  it("takes a click that only happens when the element shows up", () => {
+    expect(flowProblems({ ...ok, steps: [{ click_if_present: "text=Settings", timeout: 500 }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ click_if_present: { selector: "a" } }] })).toEqual(["step 1: click_if_present takes a string"]);
+  });
+
   it("takes a selector to hover", () => {
     expect(flowProblems({ ...ok, steps: [{ hover: "li.row" }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ hover: true }] })).toEqual(["step 1: hover takes a string"]);
