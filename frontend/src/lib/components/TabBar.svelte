@@ -38,20 +38,19 @@
 
 <svelte:window onkeydown={onKeydown} onpointerdown={onPointerDown} />
 
-<nav aria-label="Main" class="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface-1/90 pb-[env(safe-area-inset-bottom)] shadow-elevation-3 backdrop-blur-xl lg:hidden">
+<nav aria-label="Main" class="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 flex gap-1 rounded-[22px] border border-border bg-surface-2/90 p-1 shadow-elevation-3 backdrop-blur-xl lg:hidden">
   {#each TABS as item (item.page)}<NavLink {item} current={current === item.page} tab />{/each}
   <div class="relative flex flex-1" onfocusout={onFocusOut}>
     <button bind:this={button} type="button" aria-expanded={open} aria-controls="more-menu" aria-haspopup="true" aria-current={moreCurrent ? "true" : undefined} onclick={() => (open = !open)}
-      class={cn("relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-        moreCurrent || open ? "text-primary" : "text-muted-foreground hover:text-foreground")}>
-      {#if moreCurrent}<span class="absolute top-0 h-0.5 w-10 rounded-full bg-primary" aria-hidden="true"></span>{/if}
-      <MORE_TAB.icon class="size-6" />
+      class={cn("relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl text-xs font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        moreCurrent ? "bg-surface-3 text-foreground" : open ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+      <MORE_TAB.icon class={cn("size-6", (moreCurrent || open) && "text-primary")} />
       <span>{MORE_TAB.label}</span>
       {#if moreCurrent}<span class="sr-only">(current page: {currentLabel})</span>{/if}
       {#if waitingInMore}<span class="sr-only">({waitingInMore} waiting)</span>{/if}
     </button>
     {#if open}
-      <div bind:this={menu} id="more-menu" role="group" aria-label="More pages" class="absolute right-2 bottom-full mb-2 w-48 rounded-2xl border border-border bg-surface-2 p-1.5 shadow-elevation-3">
+      <div bind:this={menu} id="more-menu" role="group" aria-label="More pages" class="absolute right-0 bottom-full mb-3 w-48 rounded-2xl border border-border bg-surface-2 p-1.5 shadow-elevation-3">
         {#each MORE as item (item.page)}<NavLink {item} current={current === item.page} menu />{/each}
       </div>
     {/if}

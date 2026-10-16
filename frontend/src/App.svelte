@@ -53,10 +53,10 @@
   <TopBar />
   <div class="flex flex-1">
     <SideNav />
-    <main class="min-w-0 flex-1 px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+6rem)] md:px-8 md:pt-8 lg:pb-12">
+    <main class="min-w-0 flex-1 px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+7rem)] md:px-8 md:pt-8 lg:pb-12">
       <div class={`mx-auto max-w-3xl ${route.page === "trips" ? "lg:max-w-6xl 2xl:max-w-[90rem]" : route.page === "settings" ? "lg:max-w-5xl" : ""}`}>
         {#if app.sessionExpired}
-          <Alert.Root class="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-20 mb-4 flex flex-wrap items-center justify-between gap-3 border-signal bg-signal-soft text-signal-ink shadow-lg">
+          <Alert.Root class="sticky top-[calc(env(safe-area-inset-top)+4rem)] lg:top-4 z-20 mb-4 flex flex-wrap items-center justify-between gap-3 border-signal bg-signal-soft text-signal-ink shadow-lg">
             <Alert.Description class="text-signal-ink">
               {#if anyDirty()}Your session expired. Sign in opens in a new tab so what you’re editing stays on this page; come back here and save once you have.
               {:else}Your session expired. Sign in again.{/if}
@@ -95,4 +95,4 @@
   </div>
 </div>
 <TabBar />
-<Toaster theme="dark" position="bottom-center" mobileOffset={{ bottom: "calc(env(safe-area-inset-bottom) + 5rem)" }} />
+<Toaster theme="dark" position="bottom-center" mobileOffset={{ bottom: "calc(env(safe-area-inset-bottom) + 6rem)" }} />

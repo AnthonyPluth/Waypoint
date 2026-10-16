@@ -7,7 +7,7 @@
   const who = $derived(user && !user.local ? user.name || user.email || "" : "");
 </script>
 
-<header class="sticky top-0 z-30 border-b border-border bg-surface-1/80 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+<header class="sticky top-0 z-30 lg:hidden border-b border-border bg-surface-1/80 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
   <div class="flex h-14 items-center justify-between gap-3 px-4 md:px-6">
     <a href="#upcoming" class="flex items-center gap-2.5 rounded-lg phone:min-h-11 text-lg font-bold tracking-tight outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
       <Logo />Waypoint
