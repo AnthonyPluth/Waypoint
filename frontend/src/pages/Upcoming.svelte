@@ -100,6 +100,7 @@
   const happened = (i: DayItem) => dayIn(i.role === "end" ? endAt(i.segment) : startAt(i.segment), viewerZone()) < today;
   const firstAhead = $derived(days.findIndex((d) => !d.items.every(happened)));
   const earlier = $derived(firstAhead < 0 ? days : days.slice(0, firstAhead));
+  const earlierDates = $derived(new Set(earlier.map((d) => d.date)));
   const ahead = $derived(firstAhead < 0 ? [] : days.slice(firstAhead));
   const nextId = $derived(next?.segment.id ?? null);
   const waiting = $derived(app.state?.review_count ?? 0);
@@ -129,7 +130,8 @@
     <ul class="divide-y divide-border overflow-hidden rounded-[18px] border border-border bg-surface-1">
       {#each day.items as item (`${item.segment.id}-${item.role}`)}
         {@const seg = item.segment}
-        {@const isNext = item.role === "start" && seg.id === nextId}
+        {@const startCollapsed = earlierDates.has(seg.start_local.slice(0, 10))}
+        {@const isNext = seg.id === nextId && (item.role === "start" ? !startCollapsed : startCollapsed)}
         <li class={`row-tap flex items-center gap-3 px-4 py-3 phone:items-start ${isNext ? "bg-primary/10" : ""}`} class:opacity-60={seg.status === "cancelled"} data-next={isNext ? "true" : undefined}>
           <p class="mono w-[72px] shrink-0 text-sm font-medium order-first phone:order-last phone:w-auto phone:pt-0.5 phone:text-right">
             <DayTime segment={seg} end={item.role === "end"} />

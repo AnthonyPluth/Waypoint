@@ -73,11 +73,12 @@ export const nightsLabel = (from: string, to: string): string => {
 
 export function rangeLabel(from: string, to: string): string {
   const part = (day: string, o: Intl.DateTimeFormatOptions) => asUtc(`${day}T00:00`).toLocaleDateString(locale(), { timeZone: "UTC", ...o });
-  const withYear = from.slice(0, 4) !== to.slice(0, 4);
-  const first = part(from, { month: "short", day: "numeric", ...(withYear && { year: "numeric" }) });
+  const withYear = from.slice(0, 4) !== to.slice(0, 4) || Number(from.slice(0, 4)) !== new Date().getFullYear();
+  const full: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", ...(withYear && { year: "numeric" }) };
+  const first = part(from, full);
+  if (from === to) return first;
   const sameMonth = from.slice(0, 7) === to.slice(0, 7);
-  const last = part(to, sameMonth ? { day: "numeric" } : { month: "short", day: "numeric", ...(withYear && { year: "numeric" }) });
-  return first === last ? first : `${first} – ${last}`;
+  return `${first} – ${part(to, sameMonth && !withYear ? { day: "numeric" } : full)}`;
 }
 
 export function until(ms: number): string {

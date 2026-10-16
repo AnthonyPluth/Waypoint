@@ -692,6 +692,39 @@ describe("Upcoming header, review banner and timeline", () => {
     render(Upcoming);
     await screen.findByRole("list", { name: /day by day/ });
     expect(screen.queryByText(/night/)).toBeNull();
+    expect(screen.getByText("Nov 28")).toBeInTheDocument();
+  });
+
+  it("shows the year on both dates of a range outside the current year, and a single date for a one-day trip there", async () => {
+    const make = (a: string, b: string) => trip([segment({ id: 8, start_local: `${a}T09:00`, end_local: `${a}T12:00`, end_zone: NY }), segment({ id: 9, start_local: `${b}T09:00`, end_local: `${b}T12:00`, end_zone: NY })]);
+    serve([make("2027-01-02", "2027-01-08")]);
+    const next = render(Upcoming);
+    await screen.findByRole("list", { name: /day by day/ });
+    expect(screen.getByText("Jan 2, 2027 – Jan 8, 2027 · 6 nights")).toBeInTheDocument();
+    next.unmount();
+    serve([make("2031-03-04", "2031-03-04")]);
+    const far = render(Upcoming);
+    await screen.findByRole("list", { name: /day by day/ });
+    expect(screen.getByText("Mar 4, 2031")).toBeInTheDocument();
+    far.unmount();
+    serve([make("2026-12-30", "2027-01-02")]);
+    render(Upcoming);
+    await screen.findByRole("list", { name: /day by day/ });
+    expect(screen.getByText("Dec 30, 2026 – Jan 2, 2027 · 3 nights")).toBeInTheDocument();
+  });
+
+  it("marks the end row of an ongoing stay as next up when its start day is in the collapsed earlier days", async () => {
+    at("2026-11-24T12:00:00+00:00");
+    serve([trip([outbound, stay])]);
+    render(Upcoming);
+    const toggle = await screen.findByText(/Earlier in this trip/);
+    const details = toggle.closest("details")!;
+    const list = screen.getByRole("list", { name: "Trip to London, day by day" });
+    const marked = [...list.querySelectorAll("li[data-next='true']")];
+    expect(marked).toHaveLength(1);
+    expect(details.contains(marked[0])).toBe(false);
+    expect(marked[0]).toHaveTextContent("Check-out: Harbour Hotel");
+    expect(within(marked[0] as HTMLElement).getByTestId("next-up-pill")).toBeInTheDocument();
   });
 
   it("shows the Saved for offline pill only when offline saving is working", async () => {
