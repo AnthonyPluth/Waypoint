@@ -56,8 +56,9 @@
   const pickYear = (year: number | null) => pick(sel.who, year);
   const pickWho = (id: number | null) => pick(id ?? "all", sel.year);
   const selectedWho = $derived(typeof sel.who === "number" ? sel.who : null);
-  const showYears = $derived(yearChoices.length > 1 || sel.year !== null);
-  const showTravellers = $derived(people.length > 1);
+  const showYears = $derived(yearChoices.length > 0);
+  const choosable = $derived(people.length > 1 ? people : []);
+  const everyone = $derived({ on: sel.who === "all", onpick: () => pick(sel.who === "all" ? (me ?? "all") : "all", sel.year) });
   const inUse = $derived(sel.year !== null || sel.who !== (me ?? "all"));
   let filtersOpen = $state(false);
   const whoName = $derived(sel.who === "all" ? "Everyone" : people.find((p) => p.id === sel.who)?.display_name ?? "this person");
@@ -200,29 +201,27 @@
   <h1 class="text-4xl font-bold tracking-tight">Stats</h1>
 </div>
 
-{#if showYears || showTravellers}
-  <div class="mb-6 flex flex-col gap-3 rounded-[18px] border border-border bg-black/25 p-3 md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-3 md:p-4" role="group" aria-label="Choose whose stats and when">
-    {#if viewport.phone}
-      <div class="flex items-center justify-between gap-3">
-        <span class="min-w-0 truncate text-sm font-medium">{selectionLabel}</span>
-        <Button type="button" variant="outline" size="icon" class="relative size-[46px] shrink-0" onclick={() => (filtersOpen = true)}>
-          <SlidersHorizontal /><span class="sr-only">Filters{inUse ? ", in use" : ""}</span>
-          {#if inUse}<span class="absolute top-2 right-2 size-2 rounded-full bg-primary" data-testid="filters-dot" aria-hidden="true"></span>{/if}
-        </Button>
-      </div>
-    {:else}
-      {#if showYears}<YearChips years={yearChoices} selected={sel.year} onpick={pickYear} />{/if}
-      {#if showTravellers}<TravellerAvatars {people} selected={selectedWho} onpick={pickWho} />{/if}
-    {/if}
-  </div>
+<div class="mb-6 flex flex-col gap-3 rounded-[18px] border border-border bg-black/25 p-3 md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-3 md:p-4" role="group" aria-label="Choose whose stats and when">
   {#if viewport.phone}
-    <Sheet bind:open={filtersOpen} title="Filters">
-      <div class="flex flex-col gap-5">
-        {#if showYears}<YearChips years={yearChoices} selected={sel.year} onpick={pickYear} />{/if}
-        {#if showTravellers}<TravellerAvatars {people} selected={selectedWho} onpick={pickWho} />{/if}
-      </div>
-    </Sheet>
+    <div class="flex items-center justify-between gap-3">
+      <span class="min-w-0 truncate text-sm font-medium">{selectionLabel}</span>
+      <Button type="button" variant="outline" size="icon" class="relative size-[46px] shrink-0" onclick={() => (filtersOpen = true)}>
+        <SlidersHorizontal /><span class="sr-only">Filters{inUse ? ", in use" : ""}</span>
+        {#if inUse}<span class="absolute top-2 right-2 size-2 rounded-full bg-primary" data-testid="filters-dot" aria-hidden="true"></span>{/if}
+      </Button>
+    </div>
+  {:else}
+    {#if showYears}<YearChips years={yearChoices} selected={sel.year} onpick={pickYear} />{/if}
+    <TravellerAvatars people={choosable} selected={selectedWho} onpick={pickWho} {me} {everyone} />
   {/if}
+</div>
+{#if viewport.phone}
+  <Sheet bind:open={filtersOpen} title="Filters">
+    <div class="flex flex-col gap-5">
+      {#if showYears}<YearChips years={yearChoices} selected={sel.year} onpick={pickYear} />{/if}
+      <TravellerAvatars people={choosable} selected={selectedWho} onpick={pickWho} {me} {everyone} />
+    </div>
+  </Sheet>
 {/if}
 
 {#if problem}
