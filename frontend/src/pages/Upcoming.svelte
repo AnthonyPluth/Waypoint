@@ -2,7 +2,7 @@
   import { act, errMsg } from "$lib/act";
   import { app, refreshState } from "$lib/app.svelte";
   import { apiCall } from "$lib/contract";
-  import type { MailboxList, Person, Segment, Trip } from "$lib/api-types";
+  import type { MailboxList, Person, Segment, Trip, TripPlaces } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
@@ -13,6 +13,9 @@
   import { flightStatus, loadFlightStatus, statusFor } from "$lib/flightstatus.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
+  import RouteMapCard from "$lib/components/RouteMapCard.svelte";
+  import { NO_ROADS, stopsOf } from "$lib/route-replay";
+  import { dateTile, laterLine, laterTrips, startsIn, tripTotals } from "$lib/side-column";
   import { type Day, type DayItem, dayIn, dayLabel, dayParts, END_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import KindTile from "$lib/components/KindTile.svelte";
   import { offlineWorking } from "$lib/offline.svelte";
@@ -97,6 +100,22 @@
   const next = $derived(trips ? nextUp(trips, now) : null);
   const featured = $derived(trips ? featuredTrip(trips, next, today) : null);
   const days = $derived(featured ? tripDays(featured) : []);
+  const featuredId = $derived(featured?.id ?? null);
+  const later = $derived(trips && featured ? laterTrips(trips, featured, today) : []);
+  let places = $state<TripPlaces | null>(null);
+  const stops = $derived(featured && places ? stopsOf(featured, places) : []);
+  const totals = $derived(featured ? tripTotals(featured, places) : null);
+  let placesRequest = 0;
+  $effect(() => {
+    const mine = ++placesRequest;
+    const id = featuredId;
+    places = null;
+    if (id === null || viewport.phone) return;
+    apiCall<"GET /api/trips/{id}/places">(`/api/trips/${id}/places`).then(
+      (found) => { if (mine === placesRequest && Array.isArray(found?.airports) && Array.isArray(found?.cities)) places = found; },
+      () => { if (mine === placesRequest) places = null; },
+    );
+  });
   const happened = (i: DayItem) => dayIn(i.role === "end" ? endAt(i.segment) : startAt(i.segment), viewerZone()) < today;
   const firstAhead = $derived(days.findIndex((d) => !d.items.every(happened)));
   const earlier = $derived(firstAhead < 0 ? days : days.slice(0, firstAhead));
@@ -273,27 +292,82 @@
   {/if}
 
   {#if featured}
-    <div class="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-      <h2 class="text-title"><a class="inline-flex items-center phone:min-h-11 underline-offset-2 hover:underline" href={`#trip/${featured.id}`}>{featured.name}</a></h2>
-      {#if featured.start_date && featured.end_date}<p class="text-caption text-muted-foreground">{rangeLabel(featured.start_date, featured.end_date)}{nightsLabel(featured.start_date, featured.end_date) ? ` · ${nightsLabel(featured.start_date, featured.end_date)}` : ""}</p>{/if}
+    <div class="@container">
+      <div class="grid gap-6 @[900px]:grid-cols-[minmax(0,1fr)_340px] @[900px]:items-start">
+        <div class="min-w-0">
+        <div class="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 class="text-title"><a class="inline-flex items-center phone:min-h-11 underline-offset-2 hover:underline" href={`#trip/${featured.id}`}>{featured.name}</a></h2>
+          {#if featured.start_date && featured.end_date}<p class="text-caption text-muted-foreground">{rangeLabel(featured.start_date, featured.end_date)}{nightsLabel(featured.start_date, featured.end_date) ? ` · ${nightsLabel(featured.start_date, featured.end_date)}` : ""}</p>{/if}
+        </div>
+        <ol class="flex flex-col gap-6" aria-label={`${featured.name}, day by day`}>
+          {#if earlier.length}
+            <li>
+              <details class="group">
+                <summary class="inline-flex min-h-11 cursor-pointer items-center rounded-md font-medium text-muted-foreground underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Earlier in this trip · {earlier.length} {earlier.length === 1 ? "day" : "days"}</summary>
+                <ol class="mt-3 flex flex-col gap-6" aria-label={`${featured.name}, earlier days`}>
+                  {#each earlier as day (day.date)}
+                    {@render dayBlock(day)}
+                  {/each}
+                </ol>
+              </details>
+            </li>
+          {/if}
+          {#each ahead as day (day.date)}
+            {@render dayBlock(day)}
+          {/each}
+        </ol>
+        </div>
+        <aside class="flex min-w-0 flex-col gap-4" aria-label="Trip summary" data-testid="side-column">
+          {#if !viewport.phone}
+            {#if stops.length >= 2}<RouteMapCard tripId={featured.id} {stops} roads={places?.roads ?? NO_ROADS} />{/if}
+            {#if totals}
+              <dl class="grid grid-cols-3 divide-x divide-border overflow-hidden rounded-[18px] border border-border bg-surface-1 text-center" data-testid="trip-totals">
+                <div class="flex flex-col-reverse px-2 py-3"><dt class="eyebrow">{totals.nights === 1 ? "Night" : "Nights"}</dt><dd class="text-title">{totals.nights}</dd></div>
+                <div class="flex flex-col-reverse px-2 py-3"><dt class="eyebrow">{totals.bookings === 1 ? "Booking" : "Bookings"}</dt><dd class="text-title">{totals.bookings}</dd></div>
+                <div class="flex flex-col-reverse px-2 py-3"><dt class="eyebrow">{totals.cities === 1 ? "City" : "Cities"}</dt><dd class="text-title">{totals.cities}</dd></div>
+              </dl>
+            {/if}
+          {/if}
+          {#if later.length}
+            {#if viewport.phone}
+              <section aria-label="Later">
+                <h2 class="eyebrow mb-2">Later</h2>
+                <ul class="grid grid-cols-2 gap-3">
+                  {#each later as t (t.id)}
+                    {@const tile = dateTile(t)}
+                    <li class="row-tap rounded-[18px] border border-border bg-surface-1 p-3">
+                      <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-signal">{tile.month} {tile.day}</p>
+                      <p class="break-words text-body font-medium"><a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${t.id}`}>{t.name}</a></p>
+                      <p class="text-caption text-muted-foreground">{startsIn(t, today)}</p>
+                    </li>
+                  {/each}
+                </ul>
+              </section>
+            {:else}
+              <section class="overflow-hidden rounded-[18px] border border-border bg-surface-1" aria-label="Later">
+                <h2 class="eyebrow px-4 pt-3">Later</h2>
+                <ul class="divide-y divide-border">
+                  {#each later as t (t.id)}
+                    {@const tile = dateTile(t)}
+                    <li class="row-tap flex items-center gap-3 px-4 py-3">
+                      <span class="flex size-12 shrink-0 flex-col items-center justify-center rounded-xl bg-muted" aria-hidden="true">
+                        <span class="text-[10px] font-semibold uppercase leading-none tracking-[0.12em] text-signal">{tile.month}</span>
+                        <span class="text-xl font-bold leading-tight">{tile.day}</span>
+                      </span>
+                      <div class="min-w-0 flex-1">
+                        <p class="break-words text-body font-medium"><a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${t.id}`}>{t.name}</a></p>
+                        <p class="text-caption text-muted-foreground">{laterLine(t, today)}</p>
+                      </div>
+                    </li>
+                  {/each}
+                </ul>
+                <a class="flex min-h-11 items-center justify-between border-t border-border px-4 text-sm font-medium underline-offset-2 hover:underline" href="#trips?when=upcoming">All trips<ChevronRight class="size-4 text-muted-foreground" aria-hidden="true" /></a>
+              </section>
+            {/if}
+          {/if}
+        </aside>
+      </div>
     </div>
-    <ol class="flex flex-col gap-6" aria-label={`${featured.name}, day by day`}>
-      {#if earlier.length}
-        <li>
-          <details class="group">
-            <summary class="inline-flex min-h-11 cursor-pointer items-center rounded-md font-medium text-muted-foreground underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Earlier in this trip · {earlier.length} {earlier.length === 1 ? "day" : "days"}</summary>
-            <ol class="mt-3 flex flex-col gap-6" aria-label={`${featured.name}, earlier days`}>
-              {#each earlier as day (day.date)}
-                {@render dayBlock(day)}
-              {/each}
-            </ol>
-          </details>
-        </li>
-      {/if}
-      {#each ahead as day (day.date)}
-        {@render dayBlock(day)}
-      {/each}
-    </ol>
   {/if}
 {/if}
 

@@ -743,3 +743,125 @@ describe("Upcoming header, review banner and timeline", () => {
     expect(screen.getByTestId("offline-status")).toBeInTheDocument();
   });
 });
+
+describe("Upcoming side column", () => {
+  const places = {
+    home: null, stays: [], cities: [], roads: { legs: [], interstates: [] }, boundaries: [],
+    airports: [{ code: "JFK", city: "New York", latitude: 40.64, longitude: -73.78 }, { code: "LHR", city: "London", latitude: 51.47, longitude: -0.45 }],
+  };
+  const later = (id: number, name: string, start: string, end: string, destination: string | null) =>
+    trip([segment({ id: id * 10, trip_id: id, origin: "BOS", destination: "LIS", start_local: `${start}T10:00`, end_local: `${start}T18:00` }),
+      segment({ id: id * 10 + 1, trip_id: id, kind: "hotel", origin: "Casa", destination: "Lisbon", start_local: `${start}T19:00`, end_local: `${end}T10:00` })], { id, name, destination, start_date: start, end_date: end });
+  const lisbon = later(2, "Lisbon in winter", "2026-12-30", "2027-01-03", "Lisbon");
+  const porto = later(3, "Porto weekend", "2027-02-10", "2027-02-12", null);
+  const third = later(4, "Rome", "2027-03-01", "2027-03-04", "Rome");
+  const serveWith = (trips: unknown[], reply: (path: string) => unknown) =>
+    vi.mocked(api).mockImplementation(async (path) => (path === "/api/people/claim-suggestions" ? { guests: [] } : path === "/api/mailboxes" ? { configured: true, mailboxes: [] } : path === "/api/state" ? { review_count: 0 } : reply(path as string) ?? { trips }) as never);
+  const placesCalls = () => vi.mocked(api).mock.calls.map(([path]) => path as string).filter((p) => p.startsWith("/api/trips/"));
+  const withPlaces = (path: string) => (path === "/api/trips/1/places" ? places : undefined);
+
+  it("draws the featured trip’s route small, with a description built from its legs, and links it to the trip", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serveWith([london], withPlaces);
+    render(Upcoming);
+    const map = await screen.findByRole("img", { name: "Route map: New York to London, flight back to New York" });
+    expect(map.closest("a")).toHaveAttribute("href", "#trip/1");
+    expect(map.querySelector('[data-leg="flight"]')).toHaveAttribute("stroke-dasharray");
+    expect(map.querySelector('[data-stop="New York"] text')).toHaveTextContent("JFK");
+  });
+
+  it("counts nights, live bookings and distinct cities", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const cancelled = segment({ id: 9, kind: "hotel", status: "cancelled", origin: "Gone Inn", destination: "Paris", start_local: "2026-11-21T15:00", end_local: "2026-11-22T10:00" });
+    serveWith([trip([outbound, stay, home, cancelled], { end_date: "2026-11-27" })], (path) => { if (path.endsWith("/places")) throw new Error("offline"); return undefined; });
+    render(Upcoming);
+    const totals = await screen.findByTestId("trip-totals");
+    expect(totals.children[0]).toHaveTextContent("Nights7");
+    expect(totals.children[1]).toHaveTextContent("Bookings3");
+    expect(totals.children[2]).toHaveTextContent("Cities3");
+  });
+
+  it("names a city once when its airport and its stay agree", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serveWith([london], withPlaces);
+    render(Upcoming);
+    await screen.findByRole("img", { name: /^Route map/ });
+    expect(screen.getByTestId("trip-totals").children[2]).toHaveTextContent("Cities2");
+  });
+
+  it("lists the next two trips after the featured one, with an All trips link", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serveWith([porto, london, third, lisbon], withPlaces);
+    render(Upcoming);
+    const card = await screen.findByRole("region", { name: "Later" });
+    const rows = within(card).getAllByRole("listitem");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("Dec 30");
+    expect(rows[0]).toHaveTextContent("Lisbon in winter");
+    expect(rows[0]).toHaveTextContent("In 40 days · Lisbon");
+    expect(within(rows[0]).getByRole("link", { name: "Lisbon in winter" })).toHaveAttribute("href", "#trip/2");
+    expect(rows[1]).toHaveTextContent("Porto weekend");
+    expect(rows[1]).toHaveTextContent("In 82 days · 2 nights");
+    expect(within(card).queryByText("Rome")).toBeNull();
+    expect(within(card).getByRole("link", { name: "All trips" })).toHaveAttribute("href", "#trips?when=upcoming");
+  });
+
+  it("leaves the Later card out when there are no later trips", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serveWith([london], withPlaces);
+    render(Upcoming);
+    await screen.findByTestId("trip-totals");
+    expect(screen.queryByRole("region", { name: "Later" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "All trips" })).toBeNull();
+  });
+
+  it("leaves the map out, without an error, when the places request fails, and keeps the totals", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serveWith([london], (path) => { if (path === "/api/trips/1/places") throw new Error("offline"); return undefined; });
+    render(Upcoming);
+    await screen.findByTestId("trip-totals");
+    await waitFor(() => expect(placesCalls()).toEqual(["/api/trips/1/places"]));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(screen.queryByRole("img", { name: /^Route map/ })).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByTestId("trip-totals")).toBeInTheDocument();
+  });
+
+  it("leaves the map out when the places reply is malformed", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serveWith([london], (path) => (path === "/api/trips/1/places" ? { trips: [] } : undefined));
+    render(Upcoming);
+    await screen.findByTestId("trip-totals");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(screen.queryByRole("img", { name: /^Route map/ })).toBeNull();
+  });
+
+  it("makes no request but the featured trip’s own places, and no outside fetch", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const outside = vi.spyOn(globalThis, "fetch");
+    serveWith([london, lisbon], withPlaces);
+    render(Upcoming);
+    await screen.findByRole("img", { name: /^Route map/ });
+    expect(placesCalls()).toEqual(["/api/trips/1/places"]);
+    expect(outside).not.toHaveBeenCalled();
+    outside.mockRestore();
+  });
+
+  it("shows only the Later tiles on a phone, with no map, no totals and no places request", async () => {
+    viewport.phone = true;
+    at("2026-11-20T09:00:00-05:00");
+    serveWith([london, lisbon, porto], withPlaces);
+    render(Upcoming);
+    const section = await screen.findByRole("region", { name: "Later" });
+    const tiles = within(section).getAllByRole("listitem");
+    expect(tiles).toHaveLength(2);
+    expect(tiles[0]).toHaveTextContent("Dec 30");
+    expect(tiles[0]).toHaveTextContent("Lisbon in winter");
+    expect(tiles[0]).toHaveTextContent("In 40 days");
+    expect(tiles[0]).not.toHaveTextContent("Lisbon in winter · ");
+    expect(screen.queryByTestId("trip-totals")).toBeNull();
+    expect(screen.queryByTestId("route-map")).toBeNull();
+    expect(placesCalls()).toEqual([]);
+    viewport.phone = false;
+  });
+});
