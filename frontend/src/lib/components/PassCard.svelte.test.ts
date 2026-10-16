@@ -474,6 +474,32 @@ describe("the boarding-pass variant", () => {
     expect(primary).toHaveClass("bg-primary");
     expect(primary.compareDocumentPosition(screen.getByRole("link", { name: "Open trip" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+  it("puts the plane at the destination once live status says landed, before the booked arrival", () => {
+    flightStatus.list = list({ statuses: [status({ state: "landed", fetched_at: "2026-11-21T00:30:00+00:00" })] });
+    const { container } = render(PassCard, board({ now: dep + (arr - dep) / 4 }));
+    expect(screen.getByRole("img", { name: "Route, with the plane at the destination" }).dataset.progress).toBe("1");
+    expect(plane(container).style.left).toBe("100%");
+  });
+  it("keeps the plane at the origin when live status says the flight was cancelled", () => {
+    flightStatus.list = list({ statuses: [status({ state: "cancelled", fetched_at: "2026-11-21T00:30:00+00:00" })] });
+    const { container } = render(PassCard, board({ now: dep + (arr - dep) / 4 }));
+    expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("0");
+    expect(plane(container).style.left).toBe("0%");
+  });
+  it("lists each traveller once across every grouped reservation", () => {
+    const jane = { id: 1, person_id: 1, name: "Jane Doe", seat: null }, mia = { id: 2, person_id: 2, name: "Mia Doe", seat: null };
+    const second = { ...flight, id: 8, confirmation: "ZZ9Y8X", travelers: [{ ...jane, id: 3 }, mia] };
+    render(PassCard, board({ bookings: [{ ...flight, travelers: [jane] }, second] }, { travelers: [jane] }));
+    expect(screen.getByTestId("avatar-stack")).toHaveAccessibleName("Jane Doe, Mia Doe");
+    expect(screen.getByText("Jane & Mia")).toBeInTheDocument();
+  });
+  it("lets a long confirmation code take the whole phone strip and wrap", () => {
+    const code = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMN";
+    render(PassCard, board({}, { confirmation: code }));
+    const button = screen.getByRole("button", { name: `Copy confirmation code ${code}` });
+    expect(button).toHaveClass("break-all", "max-w-full");
+    expect(button.closest("dd")?.parentElement).toHaveClass("phone:col-span-4");
+  });
   it("keeps the live status between the route and the actions", () => {
     const live = createRawSnippet(() => ({ render: () => "<p>live area</p>" }));
     const footer = createRawSnippet(() => ({ render: () => "<a href='#trip/1'>Open trip</a>" }));

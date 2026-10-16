@@ -72,7 +72,7 @@
   const showCountdown = $derived(!cancelled && !unknown);
   const countdown = $derived(/^(.*\sin\s)(.+)$/.exec(headlineText));
   const airborne = $derived(flight && !grounded && evidence !== "landed" && progress > 0 && progress < 1);
-  const planeAt = $derived(airborne ? progress : 0.5);
+  const planeAt = $derived(evidence === "landed" ? 1 : grounded ? 0 : airborne ? progress : 0.5);
   const flightSeconds = $derived((endAt(s) - startAt(s)) / 1000);
   const length = $derived(flight && !unknown && flightSeconds > 0 ? duration(flightSeconds) : "");
   const daysLater = $derived(flight ? daysBetween(s.start_local, s.end_local) : 0);
@@ -81,7 +81,8 @@
     ["Cost", cost] as [string, string],
   ].filter(([name, value]) => (flight && name === "Gate") || (!!value && !omit.includes(name))).map(([name, value]): [string, string] => [name, value ?? ""]));
   const hasCode = $derived(showCode && codes.length > 0);
-  const people = $derived(s.travelers.map((t) => ({ id: t.person_id, name: t.name })));
+  const people = $derived(bookings.flatMap((b) => b.travelers).filter((t, i, all) => all.findIndex((o) => (t.person_id != null ? o.person_id === t.person_id : o.person_id == null && o.name.trim().toLowerCase() === t.name.trim().toLowerCase())) === i).map((t) => ({ id: t.person_id, name: t.name })));
+  const longCode = $derived(codes.some((b) => (b.confirmation ?? "").length > 8));
   const firstNames = $derived(((names) => (names.length > 1 ? `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}` : (names[0] ?? "")))(people.map((p) => p.name.trim().split(/\s+/)[0]).filter(Boolean)));
 </script>
 
@@ -187,9 +188,9 @@
     <div class="flex min-w-0 flex-col gap-5 border-t-2 border-dashed border-border p-5 desktop:border-l-2 desktop:border-t-0 md:p-6" data-stub>
       <dl class="grid grid-cols-2 gap-x-4 gap-y-4 phone:grid-cols-4">
         {#if hasCode}
-          <div class="col-span-2 min-w-0 phone:col-span-1">
+          <div class={`col-span-2 min-w-0 ${longCode ? "phone:col-span-4" : "phone:col-span-1"}`}>
             <dt class="eyebrow"><span class="phone:hidden">{codes.length > 1 ? "Confirmations" : "Confirmation"}</span><span class="desktop:hidden">Code</span></dt>
-            <dd class="mt-1 flex flex-wrap gap-x-4">{#each codes as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="mono w-fit min-h-11 text-title font-semibold phone:text-heading" />{/each}</dd>
+            <dd class="mt-1 flex flex-wrap gap-x-4">{#each codes as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="mono min-h-11 max-w-full min-w-0 break-all text-left text-title font-semibold phone:text-heading" />{/each}</dd>
           </div>
         {/if}
         {#each boardFacts as [name, value], i (name)}

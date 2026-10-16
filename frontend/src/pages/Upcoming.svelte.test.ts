@@ -589,7 +589,9 @@ describe("the reads started before the page opened", () => {
     serve([trip([lot])]);
     render(Upcoming);
     const card = (await screen.findByText("Next up")).closest("section")!;
-    expect(within(card).getByRole("button", { name: "Show the QR code for Example Airport Long-Term Lot" })).toBeInTheDocument();
+    const show = within(card).getByRole("button", { name: "Show the QR code for Example Airport Long-Term Lot" });
+    expect(show).toBeInTheDocument();
+    expect(show.closest(".phone\\:hidden")).toBeNull();
     expect(within(card).getByRole("link", { name: /Open / })).toBeInTheDocument();
   });
 

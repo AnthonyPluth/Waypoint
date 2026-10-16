@@ -194,7 +194,7 @@
       {#snippet footer()}<span class="contents">
         {#if s.status !== "cancelled" && s.links.directions}<Button href={s.links.directions} target="_blank" rel="noopener noreferrer" variant="outline" size="sm" class="phone:hidden">Directions</Button>{/if}
         {#if s.status !== "cancelled" && s.links.call}<Button href={s.links.call} variant="outline" size="sm" class="phone:hidden">Call</Button>{/if}
-        <span class="contents phone:hidden"><GateCode segment={s} {now} onchanged={load} /></span><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm" class="phone:flex-1">Open trip<span class="sr-only">: {next.trip.name}</span></Button></span>{/snippet}
+        <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm" class="phone:flex-1">Open trip<span class="sr-only">: {next.trip.name}</span></Button></span>{/snippet}
     </PassCard>
     {#if next.alongside.length}
       <section class="-mt-2 mb-6" aria-label="Also under way">
