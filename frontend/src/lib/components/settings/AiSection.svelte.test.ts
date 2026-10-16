@@ -42,7 +42,7 @@ describe("Settings → AI", () => {
     expect(box).not.toBeChecked();
     expect(screen.queryByText(/without asking each time/)).toBeNull();
     await userEvent.click(box);
-    expect(screen.getByRole("note")).toHaveTextContent("Waypoint will send the text of travel emails it couldn’t read to the AI you chose, without asking each time.");
+    expect(screen.getByRole("note")).toHaveTextContent("Waypoint will send the text of travel emails it couldn’t read to the AI you chose, and of emails it did read when a booking is missing a detail, without asking each time.");
     await userEvent.type(screen.getByLabelText("Ollama address"), "http://ollama.example:11434");
     await userEvent.type(screen.getByLabelText("Model"), "llama3.1");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));

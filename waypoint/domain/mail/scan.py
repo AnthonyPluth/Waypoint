@@ -248,6 +248,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     held: list[ingest.Held] = []
     lacks: list[str] = []
     for booking in message.bookings:
+        before = len(touched)
         filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill, held)
         if filed is None:
             failed += 1
@@ -258,7 +259,8 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
                 joined.append(1)
         elif filed not in ("unchanged", "ambiguous"):
             made += 1
-        if gaps is not None and filed in ("added", "updated", "unchanged", "attached") and ingest.lacks_details(booking) and message_id not in gaps:
+        if (gaps is not None and message_id not in gaps and filed in ("added", "updated", "unchanged", "attached")
+                and ingest.segments_lack_details(conn, touched[before:])):
             gaps.append(message_id)
     usable = len(message.bookings) - failed
     queued = 0
@@ -444,7 +446,7 @@ def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message
     for message_id in message_ids:
         with db.session() as conn:
             cfg = ai.config(conn)
-            if cfg is None or not autoask.chosen(conn):
+            if cfg is None or not autoask.fills_gaps(conn):
                 return asked
             known = tuple(loyalty.known_numbers(conn))
         left = BUDGET - (_clock() - started)
@@ -463,6 +465,7 @@ def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message
                 fields = _ai_fields(conn, suggestion)
                 if fields is None:
                     continue
+                fields.pop("travelers", None)
                 try:
                     same = trips.find_same_reservation(conn, viewer, fields, sure=True)
                     if same is not None:
@@ -531,7 +534,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
     read = made = queued = skipped = dropped = handled = not_travel = followups = with_facts = attached = asked_by_ai = 0
     gaps: list[str] = []
     with db.session() as conn:
-        filling = not again and not backfill and autoask.switched_on(conn)
+        filling = not again and not backfill and autoask.fills_gaps(conn)
     started = _clock()
     forced: set[str] = set()
     strong = True

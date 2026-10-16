@@ -27,7 +27,7 @@ Both switches are needed. With the AI off, or with this switch off, a scan sends
 - No reader made a booking from it.
 - It isn’t a follow-up of a booking you can see (a receipt, a check-in notice or a reminder that Waypoint attaches to the booking).
 
-A message a reader did turn into a booking is also sent when that booking lacks a detail the AI can read, such as a flight's cabin, a hotel's address or phone, a cruise's ship, or the total. The AI only fills in what is missing: it never changes a time, place or code a reader found, and it never adds a booking, because an answer is used only when it is for a booking you already have. Messages that were fully read are not sent.
+A message a reader did turn into a booking is also sent when that booking lacks a detail the AI can read, such as a flight's cabin, a hotel's address or phone, a cruise's ship, or the total. The AI only fills in what is missing: it never changes a time, place or code a reader found, and it never adds a booking, because an answer is used only when it is for a booking you already have. Messages that were fully read are not sent. This part needs the consent in the warning above as it now reads: a household that turned the switch on before that wording keeps the narrower behavior (unreadable mail only) until someone turns the switch off and on again.
 
 There is no limit on how many messages a scan asks about. A request that fails leaves the item as it was, with a note that the AI couldn’t be asked, and is tried again on the next scans, at most twice more. Each mailbox’s last-scan line in Settings says how many messages the AI was asked about. A count only, never a subject, a sender or any text.
 

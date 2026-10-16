@@ -13,7 +13,7 @@ from tests.test_mail_scan import ScanCase, eml
 from tests.test_trips import RouteCase
 from waypoint import monitoring
 from waypoint.domain import trips
-from waypoint.domain.mail import ai, extract, review, scan
+from waypoint.domain.mail import ai, autoask, extract, review, scan
 from waypoint.storage import db
 from waypoint.storage import settings_keys as sk
 from waypoint.storage.models import ReviewItem, Setting, StoredMessage
@@ -710,12 +710,12 @@ class ScanAiCase(ScanCase):
         os.environ.pop(ai.KEY_ENV, None)
         self.addCleanup(env.stop)
 
-    def turn_on(self, mode="local", auto=True):
+    def turn_on(self, mode="local", auto=True, gaps=False):
         with db.session() as conn:
             db.set_setting(conn, sk.AI_MODE, mode)
             db.set_setting(conn, sk.AI_OLLAMA_URL, self.fake.url)
             db.set_setting(conn, sk.AI_OLLAMA_MODEL, "llama3")
-            db.set_setting(conn, sk.AI_AUTO, "1" if auto else None)
+            db.set_setting(conn, sk.AI_AUTO, (autoask.GAPS if gaps else autoask.ON) if auto else None)
 
     def turn_off(self):
         with db.session() as conn:
@@ -992,6 +992,16 @@ class AiApiTests(RouteCase):
         self.assertTrue(self.ok("ana", "POST", "/api/ai", {**local, "auto": True})["auto"])
         self.assertFalse(self.ok("ana", "POST", "/api/ai", {"mode": "off", "auto": True})["auto"])
         self.assertFalse(self.ok("ana", "POST", "/api/ai", local)["auto"])
+
+    def test_turning_it_on_consents_to_filling_gaps_but_saving_again_does_not_widen_an_older_consent(self):
+        local = {"mode": "local", "ollama_url": "http://ollama.example:11434", "ollama_model": "llama3"}
+        self.ok("ana", "POST", "/api/ai", {**local, "auto": True})
+        with db.session() as conn:
+            self.assertEqual(db.get_setting(conn, sk.AI_AUTO), autoask.GAPS)
+            db.set_setting(conn, sk.AI_AUTO, autoask.ON)
+        self.assertTrue(self.ok("ana", "POST", "/api/ai", {**local, "auto": True})["auto"])
+        with db.session() as conn:
+            self.assertEqual(db.get_setting(conn, sk.AI_AUTO), autoask.ON)
 
     def test_what_isnt_valid_is_refused_and_changes_nothing(self):
         for body in ({"mode": "cloud"}, {}, {"mode": "local", "ollama_url": "ftp://x.example", "ollama_model": "m"},

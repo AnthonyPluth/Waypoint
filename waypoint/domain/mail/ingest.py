@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from ...storage import db
+from ...storage.models import Segment
 from .. import airports, loyalty, people, place_zones, trips
 from ..visibility import Viewer
 from . import ai, extract
@@ -98,9 +99,15 @@ EXTRAS = {"flight": ("flight_number", "cabin"), "hotel": ("address", "phone"), "
           "cruise": ("ship", "room", "deck"), "parking": ("address",)}
 
 
-def lacks_details(b: extract.Booking) -> bool:
-    have = dict(b.details)
-    return b.price is None or any(not have.get(k) for k in EXTRAS.get(b.kind, ()))
+def segments_lack_details(conn: db.Connection, segment_ids: list[int]) -> bool:
+    for segment_id in segment_ids:
+        seg = conn.orm.get(Segment, segment_id)
+        if seg is None:
+            continue
+        have = trips.decode_details(seg.details)
+        if seg.price_minor is None or any(not have.get(k) for k in EXTRAS.get(seg.kind, ())):
+            return True
+    return False
 
 
 def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:

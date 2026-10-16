@@ -146,7 +146,7 @@ class WhoIsAskedTests(AutoCase):
                   "end_zone": "Europe/London", "price_minor": 48000, "price_currency": "USD"}
 
     def test_a_message_a_reader_made_a_booking_from_is_sent_while_the_booking_lacks_a_detail_and_the_answer_only_fills_it_in(self):
-        self.turn_on()
+        self.turn_on(gaps=True)
         reply = {**self.STAY_PRICE, "origin": "Elsewhere Inn", "start_local": "2026-11-22T15:00"}
         self.put("hotel_jsonld")
         with mock.patch.object(ai, "suggest", return_value=ai.Reading([reply])) as asked:
@@ -155,8 +155,34 @@ class WhoIsAskedTests(AutoCase):
         self.assertEqual(asked.call_count, 1)
         self.assertEqual((stay["origin"], stay["start_local"], stay["price"]["amount_minor"]), ("Harbour Hotel", "2026-11-21T15:00", 48000))
 
-    def test_an_answer_for_a_booking_the_household_does_not_hold_adds_nothing(self):
+    def test_an_answer_never_adds_a_traveller_to_the_booking(self):
+        self.turn_on(gaps=True)
+        reply = {**self.STAY_PRICE, "travelers": [{"name": "Sam Doe", "seat": "1A"}]}
+        self.put("hotel_jsonld")
+        with mock.patch.object(ai, "suggest", return_value=ai.Reading([reply])):
+            self.scan()
+        [stay] = self.segments()
+        self.assertEqual(stay["price"]["amount_minor"], 48000)
+        self.assertNotIn("Sam Doe", [t["name"] for t in stay["travelers"]])
+
+    def test_a_duplicate_of_a_booking_that_already_has_everything_is_not_sent(self):
+        self.turn_on(gaps=True)
+        self.put("hotel_jsonld")
+        with mock.patch.object(ai, "suggest", return_value=ai.Reading([self.STAY_PRICE])) as asked:
+            self.scan()
+            self.put("hotel_jsonld", as_id="msg-again")
+            self.scan(now=NOW + 60)
+        self.assertEqual((asked.call_count, len(self.segments())), (1, 1))
+
+    def test_a_household_that_consented_before_gaps_were_sent_still_gets_only_unreadable_mail_sent(self):
         self.turn_on()
+        self.put("hotel_jsonld")
+        with mock.patch.object(ai, "suggest") as asked:
+            self.assertEqual(self.scan().bookings, 1)
+        self.assertEqual(asked.call_count, 0)
+
+    def test_an_answer_for_a_booking_the_household_does_not_hold_adds_nothing(self):
+        self.turn_on(gaps=True)
         self.put("hotel_jsonld")
         with mock.patch.object(ai, "suggest", return_value=ai.Reading([{**self.STAY_PRICE, "confirmation": "ZZ9999"}])):
             self.scan()
@@ -164,14 +190,14 @@ class WhoIsAskedTests(AutoCase):
         self.assertEqual(stay["price"], None)
 
     def test_an_empty_answer_changes_nothing(self):
-        self.turn_on()
+        self.turn_on(gaps=True)
         self.put("hotel_jsonld")
         with mock.patch.object(ai, "suggest", return_value=ai.Reading([])):
             self.scan()
         self.assertEqual([s["price"] for s in self.segments()], [None])
 
     def test_an_answer_missing_what_filing_needs_changes_nothing(self):
-        self.turn_on()
+        self.turn_on(gaps=True)
         self.put("hotel_jsonld")
         incomplete = {k: v for k, v in self.STAY_PRICE.items() if k != "confirmation"}
         with mock.patch.object(ai, "suggest", return_value=ai.Reading([incomplete])):
@@ -179,16 +205,16 @@ class WhoIsAskedTests(AutoCase):
         self.assertEqual([s["price"] for s in self.segments()], [None])
 
     def test_no_time_left_in_the_scan_means_no_request(self):
-        self.turn_on()
+        self.turn_on(gaps=True)
         self.put("hotel_jsonld")
         with mock.patch.object(scan, "BUDGET", 0), mock.patch.object(ai, "suggest") as asked:
             self.assertEqual(self.scan().bookings, 1)
         self.assertEqual(asked.call_count, 0)
 
     def test_a_booking_with_nothing_missing_is_never_sent(self):
-        self.turn_on()
+        self.turn_on(gaps=True)
         self.put("flight_jsonld", "hotel_jsonld")
-        with mock.patch.object(ingest, "lacks_details", return_value=False), mock.patch.object(ai, "suggest") as asked:
+        with mock.patch.object(ingest, "segments_lack_details", return_value=False), mock.patch.object(ai, "suggest") as asked:
             self.assertEqual(self.scan().bookings, 2)
         self.assertEqual(asked.call_count, 0)
 
