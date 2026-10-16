@@ -1,12 +1,12 @@
 export type AvatarPerson = { id?: number | null; name: string };
 
 export const AVATAR_TONES = [
-  "bg-[#1d3a63] text-[#d6e6ff]",
-  "bg-[#14463c] text-[#c9f3e6]",
-  "bg-[#4a2f63] text-[#ecdcff]",
-  "bg-[#5a3a12] text-[#ffe3b3]",
-  "bg-[#5a2433] text-[#ffd6df]",
-  "bg-[#2f3a4f] text-[#dbe3f2]",
+  "bg-avatar-1 text-avatar-1-ink",
+  "bg-avatar-2 text-avatar-2-ink",
+  "bg-avatar-3 text-avatar-3-ink",
+  "bg-avatar-4 text-avatar-4-ink",
+  "bg-avatar-5 text-avatar-5-ink",
+  "bg-avatar-6 text-avatar-6-ink",
 ] as const;
 
 export const avatarTone = (person: AvatarPerson): string => {

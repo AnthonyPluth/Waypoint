@@ -1,6 +1,6 @@
 ---
 title: Design
-description: The dark-only design foundation, status colours, and the shared chip, airport code and route line.
+description: The dark-only design foundation, status colours, kind tiles, avatar stacks, and the shared chip, airport code and route line.
 sidebar:
   order: 2
 ---
@@ -49,6 +49,16 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 - The Next up card on Upcoming is chosen by `nextUp` in `frontend/src/lib/trips.ts`, in this order: (1) a flight, train, cruise or visit that is under way (earliest start first); (2) otherwise the booking that starts soonest; (3) otherwise, when only background reservations remain, the hotel, rental car or parking booking that ends soonest. Hotels, rental cars and parking are background reservations: while one is under way and something else is still ahead, it never takes the card. It appears under "Also under way", soonest end first, with its check-out, drop-off or exit time, and opens like any booking (QR code included). Ties break by segment id. Times are compared as instants from each place's own zone, across every trip the person can see.
 - Times are the wall-clock times at each place, as stored, and are never shown in the viewer's own zone.
 - The card does not read the API for gate or city: a gate shows only from live flight status, and the airport name is not shown.
+
+## Kind tiles and avatar stacks
+
+`KindTile.svelte` is a 28 or 36 px square holding a booking kind's icon on its tint. The kinds use `--kind-flight`, `--kind-stay`, `--kind-train` and `--kind-car`; cruise, parking and past visit use `--kind-quiet`. Each has a `-soft` tint for the background. A tile has an accessible name matching its kind's label in `TripKinds`, unless you pass `decorative`. `TripKinds.svelte` is a row of them.
+
+`AvatarStack.svelte` overlaps up to four initials circles and then shows a "+N" circle. `avatarTone(person)` in `frontend/src/lib/avatar.ts` picks each person's tone: by id when they have one, otherwise by name, so the same person keeps the same colour. The six tones are `--avatar-1` to `--avatar-6` with their `-ink` text, all in `app.css`. Give the stack one accessible label; its circles are hidden from assistive technology.
+
+## Monospace type
+
+Times, airport codes, confirmation codes and seat numbers use `font-mono`, Geist Mono bundled under `waypoint/static/fonts`, with tabular and slashed-zero figures. The `.mono` class sets them on any element, and `.code` adds the confirmation-code style. No font is loaded from outside Waypoint.
 
 ## Navigation
 
