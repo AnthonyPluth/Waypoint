@@ -13,7 +13,7 @@ function placesOf(s: Segment): (string | null)[] {
   if (s.kind === "hotel") return [s.destination ?? placeOf(s.details.address)];
   if (s.kind === "cruise") return [s.origin, s.destination, ...s.itinerary.map((p) => p.name)];
   if (s.kind === "visit") return [s.destination];
-  if (s.kind === "car") return [s.destination ?? s.origin];
+  if (s.kind === "car") return [s.origin, s.destination];
   return [];
 }
 
@@ -40,7 +40,7 @@ export const tripTotals = (trip: Trip, places: TripPlaces | null = null): Totals
 });
 
 export function laterTrips(trips: Trip[], featured: Trip, today: string): Trip[] {
-  const upcoming = splitTrips(trips, today).upcoming.filter((t) => t.start_date);
+  const upcoming = splitTrips(trips, today).upcoming.filter((t) => t.start_date && t.start_date >= today);
   const after = upcoming.findIndex((t) => t.id === featured.id);
   return upcoming.filter((t, i) => t.id !== featured.id && (after < 0 || i > after)).slice(0, LATER_LIMIT);
 }
@@ -60,6 +60,12 @@ export function laterLine(trip: Trip, today: string): string {
 export const dateTile = (trip: Trip): { month: string; day: string } => {
   const parts = dayParts(trip.start_date ?? "");
   return { month: parts.month, day: parts.day };
+};
+
+export const usablePlaces = (found: unknown): found is TripPlaces => {
+  const p = found as Partial<TripPlaces> | null | undefined;
+  return !!p && Array.isArray(p.airports) && Array.isArray(p.cities) && Array.isArray(p.stays)
+    && Array.isArray(p.roads?.legs) && Array.isArray(p.roads?.interstates) && Array.isArray(p.boundaries);
 };
 
 const VERB: Partial<Record<NonNullable<Stop["via"]>, string>> = { flight: "flight", train: "train", cruise: "cruise" };

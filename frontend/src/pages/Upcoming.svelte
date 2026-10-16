@@ -15,7 +15,7 @@
   import PassCard from "$lib/components/PassCard.svelte";
   import RouteMapCard from "$lib/components/RouteMapCard.svelte";
   import { NO_ROADS, stopsOf } from "$lib/route-replay";
-  import { dateTile, laterLine, laterTrips, startsIn, tripTotals } from "$lib/side-column";
+  import { dateTile, usablePlaces, laterLine, laterTrips, startsIn, tripTotals } from "$lib/side-column";
   import { type Day, type DayItem, dayIn, dayLabel, dayParts, END_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import KindTile from "$lib/components/KindTile.svelte";
   import { offlineWorking } from "$lib/offline.svelte";
@@ -112,7 +112,7 @@
     places = null;
     if (id === null || viewport.phone) return;
     apiCall<"GET /api/trips/{id}/places">(`/api/trips/${id}/places`).then(
-      (found) => { if (mine === placesRequest && Array.isArray(found?.airports) && Array.isArray(found?.cities)) places = found; },
+      (found) => { if (mine === placesRequest && usablePlaces(found)) places = found; },
       () => { if (mine === placesRequest) places = null; },
     );
   });

@@ -836,6 +836,29 @@ describe("Upcoming side column", () => {
     expect(screen.queryByRole("img", { name: /^Route map/ })).toBeNull();
   });
 
+  it("leaves the map out, and keeps the page, when the places reply lacks a collection the route needs", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serveWith([london], (path) => (path === "/api/trips/1/places" ? { ...places, stays: undefined } : undefined));
+    render(Upcoming);
+    await screen.findByTestId("trip-totals");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(screen.queryByRole("img", { name: /^Route map/ })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
+  });
+
+  it("leaves out an overlapping trip that has already started", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const started = later(5, "Already away", "2026-11-10", "2026-11-25", "Oslo");
+    serveWith([started, london, lisbon], withPlaces);
+    render(Upcoming);
+    const card = await screen.findByRole("region", { name: "Later" });
+    const rows = within(card).getAllByRole("listitem");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("Lisbon in winter");
+    expect(within(card).queryByText("Already away")).toBeNull();
+    expect(card).not.toHaveTextContent("Starting today");
+  });
+
   it("makes no request but the featured trip’s own places, and no outside fetch", async () => {
     at("2026-11-20T09:00:00-05:00");
     const outside = vi.spyOn(globalThis, "fetch");
