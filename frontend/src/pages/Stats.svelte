@@ -5,6 +5,12 @@
   import type { Person, Stats } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
+  import { Sheet } from "$lib/components/ui/sheet";
+  import KindTile from "$lib/components/KindTile.svelte";
+  import TravellerAvatars from "$lib/components/TravellerAvatars.svelte";
+  import YearChips from "$lib/components/YearChips.svelte";
+  import { viewport } from "$lib/phone.svelte";
+  import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
   import type { Component } from "svelte";
   import TopList, { type Row } from "$lib/components/stats/TopList.svelte";
   import YearInReview from "$lib/components/YearInReview.svelte";
@@ -47,7 +53,15 @@
   const problem = $derived(failed && failed.key === key ? failed.message : "");
   const yearChoices = $derived(sel.year !== null && !years.includes(sel.year) ? [sel.year, ...years] : years);
   const pick = (who: number | "all", year: number | null) => setQuery(selectionQuery({ who, year }, me));
+  const pickYear = (year: number | null) => pick(sel.who, year);
+  const pickWho = (id: number | null) => pick(id ?? "all", sel.year);
+  const selectedWho = $derived(typeof sel.who === "number" ? sel.who : null);
+  const showYears = $derived(yearChoices.length > 1 || sel.year !== null);
+  const showTravellers = $derived(people.length > 1);
+  const inUse = $derived(sel.year !== null || sel.who !== (me ?? "all"));
+  let filtersOpen = $state(false);
   const whoName = $derived(sel.who === "all" ? "Everyone" : people.find((p) => p.id === sel.who)?.display_name ?? "this person");
+  const selectionLabel = $derived([people.length ? whoName : null, sel.year ?? "All time"].filter(Boolean).join(" · "));
   const unit = $derived(current?.distance_unit ?? "mi");
 
   let reviewing = $state(false);
@@ -56,6 +70,7 @@
   const f = $derived(current?.flights);
   const empty = $derived(!!current && current.flights.count === 0 && current.stays.nights === 0 && current.cars.days === 0 && current.cruises.count === 0 && current.parking.bookings === 0 && current.places.countries.length === 0);
   const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
+  const summary = $derived(current && !empty && f ? [sel.year === null ? "All time" : String(sel.year), f.count ? plural(f.count, "flight") : "", current.places.countries.length ? plural(current.places.countries.length, "country", "countries") : ""].filter(Boolean).join(" · ") : "");
   type Tile = { label: string; value: string; note?: string[] };
   const flightTiles = $derived<Tile[]>(current && f && f.count ? [
     { label: "Flights taken", value: count(f.count) },
@@ -128,7 +143,6 @@
   const seatTotal = $derived(f ? f.seat_positions.window + f.seat_positions.aisle + f.seat_positions.middle : 0);
   const seatBars = $derived(f ? [["Window", f.seat_positions.window], ["Aisle", f.seat_positions.aisle], ["Middle", f.seat_positions.middle]] as [string, number][] : []);
   const seriesFill = ["bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4"];
-  const selectClass = "border-input bg-secondary w-full rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
 </script>
 
 {#snippet bars(title: string, rows: [string, number][], whole: number)}
@@ -148,9 +162,9 @@
 {#snippet tileGrid(tiles: Tile[])}
   <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
     {#each tiles as t (t.label)}
-      <div class="rounded-2xl border bg-card p-4 shadow-elevation-1 {t.note ? 'col-span-2 sm:col-span-1' : ''}">
+      <div class="rounded-2xl border border-border bg-card p-4 shadow-card {t.note ? 'col-span-2 sm:col-span-1' : ''}">
         <dt class="eyebrow">{t.label}</dt>
-        <dd class="mt-1 break-words text-3xl font-semibold tabular-nums tracking-tight">{t.value}</dd>
+        <dd class="mono mt-1 break-words text-2xl font-semibold tracking-tight">{t.value}</dd>
         {#if t.note}{#each t.note as line (line)}<dd class="text-sm text-muted-foreground">{line}</dd>{/each}{/if}
       </div>
     {/each}
@@ -160,9 +174,9 @@
 {#snippet headline(tiles: Tile[])}
   <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="stats-headline">
     {#each tiles as t (t.label)}
-      <div class="pass p-5">
+      <div class="rounded-2xl border border-primary/35 bg-card p-5 shadow-card">
         <dt class="eyebrow">{t.label}</dt>
-        <dd class="mt-2 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight sm:text-4xl">{t.value}</dd>
+        <dd class="mono mt-2 whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-4xl lg:text-2xl">{t.value}</dd>
       </div>
     {/each}
   </dl>
@@ -172,7 +186,7 @@
   {#if items.length}
     <div class="space-y-2">
       <h3 class="eyebrow px-1">{title}</h3>
-      <dl class="rows">
+      <dl class="rows rounded-2xl">
         {#each items as r (r.label)}
             <div class="row flex-nowrap"><dt class="min-w-0 flex-1 truncate text-muted-foreground" title={r.label}>{r.label}</dt><dd class="max-w-[60%] shrink-0 break-words text-right font-medium">{r.value}{#if r.detail}<span class="block text-sm font-normal text-muted-foreground">{r.detail}</span>{/if}</dd></div>
         {/each}
@@ -181,23 +195,35 @@
   {/if}
 {/snippet}
 
-<h1 class="mb-6 text-4xl font-bold tracking-tight">Stats</h1>
-
-<div class="mb-6 grid grid-cols-2 gap-3">
-  <label class="space-y-1 text-sm font-medium">Who
-    <select class={selectClass} value={String(sel.who)} onchange={(e) => pick(e.currentTarget.value === "all" ? "all" : Number(e.currentTarget.value), sel.year)}>
-      <option value="all">Everyone</option>
-      {#each people as p (p.id)}<option value={String(p.id)}>{p.id === me ? `${p.display_name} (you)` : p.display_name}</option>{/each}
-      {#if typeof sel.who === "number" && !people.some((p) => p.id === sel.who)}<option value={String(sel.who)}>{whoName}</option>{/if}
-    </select>
-  </label>
-  <label class="space-y-1 text-sm font-medium">When
-    <select class={selectClass} value={String(sel.year ?? "all")} onchange={(e) => pick(sel.who, e.currentTarget.value === "all" ? null : Number(e.currentTarget.value))}>
-      <option value="all">All time</option>
-      {#each yearChoices as y (y)}<option value={String(y)}>{y}</option>{/each}
-    </select>
-  </label>
+<div class="mb-6">
+  {#if summary}<p class="eyebrow mb-1.5" role="status" aria-live="polite">{summary}</p>{/if}
+  <h1 class="text-4xl font-bold tracking-tight">Stats</h1>
 </div>
+
+{#if showYears || showTravellers}
+  <div class="mb-6 flex flex-col gap-3 rounded-[18px] border border-border bg-black/25 p-3 md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-3 md:p-4" role="group" aria-label="Choose whose stats and when">
+    {#if viewport.phone}
+      <div class="flex items-center justify-between gap-3">
+        <span class="min-w-0 truncate text-sm font-medium">{selectionLabel}</span>
+        <Button type="button" variant="outline" size="icon" class="relative size-[46px] shrink-0" onclick={() => (filtersOpen = true)}>
+          <SlidersHorizontal /><span class="sr-only">Filters{inUse ? ", in use" : ""}</span>
+          {#if inUse}<span class="absolute top-2 right-2 size-2 rounded-full bg-primary" data-testid="filters-dot" aria-hidden="true"></span>{/if}
+        </Button>
+      </div>
+    {:else}
+      {#if showYears}<YearChips years={yearChoices} selected={sel.year} onpick={pickYear} />{/if}
+      {#if showTravellers}<TravellerAvatars {people} selected={selectedWho} onpick={pickWho} />{/if}
+    {/if}
+  </div>
+  {#if viewport.phone}
+    <Sheet bind:open={filtersOpen} title="Filters">
+      <div class="flex flex-col gap-5">
+        {#if showYears}<YearChips years={yearChoices} selected={sel.year} onpick={pickYear} />{/if}
+        {#if showTravellers}<TravellerAvatars {people} selected={selectedWho} onpick={pickWho} />{/if}
+      </div>
+    </Sheet>
+  {/if}
+{/if}
 
 {#if problem}
   <Alert role="alert"><AlertDescription class="flex flex-wrap items-center justify-between gap-3"><span>Couldn’t load the stats: {problem}</span><Button variant="outline" size="sm" onclick={() => load(key, statsPath(sel))}>Try again</Button></AlertDescription></Alert>
@@ -207,7 +233,7 @@
     <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"></div>
   </div>
 {:else if empty}
-  <div class="rows" data-testid="stats-empty">
+  <div class="rows rounded-2xl" data-testid="stats-empty">
     <div class="row flex-col items-start gap-3 py-6">
       <p class="font-medium">{whoName === "Everyone" ? "Nothing finished" : `Nothing finished for ${whoName}`}{sel.year ? ` in ${sel.year}` : " yet"}.</p>
       <p class="text-sm text-muted-foreground">Stats count flights, stays, rentals, cruises and parking once they’re over.</p>
@@ -235,14 +261,14 @@
 
     {#if flightTiles.length}
       <section aria-labelledby="flights-title" class="space-y-3">
-        <h2 id="flights-title" class="text-2xl font-bold tracking-tight">Flights</h2>
+        <div class="flex items-center gap-3"><KindTile kind="flight" size={36} decorative /><h2 id="flights-title" class="text-2xl font-bold tracking-tight">Flights</h2></div>
         {@render tileGrid(flightTiles)}
         {#each flightLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
         {@render recordList("Flight records", flightRecords)}
       {#if cabinTotal || seatTotal}
         <section aria-labelledby="seats-title" class="space-y-3">
           <h3 id="seats-title" class="eyebrow px-1">Seats</h3>
-          <div class="rows"><div class="row flex-col flex-nowrap items-stretch gap-5 py-4">
+          <div class="rows rounded-2xl"><div class="row flex-col flex-nowrap items-stretch gap-5 py-4">
             {#if cabinTotal}{@render bars("Cabin", f.cabins.map((c) => [c.name, c.count]), cabinTotal)}{/if}
             {#if seatTotal}{@render bars("Where you sit", seatBars, seatTotal)}{/if}
             {#if f.top_seat}<p class="text-sm"><span class="text-muted-foreground">Top seat</span> <span class="font-medium">{f.top_seat}</span></p>{/if}
@@ -254,7 +280,7 @@
 
     {#if hotelTiles.length}
       <section aria-labelledby="hotels-title" class="space-y-3">
-        <h2 id="hotels-title" class="text-2xl font-bold tracking-tight">Hotels</h2>
+        <div class="flex items-center gap-3"><KindTile kind="hotel" size={36} decorative /><h2 id="hotels-title" class="text-2xl font-bold tracking-tight">Hotels</h2></div>
         {@render tileGrid(hotelTiles)}
         {#each hotelLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
         {@render recordList("Hotel records", hotelRecords)}
@@ -263,7 +289,7 @@
 
     {#if carTiles.length}
       <section aria-labelledby="cars-title" class="space-y-3">
-        <h2 id="cars-title" class="text-2xl font-bold tracking-tight">Cars</h2>
+        <div class="flex items-center gap-3"><KindTile kind="car" size={36} decorative /><h2 id="cars-title" class="text-2xl font-bold tracking-tight">Cars</h2></div>
         {@render tileGrid(carTiles)}
         {#each carLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
       </section>
@@ -271,7 +297,7 @@
 
     {#if parkingTiles.length}
       <section aria-labelledby="parking-title" class="space-y-3">
-        <h2 id="parking-title" class="text-2xl font-bold tracking-tight">Parking</h2>
+        <div class="flex items-center gap-3"><KindTile kind="parking" size={36} decorative /><h2 id="parking-title" class="text-2xl font-bold tracking-tight">Parking</h2></div>
         {@render tileGrid(parkingTiles)}
         {#each parkingLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
       </section>
@@ -279,7 +305,7 @@
 
     {#if cruiseTiles.length}
       <section aria-labelledby="cruises-title" class="space-y-3">
-        <h2 id="cruises-title" class="text-2xl font-bold tracking-tight">Cruises</h2>
+        <div class="flex items-center gap-3"><KindTile kind="cruise" size={36} decorative /><h2 id="cruises-title" class="text-2xl font-bold tracking-tight">Cruises</h2></div>
         {@render tileGrid(cruiseTiles)}
         {#each cruiseLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
       </section>

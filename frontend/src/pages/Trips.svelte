@@ -9,12 +9,12 @@
   import { Input } from "$lib/components/ui/input";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import AvatarStack from "$lib/components/AvatarStack.svelte";
+  import TravellerAvatars from "$lib/components/TravellerAvatars.svelte";
+  import YearChips from "$lib/components/YearChips.svelte";
   import TripCard from "$lib/components/TripCard.svelte";
   import TripKinds from "$lib/components/TripKinds.svelte";
-  import { avatarTone } from "$lib/avatar";
   import { OptionsMenu } from "$lib/components/ui/options-menu";
   import { Sheet } from "$lib/components/ui/sheet";
-  import { initials } from "$lib/nav";
   import { viewport } from "$lib/phone.svelte";
   import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { panes } from "$lib/panes.svelte";
@@ -91,36 +91,7 @@
     leave(() => setQuery(queryFor({ trip: t.id })));
   };
   let revealed = $state(1);
-  const chipClass = (on: boolean) => `inline-flex min-h-10 phone:min-h-11 items-center rounded-full border px-4 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${on ? "border-primary bg-primary/15 text-primary" : "border-input bg-secondary hover:bg-input/60"}`;
 </script>
-
-{#snippet yearChips()}
-  {#if years.length > 1 || year}
-    <div class="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-      <span class="eyebrow" aria-hidden="true">Year</span>
-      <div class="flex flex-wrap gap-2" role="group" aria-label="Year">
-        {#each years as y (y)}
-          <button type="button" class={chipClass(year === y)} aria-pressed={year === y} onclick={() => refine({ year: year === y ? null : y })}>{y}</button>
-        {/each}
-      </div>
-    </div>
-  {/if}
-{/snippet}
-
-{#snippet travellers()}
-  {#if people.length > 1}
-    <div class="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-      <span class="eyebrow" aria-hidden="true">Travelling</span>
-      <div class="flex flex-wrap gap-2" role="group" aria-label="Travelling">
-        {#each people as p (p.id)}
-          {@const on = who === p.id}
-          <button type="button" class={`inline-flex size-10 phone:size-11 items-center justify-center rounded-full text-sm font-semibold outline-none before:content-[attr(data-initials)] transition-opacity focus-visible:ring-[3px] focus-visible:ring-ring/50 ${avatarTone({ id: p.id, name: p.display_name })} ${on ? "ring-2 ring-primary" : who ? "opacity-60" : ""}`}
-            aria-label={p.display_name} data-initials={initials(p.display_name)} aria-pressed={on} onclick={() => refine({ who: on ? null : p.id })}></button>
-        {/each}
-      </div>
-    </div>
-  {/if}
-{/snippet}
 
 <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
   <div>
@@ -170,16 +141,16 @@
         {/if}
       </div>
       {#if !viewport.phone}
-        {@render yearChips()}
-        {@render travellers()}
+        {#if years.length > 1 || year}<YearChips {years} selected={year} onpick={(y) => refine({ year: y })} />{/if}
+        {#if people.length > 1}<TravellerAvatars {people} selected={who} onpick={(id) => refine({ who: id })} />{/if}
       {/if}
       {#if filtering}<Button type="button" variant="outline" class="md:ml-auto" onclick={clearFilters}>Clear filters</Button>{/if}
     </form>
     {#if viewport.phone}
       <Sheet bind:open={filtersOpen} title="Filters">
         <div class="flex flex-col gap-5">
-          {@render yearChips()}
-          {@render travellers()}
+          {#if years.length > 1 || year}<YearChips {years} selected={year} onpick={(y) => refine({ year: y })} />{/if}
+          {#if people.length > 1}<TravellerAvatars {people} selected={who} onpick={(id) => refine({ who: id })} />{/if}
         </div>
       </Sheet>
     {/if}
