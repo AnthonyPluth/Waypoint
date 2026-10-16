@@ -49,6 +49,8 @@ describe("what a trip holds", () => {
     expect(icons.map((i) => i.getAttribute("aria-label"))).toEqual(["Includes: flight, stay", "Includes: flight"]);
     expect(icons[0].querySelectorAll("svg")).toHaveLength(2);
     expect(icons[1].querySelectorAll("svg")).toHaveLength(1);
+    expect([...icons[0].querySelectorAll("[data-tile]")].map((t) => t.getAttribute("data-tile"))).toEqual(["flight", "hotel"]);
+    expect(icons[0].querySelectorAll("[role=img]")).toHaveLength(0);
   });
 });
 
