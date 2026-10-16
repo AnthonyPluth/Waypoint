@@ -22,7 +22,7 @@ PG_JOBS ?= $(shell tools/test_jobs.sh)
 SEMGREP ?= pipx run semgrep==1.146.0
 
 .PHONY: setup check lint python-lint frontend-lint semgrep test test-parallel test-pg test-timings fix \
-	frontend-check frontend-typecheck frontend-test frontend-build docs docs-build verify feature-map feature-map-check \
+	frontend-check frontend-typecheck frontend-test frontend-build docs docs-build verify demo-roll feature-map feature-map-check \
 	fleet-checks api-contract api-contract-check pr-screenshots
 
 # frontend-lint is a prerequisite of both lint and frontend-check, and make runs it once.
@@ -115,6 +115,12 @@ docs-build: docs/node_modules
 # fails on a console error or a 5xx. `make verify PAGES="upcoming settings"` visits only those pages.
 verify: frontend/node_modules frontend-build
 	$(PYTHON) run.py verify $(PAGES)
+
+# Moves the static demo's pinned date (frontend/demo/data.json asOf) forward to TO (default: today) and shifts every date
+# in its data with it, so the made-up trips stay where they were relative to today. Run it on purpose, not daily: each
+# roll changes the demo and the verify screenshots, so it goes in its own pull request with `make verify` output.
+demo-roll:
+	$(PYTHON) tools/demo_roll.py $(if $(TO),--to $(TO))
 
 # The feature map (docs/feature-map.json and its docs page): each route's handler, web app callers, tests and docs.
 # feature-map-check fails when it is out of date or a route has no test (tools/feature_map_allowlist.txt only shrinks).

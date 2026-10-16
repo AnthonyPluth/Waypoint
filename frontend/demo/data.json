@@ -1,11 +1,11 @@
 {
-  "asOf": "2026-10-14",
+  "asOf": "2026-10-16",
   "trips": [
     {
       "id": 1,
       "name": "Trip to Paris (Aug 2024)",
-      "start_date": "2024-08-05",
-      "end_date": "2024-08-12",
+      "start_date": "2024-08-07",
+      "end_date": "2024-08-14",
       "destination": "France",
       "destination_manual": false,
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
@@ -37,9 +37,9 @@
           "status": "confirmed",
           "confirmation": "WM8D4P",
           "provider": "Air France",
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "start_zone": "America/New_York",
-          "end_local": "2024-08-06T08:00",
+          "end_local": "2024-08-08T08:00",
           "end_zone": "Europe/Paris",
           "origin": "JFK",
           "destination": "CDG",
@@ -103,9 +103,9 @@
           "status": "confirmed",
           "confirmation": "H12984",
           "provider": "Hilton",
-          "start_local": "2024-08-06T15:00",
+          "start_local": "2024-08-08T15:00",
           "start_zone": "Europe/Paris",
-          "end_local": "2024-08-12T11:00",
+          "end_local": "2024-08-14T11:00",
           "end_zone": "Europe/Paris",
           "origin": "Hôtel du Parc",
           "destination": "Paris",
@@ -167,9 +167,9 @@
           "status": "confirmed",
           "confirmation": "WM8D4P",
           "provider": "Air France",
-          "start_local": "2024-08-12T11:15",
+          "start_local": "2024-08-14T11:15",
           "start_zone": "Europe/Paris",
-          "end_local": "2024-08-12T13:50",
+          "end_local": "2024-08-14T13:50",
           "end_zone": "America/New_York",
           "origin": "CDG",
           "destination": "JFK",
@@ -231,8 +231,8 @@
     {
       "id": 2,
       "name": "Trip to San Francisco (Sep 2025)",
-      "start_date": "2025-09-09",
-      "end_date": "2025-09-13",
+      "start_date": "2025-09-11",
+      "end_date": "2025-09-15",
       "destination": "California",
       "destination_manual": false,
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
@@ -264,9 +264,9 @@
           "status": "confirmed",
           "confirmation": "PK21866",
           "provider": "Example Parking",
-          "start_local": "2025-09-09T04:30",
+          "start_local": "2025-09-11T04:30",
           "start_zone": "America/New_York",
-          "end_local": "2025-09-13T23:15",
+          "end_local": "2025-09-15T23:15",
           "end_zone": "America/New_York",
           "origin": "Example Airport Economy Lot",
           "destination": null,
@@ -329,9 +329,9 @@
           "status": "confirmed",
           "confirmation": "TV5N2B",
           "provider": "United Airlines",
-          "start_local": "2025-09-09T07:30",
+          "start_local": "2025-09-11T07:30",
           "start_zone": "America/New_York",
-          "end_local": "2025-09-09T10:55",
+          "end_local": "2025-09-11T10:55",
           "end_zone": "America/Los_Angeles",
           "origin": "JFK",
           "destination": "SFO",
@@ -395,9 +395,9 @@
           "status": "confirmed",
           "confirmation": "C5521",
           "provider": "Hertz",
-          "start_local": "2025-09-09T12:00",
+          "start_local": "2025-09-11T12:00",
           "start_zone": "America/Los_Angeles",
-          "end_local": "2025-09-13T12:00",
+          "end_local": "2025-09-15T12:00",
           "end_zone": "America/Los_Angeles",
           "origin": "SFO airport",
           "destination": "SFO airport",
@@ -460,9 +460,9 @@
           "status": "confirmed",
           "confirmation": "H70452",
           "provider": "Marriott",
-          "start_local": "2025-09-09T15:00",
+          "start_local": "2025-09-11T15:00",
           "start_zone": "America/Los_Angeles",
-          "end_local": "2025-09-13T11:00",
+          "end_local": "2025-09-15T11:00",
           "end_zone": "America/Los_Angeles",
           "origin": "Bayview Inn",
           "destination": "San Francisco",
@@ -524,9 +524,9 @@
           "status": "confirmed",
           "confirmation": "TV5N2B",
           "provider": "United Airlines",
-          "start_local": "2025-09-13T13:00",
+          "start_local": "2025-09-15T13:00",
           "start_zone": "America/Los_Angeles",
-          "end_local": "2025-09-13T21:30",
+          "end_local": "2025-09-15T21:30",
           "end_zone": "America/New_York",
           "origin": "SFO",
           "destination": "JFK",
@@ -588,8 +588,8 @@
     {
       "id": 5,
       "name": "Trip to Miami (Feb 2026)",
-      "start_date": "2026-02-06",
-      "end_date": "2026-02-13",
+      "start_date": "2026-02-08",
+      "end_date": "2026-02-15",
       "destination": "Florida",
       "destination_manual": false,
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
@@ -620,9 +620,9 @@
           "status": "confirmed",
           "confirmation": "CR48210",
           "provider": "Example Cruise Line",
-          "start_local": "2026-02-06T16:30",
+          "start_local": "2026-02-08T16:30",
           "start_zone": "America/New_York",
-          "end_local": "2026-02-13T07:00",
+          "end_local": "2026-02-15T07:00",
           "end_zone": "America/New_York",
           "origin": "Miami",
           "destination": "Miami",
@@ -657,106 +657,106 @@
             {
               "name": "Nassau",
               "zone": "America/Nassau",
-              "arrive_local": "2026-02-07T08:00",
-              "depart_local": "2026-02-07T17:00"
+              "arrive_local": "2026-02-09T08:00",
+              "depart_local": "2026-02-09T17:00"
             },
             {
               "name": "Grand Cayman",
               "zone": "America/Cayman",
-              "arrive_local": "2026-02-10T07:00",
-              "depart_local": "2026-02-10T16:00"
+              "arrive_local": "2026-02-12T07:00",
+              "depart_local": "2026-02-12T16:00"
             },
             {
               "name": "Cozumel",
               "zone": "America/Cancun",
-              "arrive_local": "2026-02-11T08:00",
-              "depart_local": "2026-02-11T17:00"
+              "arrive_local": "2026-02-13T08:00",
+              "depart_local": "2026-02-13T17:00"
             }
           ],
           "days": [
             {
               "day": 1,
-              "date": "2026-02-06",
+              "date": "2026-02-08",
               "sea": false,
               "stops": [
                 {
                   "name": "Miami",
                   "zone": "America/New_York",
                   "arrive_local": null,
-                  "depart_local": "2026-02-06T16:30",
+                  "depart_local": "2026-02-08T16:30",
                   "recorded": true
                 }
               ]
             },
             {
               "day": 2,
-              "date": "2026-02-07",
+              "date": "2026-02-09",
               "sea": false,
               "stops": [
                 {
                   "name": "Nassau",
                   "zone": "America/Nassau",
-                  "arrive_local": "2026-02-07T08:00",
-                  "depart_local": "2026-02-07T17:00",
+                  "arrive_local": "2026-02-09T08:00",
+                  "depart_local": "2026-02-09T17:00",
                   "recorded": true
                 }
               ]
             },
             {
               "day": 3,
-              "date": "2026-02-08",
+              "date": "2026-02-10",
               "sea": true,
               "stops": []
             },
             {
               "day": 4,
-              "date": "2026-02-09",
+              "date": "2026-02-11",
               "sea": true,
               "stops": []
             },
             {
               "day": 5,
-              "date": "2026-02-10",
+              "date": "2026-02-12",
               "sea": false,
               "stops": [
                 {
                   "name": "Grand Cayman",
                   "zone": "America/Cayman",
-                  "arrive_local": "2026-02-10T07:00",
-                  "depart_local": "2026-02-10T16:00",
+                  "arrive_local": "2026-02-12T07:00",
+                  "depart_local": "2026-02-12T16:00",
                   "recorded": true
                 }
               ]
             },
             {
               "day": 6,
-              "date": "2026-02-11",
+              "date": "2026-02-13",
               "sea": false,
               "stops": [
                 {
                   "name": "Cozumel",
                   "zone": "America/Cancun",
-                  "arrive_local": "2026-02-11T08:00",
-                  "depart_local": "2026-02-11T17:00",
+                  "arrive_local": "2026-02-13T08:00",
+                  "depart_local": "2026-02-13T17:00",
                   "recorded": true
                 }
               ]
             },
             {
               "day": 7,
-              "date": "2026-02-12",
+              "date": "2026-02-14",
               "sea": true,
               "stops": []
             },
             {
               "day": 8,
-              "date": "2026-02-13",
+              "date": "2026-02-15",
               "sea": false,
               "stops": [
                 {
                   "name": "Miami",
                   "zone": "America/New_York",
-                  "arrive_local": "2026-02-13T07:00",
+                  "arrive_local": "2026-02-15T07:00",
                   "depart_local": null,
                   "recorded": true
                 }
@@ -786,8 +786,8 @@
     {
       "id": 7,
       "name": "Colorado road trip (Jun 2026)",
-      "start_date": "2026-06-16",
-      "end_date": "2026-06-24",
+      "start_date": "2026-06-18",
+      "end_date": "2026-06-26",
       "destination": "Colorado & Utah",
       "destination_manual": false,
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
@@ -817,9 +817,9 @@
           "status": "confirmed",
           "confirmation": "DEMO-ROAD-032",
           "provider": "Example Rentals",
-          "start_local": "2026-06-16T09:00",
+          "start_local": "2026-06-18T09:00",
           "start_zone": "America/Denver",
-          "end_local": "2026-06-24T17:00",
+          "end_local": "2026-06-26T17:00",
           "end_zone": "America/Denver",
           "origin": "Denver",
           "destination": "Fort Collins",
@@ -870,9 +870,9 @@
           "status": "confirmed",
           "confirmation": "H31550",
           "provider": "Example Stays",
-          "start_local": "2026-06-16T15:00",
+          "start_local": "2026-06-18T15:00",
           "start_zone": "America/Denver",
-          "end_local": "2026-06-19T11:00",
+          "end_local": "2026-06-21T11:00",
           "end_zone": "America/Denver",
           "origin": "Mile High Inn",
           "destination": "Denver",
@@ -922,9 +922,9 @@
           "status": "confirmed",
           "confirmation": "H31551",
           "provider": "Example Stays",
-          "start_local": "2026-06-19T15:00",
+          "start_local": "2026-06-21T15:00",
           "start_zone": "America/Denver",
-          "end_local": "2026-06-22T11:00",
+          "end_local": "2026-06-24T11:00",
           "end_zone": "America/Denver",
           "origin": "Salt Flat Inn",
           "destination": "Salt Lake City",
@@ -974,9 +974,9 @@
           "status": "confirmed",
           "confirmation": "H31552",
           "provider": "Example Stays",
-          "start_local": "2026-06-22T15:00",
+          "start_local": "2026-06-24T15:00",
           "start_zone": "America/Denver",
-          "end_local": "2026-06-24T11:00",
+          "end_local": "2026-06-26T11:00",
           "end_zone": "America/Denver",
           "origin": "Foothills Lodge",
           "destination": "Denver",
@@ -1024,8 +1024,8 @@
     {
       "id": 3,
       "name": "Trip to Orlando (Sep 2026)",
-      "start_date": "2026-09-03",
-      "end_date": "2026-09-08",
+      "start_date": "2026-09-05",
+      "end_date": "2026-09-10",
       "destination": "Florida",
       "destination_manual": false,
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
@@ -1057,9 +1057,9 @@
           "status": "confirmed",
           "confirmation": "RB3T6K",
           "provider": "Delta Air Lines",
-          "start_local": "2026-09-03T08:15",
+          "start_local": "2026-09-05T08:15",
           "start_zone": "America/New_York",
-          "end_local": "2026-09-03T11:20",
+          "end_local": "2026-09-05T11:20",
           "end_zone": "America/New_York",
           "origin": "JFK",
           "destination": "MCO",
@@ -1123,9 +1123,9 @@
           "status": "confirmed",
           "confirmation": "H41207",
           "provider": "Hilton",
-          "start_local": "2026-09-03T15:00",
+          "start_local": "2026-09-05T15:00",
           "start_zone": "America/New_York",
-          "end_local": "2026-09-08T11:00",
+          "end_local": "2026-09-10T11:00",
           "end_zone": "America/New_York",
           "origin": "Lakeside Resort",
           "destination": null,
@@ -1187,9 +1187,9 @@
           "status": "confirmed",
           "confirmation": "RB3T6K",
           "provider": "Delta Air Lines",
-          "start_local": "2026-09-08T17:40",
+          "start_local": "2026-09-10T17:40",
           "start_zone": "America/New_York",
-          "end_local": "2026-09-08T20:10",
+          "end_local": "2026-09-10T20:10",
           "end_zone": "America/New_York",
           "origin": "MCO",
           "destination": "JFK",
@@ -1251,8 +1251,8 @@
     {
       "id": 4,
       "name": "Trip to London (Oct 2026)",
-      "start_date": "2026-10-12",
-      "end_date": "2026-10-18",
+      "start_date": "2026-10-14",
+      "end_date": "2026-10-20",
       "destination": "United Kingdom",
       "destination_manual": false,
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
@@ -1289,9 +1289,9 @@
           "status": "confirmed",
           "confirmation": "KQ7M2X",
           "provider": "American Airlines",
-          "start_local": "2026-10-12T19:00",
+          "start_local": "2026-10-14T19:00",
           "start_zone": "America/New_York",
-          "end_local": "2026-10-13T07:10",
+          "end_local": "2026-10-15T07:10",
           "end_zone": "Europe/London",
           "origin": "JFK",
           "destination": "LHR",
@@ -1355,9 +1355,9 @@
           "status": "confirmed",
           "confirmation": "MW5T9Z",
           "provider": "American Airlines",
-          "start_local": "2026-10-12T19:00",
+          "start_local": "2026-10-14T19:00",
           "start_zone": "America/New_York",
-          "end_local": "2026-10-13T07:10",
+          "end_local": "2026-10-15T07:10",
           "end_zone": "Europe/London",
           "origin": "JFK",
           "destination": "LHR",
@@ -1409,9 +1409,9 @@
           "status": "confirmed",
           "confirmation": "H88231",
           "provider": "Marriott",
-          "start_local": "2026-10-13T15:00",
+          "start_local": "2026-10-15T15:00",
           "start_zone": "Europe/London",
-          "end_local": "2026-10-16T10:00",
+          "end_local": "2026-10-18T10:00",
           "end_zone": "Europe/London",
           "origin": "Harbour Hotel",
           "destination": null,
@@ -1479,9 +1479,9 @@
           "status": "confirmed",
           "confirmation": "G20417",
           "provider": "Example Stays",
-          "start_local": "2026-10-16T15:00",
+          "start_local": "2026-10-18T15:00",
           "start_zone": "Europe/London",
-          "end_local": "2026-10-18T10:00",
+          "end_local": "2026-10-20T10:00",
           "end_zone": "Europe/London",
           "origin": "Camden Guesthouse",
           "destination": null,
@@ -1549,9 +1549,9 @@
           "status": "confirmed",
           "confirmation": "KQ7M2X",
           "provider": "American Airlines",
-          "start_local": "2026-10-18T11:30",
+          "start_local": "2026-10-20T11:30",
           "start_zone": "Europe/London",
-          "end_local": "2026-10-18T14:35",
+          "end_local": "2026-10-20T14:35",
           "end_zone": "America/New_York",
           "origin": "LHR",
           "destination": "JFK",
@@ -1615,9 +1615,9 @@
           "status": "confirmed",
           "confirmation": "MW5T9Z",
           "provider": "American Airlines",
-          "start_local": "2026-10-18T11:30",
+          "start_local": "2026-10-20T11:30",
           "start_zone": "Europe/London",
-          "end_local": "2026-10-18T14:35",
+          "end_local": "2026-10-20T14:35",
           "end_zone": "America/New_York",
           "origin": "LHR",
           "destination": "JFK",
@@ -1667,8 +1667,8 @@
     {
       "id": 8,
       "name": "Trip to San Francisco (Nov 2026)",
-      "start_date": "2026-11-03",
-      "end_date": "2026-11-06",
+      "start_date": "2026-11-05",
+      "end_date": "2026-11-08",
       "destination": "California",
       "destination_manual": false,
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
@@ -1698,9 +1698,9 @@
           "status": "confirmed",
           "confirmation": "PK30417",
           "provider": "Example Parking",
-          "start_local": "2026-11-03T05:15",
+          "start_local": "2026-11-05T05:15",
           "start_zone": "America/New_York",
-          "end_local": "2026-11-06T03:00",
+          "end_local": "2026-11-08T03:00",
           "end_zone": "America/New_York",
           "origin": "Example Airport Long-Term Lot",
           "destination": null,
@@ -1751,9 +1751,9 @@
           "status": "confirmed",
           "confirmation": "PL4N9R",
           "provider": "United Airlines",
-          "start_local": "2026-11-03T08:00",
+          "start_local": "2026-11-05T08:00",
           "start_zone": "America/New_York",
-          "end_local": "2026-11-03T11:20",
+          "end_local": "2026-11-05T11:20",
           "end_zone": "America/Los_Angeles",
           "origin": "JFK",
           "destination": "SFO",
@@ -1805,9 +1805,9 @@
           "status": "confirmed",
           "confirmation": "C7710",
           "provider": "Hertz",
-          "start_local": "2026-11-03T12:30",
+          "start_local": "2026-11-05T12:30",
           "start_zone": "America/Los_Angeles",
-          "end_local": "2026-11-05T16:00",
+          "end_local": "2026-11-07T16:00",
           "end_zone": "America/Los_Angeles",
           "origin": "SFO airport",
           "destination": "SFO airport",
@@ -1858,9 +1858,9 @@
           "status": "confirmed",
           "confirmation": "PL4N9R",
           "provider": "United Airlines",
-          "start_local": "2026-11-05T17:00",
+          "start_local": "2026-11-07T17:00",
           "start_zone": "America/Los_Angeles",
-          "end_local": "2026-11-06T01:35",
+          "end_local": "2026-11-08T01:35",
           "end_zone": "America/New_York",
           "origin": "SFO",
           "destination": "JFK",
@@ -1910,8 +1910,8 @@
     {
       "id": 9,
       "name": "Trip to Auckland (Nov 2026)",
-      "start_date": "2026-11-28",
-      "end_date": "2026-11-30",
+      "start_date": "2026-11-30",
+      "end_date": "2026-12-02",
       "destination": "New Zealand",
       "destination_manual": false,
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
@@ -1941,9 +1941,9 @@
           "status": "confirmed",
           "confirmation": "ST2V7W",
           "provider": "Delta Air Lines",
-          "start_local": "2026-11-28T21:00",
+          "start_local": "2026-11-30T21:00",
           "start_zone": "America/New_York",
-          "end_local": "2026-11-30T06:30",
+          "end_local": "2026-12-02T06:30",
           "end_zone": "Pacific/Auckland",
           "origin": "JFK",
           "destination": "AKL",
@@ -1993,8 +1993,8 @@
     {
       "id": 10,
       "name": "Trip to Chicago (Dec 2026)",
-      "start_date": "2026-12-13",
-      "end_date": "2026-12-13",
+      "start_date": "2026-12-15",
+      "end_date": "2026-12-15",
       "destination": "Illinois",
       "destination_manual": false,
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
@@ -2022,9 +2022,9 @@
           "status": "confirmed",
           "confirmation": "CH3K5P",
           "provider": "Example Air",
-          "start_local": "2026-12-13T07:00",
+          "start_local": "2026-12-15T07:00",
           "start_zone": "America/New_York",
-          "end_local": "2026-12-13T08:45",
+          "end_local": "2026-12-15T08:45",
           "end_zone": "America/Chicago",
           "origin": "JFK",
           "destination": "ORD",
@@ -2074,8 +2074,8 @@
     {
       "id": 6,
       "name": "Trip to Seattle (Dec 2026)",
-      "start_date": "2026-12-28",
-      "end_date": "2027-01-04",
+      "start_date": "2026-12-30",
+      "end_date": "2027-01-06",
       "destination": "Washington",
       "destination_manual": false,
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
@@ -2106,9 +2106,9 @@
           "status": "confirmed",
           "confirmation": "CR90377",
           "provider": "Disney Cruise Line",
-          "start_local": "2026-12-28T16:00",
+          "start_local": "2026-12-30T16:00",
           "start_zone": "America/Los_Angeles",
-          "end_local": "2027-01-04T06:30",
+          "end_local": "2027-01-06T06:30",
           "end_zone": "America/Los_Angeles",
           "origin": "Seattle",
           "destination": "Seattle",
@@ -2143,106 +2143,106 @@
             {
               "name": "Juneau",
               "zone": "America/Juneau",
-              "arrive_local": "2026-12-31T07:00",
-              "depart_local": "2026-12-31T18:00"
+              "arrive_local": "2027-01-02T07:00",
+              "depart_local": "2027-01-02T18:00"
             },
             {
               "name": "Skagway",
               "zone": "America/Juneau",
-              "arrive_local": "2027-01-01T07:00",
-              "depart_local": "2027-01-01T20:00"
+              "arrive_local": "2027-01-03T07:00",
+              "depart_local": "2027-01-03T20:00"
             },
             {
               "name": "Victoria",
               "zone": "America/Vancouver",
-              "arrive_local": "2027-01-03T18:00",
-              "depart_local": "2027-01-03T23:00"
+              "arrive_local": "2027-01-05T18:00",
+              "depart_local": "2027-01-05T23:00"
             }
           ],
           "days": [
             {
               "day": 1,
-              "date": "2026-12-28",
+              "date": "2026-12-30",
               "sea": false,
               "stops": [
                 {
                   "name": "Seattle",
                   "zone": "America/Los_Angeles",
                   "arrive_local": null,
-                  "depart_local": "2026-12-28T16:00",
+                  "depart_local": "2026-12-30T16:00",
                   "recorded": true
                 }
               ]
             },
             {
               "day": 2,
-              "date": "2026-12-29",
+              "date": "2026-12-31",
               "sea": true,
               "stops": []
             },
             {
               "day": 3,
-              "date": "2026-12-30",
+              "date": "2027-01-01",
               "sea": true,
               "stops": []
             },
             {
               "day": 4,
-              "date": "2026-12-31",
+              "date": "2027-01-02",
               "sea": false,
               "stops": [
                 {
                   "name": "Juneau",
                   "zone": "America/Juneau",
-                  "arrive_local": "2026-12-31T07:00",
-                  "depart_local": "2026-12-31T18:00",
+                  "arrive_local": "2027-01-02T07:00",
+                  "depart_local": "2027-01-02T18:00",
                   "recorded": true
                 }
               ]
             },
             {
               "day": 5,
-              "date": "2027-01-01",
+              "date": "2027-01-03",
               "sea": false,
               "stops": [
                 {
                   "name": "Skagway",
                   "zone": "America/Juneau",
-                  "arrive_local": "2027-01-01T07:00",
-                  "depart_local": "2027-01-01T20:00",
+                  "arrive_local": "2027-01-03T07:00",
+                  "depart_local": "2027-01-03T20:00",
                   "recorded": true
                 }
               ]
             },
             {
               "day": 6,
-              "date": "2027-01-02",
+              "date": "2027-01-04",
               "sea": true,
               "stops": []
             },
             {
               "day": 7,
-              "date": "2027-01-03",
+              "date": "2027-01-05",
               "sea": false,
               "stops": [
                 {
                   "name": "Victoria",
                   "zone": "America/Vancouver",
-                  "arrive_local": "2027-01-03T18:00",
-                  "depart_local": "2027-01-03T23:00",
+                  "arrive_local": "2027-01-05T18:00",
+                  "depart_local": "2027-01-05T23:00",
                   "recorded": true
                 }
               ]
             },
             {
               "day": 8,
-              "date": "2027-01-04",
+              "date": "2027-01-06",
               "sea": false,
               "stops": [
                 {
                   "name": "Seattle",
                   "zone": "America/Los_Angeles",
-                  "arrive_local": "2027-01-04T06:30",
+                  "arrive_local": "2027-01-06T06:30",
                   "depart_local": null,
                   "recorded": true
                 }
@@ -2272,8 +2272,8 @@
     {
       "id": 11,
       "name": "Trip to Quay Street Lodge (Jan 2027)",
-      "start_date": "2027-01-12",
-      "end_date": "2027-01-17",
+      "start_date": "2027-01-14",
+      "end_date": "2027-01-19",
       "destination": "Quay Street Lodge",
       "destination_manual": false,
       "notes": "Fictional itinerary for the standalone demo. Every booking and source email is invented.",
@@ -2305,9 +2305,9 @@
           "status": "confirmed",
           "confirmation": "DEMO-030",
           "provider": null,
-          "start_local": "2027-01-12T15:00",
+          "start_local": "2027-01-14T15:00",
           "start_zone": "Europe/London",
-          "end_local": "2027-01-17T10:00",
+          "end_local": "2027-01-19T10:00",
           "end_zone": "Europe/London",
           "origin": "Quay Street Lodge",
           "destination": null,
@@ -2363,9 +2363,9 @@
           "status": "confirmed",
           "confirmation": "DEMO-031",
           "provider": null,
-          "start_local": "2027-01-12T15:00",
+          "start_local": "2027-01-14T15:00",
           "start_zone": "Europe/London",
-          "end_local": "2027-01-17T10:00",
+          "end_local": "2027-01-19T10:00",
           "end_zone": "Europe/London",
           "origin": "Quay Street Lodge",
           "destination": null,
@@ -2507,7 +2507,7 @@
       "program": "TSA PreCheck",
       "masked": "••••2345",
       "readable": true,
-      "expiry": "2029-03-31",
+      "expiry": "2029-04-02",
       "notes": "Known Traveler Number"
     },
     {
@@ -2540,7 +2540,7 @@
       "program": "Global Entry",
       "masked": "••••7890",
       "readable": true,
-      "expiry": "2028-11-15",
+      "expiry": "2028-11-17",
       "notes": null
     },
     {
@@ -2740,14 +2740,14 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-05",
-                "end": "2024-08-06"
+                "start": "2024-08-07",
+                "end": "2024-08-08"
               },
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-12",
-                "end": "2024-08-12"
+                "start": "2024-08-14",
+                "end": "2024-08-14"
               }
             ]
           },
@@ -2764,14 +2764,14 @@
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               },
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               }
             ]
           },
@@ -2788,14 +2788,14 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-03"
+                "start": "2026-09-05",
+                "end": "2026-09-05"
               },
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-08",
-                "end": "2026-09-08"
+                "start": "2026-09-10",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -2812,14 +2812,14 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-09"
+                "start": "2025-09-11",
+                "end": "2025-09-11"
               },
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-13",
-                "end": "2025-09-13"
+                "start": "2025-09-15",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -2849,14 +2849,14 @@
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "MCO",
           "distance_km": 1521.4,
-          "start_local": "2026-09-03T08:15",
+          "start_local": "2026-09-05T08:15",
           "flight_number": "DL1412"
         },
         "most_visited_airport": "JFK",
@@ -2920,8 +2920,8 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-06",
-                "end": "2024-08-12"
+                "start": "2024-08-08",
+                "end": "2024-08-14"
               }
             ]
           },
@@ -2936,14 +2936,14 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-16",
-                "end": "2026-06-19"
+                "start": "2026-06-18",
+                "end": "2026-06-21"
               },
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-22",
-                "end": "2026-06-24"
+                "start": "2026-06-24",
+                "end": "2026-06-26"
               }
             ]
           },
@@ -2958,8 +2958,8 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-08"
+                "start": "2026-09-05",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -2974,8 +2974,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           },
@@ -2990,8 +2990,8 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-19",
-                "end": "2026-06-22"
+                "start": "2026-06-21",
+                "end": "2026-06-24"
               }
             ]
           }
@@ -3056,7 +3056,7 @@
           "hotel": "Hôtel du Parc",
           "city": "Paris",
           "nights": 6,
-          "start_local": "2024-08-06T15:00"
+          "start_local": "2024-08-08T15:00"
         },
         "most_visited_hotel": {
           "name": "Hôtel du Parc",
@@ -3109,54 +3109,54 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 4
           },
           {
             "name": "FR",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           },
           {
             "name": "GB",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 4
           },
           {
             "name": "Paris",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           },
           {
             "name": "San Francisco",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           },
           {
             "name": "Denver",
-            "first_visit": "2026-06-16",
+            "first_visit": "2026-06-18",
             "visits": 2
           },
           {
             "name": "Salt Lake City",
-            "first_visit": "2026-06-19",
+            "first_visit": "2026-06-21",
             "visits": 1
           },
           {
             "name": "Orlando",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 1
           },
           {
             "name": "London",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
@@ -3171,8 +3171,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -3185,8 +3185,8 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-16",
-                "end": "2026-06-24"
+                "start": "2026-06-18",
+                "end": "2026-06-26"
               }
             ]
           },
@@ -3199,8 +3199,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -3213,8 +3213,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -3227,8 +3227,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -3313,14 +3313,14 @@
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               },
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               }
             ]
           },
@@ -3337,14 +3337,14 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-03"
+                "start": "2026-09-05",
+                "end": "2026-09-05"
               },
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-08",
-                "end": "2026-09-08"
+                "start": "2026-09-10",
+                "end": "2026-09-10"
               }
             ]
           }
@@ -3366,14 +3366,14 @@
           "origin": "JFK",
           "destination": "LHR",
           "distance_km": 5539.6,
-          "start_local": "2026-10-12T19:00",
+          "start_local": "2026-10-14T19:00",
           "flight_number": "AA101"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "MCO",
           "distance_km": 1521.4,
-          "start_local": "2026-09-03T08:15",
+          "start_local": "2026-09-05T08:15",
           "flight_number": "DL1412"
         },
         "most_visited_airport": "JFK",
@@ -3421,14 +3421,14 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-16",
-                "end": "2026-06-19"
+                "start": "2026-06-18",
+                "end": "2026-06-21"
               },
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-22",
-                "end": "2026-06-24"
+                "start": "2026-06-24",
+                "end": "2026-06-26"
               }
             ]
           },
@@ -3443,8 +3443,8 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-08"
+                "start": "2026-09-05",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -3459,8 +3459,8 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-19",
-                "end": "2026-06-22"
+                "start": "2026-06-21",
+                "end": "2026-06-24"
               }
             ]
           }
@@ -3505,7 +3505,7 @@
           "hotel": "Lakeside Resort",
           "city": null,
           "nights": 5,
-          "start_local": "2026-09-03T15:00"
+          "start_local": "2026-09-05T15:00"
         },
         "most_visited_hotel": {
           "name": "Lakeside Resort",
@@ -3549,39 +3549,39 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2026-06-16",
+            "first_visit": "2026-06-18",
             "visits": 2
           },
           {
             "name": "GB",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "Denver",
-            "first_visit": "2026-06-16",
+            "first_visit": "2026-06-18",
             "visits": 2
           },
           {
             "name": "Salt Lake City",
-            "first_visit": "2026-06-19",
+            "first_visit": "2026-06-21",
             "visits": 1
           },
           {
             "name": "New York",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 2
           },
           {
             "name": "Orlando",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 1
           },
           {
             "name": "London",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
@@ -3596,8 +3596,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -3610,8 +3610,8 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-16",
-                "end": "2026-06-24"
+                "start": "2026-06-18",
+                "end": "2026-06-26"
               }
             ]
           },
@@ -3624,8 +3624,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -3638,8 +3638,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           }
@@ -3706,14 +3706,14 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-09"
+                "start": "2025-09-11",
+                "end": "2025-09-11"
               },
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-13",
-                "end": "2025-09-13"
+                "start": "2025-09-15",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -3735,14 +3735,14 @@
           "origin": "JFK",
           "destination": "SFO",
           "distance_km": 4151.8,
-          "start_local": "2025-09-09T07:30",
+          "start_local": "2025-09-11T07:30",
           "flight_number": "UA1205"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "SFO",
           "distance_km": 4151.8,
-          "start_local": "2025-09-09T07:30",
+          "start_local": "2025-09-11T07:30",
           "flight_number": "UA1205"
         },
         "most_visited_airport": "JFK",
@@ -3782,8 +3782,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -3808,7 +3808,7 @@
           "hotel": "Bayview Inn",
           "city": "San Francisco",
           "nights": 4,
-          "start_local": "2025-09-09T15:00"
+          "start_local": "2025-09-11T15:00"
         },
         "most_visited_hotel": {
           "name": "Bayview Inn",
@@ -3852,19 +3852,19 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           },
           {
             "name": "San Francisco",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           }
         ],
@@ -3879,8 +3879,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -3951,14 +3951,14 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-05",
-                "end": "2024-08-06"
+                "start": "2024-08-07",
+                "end": "2024-08-08"
               },
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-12",
-                "end": "2024-08-12"
+                "start": "2024-08-14",
+                "end": "2024-08-14"
               }
             ]
           }
@@ -3980,14 +3980,14 @@
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "most_visited_airport": "CDG",
@@ -4027,8 +4027,8 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-06",
-                "end": "2024-08-12"
+                "start": "2024-08-08",
+                "end": "2024-08-14"
               }
             ]
           }
@@ -4053,7 +4053,7 @@
           "hotel": "Hôtel du Parc",
           "city": "Paris",
           "nights": 6,
-          "start_local": "2024-08-06T15:00"
+          "start_local": "2024-08-08T15:00"
         },
         "most_visited_hotel": {
           "name": "Hôtel du Parc",
@@ -4087,24 +4087,24 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 1
           },
           {
             "name": "FR",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 1
           },
           {
             "name": "Paris",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           }
         ],
@@ -4222,14 +4222,14 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-05",
-                "end": "2024-08-06"
+                "start": "2024-08-07",
+                "end": "2024-08-08"
               },
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-12",
-                "end": "2024-08-12"
+                "start": "2024-08-14",
+                "end": "2024-08-14"
               }
             ]
           },
@@ -4246,14 +4246,14 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-03"
+                "start": "2026-09-05",
+                "end": "2026-09-05"
               },
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-08",
-                "end": "2026-09-08"
+                "start": "2026-09-10",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -4270,14 +4270,14 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-09"
+                "start": "2025-09-11",
+                "end": "2025-09-11"
               },
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-13",
-                "end": "2025-09-13"
+                "start": "2025-09-15",
+                "end": "2025-09-15"
               }
             ]
           },
@@ -4294,8 +4294,8 @@
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               }
             ]
           }
@@ -4325,14 +4325,14 @@
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "MCO",
           "distance_km": 1521.4,
-          "start_local": "2026-09-03T08:15",
+          "start_local": "2026-09-05T08:15",
           "flight_number": "DL1412"
         },
         "most_visited_airport": "JFK",
@@ -4396,8 +4396,8 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-06",
-                "end": "2024-08-12"
+                "start": "2024-08-08",
+                "end": "2024-08-14"
               }
             ]
           },
@@ -4412,14 +4412,14 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-16",
-                "end": "2026-06-19"
+                "start": "2026-06-18",
+                "end": "2026-06-21"
               },
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-22",
-                "end": "2026-06-24"
+                "start": "2026-06-24",
+                "end": "2026-06-26"
               }
             ]
           },
@@ -4434,8 +4434,8 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-08"
+                "start": "2026-09-05",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -4450,8 +4450,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           },
@@ -4466,8 +4466,8 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-19",
-                "end": "2026-06-22"
+                "start": "2026-06-21",
+                "end": "2026-06-24"
               }
             ]
           }
@@ -4532,7 +4532,7 @@
           "hotel": "Hôtel du Parc",
           "city": "Paris",
           "nights": 6,
-          "start_local": "2024-08-06T15:00"
+          "start_local": "2024-08-08T15:00"
         },
         "most_visited_hotel": {
           "name": "Hôtel du Parc",
@@ -4585,54 +4585,54 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 4
           },
           {
             "name": "FR",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           },
           {
             "name": "GB",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 4
           },
           {
             "name": "Paris",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           },
           {
             "name": "San Francisco",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           },
           {
             "name": "Denver",
-            "first_visit": "2026-06-16",
+            "first_visit": "2026-06-18",
             "visits": 2
           },
           {
             "name": "Salt Lake City",
-            "first_visit": "2026-06-19",
+            "first_visit": "2026-06-21",
             "visits": 1
           },
           {
             "name": "Orlando",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 1
           },
           {
             "name": "London",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
@@ -4647,8 +4647,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -4661,8 +4661,8 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-16",
-                "end": "2026-06-24"
+                "start": "2026-06-18",
+                "end": "2026-06-26"
               }
             ]
           },
@@ -4675,8 +4675,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -4689,8 +4689,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -4703,8 +4703,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -4789,14 +4789,14 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-03"
+                "start": "2026-09-05",
+                "end": "2026-09-05"
               },
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-08",
-                "end": "2026-09-08"
+                "start": "2026-09-10",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -4813,8 +4813,8 @@
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               }
             ]
           }
@@ -4836,14 +4836,14 @@
           "origin": "JFK",
           "destination": "LHR",
           "distance_km": 5539.6,
-          "start_local": "2026-10-12T19:00",
+          "start_local": "2026-10-14T19:00",
           "flight_number": "AA101"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "MCO",
           "distance_km": 1521.4,
-          "start_local": "2026-09-03T08:15",
+          "start_local": "2026-09-05T08:15",
           "flight_number": "DL1412"
         },
         "most_visited_airport": "JFK",
@@ -4891,14 +4891,14 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-16",
-                "end": "2026-06-19"
+                "start": "2026-06-18",
+                "end": "2026-06-21"
               },
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-22",
-                "end": "2026-06-24"
+                "start": "2026-06-24",
+                "end": "2026-06-26"
               }
             ]
           },
@@ -4913,8 +4913,8 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-08"
+                "start": "2026-09-05",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -4929,8 +4929,8 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-19",
-                "end": "2026-06-22"
+                "start": "2026-06-21",
+                "end": "2026-06-24"
               }
             ]
           }
@@ -4975,7 +4975,7 @@
           "hotel": "Lakeside Resort",
           "city": null,
           "nights": 5,
-          "start_local": "2026-09-03T15:00"
+          "start_local": "2026-09-05T15:00"
         },
         "most_visited_hotel": {
           "name": "Lakeside Resort",
@@ -5019,39 +5019,39 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2026-06-16",
+            "first_visit": "2026-06-18",
             "visits": 2
           },
           {
             "name": "GB",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "Denver",
-            "first_visit": "2026-06-16",
+            "first_visit": "2026-06-18",
             "visits": 2
           },
           {
             "name": "Salt Lake City",
-            "first_visit": "2026-06-19",
+            "first_visit": "2026-06-21",
             "visits": 1
           },
           {
             "name": "New York",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 2
           },
           {
             "name": "Orlando",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 1
           },
           {
             "name": "London",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
@@ -5066,8 +5066,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -5080,8 +5080,8 @@
               {
                 "trip_id": 7,
                 "name": "Trip to Denver (Jun 2026)",
-                "start": "2026-06-16",
-                "end": "2026-06-24"
+                "start": "2026-06-18",
+                "end": "2026-06-26"
               }
             ]
           },
@@ -5094,8 +5094,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -5108,8 +5108,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           }
@@ -5176,14 +5176,14 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-09"
+                "start": "2025-09-11",
+                "end": "2025-09-11"
               },
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-13",
-                "end": "2025-09-13"
+                "start": "2025-09-15",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -5205,14 +5205,14 @@
           "origin": "JFK",
           "destination": "SFO",
           "distance_km": 4151.8,
-          "start_local": "2025-09-09T07:30",
+          "start_local": "2025-09-11T07:30",
           "flight_number": "UA1205"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "SFO",
           "distance_km": 4151.8,
-          "start_local": "2025-09-09T07:30",
+          "start_local": "2025-09-11T07:30",
           "flight_number": "UA1205"
         },
         "most_visited_airport": "JFK",
@@ -5252,8 +5252,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -5278,7 +5278,7 @@
           "hotel": "Bayview Inn",
           "city": "San Francisco",
           "nights": 4,
-          "start_local": "2025-09-09T15:00"
+          "start_local": "2025-09-11T15:00"
         },
         "most_visited_hotel": {
           "name": "Bayview Inn",
@@ -5322,19 +5322,19 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           },
           {
             "name": "San Francisco",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           }
         ],
@@ -5349,8 +5349,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -5421,14 +5421,14 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-05",
-                "end": "2024-08-06"
+                "start": "2024-08-07",
+                "end": "2024-08-08"
               },
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-12",
-                "end": "2024-08-12"
+                "start": "2024-08-14",
+                "end": "2024-08-14"
               }
             ]
           }
@@ -5450,14 +5450,14 @@
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "most_visited_airport": "CDG",
@@ -5497,8 +5497,8 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-06",
-                "end": "2024-08-12"
+                "start": "2024-08-08",
+                "end": "2024-08-14"
               }
             ]
           }
@@ -5523,7 +5523,7 @@
           "hotel": "Hôtel du Parc",
           "city": "Paris",
           "nights": 6,
-          "start_local": "2024-08-06T15:00"
+          "start_local": "2024-08-08T15:00"
         },
         "most_visited_hotel": {
           "name": "Hôtel du Parc",
@@ -5557,24 +5557,24 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 1
           },
           {
             "name": "FR",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 1
           },
           {
             "name": "Paris",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           }
         ],
@@ -5692,14 +5692,14 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-05",
-                "end": "2024-08-06"
+                "start": "2024-08-07",
+                "end": "2024-08-08"
               },
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-12",
-                "end": "2024-08-12"
+                "start": "2024-08-14",
+                "end": "2024-08-14"
               }
             ]
           },
@@ -5716,14 +5716,14 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-03"
+                "start": "2026-09-05",
+                "end": "2026-09-05"
               },
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-08",
-                "end": "2026-09-08"
+                "start": "2026-09-10",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -5740,14 +5740,14 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-09"
+                "start": "2025-09-11",
+                "end": "2025-09-11"
               },
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-13",
-                "end": "2025-09-13"
+                "start": "2025-09-15",
+                "end": "2025-09-15"
               }
             ]
           },
@@ -5764,8 +5764,8 @@
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               }
             ]
           }
@@ -5795,14 +5795,14 @@
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "MCO",
           "distance_km": 1521.4,
-          "start_local": "2026-09-03T08:15",
+          "start_local": "2026-09-05T08:15",
           "flight_number": "DL1412"
         },
         "most_visited_airport": "JFK",
@@ -5854,8 +5854,8 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-06",
-                "end": "2024-08-12"
+                "start": "2024-08-08",
+                "end": "2024-08-14"
               }
             ]
           },
@@ -5870,8 +5870,8 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-08"
+                "start": "2026-09-05",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -5886,8 +5886,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -5927,7 +5927,7 @@
           "hotel": "Hôtel du Parc",
           "city": "Paris",
           "nights": 6,
-          "start_local": "2024-08-06T15:00"
+          "start_local": "2024-08-08T15:00"
         },
         "most_visited_hotel": {
           "name": "Hôtel du Parc",
@@ -5976,44 +5976,44 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 3
           },
           {
             "name": "FR",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           },
           {
             "name": "GB",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 4
           },
           {
             "name": "Paris",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           },
           {
             "name": "San Francisco",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           },
           {
             "name": "Orlando",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 1
           },
           {
             "name": "London",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
@@ -6028,8 +6028,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -6042,8 +6042,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -6056,8 +6056,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -6070,8 +6070,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -6156,14 +6156,14 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-03"
+                "start": "2026-09-05",
+                "end": "2026-09-05"
               },
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-08",
-                "end": "2026-09-08"
+                "start": "2026-09-10",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -6180,8 +6180,8 @@
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               }
             ]
           }
@@ -6203,14 +6203,14 @@
           "origin": "JFK",
           "destination": "LHR",
           "distance_km": 5539.6,
-          "start_local": "2026-10-12T19:00",
+          "start_local": "2026-10-14T19:00",
           "flight_number": "AA101"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "MCO",
           "distance_km": 1521.4,
-          "start_local": "2026-09-03T08:15",
+          "start_local": "2026-09-05T08:15",
           "flight_number": "DL1412"
         },
         "most_visited_airport": "JFK",
@@ -6240,8 +6240,8 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-08"
+                "start": "2026-09-05",
+                "end": "2026-09-10"
               }
             ]
           }
@@ -6260,7 +6260,7 @@
           "hotel": "Lakeside Resort",
           "city": null,
           "nights": 5,
-          "start_local": "2026-09-03T15:00"
+          "start_local": "2026-09-05T15:00"
         },
         "most_visited_hotel": {
           "name": "Lakeside Resort",
@@ -6295,29 +6295,29 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 1
           },
           {
             "name": "GB",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 2
           },
           {
             "name": "Orlando",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 1
           },
           {
             "name": "London",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
@@ -6332,8 +6332,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -6346,8 +6346,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           },
@@ -6360,8 +6360,8 @@
               {
                 "trip_id": 5,
                 "name": "Trip to Miami (Feb 2026)",
-                "start": "2026-02-06",
-                "end": "2026-02-13"
+                "start": "2026-02-08",
+                "end": "2026-02-15"
               }
             ]
           }
@@ -6428,14 +6428,14 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-09"
+                "start": "2025-09-11",
+                "end": "2025-09-11"
               },
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-13",
-                "end": "2025-09-13"
+                "start": "2025-09-15",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -6457,14 +6457,14 @@
           "origin": "JFK",
           "destination": "SFO",
           "distance_km": 4151.8,
-          "start_local": "2025-09-09T07:30",
+          "start_local": "2025-09-11T07:30",
           "flight_number": "UA1205"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "SFO",
           "distance_km": 4151.8,
-          "start_local": "2025-09-09T07:30",
+          "start_local": "2025-09-11T07:30",
           "flight_number": "UA1205"
         },
         "most_visited_airport": "JFK",
@@ -6504,8 +6504,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -6530,7 +6530,7 @@
           "hotel": "Bayview Inn",
           "city": "San Francisco",
           "nights": 4,
-          "start_local": "2025-09-09T15:00"
+          "start_local": "2025-09-11T15:00"
         },
         "most_visited_hotel": {
           "name": "Bayview Inn",
@@ -6574,19 +6574,19 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           },
           {
             "name": "San Francisco",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           }
         ],
@@ -6601,8 +6601,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -6673,14 +6673,14 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-05",
-                "end": "2024-08-06"
+                "start": "2024-08-07",
+                "end": "2024-08-08"
               },
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-12",
-                "end": "2024-08-12"
+                "start": "2024-08-14",
+                "end": "2024-08-14"
               }
             ]
           }
@@ -6702,14 +6702,14 @@
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "most_visited_airport": "CDG",
@@ -6749,8 +6749,8 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-06",
-                "end": "2024-08-12"
+                "start": "2024-08-08",
+                "end": "2024-08-14"
               }
             ]
           }
@@ -6775,7 +6775,7 @@
           "hotel": "Hôtel du Parc",
           "city": "Paris",
           "nights": 6,
-          "start_local": "2024-08-06T15:00"
+          "start_local": "2024-08-08T15:00"
         },
         "most_visited_hotel": {
           "name": "Hôtel du Parc",
@@ -6809,24 +6809,24 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 1
           },
           {
             "name": "FR",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 1
           },
           {
             "name": "Paris",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           }
         ],
@@ -6896,8 +6896,8 @@
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               }
             ]
           }
@@ -6919,14 +6919,14 @@
           "origin": "JFK",
           "destination": "LHR",
           "distance_km": 5539.6,
-          "start_local": "2026-10-12T19:00",
+          "start_local": "2026-10-14T19:00",
           "flight_number": "AA101"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "LHR",
           "distance_km": 5539.6,
-          "start_local": "2026-10-12T19:00",
+          "start_local": "2026-10-14T19:00",
           "flight_number": "AA101"
         },
         "most_visited_airport": "JFK",
@@ -6969,24 +6969,24 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2026-10-12",
+            "first_visit": "2026-10-14",
             "visits": 1
           },
           {
             "name": "GB",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2026-10-12",
+            "first_visit": "2026-10-14",
             "visits": 1
           },
           {
             "name": "London",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
@@ -7056,8 +7056,8 @@
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               }
             ]
           }
@@ -7079,14 +7079,14 @@
           "origin": "JFK",
           "destination": "LHR",
           "distance_km": 5539.6,
-          "start_local": "2026-10-12T19:00",
+          "start_local": "2026-10-14T19:00",
           "flight_number": "AA101"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "LHR",
           "distance_km": 5539.6,
-          "start_local": "2026-10-12T19:00",
+          "start_local": "2026-10-14T19:00",
           "flight_number": "AA101"
         },
         "most_visited_airport": "JFK",
@@ -7129,24 +7129,24 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2026-10-12",
+            "first_visit": "2026-10-14",
             "visits": 1
           },
           {
             "name": "GB",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2026-10-12",
+            "first_visit": "2026-10-14",
             "visits": 1
           },
           {
             "name": "London",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
@@ -7400,14 +7400,14 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-05",
-                "end": "2024-08-06"
+                "start": "2024-08-07",
+                "end": "2024-08-08"
               },
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-12",
-                "end": "2024-08-12"
+                "start": "2024-08-14",
+                "end": "2024-08-14"
               }
             ]
           },
@@ -7424,14 +7424,14 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-03"
+                "start": "2026-09-05",
+                "end": "2026-09-05"
               },
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-08",
-                "end": "2026-09-08"
+                "start": "2026-09-10",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -7448,14 +7448,14 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-09"
+                "start": "2025-09-11",
+                "end": "2025-09-11"
               },
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-13",
-                "end": "2025-09-13"
+                "start": "2025-09-15",
+                "end": "2025-09-15"
               }
             ]
           },
@@ -7472,8 +7472,8 @@
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               }
             ]
           }
@@ -7503,14 +7503,14 @@
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "MCO",
           "distance_km": 1521.4,
-          "start_local": "2026-09-03T08:15",
+          "start_local": "2026-09-05T08:15",
           "flight_number": "DL1412"
         },
         "most_visited_airport": "JFK",
@@ -7562,8 +7562,8 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-06",
-                "end": "2024-08-12"
+                "start": "2024-08-08",
+                "end": "2024-08-14"
               }
             ]
           },
@@ -7578,8 +7578,8 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-08"
+                "start": "2026-09-05",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -7594,8 +7594,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -7635,7 +7635,7 @@
           "hotel": "Hôtel du Parc",
           "city": "Paris",
           "nights": 6,
-          "start_local": "2024-08-06T15:00"
+          "start_local": "2024-08-08T15:00"
         },
         "most_visited_hotel": {
           "name": "Hôtel du Parc",
@@ -7679,44 +7679,44 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 3
           },
           {
             "name": "FR",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           },
           {
             "name": "GB",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 4
           },
           {
             "name": "Paris",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           },
           {
             "name": "San Francisco",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           },
           {
             "name": "Orlando",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 1
           },
           {
             "name": "London",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
@@ -7731,8 +7731,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -7817,14 +7817,14 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-03"
+                "start": "2026-09-05",
+                "end": "2026-09-05"
               },
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-08",
-                "end": "2026-09-08"
+                "start": "2026-09-10",
+                "end": "2026-09-10"
               }
             ]
           },
@@ -7841,8 +7841,8 @@
               {
                 "trip_id": 4,
                 "name": "Trip to London (Oct 2026)",
-                "start": "2026-10-12",
-                "end": "2026-10-13"
+                "start": "2026-10-14",
+                "end": "2026-10-15"
               }
             ]
           }
@@ -7864,14 +7864,14 @@
           "origin": "JFK",
           "destination": "LHR",
           "distance_km": 5539.6,
-          "start_local": "2026-10-12T19:00",
+          "start_local": "2026-10-14T19:00",
           "flight_number": "AA101"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "MCO",
           "distance_km": 1521.4,
-          "start_local": "2026-09-03T08:15",
+          "start_local": "2026-09-05T08:15",
           "flight_number": "DL1412"
         },
         "most_visited_airport": "JFK",
@@ -7901,8 +7901,8 @@
               {
                 "trip_id": 3,
                 "name": "Trip to Orlando (Sep 2026)",
-                "start": "2026-09-03",
-                "end": "2026-09-08"
+                "start": "2026-09-05",
+                "end": "2026-09-10"
               }
             ]
           }
@@ -7921,7 +7921,7 @@
           "hotel": "Lakeside Resort",
           "city": null,
           "nights": 5,
-          "start_local": "2026-09-03T15:00"
+          "start_local": "2026-09-05T15:00"
         },
         "most_visited_hotel": {
           "name": "Lakeside Resort",
@@ -7951,29 +7951,29 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 1
           },
           {
             "name": "GB",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 2
           },
           {
             "name": "Orlando",
-            "first_visit": "2026-09-03",
+            "first_visit": "2026-09-05",
             "visits": 1
           },
           {
             "name": "London",
-            "first_visit": "2026-10-13",
+            "first_visit": "2026-10-15",
             "visits": 1
           }
         ],
@@ -8041,14 +8041,14 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-09"
+                "start": "2025-09-11",
+                "end": "2025-09-11"
               },
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-13",
-                "end": "2025-09-13"
+                "start": "2025-09-15",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -8070,14 +8070,14 @@
           "origin": "JFK",
           "destination": "SFO",
           "distance_km": 4151.8,
-          "start_local": "2025-09-09T07:30",
+          "start_local": "2025-09-11T07:30",
           "flight_number": "UA1205"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "SFO",
           "distance_km": 4151.8,
-          "start_local": "2025-09-09T07:30",
+          "start_local": "2025-09-11T07:30",
           "flight_number": "UA1205"
         },
         "most_visited_airport": "JFK",
@@ -8117,8 +8117,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -8143,7 +8143,7 @@
           "hotel": "Bayview Inn",
           "city": "San Francisco",
           "nights": 4,
-          "start_local": "2025-09-09T15:00"
+          "start_local": "2025-09-11T15:00"
         },
         "most_visited_hotel": {
           "name": "Bayview Inn",
@@ -8187,19 +8187,19 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           },
           {
             "name": "San Francisco",
-            "first_visit": "2025-09-09",
+            "first_visit": "2025-09-11",
             "visits": 1
           }
         ],
@@ -8214,8 +8214,8 @@
               {
                 "trip_id": 2,
                 "name": "Trip to San Francisco (Sep 2025)",
-                "start": "2025-09-09",
-                "end": "2025-09-13"
+                "start": "2025-09-11",
+                "end": "2025-09-15"
               }
             ]
           }
@@ -8286,14 +8286,14 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-05",
-                "end": "2024-08-06"
+                "start": "2024-08-07",
+                "end": "2024-08-08"
               },
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-12",
-                "end": "2024-08-12"
+                "start": "2024-08-14",
+                "end": "2024-08-14"
               }
             ]
           }
@@ -8315,14 +8315,14 @@
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "shortest": {
           "origin": "JFK",
           "destination": "CDG",
           "distance_km": 5833.6,
-          "start_local": "2024-08-05T18:30",
+          "start_local": "2024-08-07T18:30",
           "flight_number": "AF7"
         },
         "most_visited_airport": "CDG",
@@ -8362,8 +8362,8 @@
               {
                 "trip_id": 1,
                 "name": "Trip to Paris (Aug 2024)",
-                "start": "2024-08-06",
-                "end": "2024-08-12"
+                "start": "2024-08-08",
+                "end": "2024-08-14"
               }
             ]
           }
@@ -8388,7 +8388,7 @@
           "hotel": "Hôtel du Parc",
           "city": "Paris",
           "nights": 6,
-          "start_local": "2024-08-06T15:00"
+          "start_local": "2024-08-08T15:00"
         },
         "most_visited_hotel": {
           "name": "Hôtel du Parc",
@@ -8422,24 +8422,24 @@
         "countries": [
           {
             "name": "US",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 1
           },
           {
             "name": "FR",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           }
         ],
         "cities": [
           {
             "name": "New York",
-            "first_visit": "2024-08-05",
+            "first_visit": "2024-08-07",
             "visits": 1
           },
           {
             "name": "Paris",
-            "first_visit": "2024-08-06",
+            "first_visit": "2024-08-08",
             "visits": 1
           }
         ],
@@ -78172,7 +78172,7 @@
         "holds_bookings": false,
         "subject": "Simulated incomplete flight booking awaiting review",
         "has_email": true,
-        "received": "2026-10-12",
+        "received": "2026-10-14",
         "reason": "incomplete",
         "suggestions": [
           {
@@ -78181,7 +78181,7 @@
             "confirmation": "DEMO-REVIEW-101",
             "origin": "JFK",
             "destination": "CDG",
-            "start_local": "2024-08-05T18:30",
+            "start_local": "2024-08-07T18:30",
             "end_local": "",
             "start_zone": "America/New_York",
             "end_zone": "Europe/Paris",
@@ -78224,7 +78224,7 @@
         "holds_bookings": false,
         "subject": "Simulated incomplete road trip rental booking awaiting review",
         "has_email": true,
-        "received": "2026-10-12",
+        "received": "2026-10-14",
         "reason": "incomplete",
         "suggestions": [
           {
@@ -78233,7 +78233,7 @@
             "confirmation": "DEMO-REVIEW-102",
             "origin": "Denver",
             "destination": "Fort Collins",
-            "start_local": "2026-06-16T09:00",
+            "start_local": "2026-06-18T09:00",
             "end_local": "",
             "start_zone": "America/Denver",
             "end_zone": "America/Denver",
@@ -78267,7 +78267,7 @@
         "holds_bookings": false,
         "subject": "Simulated incomplete cruise booking awaiting review",
         "has_email": true,
-        "received": "2026-10-12",
+        "received": "2026-10-14",
         "reason": "incomplete",
         "suggestions": [
           {
@@ -78276,7 +78276,7 @@
             "confirmation": "DEMO-REVIEW-103",
             "origin": "Miami",
             "destination": "Miami",
-            "start_local": "2026-02-06T16:30",
+            "start_local": "2026-02-08T16:30",
             "end_local": "",
             "start_zone": "America/New_York",
             "end_zone": "America/New_York",
@@ -78311,7 +78311,7 @@
         "item_id": 5,
         "entry": 1,
         "subject": "Your stay: Quay Street Lodge",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "mine": true,
         "booking": {
           "kind": "hotel",
@@ -78319,8 +78319,8 @@
           "confirmation": "DEMO77",
           "origin": "Quay Street Lodge",
           "destination": null,
-          "start_local": "2027-01-12T15:00",
-          "end_local": "2027-01-17T10:00"
+          "start_local": "2027-01-14T15:00",
+          "end_local": "2027-01-19T10:00"
         },
         "candidates": [
           {
@@ -78331,8 +78331,8 @@
             "provider": null,
             "origin": "Quay Street Lodge",
             "destination": null,
-            "start_local": "2027-01-12T15:00",
-            "end_local": "2027-01-17T10:00"
+            "start_local": "2027-01-14T15:00",
+            "end_local": "2027-01-19T10:00"
           },
           {
             "segment_id": 31,
@@ -78342,8 +78342,8 @@
             "provider": null,
             "origin": "Quay Street Lodge",
             "destination": null,
-            "start_local": "2027-01-12T15:00",
-            "end_local": "2027-01-17T10:00"
+            "start_local": "2027-01-14T15:00",
+            "end_local": "2027-01-19T10:00"
           }
         ]
       }
@@ -78358,7 +78358,7 @@
         "provider": "Example Air",
         "origin": "JFK",
         "destination": "ORD",
-        "start_local": "2026-12-13T07:00",
+        "start_local": "2026-12-15T07:00",
         "start_zone": "America/New_York"
       }
     ],
@@ -78377,7 +78377,7 @@
       {
         "subject": "Simulated flight confirmation: WM8D4P",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: Air France\nConfirmation: WM8D4P\nTravelers: Jane Doe (12A), Sam Doe (12B), Mia Doe (12C)\nFrom: JFK\nTo: CDG\nStarts: 2024-08-05T18:30\nEnds: 2024-08-06T08:00\nStart time zone: America/New_York\nEnd time zone: Europe/Paris\nTotal: 245.00 USD\nFlight Number: AF 7\nCabin: Business\nTerminal: 1\nAircraft: Example aircraft\nSeat: Jane Doe: 12A; Sam Doe: 12B; Mia Doe: 12C\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-1\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78389,7 +78389,7 @@
       {
         "subject": "Simulated hotel confirmation: H12984",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Hilton\nConfirmation: H12984\nTravelers: Jane Doe (Double), Sam Doe (Double), Mia Doe (Double)\nFrom: Hôtel du Parc\nTo: Paris\nStarts: 2024-08-06T15:00\nEnds: 2024-08-12T11:00\nStart time zone: Europe/Paris\nEnd time zone: Europe/Paris\nTotal: 360.00 USD\nAddress: 12 Fictional Stay Lane\nPhone: +1 202-555-0101\nRoom: Double\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78401,7 +78401,7 @@
       {
         "subject": "Simulated flight confirmation: WM8D4P",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: Air France\nConfirmation: WM8D4P\nTravelers: Jane Doe (12A), Sam Doe (12B), Mia Doe (12C)\nFrom: CDG\nTo: JFK\nStarts: 2024-08-12T11:15\nEnds: 2024-08-12T13:50\nStart time zone: Europe/Paris\nEnd time zone: America/New_York\nTotal: 245.00 USD\nFlight Number: AF 8\nCabin: Business\nTerminal: 1\nAircraft: Example aircraft\nSeat: Jane Doe: 12A; Sam Doe: 12B; Mia Doe: 12C\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-3\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78413,7 +78413,7 @@
       {
         "subject": "Simulated flight confirmation: TV5N2B",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: United Airlines\nConfirmation: TV5N2B\nTravelers: Jane Doe (12A), Sam Doe (12B), Mia Doe (12C)\nFrom: JFK\nTo: SFO\nStarts: 2025-09-09T07:30\nEnds: 2025-09-09T10:55\nStart time zone: America/New_York\nEnd time zone: America/Los_Angeles\nTotal: 245.00 USD\nFlight Number: UA 1205\nCabin: Premium Economy\nTerminal: 1\nAircraft: Example aircraft\nSeat: Jane Doe: 12A; Sam Doe: 12B; Mia Doe: 12C\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-4\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78425,7 +78425,7 @@
       {
         "subject": "Simulated parking confirmation: PK21866",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: parking\nProvider: Example Parking\nConfirmation: PK21866\nTravelers: Jane Doe, Sam Doe, Mia Doe\nFrom: Example Airport Economy Lot\nTo: Example Airport Economy Lot\nStarts: 2025-09-09T04:30\nEnds: 2025-09-13T23:15\nStart time zone: America/New_York\nEnd time zone: America/New_York\nTotal: 48.00 USD\nAddress: 1 Terminal Road\nJamaica, NY 11430\nPhone: +1 202-555-0104\nSpace Type: Economy\nVehicle: Example hybrid SUV\nNotes: license plate: DEMO-042\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78437,7 +78437,7 @@
       {
         "subject": "Simulated car confirmation: C5521",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: car\nProvider: Hertz\nConfirmation: C5521\nTravelers: Jane Doe, Sam Doe, Mia Doe\nFrom: SFO airport\nTo: SFO airport\nStarts: 2025-09-09T12:00\nEnds: 2025-09-13T12:00\nStart time zone: America/Los_Angeles\nEnd time zone: America/Los_Angeles\nTotal: 180.00 USD\nAddress: 16 Fictional Rental Road\nPhone: +1 202-555-0102\nVehicle: Example hybrid SUV\nCar Class: SUV\nNotes: driver: Jane Doe; fuel policy: Full to full; insurance: Synthetic collision cover included\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78449,7 +78449,7 @@
       {
         "subject": "Simulated hotel confirmation: H70452",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Marriott\nConfirmation: H70452\nTravelers: Jane Doe (King), Sam Doe (King), Mia Doe (King)\nFrom: Bayview Inn\nTo: San Francisco\nStarts: 2025-09-09T15:00\nEnds: 2025-09-13T11:00\nStart time zone: America/Los_Angeles\nEnd time zone: America/Los_Angeles\nTotal: 360.00 USD\nAddress: 17 Fictional Stay Lane\nPhone: +1 202-555-0101\nRoom: King\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78461,7 +78461,7 @@
       {
         "subject": "Simulated flight confirmation: TV5N2B",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: United Airlines\nConfirmation: TV5N2B\nTravelers: Jane Doe (12A), Sam Doe (12B), Mia Doe (12C)\nFrom: SFO\nTo: JFK\nStarts: 2025-09-13T13:00\nEnds: 2025-09-13T21:30\nStart time zone: America/Los_Angeles\nEnd time zone: America/New_York\nTotal: 245.00 USD\nFlight Number: UA 1210\nCabin: Premium Economy\nTerminal: 1\nAircraft: Example aircraft\nSeat: Jane Doe: 12A; Sam Doe: 12B; Mia Doe: 12C\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-8\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78473,7 +78473,7 @@
       {
         "subject": "Simulated flight confirmation: RB3T6K",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: Delta Air Lines\nConfirmation: RB3T6K\nTravelers: Jane Doe (12A), Sam Doe (12B), Mia Doe (12C)\nFrom: JFK\nTo: MCO\nStarts: 2026-09-03T08:15\nEnds: 2026-09-03T11:20\nStart time zone: America/New_York\nEnd time zone: America/New_York\nTotal: 245.00 USD\nFlight Number: DL 1412\nCabin: Economy\nTerminal: 4\nAircraft: Boeing 737\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-9\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78485,7 +78485,7 @@
       {
         "subject": "Simulated hotel confirmation: H41207",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Hilton\nConfirmation: H41207\nTravelers: Jane Doe (Two queens), Sam Doe (Two queens), Mia Doe (Two queens)\nFrom: Lakeside Resort\nTo: Lakeside Resort\nStarts: 2026-09-03T15:00\nEnds: 2026-09-08T11:00\nStart time zone: America/New_York\nEnd time zone: America/New_York\nTotal: 360.00 USD\nAddress: 100 Lakeshore Drive, Orlando\nPhone: +1 202-555-0101\nRoom: Two queens\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78497,7 +78497,7 @@
       {
         "subject": "Simulated flight confirmation: RB3T6K",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: Delta Air Lines\nConfirmation: RB3T6K\nTravelers: Jane Doe (12A), Sam Doe (12B), Mia Doe (12C)\nFrom: MCO\nTo: JFK\nStarts: 2026-09-08T17:40\nEnds: 2026-09-08T20:10\nStart time zone: America/New_York\nEnd time zone: America/New_York\nTotal: 245.00 USD\nFlight Number: DL 2190\nCabin: Economy\nTerminal: 1\nAircraft: Airbus A320 family\nSeat: Jane Doe: 12A; Sam Doe: 12B; Mia Doe: 12C\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-11\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78509,7 +78509,7 @@
       {
         "subject": "Simulated flight confirmation: KQ7M2X",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: American Airlines\nConfirmation: KQ7M2X\nTravelers: Jane Doe (12A), Sam Doe (12B), Mia Doe (12C)\nFrom: JFK\nTo: LHR\nStarts: 2026-10-12T19:00\nEnds: 2026-10-13T07:10\nStart time zone: America/New_York\nEnd time zone: Europe/London\nTotal: 1286.40 USD\nFlight Number: AA 101\nCabin: Economy\nTerminal: 8\nAircraft: Boeing 777\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-12\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78521,7 +78521,7 @@
       {
         "subject": "Simulated hotel confirmation: H88231",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Marriott\nConfirmation: H88231\nTravelers: Jane Doe (Family room), Sam Doe (Family room), Mia Doe (Family room), Grandma Joan (Family room)\nFrom: Harbour Hotel\nTo: Harbour Hotel\nStarts: 2026-10-13T15:00\nEnds: 2026-10-16T10:00\nStart time zone: Europe/London\nEnd time zone: Europe/London\nTotal: 948.00 GBP\nAddress: 1 Quay Street\nLondon E1 0AA\nPhone: +44 20 7946 0000\nRoom: Family room\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78533,7 +78533,7 @@
       {
         "subject": "Simulated hotel confirmation: G20417",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Stays\nConfirmation: G20417\nTravelers: Jane Doe (Family suite), Sam Doe (Family suite), Mia Doe (Family suite), Grandma Joan (Family suite)\nFrom: Camden Guesthouse\nTo: Camden Guesthouse\nStarts: 2026-10-16T15:00\nEnds: 2026-10-18T10:00\nStart time zone: Europe/London\nEnd time zone: Europe/London\nTotal: 310.00 GBP\nAddress: 9 Parkway, Camden, London NW1 7AA\nPhone: +1 202-555-0101\nRoom: Family suite\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78545,7 +78545,7 @@
       {
         "subject": "Simulated flight confirmation: KQ7M2X",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: American Airlines\nConfirmation: KQ7M2X\nTravelers: Jane Doe (12A), Sam Doe (12B), Mia Doe (12C)\nFrom: LHR\nTo: JFK\nStarts: 2026-10-18T11:30\nEnds: 2026-10-18T14:35\nStart time zone: Europe/London\nEnd time zone: America/New_York\nTotal: 245.00 USD\nFlight Number: AA 102\nCabin: Economy\nTerminal: 3\nAircraft: Example aircraft\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-15\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78557,7 +78557,7 @@
       {
         "subject": "Simulated cruise confirmation: CR48210",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: cruise\nProvider: Example Cruise Line\nConfirmation: CR48210\nTravelers: Jane Doe (Balcony 9214), Sam Doe (Balcony 9214)\nFrom: Miami\nTo: Miami\nStarts: 2026-02-06T16:30\nEnds: 2026-02-13T07:00\nStart time zone: America/New_York\nEnd time zone: America/New_York\nTotal: 1800.00 USD\nAddress: 40 Fictional Pier Avenue\nPhone: +1 202-555-0103\nShip: Example Voyager\nRoom: Balcony 9214\nDeck: 9\nNotes: dining: 18:30 · Vegetarian meals; boarding: 12:00–14:00 local time; package: Meals included\nItinerary:\nNassau: arrive 2026-02-07T08:00, depart 2026-02-07T17:00 (America/Nassau)\nGrand Cayman: arrive 2026-02-10T07:00, depart 2026-02-10T16:00 (America/Cayman)\nCozumel: arrive 2026-02-11T08:00, depart 2026-02-11T17:00 (America/Cancun)\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78569,7 +78569,7 @@
       {
         "subject": "Simulated cruise confirmation: CR90377",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: cruise\nProvider: Disney Cruise Line\nConfirmation: CR90377\nTravelers: Jane Doe (Oceanview 6118), Sam Doe (Oceanview 6118)\nFrom: Seattle\nTo: Seattle\nStarts: 2026-12-28T16:00\nEnds: 2027-01-04T06:30\nStart time zone: America/Los_Angeles\nEnd time zone: America/Los_Angeles\nTotal: 1800.00 USD\nAddress: 2001 Terminal Way\nSeattle, WA 98100\nPhone: +1 202-555-0103\nShip: Example Explorer\nRoom: Oceanview 6118\nDeck: 6\nNotes: dining: 18:30 · Vegetarian meals; boarding: 12:00–14:00 local time; package: Meals included\nItinerary:\nJuneau: arrive 2026-12-31T07:00, depart 2026-12-31T18:00 (America/Juneau)\nSkagway: arrive 2027-01-01T07:00, depart 2027-01-01T20:00 (America/Juneau)\nVictoria: arrive 2027-01-03T18:00, depart 2027-01-03T23:00 (America/Vancouver)\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78581,7 +78581,7 @@
       {
         "subject": "Simulated hotel confirmation: H31550",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Stays\nConfirmation: H31550\nTravelers: Jane Doe (Two queens)\nFrom: Mile High Inn\nTo: Denver\nStarts: 2026-06-16T15:00\nEnds: 2026-06-19T11:00\nStart time zone: America/Denver\nEnd time zone: America/Denver\nTotal: 360.00 USD\nAddress: 28 Fictional Stay Lane\nPhone: +1 202-555-0101\nRoom: Two queens\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78593,7 +78593,7 @@
       {
         "subject": "Simulated hotel confirmation: H31551",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Stays\nConfirmation: H31551\nTravelers: Jane Doe (Two queens)\nFrom: Salt Flat Inn\nTo: Salt Lake City\nStarts: 2026-06-19T15:00\nEnds: 2026-06-22T11:00\nStart time zone: America/Denver\nEnd time zone: America/Denver\nTotal: 360.00 USD\nAddress: 29 Fictional Stay Lane\nPhone: +1 202-555-0101\nRoom: Two queens\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78605,7 +78605,7 @@
       {
         "subject": "Simulated hotel confirmation: H31552",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Stays\nConfirmation: H31552\nTravelers: Jane Doe (Two queens)\nFrom: Foothills Lodge\nTo: Denver\nStarts: 2026-06-22T15:00\nEnds: 2026-06-24T11:00\nStart time zone: America/Denver\nEnd time zone: America/Denver\nTotal: 360.00 USD\nAddress: 30 Fictional Stay Lane\nPhone: +1 202-555-0101\nRoom: Two queens\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78617,7 +78617,7 @@
       {
         "subject": "Simulated flight confirmation: MW5T9Z",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: American Airlines\nConfirmation: MW5T9Z\nTravelers: Grandma Joan (12A)\nFrom: JFK\nTo: LHR\nStarts: 2026-10-12T19:00\nEnds: 2026-10-13T07:10\nStart time zone: America/New_York\nEnd time zone: Europe/London\nTotal: 245.00 USD\nFlight Number: AA 101\nCabin: Economy\nTerminal: 8\nAircraft: Boeing 777\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-21\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78629,7 +78629,7 @@
       {
         "subject": "Simulated flight confirmation: MW5T9Z",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: American Airlines\nConfirmation: MW5T9Z\nTravelers: Grandma Joan (12A)\nFrom: LHR\nTo: JFK\nStarts: 2026-10-18T11:30\nEnds: 2026-10-18T14:35\nStart time zone: Europe/London\nEnd time zone: America/New_York\nTotal: 245.00 USD\nFlight Number: AA 102\nCabin: Economy\nTerminal: 3\nAircraft: Example aircraft\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-23\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78641,7 +78641,7 @@
       {
         "subject": "Simulated flight confirmation: PL4N9R",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: United Airlines\nConfirmation: PL4N9R\nTravelers: Jane Doe (12A)\nFrom: JFK\nTo: SFO\nStarts: 2026-11-03T08:00\nEnds: 2026-11-03T11:20\nStart time zone: America/New_York\nEnd time zone: America/Los_Angeles\nTotal: 245.00 USD\nFlight Number: UA 311\nCabin: Economy\nTerminal: 7\nAircraft: Example aircraft\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-24\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78653,7 +78653,7 @@
       {
         "subject": "Simulated parking confirmation: PK30417",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: parking\nProvider: Example Parking\nConfirmation: PK30417\nTravelers: Jane Doe\nFrom: Example Airport Long-Term Lot\nTo: Example Airport Long-Term Lot\nStarts: 2026-11-03T05:15\nEnds: 2026-11-06T03:00\nStart time zone: America/New_York\nEnd time zone: America/New_York\nTotal: 96.00 USD\nAddress: 1 Terminal Road\nJamaica, NY 11430\nPhone: +1 202-555-0104\nSpace Type: Covered\nVehicle: Blue hatchback\nNotes: license plate: DEMO-042\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78665,7 +78665,7 @@
       {
         "subject": "Simulated car confirmation: C7710",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: car\nProvider: Hertz\nConfirmation: C7710\nTravelers: Jane Doe\nFrom: SFO airport\nTo: SFO airport\nStarts: 2026-11-03T12:30\nEnds: 2026-11-05T16:00\nStart time zone: America/Los_Angeles\nEnd time zone: America/Los_Angeles\nTotal: 312.40 USD\nAddress: 1 Rental Way, San Francisco, CA 94103\nPhone: +1 415 555 0100\nVehicle: Example hybrid SUV\nCar Class: Midsize\nNotes: driver: Jane Doe; fuel policy: Full to full; insurance: Synthetic collision cover included\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78677,7 +78677,7 @@
       {
         "subject": "Simulated flight confirmation: PL4N9R",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: United Airlines\nConfirmation: PL4N9R\nTravelers: Jane Doe (12A)\nFrom: SFO\nTo: JFK\nStarts: 2026-11-05T17:00\nEnds: 2026-11-06T01:35\nStart time zone: America/Los_Angeles\nEnd time zone: America/New_York\nTotal: 245.00 USD\nFlight Number: UA 318\nCabin: Economy\nTerminal: 1\nAircraft: Example aircraft\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-27\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78689,7 +78689,7 @@
       {
         "subject": "Simulated flight confirmation: ST2V7W",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: Delta Air Lines\nConfirmation: ST2V7W\nTravelers: Sam Doe (12A)\nFrom: JFK\nTo: AKL\nStarts: 2026-11-28T21:00\nEnds: 2026-11-30T06:30\nStart time zone: America/New_York\nEnd time zone: Pacific/Auckland\nTotal: 245.00 USD\nFlight Number: DL 5\nCabin: Economy\nTerminal: 1\nAircraft: Example aircraft\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-28\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78701,7 +78701,7 @@
       {
         "subject": "Simulated flight confirmation: CH3K5P",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: flight\nProvider: Example Air\nConfirmation: CH3K5P\nTravelers: RIVERA/ALEX MR (12A)\nFrom: JFK\nTo: ORD\nStarts: 2026-12-13T07:00\nEnds: 2026-12-13T08:45\nStart time zone: America/New_York\nEnd time zone: America/Chicago\nTotal: 245.00 USD\nFlight Number: EX 410\nCabin: Economy\nTerminal: 1\nAircraft: Example aircraft\nNotes: gate: A4; baggage: One checked bag and one carry-on per traveler; ticket number: DEMO-TICKET-29\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78713,7 +78713,7 @@
       {
         "subject": "Simulated hotel confirmation: DEMO-030",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Travel\nConfirmation: DEMO-030\nTravelers: Jane Doe (Twin room), Mia Doe (Twin room)\nFrom: Quay Street Lodge\nTo: Quay Street Lodge\nStarts: 2027-01-12T15:00\nEnds: 2027-01-17T10:00\nStart time zone: Europe/London\nEnd time zone: Europe/London\nTotal: 360.00 USD\nAddress: 40 Fictional Stay Lane, London\nPhone: +1 202-555-0101\nRoom: Twin room\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78725,7 +78725,7 @@
       {
         "subject": "Simulated hotel confirmation: DEMO-031",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: hotel\nProvider: Example Travel\nConfirmation: DEMO-031\nTravelers: Sam Doe (Single room)\nFrom: Quay Street Lodge\nTo: Quay Street Lodge\nStarts: 2027-01-12T15:00\nEnds: 2027-01-17T10:00\nStart time zone: Europe/London\nEnd time zone: Europe/London\nTotal: 360.00 USD\nAddress: 40 Fictional Stay Lane, London\nPhone: +1 202-555-0101\nRoom: Single room\nNotes: board: Breakfast included; cancellation: Free cancellation until seven days before arrival\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
@@ -78737,7 +78737,7 @@
       {
         "subject": "Simulated car confirmation: DEMO-ROAD-032",
         "sender_domain": "travel.example",
-        "received": "2026-10-10",
+        "received": "2026-10-12",
         "text": "SIMULATED BOOKING EMAIL — ALL DETAILS ARE FICTIONAL\n\nFrom: reservations@travel.example\nTo: jane.doe@example.com\n\nHello Jane,\n\nYour reservation is confirmed.\n\nBooking type: car\nProvider: Example Rentals\nConfirmation: DEMO-ROAD-032\nTravelers: Jane Doe\nFrom: Denver\nTo: Fort Collins\nStarts: 2026-06-16T09:00\nEnds: 2026-06-24T17:00\nStart time zone: America/Denver\nEnd time zone: America/Denver\nTotal: 180.00 USD\nAddress: 20 Fictional Rental Lane, Denver, CO\nPhone: +1 202-555-0102\nVehicle: Example hybrid SUV\nCar Class: SUV\nNotes: driver: Jane Doe; fuel policy: Full to full; insurance: Synthetic collision cover included\n\nThank you,\nThe Example Travel team\n\nThis message was bundled for the demo. No email was received, imported or sent.",
         "html": null,
         "truncated": false,
