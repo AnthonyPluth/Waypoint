@@ -117,7 +117,7 @@ describe("Settings index", () => {
     ["Offline & notifications", "#settings/offline"], ["Connected assistants", "#settings/assistants"], ["Backup & import", "#settings/backup"],
   ])("opens %s from one clearly named category link", (task, href) => {
     render(Settings);
-    expect(index().getByRole("link", { name: task })).toHaveAttribute("href", href);
+    expect(index().getByRole("link", { name: new RegExp(`^${task}`) })).toHaveAttribute("href", href);
   });
 
   it("shows each group's sections on its own page, with a way back", () => {

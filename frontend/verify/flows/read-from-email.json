@@ -12,15 +12,15 @@
       "wait_for": "text=Read from the email"
     },
     {
-      "click": "button[aria-label^='Check what Waypoint read']:visible"
+      "click": "button[aria-label^='Check suggestion']:visible"
     },
     {
-      "wait_for": "text=Waypoint read this from labelled lines"
+      "wait_for": "form[data-editor] .ring-2"
     },
     {
       "expect_text": {
         "selector": "form",
-        "text": "Also trust"
+        "text": "Add to my trips"
       }
     },
     {

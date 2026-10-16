@@ -81,7 +81,7 @@
         {#each GROUPS as g (g.id)}
           {@const Icon = g.icon}
           <li>
-            <a href={`#settings/${g.id}`} aria-labelledby={`settings-${g.id}`} aria-describedby={`settings-${g.id}-about`} class="group flex h-full items-start gap-4 rounded-2xl border border-border bg-card p-5 shadow-card outline-none transition-colors hover:border-primary/40 hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:p-6">
+            <a href={`#settings/${g.id}`} aria-labelledby={`settings-${g.id} settings-${g.id}-about`} class="group flex h-full items-start gap-4 rounded-2xl border border-border bg-card p-5 shadow-card outline-none transition-colors hover:border-primary/40 hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:p-6">
               <span class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon class="size-5" aria-hidden="true" /></span>
               <div class="min-w-0 flex-1">
                 <h2 id={`settings-${g.id}`} class="font-medium">{g.label}</h2>

@@ -3,7 +3,7 @@
   "page": "people",
   "steps": [
     { "expect_text": { "selector": "h1", "text": "People" } },
-    { "click": "button[aria-label='Add a loyalty or traveler number for Sam Doe']" },
+    { "click": "button[aria-label='Add loyalty or traveler number for Sam Doe']" },
     { "wait_for": "form[aria-labelledby='id-form-title'], [data-slot='sheet'] form" },
     { "scroll_to": "form[aria-labelledby='id-form-title'], [data-slot='sheet'] form" },
     { "screenshot": "membership-form" }

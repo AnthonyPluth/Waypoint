@@ -2,9 +2,8 @@
   "name": "offline-settings",
   "page": "settings",
   "steps": [
-    { "click": "h2 a[href='#settings/offline']" },
+    { "click": "a[href='#settings/offline'] >> visible=true" },
     { "expect_text": { "selector": "[data-testid='offline-unavailable']", "text": "isn’t available on this device" } },
-    { "scroll_to": "#offline-title" },
     { "screenshot": "offline-unavailable" }
   ]
 }

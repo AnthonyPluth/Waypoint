@@ -93,8 +93,8 @@ describe("People", () => {
     }
     expect(screen.getByRole("button", { name: "Edit Jane Doe’s Delta SkyMiles" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove Jane Doe’s Delta SkyMiles" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show and copy Delta SkyMiles number" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show and copy Global Entry number" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Show and copy Delta SkyMiles number/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Show and copy Global Entry number/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit Jane Doe’s Other" })).toBeInTheDocument();
   });
 
@@ -114,7 +114,7 @@ describe("People", () => {
   it("keeps a membership's logo, program name and number together on one line", async () => {
     ids = [{ ...aa, logo: "/api/loyalty/11/logo" }];
     render(People);
-    const number = await screen.findByRole("button", { name: "Show and copy American AAdvantage number" });
+    const number = await screen.findByRole("button", { name: /^Show and copy American AAdvantage number/ });
     const line = number.parentElement!;
     expect(line.className).toContain("flex");
     expect(line.querySelector("img")).not.toBeNull();
@@ -158,14 +158,14 @@ describe("People", () => {
     render(People);
     expect(await screen.findByText(/visible to every signed-in household member/)).toBeInTheDocument();
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/reveal"), expect.anything());
-    await userEvent.click(screen.getAllByRole("button", { name: /Add a loyalty or traveler number for Mia Doe/ })[0]);
+    await userEvent.click(screen.getAllByRole("button", { name: /Add loyalty or traveler number for Mia Doe/ })[0]);
     expect(await screen.findByText(/Every signed-in household member can see this number/)).toBeInTheDocument();
   });
 
   it("opens a new membership's form under that person, not at the top of the page", async () => {
     render(People);
     await screen.findByRole("list", { name: "People" });
-    await userEvent.click(screen.getByRole("button", { name: "Add a loyalty or traveler number for Mia Doe" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add loyalty or traveler number for Mia Doe" }));
     const heading = await screen.findByRole("heading", { name: /Add a loyalty or traveler number for Mia Doe/ });
     const row = heading.closest("li");
     expect(row).not.toBeNull();
@@ -308,12 +308,12 @@ describe("People", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
     render(People);
-    await userEvent.click(await screen.findByRole("button", { name: "Show and copy American AAdvantage number" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Show and copy American AAdvantage number/ }));
     expect(api).toHaveBeenCalledWith("/api/loyalty/11/reveal", { method: "POST" });
     expect(await screen.findByText("DEMO1234567")).toBeInTheDocument();
     expect(writeText).toHaveBeenCalledWith("DEMO1234567");
     expect(screen.getByText("••••2345")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Hide American AAdvantage number" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Hide American AAdvantage number/ }));
     expect(screen.queryByText("DEMO1234567")).toBeNull();
     vi.unstubAllGlobals();
   });
@@ -321,7 +321,7 @@ describe("People", () => {
   it("still shows the number when it can't be copied", async () => {
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) } });
     render(People);
-    await userEvent.click(await screen.findByRole("button", { name: "Show and copy American AAdvantage number" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Show and copy American AAdvantage number/ }));
     expect(await screen.findByText("DEMO1234567")).toBeInTheDocument();
     vi.unstubAllGlobals();
   });
@@ -335,7 +335,7 @@ describe("People", () => {
 
   it("adds a membership for a person, choosing the program from the kind's list", async () => {
     render(People);
-    await userEvent.click(await screen.findByRole("button", { name: "Add a loyalty or traveler number for Mia Doe" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add loyalty or traveler number for Mia Doe" }));
     await userEvent.selectOptions(screen.getByLabelText("Kind"), "hotel");
     expect(screen.getByLabelText("Program")).toHaveValue("Marriott Bonvoy");
     await userEvent.type(screen.getByLabelText("Number"), "DEMO55501234");
@@ -347,7 +347,7 @@ describe("People", () => {
 
   it("adds a cruise membership, choosing the cruise line's program", async () => {
     render(People);
-    await userEvent.click(await screen.findByRole("button", { name: "Add a loyalty or traveler number for Mia Doe" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add loyalty or traveler number for Mia Doe" }));
     await userEvent.selectOptions(screen.getByLabelText("Kind"), "cruise");
     expect(screen.getByLabelText("Program")).toHaveValue("Disney Castaway Club");
     await userEvent.type(screen.getByLabelText("Number"), "DEMOCC0042");
@@ -358,7 +358,7 @@ describe("People", () => {
 
   it("doesn't offer a program the person already has, keeps Other, and keeps a membership's own program when editing it", async () => {
     render(People);
-    await userEvent.click(await screen.findByRole("button", { name: "Add a loyalty or traveler number for Jane Doe" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add loyalty or traveler number for Jane Doe" }));
     const program = screen.getByLabelText(/^Program/);
     expect(within(program).queryByRole("option", { name: "American AAdvantage" })).toBeNull();
     expect(within(program).getByRole("option", { name: "Other" })).toBeInTheDocument();
@@ -372,13 +372,13 @@ describe("People", () => {
     await userEvent.click(screen.getByRole("button", { name: "Edit Jane Doe’s American AAdvantage" }));
     expect(screen.getByLabelText(/^Program/)).toHaveValue("American AAdvantage");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await userEvent.click(screen.getByRole("button", { name: "Add a loyalty or traveler number for Mia Doe" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add loyalty or traveler number for Mia Doe" }));
     expect(within(screen.getByLabelText(/^Program/)).getByRole("option", { name: "American AAdvantage" })).toBeInTheDocument();
   });
 
   it("has no Tier, and offers an expiry only for Known Traveler and redress numbers", async () => {
     render(People);
-    await userEvent.click(await screen.findByRole("button", { name: "Add a loyalty or traveler number for Mia Doe" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add loyalty or traveler number for Mia Doe" }));
     expect(screen.queryByLabelText("Tier")).toBeNull();
     for (const kind of ["airline", "hotel", "car"]) {
       await userEvent.selectOptions(screen.getByLabelText("Kind"), kind);
@@ -402,7 +402,7 @@ describe("People", () => {
 
   it("keeps the membership form open and says why when saving fails", async () => {
     render(People);
-    await userEvent.click(await screen.findByRole("button", { name: "Add a loyalty or traveler number for Jane Doe" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add loyalty or traveler number for Jane Doe" }));
     vi.mocked(api).mockRejectedValueOnce(new Error("The number is too long (at most 64 characters)"));
     await userEvent.type(screen.getByLabelText("Number"), "DEMO1");
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
@@ -458,7 +458,7 @@ describe("People on a phone", () => {
   it("adds a membership in a sheet, keeping the masked number rule", async () => {
     render(People);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Add a loyalty or traveler number for Mia Doe" }));
+    await u.click(await screen.findByRole("button", { name: "Add loyalty or traveler number for Mia Doe" }));
     const sheet = await screen.findByRole("dialog", { name: "Add a loyalty or traveler number for Mia Doe" });
     await u.type(within(sheet).getByLabelText("Number"), "DEMO7654321");
     await u.click(within(sheet).getByRole("button", { name: "Add" }));
@@ -511,7 +511,7 @@ describe("People on a phone", () => {
   it("asks before dropping a typed membership number, which is kept nowhere but in memory", async () => {
     render(People);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Add a loyalty or traveler number for Mia Doe" }));
+    await u.click(await screen.findByRole("button", { name: "Add loyalty or traveler number for Mia Doe" }));
     const sheet = await screen.findByRole("dialog", { name: "Add a loyalty or traveler number for Mia Doe" });
     await u.type(within(sheet).getByLabelText("Number"), "DEMO7654321");
     await u.keyboard("{Escape}");

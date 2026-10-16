@@ -106,7 +106,7 @@
             <span class="block text-muted-foreground">{plural(d.count, "item", "items")} · mostly {WHY[d.reason].toLowerCase()}</span>
           </div>
           {#if d.item_id !== null}
-            <Button variant="outline" size="sm" aria-label={`Ignore ${d.domain}`} onclick={() => { ignoring = d; asking = true; }}>Ignore this sender</Button>
+            <Button variant="outline" size="sm" aria-label={`Ignore this sender (${d.domain})`} onclick={() => { ignoring = d; asking = true; }}>Ignore this sender</Button>
           {/if}
         </li>
       {/each}

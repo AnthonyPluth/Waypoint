@@ -3,6 +3,7 @@
   "page": "trips",
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click_if_present": "button:has-text('Show 20')" },
     { "click": "a[href^='#trip/']:has-text('San Francisco') >> nth=1" },
     { "wait_for": "h1:has-text('San Francisco')" },
     { "wait_for": "section[aria-label='Route replay'] [data-testid='replay-map']" },
