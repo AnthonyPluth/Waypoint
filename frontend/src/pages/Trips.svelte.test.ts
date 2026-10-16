@@ -670,6 +670,17 @@ describe("ticket cards for upcoming trips", () => {
     expect([pill("On now"), pill("Today"), pill("Tomorrow"), pill("Soon")]).toEqual(["Under way", "Today", "Tomorrow", "In 2 days"]);
   });
 
+  it("moves the pill on after midnight without a reload", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(new Date("2026-10-05T23:59:00"));
+    serve([stay(1, "Soon", "2026-10-07", "2026-10-08")]);
+    render(Trips);
+    await screen.findByText("Soon");
+    expect(within(link("Soon")).getByTestId("pill")).toHaveTextContent("In 2 days");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(within(link("Soon")).getByTestId("pill")).toHaveTextContent("Tomorrow");
+  });
+
   it("highlights only the soonest trip", async () => {
     serve([stay(1, "Later", "2026-12-01", "2026-12-05"), stay(2, "Soonest", "2026-10-18", "2026-10-27"), stay(3, "Last", "2027-01-02", "2027-01-05")]);
     render(Trips);

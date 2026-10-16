@@ -69,7 +69,12 @@
   let filtersOpen = $state(false);
   const years = $derived(trips ? tripYears(trips) : []);
   const filtering = $derived(!!(who || text || when || year));
-  const today = () => dayIn(Date.now(), viewerZone());
+  let now = $state(Date.now());
+  $effect(() => {
+    const tick = setInterval(() => (now = Date.now()), 30_000);
+    return () => clearInterval(tick);
+  });
+  const today = () => dayIn(now, viewerZone());
   const comingUp = $derived(trips ? splitTrips(trips, today()).upcoming.length : 0);
   const shown = $derived.by(() => {
     if (!filtered) return null;

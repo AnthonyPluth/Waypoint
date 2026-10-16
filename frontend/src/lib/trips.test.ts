@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, rangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
 import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
@@ -715,6 +715,15 @@ describe("trip card wording", () => {
     expect(stripLabel(dates("2027-01-02", "2027-01-05"), "2026-10-05")).toBe("JAN 2 – 5, 2027");
     expect(stripLabel(dates(null, null), "2026-10-05")).toBe("NO DATES");
     expect(rangeLabel(dates(null, "2026-03-04"))).toBe("Mar 4");
+  });
+  it("follows the viewer's locale for the order of month and day", () => {
+    const language = vi.spyOn(navigator, "language", "get").mockReturnValue("en-GB");
+    expect(rangeLabel(dates("2026-10-18", "2026-10-27"))).toBe("18 – 27 Oct");
+    expect(rangeLabel(dates("2026-10-30", "2026-11-02"))).toBe("30 Oct – 2 Nov");
+    expect(stubWords(dates("2026-10-30", "2026-11-02"), "2026-10-05")).toEqual({ month: "Oct", day: "30", note: "to 2 Nov" });
+    language.mockReturnValue("fr-FR");
+    expect(rangeLabel(dates("2026-10-18", "2026-10-27"))).toBe("18 – 27 oct.");
+    language.mockRestore();
   });
   it("counts down from the viewer's day", () => {
     const from = (start: string | null) => countdown({ start_date: start }, "2026-10-05");

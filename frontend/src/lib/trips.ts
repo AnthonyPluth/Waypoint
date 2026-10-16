@@ -413,8 +413,11 @@ export function passHeadline(s: Segment, now: number, live?: FlightStatus | null
 }
 
 const dayCount = (from: string, to: string): number => daysBetween(`${from}T00:00`, `${to}T00:00`);
-const monthOf = (day: string): string => asUtc(`${day}T00:00`).toLocaleDateString(locale(), { timeZone: "UTC", month: "short" });
-const dayOfMonth = (day: string): number => Number(day.slice(8, 10));
+const MONTH_DAY: Intl.DateTimeFormatOptions = { timeZone: "UTC", month: "short", day: "numeric" };
+const monthDay = (day: string): string => asUtc(`${day}T00:00`).toLocaleDateString(locale(), MONTH_DAY);
+const monthDayParts = (day: string): Intl.DateTimeFormatPart[] => new Intl.DateTimeFormat(locale(), MONTH_DAY).formatToParts(asUtc(`${day}T00:00`));
+const partOf = (day: string, type: "month" | "day"): string => monthDayParts(day).find((p) => p.type === type)?.value ?? "";
+const sameMonthRange = (start: string, end: string): string => monthDayParts(start).map((p) => (p.type === "day" ? `${p.value} – ${partOf(end, "day")}` : p.value)).join("");
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 export type Stub = { month: string; day: string; note: string };
@@ -422,21 +425,20 @@ export type Stub = { month: string; day: string; note: string };
 export function stubWords(trip: Pick<Trip, "start_date" | "end_date">, today: string): Stub {
   const { start_date: start, end_date: end } = trip;
   if (!start) return { month: "", day: "", note: "No dates" };
-  const stub = { month: monthOf(start), day: String(dayOfMonth(start)) };
+  const stub = { month: partOf(start, "month"), day: partOf(start, "day") };
   if (start.slice(0, 4) !== today.slice(0, 4)) return { ...stub, note: start.slice(0, 4) };
   if (!end || end === start) return { ...stub, note: "" };
-  if (end.slice(0, 7) === start.slice(0, 7)) return { ...stub, note: `to ${dayOfMonth(end)}` };
-  return { ...stub, note: `to ${monthOf(end)} ${dayOfMonth(end)}` };
+  if (end.slice(0, 7) === start.slice(0, 7)) return { ...stub, note: `to ${partOf(end, "day")}` };
+  return { ...stub, note: `to ${monthDay(end)}` };
 }
 
 export function rangeLabel(trip: Pick<Trip, "start_date" | "end_date">): string {
   const start = trip.start_date ?? trip.end_date;
   if (!start) return "No dates";
   const end = trip.start_date ? trip.end_date : null;
-  const first = `${monthOf(start)} ${dayOfMonth(start)}`;
-  if (!end || end === start) return first;
-  if (end.slice(0, 7) === start.slice(0, 7)) return `${first} – ${dayOfMonth(end)}`;
-  return `${first} – ${monthOf(end)} ${dayOfMonth(end)}`;
+  if (!end || end === start) return monthDay(start);
+  if (end.slice(0, 7) === start.slice(0, 7)) return sameMonthRange(start, end);
+  return `${monthDay(start)} – ${monthDay(end)}`;
 }
 
 export function stripLabel(trip: Pick<Trip, "start_date" | "end_date">, today: string): string {
