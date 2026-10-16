@@ -147,7 +147,7 @@ class WhoIsAskedTests(AutoCase):
 
     def test_a_message_a_reader_made_a_booking_from_is_sent_while_the_booking_lacks_a_detail_and_the_answer_only_fills_it_in(self):
         self.turn_on(gaps=True)
-        reply = {**self.STAY_PRICE, "origin": "Elsewhere Inn", "start_local": "2026-11-22T15:00"}
+        reply = {**self.STAY_PRICE, "start_local": "2026-11-22T15:00"}
         self.put("hotel_jsonld")
         with mock.patch.object(ai, "suggest", return_value=ai.Reading([reply])) as asked:
             self.assertEqual(self.scan().bookings, 1)
