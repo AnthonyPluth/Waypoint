@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
 
 import { api } from "$lib/api";
 import type { Person, Stats } from "$lib/api-types";
 import { app, route } from "$lib/app.svelte";
+import { viewport } from "$lib/phone.svelte";
 import { state } from "../test/fixtures";
 import Stats_ from "./Stats.svelte";
 
@@ -58,6 +59,9 @@ beforeEach(() => {
   app.state = state({ person_id: 1 });
   route.query = ""; location.hash = "#stats";
 });
+afterEach(() => { viewport.phone = false; });
+const traveller = async (name: string) => within(await screen.findByRole("group", { name: "Travelling" })).getByRole("button", { name });
+const yearChip = async (year: string) => within(await screen.findByRole("group", { name: "Year" })).getByRole("button", { name: year });
 const statsCalls = () => vi.mocked(api).mock.calls.map((c) => c[0]).filter((p) => String(p).startsWith("/api/stats"));
 
 describe("Stats", () => {
@@ -72,8 +76,8 @@ describe("Stats", () => {
     expect(within(totals).getByText("1.3× around the Earth")).toBeInTheDocument();
     expect(within(totals).getByText("14% of the way to the Moon")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Hotels" })).getByText("9")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("1");
-    expect(screen.getByRole("option", { name: "Jane Doe (you)" })).toBeInTheDocument();
+    expect((await traveller("Jane Doe (you)"))).toHaveAttribute("aria-pressed", "true");
+    expect((await traveller("Sam Doe"))).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("stats-map-slot")).toBeInTheDocument();
   });
 
@@ -294,13 +298,13 @@ describe("Stats", () => {
     render(Stats_);
     await screen.findByRole("region", { name: "Flights" });
     expect(statsCalls()).toEqual(["/api/stats?person=2&year=2025"]);
-    expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("2");
-    expect(screen.getByRole("combobox", { name: "When" })).toHaveValue("2025");
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Who" }), "all");
+    expect((await traveller("Sam Doe"))).toHaveAttribute("aria-pressed", "true");
+    expect((await yearChip("2025"))).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click((await traveller("Sam Doe")));
     await waitFor(() => expect(route.query).toBe("who=all&year=2025"));
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "When" }), "All time");
+    await userEvent.click((await yearChip("2025")));
     await waitFor(() => expect(route.query).toBe("who=all"));
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Who" }), "Jane Doe (you)");
+    await userEvent.click((await traveller("Jane Doe (you)")));
     await waitFor(() => expect(route.query).toBe(""));
     expect(statsCalls().at(-1)).toBe("/api/stats?person=1&year=all");
   }, 15_000);
@@ -309,7 +313,7 @@ describe("Stats", () => {
     serve(() => full);
     render(Stats_);
     await screen.findByRole("region", { name: "Flights" });
-    expect(within(screen.getByRole("combobox", { name: "When" })).getAllByRole("option").map((o) => o.textContent)).toEqual(["All time", "2026", "2025"]);
+    expect(within(screen.getByRole("group", { name: "Year" })).getAllByRole("button").map((b) => b.textContent)).toEqual(["2026", "2025"]);
   });
 
   it("never shows the previous choice's numbers as current while the next loads", async () => {
@@ -317,10 +321,10 @@ describe("Stats", () => {
     serve((path) => (path.includes("person=2") ? new Promise<Stats>((r) => { release = r; }) : full));
     render(Stats_);
     await screen.findByRole("region", { name: "Flights" });
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Who" }), "Sam Doe");
+    await userEvent.click((await traveller("Sam Doe")));
     await waitFor(() => expect(screen.queryByRole("region", { name: "Flights" })).toBeNull());
     expect(screen.getByLabelText("Loading")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("2");
+    expect((await traveller("Sam Doe"))).toHaveAttribute("aria-pressed", "true");
     release({ ...full, person: 2, flights: { ...full.flights, count: 37 } });
     expect(await within(await screen.findByRole("region", { name: "Flights" })).findByText("37")).toBeInTheDocument();
   });
@@ -330,7 +334,7 @@ describe("Stats", () => {
     serve(() => new Promise<Stats>((r) => { waiting.push(r); }));
     render(Stats_);
     await waitFor(() => expect(waiting).toHaveLength(1));
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Who" }), "Sam Doe");
+    await userEvent.click((await traveller("Sam Doe")));
     await waitFor(() => expect(waiting).toHaveLength(2));
     waiting[1]({ ...full, person: 2, flights: { ...full.flights, count: 21 } });
     await within(await screen.findByRole("region", { name: "Flights" })).findByText("21");
@@ -345,7 +349,8 @@ describe("Stats", () => {
     render(Stats_);
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn’t load the stats: Offline");
     expect(screen.queryByRole("region", { name: "Flights" })).toBeNull();
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "When" }), "All time");
+    await userEvent.click((await traveller("Jane Doe (you)")));
+    expect(route.query).toBe("who=all");
     fail = false;
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("region", { name: "Flights" })).toBeInTheDocument();
@@ -356,7 +361,7 @@ describe("Stats", () => {
     serve((path) => (path.includes("year=2025") ? new Error("Offline") : full));
     render(Stats_);
     await screen.findByRole("region", { name: "Flights" });
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "When" }), "2025");
+    await userEvent.click((await yearChip("2025")));
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Flights" })).toBeNull();
   });
@@ -369,7 +374,7 @@ describe("Stats", () => {
     expect(empty).toHaveTextContent("Nothing finished for Jane Doe in 2024.");
     expect(within(empty).getByRole("link", { name: "Add a trip" })).toHaveAttribute("href", "#trips");
     expect(within(empty).getByRole("link", { name: "Import past flights" })).toHaveAttribute("href", "#settings/backup");
-    expect(screen.getByRole("option", { name: "2024" })).toBeInTheDocument();
+    expect((await yearChip("2024"))).toHaveAttribute("aria-pressed", "true");
   });
 
   it("opens on everyone on your own machine, and falls back to Everyone when the names don't load", async () => {
@@ -378,7 +383,7 @@ describe("Stats", () => {
     render(Stats_);
     expect(await screen.findByTestId("stats-empty")).toHaveTextContent("Nothing finished yet.");
     expect(statsCalls()).toEqual(["/api/stats?person=all&year=all"]);
-    expect(screen.getByRole("combobox", { name: "Who" })).toHaveValue("all");
+    expect(within(screen.getByRole("group", { name: "Travelling" })).getByRole("button", { name: "Everyone" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("keeps a record's value and a bar's figure on their row when a detail or a name is long", async () => {
@@ -401,4 +406,175 @@ describe("Stats", () => {
     expect(cabin.nextElementSibling!.className).toContain("whitespace-nowrap");
     expect(cabin.nextElementSibling).toHaveTextContent("80% · 8");
   });
+
+  it("puts the counts for the selection in a polite status above the title", async () => {
+    serve(() => full);
+    route.query = "year=2026";
+    render(Stats_);
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("2026 · 12 flights · 2 countries");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status.compareDocumentPosition(screen.getByRole("heading", { name: "Stats", level: 1 })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("says all time when no year is picked, and counts one flight and one country in the singular", async () => {
+    serve(() => ({ ...full, flights: { ...full.flights, count: 1 }, places: { ...full.places, countries: [full.places.countries[0]] } }));
+    render(Stats_);
+    expect(await screen.findByRole("status")).toHaveTextContent("All time · 1 flight · 1 country");
+  });
+
+  it("leaves a count out of the status when there is nothing to count, and has no status for an empty selection", async () => {
+    serve(() => ({ ...full, flights: none.flights, places: { ...full.places, countries: [] } }));
+    render(Stats_);
+    expect(await screen.findByRole("status")).toHaveTextContent(/^All time$/);
+  });
+
+  it("has no status for a selection with nothing finished", async () => {
+    serve(() => none);
+    render(Stats_);
+    await screen.findByTestId("stats-empty");
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("writes the year to the address when a chip is pressed, reads it back, and clears it when pressed again", async () => {
+    serve(() => full);
+    render(Stats_);
+    const chip = await yearChip("2025");
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(chip);
+    await waitFor(() => expect(route.query).toBe("year=2025"));
+    await waitFor(() => expect(statsCalls().at(-1)).toBe("/api/stats?person=1&year=2025"));
+    expect(await yearChip("2025")).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("status")).toHaveTextContent(/^2025 · /);
+    await userEvent.click(await yearChip("2025"));
+    await waitFor(() => expect(route.query).toBe(""));
+    expect(await yearChip("2025")).toHaveAttribute("aria-pressed", "false");
+  }, 15_000);
+
+  it("shows travellers as initials with their names, rings the selected one and clears it when pressed again", async () => {
+    serve(() => full);
+    render(Stats_);
+    const sam = await traveller("Sam Doe");
+    expect(sam).toHaveAttribute("data-initials", "SD");
+    expect(sam.className).toContain("size-10");
+    expect(sam.className).not.toContain("ring-primary");
+    await userEvent.click(sam);
+    await waitFor(() => expect(route.query).toBe("who=2"));
+    await waitFor(() => expect(statsCalls().at(-1)).toBe("/api/stats?person=2&year=all"));
+    expect((await traveller("Sam Doe")).className).toContain("ring-2 ring-primary");
+    expect(await traveller("Jane Doe (you)")).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(await traveller("Sam Doe"));
+    await waitFor(() => expect(route.query).toBe("who=all"));
+    await waitFor(() => expect(statsCalls().at(-1)).toBe("/api/stats?person=all&year=all"));
+    expect(await traveller("Sam Doe")).toHaveAttribute("aria-pressed", "false");
+  }, 15_000);
+
+  it("offers a single year as a chip, so a one-year history can pick it and reach the year in review", async () => {
+    vi.mocked(api).mockImplementation((async (path: string) => (path === "/api/people" ? { people: [jane, sam] } : { ...full, years: [2024] })) as never);
+    render(Stats_);
+    const chip = await yearChip("2024");
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(chip);
+    await waitFor(() => expect(route.query).toBe("year=2024"));
+    expect(await screen.findByRole("button", { name: "See your 2024 in review" })).toBeInTheDocument();
+  }, 15_000);
+
+  it("has no traveller avatars for a household of one, only the Everyone chip", async () => {
+    vi.mocked(api).mockImplementation((async (path: string) => (path === "/api/people" ? { people: [jane] } : full)) as never);
+    render(Stats_);
+    await screen.findByRole("region", { name: "Flights" });
+    const group = screen.getByRole("group", { name: "Travelling" });
+    expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["Everyone"]);
+  });
+
+  it("keeps an Everyone chip that clears the person when the people list fails to load", async () => {
+    vi.mocked(api).mockImplementation((async (path: string) => { if (path === "/api/people") throw new Error("nope"); return full; }) as never);
+    route.query = "who=2"; location.hash = "#stats?who=2";
+    render(Stats_);
+    const group = await screen.findByRole("group", { name: "Travelling" });
+    await screen.findByRole("region", { name: "Flights" });
+    expect(within(group).getAllByRole("button")).toHaveLength(1);
+    const everyone = within(group).getByRole("button", { name: "Everyone" });
+    expect(everyone).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(everyone);
+    await waitFor(() => expect(route.query).toBe("who=all"));
+    expect(statsCalls().at(-1)).toBe("/api/stats?person=all&year=all");
+    expect(within(screen.getByRole("group", { name: "Travelling" })).getByRole("button", { name: "Everyone" })).toHaveAttribute("aria-pressed", "true");
+  }, 15_000);
+
+  it("returns to your own stats when the pressed Everyone chip is pressed again", async () => {
+    serve(() => full);
+    route.query = "who=all"; location.hash = "#stats?who=all";
+    render(Stats_);
+    const everyone = within(await screen.findByRole("group", { name: "Travelling" })).getByRole("button", { name: "Everyone" });
+    expect(everyone).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(everyone);
+    await waitFor(() => expect(route.query).toBe(""));
+  }, 15_000);
+
+  it("keeps (you) in the label of the signed-in person when another person shares the name", async () => {
+    const twin: Person = { ...jane, id: 3, first_name: "Jane" };
+    vi.mocked(api).mockImplementation((async (path: string) => (path === "/api/people" ? { people: [jane, twin] } : full)) as never);
+    render(Stats_);
+    const group = await screen.findByRole("group", { name: "Travelling" });
+    await waitFor(() => expect(within(group).getAllByRole("button")).toHaveLength(3));
+    const mine = within(group).getByRole("button", { name: "Jane Doe (you)" });
+    const other = within(group).getByRole("button", { name: "Jane Doe" });
+    expect(mine).not.toBe(other);
+    expect(mine).toHaveAttribute("aria-pressed", "true");
+    expect(other).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("gives each section a kind tile in its header, and none to the places", async () => {
+    serve(() => full);
+    render(Stats_);
+    await screen.findByRole("region", { name: "Flights" });
+    for (const [name, kind] of [["Flights", "flight"], ["Hotels", "hotel"], ["Cars", "car"], ["Parking", "parking"], ["Cruises", "cruise"]]) {
+      const section = screen.getByRole("region", { name });
+      const tile = section.querySelector(`[data-tile="${kind}"]`)!;
+      expect(tile).not.toBeNull();
+      expect(tile.nextElementSibling).toBe(within(section).getByRole("heading", { name, level: 2 }));
+    }
+    expect(screen.getByRole("region", { name: "Where you’ve been" }).querySelector("[data-tile]")).toBeNull();
+  });
+
+  it("sets the tile figures in the mono face", async () => {
+    serve(() => full);
+    render(Stats_);
+    const flights = await screen.findByRole("region", { name: "Flights" });
+    expect(within(flights).getByText("32,311 mi").className).toContain("mono");
+    expect(within(await screen.findByTestId("stats-headline")).getByText("32.3K mi").className).toContain("mono");
+  });
+
+  it("draws the tiles on the ticket cards' surface", async () => {
+    serve(() => full);
+    render(Stats_);
+    const tile = (await screen.findByRole("region", { name: "Cars" })).querySelector("dl > div")!;
+    for (const name of ["rounded-2xl", "border-border", "bg-card", "shadow-card"]) expect(tile.className).toContain(name);
+  });
+});
+
+describe("on a phone", () => {
+  beforeEach(() => { viewport.phone = true; });
+
+  it("moves the year and traveller controls into a Filters sheet that shows a dot while one is set", async () => {
+    serve(() => full);
+    render(Stats_);
+    await screen.findByRole("region", { name: "Flights" });
+    expect(screen.queryByRole("group", { name: "Year" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Travelling" })).toBeNull();
+    expect(screen.queryByTestId("filters-dot")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const sheet = await screen.findByRole("dialog", { name: "Filters" });
+    await userEvent.click(within(within(sheet).getByRole("group", { name: "Year" })).getByRole("button", { name: "2025" }));
+    await waitFor(() => expect(route.query).toBe("year=2025"));
+    await userEvent.click(within(within(sheet).getByRole("group", { name: "Travelling" })).getByRole("button", { name: "Sam Doe" }));
+    await waitFor(() => expect(route.query).toBe("who=2&year=2025"));
+    await userEvent.click(within(sheet).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    document.body.style.pointerEvents = "";
+    expect(screen.getByTestId("filters-dot")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filters, in use" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/^2025 · /);
+  }, 15_000);
 });

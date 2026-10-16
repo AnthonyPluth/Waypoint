@@ -4,7 +4,9 @@
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Stats" } },
     { "wait_for": "[data-visited]" },
-    { "select": { "selector": "label:has-text('Who') select", "index": 2 } },
+    { "click_if_present": "button:has-text('Filters')" },
+    { "click": "[role='group'][aria-label='Travelling'] button >> nth=1" },
+    { "click_if_present": "[role='dialog'] button[aria-label='Close']" },
     { "wait_for": "[data-testid='map-layer']" },
     { "scroll_to": "#stats-map-slot" },
     { "screenshot": "map-for-one-person" }

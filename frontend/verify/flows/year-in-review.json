@@ -3,7 +3,9 @@
   "page": "stats",
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Stats" } },
-    { "select": { "selector": "label:has-text('When') select", "index": 2 } },
+    { "click_if_present": "button:has-text('Filters')" },
+    { "click": "[role='group'][aria-label='Year'] button >> nth=1" },
+    { "click_if_present": "[role='dialog'] button[aria-label='Close']" },
     { "click": "button:has-text('in review')" },
     { "expect_text": { "selector": "[data-testid=year-in-review]", "text": "YOU TRAVELLED" } },
     { "screenshot": "distance" },
