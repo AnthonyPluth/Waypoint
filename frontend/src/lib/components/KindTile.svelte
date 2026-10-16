@@ -30,7 +30,7 @@
   role={decorative ? undefined : "img"}
   aria-label={decorative ? undefined : NAMES[kind]}
   aria-hidden={decorative ? "true" : undefined}
-  data-kind={kind}
+  data-tile={kind}
 >
   <Icon class={size === 36 ? "size-5" : "size-4"} aria-hidden="true" />
 </span>
