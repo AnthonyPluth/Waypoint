@@ -3,7 +3,7 @@
   "page": "upcoming",
   "steps": [
     { "wait_for": "text=Camden, London" },
-    { "scroll_to": "text=Camden, London" },
+    { "scroll_to": "section[aria-label='Camden Guesthouse']" },
     { "screenshot": "city-and-state" }
   ]
 }
