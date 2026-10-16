@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from ...storage import db
+from ...storage.models import Segment
 from .. import airports, loyalty, people, place_zones, trips
 from ..visibility import Viewer
 from . import ai, extract
@@ -92,6 +93,21 @@ def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
     if b.ports:
         out["itinerary"] = [{"name": p.name, "zone": p.zone, "arrive_local": p.arrive_local, "depart_local": p.depart_local} for p in b.ports]
     return out
+
+
+EXTRAS = {"flight": ("flight_number", "cabin"), "hotel": ("address", "phone"), "car": ("address", "phone"), "train": ("address",),
+          "cruise": ("ship", "room", "deck"), "parking": ("address",)}
+
+
+def segments_lack_details(conn: db.Connection, segment_ids: list[int]) -> bool:
+    for segment_id in segment_ids:
+        seg = conn.orm.get(Segment, segment_id)
+        if seg is None:
+            continue
+        have = trips.decode_details(seg.details)
+        if seg.price_minor is None or any(not have.get(k) for k in EXTRAS.get(seg.kind, ())):
+            return True
+    return False
 
 
 def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:

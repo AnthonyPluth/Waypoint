@@ -234,7 +234,7 @@ def _keep_code_quietly(mailbox_id: int, segment_id: int, raw: dict[str, Any], no
 def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str, message: extract.Message,
           ignored: list[str], now: float, why: Counter[str] | None = None, again: bool = False,
           backfill: bool = False, strong: bool = True, follow: list[followup.Followed] | None = None,
-          joined: list[int] | None = None) -> tuple[int, int, list[int] | None, str | None]:
+          joined: list[int] | None = None, gaps: list[str] | None = None) -> tuple[int, int, list[int] | None, str | None]:
     why = Counter() if why is None else why
     if again:
         conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id))
@@ -248,6 +248,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     held: list[ingest.Held] = []
     lacks: list[str] = []
     for booking in message.bookings:
+        before = len(touched)
         filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill, held)
         if filed is None:
             failed += 1
@@ -258,6 +259,9 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
                 joined.append(1)
         elif filed not in ("unchanged", "ambiguous"):
             made += 1
+        if (gaps is not None and message_id not in gaps and filed in ("added", "updated", "unchanged", "attached")
+                and ingest.segments_lack_details(conn, touched[before:])):
+            gaps.append(message_id)
     usable = len(message.bookings) - failed
     queued = 0
     if failed or message.unread or not usable:
@@ -437,6 +441,40 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
         return added, 1
 
 
+def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message_ids: list[str]) -> int:
+    asked = 0
+    for message_id in message_ids:
+        with db.session() as conn:
+            cfg = ai.config(conn)
+            if cfg is None or not autoask.fills_gaps(conn):
+                return asked
+            known = tuple(loyalty.known_numbers(conn))
+        left = BUDGET - (_clock() - started)
+        if left <= 0:
+            return asked
+        try:
+            raw = gmail.fetch(token(), message_id)
+        except gmail.GmailError:
+            continue
+        asked += 1
+        suggestions, _, _ = _read(cfg, extract.plain_text(raw), known, left)
+        if not suggestions:
+            continue
+        with db.session() as conn:
+            for suggestion in suggestions:
+                fields = _ai_fields(conn, suggestion)
+                if fields is None:
+                    continue
+                fields.pop("travelers", None)
+                try:
+                    same = trips.find_same_reservation(conn, viewer, fields, sure=True)
+                    if same is not None:
+                        trips.merge_email_segment(conn, viewer, fields, fill_only=True, into=same.id)
+                except trips.Invalid:
+                    continue
+    return asked
+
+
 def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> tuple[int, int, int]:
     asked = made = cleared = 0
     passed: set[str] = set()
@@ -494,6 +532,9 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
         ignored = review.ignored(conn, mailbox_id)
     history, last_scan = row["history_id"], row["last_scan"]
     read = made = queued = skipped = dropped = handled = not_travel = followups = with_facts = attached = asked_by_ai = 0
+    gaps: list[str] = []
+    with db.session() as conn:
+        filling = not again and not backfill and autoask.fills_gaps(conn)
     started = _clock()
     forced: set[str] = set()
     strong = True
@@ -592,7 +633,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             joined: list[int] = []
             try:
                 with _filing, db.session() as conn:
-                    a, b, wanted, outcome = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, backfill, strong, followed, joined)
+                    a, b, wanted, outcome = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, backfill, strong, followed, joined, gaps if filling else None)
             except Exception as e:
                 if db.is_busy(e):
                     raise
@@ -616,6 +657,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             read, made, queued, handled = read + 1, made + a, queued + b, handled + 1
         if not capped:
             asked_by_ai, ai_made, ai_cleared = _ask_waiting(mailbox_id, current, started)
+            asked_by_ai += _fill_gaps(current, started, viewer, gaps)
             made, queued = made + ai_made, max(0, queued - ai_cleared)
         if not again and not backfill:
             with db.session() as conn:

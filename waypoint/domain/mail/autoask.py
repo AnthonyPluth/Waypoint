@@ -11,14 +11,22 @@ TRIES = 3
 WAITING = "waiting"
 READ = "read"
 ON = "1"
+GAPS = "2"
 
 
 def chosen(conn: db.Connection) -> bool:
-    return db.get_setting(conn, sk.AI_AUTO) == ON
+    return db.get_setting(conn, sk.AI_AUTO) in (ON, GAPS)
+
+
+def fills_gaps(conn: db.Connection) -> bool:
+    return ai.config(conn) is not None and db.get_setting(conn, sk.AI_AUTO) == GAPS
 
 
 def save_choice(conn: db.Connection, on: bool) -> None:
-    db.set_setting(conn, sk.AI_AUTO, ON if on else None)
+    if not on:
+        db.set_setting(conn, sk.AI_AUTO, None)
+    elif not chosen(conn):
+        db.set_setting(conn, sk.AI_AUTO, GAPS)
 
 
 def switched_on(conn: db.Connection) -> bool:
