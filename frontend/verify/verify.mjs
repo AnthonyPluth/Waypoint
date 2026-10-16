@@ -8,6 +8,10 @@ import { animationsRunning, auditPage } from "./a11y.mjs";
 export const PHONE_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 export const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 }, laptop: { width: 1024, height: 768 }, wide: { width: 1440, height: 900 }, zoomed: { width: 853, height: 533 } };
 export const DEFAULT_VIEWPORTS = ["phone", "tablet", "desktop"];
+export const IMAGE_VIEWPORTS = ["phone", "desktop"];
+export const CHROMIUM_ARGS = ["--force-color-profile=srgb", "--disable-lcd-text", "--num-raster-threads=1"];
+export const SETTLE_MS = 300;
+export const FROZEN_NOW = "2026-06-15T12:00:00Z";
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];
 const OWN_PAGES = ["oauth-approve"];
 
@@ -23,7 +27,8 @@ export function findChromium(env = process.env, exists = existsSync, list = read
   return undefined;
 }
 
-export const screenshotFiles = (name, viewport) => ({ full: `${name}-${viewport}.png`, top: `${name}-${viewport}-top.png` });
+export const screenshotFile = (name, viewport) => `${name}-${viewport}.png`;
+export const writesImage = (viewport) => IMAGE_VIEWPORTS.includes(viewport);
 
 const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
@@ -224,6 +229,8 @@ async function main() {
   const base = opt("--url", process.env.WAYPOINT_VERIFY_URL);
   const here = dirname(fileURLToPath(import.meta.url));
   const out = opt("--out", join(here, "../../artifacts/verify"));
+  const images = opt("--images", join(here, "../../docs/src/assets/screenshots"));
+  const now = new Date(opt("--now", process.env.WAYPOINT_VERIFY_NOW ?? FROZEN_NOW));
   const flowsDir = opt("--flows", join(here, "flows"));
   if (!base) { console.error("verify: no server address (--url or WAYPOINT_VERIFY_URL)"); process.exit(2); }
   const unknown = unknownPages(args);
@@ -240,7 +247,9 @@ async function main() {
 
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
-  const browser = await chromium.launch({ executablePath: findChromium() });
+  if (!args.length) rmSync(images, { recursive: true, force: true });
+  mkdirSync(images, { recursive: true });
+  const browser = await chromium.launch({ executablePath: findChromium(), args: CHROMIUM_ARGS });
   const problems = [];
   const notes = [];
   const results = [];
@@ -249,7 +258,8 @@ async function main() {
   catch (e) { problems.push(`seeding the demo assistants: ${String(e.message).split("\n")[0]}`, { cause: e }); }
 
   async function visit(label, viewport, work, { audit = true, reducedMotion = "no-preference", allowConsole = [], phoneAgent = false } = {}) {
-    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark", reducedMotion, ...(phoneAgent && viewport === "phone" ? { userAgent: PHONE_AGENT } : {}) });
+    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark", timezoneId: "UTC", reducedMotion, ...(phoneAgent && viewport === "phone" ? { userAgent: PHONE_AGENT } : {}) });
+    await ctx.clock.setFixedTime(now);
     const page = await ctx.newPage();
     const where = `${label} @ ${viewport}`;
     const consoleErrors = [];
@@ -258,25 +268,28 @@ async function main() {
     page.on("response", (r) => { if (r.status() >= 500) problems.push(`${where}: ${r.status()} from ${r.request().method()} ${new URL(r.url()).pathname}`); });
     page.on("requestfailed", (r) => { if (r.failure()?.errorText !== "net::ERR_ABORTED") notes.push(`${where}: request failed (${r.failure()?.errorText}) ${new URL(r.url()).pathname}`); });
     const files = [];
-    const shot = async (name) => {
-      const { full, top } = screenshotFiles(name, viewport);
-      await page.screenshot({ path: join(out, full), fullPage: true });
-      files.push(full);
-      await page.screenshot({ path: join(out, top) });
-      files.push(top);
+    const shot = async (name, dir = images) => {
+      if (!writesImage(viewport)) return;
+      const file = screenshotFile(name, viewport);
+      await page.evaluate(`window.scrollTo({ top: 0, left: 0, behavior: "instant" })`);
+      try { await page.waitForLoadState("networkidle", { timeout: 3000 }); } catch { notes.push(`${where}: still loading after 3 s when ${name} was captured`); }
+      await page.evaluate("document.fonts.ready");
+      await page.waitForTimeout(SETTLE_MS);
+      await page.screenshot({ path: join(dir, file), fullPage: true, animations: "disabled" });
+      files.push(file);
     };
     const saveDownload = async (name, download) => {
-      const { full, top } = screenshotFiles(name, viewport);
-      await download.saveAs(join(out, full));
-      await download.saveAs(join(out, top));
-      files.push(full, top);
+      if (!writesImage(viewport)) return;
+      const file = screenshotFile(name, viewport);
+      await download.saveAs(join(images, file));
+      files.push(file);
     };
     try {
       await work(page, shot, saveDownload);
       if (audit) for (const p of await auditPage(page, viewport)) problems.push(`${where}: a11y ${p}`);
     } catch (e) {
       problems.push(`${where}: ${String(e.message).split("\n")[0]}`);
-      await shot(`${label.replace(/\W+/g, "-")}-FAILED`).catch(() => {});
+      await shot(`${label.replace(/\W+/g, "-")}-FAILED`, out).catch(() => {});
     }
     for (const c of consoleErrors.filter((c) => !allowConsole.some((t) => c.includes(t)))) problems.push(`${where}: console error: ${c.slice(0, 300)}`);
     results.push({ label, viewport, screenshots: files, consoleErrors });
@@ -319,7 +332,7 @@ async function main() {
 
   writeFileSync(join(out, "report.json"), JSON.stringify({ base, results, problems, notes }, null, 2));
   const shots = results.reduce((n, r) => n + r.screenshots.length, 0);
-  console.log(`verify: ${results.length} visits, ${shots} screenshots in ${out}`);
+  console.log(`verify: ${results.length} visits, ${shots} screenshots in ${images}`);
   for (const n of notes) console.log(`  note: ${n}`);
   for (const p of problems) console.error(`  FAIL: ${p}`);
   console.log(problems.length ? `verify: FAILED (${problems.length} problem${problems.length === 1 ? "" : "s"})` : "verify: OK, no console errors, 5xx responses or accessibility problems");

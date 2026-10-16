@@ -12,6 +12,16 @@ from . import tls
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "artifacts", "verify")
+IMAGES = os.path.join(ROOT, "docs", "src", "assets", "screenshots")
+FROZEN_NOW = "2026-06-15 12:00:00"
+FROZEN_NOW_ISO = "2026-06-15T12:00:00Z"
+FAKETIME_LIBRARIES = (
+    "/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1",
+    "/usr/lib/aarch64-linux-gnu/faketime/libfaketime.so.1",
+    "/usr/lib/faketime/libfaketime.so.1",
+    "/usr/local/lib/faketime/libfaketime.so.1",
+)
+FAKETIME_INSTALL = "sudo apt-get install libfaketime"
 
 
 DEMO_KEY = "demo-key-not-real"
@@ -26,6 +36,19 @@ def clean_env(data: str, base: dict[str, str] | None = None) -> dict[str, str]:
     for name in ("HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"):
         env.pop(name, None)
     return env
+
+
+def find_faketime(candidates: tuple[str, ...] = FAKETIME_LIBRARIES) -> str | None:
+    return next((c for c in candidates if os.path.isfile(c)), None)
+
+
+def frozen_env(env: dict[str, str], library: str) -> dict[str, str]:
+    return {**env, "LD_PRELOAD": library, "FAKETIME": FROZEN_NOW, "FAKETIME_DONT_FAKE_MONOTONIC": "1", "TZ": "UTC"}
+
+
+def missing_faketime_message() -> str:
+    return (f"verify: libfaketime isn't installed, and verify needs it to freeze the clock so a screenshot changes only when the UI or its data does. "
+            f"Install it with: {FAKETIME_INSTALL} (Debian and Ubuntu; verify runs on Linux, as macOS doesn't support LD_PRELOAD)")
 
 
 def server_command(port: int) -> list[str]:
@@ -63,11 +86,16 @@ def run(pages: list[str]) -> int:
     if not node:
         print("verify: Node isn't installed (the web app needs it too).", file=sys.stderr)
         return 2
+    library = find_faketime()
+    if not library:
+        print(missing_faketime_message(), file=sys.stderr)
+        return 2
     data = tempfile.mkdtemp(prefix="waypoint-verify-")
     env = clean_env(data)
+    frozen = frozen_env(env, library)
     server = None
     try:
-        seeded = subprocess.run([sys.executable, os.path.join(ROOT, "run.py"), "demo"], env=env, cwd=ROOT,
+        seeded = subprocess.run([sys.executable, os.path.join(ROOT, "run.py"), "demo"], env=frozen, cwd=ROOT,
                                 capture_output=True, text=True)
         if seeded.returncode:
             print(f"verify: couldn't fill the demo database:\n{seeded.stdout}{seeded.stderr}", file=sys.stderr)
@@ -76,7 +104,7 @@ def run(pages: list[str]) -> int:
         log_path = os.path.join(data, "server.log")
         with open(log_path, "w") as log:
             server = subprocess.Popen(server_command(port),
-                                      env=env, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+                                      env=frozen, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
             url = f"http://127.0.0.1:{port}"
             try:
                 wait_ready(url, server)
@@ -86,7 +114,7 @@ def run(pages: list[str]) -> int:
                     print(f"verify: {e}\n{f.read()[-2000:]}", file=sys.stderr)
                 return 2
             print(f"verify: demo data served at {url}")
-            return subprocess.run([node, os.path.join(frontend, "verify", "verify.mjs"), "--url", url, "--out", OUT, *pages],
+            return subprocess.run([node, os.path.join(frontend, "verify", "verify.mjs"), "--url", url, "--out", OUT, "--images", IMAGES, "--now", FROZEN_NOW_ISO, *pages],
                                   cwd=frontend, env=env).returncode
     finally:
         if server:

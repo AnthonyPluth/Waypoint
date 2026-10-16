@@ -36,3 +36,8 @@ poetry install --no-root --no-interaction
 
 # The web app's packages (npm install, not ci: the container's cache keeps them between sessions).
 (cd frontend && npm install --no-audit --no-fund)
+
+# make verify freezes the clock with libfaketime (the screenshots are committed, so they must not change from run to run).
+if ! ls /usr/lib/*/faketime/libfaketime.so.1 /usr/lib/faketime/libfaketime.so.1 >/dev/null 2>&1; then
+  (apt-get install -y --no-install-recommends libfaketime >/dev/null 2>&1 || sudo apt-get install -y --no-install-recommends libfaketime >/dev/null 2>&1) || echo "session-start: libfaketime isn't installed; make verify needs it" >&2
+fi

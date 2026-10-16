@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fakeArchive, findChromium, flowProblems, lengthenNames, PAGES, screenshotFiles, unknownPages } from "./verify.mjs";
+import { DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, IMAGE_VIEWPORTS, lengthenNames, PAGES, screenshotFile, unknownPages, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -111,11 +111,20 @@ describe("flowProblems", () => {
   it("has the app's pages", () => expect(PAGES).toEqual(["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"]));
 });
 
-describe("screenshotFiles", () => {
-  it("names the full-page file as before and a viewport-only one beside it", () => {
-    expect(screenshotFiles("upcoming", "phone")).toEqual({ full: "upcoming-phone.png", top: "upcoming-phone-top.png" });
-    expect(screenshotFiles("flow-open-settings-settings-open", "desktop").top).toBe("flow-open-settings-settings-open-desktop-top.png");
+describe("screenshotFile", () => {
+  it("names one image for a shot, with no viewport-only variant", () => {
+    expect(screenshotFile("upcoming", "phone")).toBe("upcoming-phone.png");
+    expect(screenshotFile("flow-open-settings-settings-open", "desktop")).toBe("flow-open-settings-settings-open-desktop.png");
+    expect(screenshotFile("upcoming", "phone")).not.toContain("-top");
   });
+
+  it("writes images at phone and desktop only, and checks tablet without one", () => {
+    expect(IMAGE_VIEWPORTS).toEqual(["phone", "desktop"]);
+    expect(DEFAULT_VIEWPORTS).toEqual(["phone", "tablet", "desktop"]);
+    expect(["phone", "tablet", "desktop", "laptop", "wide", "zoomed"].filter(writesImage)).toEqual(["phone", "desktop"]);
+  });
+
+  it("freezes the clock on a fixed date", () => expect(FROZEN_NOW).toBe("2026-06-15T12:00:00Z"));
 });
 
 describe("findChromium", () => {

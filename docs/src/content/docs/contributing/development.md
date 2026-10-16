@@ -81,7 +81,7 @@ Link to another page by its address, base included: `[Configuration](/Waypoint/r
 
 ## Verifying a change in the real app
 
-Unit tests don't show a layout or a picker working, so a change to the web app is also run in a browser. `make verify` (or `python run.py verify [page…]`) makes a temporary database, fills it with the demo data (the made-up data `python run.py demo` adds, never anyone’s real data), starts Waypoint on a free port, and drives it with Playwright: each page (the pages the web app has at the time) at phone (390 px), tablet (768 px) and desktop (1280 px) widths. Screenshots and `report.json` (console errors, failed requests) go to `artifacts/verify/`, which is not committed. Each screenshot is saved twice: the full page (`<page>-<width>.png`, often thousands of pixels tall) and the top of it, the size of the viewport (`<page>-<width>-top.png`), which is the one to show in a pull request. It exits non-zero on a console error, an uncaught error in the page, a 5xx response or a failed scripted step or an accessibility problem, and says which page, width and request.
+Unit tests don't show a layout or a picker working, so a change to the web app is also run in a browser. `make verify` (or `python run.py verify [page…]`) makes a temporary database, fills it with the demo data (the made-up data `python run.py demo` adds, never anyone’s real data), starts Waypoint on a free port, and drives it with Playwright: each page (the pages the web app has at the time) at phone (390 px), tablet (768 px) and desktop (1280 px) widths. Every width runs the checks, but only phone and desktop write an image: the full page (`<page>-<width>.png`, often thousands of pixels tall) goes to `docs/src/assets/screenshots/`, which is committed. A flow's extra widths (laptop, wide, zoomed) check and write no image. `report.json` (console errors, failed requests) goes to `artifacts/verify/`, which is not committed. A run of every page empties the images folder first, so a removed page leaves no stale image; a run of some pages (`PAGES=…`) only rewrites theirs. It exits non-zero on a console error, an uncaught error in the page, a 5xx response or a failed scripted step or an accessibility problem, and says which page, width and request.
 
 It also audits every page and flow it visits for accessibility, and fails on: a contrast, label, name, zoom or other [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.2 AA violation; a control that shows no focus ring when you Tab to it; and, at phone width, a button, link or field smaller than 44 × 44 px (inline links in a sentence and the map's marks are exempt). When every page is checked, it also loads each one with `prefers-reduced-motion: reduce` and fails if any animation is still running. Motion is small and purposeful (the sheet, a status chip changing, the countdown), and one rule at the end of `frontend/src/app.css` turns all of it off for someone who asked for less.
 
@@ -90,9 +90,21 @@ make verify                          # every page, and the scripted flows
 make verify PAGES="settings"     # only these pages (and the flows that start on them)
 ```
 
-It uses the Chromium that is already installed under `PLAYWRIGHT_BROWSERS_PATH` (`/opt/pw-browsers` by default); without one, run `npx playwright install chromium` in `frontend/` once. A scripted flow is a small JSON file in `frontend/verify/flows/`: a list of steps such as opening Settings and filling in a field. A pull request that changes the UI adds or edits a flow for it; the format is in `frontend/verify/flows/README.md`. Pull requests that change the UI show the `make verify` screenshots inline (below).
+It uses the Chromium that is already installed under `PLAYWRIGHT_BROWSERS_PATH` (`/opt/pw-browsers` by default); without one, run `npx playwright install chromium` in `frontend/` once. A scripted flow is a small JSON file in `frontend/verify/flows/`: a list of steps such as opening Settings and filling in a field. A pull request that changes the UI adds or edits a flow for it; the format is in `frontend/verify/flows/README.md`. Pull requests that change the UI commit the `make verify` images (below).
 
 ### Screenshots in a pull request
+
+A pull request that changes the UI commits the images `make verify` changed, so its diff shows each page before and after. `make verify` freezes the clock: the server and the demo seed run under `libfaketime` on a fixed date (`FROZEN_NOW` in `waypoint/verify.py`), and the browser's clock is set to the same date, so running it twice on one tree gives identical files and an image changes only when the UI or its data does. To keep the files identical, each image is taken from the top of the page with animations finished, after the page's requests settle and with a fixed colour profile, one raster thread and no sub-pixel text. It needs Linux (the dev container and CI; macOS doesn't support `LD_PRELOAD`) and fails with the install line when `libfaketime` is missing:
+
+```bash
+sudo apt-get install libfaketime    # Debian and Ubuntu
+make verify
+git add docs/src/assets/screenshots
+```
+
+The repository is public: only `make verify`'s made-up demo data is ever committed, so look at the images you add. Waypoint is dark only, so `make verify` runs in the dark colour scheme and its screenshots are the dark app. A pull request with no UI change has nothing to commit, and says so. The three images under `docs/public/screenshots/` are hand-picked for the README and `make verify` doesn't touch them.
+
+## Screenshots in a pull request
 
 The screenshots are not committed and the GitHub API can't attach an image to a comment, so they go to a dedicated orphan branch, `pr-screenshots`, which is not part of any pull request's diff, with a folder per pull request (`pr-<number>/`). A comment embeds them from there. Once the pull request is open:
 
