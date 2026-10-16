@@ -9,7 +9,7 @@ class CacheControl(unittest.TestCase):
         self.assertEqual(static.cache_control(os.path.join(static.APP_DIR, "assets", "index-abc.js")), "public, max-age=31536000, immutable")
 
     def test_fonts_and_icons_are_cached_for_a_week(self):
-        for name in ("fonts/Geist-Variable.woff2", "logo.svg", "logo-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"):
+        for name in ("fonts/Geist-Variable.woff2", "fonts/GeistMono-Variable.woff2", "logo.svg", "logo-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"):
             self.assertEqual(static.cache_control(os.path.join(static.STATIC, name)), "public, max-age=604800", name)
 
     def test_everything_else_is_revalidated_every_time(self):

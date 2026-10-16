@@ -1,6 +1,6 @@
-const CACHE = "waypoint-shell-v5";
+const CACHE = "waypoint-shell-v6";
 const SHELL = ["/", "/logo.svg", "/fonts/Inter-latin-Variable.woff2", "/fonts/Inter-latin-ext-Variable.woff2",
-  "/fonts/Geist-Variable.woff2", "/manifest.webmanifest"];
+  "/fonts/Geist-Variable.woff2", "/fonts/GeistMono-Variable.woff2", "/manifest.webmanifest"];
 const isShell = (path) => SHELL.includes(path) || path.startsWith("/assets/");
 const APP_PAGES = ["/", "/plaid/oauth"];
 

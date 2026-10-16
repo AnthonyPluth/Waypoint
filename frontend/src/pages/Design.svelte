@@ -1,5 +1,7 @@
 <script lang="ts">
+  import AvatarStack from "$lib/components/AvatarStack.svelte";
   import AirportCode from "$lib/components/AirportCode.svelte";
+  import KindTile from "$lib/components/KindTile.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import RouteLine from "$lib/components/RouteLine.svelte";
   import StatusChip from "$lib/components/StatusChip.svelte";
@@ -23,6 +25,9 @@
   const underWayNow = instant("2026-11-20T07:05", "America/Chicago") + 90 * 60_000;
   const stayNow = instant("2026-11-20T08:00", "America/Los_Angeles");
 
+  const tileKinds = ["flight", "hotel", "train", "car", "cruise", "parking", "visit"] as const;
+  const crew = ["Jane Doe", "Mia Doe", "Sam Roe", "Lee Poe", "Ann Coe", "Bob Foe"].map((name, i) => ({ id: i + 1, name }));
+  const stacks = [1, 3, 6].map((n) => ({ n, people: crew.slice(0, n) }));
   const booking = (["confirmed", "changed", "cancelled"] as const).map(bookingChip);
   const live = [
     liveChip({ state: "scheduled", delay_minutes: null }),
@@ -42,6 +47,7 @@
     { name: "Heading", cls: "text-heading", sample: "Check-in is open" },
     { name: "Body", cls: "text-body", sample: "Departs at 7:05 AM from Terminal 1." },
     { name: "Caption", cls: "text-caption text-muted-foreground", sample: "As of 6:42 AM" },
+    { name: "Mono", cls: "mono text-heading", sample: "07:05 MSP K7Q2ZM 14C 0123" },
     { name: "Eyebrow", cls: "text-eyebrow uppercase text-muted-foreground", sample: "Next up" },
   ];
   const surfaces = [
@@ -87,6 +93,18 @@
       <PassCard segment={flight} now={underWayNow} />
       <PassCard segment={stay} now={stayNow} />
     </div>
+  </section>
+
+  <section class="flex flex-col gap-3" aria-labelledby="design-kinds">
+    <h2 id="design-kinds" class="text-heading">Kind tiles</h2>
+    <p class="text-caption text-muted-foreground">One tile per kind of booking, at 28 and 36 px.</p>
+    <div class="rows">{#each [28, 36] as const as size (size)}<div class="row"><span class="w-20 text-caption text-muted-foreground">{size} px</span><span class="flex flex-wrap gap-2">{#each tileKinds as kind (kind)}<KindTile {kind} {size} />{/each}</span></div>{/each}</div>
+  </section>
+
+  <section class="flex flex-col gap-3" aria-labelledby="design-people">
+    <h2 id="design-people" class="text-heading">Avatar stack</h2>
+    <p class="text-caption text-muted-foreground">Up to four people, then a count.</p>
+    <div class="rows">{#each stacks as s (s.n)}<div class="row"><span class="w-20 text-caption text-muted-foreground">{s.n} {s.n === 1 ? "person" : "people"}</span><AvatarStack people={s.people} /></div>{/each}</div>
   </section>
 
   <section class="flex flex-col gap-3" aria-labelledby="design-type">

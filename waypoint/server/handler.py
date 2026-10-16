@@ -20,7 +20,7 @@ from .. import monitoring, oidc
 from . import feed, jobs, mcp_http, mcp_oauth, mcp_server, oauth_http, routes, static
 from .common import NOT_READ, ApiError, BadJson, Response, _current, header_value, host_allowed, server_error
 
-PUBLIC_FILES = {"/page.css", "/logo.svg", "/logo-180.png", "/fonts/Geist-Variable.woff2", "/manifest.webmanifest", "/sw.js",
+PUBLIC_FILES = {"/page.css", "/logo.svg", "/logo-180.png", "/fonts/Geist-Variable.woff2", "/fonts/GeistMono-Variable.woff2", "/manifest.webmanifest", "/sw.js",
                 "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png"}
 
 MAX_JSON_BODY = 1024 * 1024

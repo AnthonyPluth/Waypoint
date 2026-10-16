@@ -6,6 +6,7 @@
 @custom-variant hoverable (@media (hover: hover));
 
 @font-face { font-family: "Geist"; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("/fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 
 :root {
   color-scheme: dark;
@@ -55,6 +56,16 @@
   --chart-2: #f6b73c;
   --chart-3: #4fd1b0;
   --chart-4: #c79bff;
+  --kind-flight: var(--primary);
+  --kind-flight-soft: color-mix(in srgb, var(--kind-flight) 15%, transparent);
+  --kind-stay: var(--chart-3);
+  --kind-stay-soft: color-mix(in srgb, var(--kind-stay) 15%, transparent);
+  --kind-train: var(--chart-4);
+  --kind-train-soft: color-mix(in srgb, var(--kind-train) 15%, transparent);
+  --kind-car: var(--signal);
+  --kind-car-soft: color-mix(in srgb, var(--kind-car) 15%, transparent);
+  --kind-quiet: var(--muted-foreground);
+  --kind-quiet-soft: var(--surface-3);
   --map-sea: #0b0e15;
   --map-land: #1c2230;
   --map-border: #343c52;
@@ -69,7 +80,7 @@
 
 @theme inline {
   --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --radius-sm: calc(var(--radius) - 10px);
   --radius-md: calc(var(--radius) - 8px);
   --radius-lg: calc(var(--radius) - 6px);
@@ -121,6 +132,16 @@
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
+  --color-kind-flight: var(--kind-flight);
+  --color-kind-flight-soft: var(--kind-flight-soft);
+  --color-kind-stay: var(--kind-stay);
+  --color-kind-stay-soft: var(--kind-stay-soft);
+  --color-kind-train: var(--kind-train);
+  --color-kind-train-soft: var(--kind-train-soft);
+  --color-kind-car: var(--kind-car);
+  --color-kind-car-soft: var(--kind-car-soft);
+  --color-kind-quiet: var(--kind-quiet);
+  --color-kind-quiet-soft: var(--kind-quiet-soft);
   --color-map-sea: var(--map-sea);
   --color-map-land: var(--map-land);
   --color-map-border: var(--map-border);
@@ -165,7 +186,8 @@
 
 @layer components {
   .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
-  .code { font-family: var(--font-mono); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums slashed-zero; font-feature-settings: "zero" 1; }
+  .code { font-family: var(--font-mono); font-variant-numeric: tabular-nums slashed-zero; font-feature-settings: "zero" 1; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
   .pass { position: relative; overflow: hidden; color: var(--card-foreground); border: 1px solid var(--border);
     border-radius: var(--radius-3xl); box-shadow: var(--shadow-card);
     background: linear-gradient(165deg, color-mix(in oklab, var(--primary) 13%, var(--card)) 0%, var(--card) 62%); }

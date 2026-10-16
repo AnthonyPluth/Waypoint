@@ -27,6 +27,15 @@ describe("Design", () => {
     expect(within(pass).getByText("Under way, arrives in 2 h 45 min")).toBeTruthy();
     expect(within(pass).getByText("Check-in in 7 h")).toBeTruthy();
   });
+  it("shows every kind tile and avatar stacks of one, three and six people", () => {
+    render(Design);
+    const kinds = screen.getByRole("heading", { name: "Kind tiles" }).closest("section") as HTMLElement;
+    expect(within(kinds).getAllByRole("img", { name: "past visit" })).toHaveLength(2);
+    expect(within(kinds).getAllByRole("img")).toHaveLength(14);
+    const people = screen.getByRole("heading", { name: "Avatar stack" }).closest("section") as HTMLElement;
+    expect(within(people).getAllByTestId("avatar-stack").map((s) => s.getAttribute("aria-label")?.split(", ").length)).toEqual([1, 3, 6]);
+    expect(within(people).getByText("+2")).toBeTruthy();
+  });
   it("is reachable at #design, under Settings in the navigation", () => {
     expect(pageFor("design")).toBe("design");
     expect(navFor("design")).toBe("settings");
