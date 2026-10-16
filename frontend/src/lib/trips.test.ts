@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { describe, expect, it, vi } from "vitest";
+import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, rangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
 import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
 
@@ -700,5 +700,46 @@ describe("finding a trip", () => {
     expect(inYear(lisbon, 2023)).toBe(false);
     expect(inYear(trip([], { start_date: null, end_date: null }), 2025)).toBe(false);
     expect(tripYears([lisbon, trip([], { start_date: null, end_date: null }), trip([], { start_date: "2022-05-01", end_date: null })])).toEqual([2025, 2024, 2022]);
+  });
+});
+
+describe("trip card wording", () => {
+  const dates = (start_date: string | null, end_date: string | null) => ({ start_date, end_date });
+  it("writes the stub and the strip", () => {
+    expect(stubWords(dates("2026-10-18", "2026-10-27"), "2026-10-05")).toEqual({ month: "Oct", day: "18", note: "to 27" });
+    expect(stubWords(dates("2026-10-30", "2026-11-02"), "2026-10-05").note).toBe("to Nov 2");
+    expect(stubWords(dates("2026-10-18", "2026-10-18"), "2026-10-05").note).toBe("");
+    expect(stubWords(dates("2027-01-02", "2027-01-05"), "2026-10-05").note).toBe("2027");
+    expect(stubWords(dates(null, null), "2026-10-05")).toEqual({ month: "", day: "", note: "No dates" });
+    expect(stripLabel(dates("2026-10-18", "2026-10-27"), "2026-10-05")).toBe("OCT 18 – 27");
+    expect(stripLabel(dates("2027-01-02", "2027-01-05"), "2026-10-05")).toBe("JAN 2 – 5, 2027");
+    expect(stripLabel(dates(null, null), "2026-10-05")).toBe("NO DATES");
+    expect(rangeLabel(dates(null, "2026-03-04"))).toBe("Mar 4");
+  });
+  it("follows the viewer's locale for the order of month and day", () => {
+    const language = vi.spyOn(navigator, "language", "get").mockReturnValue("en-GB");
+    expect(rangeLabel(dates("2026-10-18", "2026-10-27"))).toBe("18 – 27 Oct");
+    expect(rangeLabel(dates("2026-10-30", "2026-11-02"))).toBe("30 Oct – 2 Nov");
+    expect(stubWords(dates("2026-10-30", "2026-11-02"), "2026-10-05")).toEqual({ month: "Oct", day: "30", note: "to 2 Nov" });
+    language.mockReturnValue("fr-FR");
+    expect(rangeLabel(dates("2026-10-18", "2026-10-27"))).toBe("18 – 27 oct.");
+    language.mockRestore();
+  });
+  it("counts down from the viewer's day", () => {
+    const from = (start: string | null) => countdown({ start_date: start }, "2026-10-05");
+    expect([from("2026-10-03"), from("2026-10-05"), from("2026-10-06"), from("2026-10-07"), from("2026-12-14"), from(null)]).toEqual(["Under way", "Today", "Tomorrow", "In 2 days", "In 70 days", ""]);
+  });
+  it("counts nights, and says nothing for a day trip or no dates", () => {
+    expect(nightsWords(dates("2026-10-18", "2026-10-19"))).toBe("1 night");
+    expect(nightsWords(dates("2026-10-18", "2026-10-27"))).toBe("9 nights");
+    expect(nightsWords(dates("2026-10-18", "2026-10-18"))).toBe("");
+    expect(nightsWords(dates(null, null))).toBe("");
+  });
+  it("names the people on a trip once, keeping their ids", () => {
+    expect(tripPeople(trip([segment({ id: 1 }), segment({ id: 2 })]))).toEqual([{ id: 1, name: "Jane Doe" }]);
+  });
+  it("groups past trips under the year they started", () => {
+    const groups = pastByYear([trip([segment({ start_local: "2026-01-04T09:00", end_local: "2026-01-06T09:00" })], { id: 1 }), trip([segment({ id: 2, kind: "hotel", start_local: "2025-12-30T09:00", end_local: "2026-01-02T09:00" })], { id: 2 })]);
+    expect(groups.map((g) => [g.year, g.totals])).toEqual([[2026, "1 trip · 2 nights · 1 flight"], [2025, "1 trip · 3 nights"]]);
   });
 });

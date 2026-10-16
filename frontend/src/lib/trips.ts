@@ -435,3 +435,71 @@ export function passHeadline(s: Segment, now: number, live?: FlightStatus | null
   if (now >= to) return PAST_WORD.flight;
   return `Under way, ${to - now >= 60_000 ? `arrives in ${until(to - now)}` : "arriving now"}`;
 }
+
+const dayCount = (from: string, to: string): number => daysBetween(`${from}T00:00`, `${to}T00:00`);
+const MONTH_DAY: Intl.DateTimeFormatOptions = { timeZone: "UTC", month: "short", day: "numeric" };
+const monthDay = (day: string): string => asUtc(`${day}T00:00`).toLocaleDateString(locale(), MONTH_DAY);
+const monthDayParts = (day: string): Intl.DateTimeFormatPart[] => new Intl.DateTimeFormat(locale(), MONTH_DAY).formatToParts(asUtc(`${day}T00:00`));
+const partOf = (day: string, type: "month" | "day"): string => monthDayParts(day).find((p) => p.type === type)?.value ?? "";
+const sameMonthRange = (start: string, end: string): string => monthDayParts(start).map((p) => (p.type === "day" ? `${p.value} – ${partOf(end, "day")}` : p.value)).join("");
+const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+export type Stub = { month: string; day: string; note: string };
+
+export function stubWords(trip: Pick<Trip, "start_date" | "end_date">, today: string): Stub {
+  const { start_date: start, end_date: end } = trip;
+  if (!start) return { month: "", day: "", note: "No dates" };
+  const stub = { month: partOf(start, "month"), day: partOf(start, "day") };
+  if (start.slice(0, 4) !== today.slice(0, 4)) return { ...stub, note: start.slice(0, 4) };
+  if (!end || end === start) return { ...stub, note: "" };
+  if (end.slice(0, 7) === start.slice(0, 7)) return { ...stub, note: `to ${partOf(end, "day")}` };
+  return { ...stub, note: `to ${monthDay(end)}` };
+}
+
+export function rangeLabel(trip: Pick<Trip, "start_date" | "end_date">): string {
+  const start = trip.start_date ?? trip.end_date;
+  if (!start) return "No dates";
+  const end = trip.start_date ? trip.end_date : null;
+  if (!end || end === start) return monthDay(start);
+  if (end.slice(0, 7) === start.slice(0, 7)) return sameMonthRange(start, end);
+  return `${monthDay(start)} – ${monthDay(end)}`;
+}
+
+export function stripLabel(trip: Pick<Trip, "start_date" | "end_date">, today: string): string {
+  const label = rangeLabel(trip).toUpperCase();
+  return trip.start_date && trip.start_date.slice(0, 4) !== today.slice(0, 4) ? `${label}, ${trip.start_date.slice(0, 4)}` : label;
+}
+
+export function countdown(trip: Pick<Trip, "start_date">, today: string): string {
+  const start = trip.start_date;
+  if (!start) return "";
+  if (start < today) return "Under way";
+  if (start === today) return "Today";
+  const days = dayCount(today, start);
+  return days === 1 ? "Tomorrow" : `In ${days} days`;
+}
+
+export function nightsWords(trip: Pick<Trip, "start_date" | "end_date">): string {
+  if (!trip.start_date || !trip.end_date) return "";
+  const nights = dayCount(trip.start_date, trip.end_date);
+  return nights > 0 ? plural(nights, "night") : "";
+}
+
+export const tripPeople = (trip: Trip): { id: number | null; name: string }[] =>
+  tripTravellers(trip.segments).map((who) => ({ id: who.key.startsWith("person:") ? Number(who.key.slice(7)) : null, name: who.name }));
+
+export type YearGroup = { year: number; trips: Trip[]; totals: string };
+
+export function pastByYear(past: Trip[]): YearGroup[] {
+  const groups = new Map<number, Trip[]>();
+  for (const t of past) {
+    const year = Number((t.start_date ?? t.end_date ?? "0000").slice(0, 4));
+    groups.set(year, [...(groups.get(year) ?? []), t]);
+  }
+  return [...groups.entries()].sort((a, b) => b[0] - a[0]).map(([year, trips]) => {
+    const nights = trips.reduce((sum, t) => sum + (t.start_date && t.end_date ? Math.max(0, dayCount(t.start_date, t.end_date)) : 0), 0);
+    const flights = trips.reduce((sum, t) => sum + t.segments.filter((s) => s.kind === "flight" && s.status !== "cancelled").length, 0);
+    const parts = [plural(trips.length, "trip"), nights ? plural(nights, "night") : "", flights ? plural(flights, "flight") : ""];
+    return { year, trips, totals: parts.filter(Boolean).join(" · ") };
+  });
+}
