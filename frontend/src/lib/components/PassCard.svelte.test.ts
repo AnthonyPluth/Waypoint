@@ -9,7 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import { forgetAirportZones } from "$lib/airport-zones";
-import type { FlightStatus, FlightStatusList } from "$lib/api-types";
+import type { FlightStatus, FlightStatusList, Segment } from "$lib/api-types";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { instant } from "$lib/trips";
 import { toast } from "svelte-sonner";
@@ -387,5 +387,183 @@ describe("airports and days on a flight pass", () => {
     render(PassCard, goes());
     await screen.findByText("London");
     expect(vi.mocked(api).mock.calls.every(([, opts]) => (opts as { keep?: boolean } | undefined)?.keep === true)).toBe(true);
+  });
+});
+
+describe("the boarding-pass variant", () => {
+  const board = (extra: Record<string, unknown> = {}, seg: object = {}) => ({ segment: { ...flight, ...seg }, now: dep - 3 * HOUR, boarding: true, tripName: "Trip to London", eyebrow: "Next up", ...extra });
+  const plane = (container: HTMLElement) => container.querySelector("[data-plane]") as HTMLElement;
+
+  it("shows the eyebrow, the trip name, the chips and the countdown in the header", () => {
+    render(PassCard, board());
+    expect(screen.getByText("Next up")).toBeInTheDocument();
+    expect(screen.getByText(/Trip to London/)).toBeInTheDocument();
+    expect(screen.getByText("Confirmed")).toBeInTheDocument();
+    expect(screen.getByText("Check-in is open, departs in 3 h")).toBeInTheDocument();
+    expect(document.querySelector("[data-countdown] strong")).toHaveTextContent("3 h");
+  });
+  it.each(["Under way", "In the air", "Delayed", "Latest flight", "Next up"])("renders the %s eyebrow", (eyebrow) => {
+    render(PassCard, board({ eyebrow }));
+    expect(screen.getByText(eyebrow)).toBeInTheDocument();
+  });
+  it("pulses the dot only where asked", () => {
+    const quiet = render(PassCard, board());
+    expect(quiet.container.querySelector("[data-dot]")).not.toHaveClass("animate-pulse");
+    quiet.unmount();
+    const live = render(PassCard, board({ pulse: true }));
+    expect(live.container.querySelector("[data-dot]")).toHaveClass("animate-pulse", "motion-reduce:animate-none");
+  });
+  it("puts the plane at the middle of the line until the flight is in the air", () => {
+    const { container } = render(PassCard, board());
+    expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("0.5");
+    expect(plane(container).style.left).toBe("50%");
+  });
+  it("moves the plane along the line with routeProgress in the air", () => {
+    const first = render(PassCard, board({ now: dep + (arr - dep) / 4 }));
+    expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("0.25");
+    expect(plane(first.container).style.left).toBe("25%");
+    first.unmount();
+    const later = render(PassCard, board({ now: dep + ((arr - dep) * 3) / 4 }));
+    expect(plane(later.container).style.left).toBe("75%");
+  });
+  it("shows both codes, the length, nonstop, and each time at its own airport with the day shift", async () => {
+    render(PassCard, board());
+    expect(screen.getByText("JFK")).toBeInTheDocument();
+    expect(screen.getByText("LHR")).toBeInTheDocument();
+    expect(screen.getByText("American Airlines AA 101")).toBeInTheDocument();
+    expect(screen.getByText("7 h 10 min · nonstop")).toBeInTheDocument();
+    expect(screen.getByText("7:00 PM")).toBeInTheDocument();
+    expect(screen.getByText("7:10 AM")).toBeInTheDocument();
+    expect(await screen.findByText("Fri, Nov 20 · New York time")).toBeInTheDocument();
+    expect(await screen.findByText("Sat, Nov 21 · London time")).toBeInTheDocument();
+    expect(document.querySelector("[data-day-shift]")).toHaveTextContent("+1");
+  });
+  it("shows no countdown for a cancelled booking, and strikes the route", () => {
+    const { container } = render(PassCard, board({}, { status: "cancelled" }));
+    expect(container.querySelector("[data-countdown]")).toBeNull();
+    expect(screen.getByText("Cancelled")).toBeInTheDocument();
+    expect(container.querySelector("[data-code='origin']")?.parentElement).toHaveClass("line-through");
+  });
+  it("shows no countdown for a booking without a time", () => {
+    const { container } = render(PassCard, board({}, { details: { flight_number: "AA 101", time_unknown: "yes" } }));
+    expect(container.querySelector("[data-countdown]")).toBeNull();
+    expect(screen.getAllByText("Time not recorded")).toHaveLength(2);
+  });
+  it("reads Not yet for a gate that isn't known, and the gate once it is", () => {
+    const first = render(PassCard, board());
+    expect(screen.getByText("Gate").closest("div")).toHaveTextContent("Not yet");
+    expect(screen.getByText("Not yet")).toHaveClass("text-muted-foreground");
+    first.unmount();
+    flightStatus.list = list();
+    render(PassCard, board());
+    expect(screen.getByText("Gate").closest("div")).toHaveTextContent("B24");
+  });
+  it("puts the code with its copy button, the details and the travellers in the stub", async () => {
+    render(PassCard, board({}, { details: { flight_number: "AA 101", terminal: "8", cabin: "Economy", seat: "14C, 14D" }, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }, { id: 2, person_id: 2, name: "Mia Doe", seat: null }] }));
+    await userEvent.click(screen.getByRole("button", { name: "Copy confirmation code KQ7M2X" }));
+    expect(toast.success).toHaveBeenCalledWith("Copied");
+    for (const label of ["Terminal", "Seats", "Cabin"]) expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.getByText("14C, 14D")).toBeInTheDocument();
+    expect(screen.getByTestId("avatar-stack")).toHaveAccessibleName("Jane Doe, Mia Doe");
+    expect(screen.getByText("Jane & Mia")).toBeInTheDocument();
+  });
+  it("shows the app link as the filled primary action before the page's own buttons", () => {
+    const footer = createRawSnippet(() => ({ render: () => "<a href='#trip/1'>Open trip</a>" }));
+    render(PassCard, board({ footer }, { links: { app: "https://example.test/app", open: null, open_kind: null, directions: null, call: null } }));
+    const primary = screen.getByRole("link", { name: "Check in" });
+    expect(primary).toHaveClass("bg-primary");
+    expect(primary.compareDocumentPosition(screen.getByRole("link", { name: "Open trip" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+  it("puts the plane at the destination once live status says landed, before the booked arrival", () => {
+    flightStatus.list = list({ statuses: [status({ state: "landed", fetched_at: "2026-11-21T00:30:00+00:00" })] });
+    const { container } = render(PassCard, board({ now: dep + (arr - dep) / 4 }));
+    expect(screen.getByRole("img", { name: "Route, with the plane at the destination" }).dataset.progress).toBe("1");
+    expect(plane(container).style.left).toBe("100%");
+  });
+  it("keeps the plane at the origin when live status says the flight was cancelled", () => {
+    flightStatus.list = list({ statuses: [status({ state: "cancelled", fetched_at: "2026-11-21T00:30:00+00:00" })] });
+    const { container } = render(PassCard, board({ now: dep + (arr - dep) / 4 }));
+    expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("0");
+    expect(plane(container).style.left).toBe("0%");
+  });
+  it("lists each traveller once across every grouped reservation", () => {
+    const jane = { id: 1, person_id: 1, name: "Jane Doe", seat: null }, mia = { id: 2, person_id: 2, name: "Mia Doe", seat: null };
+    const second = { ...flight, id: 8, confirmation: "ZZ9Y8X", travelers: [{ ...jane, id: 3 }, mia] };
+    render(PassCard, board({ bookings: [{ ...flight, travelers: [jane] }, second] }, { travelers: [jane] }));
+    expect(screen.getByTestId("avatar-stack")).toHaveAccessibleName("Jane Doe, Mia Doe");
+    expect(screen.getByText("Jane & Mia")).toBeInTheDocument();
+  });
+  it("lets a long confirmation code take the whole phone strip and wrap", () => {
+    const code = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMN";
+    render(PassCard, board({}, { confirmation: code }));
+    const button = screen.getByRole("button", { name: `Copy confirmation code ${code}` });
+    expect(button).toHaveClass("break-all", "max-w-full");
+    expect(button.closest("dd")?.parentElement).toHaveClass("phone:col-span-4");
+  });
+  it("keeps the live status between the route and the actions", () => {
+    const live = createRawSnippet(() => ({ render: () => "<p>live area</p>" }));
+    const footer = createRawSnippet(() => ({ render: () => "<a href='#trip/1'>Open trip</a>" }));
+    render(PassCard, board({ live, footer }));
+    const area = screen.getByText("live area");
+    expect(screen.getByText("JFK").compareDocumentPosition(area) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(area.compareDocumentPosition(screen.getByRole("link", { name: "Open trip" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+  it("leaves loyalty and Known Traveler numbers off the card", () => {
+    render(PassCard, board({}, { details: { flight_number: "AA 101", loyalty: "AA1234567", known_traveler: "TT12345678" } }));
+    expect(document.body.textContent).not.toMatch(/AA1234567|TT12345678/);
+  });
+
+  describe("other kinds", () => {
+    const NOW = Date.UTC(2026, 10, 21, 8);
+    const stay = segment({ id: 2, kind: "hotel", provider: "Marriott", origin: "Harbour Hotel", destination: null, start_local: "2026-11-21T15:00", start_zone: LON, end_local: "2026-11-27T10:00", end_zone: LON,
+      confirmation: "H88231", details: { address: "1 Quay Street, London", room: "412" }, travelers: [] });
+    const take = (seg: Segment, extra: Record<string, unknown> = {}) => ({ segment: seg, now: NOW, boarding: true, condensed: true, eyebrow: "Next up", tripName: "Trip to London", ...extra });
+
+    it("shows a stay's name with check-in and check-out, its room, and no empty traveller stack", async () => {
+      render(PassCard, take(stay));
+      expect(screen.getByRole("heading", { name: "Harbour Hotel" })).toBeInTheDocument();
+      expect(screen.getByText("Check-in")).toBeInTheDocument();
+      expect(screen.getByText("Check-out")).toBeInTheDocument();
+      expect(screen.getByText("3:00 PM")).toBeInTheDocument();
+      expect(screen.getByText("10:00 AM")).toBeInTheDocument();
+      expect(screen.getByText("412")).toBeInTheDocument();
+      expect(screen.getByText("Check-in in 7 h")).toBeInTheDocument();
+      expect(screen.queryByTestId("avatar-stack")).toBeNull();
+      expect(await screen.findByText("Sat, Nov 21 · London time")).toBeInTheDocument();
+    });
+    it("shows a rental car's pick-up and drop-off", () => {
+      const car = segment({ id: 3, kind: "car", provider: "Hertz", origin: "Heathrow", destination: null, start_local: "2026-11-21T09:00", start_zone: LON, end_local: "2026-11-24T09:00", end_zone: LON, details: { car_class: "Compact" } });
+      render(PassCard, take(car));
+      expect(screen.getByRole("heading", { name: "Hertz · Heathrow" })).toBeInTheDocument();
+      expect(screen.getByText("Pick-up")).toBeInTheDocument();
+      expect(screen.getByText("Drop-off")).toBeInTheDocument();
+      expect(screen.getByText("Compact")).toBeInTheDocument();
+    });
+    it("shows a train's stations in the code positions with a train on the line", () => {
+      const train = segment({ id: 4, kind: "train", provider: "Eurostar", origin: "London St Pancras", destination: "Paris Nord", start_local: "2026-11-21T10:00", start_zone: LON, end_local: "2026-11-21T13:20", end_zone: "Europe/Paris", details: {} });
+      const { container } = render(PassCard, take(train));
+      expect(screen.getByRole("heading", { name: "London St Pancras → Paris Nord" })).toBeInTheDocument();
+      expect(container.querySelector("[data-code='origin']")).toHaveTextContent("London St Pancras");
+      expect(container.querySelector("[data-code='destination']")).toHaveTextContent("Paris Nord");
+      expect(screen.queryByText("Gate")).toBeNull();
+    });
+    it("shows parking's entry and exit, and a cruise's embarkation", () => {
+      const lot = segment({ id: 5, kind: "parking", provider: "Example Parking", origin: "Example Lot", destination: null, start_local: "2026-11-21T09:00", start_zone: NY, end_local: "2026-11-28T09:00", end_zone: NY, details: {} });
+      const first = render(PassCard, take(lot));
+      expect(screen.getByRole("heading", { name: "Example Lot" })).toBeInTheDocument();
+      expect(screen.getByText("Entry")).toBeInTheDocument();
+      expect(screen.getByText("Exit")).toBeInTheDocument();
+      first.unmount();
+      const ship = segment({ id: 6, kind: "cruise", provider: "Example Cruises", origin: "Miami", destination: null, start_local: "2026-11-22T16:00", start_zone: NY, end_local: "2026-11-29T07:00", end_zone: NY, details: { ship: "Example Star", deck: "9" } });
+      render(PassCard, take(ship));
+      expect(screen.getByText("Embarks")).toBeInTheDocument();
+      expect(screen.getByText("Disembarks")).toBeInTheDocument();
+      expect(screen.getByText("Example Star")).toBeInTheDocument();
+    });
+    it("shows no countdown for a cancelled stay and strikes its name", () => {
+      const { container } = render(PassCard, take({ ...stay, status: "cancelled" }));
+      expect(container.querySelector("[data-countdown]")).toBeNull();
+      expect(screen.getByRole("heading", { name: "Harbour Hotel" })).toHaveClass("line-through");
+    });
   });
 });

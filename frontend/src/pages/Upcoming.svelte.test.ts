@@ -161,7 +161,8 @@ describe("Upcoming", () => {
     expect(within(card).getByText("Next up")).toBeInTheDocument();
     expect(within(card).getByText("Check-in is open, departs in 10 h")).toBeInTheDocument();
     expect(within(card).getByText("American Airlines AA 101")).toBeInTheDocument();
-    expect(within(card).getAllByText("7:00 PM")).toHaveLength(2);
+    expect(within(card).getByText("7:00 PM")).toBeInTheDocument();
+    expect(within(card).getByText("Fri, Nov 20 · New York time")).toBeInTheDocument();
     expect(within(card).getByText("8")).toBeInTheDocument();
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(within(card).getByRole("button", { name: "Copy confirmation code KQ7M2X" }));
     expect(await navigator.clipboard.readText()).toBe("KQ7M2X");
@@ -588,7 +589,9 @@ describe("the reads started before the page opened", () => {
     serve([trip([lot])]);
     render(Upcoming);
     const card = (await screen.findByText("Next up")).closest("section")!;
-    expect(within(card).getByRole("button", { name: "Show the QR code for Example Airport Long-Term Lot" })).toBeInTheDocument();
+    const show = within(card).getByRole("button", { name: "Show the QR code for Example Airport Long-Term Lot" });
+    expect(show).toBeInTheDocument();
+    expect(show.closest(".phone\\:hidden")).toBeNull();
     expect(within(card).getByRole("link", { name: /Open / })).toBeInTheDocument();
   });
 

@@ -189,12 +189,12 @@
     {@const proof = s.kind === "flight" && flightStatus.list?.enabled ? flightEvidence(statusFor(s.id), now, typeof navigator === "undefined" || navigator.onLine !== false) : "scheduled"}
     {@const grounded = proof === "landed" || proof === "cancelled" || proof === "diverted"}
     {@const eyebrow = next.state !== "now" ? "Next up" : s.kind !== "flight" ? "Under way" : grounded ? "Latest flight" : proof === "departed" ? "In the air" : proof === "delayed" ? "Delayed" : "Under way"}
-    <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-6" condensed compact showApp={!(s.links.directions || s.links.call)} {eyebrow} pulse={next.state === "now" && !grounded}>
+    <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-6" condensed boarding tripName={next.trip.name} showApp={!(s.links.directions || s.links.call)} {eyebrow} pulse={next.state === "now" && !grounded}>
       {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
       {#snippet footer()}<span class="contents">
-        {#if s.status !== "cancelled" && s.links.directions}<Button href={s.links.directions} target="_blank" rel="noopener noreferrer" variant="outline" size="sm">Directions</Button>{/if}
-        {#if s.status !== "cancelled" && s.links.call}<Button href={s.links.call} variant="outline" size="sm">Call</Button>{/if}
-        <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm">Open trip<span class="sr-only">: {next.trip.name}</span></Button></span>{/snippet}
+        {#if s.status !== "cancelled" && s.links.directions}<Button href={s.links.directions} target="_blank" rel="noopener noreferrer" variant="outline" size="sm" class="phone:hidden">Directions</Button>{/if}
+        {#if s.status !== "cancelled" && s.links.call}<Button href={s.links.call} variant="outline" size="sm" class="phone:hidden">Call</Button>{/if}
+        <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm" class="phone:flex-1">Open trip<span class="sr-only">: {next.trip.name}</span></Button></span>{/snippet}
     </PassCard>
     {#if next.alongside.length}
       <section class="-mt-2 mb-6" aria-label="Also under way">
