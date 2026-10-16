@@ -19,7 +19,7 @@
   import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { panes } from "$lib/panes.svelte";
   import { blank } from "$lib/segment-form";
-  import { dayIn, inYear, matchesText, pastByYear, rangeLabel, splitTrips, tripPeople, tripYears, viewerZone, type TripWhen } from "$lib/trips";
+  import { dayIn, inYear, matchesText, pastByYear, splitTrips, tripRangeLabel, tripPeople, tripYears, viewerZone, type TripWhen } from "$lib/trips";
   import TripPane from "./Trip.svelte";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Plus from "@lucide/svelte/icons/plus";
@@ -217,10 +217,10 @@
                   {#if compact}
                     <span class="min-w-0 flex-1">
                       <span class="block truncate font-semibold">{t.name}</span>
-                      <span class="block truncate text-sm text-muted-foreground">{[rangeLabel(t), t.destination].filter(Boolean).join(" · ")}</span>
+                      <span class="block truncate text-sm text-muted-foreground">{[tripRangeLabel(t), t.destination].filter(Boolean).join(" · ")}</span>
                     </span>
                   {:else}
-                    <span class="mono w-32 shrink-0 text-sm text-muted-foreground">{rangeLabel(t)}</span>
+                    <span class="mono w-32 shrink-0 text-sm text-muted-foreground">{tripRangeLabel(t)}</span>
                     <span class="min-w-0 flex-1">
                       <span class="block truncate font-semibold">{t.name}</span>
                       {#if t.destination}<span class="block truncate text-sm text-muted-foreground">{t.destination}</span>{/if}
