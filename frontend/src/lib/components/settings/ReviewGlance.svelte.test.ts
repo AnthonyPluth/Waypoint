@@ -90,7 +90,7 @@ describe("Settings → Gmail → Review at a glance", () => {
   it("asks before it ignores a travel company Waypoint knows, and ignores nothing when cancelled", async () => {
     serve(glance());
     render(ReviewGlance, { mailbox: box, onchange: vi.fn() });
-    await userEvent.click(await screen.findByRole("button", { name: "Ignore united.com" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Ignore this sender (united.com)" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByTestId("known-sender-warning")).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
@@ -100,7 +100,7 @@ describe("Settings → Gmail → Review at a glance", () => {
   it("asks before it ignores a sender, then ignores it, reloads and offers the undo", async () => {
     const onchange = serve(glance());
     render(ReviewGlance, { mailbox: box, onchange });
-    await userEvent.click(await screen.findByRole("button", { name: "Ignore seaside-stays.example" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Ignore this sender (seaside-stays.example)" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Ignore seaside-stays.example?")).toBeInTheDocument();
     expect(within(dialog).queryByTestId("known-sender-warning")).toBeNull();

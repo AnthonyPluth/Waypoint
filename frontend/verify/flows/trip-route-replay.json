@@ -10,12 +10,13 @@
     { "press": { "selector": "input[aria-label='Position along the route']", "key": "Home" } },
     { "wait_for": "[data-label='New York'][data-visible='true']" },
     { "screenshot": "replay-start" },
-    { "fill": { "selector": "input[aria-label='Position along the route']", "text": "375" } },
+    { "fill": { "selector": "input[aria-label='Position along the route']", "text": "2000" } },
     { "wait_for": "svg[data-zoomed='true']" },
     { "screenshot": "replay-zoomed" },
     { "press": { "selector": "input[aria-label='Position along the route']", "key": "End" } },
     { "wait_for": "[data-testid='stop-list']" },
-    { "expect_text": { "selector": "[data-testid='stop-list']", "text": "Back in New York" } },
+    { "wait_for": "[data-testid='stop-list'] li:last-child[data-current='true']" },
+    { "expect_text": { "selector": "[data-testid='stop-list'] li:last-child", "text": "New York" } },
     { "screenshot": "replay-end" }
   ]
 }

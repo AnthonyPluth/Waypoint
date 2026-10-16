@@ -68,7 +68,7 @@ try {
       if (route.startsWith('trip/')) {
         assert.equal(await page.getByRole('button',{name:'Add a booking',exact:true}).isDisabled(),true,'Trip editing enabled');
         const trip = data.trips.find(item=>item.id === Number(route.slice(5)));
-        const buttons = page.getByRole('button',{name:/^View the email for/});
+        const buttons = page.getByRole('button',{name:/^View email for/});
         assert.equal(await buttons.count(),trip.segments.length,`${route}: missing source emails`);
         for (let index = 0; index < trip.segments.length; index++) await buttons.first().click();
         await page.getByText('SIMULATED BOOKING EMAIL',{exact:false}).first().waitFor();
@@ -90,7 +90,7 @@ try {
     await page.getByRole('button',{name:/View email/}).first().click();
     await page.getByText('SIMULATED BOOKING EMAIL',{exact:false}).first().waitFor();
     assert.equal(await page.locator('[data-testid="match-item"] button:not([disabled]), [data-testid="who-item"] button:not([disabled])').count(),0,'Review matching enabled');
-    const suggestions = page.getByRole('button',{name:/^Check (?:the AI|what Waypoint)/});
+    const suggestions = page.getByRole('button',{name:/^Check (?:\d+ )?suggestions?: /});
     assert.equal(await suggestions.count(),3);
     for (let index=0; index<3; index++) {
       await suggestions.nth(index).click();

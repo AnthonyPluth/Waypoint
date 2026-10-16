@@ -6,7 +6,9 @@
     { "expect_text": { "selector": "h1", "text": "Upcoming" } },
     { "click": "a[href='#settings'] >> visible=true" },
     { "expect_text": { "selector": "h1", "text": "Settings" } },
-    { "expect_text": { "selector": "main", "text": "Version" } },
-    { "screenshot": "settings-open" }
+    { "screenshot": "settings-open" },
+    { "click": "a[href='#settings/account'] >> visible=true" },
+    { "expect_text": { "selector": "h1", "text": "Account" } },
+    { "expect_text": { "selector": "main", "text": "Version" } }
   ]
 }

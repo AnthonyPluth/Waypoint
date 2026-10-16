@@ -1,11 +1,11 @@
 {
   "name": "bundled-logos",
-  "page": "settings",
+  "page": "trips",
   "steps": [
-    { "goto": "#settings/travel" },
-    { "wait_for": "#logos-title" },
-    { "expect_text": { "selector": "section[aria-labelledby='logos-title']", "text": "included with Waypoint" } },
-    { "expect_text": { "selector": "section[aria-labelledby='logos-title']", "text": "no account or API key" } },
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Orlando') >> visible=true" },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "wait_for": "ul[aria-label='Bookings'] img[src*='/logo']" },
     { "screenshot": "included" }
   ]
 }

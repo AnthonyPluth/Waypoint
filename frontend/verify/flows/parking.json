@@ -3,7 +3,7 @@
   "page": "trips",
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
-    { "click": "a[href^='#trip/']:has([aria-label*='parking']) >> visible=true >> nth=0" },
+    { "click": "a[href^='#trip/']:has-text('San Francisco') >> visible=true >> nth=0" },
     { "wait_for": "ul[aria-label='Bookings']" },
     { "expect_text": { "selector": "main", "text": "Example Airport Long-Term Lot" } },
     { "expect_text": { "selector": "main", "text": "Entry" } },

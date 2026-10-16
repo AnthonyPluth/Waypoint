@@ -43,7 +43,7 @@ afterEach(() => { Reflect.deleteProperty(navigator, "wakeLock"); vi.clearAllMock
 describe("GateCode button", () => {
   it("shows Show QR code for a parking booking with a code before its exit time", () => {
     render(GateCode, { segment: lot, now: NOW });
-    expect(screen.getByRole("button", { name: "Show the QR code for Example Airport Long-Term Lot" })).toHaveTextContent("Show QR code");
+    expect(screen.getByRole("button", { name: "Show QR code for Example Airport Long-Term Lot" })).toHaveTextContent("Show QR code");
   });
 
   it("shows nothing after the exit time, for a cancelled booking, for one with no code or any other kind", () => {
@@ -57,17 +57,17 @@ describe("GateCode button", () => {
 
   it("is still shown during the last minutes of the booking and gone at the exit time", () => {
     const { unmount } = render(GateCode, { segment: lot, now: Date.parse("2026-12-04T07:59:00Z") });
-    expect(screen.getByRole("button", { name: /Show the QR code/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Show QR code/ })).toBeInTheDocument();
     unmount();
     render(GateCode, { segment: lot, now: Date.parse("2026-12-04T08:00:00Z") });
-    expect(screen.queryByRole("button", { name: /Show the QR code/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Show QR code/ })).toBeNull();
   });
 });
 
 describe("the full-screen code", () => {
   it("shows the picture centred on white with sharp pixels, the lot and the times, and the brightness reminder", async () => {
     render(GateCode, { segment: lot, now: NOW });
-    await user.click(screen.getByRole("button", { name: /Show the QR code/ }));
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
     const dialog = await screen.findByRole("dialog", { name: "QR code" });
     const picture = await within(dialog).findByRole("img", { name: "QR code for Example Airport Long-Term Lot" });
     expect(picture).toHaveAttribute("src", QR);
@@ -85,7 +85,7 @@ describe("the full-screen code", () => {
 
   it("leaves a clear margin of at least four modules around the code on the square", async () => {
     render(GateCode, { segment: lot, now: NOW });
-    await user.click(screen.getByRole("button", { name: /Show the QR code/ }));
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
     const picture = await screen.findByRole("img", { name: /QR code for/ });
     const share = Number(/width:\s*([\d.]+)%/.exec(picture.getAttribute("style") ?? "")?.[1]);
     expect(share).toBeGreaterThan(0);
@@ -95,7 +95,7 @@ describe("the full-screen code", () => {
 
   it("sizes the square from the picture once it has loaded", async () => {
     render(GateCode, { segment: lot, now: NOW });
-    await user.click(screen.getByRole("button", { name: /Show the QR code/ }));
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
     const picture = await screen.findByRole("img", { name: /QR code for/ });
     Object.defineProperty(picture, "naturalWidth", { value: 290, configurable: true });
     await fireEvent.load(picture);
@@ -105,7 +105,7 @@ describe("the full-screen code", () => {
   it("asks the browser to keep the screen on while it is open and lets go when it closes", async () => {
     const request = stubWakeLock();
     render(GateCode, { segment: lot, now: NOW });
-    await user.click(screen.getByRole("button", { name: /Show the QR code/ }));
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
     await screen.findByRole("dialog", { name: "QR code" });
     await waitFor(() => expect(request).toHaveBeenCalledWith("screen"));
     await user.click(screen.getByRole("button", { name: "Close" }));
@@ -115,7 +115,7 @@ describe("the full-screen code", () => {
   it("asks again when the page comes back to the front", async () => {
     const request = stubWakeLock();
     render(GateCode, { segment: lot, now: NOW });
-    await user.click(screen.getByRole("button", { name: /Show the QR code/ }));
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
     await waitFor(() => expect(request).toHaveBeenCalledTimes(1));
     document.dispatchEvent(new Event("visibilitychange"));
     await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
@@ -123,20 +123,20 @@ describe("the full-screen code", () => {
 
   it("works when the browser has no wake lock or refuses it", async () => {
     render(GateCode, { segment: lot, now: NOW });
-    await user.click(screen.getByRole("button", { name: /Show the QR code/ }));
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
     expect(await screen.findByRole("img", { name: /QR code for/ })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     const request = vi.fn(async () => { throw new Error("denied"); });
     Object.defineProperty(navigator, "wakeLock", { value: { request }, configurable: true });
-    await user.click(screen.getByRole("button", { name: /Show the QR code/ }));
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
     expect(await screen.findByRole("img", { name: /QR code for/ })).toBeInTheDocument();
     expect(request).toHaveBeenCalled();
   });
 
   it("closes with its button and with Escape and returns focus to the button", async () => {
     render(GateCode, { segment: lot, now: NOW });
-    const button = screen.getByRole("button", { name: /Show the QR code/ });
+    const button = screen.getByRole("button", { name: /Show QR code/ });
     await user.click(button);
     await screen.findByRole("dialog", { name: "QR code" });
     await user.click(screen.getByRole("button", { name: "Close" }));
@@ -152,14 +152,14 @@ describe("the full-screen code", () => {
   it("says so, and keeps no picture, when the code can’t be fetched", async () => {
     vi.mocked(apiImage).mockRejectedValue(new Error("offline"));
     render(GateCode, { segment: lot, now: NOW });
-    await user.click(screen.getByRole("button", { name: /Show the QR code/ }));
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The code can’t be shown right now");
     expect(screen.queryByRole("img")).toBeNull();
   });
 
   it("fetches the picture afresh each time it opens and forgets it when it closes", async () => {
     render(GateCode, { segment: lot, now: NOW });
-    const button = screen.getByRole("button", { name: /Show the QR code/ });
+    const button = screen.getByRole("button", { name: /Show QR code/ });
     await user.click(button);
     await screen.findByRole("img", { name: /QR code for/ });
     await user.keyboard("{Escape}");
@@ -171,7 +171,7 @@ describe("the full-screen code", () => {
 
   it("says the times are not recorded when the booking has none", async () => {
     render(GateCode, { segment: { ...lot, details: { time_unknown: "yes" } }, now: NOW });
-    await user.click(screen.getByRole("button", { name: /Show the QR code/ }));
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
     expect(await screen.findByTestId("code-times")).toHaveTextContent("time not recorded");
   });
 });
@@ -182,7 +182,7 @@ describe("Choose the code", () => {
   it("is offered when several pictures qualify, lists the email’s pictures and saves the choice", async () => {
     const changed = vi.fn();
     render(GateCode, { segment: pending, now: NOW, onchanged: changed });
-    expect(screen.queryByRole("button", { name: /Show the QR code/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Show QR code/ })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Choose the code for Example Airport Long-Term Lot" }));
     const list = await screen.findByRole("list", { name: "Pictures in the emails" });
     const choices = within(list).getAllByRole("button");
@@ -237,10 +237,10 @@ describe("Choose the code", () => {
 
   it("also offers another picture beside a code that is shown, only when the booking has emails", async () => {
     const { unmount } = render(GateCode, { segment: lot, now: NOW });
-    await user.click(screen.getByRole("button", { name: /Choose a different picture/ }));
+    await user.click(screen.getByRole("button", { name: /Choose another picture/ }));
     expect(await screen.findByRole("dialog", { name: "Choose the code" })).toBeInTheDocument();
     unmount();
     render(GateCode, { segment: { ...lot, has_email: false }, now: NOW });
-    expect(screen.queryByRole("button", { name: /Choose a different picture/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Choose another picture/ })).toBeNull();
   });
 });

@@ -406,14 +406,14 @@ describe("Trip", () => {
       : answer(path, opts)) as never);
     render(TripPage);
     await screen.findByRole("list", { name: "Bookings" });
-    expect(screen.getAllByRole("button", { name: /the email for/ })).toHaveLength(1);
-    await userEvent.click(screen.getByRole("button", { name: /View the email for/ }));
+    expect(screen.getAllByRole("button", { name: /email for/ })).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: /View email for/ }));
     const region = await screen.findByRole("region", { name: /The email for/ });
     expect(await within(region).findByTestId("message-subject")).toHaveTextContent("Your itinerary: EX 410");
     expect(region).toHaveTextContent("example-air.example · sent 2026-10-17");
     expect(within(region).getByTestId("preview-html").shadowRoot?.innerHTML).toContain("<b>B12</b>");
     expect(vi.mocked(api)).toHaveBeenCalledWith("/api/segments/1/emails");
-    await userEvent.click(screen.getByRole("button", { name: /Hide the email for/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Hide email for/ }));
     expect(screen.queryByRole("region", { name: /The email for/ })).toBeNull();
   });
 
@@ -423,11 +423,11 @@ describe("Trip", () => {
     let emails: unknown = new Error("Waypoint is busy.");
     vi.mocked(api).mockImplementation(async (path, opts) => { if (path === "/api/segments/1/emails") { if (emails instanceof Error) throw emails; return emails as never; } return answer(path, opts) as never; });
     render(TripPage);
-    await userEvent.click(await screen.findByRole("button", { name: /View the email for/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /View email for/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Waypoint is busy.");
-    await userEvent.click(screen.getByRole("button", { name: /Hide the email for/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Hide email for/ }));
     emails = { emails: [] };
-    await userEvent.click(screen.getByRole("button", { name: /View the email for/ }));
+    await userEvent.click(screen.getByRole("button", { name: /View email for/ }));
     expect(await screen.findByText("This email isn’t kept any more.")).toBeInTheDocument();
   });
 
@@ -531,19 +531,19 @@ describe("Trip", () => {
     expect(first.getByText(/Not matched to a person/)).toBeInTheDocument();
     const hotel = within(cards[1]);
     expect(hotel.getByText("Changed")).toBeInTheDocument();
-    expect(hotel.getByRole("button", { name: "Show and copy Marriott Bonvoy number" })).toHaveTextContent("••••8899");
+    expect(hotel.getByRole("button", { name: /^Show and copy Marriott Bonvoy number/ })).toHaveTextContent("••••8899");
   });
 
   it("reveals a number only when asked, copies it, and hides it again", async () => {
     render(TripPage);
     const u = userEvent.setup();
-    const button = await screen.findByRole("button", { name: "Show and copy Marriott Bonvoy number" });
+    const button = await screen.findByRole("button", { name: /^Show and copy Marriott Bonvoy number/ });
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/reveal"), expect.anything());
     await u.click(button);
-    expect(await screen.findByRole("button", { name: "Hide Marriott Bonvoy number" })).toHaveTextContent("DEMO1234567");
+    expect(await screen.findByRole("button", { name: /^Hide Marriott Bonvoy number/ })).toHaveTextContent("DEMO1234567");
     expect(await navigator.clipboard.readText()).toBe("DEMO1234567");
-    await u.click(screen.getByRole("button", { name: "Hide Marriott Bonvoy number" }));
-    expect(screen.getByRole("button", { name: "Show and copy Marriott Bonvoy number" })).toHaveTextContent("••••8899");
+    await u.click(screen.getByRole("button", { name: /^Hide Marriott Bonvoy number/ }));
+    expect(screen.getByRole("button", { name: /^Show and copy Marriott Bonvoy number/ })).toHaveTextContent("••••8899");
   });
 
   it("says a number can't be read with this key rather than showing nothing", async () => {
@@ -1026,13 +1026,13 @@ describe("Trip", () => {
       const group = await screen.findByRole("group", { name: /Actions for Harbour Hotel/ });
       expect(group).toHaveClass("flex", "flex-wrap");
       expect(Array.from(group.querySelectorAll("a, button"), (el) => el.textContent?.trim())).toEqual(["Directions", "Call", "View email"]);
-      expect(within(group).getByRole("button", { name: "View the email for Harbour Hotel" })).toHaveAttribute("aria-expanded", "false");
+      expect(within(group).getByRole("button", { name: "View email for Harbour Hotel" })).toHaveAttribute("aria-expanded", "false");
     });
 
     it("renders View email on its own when the booking has no action links", async () => {
       held = trip([{ ...stay, has_email: true, links: { app: null, open: null, open_kind: null, directions: null, call: null } }]);
       render(TripPage);
-      const button = await screen.findByRole("button", { name: "View the email for Harbour Hotel" });
+      const button = await screen.findByRole("button", { name: "View email for Harbour Hotel" });
       expect(button).toHaveTextContent("View email");
       expect(button).toHaveAttribute("aria-expanded", "false");
       expect(screen.queryByRole("link", { name: "Directions" })).toBeNull();
@@ -1044,14 +1044,14 @@ describe("Trip", () => {
       vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/2/emails" ? emailed : answer(path, opts)) as never);
       render(TripPage);
       const group = await screen.findByRole("group", { name: /Actions for Harbour Hotel/ });
-      await userEvent.click(within(group).getByRole("button", { name: "View the email for Harbour Hotel" }));
+      await userEvent.click(within(group).getByRole("button", { name: "View email for Harbour Hotel" }));
       const region = await screen.findByRole("region", { name: "The email for Harbour Hotel" });
       expect(group.contains(region)).toBe(false);
       expect(group.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(within(region).getByTestId("message-subject")).toHaveTextContent("Your stay");
       expect(within(group).getByRole("link", { name: "Directions" })).toHaveAttribute("href", stay.links.directions!);
       expect(within(group).getByRole("link", { name: "Call" })).toHaveAttribute("href", stay.links.call!);
-      expect(within(group).getByRole("button", { name: "Hide the email for Harbour Hotel" })).toHaveAttribute("aria-expanded", "true");
+      expect(within(group).getByRole("button", { name: "Hide email for Harbour Hotel" })).toHaveAttribute("aria-expanded", "true");
     });
   });
 

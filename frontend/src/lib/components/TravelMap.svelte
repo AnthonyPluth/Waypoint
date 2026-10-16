@@ -117,7 +117,7 @@
             {#each stateOutlines as c (c.id ?? c.name)}
               {@const shaded = visitedStates.has(c.id ?? "")}
               <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-              <path d={c.d} class={shaded ? "fill-map-visited cursor-pointer outline-none focus-visible:stroke-foreground" : "fill-map-land"} data-state={c.name} data-visited={shaded ? "true" : undefined}
+              <path d={c.d} class={shaded ? "fill-map-visited cursor-pointer outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring focus-visible:stroke-foreground" : "fill-map-land"} data-state={c.name} data-visited={shaded ? "true" : undefined}
                 role={shaded ? "button" : undefined} tabindex={shaded ? 0 : undefined} aria-label={shaded ? `${c.name}: visited` : undefined}
                 onclick={shaded ? (e) => { e.stopPropagation(); pick(c.name, stateTrips.get(c.id ?? "") ?? []); } : undefined}
                 onkeydown={shaded ? (e) => key(e, c.name, stateTrips.get(c.id ?? "") ?? []) : undefined}><title>{c.name}</title></path>

@@ -13,7 +13,9 @@
     { "screenshot": "people-current" },
     { "click": "#more-menu a[href='#settings']" },
     { "expect_text": { "selector": "h1", "text": "Settings" } },
-    { "expect_text": { "selector": "main", "text": "Version" } },
-    { "screenshot": "settings" }
+    { "screenshot": "settings" },
+    { "click": "a[href='#settings/account']" },
+    { "expect_text": { "selector": "h1", "text": "Account" } },
+    { "expect_text": { "selector": "main", "text": "Version" } }
   ]
 }

@@ -420,7 +420,7 @@
       <GateCode segment={s} {now} onchanged={() => void load()} />
       {#if s.has_email}
         {@const mail = mails[s.id]}
-        <Button variant="outline" size="sm" aria-expanded={!!mail} aria-label={`${mail ? "Hide" : "View"} the email for ${headline(s)}`} onclick={() => toggleMail(s)}>{mail ? "Hide email" : "View email"}</Button>
+        <Button variant="outline" size="sm" aria-expanded={!!mail} aria-label={`${mail ? "Hide" : "View"} email for ${headline(s)}`} onclick={() => toggleMail(s)}>{mail ? "Hide email" : "View email"}</Button>
       {/if}
     </div>
   {/if}

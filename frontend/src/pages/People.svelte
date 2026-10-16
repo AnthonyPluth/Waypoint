@@ -276,7 +276,7 @@
                         <span class="min-w-0 break-words font-medium">{m.program}</span>
                         {#if m.readable}
                           <button type="button" class="shrink-0 rounded-md px-1.5 py-0.5 phone:min-h-11 phone:-my-3 font-mono underline-offset-2 hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
-                            aria-label={revealed[m.id] !== undefined ? `Hide ${m.program} number` : `Show and copy ${m.program} number`} onclick={() => toggle(m)}>{revealed[m.id] ?? m.masked}</button>
+                            aria-label={revealed[m.id] !== undefined ? `Hide ${m.program} number ${revealed[m.id]}` : `Show and copy ${m.program} number ${m.masked}`} onclick={() => toggle(m)}>{revealed[m.id] ?? m.masked}</button>
                         {:else}
                           <span class="text-muted-foreground">Can’t be read with this key: enter it again</span>
                         {/if}</p>
@@ -293,7 +293,7 @@
           {/each}
         </div>
         <div class="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" aria-label={`Add a loyalty or traveler number for ${p.display_name}`} onclick={() => startAddId(p)}><Plus /> Add loyalty or traveler number</Button>
+          <Button variant="outline" size="sm" aria-label={`Add loyalty or traveler number for ${p.display_name}`} onclick={() => startAddId(p)}><Plus /> Add loyalty or traveler number</Button>
           {#if !p.member && canClaim}<Button variant="outline" size="sm" aria-label={`This is me: ${p.display_name}`} onclick={() => { claiming = p; claimAsking = true; }}>This is me</Button>{/if}
         </div>
         {#if idDraft && idDraft.person_id === p.id && !idInSheet}<div class="basis-full">{@render idForm(idDraft, true)}</div>{/if}

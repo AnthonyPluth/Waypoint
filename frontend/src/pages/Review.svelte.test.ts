@@ -86,7 +86,7 @@ describe("Review", () => {
     expect(within(list).getByText("Sent 2026-10-17 · to ana@gmail.example")).toBeInTheDocument();
     expect(within(list).getByText(REASONS.no_markup)).toBeInTheDocument();
     expect(within(list).queryByRole("link")).toBeNull();
-    expect(within(list).getByRole("button", { name: /View email .Mail from example-air.example on 2026-10-17./ })).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: /View email: .Mail from example-air.example on 2026-10-17./ })).toBeInTheDocument();
   });
 
   it("names an item by its message's subject, and says who it came from beside it", async () => {
@@ -94,7 +94,7 @@ describe("Review", () => {
     render(ReviewPage);
     const list = await screen.findByRole("list", { name: "Add missing details" });
     expect(within(list).getByText("Your itinerary: EX 410")).toBeInTheDocument();
-    expect(within(list).getByRole("button", { name: "Add “Your itinerary: EX 410” by hand" })).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "Add by hand: “Your itinerary: EX 410”" })).toBeInTheDocument();
     expect(within(list).getByText("Sent 2026-10-17 · to ana@gmail.example")).toBeInTheDocument();
   });
 
@@ -113,10 +113,10 @@ describe("Review", () => {
     const row = await screen.findByTestId("review-item");
     expect(row).toHaveTextContent("in Sam Doe’s mailbox, shared with the household");
     expect(row).not.toHaveTextContent("sam@gmail.example");
-    expect(within(row).getByRole("button", { name: /View email .Mail from example-air.example.* on 2026-10-17/ })).toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: /Add .Mail from example-air.example.* by hand/ })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: /View email: .Mail from example-air.example.* on 2026-10-17/ })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: /Add by hand: .Mail from example-air.example.*/ })).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: /Dismiss/ })).toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: /Ask AI about/ })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: /^(Ask AI|Ask again): / })).toBeInTheDocument();
     expect(within(row).queryByRole("button", { name: /ignore example-air.example/i })).toBeNull();
     expect(within(row).queryByRole("link")).toBeNull();
   });
@@ -125,7 +125,7 @@ describe("Review", () => {
     held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" })], who: [], ai: false };
     render(ReviewPage);
     const row = await screen.findByTestId("review-item");
-    expect(within(row).queryByRole("button", { name: /Ask AI about/ })).toBeNull();
+    expect(within(row).queryByRole("button", { name: /^(Ask AI|Ask again): / })).toBeNull();
   });
 
   it("opens a shared item's message beside the form like any other, and dismisses it", async () => {
@@ -144,7 +144,7 @@ describe("Review", () => {
 
   it("dismisses an item", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Dismiss .Mail from example-air.example/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
     expect(calls.filter(([, method]) => method === "DELETE")).toEqual([]);
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/deletes its stored copy of this email/)).toBeInTheDocument();
@@ -184,7 +184,7 @@ describe("Review", () => {
       { id: 2, subject: "Your payment receipt", has_email: true, received: "2026-10-12" },
       { id: 3, subject: "Your reminder", has_email: true, received: "2026-10-10" }] })] };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Dismiss all 3 emails about “Online check-in is open”" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Dismiss all: 3 emails about “Online check-in is open”" }));
     expect(within(await screen.findByRole("dialog")).getByText(/all 3 emails about this reservation/)).toBeInTheDocument();
     await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Dismiss all" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
@@ -196,7 +196,7 @@ describe("Review", () => {
     const read = { kind: "hotel" as const, provider: "Seaside Inn", confirmation: "SS48213", origin: "Seaside Inn", start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London", sources: {} };
     held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check what Waypoint read/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42", "DELETE", undefined]));
   });
@@ -205,7 +205,7 @@ describe("Review", () => {
     const read = { kind: "hotel" as const, provider: "Seaside Inn", confirmation: "SS48213", origin: "Seaside Inn", start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London", sources: {} };
     held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check what Waypoint read/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.queryByRole("checkbox", { name: /Also trust/ })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1?segment=42", "DELETE", undefined]));
@@ -214,7 +214,7 @@ describe("Review", () => {
   it("adds a booking from a grouped row through the newest item alone", async () => {
     held = { ...held, who: [], items: [item({ subject: "Online check-in is open", count: 2, others: [{ id: 2, subject: "Your payment receipt", has_email: true, received: "2026-10-12" }] })] };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Add “Online check-in is open” by hand" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add by hand: “Online check-in is open”" }));
     await userEvent.type(screen.getByLabelText("From (airport code)"), "BOS");
     await userEvent.type(screen.getByLabelText("To (airport code)"), "DEN");
     await userEvent.type(screen.getByLabelText("Departs"), "2027-01-02T07:15");
@@ -228,14 +228,14 @@ describe("Review", () => {
     held = { ...held, who: [], items: [item({ count: 3, others: [
       { id: 2, subject: null, has_email: true, received: null }, { id: 3, subject: null, has_email: true, received: null }] }), item({ id: 4 })] };
     render(ReviewPage);
-    await userEvent.click((await screen.findAllByRole("button", { name: "Not travel: ignore example-air.example" }))[0]!);
+    await userEvent.click((await screen.findAllByRole("button", { name: "Not travel: ignore this sender (example-air.example)" }))[0]!);
     expect(await screen.findByText(/4 items from them \(this one included\) leave this list/)).toBeInTheDocument();
   });
 
   it("ignores a sender only after asking", async () => {
     held = { ...held, items: [item(), item({ id: 2 }), item({ id: 3, sender_domain: "other-air.example" }), item({ id: 4, address: "bo@gmail.example" })] };
     render(ReviewPage);
-    await userEvent.click((await screen.findAllByRole("button", { name: "Not travel: ignore example-air.example" }))[0]!);
+    await userEvent.click((await screen.findAllByRole("button", { name: "Not travel: ignore this sender (example-air.example)" }))[0]!);
     expect(await screen.findByText("Ignore example-air.example?")).toBeInTheDocument();
     expect(await screen.findByText(/2 items from them \(this one included\) leave this list/)).toBeInTheDocument();
     expect(calls.some(([p]) => p.endsWith("/ignore"))).toBe(false);
@@ -246,7 +246,7 @@ describe("Review", () => {
 
   it("offers Undo on the toast, and Undo stops ignoring that sender and says the mail is read again", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore example-air.example" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore this sender (example-air.example)" }));
     await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Ignoring example-air.example", expect.anything()));
     const options = vi.mocked(toast.success).mock.calls.find(([text]) => text === "Ignoring example-air.example")![1] as unknown as { action: { onClick: () => void } };
@@ -280,7 +280,7 @@ describe("Review", () => {
 
   it("says in the ignore dialog where to undo it", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore example-air.example" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore this sender (example-air.example)" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("You can undo this in Settings → Mail & review → Gmail.")).toBeInTheDocument();
     expect(within(dialog).queryByTestId("known-sender-warning")).toBeNull();
@@ -289,7 +289,7 @@ describe("Review", () => {
   it("warns in the ignore dialog when the sender is a travel company Waypoint knows, and still allows it", async () => {
     held = { ...held, items: [item({ sender_domain: "delta.example", known_sender: true })] };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore delta.example" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore this sender (delta.example)" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByTestId("known-sender-warning")).toHaveTextContent("This sender is a travel company Waypoint knows. Ignoring it means its bookings won’t be added.");
     await userEvent.click(dialog.querySelector("button[type=submit]")!);
@@ -299,19 +299,19 @@ describe("Review", () => {
   it("does not count items that hold bookings to settle, since they stay", async () => {
     held = { ...held, items: [item(), item({ id: 2 }), item({ id: 3, holds_bookings: true })] };
     render(ReviewPage);
-    await userEvent.click((await screen.findAllByRole("button", { name: "Not travel: ignore example-air.example" }))[0]!);
+    await userEvent.click((await screen.findAllByRole("button", { name: "Not travel: ignore this sender (example-air.example)" }))[0]!);
     expect(await screen.findByText(/2 items from them \(this one included\) leave this list/)).toBeInTheDocument();
   });
 
   it("says one item when it is the only one from that sender", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore example-air.example" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore this sender (example-air.example)" }));
     expect(await screen.findByText(/and this item leaves this list/)).toBeInTheDocument();
   });
 
   it("does nothing when the question is cancelled", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore example-air.example" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Not travel: ignore this sender (example-air.example)" }));
     await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(calls.some(([p]) => p.endsWith("/ignore"))).toBe(false);
@@ -320,7 +320,7 @@ describe("Review", () => {
 
   it("adds a booking by hand with the provider filled in, then takes the item off the list", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add by hand: .Mail from example-air.example on 2026-10-17./ }));
     expect(screen.getByLabelText("Provider")).toHaveValue("Example Air");
     await userEvent.type(screen.getByLabelText("Confirmation code"), "ZZ9Y8X");
     await userEvent.type(screen.getByLabelText("From (airport code)"), "BOS");
@@ -339,7 +339,7 @@ describe("Review", () => {
 
   it("asks for a stay’s one time zone, which an airport can’t give", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add by hand: .Mail from example-air.example on 2026-10-17./ }));
     await userEvent.selectOptions(screen.getByLabelText("What is it?"), "hotel");
     expect(screen.getByLabelText("Hotel")).toBeInTheDocument();
     expect(screen.queryByLabelText("To (airport code)")).toBeNull();
@@ -357,7 +357,7 @@ describe("Review", () => {
 
   it("offers Cruise by hand, shows its port and ship fields and adds it", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add by hand: .Mail from example-air.example on 2026-10-17./ }));
     const kinds = within(screen.getByLabelText("What is it?")).getAllByRole("option").map((o) => o.textContent);
     expect(kinds).toEqual(["Flight", "Hotel stay", "Car rental", "Train", "Cruise", "Parking"]);
     await userEvent.selectOptions(screen.getByLabelText("What is it?"), "cruise");
@@ -381,14 +381,14 @@ describe("Review", () => {
       start_zone: "America/New_York", end_zone: "America/Nassau" };
     held = { matches: [], items: [item({ suggestions: [cruise] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("What is it?")).toHaveValue("cruise");
     expect(screen.getByRole("option", { name: "Cruise" })).toBeInTheDocument();
   });
 
   it("sends a stay’s address, and no zone, for the server to work the zone out from", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add by hand: .Mail from example-air.example on 2026-10-17./ }));
     await userEvent.selectOptions(screen.getByLabelText("What is it?"), "hotel");
     await userEvent.type(screen.getByLabelText("Hotel"), "Harbour Hotel");
     await userEvent.type(screen.getByLabelText(/^Address/), "1 Quay Road, Bristol BS1 4AA, UK");
@@ -401,7 +401,7 @@ describe("Review", () => {
 
   it("asks for a zone or an address for a stay, and sends nothing without either", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add by hand: .Mail from example-air.example on 2026-10-17./ }));
     await userEvent.selectOptions(screen.getByLabelText("What is it?"), "hotel");
     await userEvent.type(screen.getByLabelText("Hotel"), "Harbour Hotel");
     await userEvent.type(screen.getByLabelText("Check-in"), "2026-11-21T15:00");
@@ -413,7 +413,7 @@ describe("Review", () => {
 
   it("adds a parking booking by hand with its lot, entry and exit, and the address to work the zone out from", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add by hand: .Mail from example-air.example on 2026-10-17./ }));
     await userEvent.selectOptions(screen.getByLabelText("What is it?"), "parking");
     expect(screen.queryByLabelText("To (airport code)")).toBeNull();
     await userEvent.type(screen.getByLabelText("Lot"), "Example Long-Term Lot");
@@ -431,7 +431,7 @@ describe("Review", () => {
       start_local: "2026-12-02T08:00", end_local: "2026-12-09T21:00" };
     held = { matches: [], items: [item({ suggestions: [lot] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("Lot")).toHaveValue("Example Long-Term Lot");
     expect(screen.getByLabelText("Entry")).toHaveValue("2026-12-02T08:00");
     expect(screen.getByLabelText("Exit")).toHaveValue("2026-12-09T21:00");
@@ -443,7 +443,7 @@ describe("Review", () => {
   it("shows why a booking wasn’t added, and keeps what was typed", async () => {
     serve("/api/segments");
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add by hand: .Mail from example-air.example on 2026-10-17./ }));
     await userEvent.type(screen.getByLabelText("From (airport code)"), "BOS");
     await userEvent.type(screen.getByLabelText("To (airport code)"), "DEN");
     await userEvent.type(screen.getByLabelText("Departs"), "2027-01-02T07:15");
@@ -460,7 +460,7 @@ describe("Review", () => {
   it("says when a booking was added but its item couldn’t be taken off the list", async () => {
     serve("/api/review/1?");
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add by hand: .Mail from example-air.example on 2026-10-17./ }));
     await userEvent.type(screen.getByLabelText("From (airport code)"), "BOS");
     await userEvent.type(screen.getByLabelText("To (airport code)"), "DEN");
     await userEvent.type(screen.getByLabelText("Departs"), "2027-01-02T07:15");
@@ -475,7 +475,7 @@ describe("Review", () => {
     const list = await screen.findByRole("list", { name: "Match people" });
     expect(within(list).getByText("DOE/MIA MISS")).toBeInTheDocument();
     expect(within(list).getByText("Flight JFK → SFO on 2026-12-08 (Example Air)")).toBeInTheDocument();
-    const button = within(list).getByRole("button", { name: "Match DOE/MIA MISS" });
+    const button = within(list).getByRole("button", { name: "That’s them: DOE/MIA MISS" });
     expect(button).toBeDisabled();
     await userEvent.selectOptions(within(list).getByLabelText("Who is DOE/MIA MISS?"), "Mia Doe");
     await userEvent.click(button);
@@ -488,7 +488,7 @@ describe("Review", () => {
     render(ReviewPage);
     const list = await screen.findByRole("list", { name: "Match people" });
     await userEvent.selectOptions(within(list).getByLabelText("Who is DOE/MIA MISS?"), "A new guest…");
-    const button = within(list).getByRole("button", { name: "Match DOE/MIA MISS" });
+    const button = within(list).getByRole("button", { name: "That’s them: DOE/MIA MISS" });
     expect(button).toBeDisabled();
     await userEvent.type(within(list).getByLabelText("Name for DOE/MIA MISS"), "Mia Rose Doe");
     await userEvent.click(button);
@@ -519,7 +519,7 @@ describe("Review", () => {
   it("fills in the one chosen, and the item goes", async () => {
     held = { matches: [held_match()], items: [], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click((await screen.findAllByRole("button", { name: /^It’s Stay Harbour Hotel/ }))[1]);
+    await userEvent.click((await screen.findAllByRole("button", { name: /^It’s this one: Stay Harbour Hotel/ }))[1]);
     await waitFor(() => expect(calls).toContainEqual(["/api/review/9/match", "POST", { entry: 1, segment_id: 12 }]));
     expect(toast.success).toHaveBeenCalledWith("Filled in");
     expect(await screen.findByText(/Nothing to review/)).toBeInTheDocument();
@@ -539,7 +539,7 @@ describe("Review", () => {
     held = { matches: [held_match({ candidates: [], mine: false })], items: [], who: [], ai: false };
     render(ReviewPage);
     expect(await screen.findByText("The bookings it could be aren’t yours to see.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^It’s Stay/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^It’s this one: Stay/ })).toBeNull();
     expect(screen.getByRole("button", { name: "It’s a new booking" })).toBeInTheDocument();
   });
 
@@ -587,7 +587,7 @@ describe("Review: the AI’s suggestion", () => {
   it("starts the form filled in with it, to confirm or edit, and saves only when added", async () => {
     held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByRole("heading", { name: "Check this suggestion" })).toBeInTheDocument();
     expect(screen.getByLabelText("Confirmation code")).toHaveValue("QW4R7T");
     expect(screen.getByLabelText("From (airport code)")).toHaveValue("BOS");
@@ -605,7 +605,7 @@ describe("Review: the AI’s suggestion", () => {
     const seated = { ...suggestion, travelers: [{ name: "Doe/Jane", seat: "23A" }, { name: "Sam Printed", seat: "23B" }] };
     held = { matches: [], items: [item({ suggestions: [seated as never] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("Seat for Doe/Jane")).toHaveValue("23A");
     expect(screen.getByLabelText("Seat for Sam Printed")).toHaveClass("ring-primary");
     await userEvent.clear(screen.getByLabelText("Seat for Sam Printed"));
@@ -619,7 +619,7 @@ describe("Review: the AI’s suggestion", () => {
   it("sends no travellers for a suggestion that read no seats", async () => {
     held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.queryByRole("group", { name: "Seats" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
@@ -631,7 +631,7 @@ describe("Review: the AI’s suggestion", () => {
       end_local: "2026-12-05T11:00", start_zone: "Europe/London", address: "1 Quay Road, Bristol BS1 4AA, UK", phone: "+44 117 555 0100" };
     held = { matches: [], items: [item({ suggestions: [stay] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.queryByText(/An AI read the email and suggested this/)).toBeNull();
     expect(screen.getByLabelText(/^Address/)).toHaveValue("1 Quay Road, Bristol BS1 4AA, UK");
     expect(screen.getByLabelText(/^Address/)).toHaveClass("ring-2");
@@ -646,7 +646,7 @@ describe("Review: the AI’s suggestion", () => {
   it("shows the total the AI read as a cost to check, and sends it in the smallest unit when added", async () => {
     held = { matches: [], items: [item({ suggestions: [{ ...suggestion, price_minor: 124000, price_currency: "USD" }] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("Cost amount")).toHaveValue("1240.00");
     expect(screen.getByLabelText("Cost amount")).toHaveClass("ring-2");
     expect(screen.getByLabelText("Cost currency")).toHaveValue("USD");
@@ -659,7 +659,7 @@ describe("Review: the AI’s suggestion", () => {
   it("refuses a cost it can't read and posts nothing", async () => {
     held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.type(screen.getByLabelText("Cost amount"), "abc");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     expect(await screen.findByText("Enter the cost as an amount like 1240.00 and a three-letter currency code like USD")).toBeInTheDocument();
@@ -669,7 +669,7 @@ describe("Review: the AI’s suggestion", () => {
   it("sends no cost when the suggestion has none and none is typed", async () => {
     held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("Cost amount")).toHaveValue("");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
@@ -681,7 +681,7 @@ describe("Review: the AI’s suggestion", () => {
     const stay = { kind: "hotel" as const, origin: "Harbour Hotel", start_local: "2026-12-02T15:00", end_local: "2026-12-05T11:00", start_zone: "Europe/London" };
     held = { matches: [], items: [item({ suggestions: [stay] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText(/^Address/)).toHaveValue("");
     expect(screen.getByLabelText(/^Address/)).not.toHaveClass("ring-2");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
@@ -693,7 +693,7 @@ describe("Review: the AI’s suggestion", () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "4 Runway Drive, Bristol BS48 3DY" };
     held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
     expect(screen.getByPlaceholderText("Same as pick-up")).toHaveValue("");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
@@ -705,7 +705,7 @@ describe("Review: the AI’s suggestion", () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "4 Runway Drive, Bristol BS48 3DY" };
     held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.clear(screen.getByLabelText(/^Pick-up address/));
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
@@ -716,7 +716,7 @@ describe("Review: the AI’s suggestion", () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00" };
     held = { matches: [], items: [item({ suggestions: [{ ...car, address: "Bristol Airport" }] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.queryByLabelText(/address/i)).toBeNull();
   });
 
@@ -724,7 +724,7 @@ describe("Review: the AI’s suggestion", () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", destination: "Cardiff Station", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "Bristol Airport" };
     held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
     expect(calls.find(([p]) => p === "/api/segments")?.[2]).toMatchObject({ destination: "Cardiff Station", details: { address: "Bristol Airport" } });
@@ -735,7 +735,7 @@ describe("Review: the AI’s suggestion", () => {
       address: "4 Runway Drive, Bristol BS48 3DY" };
     held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
     const first = render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
     expect(screen.getByLabelText(/^Pick-up(?! time| address)/)).toHaveValue("Bristol Airport");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
@@ -746,7 +746,7 @@ describe("Review: the AI’s suggestion", () => {
       start_zone: "America/New_York", end_zone: "America/Nassau", address: "1015 North America Way, Miami FL 33132", room: "8123", ship: "Example Voyager", deck: "8" };
     held = { matches: [], items: [item({ suggestions: [cruise] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText(/^Terminal address/)).toHaveValue("1015 North America Way, Miami FL 33132");
     expect(screen.getByLabelText(/^Cabin/)).toHaveValue("8123");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
@@ -760,7 +760,7 @@ describe("Review: the AI’s suggestion", () => {
       start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00", start_zone: "America/New_York", end_zone: "America/Nassau" };
     held = { matches: [], items: [item({ suggestions: [cruise] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("Embarkation port")).toHaveValue("Miami");
     expect(screen.getByLabelText("Disembarkation port")).toHaveValue("Nassau");
     expect(screen.getByLabelText("Time zone where it ends")).toHaveValue("America/Nassau");
@@ -774,7 +774,7 @@ describe("Review: the AI’s suggestion", () => {
     held = { matches: [], items: [item({ suggestion_error: "The AI didn’t find a booking in this message." })], who: [], ai: false };
     render(ReviewPage);
     expect(await screen.findByText("The AI didn’t find a booking in this message.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Check the AI’s suggestion/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Check suggestion: / })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /by hand/ }));
     expect(screen.getByRole("heading", { name: "Add this booking by hand" })).toBeInTheDocument();
   });
@@ -858,14 +858,14 @@ describe("Review: the message beside the form", () => {
 
   it("opens the message beside the form when adding by hand", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add by hand: .Mail from example-air.example on 2026-10-17./ }));
     expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
     expect(screen.getByLabelText("Provider")).toBeInTheDocument();
   });
 
   it("opens the message from View email without starting the form, and closes it again", async () => {
     render(ReviewPage);
-    const view = await screen.findByRole("button", { name: /View email .Mail from example-air.example on 2026-10-17./ });
+    const view = await screen.findByRole("button", { name: /View email: .Mail from example-air.example on 2026-10-17./ });
     expect(view).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(view);
     expect(await screen.findByTestId("preview")).toHaveTextContent("EX 410");
@@ -883,7 +883,7 @@ describe("Review: the message beside the form", () => {
     await userEvent.click(await screen.findByRole("button", { name: /View email/ }));
     const viewed = await screen.findByTestId("preview");
     const viewedText = viewed.textContent;
-    await userEvent.click(screen.getByRole("button", { name: /Add .Mail from example-air.example on 2026-10-17. by hand/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Add by hand: .Mail from example-air.example on 2026-10-17./ }));
     expect(within(await screen.findByRole("dialog")).getByTestId("preview").textContent).toBe(viewedText);
     expect(screen.getByLabelText("Provider")).toBeInTheDocument();
   });
@@ -917,10 +917,10 @@ describe("Review: Ask AI", () => {
   it("asks the AI, then offers its suggestion to check", async () => {
     held = { matches: [], items: [item()], who: [], ai: true };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Ask AI about/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^(Ask AI|Ask again): / }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1/suggest", "POST", undefined]));
-    expect(await screen.findByRole("button", { name: /Check the AI.s suggestion/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Ask AI about/ })).toHaveTextContent("Ask again");
+    expect(await screen.findByRole("button", { name: /Check suggestion: / })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^(Ask AI|Ask again): / })).toHaveTextContent("Ask again");
   });
 
   it("asks about several messages at once, each showing its own progress", async () => {
@@ -928,7 +928,7 @@ describe("Review: Ask AI", () => {
     suggestGate = new Promise((r) => { open = r; });
     held = { matches: [], items: [item(), item({ id: 2 }), item({ id: 3 }), item({ id: 4 })], who: [], ai: true };
     render(ReviewPage);
-    const asks = await screen.findAllByRole("button", { name: /Ask AI about “/ });
+    const asks = await screen.findAllByRole("button", { name: /^Ask AI: “/ });
     await userEvent.click(asks[0]);
     await userEvent.click(asks[1]);
     await waitFor(() => expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest", "/api/review/2/suggest"]));
@@ -938,14 +938,14 @@ describe("Review: Ask AI", () => {
     expect(asks[2]).toBeEnabled();
     expect(screen.getByRole("button", { name: "Ask AI about all 2" })).toBeEnabled();
     open();
-    await waitFor(() => expect(screen.getAllByRole("button", { name: /Check the AI.s suggestion/ })).toHaveLength(4));
+    await waitFor(() => expect(screen.getAllByRole("button", { name: /Check suggestion: / })).toHaveLength(4));
   });
 
   it("says when the AI couldn’t be asked", async () => {
     held = { matches: [], items: [item()], who: [], ai: true };
     suggestFails = "Turn on AI suggestions in Settings first.";
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Ask AI about/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^(Ask AI|Ask again): / }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Turn on AI suggestions in Settings first."));
   });
 
@@ -1041,7 +1041,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   it("opens Add by hand in a sheet with the message above the form, and Cancel closes it", async () => {
     render(ReviewPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await u.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     const sheet = await screen.findByRole("dialog", { name: "Add this booking by hand" });
     expect(sheet).toHaveAttribute("data-side", side);
     const peek = await within(sheet).findByTestId("preview");
@@ -1061,7 +1061,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   it("opens Check suggestion in the sheet with the message above the form", async () => {
     held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     const sheet = await screen.findByRole("dialog", { name: "Check this suggestion" });
     expect(sheet).toHaveAttribute("data-side", side);
     expect(await within(sheet).findByTestId("preview")).toHaveTextContent("EX 410");
@@ -1073,7 +1073,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   it("closes an untouched form with Escape, the close button, Cancel or an outside click without asking", async () => {
     render(ReviewPage);
     const u = userEvent.setup();
-    const open = await screen.findByRole("button", { name: /Add .* by hand/ });
+    const open = await screen.findByRole("button", { name: /^Add by hand: / });
     const gone = settled;
     await u.click(open);
     await screen.findByRole("dialog");
@@ -1098,7 +1098,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   it("asks before discarding a changed form, keeps it on Keep editing and closes it on Discard", async () => {
     render(ReviewPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await u.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     const sheet = await screen.findByRole("dialog", { name: "Add this booking by hand" });
     if (phone) await u.click(within(sheet).getByRole("button", { name: "Booking" }));
     await u.type(within(sheet).getByLabelText("From (airport code)"), "JFK");
@@ -1117,7 +1117,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   it("treats a field changed back to what it was as untouched", async () => {
     render(ReviewPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await u.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     const sheet = await screen.findByRole("dialog");
     if (phone) await u.click(within(sheet).getByRole("button", { name: "Booking" }));
     await u.type(within(sheet).getByLabelText("From (airport code)"), "J");
@@ -1129,7 +1129,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   it("moves focus into the form on open and back to the button on close", async () => {
     render(ReviewPage);
     const u = userEvent.setup();
-    const open = await screen.findByRole("button", { name: /Add .* by hand/ });
+    const open = await screen.findByRole("button", { name: /^Add by hand: / });
     await u.click(open);
     const sheet = await screen.findByRole("dialog");
     if (phone) await waitFor(() => expect(within(sheet).getByRole("heading", { name: "Add this booking by hand" })).toHaveFocus());
@@ -1142,7 +1142,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   it("moves focus to the heading for a suggestion", async () => {
     held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     const sheet = await screen.findByRole("dialog", { name: "Check this suggestion" });
     await waitFor(() => expect(within(sheet).getByRole("heading", { name: "Check this suggestion" })).toHaveFocus());
   });
@@ -1150,7 +1150,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   it("collapses the email to its subject and opens it again", async () => {
     render(ReviewPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await u.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     const sheet = await screen.findByRole("dialog");
     if (phone) {
       const email = within(sheet).getByRole("button", { name: "Email" });
@@ -1185,8 +1185,8 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     held = { matches: [], items: [item({ id: 1, subject: "First booking" }), item({ id: 2, subject: "Second booking" })], who: [], ai: false };
     render(ReviewPage);
     await screen.findByText("First booking");
-    const first = screen.getByRole("button", { name: "Add “First booking” by hand" });
-    const second = screen.getByRole("button", { name: "Add “Second booking” by hand" });
+    const first = screen.getByRole("button", { name: "Add by hand: “First booking”" });
+    const second = screen.getByRole("button", { name: "Add by hand: “Second booking”" });
     first.click();
     await screen.findByRole("dialog");
     await waitFor(() => expect(calls.some(([path]) => path === "/api/review/1/preview")).toBe(true));
@@ -1200,7 +1200,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   it("adds the booking from the sheet and closes it", async () => {
     render(ReviewPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await u.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     const sheet = await screen.findByRole("dialog");
     if (phone) await u.click(within(sheet).getByRole("button", { name: "Booking" }));
     await u.type(within(sheet).getByLabelText("From (airport code)"), "JFK");
@@ -1215,7 +1215,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   it("keeps the sheet open while adding, and shows a failure in it with what was typed", async () => {
     render(ReviewPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await u.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     const sheet = await screen.findByRole("dialog");
     if (phone) await u.click(within(sheet).getByRole("button", { name: "Booking" }));
     await u.type(within(sheet).getByLabelText("From (airport code)"), "JFK");
@@ -1253,7 +1253,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     expect(await screen.findByText("Read from the email")).toBeInTheDocument();
     expect(screen.queryByText("AI suggestion")).toBeNull();
     expect(screen.queryByRole("button", { name: /Ask AI/ })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: /Check what Waypoint read/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Check suggestion: / }));
     expect(screen.queryByText(/later mail from seaside-stays.example is still checked with you first/)).toBeNull();
     expect(screen.queryByRole("checkbox", { name: /Also trust/ })).toBeNull();
     const checkin = screen.getByLabelText(/^Check-in/);
@@ -1274,12 +1274,12 @@ describe("Review: a booking email with several flights", () => {
   const open = async () => {
     held = { matches: [], items: [item({ suggestions: [outbound, back] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s 2 suggestions/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
   };
 
   it("offers one button for the item and shows one suggestion per leg, in order, each with its own fields", async () => {
     await open();
-    expect(screen.getByRole("button", { name: /Check the AI’s 2 suggestions/ })).toHaveTextContent("Check 2 suggestions");
+    expect(screen.getByRole("button", { name: /Check 2 suggestions: / })).toHaveTextContent("Check 2 suggestions");
     expect(screen.getByRole("heading", { name: "Check these suggestions" })).toBeInTheDocument();
     const legs = screen.getAllByTestId("leg");
     expect(legs.map((l) => l.querySelector("legend")?.textContent)).toEqual(["Flight 1 of 2: BOS → DEN", "Flight 2 of 2: DEN → BOS"]);
@@ -1311,7 +1311,7 @@ describe("Review: a booking email with several flights", () => {
 
   it("lets one leg be dismissed before adding, and then adds the other as a single booking", async () => {
     await open();
-    await userEvent.click(screen.getByRole("button", { name: "Dismiss Flight 1 of 2: BOS → DEN" }));
+    await userEvent.click(screen.getByRole("button", { name: "Dismiss this flight: Flight 1 of 2: BOS → DEN" }));
     expect(screen.queryByTestId("leg")).toBeNull();
     expect(screen.getByLabelText("From (airport code)")).toHaveValue("DEN");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
@@ -1357,7 +1357,7 @@ describe("Review: a booking email with several flights", () => {
     expect(previews()).toBe(1);
     await settled();
     expect(calls).toContainEqual(["/api/review/1?suggestion=1&suggestion=2", "DELETE", undefined]);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     await waitFor(() => expect(previews()).toBe(2));
   });
 
@@ -1365,12 +1365,12 @@ describe("Review: a booking email with several flights", () => {
     takeOffFails = "The list is busy.";
     held = { matches: [], items: [item({ suggestions: [outbound] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Added, but couldn’t take it off this list: The list is busy."));
     expect(toast.success).not.toHaveBeenCalled();
     await settled();
-    await userEvent.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     await waitFor(() => expect(calls.filter(([p]) => p.endsWith("/preview"))).toHaveLength(2));
   });
 
@@ -1385,7 +1385,7 @@ describe("Review: a booking email with several flights", () => {
     expect(calls.some(([p, m]) => m === "DELETE" && p.includes("?segment="))).toBe(false);
     secondSegmentFails = "";
     await settled();
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("From (airport code)")).toHaveValue("DEN");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
@@ -1402,7 +1402,7 @@ describe("Review: a booking email with several flights", () => {
   it("looks as before for an item with one suggestion", async () => {
     held = { matches: [], items: [item({ suggestions: [outbound] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByRole("heading", { name: "Check this suggestion" })).toBeInTheDocument();
     expect(screen.queryByTestId("leg")).toBeNull();
     expect(screen.getByRole("button", { name: "Add to my trips" })).toBeInTheDocument();
@@ -1411,7 +1411,7 @@ describe("Review: a booking email with several flights", () => {
   it("warns, without blocking, when a suggested flight is far longer than any flight", async () => {
     held = { matches: [], items: [item({ suggestions: [{ ...outbound, end_local: "2026-12-11T21:50" }] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(await screen.findByText("This flight is 6 days long. Check the times.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Added to your trips"));
@@ -1420,7 +1420,7 @@ describe("Review: a booking email with several flights", () => {
   it("shows no warning for an ordinary flight, and the warning goes when the time is put right", async () => {
     held = { matches: [], items: [item({ suggestions: [{ ...outbound, end_local: "2026-12-11T21:50" }] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await screen.findByText(/This flight is/);
     await userEvent.clear(screen.getByLabelText("Arrives"));
     await userEvent.type(screen.getByLabelText("Arrives"), "2026-12-05T10:05");
@@ -1433,7 +1433,7 @@ describe("Review: several legs or bookings added by hand from one email", () => 
   const openByHand = async () => {
     render(ReviewPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await u.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     await screen.findByRole("dialog");
     return u;
   };
@@ -1462,7 +1462,7 @@ describe("Review: several legs or bookings added by hand from one email", () => 
     expect(screen.getByRole("button", { name: "Add another leg or booking" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add to my trips" })).toBeInTheDocument();
     expect(screen.queryByTestId("leg")).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Dismiss (Flight|Booking)/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Dismiss this (flight|booking)/ })).toBeNull();
     await u.click(screen.getByRole("button", { name: "Cancel" }));
     await settled();
   });
@@ -1533,7 +1533,7 @@ describe("Review: several legs or bookings added by hand from one email", () => 
     held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [], ai: false };
     render(ReviewPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await u.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await u.click(await screen.findByRole("button", { name: "Add another leg or booking" }));
     const legs = screen.getAllByTestId("leg");
     expect(legs.map((l) => l.querySelector("legend")?.textContent)).toEqual(["Flight 1 of 2: BOS → DEN", "Flight 2 of 2"]);
@@ -1551,10 +1551,10 @@ describe("Review: several legs or bookings added by hand from one email", () => 
     const u = await openByHand();
     await u.type(screen.getByLabelText("From (airport code)"), "BOS");
     await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
-    expect(screen.getAllByRole("button", { name: /^Dismiss Flight/ })).toHaveLength(2);
-    await u.click(screen.getByRole("button", { name: "Dismiss Flight 2 of 2" }));
+    expect(screen.getAllByRole("button", { name: /^Dismiss this flight: Flight/ })).toHaveLength(2);
+    await u.click(screen.getByRole("button", { name: "Dismiss this flight: Flight 2 of 2" }));
     expect(screen.queryByTestId("leg")).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Dismiss (Flight|Booking)/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Dismiss this (flight|booking)/ })).toBeNull();
     expect(screen.getByLabelText("From (airport code)")).toHaveValue("BOS");
     expect(screen.getByRole("button", { name: "Add to my trips" })).toBeInTheDocument();
   });
@@ -1604,7 +1604,7 @@ describe("Review: several legs or bookings added by hand from one email", () => 
     const u = await openByHand();
     await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
     await u.type(within(screen.getAllByTestId("leg")[1]).getByLabelText("To (airport code)"), "SFO");
-    await u.click(screen.getByRole("button", { name: "Dismiss Flight 1 of 2" }));
+    await u.click(screen.getByRole("button", { name: "Dismiss this flight: Flight 1 of 2" }));
     expect(screen.queryByTestId("leg")).toBeNull();
     await u.keyboard("{Escape}");
     expect(await screen.findByRole("dialog", { name: "Discard changes?" })).toBeInTheDocument();
@@ -1613,7 +1613,7 @@ describe("Review: several legs or bookings added by hand from one email", () => 
   it("closes without asking once the added leg is dismissed again", async () => {
     const u = await openByHand();
     await u.click(screen.getByRole("button", { name: "Add another leg or booking" }));
-    await u.click(screen.getByRole("button", { name: "Dismiss Flight 2 of 2" }));
+    await u.click(screen.getByRole("button", { name: "Dismiss this flight: Flight 2 of 2" }));
     await u.keyboard("{Escape}");
     await settled();
     expect(discardAsked()).toBeNull();
@@ -1668,7 +1668,7 @@ describe("Review: the form's explanatory text is gone", () => {
   it.each(KINDS.flatMap((kind) => [[kind, "2026-10-17"], [kind, null]]))("the suggestion form for %s, received %s, shows none of it", async (kind, received) => {
     held = { matches: [], items: [item({ suggestions: [suggestionOf(kind)], received })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByRole("heading", { name: "Check this suggestion" })).toBeInTheDocument();
     noRemovedText();
     noDanglingDescribedBy();
@@ -1686,7 +1686,7 @@ describe("Review: the form's explanatory text is gone", () => {
   it("keeps the blank zone choice, the generic-reading note and the outlines of a suggestion", async () => {
     held = { matches: [], items: [item({ reason: "generic", suggestions: [suggestionOf("hotel")] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check what Waypoint read/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByPlaceholderText("Work it out from the address")).toBeInTheDocument();
     expect(screen.queryByText(/Waypoint read this from labelled lines in the email/)).toBeNull();
     expect(screen.getByLabelText(/^Address/)).toHaveClass("ring-2");
@@ -1695,7 +1695,7 @@ describe("Review: the form's explanatory text is gone", () => {
   it("still says what to enter when a stay has neither a time zone nor an address", async () => {
     held = { matches: [], items: [item({ suggestions: [suggestionOf("hotel", { address: undefined, start_zone: undefined })] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     expect(await screen.findByText(/Enter the hotel’s time zone/)).toBeInTheDocument();
     expect(calls.some(([p]) => p === "/api/segments")).toBe(false);
@@ -1711,7 +1711,7 @@ describe("Review: a suggestion that is a booking already in your trips", () => {
   const open = async (...legs: (typeof suggestion)[]) => {
     held = { matches: [], items: [item({ suggestions: legs.length ? legs : [suggestion] })], who: [], ai: false };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Check the AI’s/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Check (\d+ )?suggestions?: / }));
     await userEvent.click(screen.getByRole("button", { name: /^Add (to my trips|2 flights)$/ }));
   };
 
@@ -1834,11 +1834,11 @@ describe("Review as a queue of decisions", () => {
     expect(within(menu).getByText("More")).toBeInTheDocument();
     expect(within(row).getByLabelText("More actions for “Your itinerary”")).toBeInTheDocument();
     const mine = within(menu).getByRole("group", { name: "This email" });
-    expect(within(mine).getByRole("button", { name: "Ask AI about “Your itinerary”" })).toBeInTheDocument();
-    expect(within(mine).getByRole("button", { name: "Dismiss “Your itinerary”" })).toBeInTheDocument();
+    expect(within(mine).getByRole("button", { name: "Ask AI: “Your itinerary”" })).toBeInTheDocument();
+    expect(within(mine).getByRole("button", { name: "Dismiss: “Your itinerary”" })).toBeInTheDocument();
     expect(within(mine).queryByRole("button", { name: /ignore/ })).toBeNull();
     const future = within(menu).getByRole("group", { name: "All future mail from example-air.example" });
-    expect(within(future).getByRole("button", { name: "Not travel: ignore example-air.example" })).toBeInTheDocument();
+    expect(within(future).getByRole("button", { name: "Not travel: ignore this sender (example-air.example)" })).toBeInTheDocument();
     expect(within(future).queryByRole("button", { name: /Dismiss/ })).toBeNull();
   });
 
@@ -1847,7 +1847,7 @@ describe("Review as a queue of decisions", () => {
     render(ReviewPage);
     const menu = within(await screen.findByTestId("action-menu"));
     await userEvent.click(menu.getByText("More"));
-    await userEvent.click(menu.getByRole("button", { name: "Add “Your itinerary” by hand" }));
+    await userEvent.click(menu.getByRole("button", { name: "Add by hand instead: “Your itinerary”" }));
     expect(await screen.findByRole("dialog", { name: "Add this booking by hand" })).toBeInTheDocument();
   });
 
@@ -1932,7 +1932,7 @@ describe("Review's sheet on a wide screen", () => {
 
   it("shows the email beside the form, with no Hide the email button", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     const sheet = await screen.findByRole("dialog");
     expect(sheet).toHaveAttribute("data-split");
     expect(await within(sheet).findByText(/Your flight EX 410/)).toBeVisible();
@@ -1943,7 +1943,7 @@ describe("Review's sheet on a wide screen", () => {
   it("is not split below that width, and the email can be hidden there", async () => {
     viewport.split = false;
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     const sheet = await screen.findByRole("dialog");
     await userEvent.click(within(sheet).getByRole("button", { name: "Hide the email" }));
     expect(within(sheet).getByText(/Your flight EX 410/)).not.toBeVisible();
@@ -1958,12 +1958,12 @@ describe("Review's sheet on a phone", () => {
     held = { matches: [], items: [item({ id: 1, subject: "By hand" }), item({ id: 2, subject: "Suggested", suggestions: [SUGGESTION] })], who: [], ai: false };
     render(ReviewPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Add “By hand” by hand" }));
+    await u.click(await screen.findByRole("button", { name: "Add by hand: “By hand”" }));
     let sheet = await screen.findByRole("dialog");
     expect(within(sheet).getByRole("button", { name: "Email" })).toHaveAttribute("aria-pressed", "true");
     await u.click(within(sheet).getByRole("button", { name: "Cancel" }));
     await settled();
-    await u.click(screen.getByRole("button", { name: /Check the AI’s suggestion/ }));
+    await u.click(screen.getByRole("button", { name: /Check suggestion: / }));
     sheet = await screen.findByRole("dialog");
     expect(within(sheet).getByRole("button", { name: "Booking" })).toHaveAttribute("aria-pressed", "true");
     expect(within(sheet).getByLabelText("Confirmation code")).toBeVisible();
@@ -1973,7 +1973,7 @@ describe("Review's sheet on a phone", () => {
     held = { matches: [], items: [item({ id: 1, suggestions: [SUGGESTION] })], who: [], ai: false };
     render(ReviewPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: /Check the AI’s suggestion/ }));
+    await u.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     const sheet = await screen.findByRole("dialog");
     await u.click(within(sheet).getByRole("button", { name: "Email" }));
     expect(within(sheet).getByTestId("booking-fields")).not.toBeVisible();
@@ -1983,7 +1983,7 @@ describe("Review's sheet on a phone", () => {
 
   it("keeps the save action in a sticky bar at the bottom of the sheet", async () => {
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /Add .* by hand/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Add by hand: / }));
     const sheet = await screen.findByRole("dialog");
     const bar = within(sheet).getByTestId("form-actions");
     expect(bar).toHaveClass("review-actions");

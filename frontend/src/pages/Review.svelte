@@ -172,6 +172,7 @@
   }, { busy: (on) => (on ? asking_ai.add(item.id) : asking_ai.delete(item.id)) });
 
   let asking_all = $state(false);
+  const askWord = (item: ReviewItem) => asking_ai.has(item.id) ? "Asking…" : item.suggestions.length ? "Ask again" : "Ask AI";
   const askable = (items: ReviewItem[]) => review?.ai ? items.filter((i) => !i.suggestions.length && !asking_ai.has(i.id)) : [];
   const suggested = $derived(shown.filter((i) => i.suggestions.length > 0));
   const missing = $derived(shown.filter((i) => i.suggestions.length === 0));
@@ -434,7 +435,7 @@
         <fieldset class="flex min-w-0 flex-col gap-4 rounded-xl border border-border p-3" data-testid="leg">
           <legend class="px-1 text-sm font-medium">{legTitle(leg, n)}</legend>
           {@render legFields(leg)}
-          <div><Button type="button" variant="outline" size="sm" disabled={saving} onclick={() => dropLeg(leg)} aria-label={`Dismiss ${legTitle(leg, n)}`}>Dismiss this {leg.kind === "flight" ? "flight" : "booking"}</Button></div>
+          <div><Button type="button" variant="outline" size="sm" disabled={saving} onclick={() => dropLeg(leg)} aria-label={`Dismiss this ${leg.kind === "flight" ? "flight" : "booking"}: ${legTitle(leg, n)}`}>Dismiss this {leg.kind === "flight" ? "flight" : "booking"}</Button></div>
         </fieldset>
       {/each}
     {:else if lead}
@@ -499,23 +500,23 @@
     </div>
     <div class="flex basis-full flex-wrap items-center gap-2">
       {#if item.suggestions.length}
-        <Button size="sm" onclick={() => startAdd(item, true)} aria-label={item.reason === "generic" ? `Check what Waypoint read from “${subject(item)}”` : item.suggestions.length > 1 ? `Check the AI’s ${item.suggestions.length} suggestions for “${subject(item)}”` : `Check the AI’s suggestion for “${subject(item)}”`}>{item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}</Button>
+        <Button size="sm" onclick={() => startAdd(item, true)} aria-label={`${item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}: “${subject(item)}”`}>{item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}</Button>
       {:else}
-        <Button size="sm" onclick={() => startAdd(item)} aria-label={`Add “${subject(item)}” by hand`}>Add by hand</Button>
+        <Button size="sm" onclick={() => startAdd(item)} aria-label={`Add by hand: “${subject(item)}”`}>Add by hand</Button>
       {/if}
-      <Button variant="outline" size="sm" aria-expanded={viewing === item.id} onclick={() => toggleView(item)} aria-label={`View email “${subject(item)}”`}>View email</Button>
+      <Button variant="outline" size="sm" aria-expanded={viewing === item.id} onclick={() => toggleView(item)} aria-label={`View email: “${subject(item)}”`}>View email</Button>
       <ActionMenu label={`More actions for “${subject(item)}”`} bind:button={menuButtons[item.id]}>
         {#snippet children(close)}
           <div class="flex flex-col items-stretch gap-1" role="group" aria-label="This email">
             <p class="eyebrow px-1">This email</p>
-            {#if item.suggestions.length}<Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); startAdd(item); }} aria-label={`Add “${subject(item)}” by hand`}>Add by hand instead</Button>{/if}
-            {#if review?.ai && item.reason !== "generic"}<Button variant="ghost" size="sm" class="justify-start" disabled={asking_all || asking_ai.has(item.id)} onclick={() => { close(); void askAi(item); }} aria-label={`Ask AI about “${subject(item)}”`}>{asking_ai.has(item.id) ? "Asking…" : item.suggestions.length ? "Ask again" : "Ask AI"}</Button>{/if}
-            <Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); dismissing = item; dismissAsking = true; }} aria-label={item.count > 1 ? `Dismiss all ${item.count} emails about “${subject(item)}”` : `Dismiss “${subject(item)}”`}>{item.count > 1 ? "Dismiss all" : "Dismiss"}</Button>
+            {#if item.suggestions.length}<Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); startAdd(item); }} aria-label={`Add by hand instead: “${subject(item)}”`}>Add by hand instead</Button>{/if}
+            {#if review?.ai && item.reason !== "generic"}<Button variant="ghost" size="sm" class="justify-start" disabled={asking_all || asking_ai.has(item.id)} onclick={() => { close(); void askAi(item); }} aria-label={`${askWord(item)}: “${subject(item)}”`}>{askWord(item)}</Button>{/if}
+            <Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); dismissing = item; dismissAsking = true; }} aria-label={item.count > 1 ? `Dismiss all: ${item.count} emails about “${subject(item)}”` : `Dismiss: “${subject(item)}”`}>{item.count > 1 ? "Dismiss all" : "Dismiss"}</Button>
           </div>
           {#if item.sender_domain && item.mine}
             <div class="flex flex-col items-stretch gap-1 border-t border-border pt-2" role="group" aria-label={`All future mail from ${item.sender_domain}`}>
               <p class="eyebrow break-words px-1">All future mail from {item.sender_domain}</p>
-              <Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); ignoring = item; asking = true; }} aria-label={`Not travel: ignore ${item.sender_domain}`}>Not travel: ignore this sender</Button>
+              <Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); ignoring = item; asking = true; }} aria-label={`Not travel: ignore this sender (${item.sender_domain})`}>Not travel: ignore this sender</Button>
             </div>
           {/if}
         {/snippet}
@@ -611,7 +612,7 @@
                         <p class="break-words text-sm font-medium">{what(c)}</p>
                         <p class="break-words text-sm text-muted-foreground">{c.trip_name}</p>
                       </div>
-                      <Button size="sm" disabled={settling === matchKey(m)} onclick={() => settleMatch(m, c.segment_id)} aria-label={`It’s ${what(c)}`}>It’s this one</Button>
+                      <Button size="sm" disabled={settling === matchKey(m)} onclick={() => settleMatch(m, c.segment_id)} aria-label={`It’s this one: ${what(c)}`}>It’s this one</Button>
                     </li>
                   {/each}
                 </ul>
@@ -649,7 +650,7 @@
                   <Input bind:value={guestName[w.id]} maxlength={100} autocomplete="off" placeholder="Their name" class="sm:w-48" aria-label={`Name for ${w.name}`} />
                 {/if}
                 <Button size="sm" disabled={!chosen[w.id] || (chosen[w.id] === "new" && !guestName[w.id]?.trim()) || matching === w.id} onclick={() => match(w)}
-                  aria-label={`Match ${w.name}`}>{matching === w.id ? "Matching…" : "That’s them"}</Button>
+                  aria-label={`${matching === w.id ? "Matching…" : "That’s them"}: ${w.name}`}>{matching === w.id ? "Matching…" : "That’s them"}</Button>
               </div>
             </li>
           {/each}
