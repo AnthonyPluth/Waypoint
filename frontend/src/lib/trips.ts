@@ -456,7 +456,7 @@ export function stubWords(trip: Pick<Trip, "start_date" | "end_date">, today: st
   return { ...stub, note: `to ${monthDay(end)}` };
 }
 
-export function rangeLabel(trip: Pick<Trip, "start_date" | "end_date">): string {
+export function tripRangeLabel(trip: Pick<Trip, "start_date" | "end_date">): string {
   const start = trip.start_date ?? trip.end_date;
   if (!start) return "No dates";
   const end = trip.start_date ? trip.end_date : null;
@@ -466,7 +466,7 @@ export function rangeLabel(trip: Pick<Trip, "start_date" | "end_date">): string 
 }
 
 export function stripLabel(trip: Pick<Trip, "start_date" | "end_date">, today: string): string {
-  const label = rangeLabel(trip).toUpperCase();
+  const label = tripRangeLabel(trip).toUpperCase();
   return trip.start_date && trip.start_date.slice(0, 4) !== today.slice(0, 4) ? `${label}, ${trip.start_date.slice(0, 4)}` : label;
 }
 
