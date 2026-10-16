@@ -9,12 +9,19 @@
   import { Input } from "$lib/components/ui/input";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import TripKinds from "$lib/components/TripKinds.svelte";
+  import { avatarTone } from "$lib/avatar";
+  import { OptionsMenu } from "$lib/components/ui/options-menu";
+  import { Sheet } from "$lib/components/ui/sheet";
+  import { initials } from "$lib/nav";
+  import { viewport } from "$lib/phone.svelte";
   import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { panes } from "$lib/panes.svelte";
   import { blank } from "$lib/segment-form";
   import { dateLabel, dayIn, inYear, matchesText, splitTrips, tripYears, viewerZone, type TripWhen } from "$lib/trips";
   import TripPane from "./Trip.svelte";
   import Plus from "@lucide/svelte/icons/plus";
+  import Search from "@lucide/svelte/icons/search";
+  import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
 
   let trips = $state<Trip[] | null>(null);
   let people = $state<Person[]>([]);
@@ -48,12 +55,6 @@
     return q.toString();
   };
   const refine = (change: Record<string, string | number | null>) => leave(() => setQuery(queryFor(change)));
-  const pick = (key: string) => (e: Event) => {
-    const field = e.currentTarget as HTMLSelectElement;
-    const v = field.value;
-    field.value = String(({ who, when, year } as Record<string, unknown>)[key] ?? "");
-    refine({ [key]: v || null });
-  };
   const search = (e: Event) => {
     const field = e.currentTarget as HTMLInputElement;
     const v = field.value;
@@ -62,14 +63,18 @@
   const clearFilters = () => refine({ who: null, q: null, when: null, year: null });
   const filtered = $derived(trips && trips.filter((t) => (!who || t.segments.some((s) => s.travelers.some((x) => x.person_id === who))) && matchesText(t, text) && (!year || inYear(t, year))));
   const count = (n: number) => `${n} ${n === 1 ? "trip" : "trips"}`;
+  let filtersOpen = $state(false);
   const years = $derived(trips ? tripYears(trips) : []);
   const filtering = $derived(!!(who || text || when || year));
+  const today = () => dayIn(Date.now(), viewerZone());
+  const comingUp = $derived(trips ? splitTrips(trips, today()).upcoming.length : 0);
   const shown = $derived.by(() => {
     if (!filtered) return null;
-    const split = splitTrips(filtered, dayIn(Date.now(), viewerZone()));
+    const split = splitTrips(filtered, today());
     return { upcoming: when === "past" ? [] : split.upcoming, past: when === "upcoming" ? [] : split.past };
   });
   const everyTrip = $derived(shown ? [...shown.upcoming, ...shown.past] : []);
+  const summary = $derived(trips ? (filtering ? `${everyTrip.length} of ${count(trips.length)}` : `${count(trips.length)}${comingUp ? ` · ${comingUp} coming up` : ""}`) : "");
   const selected = $derived(everyTrip.find((t) => t.id === tripParam) ?? everyTrip[0] ?? null);
   const reloaded = (movedTo?: number) => { if (movedTo) setQuery(queryFor({ trip: movedTo })); void load(); };
   const choose = (e: MouseEvent, t: Trip) => {
@@ -79,12 +84,49 @@
   };
   const names = (t: Trip) => [...new Set(t.segments.flatMap((s) => s.travelers.map((x) => x.name)))].join(", ");
   const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
-  const selectClass = "border-input bg-secondary rounded-xl border px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm";
+  const chipClass = (on: boolean) => `inline-flex min-h-10 phone:min-h-11 items-center rounded-full border px-4 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${on ? "border-primary bg-primary/15 text-primary" : "border-input bg-secondary hover:bg-input/60"}`;
 </script>
 
-<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-4xl font-bold tracking-tight">Trips</h1>
-  {#if trips && !adding}<div class="flex flex-wrap gap-2"><Button onclick={() => (adding = "booking")}><Plus /> Add a booking</Button><Button variant="outline" onclick={() => (adding = "past")}>Add a past trip</Button></div>{/if}
+{#snippet yearChips()}
+  {#if years.length > 1 || year}
+    <div class="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+      <span class="eyebrow" aria-hidden="true">Year</span>
+      <div class="flex flex-wrap gap-2" role="group" aria-label="Year">
+        {#each years as y (y)}
+          <button type="button" class={chipClass(year === y)} aria-pressed={year === y} onclick={() => refine({ year: year === y ? null : y })}>{y}</button>
+        {/each}
+      </div>
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet travellers()}
+  {#if people.length > 1}
+    <div class="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+      <span class="eyebrow" aria-hidden="true">Travelling</span>
+      <div class="flex flex-wrap gap-2" role="group" aria-label="Travelling">
+        {#each people as p (p.id)}
+          {@const on = who === p.id}
+          <button type="button" class={`inline-flex size-10 phone:size-11 items-center justify-center rounded-full text-sm font-semibold outline-none before:content-[attr(data-initials)] transition-opacity focus-visible:ring-[3px] focus-visible:ring-ring/50 ${avatarTone({ id: p.id, name: p.display_name })} ${on ? "ring-2 ring-primary" : who ? "opacity-60" : ""}`}
+            aria-label={p.display_name} data-initials={initials(p.display_name)} aria-pressed={on} onclick={() => refine({ who: on ? null : p.id })}></button>
+        {/each}
+      </div>
+    </div>
+  {/if}
+{/snippet}
+
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div>
+    {#if trips && trips.length > 0}<p class="eyebrow mb-1.5" role="status" aria-live="polite">{summary}</p>{/if}
+    <h1 class="text-4xl font-bold tracking-tight">Trips</h1>
+  </div>
+  {#if trips && !adding}
+    {#if viewport.phone}
+      <OptionsMenu label="Add a booking" text="Add" icon={Plus} iconOnly variant="default" items={[{ label: "Add a booking", onselect: () => (adding = "booking") }, { label: "Add a past trip", onselect: () => (adding = "past") }]} />
+    {:else}
+      <div class="flex flex-wrap gap-2"><Button variant="outline" onclick={() => (adding = "past")}>Add a past trip</Button><Button onclick={() => (adding = "booking")}><Plus /> Add a booking</Button></div>
+    {/if}
+  {/if}
 </div>
 
 {#if adding && trips}
@@ -99,30 +141,41 @@
   <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading"></div>
 {:else}
   {#if trips && trips.length > 0}
-    <form class="mb-6 flex flex-wrap items-end gap-3" role="search" aria-label="Find a trip" onsubmit={(e) => e.preventDefault()}>
-      <label class="flex min-w-48 flex-1 flex-col gap-1.5 text-sm sm:max-w-sm"><span class="font-medium">Search</span>
-        <Input type="search" value={text} oninput={search} placeholder="Name, destination or airline" autocomplete="off" /></label>
-      <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Show</span>
-        <select class={selectClass} value={when ?? ""} onchange={pick("when")}>
-          <option value="">All trips</option><option value="upcoming">Upcoming</option><option value="past">Past</option>
-        </select></label>
-      {#if years.length > 1 || year}
-        <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Year</span>
-          <select class={selectClass} value={year ?? ""} onchange={pick("year")}>
-            <option value="">Any year</option>
-            {#each years as y (y)}<option value={y}>{y}</option>{/each}
-          </select></label>
+    <form class="mb-6 flex flex-col gap-3 rounded-[18px] border border-border bg-black/25 p-3 md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-3 md:p-4" role="search" aria-label="Find a trip" onsubmit={(e) => e.preventDefault()}>
+      <div class="relative w-full md:max-w-sm md:min-w-56 md:flex-1">
+        <label for="trip-search" class="sr-only">Search trips</label>
+        <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <Input id="trip-search" type="search" class="pl-9 phone:h-11" value={text} oninput={search} placeholder="Name, destination or airline" autocomplete="off" />
+      </div>
+      <div class="flex items-center gap-2 md:gap-3">
+        <span class="eyebrow hidden md:inline" aria-hidden="true">Show</span>
+        <div class="flex flex-1 overflow-hidden rounded-xl border border-input bg-secondary" role="group" aria-label="Show">
+          {#each [["All", null], ["Upcoming", "upcoming"], ["Past", "past"]] as const as [label, value] (label)}
+            <button type="button" class={`min-h-10 phone:min-h-11 flex-1 px-4 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset ${when === value ? "bg-primary text-primary-foreground" : "hover:bg-input/60"}`}
+              aria-pressed={when === value} onclick={() => refine({ when: value })}>{label}</button>
+          {/each}
+        </div>
+        {#if viewport.phone && (years.length > 1 || year || people.length > 1)}
+          <Button type="button" variant="outline" size="icon" class="relative size-[46px]" onclick={() => (filtersOpen = true)}>
+            <SlidersHorizontal /><span class="sr-only">Filters{year || who ? ", in use" : ""}</span>
+            {#if year || who}<span class="absolute top-2 right-2 size-2 rounded-full bg-primary" data-testid="filters-dot" aria-hidden="true"></span>{/if}
+          </Button>
+        {/if}
+      </div>
+      {#if !viewport.phone}
+        {@render yearChips()}
+        {@render travellers()}
       {/if}
-      {#if people.length > 1}
-        <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Travelling</span>
-          <select class={selectClass} value={who ?? ""} onchange={pick("who")}>
-            <option value="">Everyone</option>
-            {#each people as p (p.id)}<option value={p.id}>{p.display_name}</option>{/each}
-          </select></label>
-      {/if}
-      {#if filtering}<Button type="button" variant="outline" onclick={clearFilters}>Clear filters</Button>{/if}
+      {#if filtering}<Button type="button" variant="outline" class="md:ml-auto" onclick={clearFilters}>Clear filters</Button>{/if}
     </form>
-    <p class="mb-4 text-sm text-muted-foreground" role="status" aria-live="polite">{filtering ? `${everyTrip.length} of ${count(trips.length)}` : count(trips.length)}</p>
+    {#if viewport.phone}
+      <Sheet bind:open={filtersOpen} title="Filters">
+        <div class="flex flex-col gap-5">
+          {@render yearChips()}
+          {@render travellers()}
+        </div>
+      </Sheet>
+    {/if}
   {/if}
   {#if shown.upcoming.length === 0 && shown.past.length === 0}
     <p class="text-muted-foreground">{filtering ? (who && !text && !when && !year ? "No trips with them." : "No trips match.") : "No trips yet — they’ll appear here once Waypoint can read your confirmation emails, or when you add a booking."}</p>

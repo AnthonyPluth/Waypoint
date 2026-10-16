@@ -7,7 +7,12 @@
   import { Button } from "$lib/components/ui/button";
   import { cn } from "$lib/utils";
 
-  let { label, text, items, size = "default", align = "right", up = false }: { label: string; text: string; items: OptionsMenuItem[]; size?: "default" | "sm"; align?: "left" | "right"; up?: boolean } = $props();
+  import type { Component } from "svelte";
+
+  let { label, text, items, size = "default", align = "right", up = false, icon: Icon = Ellipsis, iconOnly = false, variant = "outline" }: {
+    label: string; text: string; items: OptionsMenuItem[]; size?: "default" | "sm"; align?: "left" | "right"; up?: boolean;
+    icon?: Component; iconOnly?: boolean; variant?: "outline" | "default";
+  } = $props();
 
   const id = $props.id();
   let open = $state(false);
@@ -42,7 +47,7 @@
 <svelte:window onkeydown={onKeydown} onpointerdown={onPointerDown} />
 
 <div class="relative" onfocusout={onFocusOut}>
-  <Button bind:ref={button} variant="outline" {size} aria-label={label} aria-expanded={open} aria-controls={id} onclick={() => (open = !open)}><Ellipsis /> {text}</Button>
+  <Button bind:ref={button} {variant} size={iconOnly ? "icon" : size} aria-label={label} aria-expanded={open} aria-controls={id} onclick={() => (open = !open)}><Icon />{#if !iconOnly} {text}{/if}</Button>
   {#if open}
     <div bind:this={menu} {id} role="group" aria-label={label} class={cn("absolute z-20 flex min-w-48 max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-border bg-surface-2 p-1.5 shadow-elevation-3", up ? "bottom-full mb-2" : "top-full mt-2", align === "right" ? "right-0" : "left-0")}>
       {#each items as item (item.label)}
