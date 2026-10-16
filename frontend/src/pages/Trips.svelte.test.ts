@@ -68,9 +68,12 @@ describe("Trips", () => {
   it("lists the trips still to come, soonest first, and the past ones apart", async () => {
     render(Trips);
     const upcoming = await screen.findByRole("list", { name: "Upcoming trips" });
-    expect(within(upcoming).getAllByRole("link").map((a) => a.textContent?.split(" ")[0] + " " + a.textContent?.split(" ")[1] + " " + a.textContent?.split(" ")[2])).toEqual(["Trip to London", "Trip to Auckland"]);
+    const links = within(upcoming).getAllByRole("link");
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveTextContent("Trip to London");
+    expect(links[1]).toHaveTextContent("Trip to Auckland");
     expect(within(upcoming).getAllByRole("link")[0]).toHaveAttribute("href", "#trip/1");
-    expect(within(screen.getByRole("list", { name: "Past trips" })).getByRole("link")).toHaveTextContent("Trip to Orlando");
+    expect(within(screen.getByRole("list", { name: "Past trips in 2026" })).getByRole("link")).toHaveTextContent("Trip to Orlando");
   });
 
   it("filters by traveller, and keeps the filter in the address", async () => {
@@ -638,5 +641,124 @@ describe("on a phone", () => {
     await u.click(within(screen.getByRole("group", { name: "Add a booking" })).getByRole("button", { name: "Add a past trip" }));
     expect(await screen.findByRole("button", { name: "Add booking" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add a booking" })).toBeNull();
+  });
+});
+
+const stay = (id: number, name: string, start: string, end: string, extra: Partial<Trip> = {}) =>
+  trip([segment({ id, trip_id: id, kind: "hotel", start_local: `${start}T15:00`, end_local: `${end}T11:00`, origin: null, destination: null })], { id, name, destination: "Portugal", ...extra });
+const link = (name: string) => screen.getByRole("link", { name: new RegExp(name) });
+const highlighted = () => screen.getAllByRole("link").filter((a) => a.className.includes("border-primary/35")).map((a) => a.textContent);
+
+describe("ticket cards for upcoming trips", () => {
+  it("writes the stub for a trip within a month, across months, in another year and without dates", async () => {
+    serve([stay(1, "Same month", "2026-10-18", "2026-10-27"), stay(2, "Across months", "2026-10-30", "2026-11-02"), stay(3, "Another year", "2027-03-04", "2027-03-09"), stay(4, "Undated", "2026-12-01", "2026-12-02", { start_date: null, end_date: null })]);
+    render(Trips);
+    await screen.findByText("Same month");
+    const stub = (name: string) => within(link(name)).getByTestId("stub");
+    expect(stub("Same month")).toHaveTextContent("Oct 18 to 27");
+    expect(stub("Across months")).toHaveTextContent("Oct 30 to Nov 2");
+    expect(stub("Another year")).toHaveTextContent("Mar 4 2027");
+    expect(stub("Undated")).toHaveTextContent("No dates");
+    expect(link("Same month")).toHaveTextContent("Portugal · 9 nights");
+  });
+
+  it("says in the pill how soon a trip starts", async () => {
+    serve([stay(1, "On now", "2026-10-03", "2026-10-09"), stay(2, "Today", "2026-10-05", "2026-10-08"), stay(3, "Tomorrow", "2026-10-06", "2026-10-08"), stay(4, "Soon", "2026-10-07", "2026-10-08")]);
+    render(Trips);
+    await screen.findByText("Soon");
+    const pill = (name: string) => within(link(name)).getByTestId("pill").textContent;
+    expect([pill("On now"), pill("Today"), pill("Tomorrow"), pill("Soon")]).toEqual(["Under way", "Today", "Tomorrow", "In 2 days"]);
+  });
+
+  it("highlights only the soonest trip", async () => {
+    serve([stay(1, "Later", "2026-12-01", "2026-12-05"), stay(2, "Soonest", "2026-10-18", "2026-10-27"), stay(3, "Last", "2027-01-02", "2027-01-05")]);
+    render(Trips);
+    await screen.findByText("Soonest");
+    expect(highlighted()).toHaveLength(1);
+    expect(highlighted()[0]).toContain("Soonest");
+  });
+
+  it("shows the travellers as an avatar stack", async () => {
+    render(Trips);
+    const london = await screen.findByRole("link", { name: /Trip to London/ });
+    expect(within(london).getByTestId("avatar-stack")).toHaveAttribute("aria-label", "Jane Doe, Sam Doe");
+  });
+});
+
+describe("past trips by year", () => {
+  const flown = (id: number, name: string, start: string, end: string, flights = 1) =>
+    trip(Array.from({ length: flights }, (_, i) => segment({ id: id * 10 + i, trip_id: id, start_local: `${start}T09:00`, end_local: `${end}T10:00` })), { id, name, destination: "Nags Head, NC" });
+  const history = () => [
+    flown(1, "Beach", "2026-08-08", "2026-08-15", 2),
+    flown(2, "Spring", "2026-03-02", "2026-03-05"),
+    flown(3, "New Year", "2025-12-29", "2026-01-03"),
+    flown(4, "Old", "2024-06-01", "2024-06-02"),
+  ];
+
+  it("groups by the year a trip started, newest first, with totals that leave out a part that is 0", async () => {
+    serve(history());
+    render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    expect(screen.getByRole("heading", { level: 3, name: "2026" }).parentElement).toHaveTextContent("2 trips · 10 nights · 3 flights");
+    expect(screen.getByRole("heading", { level: 3, name: "2025" }).parentElement).toHaveTextContent("1 trip · 5 nights · 1 flight");
+    expect(screen.getByRole("heading", { level: 3, name: "2024" }).parentElement).toHaveTextContent("1 trip · 1 night · 1 flight");
+    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["2026", "2025", "2024"]);
+    expect(within(screen.getByRole("list", { name: "Past trips in 2025" })).getByRole("link")).toHaveTextContent("New Year");
+    expect(within(screen.getByRole("list", { name: "Past trips in 2026" })).getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual(["#trip/1", "#trip/2"]);
+    expect(screen.getByText("Aug 8 – 15")).toBeInTheDocument();
+    expect(screen.getByText("Dec 29 – Jan 3")).toBeInTheDocument();
+  });
+
+  it("leaves out flights when a year has none", async () => {
+    serve([stay(1, "Stay", "2026-03-02", "2026-03-05")]);
+    render(Trips);
+    expect((await screen.findByRole("heading", { level: 3, name: "2026" })).parentElement).toHaveTextContent("1 trip · 3 nights");
+    expect(screen.queryByText(/flight/)).toBeNull();
+  });
+
+  it("shows only the newest year on a phone, and reveals the next ones in turn", async () => {
+    viewport.phone = true;
+    serve(history());
+    render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    expect(screen.queryByRole("list", { name: "Past trips in 2025" })).toBeNull();
+    expect(screen.getByText("Aug 8 – 15 · Nags Head, NC")).toBeInTheDocument();
+    await user().click(screen.getByRole("button", { name: "Show 2025" }));
+    expect(screen.getByRole("list", { name: "Past trips in 2025" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Past trips in 2024" })).toBeNull();
+    await user().click(screen.getByRole("button", { name: "Show 2024" }));
+    expect(screen.getByRole("list", { name: "Past trips in 2024" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Show/ })).toBeNull();
+  });
+});
+
+describe("trip cards on a phone and in two panes", () => {
+  it("shows the soonest trip as a full card with a header strip, and the rest as compact rows", async () => {
+    viewport.phone = true;
+    serve([stay(1, "Soonest", "2026-10-18", "2026-10-27"), stay(2, "Next", "2026-11-14", "2026-11-18")]);
+    render(Trips);
+    await screen.findByText("Soonest");
+    expect(within(link("Soonest")).getByTestId("stub")).toHaveTextContent("OCT 18 – 27 In 13 days");
+    expect(link("Next")).toHaveTextContent("4 nights · in 40 days");
+    expect(within(link("Next")).queryByTestId("pill")).toBeNull();
+  });
+
+  it("uses the compact row in two panes and keeps the picked trip current with a highlighted border", async () => {
+    panes.two = true;
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "/api/people") return { people: [jane, sam] };
+      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+      const one = /^\/api\/trips\/(\d+)$/.exec(path);
+      if (one) return [london, auckland].find((t) => t.id === Number(one[1]));
+      return { trips: [london, auckland] };
+    });
+    render(Trips);
+    await screen.findByRole("region", { name: "Selected trip" });
+    const first = link("Trip to London");
+    expect(first).toHaveAttribute("aria-current", "true");
+    expect(first.className).toContain("border-primary");
+    expect(first.className).not.toContain("border-primary/35");
+    expect(within(first).queryByTestId("pill")).toBeNull();
+    expect(link("Trip to Auckland")).not.toHaveAttribute("aria-current");
   });
 });

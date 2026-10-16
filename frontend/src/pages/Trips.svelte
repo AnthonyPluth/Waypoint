@@ -8,6 +8,8 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
+  import AvatarStack from "$lib/components/AvatarStack.svelte";
+  import TripCard from "$lib/components/TripCard.svelte";
   import TripKinds from "$lib/components/TripKinds.svelte";
   import { avatarTone } from "$lib/avatar";
   import { OptionsMenu } from "$lib/components/ui/options-menu";
@@ -17,8 +19,9 @@
   import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { panes } from "$lib/panes.svelte";
   import { blank } from "$lib/segment-form";
-  import { dateLabel, dayIn, inYear, matchesText, splitTrips, tripYears, viewerZone, type TripWhen } from "$lib/trips";
+  import { dayIn, inYear, matchesText, pastByYear, rangeLabel, splitTrips, tripPeople, tripYears, viewerZone, type TripWhen } from "$lib/trips";
   import TripPane from "./Trip.svelte";
+  import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Plus from "@lucide/svelte/icons/plus";
   import Search from "@lucide/svelte/icons/search";
   import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
@@ -82,8 +85,7 @@
     e.preventDefault();
     leave(() => setQuery(queryFor({ trip: t.id })));
   };
-  const names = (t: Trip) => [...new Set(t.segments.flatMap((s) => s.travelers.map((x) => x.name)))].join(", ");
-  const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
+  let revealed = $state(1);
   const chipClass = (on: boolean) => `inline-flex min-h-10 phone:min-h-11 items-center rounded-full border px-4 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${on ? "border-primary bg-primary/15 text-primary" : "border-input bg-secondary hover:bg-input/60"}`;
 </script>
 
@@ -180,28 +182,65 @@
   {#if shown.upcoming.length === 0 && shown.past.length === 0}
     <p class="text-muted-foreground">{filtering ? (who && !text && !when && !year ? "No trips with them." : "No trips match.") : "No trips yet — they’ll appear here once Waypoint can read your confirmation emails, or when you add a booking."}</p>
   {/if}
+  {#snippet upcomingList(group: Trip[])}
+    {@const day = today()}
+    {@const phoneList = viewport.phone && !panes.two}
+    {@const featuredId = !panes.two && group[0]?.start_date ? group[0].id : null}
+    <ul class={panes.two ? "flex flex-col gap-2" : phoneList ? "flex flex-col gap-2.5" : "grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-[14px]"} aria-label="Upcoming trips">
+      {#each group as t, i (t.id)}
+        <li><TripCard trip={t} today={day} form={panes.two ? "row" : phoneList ? (i === 0 ? "hero" : "row") : "card"} featured={t.id === featuredId || (phoneList && i === 0 && !!t.start_date)} current={panes.two && selected?.id === t.id} onclick={(e) => choose(e, t)} /></li>
+      {/each}
+    </ul>
+  {/snippet}
+  {#snippet pastList(group: Trip[])}
+    {@const groups = pastByYear(group)}
+    {@const compact = viewport.phone || panes.two}
+    {@const visible = viewport.phone ? groups.slice(0, revealed) : groups}
+    <div class="flex flex-col gap-4">
+      {#each visible as g (g.year)}
+        <div class="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border px-4 py-3">
+            <h3 class="text-lg font-bold tracking-tight">{g.year}</h3>
+            <span class="text-sm text-muted-foreground">{g.totals}</span>
+          </div>
+          <ul aria-label={`Past trips in ${g.year}`}>
+            {#each g.trips as t (t.id)}
+              {@const current = panes.two && selected?.id === t.id}
+              <li class="border-b border-border last:border-b-0">
+                <a class="group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-3 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-inset {current ? 'bg-surface-2 ring-1 ring-primary ring-inset' : ''}"
+                  href={`#trip/${t.id}`} aria-current={current ? "true" : undefined} onclick={(e) => choose(e, t)}>
+                  {#if compact}
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate font-semibold">{t.name}</span>
+                      <span class="block truncate text-sm text-muted-foreground">{[rangeLabel(t), t.destination].filter(Boolean).join(" · ")}</span>
+                    </span>
+                  {:else}
+                    <span class="mono w-32 shrink-0 text-sm text-muted-foreground">{rangeLabel(t)}</span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate font-semibold">{t.name}</span>
+                      {#if t.destination}<span class="block truncate text-sm text-muted-foreground">{t.destination}</span>{/if}
+                    </span>
+                    <TripKinds trip={t} />
+                    <AvatarStack people={tripPeople(t)} />
+                  {/if}
+                  <ChevronRight class="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" aria-hidden="true" />
+                </a>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/each}
+      {#if viewport.phone && revealed < groups.length}
+        <button type="button" class="self-start rounded-md px-1 py-2 text-sm font-medium text-primary outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" onclick={() => (revealed += 1)}>Show {groups[revealed].year}</button>
+      {/if}
+    </div>
+  {/snippet}
   {#snippet list()}
     {#each [["Upcoming", shown.upcoming], ["Past", shown.past]] as const as [title, group] (title)}
       {#if group.length}
         <section class="mb-8" aria-labelledby={`trips-${title}`}>
           <h2 id={`trips-${title}`} class="eyebrow mb-2">{title}</h2>
-          <ul class={panes.two ? "flex flex-col gap-3" : "grid gap-3 md:grid-cols-2"} aria-label={`${title} trips`}>
-            {#each group as t (t.id)}
-              {@const current = panes.two && selected?.id === t.id}
-              <li>
-                <a class="block h-full rounded-2xl border bg-card p-4 shadow-card transition-colors hover:bg-surface-3 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {current ? 'border-primary bg-surface-2' : 'border-border'}"
-                  href={`#trip/${t.id}`} aria-current={current ? "true" : undefined} onclick={(e) => choose(e, t)}>
-                  <span class="flex items-start justify-between gap-3">
-                    <span class="min-w-0 break-words text-lg font-bold tracking-tight">{t.name}</span>
-                    <TripKinds trip={t} />
-                  </span>
-                  <span class="eyebrow mt-1.5 block">{dates(t)}</span>
-                  {#if t.destination}<span class="block text-sm text-muted-foreground">{t.destination}</span>{/if}
-                  {#if names(t)}<span class="mt-2 block break-words text-sm text-muted-foreground">{names(t)}</span>{/if}
-                </a>
-              </li>
-            {/each}
-          </ul>
+          {#if title === "Upcoming"}{@render upcomingList(group)}{:else}{@render pastList(group)}{/if}
         </section>
       {/if}
     {/each}
