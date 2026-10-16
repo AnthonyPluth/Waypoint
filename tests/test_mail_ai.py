@@ -739,11 +739,11 @@ class ScanTests(ScanAiCase):
         self.assertEqual(self.segments(), [])
         self.assertEqual(len(self.fake.requests), 1)
 
-    def test_only_the_review_queue_is_sent_never_a_booking_that_was_read(self):
+    def test_a_booking_that_was_read_stays_as_read_and_the_ai_adds_nothing_to_the_queue(self):
         self.turn_on()
         self.put("flight_jsonld", "hotel_jsonld")
         self.assertEqual(self.scan().bookings, 2)
-        self.assertEqual(self.fake.requests, [])
+        self.assertEqual((len(self.segments()), self.items()), (2, []))
 
     def test_the_request_carries_the_body_but_none_of_the_ids_and_nothing_else_leaks(self):
         os.environ[ai.KEY_ENV] = KEY

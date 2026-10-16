@@ -94,6 +94,15 @@ def fields(conn: db.Connection, b: extract.Booking) -> trips.SegmentIn | None:
     return out
 
 
+EXTRAS = {"flight": ("flight_number", "cabin"), "hotel": ("address", "phone"), "car": ("address", "phone"), "train": ("address",),
+          "cruise": ("ship", "room", "deck"), "parking": ("address",)}
+
+
+def lacks_details(b: extract.Booking) -> bool:
+    have = dict(b.details)
+    return b.price is None or any(not have.get(k) for k in EXTRAS.get(b.kind, ()))
+
+
 def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:
     out: ai.Suggestion = {"kind": b.kind, "start_local": b.start, "end_local": b.end, "origin": b.origin or "", "sources": dict(b.generic)}
     if b.provider:
