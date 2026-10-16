@@ -7,3 +7,4 @@ export async function turnOnOffline(): Promise<null> { return null; }
 export async function switchSaving(_on: boolean): Promise<void> {}
 export function clearOnDenied(): void {}
 export const askAboutOffline = (): boolean => false;
+export const offlineWorking = (): boolean => false;

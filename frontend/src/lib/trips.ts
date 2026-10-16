@@ -57,6 +57,30 @@ export function dayShiftWords(from: string | null, to: string | null): string {
 }
 export const dateLabel = (day: string): string => asUtc(`${day}T00:00`).toLocaleDateString(locale(), { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
 
+export const todayLabel = (ms: number, zone: string, short: boolean): string =>
+  new Date(ms).toLocaleDateString(locale(), { timeZone: zone, weekday: short ? "short" : "long", month: short ? "short" : "long", day: "numeric" });
+
+export function dayParts(day: string): { weekday: string; day: string; month: string } {
+  const at = asUtc(`${day}T00:00`);
+  const part = (o: Intl.DateTimeFormatOptions) => at.toLocaleDateString(locale(), { timeZone: "UTC", ...o });
+  return { weekday: part({ weekday: "short" }), day: part({ day: "numeric" }), month: part({ month: "short" }) };
+}
+
+export const nightsLabel = (from: string, to: string): string => {
+  const nights = daysBetween(`${from}T00:00`, `${to}T00:00`);
+  return nights > 0 ? `${nights} ${nights === 1 ? "night" : "nights"}` : "";
+};
+
+export function rangeLabel(from: string, to: string): string {
+  const part = (day: string, o: Intl.DateTimeFormatOptions) => asUtc(`${day}T00:00`).toLocaleDateString(locale(), { timeZone: "UTC", ...o });
+  const withYear = from.slice(0, 4) !== to.slice(0, 4) || Number(from.slice(0, 4)) !== new Date().getFullYear();
+  const full: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", ...(withYear && { year: "numeric" }) };
+  const first = part(from, full);
+  if (from === to) return first;
+  const sameMonth = from.slice(0, 7) === to.slice(0, 7);
+  return `${first} – ${part(to, sameMonth && !withYear ? { day: "numeric" } : full)}`;
+}
+
 export function until(ms: number): string {
   const mins = Math.round(ms / 60000);
   if (mins < 1) return "now";

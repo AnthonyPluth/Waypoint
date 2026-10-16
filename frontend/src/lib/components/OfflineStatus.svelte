@@ -2,17 +2,18 @@
   import { Button } from "$lib/components/ui/button";
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
   import { ago, ONLY_THESE, savedList, WHEN_SAVED } from "$lib/offline";
-  import { offline, refreshOffline, syncSavedTrip } from "$lib/offline.svelte";
+  import { offline, offlineWorking, refreshOffline, syncSavedTrip } from "$lib/offline.svelte";
+  import CloudCheck from "@lucide/svelte/icons/cloud-check";
   import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
   import { onMount } from "svelte";
 
-  let { tripId = null }: { tripId?: number | null } = $props();
+  let { tripId = null, pill = false, open = false, ontoggle }: { tripId?: number | null; pill?: boolean; open?: boolean; ontoggle?: () => void } = $props();
 
   let setting = $state(false);
   let retrying = $state(false);
   let now = $state(Date.now());
   onMount(() => {
-    if (!offline.checked) void refreshOffline();
+    if (!pill && !offline.checked) void refreshOffline();
     const tick = setInterval(() => (now = Date.now()), 30_000);
     return () => clearInterval(tick);
   });
@@ -28,7 +29,14 @@
   }
 </script>
 
-{#if offline.checked}
+{#if pill}
+  {#if offlineWorking()}
+    <button type="button" class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-status-ok-ink/30 bg-status-ok-soft px-3.5 text-sm font-medium text-status-ok-ink outline-none transition-colors hover:bg-status-ok-soft/70 focus-visible:ring-[3px] focus-visible:ring-ring/50 phone:size-11 phone:justify-center phone:px-0"
+      aria-expanded={open} onclick={ontoggle} data-testid="offline-pill">
+      <CloudCheck class="size-4 shrink-0" aria-hidden="true" /><span class="phone:sr-only">Saved for offline</span>
+    </button>
+  {/if}
+{:else if offline.checked}
   <section class="mt-3 max-w-prose rounded-xl border border-border bg-card p-3 text-sm" aria-label="Offline access" data-testid="offline-status">
     <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <p class="flex min-w-0 items-start gap-2">

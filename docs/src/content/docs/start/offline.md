@@ -38,6 +38,7 @@ An **installed home-screen app** keeps the copy far more reliably than a browser
 
 Upcoming and each trip’s page show a small **Offline access** panel, so you can check before you board:
 
+- When saving is set up and working, Upcoming shows only a green **Saved for offline** pill beside the title (an icon on a phone); tap it for the full panel. Every other state keeps the panel itself.
 - **Saved on this device · updated 2 h ago** says the copy is there and how fresh it is. On Upcoming it also names every saved trip. On a trip that is saved, it adds **also saved:** with the others.
 - **This trip isn’t saved on this device** appears on a trip that is not among the saved ones, such as a trip months away that isn’t the next one yet, with the trips that are saved and the rule above. It never says nothing is saved while other trips are.
 - **Nothing is saved yet** appears only when no trip is saved at all.
