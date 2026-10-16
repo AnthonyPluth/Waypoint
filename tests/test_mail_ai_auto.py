@@ -141,7 +141,7 @@ class WhoIsAskedTests(AutoCase):
         self.assertEqual((result.review, result.skipped), (0, 5))
         self.assertEqual(self.fake.requests, [])
 
-    STAY_PRICE = {"kind": "hotel", "provider": "Example Stays", "confirmation": "H88231", "origin": "Harbour Hotel",
+    STAY_PRICE = {"kind": "hotel", "provider": "Harbour Hotel", "confirmation": "H88231", "origin": "Harbour Hotel",
                   "start_local": "2026-11-21T15:00", "end_local": "2026-11-27T10:00", "start_zone": "Europe/London",
                   "end_zone": "Europe/London", "price_minor": 48000, "price_currency": "USD"}
 
