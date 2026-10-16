@@ -10,7 +10,7 @@ import TopBar from "./TopBar.svelte";
 
 const demoUser = { name: "Demo Person", email: "demo@example.com", local: false } as unknown as AppState["user"];
 const state = (extra: Partial<AppState> = {}): AppState =>
-  ({ version: "1.0", database: "sqlite", user: null, last_backup: null, review_count: 0, person_id: null, ai: false, ...extra });
+  ({ version: "1.0", database: "sqlite", user: null, last_backup: null, review_count: 0, person_id: null, ai: false, show_costs: false, ...extra });
 
 beforeEach(() => {
   route.page = "upcoming";
