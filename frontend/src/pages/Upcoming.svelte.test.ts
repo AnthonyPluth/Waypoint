@@ -8,6 +8,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import { app } from "$lib/app.svelte";
+import { offline } from "$lib/offline.svelte";
 import { dropEarly, startEarly } from "$lib/early";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { viewport } from "$lib/phone.svelte";
@@ -539,7 +540,7 @@ describe("Upcoming day-by-day rows", () => {
     serve([london]);
     render(Upcoming);
     const list = await screen.findByRole("list", { name: /day by day/ });
-    return within(list).getAllByRole("listitem").filter((li) => li.classList.contains("row"));
+    return within(list).getAllByRole("listitem").filter((li) => li.classList.contains("row-tap"));
   };
 
   it("gives each row one link, named as before, that carries the stretched hit area over the whole row", async () => {
@@ -588,7 +589,7 @@ describe("the reads started before the page opened", () => {
     at("2099-01-09T09:00:00-05:00");
     serve([trip([lot])]);
     render(Upcoming);
-    const card = (await screen.findByText("Next up")).closest("section")!;
+    const card = (await screen.findAllByText("Next up")).map((e) => e.closest("section")).find(Boolean)!;
     const show = within(card).getByRole("button", { name: "Show the QR code for Example Airport Long-Term Lot" });
     expect(show).toBeInTheDocument();
     expect(show.closest(".phone\\:hidden")).toBeNull();
@@ -601,5 +602,111 @@ describe("the reads started before the page opened", () => {
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(within(card).queryByRole("button", { name: /QR code/ })).toBeNull();
+  });
+});
+
+describe("Upcoming header, review banner and timeline", () => {
+  const offlineReset = { checked: true, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, trips: [] };
+  beforeEach(() => { Object.assign(offline, offlineReset); at("2026-11-20T09:00:00-05:00"); });
+  afterEach(() => { app.state = null; viewport.phone = false; Object.assign(offline, offlineReset); });
+
+  it("puts today's date above the title, short on a phone", async () => {
+    serve([london]);
+    const { unmount } = render(Upcoming);
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    expect(screen.getByTestId("today-eyebrow")).toHaveTextContent("Friday, November 20");
+    unmount();
+    viewport.phone = true;
+    render(Upcoming);
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    expect(screen.getByTestId("today-eyebrow")).toHaveTextContent("Fri, Nov 20");
+    expect(screen.getByRole("link", { name: "Add a booking" })).toHaveAttribute("href", "#trips?add=booking");
+  });
+
+  it("shows the review banner only with trips and a review count, above the next-up card", async () => {
+    app.state = { review_count: 2 } as never;
+    serve([london]);
+    render(Upcoming);
+    const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
+    const banner = screen.getByTestId("review-banner");
+    expect(banner).toHaveTextContent("2 emails to review. Waypoint found what look like bookings and needs you to check them.");
+    expect(within(banner).getByRole("link", { name: "Review emails" })).toHaveAttribute("href", "#review");
+    expect(banner.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("says one email in the singular and shows no banner for none", async () => {
+    app.state = { review_count: 1 } as never;
+    serve([london]);
+    const { unmount } = render(Upcoming);
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    expect(screen.getByTestId("review-banner")).toHaveTextContent("1 email to review.");
+    unmount();
+    app.state = { review_count: 0 } as never;
+    render(Upcoming);
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    expect(screen.queryByTestId("review-banner")).toBeNull();
+  });
+
+  it("keeps the empty-state review wording, with no banner, when there are no trips", async () => {
+    app.state = { review_count: 3 } as never;
+    serve([], [], { configured: true, mailboxes: [box()] });
+    render(Upcoming);
+    expect(await screen.findByRole("heading", { name: "3 emails are waiting for your review" })).toBeInTheDocument();
+    expect(screen.queryByTestId("review-banner")).toBeNull();
+  });
+
+  it("is one compact link to Review on a phone, with no explanation and no email details", async () => {
+    viewport.phone = true;
+    app.state = { review_count: 2 } as never;
+    serve([london]);
+    render(Upcoming);
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    const banner = screen.getByTestId("review-banner");
+    expect(banner.tagName).toBe("A");
+    expect(banner).toHaveAttribute("href", "#review");
+    expect(banner).toHaveTextContent("2 emails to review Review");
+    expect(banner).not.toHaveTextContent("Waypoint found");
+  });
+
+  it("marks the next-up booking's row with a Next up pill instead of a chevron", async () => {
+    serve([london]);
+    render(Upcoming);
+    const list = await screen.findByRole("list", { name: /day by day/ });
+    const rows = within(list).getAllByRole("listitem").filter((li) => li.classList.contains("row-tap"));
+    const marked = rows.filter((r) => r.dataset.next === "true");
+    expect(marked).toHaveLength(1);
+    expect(within(marked[0]).getByTestId("next-up-pill")).toHaveTextContent("Next up");
+    expect(within(marked[0]).getByRole("link")).toHaveTextContent("JFK → LHR");
+    expect(rows.filter((r) => r !== marked[0]).every((r) => within(r).queryByTestId("next-up-pill") === null)).toBe(true);
+  });
+
+  it("counts the nights of the trip across a month end, and none for a one-day trip", async () => {
+    const away = trip([segment({ id: 5, start_local: "2026-11-28T09:00", end_local: "2026-11-28T12:00", end_zone: NY }), segment({ id: 6, start_local: "2026-12-02T09:00", end_local: "2026-12-02T12:00", end_zone: NY })]);
+    serve([away]);
+    const { unmount } = render(Upcoming);
+    await screen.findByRole("list", { name: /day by day/ });
+    expect(screen.getByText("Nov 28 – Dec 2 · 4 nights")).toBeInTheDocument();
+    unmount();
+    const one = trip([segment({ id: 7, start_local: "2026-11-28T09:00", end_local: "2026-11-28T12:00", end_zone: NY })]);
+    serve([one]);
+    render(Upcoming);
+    await screen.findByRole("list", { name: /day by day/ });
+    expect(screen.queryByText(/night/)).toBeNull();
+  });
+
+  it("shows the Saved for offline pill only when offline saving is working", async () => {
+    Object.assign(offline, { setUp: true, hasCopy: true, savedAt: Date.now(), trips: [{ id: 1, name: "Trip" }] });
+    serve([london]);
+    const { unmount } = render(Upcoming);
+    const pill = await screen.findByRole("button", { name: "Saved for offline" });
+    expect(screen.queryByTestId("offline-status")).toBeNull();
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(pill);
+    expect(screen.getByTestId("offline-status")).toBeInTheDocument();
+    unmount();
+    Object.assign(offline, { failed: true });
+    render(Upcoming);
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    expect(screen.queryByRole("button", { name: "Saved for offline" })).toBeNull();
+    expect(screen.getByTestId("offline-status")).toBeInTheDocument();
   });
 });

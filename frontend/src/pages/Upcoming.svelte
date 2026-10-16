@@ -13,9 +13,15 @@
   import { flightStatus, loadFlightStatus, statusFor } from "$lib/flightstatus.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
-  import { type Day, type DayItem, dateLabel, dayIn, dayLabel, END_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, startAt, subline, timesDiffer, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
+  import { type Day, type DayItem, dayIn, dayLabel, dayParts, END_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
+  import KindTile from "$lib/components/KindTile.svelte";
+  import { offlineWorking } from "$lib/offline.svelte";
+  import { viewport } from "$lib/phone.svelte";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
+  import ChevronRight from "@lucide/svelte/icons/chevron-right";
+  import Inbox from "@lucide/svelte/icons/inbox";
+  import Plus from "@lucide/svelte/icons/plus";
   import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
   import { toast } from "svelte-sonner";
 
@@ -27,6 +33,7 @@
   let asking = $state(false);
   let mail = $state<MailboxList | null>(null);
   let connecting = $state(false);
+  let offlineOpen = $state(false);
   let detail = $state<{ segment: Segment; bookings: Segment[] } | null>(null);
 
   function openDetail(e: MouseEvent, segment: Segment, bookings: Segment[]) {
@@ -94,6 +101,7 @@
   const firstAhead = $derived(days.findIndex((d) => !d.items.every(happened)));
   const earlier = $derived(firstAhead < 0 ? days : days.slice(0, firstAhead));
   const ahead = $derived(firstAhead < 0 ? [] : days.slice(firstAhead));
+  const nextId = $derived(next?.segment.id ?? null);
   const waiting = $derived(app.state?.review_count ?? 0);
   const boxes = $derived(mail?.mailboxes ?? []);
   const scanning = $derived(boxes.some((m) => m.scanning));
@@ -108,30 +116,60 @@
 </script>
 
 {#snippet dayBlock(day: Day)}
-  <li>
-    <h3 class="eyebrow mb-2">{dayLabel(`${day.date}T00:00`)}{day.date === today ? " · Today" : ""}</h3>
-    <ul class="rows">
+  {@const parts = dayParts(day.date)}
+  {@const isToday = day.date === today}
+  <li class="grid grid-cols-[64px_minmax(0,1fr)] items-start gap-4 phone:block">
+    <h3 class="eyebrow mb-2 sr-only phone:not-sr-only">{dayLabel(`${day.date}T00:00`)}{isToday ? " · Today" : ""}</h3>
+    <div class="flex flex-col items-center pt-3 text-center phone:hidden" aria-hidden="true">
+      <span class="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{parts.weekday}</span>
+      <span class="text-3xl font-bold leading-none" class:text-primary={isToday}>{parts.day}</span>
+      <span class="text-xs text-muted-foreground">{parts.month}</span>
+      {#if isToday}<span class="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">Today</span>{/if}
+    </div>
+    <ul class="divide-y divide-border overflow-hidden rounded-[18px] border border-border bg-surface-1">
       {#each day.items as item (`${item.segment.id}-${item.role}`)}
         {@const seg = item.segment}
-        <li class="row row-tap items-start" class:opacity-60={seg.status === "cancelled"}>
-          <BrandLogo src={seg.logo} label={seg.logo_label} size={32} class="mt-0.5" />
+        {@const isNext = item.role === "start" && seg.id === nextId}
+        <li class={`row-tap flex items-center gap-3 px-4 py-3 phone:items-start ${isNext ? "bg-primary/10" : ""}`} class:opacity-60={seg.status === "cancelled"} data-next={isNext ? "true" : undefined}>
+          <p class="mono w-[72px] shrink-0 text-sm font-medium order-first phone:order-last phone:w-auto phone:pt-0.5 phone:text-right">
+            <DayTime segment={seg} end={item.role === "end"} />
+          </p>
+          {#if seg.logo}
+            <BrandLogo src={seg.logo} label={seg.logo_label} size={viewport.phone ? 34 : 36} class="mt-0.5" />
+          {:else}
+            <KindTile kind={seg.kind} size={viewport.phone ? 34 : 36} decorative />
+          {/if}
           <div class="min-w-0 flex-1">
             <p class="break-words text-body font-medium" class:line-through={seg.status === "cancelled"}>
               <a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}
               title={upcomingTitle(seg) === headline(seg) ? undefined : headline(seg)} onclick={(e) => openDetail(e, seg, item.bookings)}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${upcomingTitle(seg)}` : upcomingTitle(seg)}</a></p>
             {#if item.role === "start" && subline(seg, true)}<p class="break-words text-caption text-muted-foreground">{subline(seg, true)}</p>{/if}
             {#if item.role === "start" && item.bookings.length > 1}<p class="text-caption text-muted-foreground">{item.bookings.length} bookings{timesDiffer(item.bookings) ? " · times differ between bookings" : ""}</p>{/if}
+            {#if isNext && viewport.phone}<span class="mt-1 inline-block rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground" data-testid="next-up-pill">Next up</span>{/if}
           </div>
-          <p class="text-body font-medium">
-            <DayTime segment={seg} end={item.role === "end"} />
-          </p>
+          {#if isNext && !viewport.phone}
+            <span class="shrink-0 self-center rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground" data-testid="next-up-pill">Next up</span>
+          {:else if !isNext}
+            <ChevronRight class="size-4 shrink-0 self-center text-muted-foreground phone:hidden" aria-hidden="true" />
+          {/if}
         </li>
       {/each}
     </ul>
   </li>
 {/snippet}
 
-<h1 class="mb-3 text-title md:mb-6 md:text-display">Upcoming</h1>
+<div class="mb-4 flex items-end justify-between gap-3 md:mb-6">
+  <div class="min-w-0">
+    <p class="eyebrow mb-1" data-testid="today-eyebrow">{todayLabel(now, viewerZone(), viewport.phone)}</p>
+    <h1 class="text-title md:text-display">Upcoming</h1>
+  </div>
+  {#if trips && trips.length > 0}
+    <div class="flex shrink-0 items-center gap-2">
+      <OfflineStatus pill open={offlineOpen} ontoggle={() => (offlineOpen = !offlineOpen)} />
+      <Button href="#trips?add=booking" class="phone:size-11 phone:p-0"><Plus aria-hidden="true" /><span class="phone:sr-only">Add a booking</span></Button>
+    </div>
+  {/if}
+</div>
 
 {#if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">
@@ -183,7 +221,22 @@
     </div>
   </section>
 {:else}
-  <div class="-mt-1 mb-6"><OfflineStatus /></div>
+  {#if waiting > 0}
+    {#if viewport.phone}
+      <a href="#review" class="mb-4 flex min-h-[52px] items-center gap-3 rounded-2xl border border-signal/22 bg-signal-soft px-4 text-sm" data-testid="review-banner">
+        <Inbox class="size-5 shrink-0 text-signal" aria-hidden="true" />
+        <span class="min-w-0 flex-1 font-semibold">{waiting} {waiting === 1 ? "email" : "emails"} to review</span>
+        <span class="flex items-center gap-1 font-semibold text-signal-ink">Review<ChevronRight class="size-4" aria-hidden="true" /></span>
+      </a>
+    {:else}
+      <section class="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-signal/22 bg-signal-soft px-4 py-3 text-sm" aria-label="Emails to review" data-testid="review-banner">
+        <Inbox class="size-5 shrink-0 text-signal" aria-hidden="true" />
+        <p class="min-w-0 flex-1"><strong class="font-semibold">{waiting} {waiting === 1 ? "email" : "emails"} to review.</strong> Waypoint found what look like bookings and needs you to check them.</p>
+        <Button href="#review" class="bg-signal text-signal-foreground hover:bg-signal/90">Review emails</Button>
+      </section>
+    {/if}
+  {/if}
+  {#if !offlineWorking() || offlineOpen}<div class="-mt-1 mb-6"><OfflineStatus /></div>{/if}
   {#if next}
     {@const s = next.segment}
     {@const proof = s.kind === "flight" && flightStatus.list?.enabled ? flightEvidence(statusFor(s.id), now, typeof navigator === "undefined" || navigator.onLine !== false) : "scheduled"}
@@ -199,11 +252,11 @@
     {#if next.alongside.length}
       <section class="-mt-2 mb-6" aria-label="Also under way">
         <p class="eyebrow mb-2">Also under way</p>
-        <ul class="rows">
+        <ul class="divide-y divide-border overflow-hidden rounded-[18px] border border-border bg-surface-1">
           {#each next.alongside as item (item.segment.id)}
             {@const seg = item.segment}
-            <li class="row row-tap items-start">
-              <BrandLogo src={seg.logo} label={seg.logo_label} size={32} class="mt-0.5" />
+            <li class="row-tap flex items-center gap-3 px-4 py-3 phone:items-start">
+              {#if seg.logo}<BrandLogo src={seg.logo} label={seg.logo_label} size={viewport.phone ? 34 : 36} class="mt-0.5" />{:else}<KindTile kind={seg.kind} size={viewport.phone ? 34 : 36} decorative />{/if}
               <div class="min-w-0 flex-1">
                 <p class="break-words text-body font-medium"><a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`} onclick={(e) => openDetail(e, seg, item.bookings)}>{upcomingTitle(seg)}</a></p>
                 <p class="text-caption text-muted-foreground">{END_WORD[seg.kind]} <DayTime segment={seg} end dated /></p>
@@ -218,8 +271,10 @@
   {/if}
 
   {#if featured}
-    <h2 class="mb-1 text-title"><a class="inline-flex items-center phone:min-h-11 underline-offset-2 hover:underline" href={`#trip/${featured.id}`}>{featured.name}</a></h2>
-    {#if featured.start_date && featured.end_date}<p class="mb-4 text-caption text-muted-foreground">{dateLabel(featured.start_date)} – {dateLabel(featured.end_date)}</p>{/if}
+    <div class="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <h2 class="text-title"><a class="inline-flex items-center phone:min-h-11 underline-offset-2 hover:underline" href={`#trip/${featured.id}`}>{featured.name}</a></h2>
+      {#if featured.start_date && featured.end_date}<p class="text-caption text-muted-foreground">{rangeLabel(featured.start_date, featured.end_date)}{nightsLabel(featured.start_date, featured.end_date) ? ` · ${nightsLabel(featured.start_date, featured.end_date)}` : ""}</p>{/if}
+    </div>
     <ol class="flex flex-col gap-6" aria-label={`${featured.name}, day by day`}>
       {#if earlier.length}
         <li>

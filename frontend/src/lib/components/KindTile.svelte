@@ -9,7 +9,7 @@
 
   type TileKind = "flight" | "hotel" | "car" | "train" | "cruise" | "parking" | "visit";
 
-  let { kind, size = 28, decorative = false }: { kind: TileKind; size?: 28 | 36; decorative?: boolean } = $props();
+  let { kind, size = 28, decorative = false }: { kind: TileKind; size?: 28 | 34 | 36; decorative?: boolean } = $props();
 
   const ICONS = { flight: Plane, hotel: Building, car: Car, train: TrainFront, cruise: Ship, parking: ParkingSquare, visit: History } as const;
   const NAMES = { flight: "flight", hotel: "stay", car: "rental car", train: "train", cruise: "cruise", parking: "parking", visit: "past visit" } as const;
@@ -26,11 +26,11 @@
 </script>
 
 <span
-  class={`inline-flex shrink-0 items-center justify-center ${size === 36 ? "size-9 rounded-[10px]" : "size-7 rounded-lg"} ${TONES[kind]}`}
+  class={`inline-flex shrink-0 items-center justify-center ${size === 36 ? "size-9 rounded-[10px]" : size === 34 ? "size-[34px] rounded-[10px]" : "size-7 rounded-lg"} ${TONES[kind]}`}
   role={decorative ? undefined : "img"}
   aria-label={decorative ? undefined : NAMES[kind]}
   aria-hidden={decorative ? "true" : undefined}
   data-tile={kind}
 >
-  <Icon class={size === 36 ? "size-5" : "size-4"} aria-hidden="true" />
+  <Icon class={size === 28 ? "size-4" : "size-5"} aria-hidden="true" />
 </span>

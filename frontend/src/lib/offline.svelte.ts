@@ -18,6 +18,9 @@ export const offline = $state({
   trips: [] as KnownTrip[],
 });
 
+export const offlineWorking = (): boolean =>
+  offline.checked && offline.supported && !offline.damaged && offline.setUp && !offline.off && !offline.failed && offline.hasCopy && offline.savedAt !== null;
+
 function forgetTrips(): void {
   offline.trips = [];
 }
