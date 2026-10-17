@@ -53,6 +53,15 @@ describe("SegmentForm: the minimal flight and hotel", () => {
     expect(screen.getByText("More details").closest("details")).toHaveAttribute("open");
   });
 
+  it("opens More details when a hotel's chain is carried over by switching to Flight", async () => {
+    mount({ ...blank(1), kind: "hotel", provider: "Marriott" });
+    const more = screen.getByText("More details").closest("details")!;
+    expect(more).not.toHaveAttribute("open");
+    await userEvent.selectOptions(screen.getByLabelText("What is it"), "flight");
+    expect(more).toHaveAttribute("open");
+    expect(screen.getByLabelText("Airline")).toHaveValue("Marriott");
+  });
+
   it("keeps a hotel's chain and confirmation code in the first group", () => {
     mount({ ...blank(1), kind: "hotel" });
     const more = screen.getByText("More details").closest("details")!;

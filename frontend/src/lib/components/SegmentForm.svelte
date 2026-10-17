@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import { actGet } from "$lib/act";
   import { apiCall } from "$lib/contract";
   import type { Person, Segment } from "$lib/api-types";
@@ -92,6 +92,10 @@
 
   $effect(() => {
     if (found.some((i) => inMore(i.field, d.kind))) moreOpen = true;
+  });
+
+  $effect(() => {
+    if (flight && untrack(() => d.provider.trim() || d.confirmation.trim())) moreOpen = true;
   });
 
   async function focusFirstInvalid(list: { field: string }[]) {
