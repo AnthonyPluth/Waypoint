@@ -93,6 +93,11 @@
       <PassCard segment={flight} now={underWayNow} />
       <PassCard segment={stay} now={stayNow} />
     </div>
+    <h3 class="text-caption text-muted-foreground">Next up (boarding) variant: the plane starts at the left of the arc before departure and rides it in the air.</h3>
+    <div class="grid gap-4 lg:grid-cols-2">
+      <PassCard segment={flight} now={flightNow} boarding eyebrow="Next up" tripName="Trip to Minneapolis" />
+      <PassCard segment={flight} now={underWayNow} boarding eyebrow="Under way" tripName="Trip to Minneapolis" pulse />
+    </div>
   </section>
 
   <section class="flex flex-col gap-3" aria-labelledby="design-kinds">

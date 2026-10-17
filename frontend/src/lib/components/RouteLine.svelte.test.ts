@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
-import RouteLine, { clampProgress, headingDegrees } from "./RouteLine.svelte";
+import RouteLine, { clampProgress, headingDegrees, travelledPath } from "./RouteLine.svelte";
 
 const line = (container: HTMLElement) => container.firstElementChild as HTMLElement;
 const along = (container: HTMLElement) => (container.querySelector("[style*='--along']") as HTMLElement).style.getPropertyValue("--along");
@@ -20,13 +20,27 @@ describe("RouteLine", () => {
       unmount();
     }
   });
-  it("draws the route as one arch, dashed behind and solid up to the plane", () => {
+  it("draws the route as one arch, dashed behind and a solid path of the same arch up to the plane", () => {
     const { container } = render(RouteLine, { progress: 0.3 });
     const paths = [...container.querySelectorAll("svg[preserveAspectRatio] path")];
-    expect(paths.map((p) => p.getAttribute("d"))).toEqual(["M0 100 Q50 0 100 100", "M0 100 Q50 0 100 100"]);
+    expect(paths.map((p) => p.getAttribute("d"))).toEqual(["M0 100 Q50 0 100 100", "M0 100 Q15 70 30 58"]);
     expect(paths[0].getAttribute("stroke-dasharray")).toBe("4 4");
     expect(paths[1].getAttribute("stroke-dasharray")).toBeNull();
-    expect(paths[1].closest("svg")?.getAttribute("style")).toContain("var(--along)");
+    expect(container.querySelector("svg[style*='clip-path']")).toBeNull();
+  });
+  it("draws no solid path at the start and the whole arch at the end", () => {
+    const start = render(RouteLine, { progress: 0 });
+    expect(start.container.querySelectorAll("svg[preserveAspectRatio] path")).toHaveLength(1);
+    start.unmount();
+    const end = render(RouteLine, { progress: 1 });
+    expect([...end.container.querySelectorAll("svg[preserveAspectRatio] path")].map((p) => p.getAttribute("d"))).toEqual(["M0 100 Q50 0 100 100", "M0 100 Q50 0 100 100"]);
+  });
+  it("travelledPath stays on the arch: its end is where the plane sits", () => {
+    expect(travelledPath(0)).toBe("M0 100 Q0 100 0 100");
+    expect(travelledPath(0.5)).toBe("M0 100 Q25 50 50 50");
+    expect(travelledPath(1)).toBe("M0 100 Q50 0 100 100");
+    expect(travelledPath(2)).toBe(travelledPath(1));
+    expect(travelledPath(Number.NaN)).toBe(travelledPath(0));
   });
   it("centres the plane on the arch with one offset, at the start, the top and the end", () => {
     for (const [progress, top] of [[0, "100%"], [0.5, "50%"], [1, "100%"]] as const) {

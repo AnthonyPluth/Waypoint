@@ -23,9 +23,16 @@ describe("Design", () => {
   it("shows the pass card for a flight before and during the flight, and for a stay", () => {
     render(Design);
     const pass = screen.getByRole("heading", { name: "Pass card" }).closest("section") as HTMLElement;
-    expect(within(pass).getByText("Check-in is open, departs in 3 h")).toBeTruthy();
-    expect(within(pass).getByText("Under way, arrives in 2 h 45 min")).toBeTruthy();
+    expect(within(pass).getAllByText("Check-in is open, departs in 3 h")).toHaveLength(2);
+    expect(within(pass).getAllByText("Under way, arrives in 2 h 45 min")).toHaveLength(2);
     expect(within(pass).getByText("Check-in in 7 h")).toBeTruthy();
+  });
+  it("shows the boarding variant's arc with the plane at the start before departure and part-way in the air", () => {
+    render(Design);
+    const pass = screen.getByRole("heading", { name: "Pass card" }).closest("section") as HTMLElement;
+    const routes = within(pass).getAllByRole("img", { name: "Route" }).map((r) => r.dataset.progress);
+    expect(routes.slice(2)).toEqual(["0", routes[3]]);
+    expect(Number(routes[3])).toBeGreaterThan(0);
   });
   it("shows every kind tile and avatar stacks of one, three and six people", () => {
     render(Design);

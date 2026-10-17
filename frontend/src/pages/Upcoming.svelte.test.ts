@@ -163,7 +163,8 @@ describe("Upcoming", () => {
     expect(within(card).getByText("Check-in is open, departs in 10 h")).toBeInTheDocument();
     expect(within(card).getByText("American Airlines AA 101")).toBeInTheDocument();
     expect(within(card).getByText("7:00 PM")).toBeInTheDocument();
-    expect(within(card).getByText("Fri, Nov 20 · New York time")).toBeInTheDocument();
+    expect(within(card).getByText("Fri, Nov 20")).toBeInTheDocument();
+    expect(within(card).getByText("New York time")).toBeInTheDocument();
     expect(within(card).getByText("8")).toBeInTheDocument();
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(within(card).getByRole("button", { name: "Copy confirmation code KQ7M2X" }));
     expect(await navigator.clipboard.readText()).toBe("KQ7M2X");
