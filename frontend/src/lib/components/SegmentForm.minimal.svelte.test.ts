@@ -34,6 +34,32 @@ describe("SegmentForm: the minimal flight and hotel", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("keeps a flight's airline and confirmation code inside More details, and sends them", async () => {
+    const onsaved = vi.fn();
+    mount({ ...blank(1), people: [1], origin: "JFK", destination: "LHR", start_local: "2026-12-01T19:00", end_local: "2026-12-02T07:00" }, onsaved);
+    const more = screen.getByText("More details").closest("details")!;
+    expect(more).not.toHaveAttribute("open");
+    expect(more).toContainElement(screen.getByLabelText("Airline"));
+    expect(more).toContainElement(screen.getByLabelText("Confirmation code"));
+    await userEvent.type(screen.getByLabelText("Airline"), "Example Air");
+    await userEvent.type(screen.getByLabelText("Confirmation code"), "ABC123");
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
+    await waitFor(() => expect(onsaved).toHaveBeenCalled());
+    expect(sentBody()).toMatchObject({ provider: "Example Air", confirmation: "ABC123" });
+  });
+
+  it("opens More details for a flight that already has an airline", () => {
+    mount({ ...blank(1), people: [1], provider: "Example Air" });
+    expect(screen.getByText("More details").closest("details")).toHaveAttribute("open");
+  });
+
+  it("keeps a hotel's chain and confirmation code in the first group", () => {
+    mount({ ...blank(1), kind: "hotel" });
+    const more = screen.getByText("More details").closest("details")!;
+    expect(more).not.toContainElement(screen.getByLabelText("Hotel chain or booking site"));
+    expect(more).not.toContainElement(screen.getByLabelText("Confirmation code"));
+  });
+
   it("saves a hotel from its name, times and address, without a time zone", async () => {
     const onsaved = vi.fn();
     mount({ ...blank(1), kind: "hotel" }, onsaved);

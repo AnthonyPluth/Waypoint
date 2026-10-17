@@ -1,12 +1,13 @@
 <script lang="ts">
   import { errMsg } from "$lib/act";
-  import { route, setQuery } from "$lib/app.svelte";
+  import { app, route, setQuery } from "$lib/app.svelte";
   import { apiCall } from "$lib/contract";
   import { takeEarlyTrips } from "$lib/early";
   import type { Person, Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
+  import QuickTripForm from "$lib/components/QuickTripForm.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import AvatarStack from "$lib/components/AvatarStack.svelte";
   import TravellerAvatars from "$lib/components/TravellerAvatars.svelte";
@@ -18,7 +19,7 @@
   import { viewport } from "$lib/phone.svelte";
   import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { panes } from "$lib/panes.svelte";
-  import { blank } from "$lib/segment-form";
+  import { blankFor } from "$lib/segment-form";
   import { dayIn, inYear, matchesText, pastByYear, splitTrips, tripRangeLabel, tripPeople, tripYears, viewerZone, type TripWhen } from "$lib/trips";
   import TripPane from "./Trip.svelte";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
@@ -30,7 +31,7 @@
   let people = $state<Person[]>([]);
   let loadError = $state("");
   const addQuery = new URLSearchParams(route.query).get("add");
-  let adding = $state<"booking" | "past" | null>(addQuery === "booking" || addQuery === "past" ? addQuery : null);
+  let adding = $state<"trip" | "booking" | "past" | null>(addQuery === "trip" || addQuery === "booking" || addQuery === "past" ? addQuery : null);
   const closeForm = () => { adding = null; if (addQuery) setQuery(""); };
 
   let latest = 0;
@@ -100,15 +101,17 @@
   </div>
   {#if trips && !adding}
     {#if viewport.phone}
-      <OptionsMenu label="Add a booking" text="Add" icon={Plus} iconOnly variant="default" items={[{ label: "Add a booking", onselect: () => (adding = "booking") }, { label: "Add a past trip", onselect: () => (adding = "past") }]} />
+      <OptionsMenu label="Add" text="Add" icon={Plus} iconOnly variant="default" items={[{ label: "Add a trip", onselect: () => (adding = "trip") }, { label: "Add a booking", onselect: () => (adding = "booking") }, { label: "Add a past trip", onselect: () => (adding = "past") }]} />
     {:else}
-      <div class="flex flex-wrap gap-2"><Button variant="outline" onclick={() => (adding = "past")}>Add a past trip</Button><Button onclick={() => (adding = "booking")}><Plus /> Add a booking</Button></div>
+      <div class="flex flex-wrap gap-2"><Button variant="outline" onclick={() => (adding = "past")}>Add a past trip</Button><Button variant="outline" onclick={() => (adding = "booking")}>Add a booking</Button><Button onclick={() => (adding = "trip")}><Plus /> Add a trip</Button></div>
     {/if}
   {/if}
 </div>
 
-{#if adding && trips}
-  <SegmentForm initial={adding === "past" ? { ...blank(), kind: "visit" } : blank()} {people} oncancel={closeForm} onsaved={(s) => { adding = null; dropDrafts(); location.hash = `#trip/${s.trip_id}`; }} />
+{#if adding === "trip" && trips}
+  <QuickTripForm me={people.some((p) => p.id === app.state?.person_id) ? (app.state?.person_id ?? null) : null} oncancel={closeForm} oncreated={(t) => { adding = null; dropDrafts(); location.hash = `#trip/${t.id}`; }} />
+{:else if adding && trips}
+  <SegmentForm initial={adding === "past" ? { ...blankFor(people, app.state?.person_id), kind: "visit" } : blankFor(people, app.state?.person_id)} {people} oncancel={closeForm} onsaved={(s) => { adding = null; dropDrafts(); location.hash = `#trip/${s.trip_id}`; }} />
 {/if}
 
 {#if loadError}
