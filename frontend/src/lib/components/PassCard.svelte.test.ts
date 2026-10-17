@@ -430,6 +430,14 @@ describe("the boarding-pass variant", () => {
     render(PassCard, board({}, { status: "cancelled" }));
     expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("0");
   });
+  it("keeps the airport names out of the grid that holds the codes and the arc, so long names cannot squeeze the route", async () => {
+    const { container } = render(PassCard, board());
+    const grid = container.querySelector("[data-code='origin']")?.parentElement as HTMLElement;
+    expect(grid.children).toHaveLength(3);
+    expect(grid.contains(screen.getByRole("img", { name: "Route" }))).toBe(true);
+    expect(await screen.findByText("John F. Kennedy International Airport")).toBeInTheDocument();
+    expect(grid.contains(screen.getByText("John F. Kennedy International Airport"))).toBe(false);
+  });
   it("shows both codes, the length, nonstop, and each time at its own airport with the day shift", async () => {
     render(PassCard, board());
     expect(screen.getByText("JFK")).toBeInTheDocument();

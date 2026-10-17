@@ -128,21 +128,24 @@
       </div>
 
       {#if routed}
-        <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 desktop:gap-x-5" class:line-through={cancelled}>
-          <p class="break-words text-[44px] font-semibold leading-none tracking-tight desktop:text-[64px]" data-code="origin">{s.origin ?? "—"}</p>
+        <div class="flex flex-col gap-1">
+          <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 desktop:gap-x-5" class:line-through={cancelled}>
+            <p class="break-words text-[44px] font-semibold leading-none tracking-tight desktop:text-[64px]" data-code="origin">{s.origin ?? "—"}</p>
+            {#if flight}
+              <RouteLine progress={grounded ? 0 : progress} label={evidence === "landed" ? "Route, with the plane at the destination" : "Route"} />
+            {:else}
+              <span class="relative flex h-11 min-w-0 items-center desktop:h-16" role="img" aria-label="Route" data-progress={0.5}>
+                <span class="absolute inset-x-0 top-1/2 border-t-2 border-dashed border-border"></span>
+                <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-1 text-primary" data-plane><TrainFront class="size-5" aria-hidden="true" /></span>
+              </span>
+            {/if}
+            <p class="break-words text-right text-[44px] font-semibold leading-none tracking-tight desktop:text-[64px]" data-code="destination">{s.destination ?? "—"}</p>
+          </div>
           {#if flight}
-            <RouteLine progress={grounded ? 0 : progress} label={evidence === "landed" ? "Route, with the plane at the destination" : "Route"} />
-          {:else}
-            <span class="relative flex h-11 min-w-0 items-center desktop:h-16" role="img" aria-label="Route" data-progress={0.5}>
-              <span class="absolute inset-x-0 top-1/2 border-t-2 border-dashed border-border"></span>
-              <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-1 text-primary" data-plane><TrainFront class="size-5" aria-hidden="true" /></span>
-            </span>
-          {/if}
-          <p class="break-words text-right text-[44px] font-semibold leading-none tracking-tight desktop:text-[64px]" data-code="destination">{s.destination ?? "—"}</p>
-          {#if flight}
-            <div class="min-w-0"><AirportName code={s.origin ?? ""} /></div>
-            <span></span>
-            <div class="min-w-0 text-right"><AirportName code={s.destination ?? ""} /></div>
+            <div class="grid grid-cols-2 gap-x-3" class:line-through={cancelled}>
+              <div class="min-w-0"><AirportName code={s.origin ?? ""} /></div>
+              <div class="min-w-0 text-right"><AirportName code={s.destination ?? ""} /></div>
+            </div>
           {/if}
         </div>
         {#if differ}
