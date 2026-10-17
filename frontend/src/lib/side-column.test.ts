@@ -28,6 +28,11 @@ describe("laterTrips", () => {
     const coming = dated(3, "2026-12-30", "2027-01-03");
     expect(laterTrips([began, featured, coming], featured, "2026-11-20").map((t) => t.id)).toEqual([3]);
   });
+  it("lists every trip that has not started, soonest first, with no cap", () => {
+    const featured = dated(1, "2026-11-20", "2026-11-27");
+    const rest = [2, 3, 4, 5, 6, 7].map((id) => dated(id, `2026-12-${String(id).padStart(2, "0")}`, `2026-12-${String(id + 1).padStart(2, "0")}`));
+    expect(laterTrips([featured, ...rest], featured, "2026-11-20").map((t) => t.id)).toEqual([2, 3, 4, 5, 6, 7]);
+  });
 });
 
 describe("usablePlaces", () => {
