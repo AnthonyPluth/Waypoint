@@ -2,9 +2,9 @@
   {
     "name": "American Airlines",
     "file": "american-airlines.svg",
-    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/americanairlines.svg",
-    "upstream_path": "icons/americanairlines.svg",
-    "sha": "bbbe22d15fce5d74d8512457029a869e481fd2a4"
+    "source": "https://commons.wikimedia.org/wiki/File:AA_Symbol.svg",
+    "upstream_path": "AA Symbol.svg",
+    "sha": "afde8b22ed4509ff8cbb15f741cab161ae58e890"
   },
   {
     "name": "Delta Air Lines",
@@ -289,9 +289,9 @@
   {
     "name": "Hertz",
     "file": "hertz.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hertz.svg",
-    "upstream_path": "svg/h/hertz.svg",
-    "sha": "44eff7b48085c19abcabe4b69b30d5684aa767e8"
+    "source": "https://commons.wikimedia.org/wiki/File:Hertz_Car_Rental_logo.svg",
+    "upstream_path": "Hertz Car Rental logo.svg",
+    "sha": "7f56db61e9d4a2bbcd5e8d7abda86f402744222e"
   },
   {
     "name": "Avis",
