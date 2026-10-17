@@ -679,6 +679,24 @@ describe("on a phone", () => {
     expect(await screen.findByLabelText("Where to, or a name")).toBeInTheDocument();
   });
 
+  it("opens the add form when the add link is followed while Trips is already showing", async () => {
+    render(Trips);
+    await screen.findByText("Trip to London");
+    expect(screen.queryByLabelText("Where to, or a name")).toBeNull();
+    route.query = "add=trip";
+    expect(await screen.findByLabelText("Where to, or a name")).toBeInTheDocument();
+  });
+
+  it("keeps a trip with no bookings under the traveller it was made for", async () => {
+    viewport.phone = false;
+    serve([london, trip([], { id: 4, name: "Lisbon", people: [2] })]);
+    route.query = "who=2";
+    render(Trips);
+    expect(await screen.findByText("Lisbon")).toBeInTheDocument();
+    route.query = "who=1";
+    await waitFor(() => expect(screen.queryByText("Lisbon")).toBeNull());
+  });
+
   it("ticks only the signed-in person on a new booking", async () => {
     viewport.phone = false;
     app.state = state({ person_id: 2 });

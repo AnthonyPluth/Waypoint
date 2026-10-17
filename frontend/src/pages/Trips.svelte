@@ -32,7 +32,7 @@
   let loadError = $state("");
   const addQuery = new URLSearchParams(route.query).get("add");
   let adding = $state<"trip" | "booking" | "past" | null>(addQuery === "trip" || addQuery === "booking" || addQuery === "past" ? addQuery : null);
-  const closeForm = () => { adding = null; if (addQuery) setQuery(""); };
+  const closeForm = () => { adding = null; if (param("add")) setQuery(""); };
 
   let latest = 0;
   async function load() {
@@ -47,6 +47,10 @@
   $effect(() => { void load(); });
 
   const param = (key: string) => new URLSearchParams(route.query).get(key);
+  $effect(() => {
+    const wanted = param("add");
+    if (wanted === "trip" || wanted === "booking" || wanted === "past") adding = wanted;
+  });
   const who = $derived(Number(param("who")) || null);
   const tripParam = $derived(Number(param("trip")) || null);
   const text = $derived((param("q") ?? "").trim());
@@ -65,7 +69,7 @@
     if (!refine({ q: v.trim() ? v : null })) field.value = text;
   };
   const clearFilters = () => refine({ who: null, q: null, when: null, year: null });
-  const filtered = $derived(trips && trips.filter((t) => (!who || t.segments.some((s) => s.travelers.some((x) => x.person_id === who))) && matchesText(t, text) && (!year || inYear(t, year))));
+  const filtered = $derived(trips && trips.filter((t) => (!who || t.people.includes(who) || t.segments.some((s) => s.travelers.some((x) => x.person_id === who))) && matchesText(t, text) && (!year || inYear(t, year))));
   const count = (n: number) => `${n} ${n === 1 ? "trip" : "trips"}`;
   let filtersOpen = $state(false);
   const years = $derived(trips ? tripYears(trips) : []);
