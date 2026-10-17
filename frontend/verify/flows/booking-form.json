@@ -3,8 +3,8 @@
   "page": "trips",
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
-    { "click": "button:has-text('Add a booking'), button[aria-label='Add a booking']" },
-    { "click_if_present": "[role='group'][aria-label='Add a booking'] button" },
+    { "click": "button:has-text('Add a booking'), button[aria-label='Add']" },
+    { "click_if_present": "[role='group'][aria-label='Add'] button:has-text('Add a booking')" },
     { "wait_for": "form[data-editor]" },
     { "expect_text": { "selector": "form[data-editor]", "text": "When and where" } },
     { "expect_text": { "selector": "form[data-editor]", "text": "More details" } },

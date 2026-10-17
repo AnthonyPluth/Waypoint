@@ -1,0 +1,26 @@
+{
+  "name": "add-trip",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click_if_present": "button[aria-label='Add']" },
+    { "click": "button:has-text('Add a trip') >> visible=true" },
+    { "wait_for": "form[data-editor]" },
+    { "fill": { "selector": "label:has(> span:text-is('Where to, or a name')) input", "text": "Lisbon" } },
+    { "fill": { "selector": "label:has(> span:text-is('First day (optional)')) input", "text": "2027-03-04" } },
+    { "fill": { "selector": "label:has(> span:text-is('Last day (optional)')) input", "text": "2027-03-11" } },
+    { "scroll_to": "form[data-editor]" },
+    { "screenshot": "form" },
+    { "click": "form[data-editor] button[type=submit]" },
+    { "expect_text": { "selector": "h1", "text": "Lisbon" } },
+    { "expect_text": { "selector": "main", "text": "Nothing booked on this trip yet." } },
+    { "screenshot": "created" },
+    { "click": "button:has-text('Trip options') >> visible=true" },
+    { "click": "button:has-text('Delete trip') >> visible=true" },
+    { "click": "[role='dialog'] button[type=submit]" },
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "wait_for": "body:not(:has([data-sonner-toast]))" },
+    { "scroll_to": "h1" },
+    { "hover": "h1" }
+  ]
+}

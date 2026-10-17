@@ -3,7 +3,7 @@
   "page": "trips",
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
-    { "click_if_present": "button[aria-label='Add a booking']" },
+    { "click_if_present": "button[aria-label='Add']" },
     { "click": "button:has-text('Add a past trip')" },
     { "wait_for": "label:has(> span:text-is('Country')) select" },
     { "select": { "selector": "label:has(> span:text-is('Country')) select", "index": 62 } },

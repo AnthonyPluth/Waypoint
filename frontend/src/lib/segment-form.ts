@@ -1,4 +1,4 @@
-import type { Segment, SegmentBody, SegmentEdit } from "./api-types";
+import type { Person, Segment, SegmentBody, SegmentEdit } from "./api-types";
 import { isUsState } from "./countries";
 import { amountText, toMinor } from "./money";
 import { instant, untimed } from "./trips";
@@ -70,6 +70,10 @@ export const nextVisitRow = (previous: VisitRow): VisitRow => ({ destination: ""
 export const blank = (tripId: number | null = null, currency = DEFAULT_CURRENCY): Draft => ({
   id: null, tripId, kind: "flight", status: "confirmed", provider: "", confirmation: "", origin: "", destination: "", start_local: "", end_local: "",
   start_zone: "", end_zone: "", details: {}, itinerary: [], manage_url: "", seats: {}, people: [], printed: [], cost: "", currency, costSource: null,
+});
+
+export const blankFor = (people: Person[], me: number | null | undefined, tripId: number | null = null, currency = DEFAULT_CURRENCY): Draft => ({
+  ...blank(tripId, currency), people: people.some((p) => p.id === me) ? [me as number] : [],
 });
 
 export const draftOf = (s: Segment, currency = DEFAULT_CURRENCY): Draft => ({
@@ -188,7 +192,7 @@ export const STAYS: Kind[] = ["hotel", "parking"];
 export const inMore = (field: string, kind: Kind): boolean => ["manage_url", "cost", "currency"].includes(field) || (field === "address" && !STAYS.includes(kind));
 
 export const hasMore = (d: Draft): boolean =>
-  d.status !== "confirmed" || !!d.manage_url.trim() || !!d.cost.trim() || d.costSource !== null || DETAILS[d.kind].some(([key]) => !(key === "address" && STAYS.includes(d.kind)) && (d.details[key] ?? "").trim()) || (d.kind === "car" && !!d.addressField);
+  d.status !== "confirmed" || (d.kind === "flight" && (!!d.provider.trim() || !!d.confirmation.trim())) || !!d.manage_url.trim() || !!d.cost.trim() || d.costSource !== null || DETAILS[d.kind].some(([key]) => !(key === "address" && STAYS.includes(d.kind)) && (d.details[key] ?? "").trim()) || (d.kind === "car" && !!d.addressField);
 
 export const differs = (address: string | undefined, origin: string | null | undefined): boolean =>
   !!address?.trim() && address.trim().split(/\s+/).join(" ").toLowerCase() !== (origin ?? "").trim().split(/\s+/).join(" ").toLowerCase();
