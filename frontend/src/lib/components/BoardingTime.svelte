@@ -31,5 +31,6 @@
       {#if shift}<span class="rounded-full bg-signal-soft px-2 py-0.5 text-xs font-semibold text-signal-ink" data-day-shift><span aria-hidden="true">{shiftText}</span><span class="sr-only">, {shiftWords}</span></span>{/if}
     {/if}
   </p>
-  <p class="mt-1 text-sm text-muted-foreground">{unknown ? dayLabel(local) : `${dayLabel(local)} · ${city} time`}</p>
+  <p class="mt-1 text-sm text-muted-foreground">{dayLabel(local)}</p>
+  {#if !unknown}<p class="text-sm text-muted-foreground">{city} time</p>{/if}
 </div>

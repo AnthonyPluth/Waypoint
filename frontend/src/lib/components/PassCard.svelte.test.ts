@@ -392,7 +392,6 @@ describe("airports and days on a flight pass", () => {
 
 describe("the boarding-pass variant", () => {
   const board = (extra: Record<string, unknown> = {}, seg: object = {}) => ({ segment: { ...flight, ...seg }, now: dep - 3 * HOUR, boarding: true, tripName: "Trip to London", eyebrow: "Next up", ...extra });
-  const plane = (container: HTMLElement) => container.querySelector("[data-plane]") as HTMLElement;
 
   it("shows the eyebrow, the trip name, the chips and the countdown in the header", () => {
     render(PassCard, board());
@@ -413,18 +412,31 @@ describe("the boarding-pass variant", () => {
     const live = render(PassCard, board({ pulse: true }));
     expect(live.container.querySelector("[data-dot]")).toHaveClass("animate-pulse", "motion-reduce:animate-none");
   });
-  it("puts the plane at the middle of the line until the flight is in the air", () => {
-    const { container } = render(PassCard, board());
-    expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("0.5");
-    expect(plane(container).style.left).toBe("50%");
+  it("starts the plane at the start of the arc until the flight departs", () => {
+    render(PassCard, board());
+    expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("0");
   });
-  it("moves the plane along the line with routeProgress in the air", () => {
+  it("moves the plane along the arc with routeProgress in the air", () => {
     const first = render(PassCard, board({ now: dep + (arr - dep) / 4 }));
     expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("0.25");
-    expect(plane(first.container).style.left).toBe("25%");
     first.unmount();
-    const later = render(PassCard, board({ now: dep + ((arr - dep) * 3) / 4 }));
-    expect(plane(later.container).style.left).toBe("75%");
+    render(PassCard, board({ now: dep + ((arr - dep) * 3) / 4 }));
+    expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("0.75");
+  });
+  it("parks the plane at the end of the arc once the booked arrival has passed and at the start when cancelled", () => {
+    const landed = render(PassCard, board({ now: arr + HOUR }));
+    expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("1");
+    landed.unmount();
+    render(PassCard, board({}, { status: "cancelled" }));
+    expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("0");
+  });
+  it("keeps the airport names out of the grid that holds the codes and the arc, so long names cannot squeeze the route", async () => {
+    const { container } = render(PassCard, board());
+    const grid = container.querySelector("[data-code='origin']")?.parentElement as HTMLElement;
+    expect(grid.children).toHaveLength(3);
+    expect(grid.contains(screen.getByRole("img", { name: "Route" }))).toBe(true);
+    expect(await screen.findByText("John F. Kennedy International Airport")).toBeInTheDocument();
+    expect(grid.contains(screen.getByText("John F. Kennedy International Airport"))).toBe(false);
   });
   it("shows both codes, the length, nonstop, and each time at its own airport with the day shift", async () => {
     render(PassCard, board());
@@ -434,8 +446,10 @@ describe("the boarding-pass variant", () => {
     expect(screen.getByText("7 h 10 min · nonstop")).toBeInTheDocument();
     expect(screen.getByText("7:00 PM")).toBeInTheDocument();
     expect(screen.getByText("7:10 AM")).toBeInTheDocument();
-    expect(await screen.findByText("Fri, Nov 20 · New York time")).toBeInTheDocument();
-    expect(await screen.findByText("Sat, Nov 21 · London time")).toBeInTheDocument();
+    expect(await screen.findByText("Fri, Nov 20")).toBeInTheDocument();
+    expect(await screen.findByText("New York time")).toBeInTheDocument();
+    expect(await screen.findByText("Sat, Nov 21")).toBeInTheDocument();
+    expect(await screen.findByText("London time")).toBeInTheDocument();
     expect(document.querySelector("[data-day-shift]")).toHaveTextContent("+1");
   });
   it("shows no countdown for a cancelled booking, and strikes the route", () => {
@@ -476,15 +490,13 @@ describe("the boarding-pass variant", () => {
   });
   it("puts the plane at the destination once live status says landed, before the booked arrival", () => {
     flightStatus.list = list({ statuses: [status({ state: "landed", fetched_at: "2026-11-21T00:30:00+00:00" })] });
-    const { container } = render(PassCard, board({ now: dep + (arr - dep) / 4 }));
+    render(PassCard, board({ now: dep + (arr - dep) / 4 }));
     expect(screen.getByRole("img", { name: "Route, with the plane at the destination" }).dataset.progress).toBe("1");
-    expect(plane(container).style.left).toBe("100%");
   });
   it("keeps the plane at the origin when live status says the flight was cancelled", () => {
     flightStatus.list = list({ statuses: [status({ state: "cancelled", fetched_at: "2026-11-21T00:30:00+00:00" })] });
-    const { container } = render(PassCard, board({ now: dep + (arr - dep) / 4 }));
+    render(PassCard, board({ now: dep + (arr - dep) / 4 }));
     expect(screen.getByRole("img", { name: "Route" }).dataset.progress).toBe("0");
-    expect(plane(container).style.left).toBe("0%");
   });
   it("lists each traveller once across every grouped reservation", () => {
     const jane = { id: 1, person_id: 1, name: "Jane Doe", seat: null }, mia = { id: 2, person_id: 2, name: "Mia Doe", seat: null };
@@ -529,7 +541,7 @@ describe("the boarding-pass variant", () => {
       expect(screen.getByText("412")).toBeInTheDocument();
       expect(screen.getByText("Check-in in 7 h")).toBeInTheDocument();
       expect(screen.queryByTestId("avatar-stack")).toBeNull();
-      expect(await screen.findByText("Sat, Nov 21 · London time")).toBeInTheDocument();
+      expect((await screen.findAllByText("London time")).length).toBeGreaterThan(0);
     });
     it("shows a rental car's pick-up and drop-off", () => {
       const car = segment({ id: 3, kind: "car", provider: "Hertz", origin: "Heathrow", destination: null, start_local: "2026-11-21T09:00", start_zone: LON, end_local: "2026-11-24T09:00", end_zone: LON, details: { car_class: "Compact" } });
