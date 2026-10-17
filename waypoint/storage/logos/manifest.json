@@ -9,9 +9,9 @@
   {
     "name": "Delta Air Lines",
     "file": "delta-air-lines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/d/delta-air-lines.svg",
-    "upstream_path": "svg/d/delta-air-lines.svg",
-    "sha": "356a716a8ace270da7eaa0b9798831cf7a711eae"
+    "source": "https://commons.wikimedia.org/wiki/File:Delta_logo.svg",
+    "upstream_path": "Delta logo.svg",
+    "sha": "0da240dcc0ff4e7bd33a1baef78d024b56448236"
   },
   {
     "name": "United Airlines",
@@ -30,23 +30,23 @@
   {
     "name": "Alaska Airlines",
     "file": "alaska-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/alaska-airlines.svg",
-    "upstream_path": "svg/a/alaska-airlines.svg",
-    "sha": "1fdd77cf0c364c5f3b717c05632d75f216d73958"
+    "source": "https://commons.wikimedia.org/wiki/File:Alaska_Airlines_logo.svg",
+    "upstream_path": "Alaska Airlines logo.svg",
+    "sha": "2580384434ec55ae761a86ee62afee9e38667da3"
   },
   {
     "name": "Frontier Airlines",
     "file": "frontier-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/f/frontier-airlines.svg",
-    "upstream_path": "svg/f/frontier-airlines.svg",
-    "sha": "88988a5be9db027af6687b7431003dc7badc1548"
+    "source": "https://commons.wikimedia.org/wiki/File:Frontier_Airlines_logo.svg",
+    "upstream_path": "Frontier Airlines logo.svg",
+    "sha": "432e1956be19d56121de047225cedc4bf1a2cfc2"
   },
   {
     "name": "Hawaiian Airlines",
     "file": "hawaiian-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hawaiian-airlines.svg",
-    "upstream_path": "svg/h/hawaiian-airlines.svg",
-    "sha": "618e7e1eccdd04b9a0682cde6a2a6fde681c603d"
+    "source": "https://commons.wikimedia.org/wiki/File:Hawaiian_Airlines_2017_wordmark.svg",
+    "upstream_path": "Hawaiian Airlines 2017 wordmark.svg",
+    "sha": "cf055ad7d03caa8df86173e7399c25895d229812"
   },
   {
     "name": "Air Canada",
@@ -58,9 +58,9 @@
   {
     "name": "WestJet",
     "file": "westjet.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/westjet.svg",
-    "upstream_path": "svg/w/westjet.svg",
-    "sha": "a3d9425ad00c14cacc316dd7115545955c40d0aa"
+    "source": "https://commons.wikimedia.org/wiki/File:WestJetLogo2018.svg",
+    "upstream_path": "WestJetLogo2018.svg",
+    "sha": "e220be6af04f0797ee05ca2845fff0395025f381"
   },
   {
     "name": "British Airways",
@@ -92,17 +92,17 @@
   },
   {
     "name": "Austrian Airlines",
-    "file": "austrian-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/austrian-airlines.svg",
-    "upstream_path": "svg/a/austrian-airlines.svg",
-    "sha": "247591e99a752982f38c74f713473c63b2463cd7"
+    "file": "austrian-airlines.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Austrian_Airlines_Logo_2018.svg",
+    "upstream_path": "Austrian Airlines Logo 2018.svg",
+    "sha": "ceb97fbc4544874ae9e814586d81461346dbbf82"
   },
   {
     "name": "Aer Lingus",
     "file": "aer-lingus.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/aer-lingus.svg",
-    "upstream_path": "svg/a/aer-lingus.svg",
-    "sha": "6629040f0d9b1d82915458cc83a131e89c7395c4"
+    "source": "https://commons.wikimedia.org/wiki/File:Aer_Lingus_2022_logo.svg",
+    "upstream_path": "Aer Lingus 2022 logo.svg",
+    "sha": "5ba1f603bbe95cf9184dba7f2c27879794358c6e"
   },
   {
     "name": "Ryanair",
@@ -142,9 +142,9 @@
   {
     "name": "Cathay Pacific",
     "file": "cathay-pacific.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/cathay-pacific.svg",
-    "upstream_path": "svg/c/cathay-pacific.svg",
-    "sha": "ea7f8cdd98d5286207ca777f003014b5cd5c8017"
+    "source": "https://commons.wikimedia.org/wiki/File:Cathay_Pacific_Ltd._logo.svg",
+    "upstream_path": "Cathay Pacific Ltd. logo.svg",
+    "sha": "15d75c8b8cfcd90fddc00466794c923891773a8f"
   },
   {
     "name": "Japan Airlines",
@@ -156,16 +156,16 @@
   {
     "name": "All Nippon Airways",
     "file": "all-nippon-airways.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/ana.svg",
-    "upstream_path": "svg/a/ana.svg",
-    "sha": "1f24e248d7e3119baa9b0f73ab337316117e4aaf"
+    "source": "https://commons.wikimedia.org/wiki/File:All_Nippon_Airways_Logo.svg",
+    "upstream_path": "All Nippon Airways Logo.svg",
+    "sha": "aec7849a2713e2401aa3cbb39b3d420c2d27f589"
   },
   {
     "name": "Korean Air",
     "file": "korean-air.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/k/korean-air.svg",
-    "upstream_path": "svg/k/korean-air.svg",
-    "sha": "a7885618483ed0dad74850aeb7cf4e5ea7bfa7a6"
+    "source": "https://commons.wikimedia.org/wiki/File:Korean_Air_2025.svg",
+    "upstream_path": "Korean Air 2025.svg",
+    "sha": "b82d6a12088689dd39789facd4c34d7fd16b3baf"
   },
   {
     "name": "Qantas",
@@ -177,9 +177,9 @@
   {
     "name": "Air New Zealand",
     "file": "air-new-zealand.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-new-zealand.svg",
-    "upstream_path": "svg/a/air-new-zealand.svg",
-    "sha": "6fba5728c0f433762e406411966701dee36570bd"
+    "source": "https://commons.wikimedia.org/wiki/File:Air_New_Zealand_logo.svg",
+    "upstream_path": "Air New Zealand logo.svg",
+    "sha": "b626d14681ccd8bd1b23d5a1931dae7b1a485b4b"
   },
   {
     "name": "Turkish Airlines",
@@ -191,9 +191,9 @@
   {
     "name": "Aeromexico",
     "file": "aeromexico.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/aeromexico.svg",
-    "upstream_path": "svg/a/aeromexico.svg",
-    "sha": "dc2a7f7d4bbecdbc8517ca8a28f4cdeddf6cf8cd"
+    "source": "https://commons.wikimedia.org/wiki/File:Aerom%C3%A9xico_wordmark.svg",
+    "upstream_path": "Aeroméxico wordmark.svg",
+    "sha": "4a8aa7a2224c903b4d2f190163a83f040057cb66"
   },
   {
     "name": "Copa Airlines",
@@ -219,9 +219,9 @@
   {
     "name": "SAS",
     "file": "sas.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/sas.svg",
-    "upstream_path": "svg/s/sas.svg",
-    "sha": "3ff262c72505d0dff146eb2aa3514179b1188b71"
+    "source": "https://commons.wikimedia.org/wiki/File:Scandinavian_Airlines_logo.svg",
+    "upstream_path": "Scandinavian Airlines logo.svg",
+    "sha": "9143a08edc687dbdcefb7406703b96ec52b21346"
   },
   {
     "name": "Hilton",
@@ -233,9 +233,9 @@
   {
     "name": "Hyatt",
     "file": "hyatt.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hyatt.svg",
-    "upstream_path": "svg/h/hyatt.svg",
-    "sha": "6c9e50e856a3830d37b56b6787c92abe1fe73376"
+    "source": "https://commons.wikimedia.org/wiki/File:Hyatt_Logo.svg",
+    "upstream_path": "Hyatt Logo.svg",
+    "sha": "e7e7ea1b009fbf986761ea7a99e2c41783a06cc2"
   },
   {
     "name": "Marriott",
@@ -247,29 +247,30 @@
   {
     "name": "IHG Hotels & Resorts",
     "file": "ihg-hotels-resorts.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/i/intercontinental-hotels-group-1.svg",
-    "upstream_path": "svg/i/intercontinental-hotels-group-1.svg",
-    "sha": "19533fe71e8c61ac58a27ab576455573548d2ae7"
+    "source": "https://commons.wikimedia.org/wiki/File:IHG_Hotels_%26_Resorts_logo.svg",
+    "upstream_path": "IHG Hotels & Resorts logo.svg",
+    "sha": "1816697fc337ac23868780037a92a71dc65512c7"
   },
   {
     "name": "Wyndham Hotels & Resorts",
     "file": "wyndham-hotels-resorts.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/wyndham-hotels-resorts.svg",
-    "upstream_path": "svg/w/wyndham-hotels-resorts.svg",
-    "sha": "0ceb058c2413d18ac2001419feebd5b7bdce9e9c"
+    "source": "https://commons.wikimedia.org/wiki/File:Wyndham_Hotels_%26_Resorts_logo.svg",
+    "upstream_path": "Wyndham Hotels & Resorts logo.svg",
+    "sha": "cacc82bbc404acdd9672c081273ae5c3ab926a5b"
   },
   {
     "name": "Choice Hotels",
-    "file": "choice-hotels.png",
-    "source": "https://github.com/cocdeshijie/PointLens/blob/master/pointlens/assets/choice.png",
-    "sha": "1506441123fcb1396de87ab00668471f0293b685"
+    "file": "choice-hotels.svg",
+    "source": "https://commons.wikimedia.org/wiki/File:Choice_Hotels_logo.svg",
+    "sha": "f8c6dbe402b3a231e7b2428feb369746958d49e9",
+    "upstream_path": "Choice Hotels logo.svg"
   },
   {
     "name": "Best Western",
     "file": "best-western.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/b/best-western.svg",
-    "upstream_path": "svg/b/best-western.svg",
-    "sha": "ae0c1ce0e324909afb7b86f38e604179fd8638f6"
+    "source": "https://commons.wikimedia.org/wiki/File:Best_Western_Hotels_%26_Resorts_logo.svg",
+    "upstream_path": "Best Western Hotels & Resorts logo.svg",
+    "sha": "f73d29f6c369aec08f03499eabde24650962817a"
   },
   {
     "name": "Radisson Hotel Group",
@@ -280,10 +281,10 @@
   },
   {
     "name": "Accor",
-    "file": "accor.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/accor.svg",
-    "upstream_path": "svg/a/accor.svg",
-    "sha": "4175183d406e2130a16b1d2704e28d50bd7096a7"
+    "file": "accor.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Logo_Accor.png",
+    "upstream_path": "Logo Accor.png",
+    "sha": "948e6411341ed724eb2dc98e04d75535cbe59c04"
   },
   {
     "name": "Hertz",
@@ -295,44 +296,44 @@
   {
     "name": "Avis",
     "file": "avis.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/avis.svg",
-    "upstream_path": "svg/a/avis.svg",
-    "sha": "8f4310300c29bcc66885709a050cb7e5252d7da2"
+    "source": "https://commons.wikimedia.org/wiki/File:AVIS_logo_2012.svg",
+    "upstream_path": "AVIS logo 2012.svg",
+    "sha": "a6877776824e8a168b41da06d75d3ef72942720c"
   },
   {
     "name": "Budget",
     "file": "budget.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/b/budget-rent-a-car-1.svg",
-    "upstream_path": "svg/b/budget-rent-a-car-1.svg",
-    "sha": "9f2121187f054a4029cf134ecb187a30d2e3e245"
+    "source": "https://commons.wikimedia.org/wiki/File:Budget_logo.svg",
+    "upstream_path": "Budget logo.svg",
+    "sha": "01520d1f5d3d29e8e902dcb6dbf5bce1754827d2"
   },
   {
     "name": "Enterprise",
     "file": "enterprise.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/enterprise-rent-a-car.svg",
-    "upstream_path": "svg/e/enterprise-rent-a-car.svg",
-    "sha": "e52eabdb45a15f3ebc59b867638de53964c48eb7"
+    "source": "https://commons.wikimedia.org/wiki/File:Enterprise_Rent-A-Car_Logo.svg",
+    "upstream_path": "Enterprise Rent-A-Car Logo.svg",
+    "sha": "f49070087b2f3dad0f6f9af55b1e93735556929c"
   },
   {
     "name": "National",
     "file": "national.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/n/national-car-rental.svg",
-    "upstream_path": "svg/n/national-car-rental.svg",
-    "sha": "8bed5eed3d03e8e6b53edbb2f7ff0021d3648a2a"
+    "source": "https://commons.wikimedia.org/wiki/File:National-Car-Rental-Logo.svg",
+    "upstream_path": "National-Car-Rental-Logo.svg",
+    "sha": "249f1cab9094be873d3ac1347a0e846dc8f3d4c9"
   },
   {
     "name": "Alamo",
     "file": "alamo.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/alamo-rent-a-car-1.svg",
-    "upstream_path": "svg/a/alamo-rent-a-car-1.svg",
-    "sha": "c4cbbd07c66736166cb6687c0461b259724fd7ac"
+    "source": "https://commons.wikimedia.org/wiki/File:Alamo_Rent_a_Car_%28logo%29.svg",
+    "upstream_path": "Alamo Rent a Car (logo).svg",
+    "sha": "0822c0954b1d918b2885ddff00905d8e46a014d6"
   },
   {
     "name": "Sixt",
     "file": "sixt.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/sixt.svg",
-    "upstream_path": "svg/s/sixt.svg",
-    "sha": "30b1f9bb6c8e7832b2ee01e2450679a7bdba08ca"
+    "source": "https://commons.wikimedia.org/wiki/File:Sixt_Logo_2023.svg",
+    "upstream_path": "Sixt Logo 2023.svg",
+    "sha": "c5b457ba01d0de7326eccd5e0e4ba608452ee8e1"
   },
   {
     "name": "Dollar",
@@ -351,9 +352,9 @@
   {
     "name": "Europcar",
     "file": "europcar.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/europcar.svg",
-    "upstream_path": "svg/e/europcar.svg",
-    "sha": "dd0467a105946d357117d6bbc9301d215b0e3fd4"
+    "source": "https://commons.wikimedia.org/wiki/File:Europcar-Logo.svg",
+    "upstream_path": "Europcar-Logo.svg",
+    "sha": "3c7c7c9bb4f4f7529fd787e2fcc194fc37f23b75"
   },
   {
     "name": "Carnival Cruise Line",
@@ -365,37 +366,37 @@
   {
     "name": "Royal Caribbean",
     "file": "royal-caribbean.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/royal-caribbean.svg",
-    "upstream_path": "svg/r/royal-caribbean.svg",
-    "sha": "5d195d1e9fddee0e924f78f877b3a1f2260d8fec"
+    "source": "https://commons.wikimedia.org/wiki/File:Royal_Caribbean_logo_%282024%29.svg",
+    "upstream_path": "Royal Caribbean logo (2024).svg",
+    "sha": "99f48877045598de6e60a13373cdfd69af14cbd1"
   },
   {
     "name": "Norwegian Cruise Line",
     "file": "norwegian-cruise-line.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/n/norwegian-cruise-line.svg",
-    "upstream_path": "svg/n/norwegian-cruise-line.svg",
-    "sha": "406bfd5197f003cbfca9cc1bb446a2c6b36b7fcf"
+    "source": "https://commons.wikimedia.org/wiki/File:Norwegian-Cruise-Line-Logo.svg",
+    "upstream_path": "Norwegian-Cruise-Line-Logo.svg",
+    "sha": "3a9acce65a8f35d89ce721ba8e220d2c4b1e8877"
   },
   {
     "name": "Princess Cruises",
     "file": "princess-cruises.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/p/princess-cruises.svg",
-    "upstream_path": "svg/p/princess-cruises.svg",
-    "sha": "e94ae01daae58a56f48a133350b5acc81470e266"
+    "source": "https://commons.wikimedia.org/wiki/File:Princess_Cruises_Wordmark.svg",
+    "upstream_path": "Princess Cruises Wordmark.svg",
+    "sha": "7113e060348c32b335ed518dec4203f2ecd7d918"
   },
   {
     "name": "Celebrity Cruises",
     "file": "celebrity-cruises.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/celebrity-cruises.svg",
-    "upstream_path": "svg/c/celebrity-cruises.svg",
-    "sha": "f9a0a50505c758c4c8cbbe60996ad370f9e68346"
+    "source": "https://commons.wikimedia.org/wiki/File:Celebrity-Cruises-Logo.svg",
+    "upstream_path": "Celebrity-Cruises-Logo.svg",
+    "sha": "067b6a58a63ddc164af05c3f28fd330c46213de8"
   },
   {
     "name": "MSC Cruises",
-    "file": "msc-cruises.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/m/msc-cruises-1.svg",
-    "upstream_path": "svg/m/msc-cruises-1.svg",
-    "sha": "0bc4dd9fae595966400ce99eaf143e7c70e91643"
+    "file": "msc-cruises.png",
+    "source": "https://commons.wikimedia.org/wiki/File:MSC_Cruises_Logo.png",
+    "upstream_path": "MSC Cruises Logo.png",
+    "sha": "2b01b69c0a081eb0a5d24fb0f1676619b289410c"
   },
   {
     "name": "Viking",
@@ -413,10 +414,10 @@
   },
   {
     "name": "Cunard",
-    "file": "cunard.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/cunard.svg",
-    "upstream_path": "svg/c/cunard.svg",
-    "sha": "3bf5622a4d479331cfbfd2f05bc3fee75fdbf369"
+    "file": "cunard.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Cunard_logo_in_red_Microgramma_typeface.png",
+    "upstream_path": "Cunard logo in red Microgramma typeface.png",
+    "sha": "9e547dee5162e5505657d316723c0318c1101664"
   },
   {
     "name": "Seabourn",
@@ -434,9 +435,10 @@
   },
   {
     "name": "Swiss International Air Lines",
-    "file": "swr.png",
-    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/SWR.png",
-    "sha": "4363fcb309a1d9e7c976935ce95f6c0b5e3d47b4"
+    "file": "swr.svg",
+    "source": "https://commons.wikimedia.org/wiki/File:Swiss_International_Air_Lines_Logo_2011.svg",
+    "sha": "154b503e4e8ac0fae0aa1103fcb8cdc4233fe364",
+    "upstream_path": "Swiss International Air Lines Logo 2011.svg"
   },
   {
     "name": "Iberia",
@@ -455,9 +457,9 @@
   {
     "name": "LATAM Airlines",
     "file": "latam-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/l/latam-1.svg",
-    "upstream_path": "svg/l/latam-1.svg",
-    "sha": "8e3ce34d8b63e5a972eda31715a1c74b2f617af6"
+    "source": "https://commons.wikimedia.org/wiki/File:Latam-logo_-v_%28Indigo%29.svg",
+    "upstream_path": "Latam-logo -v (Indigo).svg",
+    "sha": "2d63b9c5ed294e9f9a451e57f47ab93c9d293f24"
   },
   {
     "name": "Avianca",
@@ -483,9 +485,9 @@
   {
     "name": "Hyatt Place",
     "file": "hyatt-place.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hyatt-place-1.svg",
-    "upstream_path": "svg/h/hyatt-place-1.svg",
-    "sha": "9b4dca726cc2ebc17167971bd343f59bc7841bc2"
+    "source": "https://commons.wikimedia.org/wiki/File:Hyatt_Place_logo.svg",
+    "upstream_path": "Hyatt Place logo.svg",
+    "sha": "0e83d91979b5f38c4b4fcf791feafbb03ebbcc40"
   },
   {
     "name": "Hyatt House",
@@ -496,24 +498,24 @@
   },
   {
     "name": "Courtyard by Marriott",
-    "file": "courtyard-by-marriott.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/courtyard-by-marriott.svg",
-    "upstream_path": "svg/c/courtyard-by-marriott.svg",
-    "sha": "4238aa1f3ac27f24972c7cee1857177afe09d2d3"
+    "file": "courtyard-by-marriott.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Courtyard_by_Marriott_logo.svg",
+    "upstream_path": "Courtyard by Marriott logo.svg",
+    "sha": "9bfac02e604cac37eb48a12b3cf201bb87c1e643"
   },
   {
     "name": "Residence Inn by Marriott",
-    "file": "residence-inn-by-marriott.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/residence-inn.svg",
-    "upstream_path": "svg/r/residence-inn.svg",
-    "sha": "318968e5b0c590c236d2c3440bbdb93b6defe51f"
+    "file": "residence-inn-by-marriott.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Residence_Inn_logo.svg",
+    "upstream_path": "Residence Inn logo.svg",
+    "sha": "cc929287c449f08f52f6fd19c0cf1f8e4bb6eb1f"
   },
   {
     "name": "Fairfield by Marriott",
-    "file": "fairfield-by-marriott.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/f/fairfield-inn.svg",
-    "upstream_path": "svg/f/fairfield-inn.svg",
-    "sha": "512111a940ca98b5f4c08b0841525cc191a6dad3"
+    "file": "fairfield-by-marriott.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Fairfield_by_Marriott_logo.png",
+    "upstream_path": "Fairfield by Marriott logo.png",
+    "sha": "36460d10df039020b193edc197a208e110be1223"
   },
   {
     "name": "SpringHill Suites by Marriott",
@@ -539,23 +541,23 @@
   {
     "name": "Renaissance Hotels",
     "file": "renaissance-hotels.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/renaissance-hotels.svg",
-    "upstream_path": "svg/r/renaissance-hotels.svg",
-    "sha": "2db50f25b3ae3579edc985ab6b704e16bf813f00"
+    "source": "https://commons.wikimedia.org/wiki/File:RenaissanceHotelsNew.svg",
+    "upstream_path": "RenaissanceHotelsNew.svg",
+    "sha": "f163d95e9e0c4aa8829feb94ddfe1757e999e9e1"
   },
   {
     "name": "Le Méridien",
     "file": "le-meridien.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/l/le-meridien.svg",
-    "upstream_path": "svg/l/le-meridien.svg",
-    "sha": "da72d3d238aad26700998c852d6addd24c158315"
+    "source": "https://commons.wikimedia.org/wiki/File:LeMeridien.svg",
+    "upstream_path": "LeMeridien.svg",
+    "sha": "7b2ba53aac2127bdd5be31bfa69333fdea60b5b9"
   },
   {
     "name": "The St. Regis",
     "file": "the-st-regis.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/st-regis.svg",
-    "upstream_path": "svg/s/st-regis.svg",
-    "sha": "9e3157a9e0bb48d7d9e6b37dd596ad3097bfc63f"
+    "source": "https://commons.wikimedia.org/wiki/File:St._Regis_Hotels_%26_Resorts_logo.svg",
+    "upstream_path": "St. Regis Hotels & Resorts logo.svg",
+    "sha": "1e70eb17a81548b28680ef57befaa25b0d1b6ac8"
   },
   {
     "name": "Gaylord Hotels",
@@ -567,16 +569,16 @@
   {
     "name": "W Hotels",
     "file": "w-hotels.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/w-hotels.svg",
-    "upstream_path": "svg/w/w-hotels.svg",
-    "sha": "9046b7205ad38ca486b2c9befeaa30244b936d4d"
+    "source": "https://commons.wikimedia.org/wiki/File:W_Hotels_Logo.svg",
+    "upstream_path": "W Hotels Logo.svg",
+    "sha": "d17b2d45320c8c17764204745f8fb46ba5183989"
   },
   {
     "name": "Delta Hotels by Marriott",
     "file": "delta-hotels-by-marriott.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/d/delta-hotels.svg",
-    "upstream_path": "svg/d/delta-hotels.svg",
-    "sha": "ff2c94dc0181d7b06248464a5ca8e7525c727ba4"
+    "source": "https://commons.wikimedia.org/wiki/File:Delta_Hotels_logo.svg",
+    "upstream_path": "Delta Hotels logo.svg",
+    "sha": "df05348848143a631c1ead6444512c504638d08d"
   },
   {
     "name": "City Express by Marriott",
@@ -608,10 +610,10 @@
   },
   {
     "name": "Hilton Garden Inn",
-    "file": "hilton-garden-inn.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hilton-garden-inn.svg",
-    "upstream_path": "svg/h/hilton-garden-inn.svg",
-    "sha": "3b2b6078086a95936e8e4d3db82aa7951712cede"
+    "file": "hilton-garden-inn.png",
+    "source": "https://commons.wikimedia.org/wiki/File:HGI-Logo-Color_HR.png",
+    "upstream_path": "HGI-Logo-Color HR.png",
+    "sha": "4f85453a09a6afdacb42a5f00d6ad2e70f80cc41"
   },
   {
     "name": "DoubleTree by Hilton",
@@ -622,17 +624,17 @@
   },
   {
     "name": "Embassy Suites by Hilton",
-    "file": "embassy-suites-by-hilton.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/embassy-suites.svg",
-    "upstream_path": "svg/e/embassy-suites.svg",
-    "sha": "4609d149b54bed0a70079b7de43884b2b6024941"
+    "file": "embassy-suites-by-hilton.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Embassy_Suites_Hotels.png",
+    "upstream_path": "Embassy Suites Hotels.png",
+    "sha": "3a72b0137b3df62436fb7d2ca815c1e3191942d9"
   },
   {
     "name": "Homewood Suites by Hilton",
     "file": "homewood-suites-by-hilton.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/homewood-suites.svg",
-    "upstream_path": "svg/h/homewood-suites.svg",
-    "sha": "b2b1d8527ca6284c4ccb487946f6812b6236bdb6"
+    "source": "https://commons.wikimedia.org/wiki/File:Homewood_Suites_logo_%282021%29.svg",
+    "upstream_path": "Homewood Suites logo (2021).svg",
+    "sha": "c62430423a0f71af3a52fc3feb0c2e74df5d0ff7"
   },
   {
     "name": "Conrad Hotels",
@@ -644,16 +646,16 @@
   {
     "name": "Holiday Inn Express",
     "file": "holiday-inn-express.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/holiday-inn-express.svg",
-    "upstream_path": "svg/h/holiday-inn-express.svg",
-    "sha": "f2d19877ae0dd15fcea2713d1b021dd005bb7e56"
+    "source": "https://commons.wikimedia.org/wiki/File:Holiday_Inn_Express_by_IHG_logo.svg",
+    "upstream_path": "Holiday Inn Express by IHG logo.svg",
+    "sha": "540455fe81dc5696f42f4e773ecc87a9b51377e1"
   },
   {
     "name": "Holiday Inn",
     "file": "holiday-inn.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/holiday-inn-1.svg",
-    "upstream_path": "svg/h/holiday-inn-1.svg",
-    "sha": "3240a33c1d81c7dd1e9c408e1d44e974cedd1ebd"
+    "source": "https://commons.wikimedia.org/wiki/File:Holiday_Inn_by_IHG_logo.svg",
+    "upstream_path": "Holiday Inn by IHG logo.svg",
+    "sha": "75e2c20705b34a1008295a7229ebb174d398aa9f"
   },
   {
     "name": "Crowne Plaza",
@@ -713,10 +715,10 @@
   },
   {
     "name": "AmericInn by Wyndham",
-    "file": "americinn-by-wyndham.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/americinn.svg",
-    "upstream_path": "svg/a/americinn.svg",
-    "sha": "1d568aad4b1af2189f821e5b8172969567d8a10a"
+    "file": "americinn-by-wyndham.png",
+    "source": "https://commons.wikimedia.org/wiki/File:AmericInn_logo.svg",
+    "upstream_path": "AmericInn logo.svg",
+    "sha": "7cc9675c1ed225b71874a615531727e2319c5de8"
   },
   {
     "name": "Knights Inn",
@@ -776,10 +778,10 @@
   },
   {
     "name": "Park Inn by Radisson",
-    "file": "park-inn-by-radisson.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/p/park-inn.svg",
-    "upstream_path": "svg/p/park-inn.svg",
-    "sha": "0a5ff919b338b42e25a61bfa4df65c19c2502904"
+    "file": "park-inn-by-radisson.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Park_Inn_by_Radisson_logo.png",
+    "upstream_path": "Park Inn by Radisson logo.png",
+    "sha": "a74567367697c36969912272be81363904c725f3"
   },
   {
     "name": "Fairmont Hotels",
@@ -790,24 +792,24 @@
   },
   {
     "name": "Sofitel",
-    "file": "sofitel.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/sofitel.svg",
-    "upstream_path": "svg/s/sofitel.svg",
-    "sha": "81dddc374bbcdf4bba928a2c6165dc3180fb646e"
+    "file": "sofitel.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Sofitel_Logo_2015.png",
+    "upstream_path": "Sofitel Logo 2015.png",
+    "sha": "de2dca154bea4b48d66e864c0e7658d372c06d80"
   },
   {
     "name": "Novotel",
-    "file": "novotel.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/n/novotel.svg",
-    "upstream_path": "svg/n/novotel.svg",
-    "sha": "7e4eccf6ef2f761b213a54a5ba4af7a721ed7d2c"
+    "file": "novotel.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Novotel_logo_2019.png",
+    "upstream_path": "Novotel logo 2019.png",
+    "sha": "97f342c279a73b7df7c3b732ea29a79f02b0163e"
   },
   {
     "name": "Mercure Hotels",
     "file": "mercure-hotels.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/m/mercure-hotels.svg",
-    "upstream_path": "svg/m/mercure-hotels.svg",
-    "sha": "70753bb9b1ddfa64b182e93ab8c0a60230358dff"
+    "source": "https://commons.wikimedia.org/wiki/File:Mercure_Hotels_Logo_neu.svg",
+    "upstream_path": "Mercure Hotels Logo neu.svg",
+    "sha": "3bffc1a2c628ac2ea851bc55ac5be918c7e525ca"
   },
   {
     "name": "Swissôtel",
@@ -819,9 +821,9 @@
   {
     "name": "Sheraton",
     "file": "sheraton.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/sheraton-hotels-resorts.svg",
-    "upstream_path": "svg/s/sheraton-hotels-resorts.svg",
-    "sha": "f21b394084a7775b4038d1a25229f95b44728d0f"
+    "source": "https://commons.wikimedia.org/wiki/File:Sheraton_%281%29.svg",
+    "upstream_path": "Sheraton (1).svg",
+    "sha": "707401acd95d2e412dfde5b4259476fa9b6fca41"
   },
   {
     "name": "The Ritz-Carlton",
@@ -839,9 +841,10 @@
   },
   {
     "name": "JetBlue Airways",
-    "file": "jbu.png",
-    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/JBU.png",
-    "sha": "50622351800cec6b1e5d8476a783b54d9ea85ac2"
+    "file": "jbu.svg",
+    "source": "https://commons.wikimedia.org/wiki/File:JetBlue_Airways_Logo.svg",
+    "sha": "94d2d8e212e475ae7509b2a7d231b2db895c57a5",
+    "upstream_path": "JetBlue Airways Logo.svg"
   },
   {
     "name": "Spirit Airlines",
@@ -851,9 +854,10 @@
   },
   {
     "name": "Allegiant Air",
-    "file": "aay.png",
-    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/AAY.png",
-    "sha": "7624844b2a00fc58b087015517108a4592248318"
+    "file": "aay.svg",
+    "source": "https://commons.wikimedia.org/wiki/File:Allegiant_Air_logo.svg",
+    "sha": "5d45811ae3374de86d82b89c058d2baaf9d6db55",
+    "upstream_path": "Allegiant Air logo.svg"
   },
   {
     "name": "Disney Cruise Line",
@@ -864,8 +868,9 @@
   {
     "name": "Virgin Voyages",
     "file": "virgin-voyages.svg",
-    "source": "https://github.com/kaliartistry/cruisekit/blob/main/apps/web/public/images/cruise-lines/virgin-voyages.svg",
-    "sha": "57f1858c480c814785b113c62a80043477155c9a"
+    "source": "https://commons.wikimedia.org/wiki/File:Virgin_Voyages_logo.svg",
+    "sha": "4197f4af80009951b471ef451c316c46235a001f",
+    "upstream_path": "Virgin Voyages logo.svg"
   },
   {
     "name": "Azamara",
@@ -890,9 +895,9 @@
   {
     "name": "Air Europa",
     "file": "air-europa.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-europa-1.svg",
-    "upstream_path": "svg/a/air-europa-1.svg",
-    "sha": "44831501bed7a531a81609ef2759b849079561f3"
+    "source": "https://commons.wikimedia.org/wiki/File:Air_Europa_Logo_%282015%29.svg",
+    "upstream_path": "Air Europa Logo (2015).svg",
+    "sha": "8e04a10eee88d25d17cdea65c1d34aaaf53007a3"
   },
   {
     "name": "LOT Polish Airlines",
@@ -1002,9 +1007,9 @@
   {
     "name": "Royal Air Maroc",
     "file": "royal-air-maroc.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/royal-air-maroc.svg",
-    "upstream_path": "svg/r/royal-air-maroc.svg",
-    "sha": "bcd7bc6e6a7e23e655baa67086d20647a904c5c3"
+    "source": "https://commons.wikimedia.org/wiki/File:Logo_Royal_Air_Maroc.svg",
+    "upstream_path": "Logo Royal Air Maroc.svg",
+    "sha": "d5d4c5de9faca34aa6082bddf5dbb48ed90ffd83"
   },
   {
     "name": "Kenya Airways",
@@ -1036,15 +1041,17 @@
   },
   {
     "name": "TAP Air Portugal",
-    "file": "tap.png",
-    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/TAP.png",
-    "sha": "95d6f2d03a35ec4d939bd372ed9c2eaa9d563041"
+    "file": "tap.svg",
+    "source": "https://commons.wikimedia.org/wiki/File:TAP-Portugal-Logo.svg",
+    "sha": "f356ab128ab74ba5de7a0c3ac038c17b515076a7",
+    "upstream_path": "TAP-Portugal-Logo.svg"
   },
   {
     "name": "Vueling",
-    "file": "vlg.png",
-    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/VLG.png",
-    "sha": "946173ec1c84842a9a7e4da5512bc1f066553cb6"
+    "file": "vlg.svg",
+    "source": "https://commons.wikimedia.org/wiki/File:Logo_Vueling.svg",
+    "sha": "023cf698f6d0ba4adbce0bc9940b0c07820ca923",
+    "upstream_path": "Logo Vueling.svg"
   },
   {
     "name": "Pegasus Airlines",
@@ -1074,9 +1081,10 @@
   },
   {
     "name": "EgyptAir",
-    "file": "msr.png",
-    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/MSR.png",
-    "sha": "05f86f41025da7555ea5bf0b5bcf38a5b7bd4141"
+    "file": "msr.svg",
+    "source": "https://commons.wikimedia.org/wiki/File:Egyptair-Logo-2010.svg",
+    "sha": "e022f9c8e625fa56775542c91c1ad9597b6119d9",
+    "upstream_path": "Egyptair-Logo-2010.svg"
   },
   {
     "name": "Jetstar",
@@ -1092,9 +1100,10 @@
   },
   {
     "name": "Azul",
-    "file": "azu.png",
-    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/AZU.png",
-    "sha": "fb949b85f8862468930282f59100259bd7a29263"
+    "file": "azu.svg",
+    "source": "https://commons.wikimedia.org/wiki/File:Logo_da_Azul_Linhas_A%C3%A9reas_Brasileiras.svg",
+    "sha": "0a295349dfc1d2ee3d7f55e8f684609adee8de52",
+    "upstream_path": "Logo da Azul Linhas Aéreas Brasileiras.svg"
   },
   {
     "name": "Sonesta",
@@ -1111,7 +1120,8 @@
   {
     "name": "Oceania Cruises",
     "file": "oceania-cruises.svg",
-    "source": "https://github.com/razielgaitan/double-g-proyect/blob/master/src/assets/logo/cruceros/logo-oceania-cruises.svg",
-    "sha": "75eee29776f47c7c55067dea78bee0bbbec2b232"
+    "source": "https://commons.wikimedia.org/wiki/File:Oceania_cruises_logo.svg",
+    "sha": "c80cee565bcb8e8b4e5997bd0a9cfc6e6699f567",
+    "upstream_path": "Oceania cruises logo.svg"
   }
 ]

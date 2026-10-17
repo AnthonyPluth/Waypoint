@@ -15,7 +15,7 @@ class CatalogTests(unittest.TestCase):
         for entry in entries:
             with self.subTest(brand=entry["name"]):
                 self.assertEqual(entry["file"], entry["file"].rsplit("/", 1)[-1])
-                self.assertTrue(entry["source"].startswith("https://github.com/"))
+                self.assertTrue(entry["source"].startswith(("https://github.com/", "https://commons.wikimedia.org/wiki/File:")))
                 self.assertRegex(entry["sha"], r"^[a-f0-9]{40}$")
                 body, content_type = bundled_logos.read(entry["name"])
                 if content_type == "image/png":
