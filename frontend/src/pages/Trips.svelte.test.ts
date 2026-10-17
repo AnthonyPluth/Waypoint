@@ -8,10 +8,10 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import type { Person, Trip } from "$lib/api-types";
-import { route } from "$lib/app.svelte";
+import { app, route } from "$lib/app.svelte";
 import { panes } from "$lib/panes.svelte";
 import { viewport } from "$lib/phone.svelte";
-import { segment, trip } from "../test/fixtures";
+import { segment, state, trip } from "../test/fixtures";
 import { bookingOptions } from "../test/menu";
 import Trips from "./Trips.svelte";
 
@@ -38,7 +38,7 @@ beforeEach(() => {
   location.hash = "#trips";
   serve();
 });
-afterEach(() => { vi.useRealTimers(); panes.two = false; viewport.phone = false; });
+afterEach(() => { vi.useRealTimers(); panes.two = false; viewport.phone = false; app.state = null; });
 const person = (name: string) => screen.getByRole("button", { name });
 const travelling = () => screen.getByRole("group", { name: "Travelling" });
 const user = () => userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -634,13 +634,66 @@ describe("on a phone", () => {
     expect(screen.getByRole("group", { name: "Show" })).toBeInTheDocument();
   });
 
-  it("offers adding a booking or a past trip from one button", async () => {
+  it("offers adding a trip, a booking or a past trip from one button", async () => {
     render(Trips);
     const u = user();
-    await u.click(await screen.findByRole("button", { name: "Add a booking" }));
-    await u.click(within(screen.getByRole("group", { name: "Add a booking" })).getByRole("button", { name: "Add a past trip" }));
+    await u.click(await screen.findByRole("button", { name: "Add" }));
+    const menu = within(screen.getByRole("group", { name: "Add" }));
+    expect(menu.getAllByRole("button").map((b) => b.textContent)).toEqual(["Add a trip", "Add a booking", "Add a past trip"]);
+    await u.click(menu.getByRole("button", { name: "Add a past trip" }));
     expect(await screen.findByRole("button", { name: "Add booking" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add a booking" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+  });
+
+  it("adds a trip from a name alone and opens its page", async () => {
+    app.state = state({ person_id: 1 });
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (path === "/api/trips" && opts?.method === "POST") return trip([], { id: 8, name: "Lisbon" });
+      return path === "/api/people" ? { people: [jane, sam] } : { trips: [london] };
+    });
+    render(Trips);
+    const u = user();
+    await u.click(await screen.findByRole("button", { name: "Add" }));
+    await u.click(screen.getByRole("button", { name: "Add a trip" }));
+    await u.type(screen.getByLabelText("Where to, or a name"), "Lisbon");
+    await u.click(screen.getByRole("button", { name: "Add trip" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips", { method: "POST", body: { name: "Lisbon", people: [1] } }));
+    await waitFor(() => expect(location.hash).toBe("#trip/8"));
+  });
+
+  it("offers Add a trip first on a wide screen, and Cancel returns to the list", async () => {
+    viewport.phone = false;
+    render(Trips);
+    const u = user();
+    await u.click(await screen.findByRole("button", { name: /Add a trip/ }));
+    expect(screen.getByLabelText("Where to, or a name")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add a booking/ })).toBeNull();
+    await u.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByLabelText("Where to, or a name")).toBeNull();
+    expect(screen.getByRole("button", { name: /Add a booking/ })).toBeInTheDocument();
+  });
+
+  it("opens the quick trip form when sent here to add a trip", async () => {
+    route.query = "add=trip";
+    render(Trips);
+    expect(await screen.findByLabelText("Where to, or a name")).toBeInTheDocument();
+  });
+
+  it("ticks only the signed-in person on a new booking", async () => {
+    viewport.phone = false;
+    app.state = state({ person_id: 2 });
+    render(Trips);
+    await user().click(await screen.findByRole("button", { name: /Add a booking/ }));
+    expect(screen.getByRole("checkbox", { name: "Sam Doe" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Jane Doe" })).not.toBeChecked();
+  });
+
+  it("ticks no one when the signed-in person is not in the list", async () => {
+    viewport.phone = false;
+    app.state = state({ person_id: 99 });
+    render(Trips);
+    await user().click(await screen.findByRole("button", { name: /Add a booking/ }));
+    expect(screen.getAllByRole("checkbox").filter((c) => (c as HTMLInputElement).checked)).toEqual([]);
   });
 });
 

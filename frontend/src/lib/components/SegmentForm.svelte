@@ -154,12 +154,7 @@
           <select bind:value={d.kind} disabled={editing} class={selectClass}>
             {#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}
           </select></label>
-        {#if !visit}
-          <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel chain or booking site" : d.kind === "car" ? "Rental company" : d.kind === "train" ? "Railway" : d.kind === "cruise" ? "Cruise line" : d.kind === "parking" ? "Parking operator" : "Airline"}</span>
-            <Input bind:value={d.provider} maxlength={100} autocomplete="off" placeholder={d.kind === "flight" ? "American Airlines" : d.kind === "hotel" ? "Marriott" : ""} /></label>
-          <label class={label}><span class="font-medium">Confirmation code</span>
-            <Input bind:value={d.confirmation} maxlength={50} autocomplete="off" spellcheck={false} /></label>
-        {/if}
+        {#if !visit && !flight}{@render providerFields()}{/if}
       </section>
 
       <section class={group} aria-labelledby={fieldId("where")}>
@@ -334,6 +329,7 @@
         <details class="rounded-xl border border-border" bind:open={moreOpen} data-more>
           <summary class="cursor-pointer px-3 py-2.5 text-sm font-medium">More details</summary>
           <div class="flex flex-col gap-4 p-3 pt-1">
+            {#if flight}{@render providerFields()}{/if}
             <label class={label}><span class="font-medium">Status</span>
               <select bind:value={d.status} class={selectClass}>
                 <option value="confirmed">Confirmed</option><option value="changed">Changed</option><option value="cancelled">Cancelled</option>
@@ -388,6 +384,13 @@
 </form>
 
 <DiscardDialog {guard} />
+
+{#snippet providerFields()}
+  <label class={label}><span class="font-medium">{d.kind === "hotel" ? "Hotel chain or booking site" : d.kind === "car" ? "Rental company" : d.kind === "train" ? "Railway" : d.kind === "cruise" ? "Cruise line" : d.kind === "parking" ? "Parking operator" : "Airline"}</span>
+    <Input bind:value={d.provider} maxlength={100} autocomplete="off" placeholder={d.kind === "flight" ? "American Airlines" : d.kind === "hotel" ? "Marriott" : ""} /></label>
+  <label class={label}><span class="font-medium">Confirmation code</span>
+    <Input bind:value={d.confirmation} maxlength={50} autocomplete="off" spellcheck={false} /></label>
+{/snippet}
 
 {#snippet fieldError(field: string)}
   {#if shown[field]}<p id={fieldId(field)} class="text-sm text-signal-ink" data-error>{shown[field]}</p>{/if}

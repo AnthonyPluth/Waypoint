@@ -33,7 +33,7 @@
   import TripDetails from "$lib/components/TripDetails.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
   import { countNote, formatMoney, formatTotals } from "$lib/money";
-  import { blank, draftOf, KINDS, type Draft } from "$lib/segment-form";
+  import { blankFor, draftOf, KINDS, type Draft } from "$lib/segment-form";
   import { appWord, bookingCards, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, samePlace, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Plus from "@lucide/svelte/icons/plus";
@@ -298,7 +298,7 @@
     </div>
     {#if !form}
       <div class="flex flex-wrap gap-2">
-        <Button onclick={() => { focus = ""; form = blank(t.id, t.costs.totals[0]?.currency); }}><Plus /> Add a booking</Button>
+        <Button onclick={() => { focus = ""; form = blankFor(people, app.state?.person_id, t.id, t.costs.totals[0]?.currency); }}><Plus /> Add a booking</Button>
         <OptionsMenu label="Trip options" text="Trip options" items={[
           { label: "Merge another trip", onselect: () => { mergeWith = ""; merging = true; void loadOthers(); } },
           { label: "Delete trip", destructive: true, onselect: () => { deleting = true; } },

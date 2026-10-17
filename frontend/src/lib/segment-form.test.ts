@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blank, body, DETAILS, draftOf, longFlightWarning, MAX_VISITS, nextVisitRow, problem, visitBodies, visitRows, type Draft, type Kind, type VisitRow } from "./segment-form";
+import { blank, blankFor, body, DETAILS, draftOf, hasMore, longFlightWarning, MAX_VISITS, nextVisitRow, problem, visitBodies, visitRows, type Draft, type Kind, type VisitRow } from "./segment-form";
 import { segment } from "../test/fixtures";
 
 const flight = (extra: Partial<Draft> = {}): Draft => ({ ...blank(), origin: "JFK", destination: "LHR", start_local: "2026-11-20T19:00", end_local: "2026-11-21T07:10", people: [1], ...extra });
@@ -340,5 +340,33 @@ describe("a rental car's one pick-up field", () => {
     const stored = { address: "1 Rental Way, Bristol BS48 3DY" };
     expect(body(car({ pickup: "Example Rental", details: { address: "2 Depot Road" } })).details?.address).toBe("2 Depot Road");
     expect(body(car({ pickup: "Example Rental", details: { ...stored, address: "" } })).details?.address).toBe("Example Rental");
+  });
+});
+
+describe("who a new booking starts with", () => {
+  const people = [{ id: 1 }, { id: 2 }] as never;
+
+  it("ticks only the signed-in person", () => {
+    expect(blankFor(people, 2).people).toEqual([2]);
+    expect(blankFor(people, 1, 5, "EUR")).toMatchObject({ people: [1], tripId: 5, currency: "EUR" });
+  });
+
+  it("ticks no one when the signed-in person is unknown or not in the list", () => {
+    expect(blankFor(people, null).people).toEqual([]);
+    expect(blankFor(people, undefined).people).toEqual([]);
+    expect(blankFor(people, 9).people).toEqual([]);
+  });
+});
+
+describe("when a flight's More details opens by itself", () => {
+  it("stays closed for a new flight and opens for an airline or a confirmation code", () => {
+    expect(hasMore(flight())).toBe(false);
+    expect(hasMore(flight({ provider: "Example Air" }))).toBe(true);
+    expect(hasMore(flight({ confirmation: "ABC123" }))).toBe(true);
+    expect(hasMore(flight({ provider: "  ", confirmation: " " }))).toBe(false);
+  });
+
+  it("does not open for a hotel's chain, which stays under Booking", () => {
+    expect(hasMore(hotel({ provider: "Marriott" }))).toBe(false);
   });
 });
