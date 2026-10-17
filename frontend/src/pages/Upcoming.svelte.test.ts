@@ -790,20 +790,20 @@ describe("Upcoming side column", () => {
     expect(screen.getByTestId("trip-totals").children[2]).toHaveTextContent("Cities2");
   });
 
-  it("lists the next two trips after the featured one, with an All trips link", async () => {
+  it("lists every trip after the featured one, soonest first, with an All trips link", async () => {
     at("2026-11-20T09:00:00-05:00");
     serveWith([porto, london, third, lisbon], withPlaces);
     render(Upcoming);
     const card = await screen.findByRole("region", { name: "Later" });
     const rows = within(card).getAllByRole("listitem");
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent("Dec 30");
     expect(rows[0]).toHaveTextContent("Lisbon in winter");
     expect(rows[0]).toHaveTextContent("In 40 days · Lisbon");
     expect(within(rows[0]).getByRole("link", { name: "Lisbon in winter" })).toHaveAttribute("href", "#trip/2");
     expect(rows[1]).toHaveTextContent("Porto weekend");
     expect(rows[1]).toHaveTextContent("In 82 days · 2 nights");
-    expect(within(card).queryByText("Rome")).toBeNull();
+    expect(rows[2]).toHaveTextContent("Rome");
     expect(within(card).getByRole("link", { name: "All trips" })).toHaveAttribute("href", "#trips?when=upcoming");
   });
 

@@ -2,7 +2,6 @@ import type { Segment, Trip, TripPlaces } from "./api-types";
 import type { Stop } from "./route-replay";
 import { daysBetween, dayParts, placeOf, splitTrips } from "./trips";
 
-export const LATER_LIMIT = 2;
 const AIRPORT_CODE = /^[A-Za-z]{3}$/;
 
 const head = (text: string): string => text.split(",")[0].trim();
@@ -42,7 +41,7 @@ export const tripTotals = (trip: Trip, places: TripPlaces | null = null): Totals
 export function laterTrips(trips: Trip[], featured: Trip, today: string): Trip[] {
   const upcoming = splitTrips(trips, today).upcoming.filter((t) => t.start_date && t.start_date >= today);
   const after = upcoming.findIndex((t) => t.id === featured.id);
-  return upcoming.filter((t, i) => t.id !== featured.id && (after < 0 || i > after)).slice(0, LATER_LIMIT);
+  return upcoming.filter((t, i) => t.id !== featured.id && (after < 0 || i > after));
 }
 
 export function startsIn(trip: Trip, today: string): string {
