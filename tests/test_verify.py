@@ -88,6 +88,36 @@ class RunTests(unittest.TestCase):
             self.assertEqual(verify.run([]), 2)
         self.assertIn("npm ci", out.call_args.args[0])
 
+    def test_without_libfaketime_it_stops_and_says_how_to_install_it(self):
+        with mock.patch("os.path.isdir", return_value=True), mock.patch("os.path.isfile", return_value=True), \
+                mock.patch("shutil.which", return_value="/usr/bin/node"), mock.patch.object(verify, "find_faketime", return_value=None), \
+                mock.patch("builtins.print") as out, mock.patch("subprocess.run") as ran:
+            self.assertEqual(verify.run([]), 2)
+        self.assertIn("sudo apt-get install libfaketime", out.call_args.args[0])
+        self.assertIn("macOS", out.call_args.args[0])
+        ran.assert_not_called()
+
+
+class FrozenClockTests(unittest.TestCase):
+    def test_the_library_is_found_where_debian_puts_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            library = os.path.join(tmp, "libfaketime.so.1")
+            self.assertIsNone(verify.find_faketime((library,)))
+            open(library, "w").close()
+            self.assertEqual(verify.find_faketime(("/nowhere/x.so", library)), library)
+
+    def test_the_server_and_the_seed_run_on_one_fixed_date_in_one_zone(self):
+        env = verify.frozen_env({"PATH": "/bin", "TZ": "America/Denver"}, "/lib/libfaketime.so.1")
+        self.assertEqual((env["LD_PRELOAD"], env["FAKETIME"], env["TZ"]), ("/lib/libfaketime.so.1", verify.FROZEN_NOW, "UTC"))
+        self.assertEqual(env["PATH"], "/bin")
+
+    def test_the_browser_gets_the_same_date_as_the_server(self):
+        self.assertEqual(verify.FROZEN_NOW_ISO, verify.FROZEN_NOW.replace(" ", "T") + "Z")
+
+    def test_images_go_to_the_docs_assets_and_the_report_stays_in_artifacts(self):
+        self.assertTrue(verify.IMAGES.endswith(os.path.join("docs", "src", "assets", "screenshots")))
+        self.assertTrue(verify.OUT.endswith(os.path.join("artifacts", "verify")))
+
 
 if __name__ == "__main__":
     unittest.main()

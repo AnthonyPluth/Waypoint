@@ -23,7 +23,7 @@ SEMGREP ?= pipx run semgrep==1.146.0
 
 .PHONY: setup check lint python-lint frontend-lint semgrep test test-parallel test-pg test-timings fix \
 	frontend-check frontend-typecheck frontend-test frontend-build docs docs-build verify feature-map feature-map-check \
-	fleet-checks api-contract api-contract-check pr-screenshots
+	fleet-checks api-contract api-contract-check
 
 # frontend-lint is a prerequisite of both lint and frontend-check, and make runs it once.
 check: lint feature-map-check api-contract-check fleet-checks test-parallel frontend-check docs-build
@@ -110,9 +110,9 @@ docs-build: docs/node_modules
 	cd docs && $(NPM) run build
 
 # Runs the real app on made-up demo data and drives it with Playwright: each page at phone, tablet and desktop widths, plus
-# the scripted flows in frontend/verify/flows. Screenshots (full page, and `-top`: the viewport only), console errors and
-# failed requests go to artifacts/verify/; it
-# fails on a console error or a 5xx. `make verify PAGES="upcoming settings"` visits only those pages.
+# the scripted flows in frontend/verify/flows, under libfaketime so the clock is fixed. Full-page images at phone and
+# desktop go to docs/src/assets/screenshots/ (committed); the report, console errors and failed requests go to
+# artifacts/verify/; it fails on a console error or a 5xx. `make verify PAGES="upcoming settings"` visits only those pages.
 verify: frontend/node_modules frontend-build
 	$(PYTHON) run.py verify $(PAGES)
 
@@ -131,13 +131,6 @@ api-contract:
 
 api-contract-check:
 	$(PYTHON) tools/api_contract.py --check
-
-# Pushes make verify's `*-top.png` screenshots to the pr-screenshots branch (pr-$(PR)/) and prints the markdown for the
-# PR's comment (tools/pr_screenshots.py). `make pr-screenshots PR=12 FILES="artifacts/verify/upcoming-phone-top.png …"` picks
-# files; trailers for the commit go in $PR_SCREENSHOTS_TRAILERS and its git settings (such as a signing program) in $PR_SCREENSHOTS_GIT_CONFIG, one KEY=VALUE per line (the script reads it from the environment). Demo data only: the repository is public.
-pr-screenshots:
-	@test -n "$(PR)" || { echo "usage: make pr-screenshots PR=<pull request number> [FILES=\"…\"]" >&2; exit 2; }
-	@$(PYTHON) tools/pr_screenshots.py $(PR) $(FILES)
 
 # Checks that replaced instructions (tools/fleet_checks.py): one Alembic head, a test for each new migration, the
 # workflows' conventions, and the Co-Authored-By trailer on your commits since main, as CI checks a pull request's.
