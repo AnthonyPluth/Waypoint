@@ -2,9 +2,9 @@
   {
     "name": "American Airlines",
     "file": "american-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/american-airlines.svg",
-    "upstream_path": "svg/a/american-airlines.svg",
-    "sha": "a01ff502674d839fff1eeb763d4bb8007b06e21f"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/americanairlines.svg",
+    "upstream_path": "icons/americanairlines.svg",
+    "sha": "bbbe22d15fce5d74d8512457029a869e481fd2a4"
   },
   {
     "name": "Delta Air Lines",
@@ -15,15 +15,17 @@
   },
   {
     "name": "United Airlines",
-    "file": "ual.png",
-    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/UAL.png",
-    "sha": "eb91098a91a9c91fc18bd03d4d028164205e3a7f"
+    "file": "ual.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/unitedairlines.svg",
+    "sha": "2958b7ceb830ba75e5020e097a244e734ecd73d6",
+    "upstream_path": "icons/unitedairlines.svg"
   },
   {
     "name": "Southwest Airlines",
-    "file": "swa.png",
-    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/SWA.png",
-    "sha": "18bfe9b270b5afbf9bcb4175041f69632880ed9d"
+    "file": "swa.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/southwestairlines.svg",
+    "sha": "07cd97ef3dfdfd2e14ea5c6f08223384258ebecd",
+    "upstream_path": "icons/southwestairlines.svg"
   },
   {
     "name": "Alaska Airlines",
@@ -49,9 +51,9 @@
   {
     "name": "Air Canada",
     "file": "air-canada.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-canada.svg",
-    "upstream_path": "svg/a/air-canada.svg",
-    "sha": "646c0ca9977f8d4a2d493c2551e08ecb8a52cef6"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/aircanada.svg",
+    "upstream_path": "icons/aircanada.svg",
+    "sha": "a4f3ba2afc047967465f7a7fec5506903382309d"
   },
   {
     "name": "WestJet",
@@ -63,30 +65,30 @@
   {
     "name": "British Airways",
     "file": "british-airways.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/b/british-airways.svg",
-    "upstream_path": "svg/b/british-airways.svg",
-    "sha": "561f59fa071f6a2406b3b5dce824b9dbc5a2a427"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/britishairways.svg",
+    "upstream_path": "icons/britishairways.svg",
+    "sha": "ad710c50c8cbcab2c86a2e5bc458b292f760195e"
   },
   {
     "name": "Air France",
     "file": "air-france.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-france.svg",
-    "upstream_path": "svg/a/air-france.svg",
-    "sha": "e9f994906319df31c8839345faefcd783bc6a537"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/airfrance.svg",
+    "upstream_path": "icons/airfrance.svg",
+    "sha": "7d39a649fc27f0108c7fe5e80bf9a4058ab33878"
   },
   {
     "name": "KLM",
     "file": "klm.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/k/klm.svg",
-    "upstream_path": "svg/k/klm.svg",
-    "sha": "862aa604f96c147a5f72a8a7e1070a16024d638e"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/klm.svg",
+    "upstream_path": "icons/klm.svg",
+    "sha": "77ba4cc5d2eff646f42a86ec3eb5843fc59cfdcc"
   },
   {
     "name": "Lufthansa",
     "file": "lufthansa.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/l/lufthansa.svg",
-    "upstream_path": "svg/l/lufthansa.svg",
-    "sha": "555ab1694da666262880d64619ae804a81b703f8"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/lufthansa.svg",
+    "upstream_path": "icons/lufthansa.svg",
+    "sha": "9830ecca31ee9d3aeea1a94fbece09d9edb495ee"
   },
   {
     "name": "Austrian Airlines",
@@ -105,37 +107,37 @@
   {
     "name": "Ryanair",
     "file": "ryanair.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/ryanair.svg",
-    "upstream_path": "svg/r/ryanair.svg",
-    "sha": "8e51afc15861066a00d7ae310a3b63f774f9e822"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/ryanair.svg",
+    "upstream_path": "icons/ryanair.svg",
+    "sha": "505568e46aefb296688481fc36bb56622b1763af"
   },
   {
     "name": "Emirates",
     "file": "emirates.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/emirates-1.svg",
-    "upstream_path": "svg/e/emirates-1.svg",
-    "sha": "ea7459f131157dc38b421aa7574070bc79ea44de"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/emirates.svg",
+    "upstream_path": "icons/emirates.svg",
+    "sha": "c667e77930f98d814aa6f5a274717a7cda7ac702"
   },
   {
     "name": "Qatar Airways",
     "file": "qatar-airways.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/q/qatar-airways.svg",
-    "upstream_path": "svg/q/qatar-airways.svg",
-    "sha": "df349868ef0b6ea0daa2897d84285033ac9b84cd"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/qatarairways.svg",
+    "upstream_path": "icons/qatarairways.svg",
+    "sha": "dd216f23da9d9fa8d49b3994ef5244704f67a2c1"
   },
   {
     "name": "Etihad Airways",
     "file": "etihad-airways.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/etihad-airways-1.svg",
-    "upstream_path": "svg/e/etihad-airways-1.svg",
-    "sha": "34eb5cb863b3d56a82e76f4c6537876ce9f57f19"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/etihadairways.svg",
+    "upstream_path": "icons/etihadairways.svg",
+    "sha": "8664bf61eb7d83df2bdaabf163ab01d795f16a10"
   },
   {
     "name": "Singapore Airlines",
     "file": "singapore-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/singapore-airlines.svg",
-    "upstream_path": "svg/s/singapore-airlines.svg",
-    "sha": "c6b4c09b9f332d1cdb71c491cd21af4602d546ea"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/singaporeairlines.svg",
+    "upstream_path": "icons/singaporeairlines.svg",
+    "sha": "5ace0439acf30cea97c79349b9b995b31c7cb8ac"
   },
   {
     "name": "Cathay Pacific",
@@ -147,9 +149,9 @@
   {
     "name": "Japan Airlines",
     "file": "japan-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/j/japan-airlines.svg",
-    "upstream_path": "svg/j/japan-airlines.svg",
-    "sha": "b0a1c5405f6363597167926a5b77857cfe168843"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/japanairlines.svg",
+    "upstream_path": "icons/japanairlines.svg",
+    "sha": "7666c89afd95ce1ac499c3c5c705b56337c7ccdb"
   },
   {
     "name": "All Nippon Airways",
@@ -168,9 +170,9 @@
   {
     "name": "Qantas",
     "file": "qantas.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/q/qantas.svg",
-    "upstream_path": "svg/q/qantas.svg",
-    "sha": "6162167b2321200ea489aae7d1b9abee3d9038ce"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/qantas.svg",
+    "upstream_path": "icons/qantas.svg",
+    "sha": "deab9248551a4c7b9e765bca3bfcd08fa42083a7"
   },
   {
     "name": "Air New Zealand",
@@ -182,9 +184,9 @@
   {
     "name": "Turkish Airlines",
     "file": "turkish-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/t/turkish-airlines-1.svg",
-    "upstream_path": "svg/t/turkish-airlines-1.svg",
-    "sha": "96dc1081e89ab8f79123e031317bf3eb11c02cf2"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/turkishairlines.svg",
+    "upstream_path": "icons/turkishairlines.svg",
+    "sha": "54dda18d1a400f99a572762904c1e82d04296080"
   },
   {
     "name": "Aeromexico",
@@ -196,23 +198,23 @@
   {
     "name": "Copa Airlines",
     "file": "copa-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/copa-airlines.svg",
-    "upstream_path": "svg/c/copa-airlines.svg",
-    "sha": "1d0bd234565c853d547c9ca41424a96359bba46e"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/copaairlines.svg",
+    "upstream_path": "icons/copaairlines.svg",
+    "sha": "4d78014a259b0b36605d28f8754b50e87a8c8b09"
   },
   {
     "name": "Air India",
     "file": "air-india.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-india.svg",
-    "upstream_path": "svg/a/air-india.svg",
-    "sha": "2c8cac583e0ceb356b97fb2ec2773922e8261b3e"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/airindia.svg",
+    "upstream_path": "icons/airindia.svg",
+    "sha": "bd86a4f4b757eecae31a0f30ec9057929772662e"
   },
   {
     "name": "Ethiopian Airlines",
     "file": "ethiopian-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/ethiopian-airlines.svg",
-    "upstream_path": "svg/e/ethiopian-airlines.svg",
-    "sha": "a7e069b6396f4e26af44b6c11921b3b5864de5fc"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/ethiopianairlines.svg",
+    "upstream_path": "icons/ethiopianairlines.svg",
+    "sha": "5445b132f32651539c88fc47583d7d5c0b94e628"
   },
   {
     "name": "SAS",
@@ -224,9 +226,9 @@
   {
     "name": "Hilton",
     "file": "hilton.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hilton.svg",
-    "upstream_path": "svg/h/hilton.svg",
-    "sha": "f544eb9b903c2d6a7944bdd01930fc2279c2d502"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/hilton.svg",
+    "upstream_path": "icons/hilton.svg",
+    "sha": "de08e17da4486da6b3b0c7bfe7bc1a078f3b7111"
   },
   {
     "name": "Hyatt",
@@ -238,9 +240,9 @@
   {
     "name": "Marriott",
     "file": "marriott.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/m/marriott.svg",
-    "upstream_path": "svg/m/marriott.svg",
-    "sha": "a59c6e8993b059bce1f8ce485b060b9264359778"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/marriott.svg",
+    "upstream_path": "icons/marriott.svg",
+    "sha": "baab3051e5ee0c64413661e0a2dfb427ad4e5943"
   },
   {
     "name": "IHG Hotels & Resorts",
@@ -439,16 +441,16 @@
   {
     "name": "Iberia",
     "file": "iberia.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/i/iberia-airlines.svg",
-    "upstream_path": "svg/i/iberia-airlines.svg",
-    "sha": "578fd729b781d2f1ff85621815b15e055e57da45"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/iberia.svg",
+    "upstream_path": "icons/iberia.svg",
+    "sha": "5d9686f545b3a829e6c06e91b2359a85871c6ddd"
   },
   {
     "name": "easyJet",
     "file": "easyjet.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/easyjet-airline.svg",
-    "upstream_path": "svg/e/easyjet-airline.svg",
-    "sha": "910f32cae82f2ffb948d9714939e10fa37650011"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/easyjet.svg",
+    "upstream_path": "icons/easyjet.svg",
+    "sha": "1781b320747049ee1ec98ae318ca1bb86dc784b6"
   },
   {
     "name": "LATAM Airlines",
@@ -460,9 +462,9 @@
   {
     "name": "Avianca",
     "file": "avianca.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/avianca-55542.svg",
-    "upstream_path": "svg/a/avianca-55542.svg",
-    "sha": "5b5910b7ed5340b4726230614318b688144b4edc"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/avianca.svg",
+    "upstream_path": "icons/avianca.svg",
+    "sha": "464091a1cca0bbe14407934c2e5c51bdf84f60d2"
   },
   {
     "name": "Holland America Line",
@@ -881,9 +883,9 @@
   {
     "name": "Wizz Air",
     "file": "wizz-air.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/wizz-air.svg",
-    "upstream_path": "svg/w/wizz-air.svg",
-    "sha": "2ddbaf1b7055d355ddf45c01c36dc740cbeae793"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/wizzair.svg",
+    "upstream_path": "icons/wizzair.svg",
+    "sha": "d62a9534e1c984b3e34c3821e67f109e43d3fe4b"
   },
   {
     "name": "Air Europa",
@@ -895,9 +897,9 @@
   {
     "name": "LOT Polish Airlines",
     "file": "lot-polish-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/l/lot-polish-airlines.svg",
-    "upstream_path": "svg/l/lot-polish-airlines.svg",
-    "sha": "2c2af1d08a49cea60a7cc595ac92512465752822"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/lotpolishairlines.svg",
+    "upstream_path": "icons/lotpolishairlines.svg",
+    "sha": "47abc2f46fd9bb87de7aad2977c12d85463acf60"
   },
   {
     "name": "ITA Airways",
@@ -909,23 +911,23 @@
   {
     "name": "Air Transat",
     "file": "air-transat.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-transat.svg",
-    "upstream_path": "svg/a/air-transat.svg",
-    "sha": "dd9c26b20a7e83b9db3e884149e9dec4823c11b4"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/airtransat.svg",
+    "upstream_path": "icons/airtransat.svg",
+    "sha": "ffb0ba3e8e19d5ed5519db14131c2a23d5c2e192"
   },
   {
     "name": "Air China",
     "file": "air-china.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/air-china.svg",
-    "upstream_path": "svg/a/air-china.svg",
-    "sha": "19117a8571f4f8741262d3465656b2c253c614fe"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/airchina.svg",
+    "upstream_path": "icons/airchina.svg",
+    "sha": "b96b1954729ab0e3c1c422fe6524d5ad8ca5c18b"
   },
   {
     "name": "China Eastern Airlines",
     "file": "china-eastern-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/china-eastern-airlines.svg",
-    "upstream_path": "svg/c/china-eastern-airlines.svg",
-    "sha": "e49d0ff622fbed2df41ad852d8bbdbe83f2b0ad1"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/chinaeasternairlines.svg",
+    "upstream_path": "icons/chinaeasternairlines.svg",
+    "sha": "18d3938bce43c19f32e276aee7cc7f6ee920d59d"
   },
   {
     "name": "China Airlines",
@@ -979,23 +981,23 @@
   {
     "name": "AirAsia",
     "file": "airasia.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/a/airasia.svg",
-    "upstream_path": "svg/a/airasia.svg",
-    "sha": "0c6c2b0abd1f98560cd8fb5e9952916d62d5d5fa"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/airasia.svg",
+    "upstream_path": "icons/airasia.svg",
+    "sha": "b9791ccc37f46b94f14aad76045017b4c6f53a70"
   },
   {
     "name": "IndiGo",
     "file": "indigo.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/i/indigo.svg",
-    "upstream_path": "svg/i/indigo.svg",
-    "sha": "2abb6dd2f0d8a090973dc23970008b0ee50ff36f"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/indigo.svg",
+    "upstream_path": "icons/indigo.svg",
+    "sha": "9f1be1184e94606c966922b93db38391b8692e6b"
   },
   {
     "name": "Saudia",
     "file": "saudia.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/saudia-1.svg",
-    "upstream_path": "svg/s/saudia-1.svg",
-    "sha": "62b1203e0e7d75e295d25dc491b7c77c1808a606"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/saudia.svg",
+    "upstream_path": "icons/saudia.svg",
+    "sha": "70d34969ae3b9c2f0ede927f0252d353d27d5155"
   },
   {
     "name": "Royal Air Maroc",
@@ -1021,9 +1023,9 @@
   {
     "name": "Virgin Atlantic",
     "file": "virgin-atlantic.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/v/virgin-atlantic.svg",
-    "upstream_path": "svg/v/virgin-atlantic.svg",
-    "sha": "3cb3be8229d81dab282f8c62472490a5137d9aff"
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/virginatlantic.svg",
+    "upstream_path": "icons/virginatlantic.svg",
+    "sha": "3b0bad2e1ad1d503fc69f241332ae9e223ce994b"
   },
   {
     "name": "GOL",
@@ -1046,9 +1048,10 @@
   },
   {
     "name": "Pegasus Airlines",
-    "file": "pgt.png",
-    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/PGT.png",
-    "sha": "c74164c31f74dbb6b04cb1ed95f8ed6a4729a1f6"
+    "file": "pgt.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/pegasusairlines.svg",
+    "sha": "90699c5625e7848674a0e2a7c90482bdba8d2771",
+    "upstream_path": "icons/pegasusairlines.svg"
   },
   {
     "name": "Aegean Airlines",
@@ -1058,9 +1061,10 @@
   },
   {
     "name": "China Southern Airlines",
-    "file": "csn.png",
-    "source": "https://github.com/sexym0nk3y/airline-logos/blob/main/logos/CSN.png",
-    "sha": "3eb65d00572ae370daafcb1b21cc50c8baf054b9"
+    "file": "csn.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/chinasouthernairlines.svg",
+    "sha": "c3ef3b154b4aa76c0141332066e08c11dc9ed2f0",
+    "upstream_path": "icons/chinasouthernairlines.svg"
   },
   {
     "name": "Philippine Airlines",
