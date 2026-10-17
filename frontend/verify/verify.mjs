@@ -278,10 +278,10 @@ async function main() {
       await page.screenshot({ path: join(dir, file), fullPage: true, animations: "disabled" });
       files.push(file);
     };
-    const saveDownload = async (name, download) => {
+    const saveDownload = async (name, download, dir = images) => {
       if (!writesImage(viewport)) return;
       const file = screenshotFile(name, viewport);
-      await download.saveAs(join(images, file));
+      await download.saveAs(join(dir, file));
       files.push(file);
     };
     try {
@@ -314,10 +314,10 @@ async function main() {
       await visit(`flow ${flow.name}`, viewport, async (page, shot, saveDownload) => {
         await page.goto(`${flow.host ? base.replace("127.0.0.1", flow.host) : base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
         for (const [i, step] of flow.steps.entries()) {
-          try { await runStep(page, step, (n) => shot(`flow-${flow.name}-${n}`), (n, d) => saveDownload(`flow-${flow.name}-${n}`, d)); }
+          try { await runStep(page, step, (n) => shot(`flow-${flow.name}-${n}`, out), (n, d) => saveDownload(`flow-${flow.name}-${n}`, d, out)); }
           catch (e) { throw new Error(`step ${i + 1} (${JSON.stringify(step).slice(0, 80)}): ${String(e.message).split("\n")[0]}`, { cause: e }); }
         }
-        await shot(`flow-${flow.name}`);
+        await shot(`flow-${flow.name}`, out);
       }, { allowConsole: flow.allow_console, phoneAgent: flow.phone_agent === true });
     }
   }
