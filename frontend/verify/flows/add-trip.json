@@ -18,6 +18,9 @@
     { "click": "button:has-text('Trip options') >> visible=true" },
     { "click": "button:has-text('Delete trip') >> visible=true" },
     { "click": "[role='dialog'] button[type=submit]" },
-    { "expect_text": { "selector": "h1", "text": "Trips" } }
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "wait_for": "body:not(:has([data-sonner-toast]))" },
+    { "scroll_to": "h1" },
+    { "hover": "h1" }
   ]
 }
