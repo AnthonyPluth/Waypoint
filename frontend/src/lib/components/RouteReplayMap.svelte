@@ -29,8 +29,6 @@
   const lines = $derived(boundaryShapes(boundaries, projection));
   const spots = $derived(positions(stops, projection));
   const sphere = $derived(path({ type: "Sphere" }) ?? "");
-  const terrain = landFor(() => ({ projection, width: width, height: height }));
-  const land = $derived(terrain.features.map((c) => ({ id: c.id ?? c.properties?.name ?? "", d: path(c) ?? "" })));
 
   let progress = $state(0);
   let playing = $state(false);
@@ -73,6 +71,8 @@
   const showing = (i: number) => calm || reached(i, stops.length, progress);
   const lit = (i: number) => calm || (i === stops.length - 1 ? progress >= 1 && playing && tail < LABEL_HOLD_MS : labelLit(i, stops.length, progress, !playing));
   const box = $derived(calm ? { x: 0, y: 0, w: width, h: height } : cameraAt(stops, spots, width, height, progress, legs));
+  const terrain = landFor(() => ({ projection, width, height, box, zoom: width / box.w }));
+  const land = $derived(terrain.features.map((c, i) => ({ id: i, d: path(c) ?? "" })));
   const zoom = $derived(box.w / width);
   const drawn = $derived(roadsShown(projection, zoom) ? shapes.filter((r) => inView(r, box)) : []);
   const stateLines = $derived(boundariesShown(projection, zoom) ? lines.filter((l) => inView(l, box)) : []);
