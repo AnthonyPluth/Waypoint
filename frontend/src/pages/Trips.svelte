@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { errMsg } from "$lib/act";
   import { app, route, setQuery } from "$lib/app.svelte";
   import { apiCall } from "$lib/contract";
@@ -20,7 +21,7 @@
   import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { panes } from "$lib/panes.svelte";
   import { blankFor } from "$lib/segment-form";
-  import { dayIn, inYear, matchesText, pastByYear, splitTrips, tripRangeLabel, tripPeople, tripYears, viewerZone, type TripWhen } from "$lib/trips";
+  import { dayIn, inYear, matchesText, pastByYear, splitTrips, tripRangeLabel, tripPeople, tripYears, viewerZone } from "$lib/trips";
   import TripPane from "./Trip.svelte";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Plus from "@lucide/svelte/icons/plus";
@@ -32,7 +33,8 @@
   let loadError = $state("");
   const addQuery = new URLSearchParams(route.query).get("add");
   let adding = $state<"trip" | "booking" | "past" | null>(addQuery === "trip" || addQuery === "booking" || addQuery === "past" ? addQuery : null);
-  const closeForm = () => { adding = null; if (param("add")) setQuery(""); };
+  let openedByQuery = $state(addQuery === "trip" || addQuery === "booking" || addQuery === "past");
+  const closeForm = () => { adding = null; openedByQuery = false; if (param("add")) setQuery(queryFor({})); };
 
   let latest = 0;
   async function load() {
@@ -48,16 +50,15 @@
 
   const param = (key: string) => new URLSearchParams(route.query).get(key);
   $effect(() => {
-    const wanted = param("add");
-    if (wanted === "trip" || wanted === "booking" || wanted === "past") adding = wanted;
+    const wanted = param("add");    if (wanted === "trip" || wanted === "booking" || wanted === "past") { adding = wanted; openedByQuery = true; }
+    else if (untrack(() => openedByQuery)) { adding = null; openedByQuery = false; }
   });
   const who = $derived(Number(param("who")) || null);
   const tripParam = $derived(Number(param("trip")) || null);
   const text = $derived((param("q") ?? "").trim());
-  const when = $derived<TripWhen | null>(param("when") === "upcoming" || param("when") === "past" ? (param("when") as TripWhen) : null);
   const year = $derived(Number(param("year")) || null);
   const queryFor = (change: Record<string, string | number | null>) => {
-    const next = { who, q: text, when, year, trip: tripParam, ...change };
+    const next = { who, q: text, year, trip: tripParam, add: openedByQuery ? adding : null, ...change };
     const q = new URLSearchParams();
     for (const [key, value] of Object.entries(next)) if (value) q.set(key, String(value));
     return q.toString();
@@ -68,12 +69,12 @@
     const v = field.value;
     if (!refine({ q: v.trim() ? v : null })) field.value = text;
   };
-  const clearFilters = () => refine({ who: null, q: null, when: null, year: null });
+  const clearFilters = () => refine({ who: null, q: null, year: null });
   const filtered = $derived(trips && trips.filter((t) => (!who || t.people.includes(who) || t.segments.some((s) => s.travelers.some((x) => x.person_id === who))) && matchesText(t, text) && (!year || inYear(t, year))));
   const count = (n: number) => `${n} ${n === 1 ? "trip" : "trips"}`;
   let filtersOpen = $state(false);
   const years = $derived(trips ? tripYears(trips) : []);
-  const filtering = $derived(!!(who || text || when || year));
+  const filtering = $derived(!!(who || text || year));
   let now = $state(Date.now());
   $effect(() => {
     const tick = setInterval(() => (now = Date.now()), 30_000);
@@ -84,7 +85,7 @@
   const shown = $derived.by(() => {
     if (!filtered) return null;
     const split = splitTrips(filtered, today());
-    return { upcoming: when === "past" ? [] : split.upcoming, past: when === "upcoming" ? [] : split.past };
+    return split;
   });
   const everyTrip = $derived(shown ? [...shown.upcoming, ...shown.past] : []);
   const summary = $derived(trips ? (filtering ? `${everyTrip.length} of ${count(trips.length)}` : `${count(trips.length)}${comingUp ? ` · ${comingUp} coming up` : ""}`) : "");
@@ -127,21 +128,14 @@
 {:else}
   {#if trips && trips.length > 0}
     <form class="mb-6 flex flex-col gap-3 rounded-[18px] border border-border bg-black/25 p-3 md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-3 md:p-4" role="search" aria-label="Find a trip" onsubmit={(e) => e.preventDefault()}>
-      <div class="relative w-full md:max-w-sm md:min-w-56 md:flex-1">
-        <label for="trip-search" class="sr-only">Search trips</label>
-        <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        <Input id="trip-search" type="search" class="pl-9 phone:h-11" value={text} oninput={search} placeholder="Name, destination or airline" autocomplete="off" />
-      </div>
-      <div class="flex items-center gap-2 md:gap-3">
-        <span class="eyebrow hidden md:inline" aria-hidden="true">Show</span>
-        <div class="flex flex-1 overflow-hidden rounded-xl border border-input bg-secondary" role="group" aria-label="Show">
-          {#each [["All", null], ["Upcoming", "upcoming"], ["Past", "past"]] as const as [label, value] (label)}
-            <button type="button" class={`min-h-10 phone:min-h-11 flex-1 px-4 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset ${when === value ? "bg-primary text-primary-foreground" : "hover:bg-input/60"}`}
-              aria-pressed={when === value} onclick={() => refine({ when: value })}>{label}</button>
-          {/each}
+      <div class="flex items-center gap-2 md:contents">
+        <div class="relative min-w-0 flex-1 md:max-w-sm md:min-w-56">
+          <label for="trip-search" class="sr-only">Search trips</label>
+          <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input id="trip-search" type="search" class="pl-9 phone:h-11" value={text} oninput={search} placeholder="Name, destination or airline" autocomplete="off" />
         </div>
         {#if viewport.phone && (years.length > 1 || year || people.length > 1)}
-          <Button type="button" variant="outline" size="icon" class="relative size-[46px]" onclick={() => (filtersOpen = true)}>
+          <Button type="button" variant="outline" size="icon" class="relative size-[46px] shrink-0" onclick={() => (filtersOpen = true)}>
             <SlidersHorizontal /><span class="sr-only">Filters{year || who ? ", in use" : ""}</span>
             {#if year || who}<span class="absolute top-2 right-2 size-2 rounded-full bg-primary" data-testid="filters-dot" aria-hidden="true"></span>{/if}
           </Button>
@@ -163,7 +157,7 @@
     {/if}
   {/if}
   {#if shown.upcoming.length === 0 && shown.past.length === 0}
-    <p class="text-muted-foreground">{filtering ? (who && !text && !when && !year ? "No trips with them." : "No trips match.") : "No trips yet — they’ll appear here once Waypoint can read your confirmation emails, or when you add a booking."}</p>
+    <p class="text-muted-foreground">{filtering ? (who && !text && !year ? "No trips with them." : "No trips match.") : "No trips yet — they’ll appear here once Waypoint can read your confirmation emails, or when you add a booking."}</p>
   {/if}
   {#snippet upcomingList(group: Trip[])}
     {@const day = today()}

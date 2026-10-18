@@ -804,7 +804,7 @@ describe("Upcoming side column", () => {
     expect(rows[1]).toHaveTextContent("Porto weekend");
     expect(rows[1]).toHaveTextContent("In 82 days · 2 nights");
     expect(rows[2]).toHaveTextContent("Rome");
-    expect(within(card).getByRole("link", { name: "All trips" })).toHaveAttribute("href", "#trips?when=upcoming");
+    expect(within(card).getByRole("link", { name: "All trips" })).toHaveAttribute("href", "#trips");
   });
 
   it("leaves the Later card out when there are no later trips", async () => {

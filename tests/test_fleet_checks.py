@@ -288,5 +288,50 @@ class DarkOnly(unittest.TestCase):
         self.assertEqual(fc.check_dark_only({"a.css": ":root { color-scheme: dark; --bg: #07090e }"}), [])
 
 
+class Images(unittest.TestCase):
+    PAGES = ["upcoming", "trips", "oauth-approve"]
+
+    def problems(self, *paths):
+        return fc.check_images(list(paths), self.PAGES)
+
+    def test_the_pages_come_from_verify_mjs(self):
+        pages = fc.verify_pages()
+        self.assertIn("upcoming", pages)
+        self.assertIn("oauth-approve", pages)
+        self.assertEqual(fc.verify_pages("export const PAGES = ['a', \"b-c\"];"), ["a", "b-c"])
+        self.assertEqual(fc.verify_pages("nothing here"), [])
+
+    def test_a_page_image_make_verify_writes_passes(self):
+        self.assertEqual(self.problems("docs/src/assets/screenshots/trips-phone.png", "docs/src/assets/screenshots/oauth-approve-desktop.png"), [])
+
+    def test_a_file_in_the_screenshots_folder_make_verify_would_not_write_fails(self):
+        self.assertEqual(len(self.problems("docs/src/assets/screenshots/before-after.png")), 1)
+        self.assertEqual(len(self.problems("docs/src/assets/screenshots/trips-tablet.png")), 1)
+        self.assertEqual(len(self.problems("docs/src/assets/screenshots/trips-phone-top.png")), 1)
+        self.assertEqual(len(self.problems("docs/src/assets/screenshots/nope-phone.png")), 1)
+
+    def test_the_logo_catalogue_icons_and_docs_public_files_pass(self):
+        self.assertEqual(self.problems("waypoint/storage/logos/delta.png", "waypoint/static/icon-192.png", "docs/public/screenshots/x.png", "docs/src/assets/logo.png"), [])
+
+    def test_only_the_logo_itself_is_exempt_not_files_that_start_with_its_name(self):
+        self.assertEqual(self.problems("docs/src/assets/logo.png"), [])
+        self.assertEqual(len(self.problems("docs/src/assets/logo.png-before.png")), 1)
+        self.assertEqual(len(self.problems("docs/src/assets/logo.before.png")), 1)
+
+    def test_a_hand_made_comparison_image_fails(self):
+        problems = self.problems("docs/src/assets/tabbar-glass-before-after.png", "docs/src/assets/screenshots/trips-phone.png")
+        self.assertEqual(len(problems), 1)
+        self.assertIn("docs/src/assets/tabbar-glass-before-after.png: the only images a change commits", problems[0])
+
+    def test_every_raster_format_is_counted_and_vector_and_text_files_are_not(self):
+        raster = ["a.png", "b.JPG", "c.jpeg", "d.gif", "e.webp", "f.avif", "g.ico", "h.heic", "i.bmp", "j.tif", "k.TIFF"]
+        self.assertEqual([p for p in [*raster, "l.svg", "m.md"] if fc.IMAGE.search(p)], raster)
+
+    def test_the_branch_s_added_images_are_read_from_git(self):
+        with mock.patch.object(fc, "_git", return_value="docs/src/assets/x.png\0README.md\0docs/new-é.png\0frontend/a.svg\0") as git:
+            self.assertEqual(fc.added_images("base"), ["docs/src/assets/x.png", "docs/new-é.png"])
+        git.assert_called_once_with("diff", "--name-only", "-z", "--diff-filter=AMR", "base", "HEAD")
+
+
 if __name__ == "__main__":
     unittest.main()
