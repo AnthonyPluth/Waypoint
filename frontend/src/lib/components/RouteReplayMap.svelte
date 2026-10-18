@@ -1,7 +1,7 @@
 <script lang="ts">
   import { geoPath } from "d3-geo";
   import { Button } from "$lib/components/ui/button";
-  import { loadCountries, type Country } from "$lib/map";
+  import { landFor } from "$lib/land.svelte";
   import { viewport } from "$lib/phone.svelte";
   import { activeStop, boundariesShown, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, roadShapes, roadsShown, SCRUB_STEPS, shieldsOf, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Roads, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
@@ -29,9 +29,8 @@
   const lines = $derived(boundaryShapes(boundaries, projection));
   const spots = $derived(positions(stops, projection));
   const sphere = $derived(path({ type: "Sphere" }) ?? "");
-  let countries = $state<Country[]>([]);
-  const land = $derived(countries.map((c) => ({ id: c.id ?? c.properties?.name ?? "", d: path(c) ?? "" })));
-  $effect(() => { loadCountries().then((c) => { countries = c; }, () => { countries = []; }); });
+  const terrain = landFor(() => ({ projection, width: width, height: height }));
+  const land = $derived(terrain.features.map((c) => ({ id: c.id ?? c.properties?.name ?? "", d: path(c) ?? "" })));
 
   let progress = $state(0);
   let playing = $state(false);

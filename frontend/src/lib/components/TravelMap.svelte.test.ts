@@ -6,6 +6,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { StatsFlights } from "$lib/api-types";
 import TravelMap from "./TravelMap.svelte";
 
+vi.mock("$lib/map", async (original) => {
+  const real = await original<typeof import("$lib/map")>();
+  return { ...real, loadDetailedCountries: real.loadCountries, loadFineCountries: real.loadCountries };
+});
+
 const flights = {
   airports: [
     { code: "JFK", name: "John F. Kennedy International Airport", city: "New York", country: "US", visits: 6, latitude: 40.6398, longitude: -73.7789 },

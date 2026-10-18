@@ -1,6 +1,6 @@
 <script lang="ts">
   import { geoPath } from "d3-geo";
-  import { loadCountries, type Country } from "$lib/map";
+  import { landFor } from "$lib/land.svelte";
   import { legsOf, NO_ROADS, positions, routeProjection, type Roads, type Stop } from "$lib/route-replay";
   import { routeDescription } from "$lib/side-column";
 
@@ -13,9 +13,8 @@
   const legs = $derived(legsOf(stops, projection, roads));
   const spots = $derived(positions(stops, projection));
   const sphere = $derived(path({ type: "Sphere" }) ?? "");
-  let countries = $state<Country[]>([]);
-  const land = $derived(countries.map((c) => ({ id: c.id ?? c.properties?.name ?? "", d: path(c) ?? "" })));
-  $effect(() => { loadCountries().then((c) => { countries = c; }, () => { countries = []; }); });
+  const terrain = landFor(() => ({ projection, width: WIDTH, height: HEIGHT }));
+  const land = $derived(terrain.features.map((c) => ({ id: c.id ?? c.properties?.name ?? "", d: path(c) ?? "" })));
   const label = (s: Stop): string => s.code ?? s.city;
 </script>
 

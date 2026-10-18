@@ -1,7 +1,7 @@
-import { geoContains, geoPath } from "d3-geo";
+import { geoContains, geoMercator, geoPath } from "d3-geo";
 import { describe, expect, it } from "vitest";
 import type { StatsAirport, StatsFlights, StatsPlacePoint, StatsRoute, StatsStayPin, StatsVisit } from "./api-types";
-import { arcs, clampPan, dots, fitBox, flownBounds, IDENTITY, loadStates, MAP_HEIGHT, MAP_WIDTH, mapData, pieces, pins, stateAt, stateSources, visitedFeatureIds, visitedPoints, visitedStateTrips, worldProjection, zoomAt } from "./map";
+import { arcs, clampPan, dots, fitBox, flownBounds, clipToWindow, COARSE_FROM_KM, detailFor, IDENTITY, kmPerPixel, loadCountries, loadDetailedCountries, loadStates, MEDIUM_FROM_KM, windowOf, MAP_HEIGHT, MAP_WIDTH, mapData, pieces, pins, stateAt, stateSources, visitedFeatureIds, visitedPoints, visitedStateTrips, worldProjection, zoomAt } from "./map";
 
 const airport = (code: string, visits: number, latitude: number | null, longitude: number | null, city: string | null = null): StatsAirport =>
   ({ code, name: code, city, country: "XX", visits, latitude, longitude });
@@ -252,5 +252,65 @@ describe("Alaska", () => {
     const farWest = clampPan({ k: 4, x: 1e6, y: -1e6 });
     expect(farWest.x + 4 * alaska[0]).toBeGreaterThan(0);
     expect(farEast.x + 4 * alaska[0]).toBeLessThan(MAP_WIDTH);
+  });
+});
+
+describe("how much map detail a view needs", () => {
+  const region = (west: number, south: number, east: number, north: number) =>
+    geoMercator().fitExtent([[0, 0], [600, 400]], { type: "Polygon", coordinates: [[[west, south], [west, north], [east, north], [east, south], [west, south]]] });
+
+  it("asks for the quick outlines at world scale, more across a continent and the most across a region", () => {
+    expect(detailFor(kmPerPixel(worldProjection(), MAP_WIDTH, MAP_HEIGHT))).toBe("coarse");
+    expect(detailFor(kmPerPixel(region(-125, 25, -65, 50), 600, 400))).toBe("fine");
+    expect(detailFor(COARSE_FROM_KM)).toBe("coarse");
+    expect(detailFor(COARSE_FROM_KM - 0.1)).toBe("medium");
+    expect(detailFor(MEDIUM_FROM_KM)).toBe("medium");
+    expect(detailFor(MEDIUM_FROM_KM - 0.1)).toBe("fine");
+  });
+
+  it("measures a pixel in kilometres, and says so when the centre is off the map", () => {
+    expect(kmPerPixel(region(-80, 30, -70, 40), 600, 400)).toBeGreaterThan(1);
+    expect(kmPerPixel(region(-80, 30, -70, 40), 600, 400)).toBeLessThan(4);
+    expect(kmPerPixel({ invert: () => null } as never, 600, 400)).toBe(Infinity);
+  });
+
+  it("keeps only the outlines that reach the window", async () => {
+    const countries = await loadCountries();
+    const projection = region(-10, 35, 30, 60);
+    const window = windowOf(projection, { x: 0, y: 0, w: 600, h: 400 });
+    expect(window).not.toBeNull();
+    const names = clipToWindow(countries, window).map((c) => c.properties?.name);
+    expect(names).toContain("France");
+    expect(names).toContain("Germany");
+    expect(names).not.toContain("Brazil");
+    expect(names).not.toContain("Australia");
+    expect(clipToWindow(countries, null)).toHaveLength(countries.length);
+  });
+
+  it("drops the far islands of a country that is partly in the window", async () => {
+    const detailed = await loadDetailedCountries();
+    const window = windowOf(region(-10, 35, 30, 60), { x: 0, y: 0, w: 600, h: 400 });
+    const france = (cs: typeof detailed) => cs.find((c) => c.properties?.name === "France")!.geometry;
+    const whole = france(detailed);
+    const clipped = france(clipToWindow(detailed, window));
+    expect(whole.type).toBe("MultiPolygon");
+    expect(clipped.type).toBe("MultiPolygon");
+    expect((clipped as { coordinates: unknown[] }).coordinates.length).toBeLessThan((whole as { coordinates: unknown[] }).coordinates.length);
+  });
+
+  it("drops a polygon bigger than a hemisphere, which no country is, even when the window is null", () => {
+    const real = { type: "Feature", id: "A", properties: { name: "Real" }, geometry: { type: "Polygon", coordinates: [[[0, 0], [0, 10], [10, 10], [10, 0], [0, 0]]] } } as never;
+    const wholeWorld = { type: "Polygon", coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] };
+    const bogus = { type: "Feature", id: "B", properties: { name: "Bogus" }, geometry: { type: "MultiPolygon", coordinates: [wholeWorld.coordinates, [[[20, 0], [20, 10], [30, 10], [30, 0], [20, 0]]]] } } as never;
+    expect(clipToWindow([real, bogus], null).map((c) => (c.geometry as { coordinates: unknown[] }).coordinates.length)).toEqual([1, 1]);
+    const onlyBogus = { type: "Feature", id: "C", properties: { name: "Only" }, geometry: wholeWorld } as never;
+    expect(clipToWindow([onlyBogus], null)).toEqual([]);
+  });
+
+  it("does not clip a window that spans the world, and the detailed sets keep every country", async () => {
+    expect(windowOf(worldProjection(), { x: 0, y: 0, w: MAP_WIDTH, h: MAP_HEIGHT })).toBeNull();
+    const [quick, medium] = await Promise.all([loadCountries(), loadDetailedCountries()]);
+    const ids = (cs: typeof quick) => new Set(cs.map((c) => String(c.id)));
+    expect([...ids(quick)].every((id) => ids(medium).has(id))).toBe(true);
   });
 });
