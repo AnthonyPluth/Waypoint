@@ -206,6 +206,20 @@ def check_tests(base: str, messages: list[str]) -> list[str]:
     return problems
 
 
+IMAGE = re.compile(r"\.(png|jpe?g|gif|webp|avif)$", re.IGNORECASE)
+IMAGE_HOMES = ("docs/src/assets/screenshots/", "docs/public/", "waypoint/static/", "waypoint/storage/logos/", "docs/src/assets/logo.")
+
+
+def added_images(base: str) -> list[str]:
+    return [path for path in _git("diff", "--name-only", "--diff-filter=AMR", base, "HEAD").splitlines() if IMAGE.search(path)]
+
+
+def check_images(paths: list[str]) -> list[str]:
+    return [f"{path}: the only images a change commits are the page images make verify writes to docs/src/assets/screenshots/ "
+            "(the visual regression baselines); show a before and after through those images' diff, not a hand-made file"
+            for path in paths if not path.startswith(IMAGE_HOMES)]
+
+
 PARSER_FIXTURES = ("booking", "change", "cancellation")
 
 
@@ -318,11 +332,12 @@ def main(argv: list[str] | None = None) -> int:
             problems += check_commit(sha, message)
         base = _git("merge-base", *args.commits.split("..", 1)).strip() if ".." in args.commits else args.commits
         problems += check_tests(base, [message for _, message in found])
+        problems += check_images(added_images(base))
     for p in problems:
         print(f"::error::{p}" if "GITHUB_ACTIONS" in os.environ else p, file=sys.stderr)
     if not problems:
         print("Fleet checks passed: one migration head, migrations tested, mail parsers registered with fixtures and a test"
-              + (", commit trailers, no test removed or skipped without a reason" if args.commits else "")
+              + (", commit trailers, no test removed or skipped without a reason, images only where make verify puts them" if args.commits else "")
               + ", workflow conventions, dark only, manage links tested.")
     return 1 if problems else 0
 

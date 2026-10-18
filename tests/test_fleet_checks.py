@@ -288,5 +288,26 @@ class DarkOnly(unittest.TestCase):
         self.assertEqual(fc.check_dark_only({"a.css": ":root { color-scheme: dark; --bg: #07090e }"}), [])
 
 
+class Images(unittest.TestCase):
+    def test_a_page_image_make_verify_writes_passes(self):
+        self.assertEqual(fc.check_images(["docs/src/assets/screenshots/trips-phone.png"]), [])
+
+    def test_the_logo_catalogue_icons_and_docs_public_files_pass(self):
+        self.assertEqual(fc.check_images(["waypoint/storage/logos/delta.png", "waypoint/static/icon-192.png", "docs/public/screenshots/x.png", "docs/src/assets/logo.png"]), [])
+
+    def test_a_hand_made_comparison_image_fails(self):
+        problems = fc.check_images(["docs/src/assets/tabbar-glass-before-after.png", "docs/src/assets/screenshots/ok.png"])
+        self.assertEqual(len(problems), 1)
+        self.assertIn("docs/src/assets/tabbar-glass-before-after.png: the only images a change commits", problems[0])
+
+    def test_only_raster_images_are_counted(self):
+        self.assertEqual([p for p in ["a.png", "b.JPG", "c.jpeg", "d.gif", "e.webp", "f.avif", "g.svg", "h.md"] if fc.IMAGE.search(p)], ["a.png", "b.JPG", "c.jpeg", "d.gif", "e.webp", "f.avif"])
+
+    def test_the_branch_s_added_images_are_read_from_git(self):
+        with mock.patch.object(fc, "_git", return_value="docs/src/assets/x.png\nREADME.md\nfrontend/a.svg\n") as git:
+            self.assertEqual(fc.added_images("base"), ["docs/src/assets/x.png"])
+        git.assert_called_once_with("diff", "--name-only", "--diff-filter=AMR", "base", "HEAD")
+
+
 if __name__ == "__main__":
     unittest.main()
