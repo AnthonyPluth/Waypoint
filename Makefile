@@ -109,10 +109,10 @@ docs: docs/node_modules
 docs-build: docs/node_modules
 	cd docs && $(NPM) run build
 
-# Runs the real app on made-up demo data and drives it with Playwright: each page at phone, tablet and desktop widths, plus
+# Runs the real app on made-up demo data and drives it with Playwright: each page at phone and desktop widths, plus
 # the scripted flows in frontend/verify/flows, under libfaketime so the clock is fixed. Full-page images at phone and
 # desktop go to docs/src/assets/screenshots/ (committed); the report, console errors and failed requests go to
-# artifacts/verify/; it fails on a console error or a 5xx. `make verify PAGES="upcoming settings"` visits only those pages.
+# artifacts/verify/; it fails on a console error or a 5xx. It runs VERIFY_JOBS servers at once (default: the CPU count, at most 4). `make verify PAGES="upcoming settings"` visits only those pages.
 verify: frontend/node_modules frontend-build
 	$(PYTHON) run.py verify $(PAGES)
 

@@ -13,7 +13,7 @@ describe("tapProblems", () => {
   const boxes = [{ target: "button A", width: MIN_TAP, height: MIN_TAP }, { target: "button B", width: 32, height: 44 }, { target: "a C", width: 100, height: 20.4 }];
   it("flags targets under 44 px on the phone only", () => {
     expect(tapProblems(boxes, "phone")).toEqual([`tap-target: button B is 32×44 px, under ${MIN_TAP}`, `tap-target: a C is 100×20 px, under ${MIN_TAP}`]);
-    expect(tapProblems(boxes, "tablet")).toEqual([]);
+    expect(tapProblems(boxes, "laptop")).toEqual([]);
     expect(tapProblems(boxes, "desktop")).toEqual([]);
   });
 });

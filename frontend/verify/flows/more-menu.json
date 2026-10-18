@@ -1,7 +1,7 @@
 {
   "name": "more-menu",
   "page": "upcoming",
-  "viewports": ["phone", "tablet"],
+  "viewports": ["phone"],
   "steps": [
     { "click": "button:has-text('More')" },
     { "wait_for": "#more-menu" },

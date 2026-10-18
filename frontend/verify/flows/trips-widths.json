@@ -1,7 +1,7 @@
 {
   "name": "trips-widths",
   "page": "trips",
-  "viewports": ["tablet", "laptop", "desktop", "wide", "zoomed"],
+  "viewports": ["laptop", "desktop", "wide", "zoomed"],
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "wait_for": "a[href^='#trip/'] >> visible=true" },

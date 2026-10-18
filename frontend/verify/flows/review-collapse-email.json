@@ -2,7 +2,7 @@
   "name": "review-collapse-email",
   "page": "review",
   "viewports": [
-    "tablet"
+    "zoomed"
   ],
   "steps": [
     {

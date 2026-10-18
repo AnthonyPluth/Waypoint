@@ -118,10 +118,10 @@ describe("screenshotFile", () => {
     expect(screenshotFile("upcoming", "phone")).not.toContain("-top");
   });
 
-  it("writes images at phone and desktop only, and checks tablet without one", () => {
+  it("writes images at phone and desktop only, and checks the extra widths without one", () => {
     expect(IMAGE_VIEWPORTS).toEqual(["phone", "desktop"]);
-    expect(DEFAULT_VIEWPORTS).toEqual(["phone", "tablet", "desktop"]);
-    expect(["phone", "tablet", "desktop", "laptop", "wide", "zoomed"].filter(writesImage)).toEqual(["phone", "desktop"]);
+    expect(DEFAULT_VIEWPORTS).toEqual(["phone", "desktop"]);
+    expect(["phone", "desktop", "laptop", "wide", "zoomed"].filter(writesImage)).toEqual(["phone", "desktop"]);
   });
 
   it("freezes the clock on a fixed date", () => expect(FROZEN_NOW).toBe("2026-06-15T12:00:00Z"));

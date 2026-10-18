@@ -7,6 +7,8 @@ from unittest import mock
 
 from waypoint import verify
 
+REAL_POPEN = subprocess.Popen
+
 
 class ServerCommandTests(unittest.TestCase):
     def test_the_demo_server_listens_on_loopback_whatever_waypoint_host_says(self):
@@ -96,6 +98,107 @@ class RunTests(unittest.TestCase):
         self.assertIn("sudo apt-get install libfaketime", out.call_args.args[0])
         self.assertIn("macOS", out.call_args.args[0])
         ran.assert_not_called()
+
+
+class JobsTests(unittest.TestCase):
+    def test_the_default_is_the_cpu_count_capped_at_four(self):
+        self.assertEqual([verify.default_jobs(n) for n in (0, 1, 2, 4, 16)], [1, 1, 2, 4, 4])
+        with mock.patch("os.cpu_count", return_value=3):
+            self.assertEqual(verify.default_jobs(), 3)
+        with mock.patch("os.cpu_count", return_value=None):
+            self.assertEqual(verify.default_jobs(), 1)
+
+    def test_the_flag_beats_the_environment_which_beats_the_default(self):
+        self.assertEqual(verify.resolve_jobs(2, {"VERIFY_JOBS": "3"}, cpus=8), 2)
+        self.assertEqual(verify.resolve_jobs(None, {"VERIFY_JOBS": "3"}, cpus=8), 3)
+        self.assertEqual(verify.resolve_jobs(None, {"VERIFY_JOBS": " "}, cpus=8), 4)
+        self.assertEqual(verify.resolve_jobs(None, {}, cpus=2), 2)
+        self.assertEqual(verify.resolve_jobs(1, {}, cpus=8), 1)
+
+    def test_a_count_that_is_not_a_positive_whole_number_names_where_it_came_from(self):
+        for flag, env, source in ((0, {}, "--jobs"), (-1, {}, "--jobs"), (None, {"VERIFY_JOBS": "many"}, "VERIFY_JOBS"), (None, {"VERIFY_JOBS": "0"}, "VERIFY_JOBS")):
+            with self.assertRaisesRegex(ValueError, source):
+                verify.resolve_jobs(flag, env)
+
+    def test_run_refuses_a_bad_count_before_starting_anything(self):
+        with mock.patch("os.path.isdir", return_value=True), mock.patch("os.path.isfile", return_value=True), \
+                mock.patch("shutil.which", return_value="/usr/bin/node"), mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"), \
+                mock.patch.object(verify, "start_instances") as started, mock.patch("builtins.print") as out:
+            self.assertEqual(verify.run([], 0), 2)
+        self.assertIn("--jobs", out.call_args.args[0])
+        started.assert_not_called()
+
+    def test_the_browser_gets_every_server_address_the_flows_and_the_pages(self):
+        command = verify.node_command("node", "/app/frontend", ["http://127.0.0.1:1", "http://127.0.0.1:2"], ["trips"], ["add-trip"])
+        self.assertEqual([command[i + 1] for i, a in enumerate(command) if a == "--url"], ["http://127.0.0.1:1", "http://127.0.0.1:2"])
+        self.assertEqual(command[command.index("--flow") + 1], "add-trip")
+        self.assertEqual(command[-1], "trips")
+        self.assertEqual(command[command.index("--now") + 1], verify.FROZEN_NOW_ISO)
+
+
+class InstanceTests(unittest.TestCase):
+    def fakes(self, root, ready=None):
+        seeded = []
+
+        def seed(command, env, **_):
+            seeded.append(env["WAYPOINT_DATA"])
+            with open(os.path.join(env["WAYPOINT_DATA"], "waypoint.db"), "w") as f:
+                f.write("seed")
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        self.servers = []
+
+        def start(*args, **kwargs):
+            self.servers.append(mock.Mock(spec=REAL_POPEN, returncode=None))
+            return self.servers[-1]
+
+        popen = mock.Mock(side_effect=start)
+        ports = iter(range(9101, 9110))
+        return seeded, mock.patch("subprocess.run", side_effect=seed), mock.patch("subprocess.Popen", popen), \
+            mock.patch.object(verify, "free_port", side_effect=lambda: next(ports)), mock.patch.object(verify, "wait_ready", side_effect=ready), popen
+
+    def test_every_server_gets_its_own_copy_of_one_seed_and_its_own_port(self):
+        with tempfile.TemporaryDirectory() as root:
+            seeded, run, popen_patch, port, ready, popen = self.fakes(root)
+            with run, popen_patch, port, ready:
+                instances = verify.start_instances(root, 3, "/lib/f.so")
+            self.assertEqual(len(seeded), 1)
+            self.assertEqual([i.url for i in instances], ["http://127.0.0.1:9101", "http://127.0.0.1:9102", "http://127.0.0.1:9103"])
+            self.assertEqual(len({i.data for i in instances}), 3)
+            for instance in instances:
+                with open(os.path.join(instance.data, "waypoint.db")) as f:
+                    self.assertEqual(f.read(), "seed")
+            datas = [call.kwargs["env"]["WAYPOINT_DATA"] for call in popen.call_args_list]
+            self.assertEqual(datas, [i.data for i in instances])
+            self.assertTrue(all(call.kwargs["env"]["FAKETIME"] == verify.FROZEN_NOW for call in popen.call_args_list))
+
+    def test_one_server_is_served_from_the_seeded_folder_itself(self):
+        with tempfile.TemporaryDirectory() as root:
+            seeded, run, popen_patch, port, ready, _ = self.fakes(root)
+            with run, popen_patch, port, ready:
+                (only,) = verify.start_instances(root, 1, "/lib/f.so")
+            self.assertEqual(seeded, [only.data])
+
+    def test_a_server_that_does_not_come_up_stops_the_others_and_says_which(self):
+        with tempfile.TemporaryDirectory() as root:
+            def ready(url, server, timeout=60):
+                if url.endswith("9102"):
+                    raise RuntimeError("the server exited with code 3 before it was ready")
+
+            _, run, popen_patch, port, patched, _ = self.fakes(root, ready)
+            with run, popen_patch, port, patched:
+                with self.assertRaisesRegex(RuntimeError, "exited with code 3"):
+                    verify.start_instances(root, 2, "/lib/f.so")
+            self.assertEqual(len(self.servers), 2)
+            for server in self.servers:
+                server.terminate.assert_called_once()
+
+    def test_a_failed_seed_is_reported_with_its_output(self):
+        with tempfile.TemporaryDirectory() as root, mock.patch("subprocess.run", return_value=mock.Mock(returncode=1, stdout="out", stderr="err")), \
+                mock.patch("subprocess.Popen") as popen:
+            with self.assertRaisesRegex(RuntimeError, "couldn't fill the demo database:\nouterr"):
+                verify.start_instances(root, 2, "/lib/f.so")
+        popen.assert_not_called()
 
 
 class FrozenClockTests(unittest.TestCase):

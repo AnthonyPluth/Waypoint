@@ -1,6 +1,6 @@
 # Scripted flows
 
-Each `*.json` file here is a flow that `make verify` runs after visiting the pages, at phone, tablet and desktop widths (or the `viewports` it lists). A pull request adds steps by adding or editing a file.
+Each `*.json` file here is a flow that `make verify` runs after visiting the pages, at phone and desktop widths (or the `viewports` it lists). A pull request adds steps by adding or editing a file.
 
 ```json
 {
@@ -15,7 +15,7 @@ Each `*.json` file here is a flow that `make verify` runs after visiting the pag
 }
 ```
 
-- `page` is the route the flow starts on (default `upcoming`); `viewports` defaults to phone, tablet and desktop; `laptop` (1024 px), `wide` (1440 px) and `zoomed` (853 px, a 1280 px window at 150% zoom) are there for a flow that lists them. The app is dark only, so every flow runs in the dark colour scheme.
+- `page` is the route the flow starts on (default `upcoming`); `viewports` defaults to phone and desktop; `laptop` (1024 px), `wide` (1440 px) and `zoomed` (853 px, a 1280 px window at 150% zoom) are there for a flow that lists them. The app is dark only, so every flow runs in the dark colour scheme.
 - A step has one action, and an optional `timeout` in milliseconds (default 10000). Selectors are [Playwright selectors](https://playwright.dev/docs/other-locators) (CSS, `text=…`, `role=…`).
   - `{"goto": "#route"}` opens a route of the app (or a full URL).
   - `{"select": {"selector": "label:has-text('What is it') select", "index": 1}}` chooses an option of a `<select>` by its position.
@@ -34,8 +34,8 @@ Each `*.json` file here is a flow that `make verify` runs after visiting the pag
   - `{"wait_for": selector}` waits for it to appear; `{"expect_text": {"selector": …, "text": …}}` fails unless it contains the text within the timeout (it keeps looking while the page settles).
   - `{"screenshot": "name"}` saves `flow-<flow name>-<name>-<viewport>.png` (full page) to `docs/src/assets/screenshots/`, at phone and desktop only; other widths run the steps and checks and write no image.
 - `host` (default the server's own address, 127.0.0.1) opens the flow on another name for the same server: passkeys need a host name such as `localhost`, not an IP address.
-- `phone_agent` (true) makes the phone-width visit look like an iPhone to the page, for features that only show on a phone (the app's own `isMobile()` reads the user agent); tablet and desktop visits are unchanged.
+- `phone_agent` (true) makes the phone-width visit look like an iPhone to the page, for features that only show on a phone (the app's own `isMobile()` reads the user agent); desktop visits are unchanged.
 - `allow_console` (a list of texts) names console errors a flow expects, such as the browser's own "net::ERR_INTERNET_DISCONNECTED" while it is offline on purpose.
 - A flow also ends with a screenshot, and fails the run on a failed step, a console error or a 5xx response.
 
-Flows run against the demo data only.
+Flows run against the demo data only, on one of several servers that `make verify` runs at once (`VERIFY_JOBS`), each with its own copy of the data: a flow sees its own earlier changes and those of the flows queued before it on the same server, never another server's. So a flow must find what it needs in the untouched demo data (not rely on another flow having added or removed something) and put back what it changes if a later flow could trip on it; it must also work alone (`poetry run python run.py verify --flow NAME`). Dates in the demo data are relative to the frozen clock, so look for a trip by what the page shows today rather than by a date you remember.
