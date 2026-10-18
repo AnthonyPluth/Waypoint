@@ -38,7 +38,7 @@
 
 <svelte:window onkeydown={onKeydown} onpointerdown={onPointerDown} />
 
-<nav aria-label="Main" class="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 flex gap-1 rounded-[22px] border border-white/[0.14] bg-surface-2 p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_18px_40px_-16px_rgb(0_0_0/0.8)] supports-[backdrop-filter]:bg-surface-2/72 supports-[backdrop-filter]:backdrop-blur-2xl supports-[backdrop-filter]:backdrop-saturate-200 supports-[backdrop-filter]:backdrop-brightness-50 lg:hidden">
+<nav aria-label="Main" class="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 flex gap-1 rounded-[22px] border border-white/20 bg-surface-2 p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_18px_40px_-16px_rgb(0_0_0/0.8)] supports-[backdrop-filter]:bg-white/[0.04] supports-[backdrop-filter]:backdrop-blur-[28px] supports-[backdrop-filter]:backdrop-saturate-200 supports-[backdrop-filter]:backdrop-brightness-110 lg:hidden">
   {#each TABS as item (item.page)}<NavLink {item} current={current === item.page} tab />{/each}
   <div class="relative flex flex-1" onfocusout={onFocusOut}>
     <button bind:this={button} type="button" aria-expanded={open} aria-controls="more-menu" aria-haspopup="true" aria-current={moreCurrent ? "true" : undefined} onclick={() => (open = !open)}
