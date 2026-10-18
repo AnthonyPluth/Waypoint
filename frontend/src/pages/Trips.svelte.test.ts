@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
+import { tick } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
@@ -685,6 +686,47 @@ describe("on a phone", () => {
     expect(screen.queryByLabelText("Where to, or a name")).toBeNull();
     route.query = "add=trip";
     expect(await screen.findByLabelText("Where to, or a name")).toBeInTheDocument();
+  });
+
+  it("closes a form opened by the add link when the add parameter goes away", async () => {
+    route.query = "add=trip";
+    render(Trips);
+    expect(await screen.findByLabelText("Where to, or a name")).toBeInTheDocument();
+    route.query = "";
+    await waitFor(() => expect(screen.queryByLabelText("Where to, or a name")).toBeNull());
+  });
+
+  it("keeps a form opened by its own button when the query stays empty", async () => {
+    viewport.phone = false;
+    render(Trips);
+    const u = user();
+    await u.click(await screen.findByRole("button", { name: /Add a trip/ }));
+    route.query = "";
+    await tick();
+    expect(screen.getByLabelText("Where to, or a name")).toBeInTheDocument();
+  });
+
+  it("keeps a form opened by the add link open while the filters change", async () => {
+    location.hash = "#trips?add=trip";
+    route.query = "add=trip";
+    render(Trips);
+    expect(await screen.findByLabelText("Where to, or a name")).toBeInTheDocument();
+    await user().type(screen.getByLabelText("Search trips"), "x");
+    await tick();
+    expect(route.query).toContain("add=trip");
+    expect(screen.getByLabelText("Where to, or a name")).toBeInTheDocument();
+  });
+
+  it("keeps the filters chosen after the add link when the form is cancelled", async () => {
+    viewport.phone = false;
+    location.hash = "#trips?add=trip";
+    route.query = "add=trip";
+    render(Trips);
+    await screen.findByLabelText("Where to, or a name");
+    await user().type(screen.getByLabelText("Search trips"), "x");
+    await user().click(screen.getByRole("button", { name: "Cancel" }));
+    expect(new URLSearchParams(route.query).get("q")).toBe("x");
+    expect(new URLSearchParams(route.query).get("add")).toBeNull();
   });
 
   it("keeps a trip with no bookings under the traveller it was made for", async () => {

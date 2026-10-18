@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { errMsg } from "$lib/act";
   import { app, route, setQuery } from "$lib/app.svelte";
   import { apiCall } from "$lib/contract";
@@ -32,7 +33,8 @@
   let loadError = $state("");
   const addQuery = new URLSearchParams(route.query).get("add");
   let adding = $state<"trip" | "booking" | "past" | null>(addQuery === "trip" || addQuery === "booking" || addQuery === "past" ? addQuery : null);
-  const closeForm = () => { adding = null; if (param("add")) setQuery(""); };
+  let openedByQuery = $state(addQuery === "trip" || addQuery === "booking" || addQuery === "past");
+  const closeForm = () => { adding = null; openedByQuery = false; if (param("add")) setQuery(queryFor({})); };
 
   let latest = 0;
   async function load() {
@@ -48,8 +50,8 @@
 
   const param = (key: string) => new URLSearchParams(route.query).get(key);
   $effect(() => {
-    const wanted = param("add");
-    if (wanted === "trip" || wanted === "booking" || wanted === "past") adding = wanted;
+    const wanted = param("add");    if (wanted === "trip" || wanted === "booking" || wanted === "past") { adding = wanted; openedByQuery = true; }
+    else if (untrack(() => openedByQuery)) { adding = null; openedByQuery = false; }
   });
   const who = $derived(Number(param("who")) || null);
   const tripParam = $derived(Number(param("trip")) || null);
@@ -57,7 +59,7 @@
   const when = $derived<TripWhen | null>(param("when") === "upcoming" || param("when") === "past" ? (param("when") as TripWhen) : null);
   const year = $derived(Number(param("year")) || null);
   const queryFor = (change: Record<string, string | number | null>) => {
-    const next = { who, q: text, when, year, trip: tripParam, ...change };
+    const next = { who, q: text, when, year, trip: tripParam, add: openedByQuery ? adding : null, ...change };
     const q = new URLSearchParams();
     for (const [key, value] of Object.entries(next)) if (value) q.set(key, String(value));
     return q.toString();
