@@ -254,7 +254,7 @@ async function visit(env, label, viewport, work, { audit = true, reducedMotion =
       await page.evaluate(`window.scrollTo({ top: 0, left: 0, behavior: "instant" })`);
       try { await page.waitForLoadState("networkidle", { timeout: 3000 }); } catch { notes.push(`${where}: still loading after 3 s when ${name} was captured`); }
       await page.evaluate("document.fonts.ready");
-      try { await page.waitForFunction(`document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity)`, undefined, { timeout: 3000 }); }
+      try { await page.waitForFunction(() => globalThis.document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity), undefined, { timeout: 3000 }); }
       catch { notes.push(`${where}: an animation was still running after 3 s when ${name} was captured`); }
       await page.waitForTimeout(SETTLE_MS);
       await page.screenshot({ path: join(dir, file), fullPage: true, animations: "disabled" });
