@@ -487,26 +487,20 @@ describe("finding a trip", () => {
 
   it("opens with the filters from the address, and says when nothing matches", async () => {
     serve(archive);
-    route.query = "q=nowhere&when=past&year=2019";
+    route.query = "q=nowhere&year=2019";
     render(Trips);
     expect(await screen.findByText("No trips match.")).toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "Search trips" })).toHaveValue("nowhere");
-    expect(within(screen.getByRole("group", { name: "Show" })).getByRole("button", { name: "Past" })).toHaveAttribute("aria-pressed", "true");
     expect(within(screen.getByRole("group", { name: "Year" })).getByRole("button", { name: "2019" })).toHaveAttribute("aria-pressed", "true");
     await user().click(screen.getByRole("button", { name: "Clear filters" }));
     expect(route.query).toBe("");
     expect(await screen.findByText("300 trips")).toBeInTheDocument();
   });
 
-  it("filters by year and by upcoming or past, together with the traveller", async () => {
+  it("filters by year, together with the traveller", async () => {
     serve();
     render(Trips);
     await screen.findByText("3 trips · 2 coming up");
-    await user().click(within(screen.getByRole("group", { name: "Show" })).getByRole("button", { name: "Past" }));
-    expect(route.query).toBe("when=past");
-    expect(screen.queryByRole("list", { name: "Upcoming trips" })).toBeNull();
-    expect(screen.getByText("Trip to Orlando")).toBeInTheDocument();
-    await user().click(within(screen.getByRole("group", { name: "Show" })).getByRole("button", { name: "All" }));
     await user().click(within(screen.getByRole("group", { name: "Year" })).getByRole("button", { name: "2027" }));
     expect(route.query).toBe("year=2027");
     expect(screen.getByText("Trip to Auckland")).toBeInTheDocument();
@@ -523,9 +517,17 @@ describe("finding a trip", () => {
     await screen.findByText("3 trips · 2 coming up");
     await user().click(within(screen.getByRole("group", { name: "Year" })).getByRole("button", { name: "2027" }));
     expect(route.query).toBe("year=2027&trip=2");
-    await user().click(within(screen.getByRole("group", { name: "Show" })).getByRole("button", { name: "Past" }));
-    expect(route.query).toBe("when=past&year=2027&trip=2");
+    await user().click(person("Jane Doe"));
+    expect(route.query).toBe("who=1&year=2027&trip=2");
     expect(screen.getByText("No trips match.")).toBeInTheDocument();
+  });
+
+  it("ignores a Show choice left in an old address", async () => {
+    route.query = "when=past";
+    serve();
+    render(Trips);
+    expect(await screen.findByRole("list", { name: "Upcoming trips" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
   });
 
   it("shows no filters before there is a trip to find", async () => {
@@ -533,19 +535,6 @@ describe("finding a trip", () => {
     render(Trips);
     await screen.findByText(/No trips yet/);
     expect(screen.queryByRole("searchbox")).toBeNull();
-  });
-
-  it("reads the Show control from the address and writes each choice back", async () => {
-    route.query = "when=upcoming";
-    render(Trips);
-    await screen.findByRole("list", { name: "Upcoming trips" });
-    const show = within(screen.getByRole("group", { name: "Show" }));
-    expect(show.getAllByRole("button").map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([["All", "false"], ["Upcoming", "true"], ["Past", "false"]]);
-    expect(screen.queryByRole("list", { name: "Past trips" })).toBeNull();
-    await user().click(show.getByRole("button", { name: "Past" }));
-    expect(route.query).toBe("when=past");
-    await user().click(show.getByRole("button", { name: "All" }));
-    expect(route.query).toBe("");
   });
 
   it("clears the year by pressing it again, and reads it back from the address", async () => {
@@ -597,7 +586,7 @@ describe("finding a trip", () => {
     await screen.findByRole("list", { name: "Upcoming trips" });
     expect(screen.queryByRole("group", { name: "Year" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Travelling" })).toBeNull();
-    expect(screen.getByRole("group", { name: "Show" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Show" })).toBeNull();
   });
 
   it("keeps a year that is in the address even when it is the only one", async () => {
@@ -632,7 +621,13 @@ describe("on a phone", () => {
     expect(screen.getByTestId("filters-dot")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Filters, in use" })).toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "Search trips" })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Show" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Show" })).toBeNull();
+  });
+
+  it("puts the Filters button beside the search field", async () => {
+    render(Trips);
+    await screen.findByRole("list", { name: "Upcoming trips" });
+    expect(screen.getByRole("button", { name: "Filters" }).parentElement).toBe(screen.getByRole("searchbox", { name: "Search trips" }).parentElement?.parentElement);
   });
 
   it("offers adding a trip, a booking or a past trip from one button", async () => {
