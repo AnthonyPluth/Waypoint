@@ -477,10 +477,10 @@
   },
   {
     "name": "Hyatt Regency",
-    "file": "hyatt-regency.png",
-    "source": "https://commons.wikimedia.org/wiki/File:Hyatt_Regency_Danang%2C_Corporate_logo%2C_March_2014.png",
-    "upstream_path": "Hyatt Regency Danang, Corporate logo, March 2014.png",
-    "sha": "9eb00ae58512e15550dbec83c6a3f38025e2abbf"
+    "file": "hyatt-regency.svg",
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hyatt-regency.svg",
+    "upstream_path": "svg/h/hyatt-regency.svg",
+    "sha": "ab4c25aeb9f34c3e3f535d1d9dbfaaaf0c22b89b"
   },
   {
     "name": "Hyatt Place",
@@ -590,9 +590,9 @@
   {
     "name": "Bvlgari Hotels & Resorts",
     "file": "bvlgari-hotels-resorts.svg",
-    "source": "https://commons.wikimedia.org/wiki/File:Bulgari_logo.svg",
-    "upstream_path": "Bulgari logo.svg",
-    "sha": "eb4e8a329d12c3be2ce0fc1d7b63cfca1edc40ee"
+    "source": "https://github.com/detain/svg-logos/blob/master/svg/b/bvlgari-hotels-resorts.svg",
+    "upstream_path": "svg/b/bvlgari-hotels-resorts.svg",
+    "sha": "e3566b7f329d5a453e39c20d669b1100410cce0a"
   },
   {
     "name": "Marriott Executive Apartments",
