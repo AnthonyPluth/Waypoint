@@ -2,9 +2,9 @@
   {
     "name": "American Airlines",
     "file": "american-airlines.svg",
-    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/americanairlines.svg",
-    "upstream_path": "icons/americanairlines.svg",
-    "sha": "bbbe22d15fce5d74d8512457029a869e481fd2a4"
+    "source": "https://commons.wikimedia.org/wiki/File:AA_Symbol.svg",
+    "upstream_path": "AA Symbol.svg",
+    "sha": "afde8b22ed4509ff8cbb15f741cab161ae58e890"
   },
   {
     "name": "Delta Air Lines",
@@ -226,9 +226,9 @@
   {
     "name": "Hilton",
     "file": "hilton.svg",
-    "source": "https://github.com/simple-icons/simple-icons/blob/16.35.0/icons/hilton.svg",
-    "upstream_path": "icons/hilton.svg",
-    "sha": "de08e17da4486da6b3b0c7bfe7bc1a078f3b7111"
+    "source": "https://commons.wikimedia.org/wiki/File:HiltonHotelsLogo.svg",
+    "upstream_path": "HiltonHotelsLogo.svg",
+    "sha": "150162c4d39332c1ae46445c643408c67038d31d"
   },
   {
     "name": "Hyatt",
@@ -289,9 +289,9 @@
   {
     "name": "Hertz",
     "file": "hertz.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hertz.svg",
-    "upstream_path": "svg/h/hertz.svg",
-    "sha": "44eff7b48085c19abcabe4b69b30d5684aa767e8"
+    "source": "https://commons.wikimedia.org/wiki/File:Hertz_Car_Rental_logo.svg",
+    "upstream_path": "Hertz Car Rental logo.svg",
+    "sha": "7f56db61e9d4a2bbcd5e8d7abda86f402744222e"
   },
   {
     "name": "Avis",
@@ -380,9 +380,9 @@
   {
     "name": "Princess Cruises",
     "file": "princess-cruises.svg",
-    "source": "https://commons.wikimedia.org/wiki/File:Princess_Cruises_Wordmark.svg",
-    "upstream_path": "Princess Cruises Wordmark.svg",
-    "sha": "7113e060348c32b335ed518dec4203f2ecd7d918"
+    "source": "https://en.wikipedia.org/wiki/File:Princess_Cruises_logo.svg",
+    "upstream_path": "Princess_Cruises_logo.svg",
+    "sha": "f1518607833bf086720be34a99c87ccf2ff4c7f1"
   },
   {
     "name": "Celebrity Cruises",
@@ -421,10 +421,10 @@
   },
   {
     "name": "Seabourn",
-    "file": "seabourn.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/seabourn-cruise-line.svg",
-    "upstream_path": "svg/s/seabourn-cruise-line.svg",
-    "sha": "290cf5231bf3fb5934a2e8ab7d1d06b0e3120460"
+    "file": "seabourn.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Seabourn_Cruise_Line_Logo.png",
+    "upstream_path": "Seabourn_Cruise_Line_Logo.png",
+    "sha": "7abd07342f4cfeeb1f228e4847910be2117a7ac5"
   },
   {
     "name": "Windstar Cruises",
@@ -471,9 +471,9 @@
   {
     "name": "Holland America Line",
     "file": "holland-america-line.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/holland-america-cruises.svg",
-    "upstream_path": "svg/h/holland-america-cruises.svg",
-    "sha": "7e2dd4bb49e6e6906af9a4eef8c9a089f44d222f"
+    "source": "https://en.wikipedia.org/wiki/File:Holland_America_Line_logo.svg",
+    "upstream_path": "Holland_America_Line_logo.svg",
+    "sha": "a0cae8b56ad167259f348b8ac394901150437046"
   },
   {
     "name": "Hyatt Regency",
@@ -758,9 +758,9 @@
   {
     "name": "Econo Lodge",
     "file": "econo-lodge.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/e/econo-lodge.svg",
-    "upstream_path": "svg/e/econo-lodge.svg",
-    "sha": "215c1c76bbb5b86ce1c527c7d22badc34be858f5"
+    "source": "https://en.wikipedia.org/wiki/File:Econo_Lodge_Logo_%282007-present%29.svg",
+    "upstream_path": "Econo_Lodge_Logo_(2007-present).svg",
+    "sha": "b8e9f1c1d3eb52e723ab60b3518dc1480ccf6516"
   },
   {
     "name": "Rodeway Inn",
@@ -937,9 +937,9 @@
   {
     "name": "China Airlines",
     "file": "china-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/china-airlines.svg",
-    "upstream_path": "svg/c/china-airlines.svg",
-    "sha": "99c32cee3a3d90f9398347c810c521e279e898d0"
+    "source": "https://en.wikipedia.org/wiki/File:China_Airlines.svg",
+    "upstream_path": "China_Airlines.svg",
+    "sha": "ac44f5dfdbd5e44b9e3deda12fa4c33296cdbe0a"
   },
   {
     "name": "EVA Air",
@@ -965,9 +965,9 @@
   {
     "name": "Malaysia Airlines",
     "file": "malaysia-airlines.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/m/malaysia-airlines-1.svg",
-    "upstream_path": "svg/m/malaysia-airlines-1.svg",
-    "sha": "1b9fb3128e65c2272866c5e1168d2e151af8f8c3"
+    "source": "https://en.wikipedia.org/wiki/File:Malaysia_Airlines_Logo.svg",
+    "upstream_path": "Malaysia_Airlines_Logo.svg",
+    "sha": "b991273e53f272f4ab4b10ef2630c6edb7a2dbcf"
   },
   {
     "name": "Garuda Indonesia",
@@ -1108,8 +1108,9 @@
   {
     "name": "Sonesta",
     "file": "sonesta.png",
-    "source": "https://github.com/cocdeshijie/PointLens/blob/master/pointlens/assets/sonesta.png",
-    "sha": "ea158e5c68a983c690db25e2eb1f6cdeb1d601ea"
+    "source": "https://en.wikipedia.org/wiki/File:Sonesta_International_Hotels_logo.png",
+    "sha": "16eaa757946a3e4f9c92dcf9c12b64792932e499",
+    "upstream_path": "Sonesta_International_Hotels_logo.png"
   },
   {
     "name": "Regent Seven Seas Cruises",
