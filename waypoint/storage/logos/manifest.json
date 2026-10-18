@@ -275,9 +275,9 @@
   {
     "name": "Radisson Hotel Group",
     "file": "radisson-hotel-group.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/r/radisson.svg",
-    "upstream_path": "svg/r/radisson.svg",
-    "sha": "54a318f2bd592a8ddff07085723a2129cc6a1ee1"
+    "source": "https://commons.wikimedia.org/wiki/File:Radisson_Hotel_Group_logo.svg",
+    "upstream_path": "Radisson Hotel Group logo.svg",
+    "sha": "3907cd5617c90d6882266280d8c6045339a4de1c"
   },
   {
     "name": "Accor",
@@ -401,16 +401,16 @@
   {
     "name": "Viking",
     "file": "viking.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/v/viking-river-cruises.svg",
-    "upstream_path": "svg/v/viking-river-cruises.svg",
-    "sha": "3beb96dbdf179c2820d68f9db5a81ad6a64ab4e7"
+    "source": "https://en.wikipedia.org/wiki/File:Viking_Cruises_transparent_logo.svg",
+    "upstream_path": "Viking_Cruises_transparent_logo.svg",
+    "sha": "4c4998ee33d71c2d072fd8f922e0cda4124cac81"
   },
   {
     "name": "Costa Cruises",
     "file": "costa-cruises.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/costa-cruises.svg",
-    "upstream_path": "svg/c/costa-cruises.svg",
-    "sha": "3ccab156794c6af933b1a5ee543df2aded26a0f9"
+    "source": "https://commons.wikimedia.org/wiki/File:Costa-logo-2021.svg",
+    "upstream_path": "Costa-logo-2021.svg",
+    "sha": "81d459df34b93e4dec11663410eff4c334d89f8a"
   },
   {
     "name": "Cunard",
@@ -428,10 +428,10 @@
   },
   {
     "name": "Windstar Cruises",
-    "file": "windstar-cruises.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/windstar-cruises.svg",
-    "upstream_path": "svg/w/windstar-cruises.svg",
-    "sha": "17a6fe7a1a8ac34a80f9f61c8adfe717debf510a"
+    "file": "windstar-cruises.png",
+    "source": "https://en.wikipedia.org/wiki/File:Windstar-Cruises-logo-2014.png",
+    "upstream_path": "Windstar-Cruises-logo-2014.png",
+    "sha": "c69263bd73b0f0317bbe9b518bbd4b302708bf8f"
   },
   {
     "name": "Swiss International Air Lines",
@@ -477,10 +477,10 @@
   },
   {
     "name": "Hyatt Regency",
-    "file": "hyatt-regency.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hyatt-regency.svg",
-    "upstream_path": "svg/h/hyatt-regency.svg",
-    "sha": "ab4c25aeb9f34c3e3f535d1d9dbfaaaf0c22b89b"
+    "file": "hyatt-regency.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Hyatt_Regency_Danang%2C_Corporate_logo%2C_March_2014.png",
+    "upstream_path": "Hyatt Regency Danang, Corporate logo, March 2014.png",
+    "sha": "9eb00ae58512e15550dbec83c6a3f38025e2abbf"
   },
   {
     "name": "Hyatt Place",
@@ -534,9 +534,9 @@
   {
     "name": "Westin",
     "file": "westin.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/w/westin.svg",
-    "upstream_path": "svg/w/westin.svg",
-    "sha": "16a71148334cf94921fd542b940bde76e18ad3a3"
+    "source": "https://commons.wikimedia.org/wiki/File:Westin_Hotels_%26_Resorts_logo.svg",
+    "upstream_path": "Westin Hotels & Resorts logo.svg",
+    "sha": "5a9bb78b980d1516b44f15f695dd8eed6b57729b"
   },
   {
     "name": "Renaissance Hotels",
@@ -590,9 +590,9 @@
   {
     "name": "Bvlgari Hotels & Resorts",
     "file": "bvlgari-hotels-resorts.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/b/bvlgari-hotels-resorts.svg",
-    "upstream_path": "svg/b/bvlgari-hotels-resorts.svg",
-    "sha": "e3566b7f329d5a453e39c20d669b1100410cce0a"
+    "source": "https://commons.wikimedia.org/wiki/File:Bulgari_logo.svg",
+    "upstream_path": "Bulgari logo.svg",
+    "sha": "eb4e8a329d12c3be2ce0fc1d7b63cfca1edc40ee"
   },
   {
     "name": "Marriott Executive Apartments",
@@ -603,10 +603,10 @@
   },
   {
     "name": "Hampton by Hilton",
-    "file": "hampton-by-hilton.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hampton-inn.svg",
-    "upstream_path": "svg/h/hampton-inn.svg",
-    "sha": "3800fc386b72ff509f7d9042bf00ab506a076904"
+    "file": "hampton-by-hilton.png",
+    "source": "https://commons.wikimedia.org/wiki/File:Hampton-by-Hilton-Logo-Color.png",
+    "upstream_path": "Hampton-by-Hilton-Logo-Color.png",
+    "sha": "c28774a9a6f0766b6f7bdd30e6b5fb2a97c84250"
   },
   {
     "name": "Hilton Garden Inn",
@@ -618,9 +618,9 @@
   {
     "name": "DoubleTree by Hilton",
     "file": "doubletree-by-hilton.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/d/doubletree.svg",
-    "upstream_path": "svg/d/doubletree.svg",
-    "sha": "a35d3bd27b56d1ba0bd857cdadc4c8a74b626126"
+    "source": "https://en.wikipedia.org/wiki/File:DoubletreeLogo.svg",
+    "upstream_path": "DoubletreeLogo.svg",
+    "sha": "826a94f671071ecb938c2dfc5c4059e2db1058e9"
   },
   {
     "name": "Embassy Suites by Hilton",
@@ -639,9 +639,9 @@
   {
     "name": "Conrad Hotels",
     "file": "conrad-hotels.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/conrad-hotels.svg",
-    "upstream_path": "svg/c/conrad-hotels.svg",
-    "sha": "dda88a8625d5cf32a959eb8c11be442011ece50d"
+    "source": "https://commons.wikimedia.org/wiki/File:ConradHotelsLogo.svg",
+    "upstream_path": "ConradHotelsLogo.svg",
+    "sha": "0185103f167a47835a30ca94a6032721c7ca7ce5"
   },
   {
     "name": "Holiday Inn Express",
@@ -660,16 +660,16 @@
   {
     "name": "Crowne Plaza",
     "file": "crowne-plaza.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/c/crowne-plaza.svg",
-    "upstream_path": "svg/c/crowne-plaza.svg",
-    "sha": "41e37483ac3fc6fcc1918ab54f278865932b1bcc"
+    "source": "https://en.wikipedia.org/wiki/File:Crowne_Plaza_by_IHG_logo.svg",
+    "upstream_path": "Crowne_Plaza_by_IHG_logo.svg",
+    "sha": "f2db9b30e410832d01df97846c73bda374913f09"
   },
   {
     "name": "Staybridge Suites",
     "file": "staybridge-suites.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/staybridge-suites.svg",
-    "upstream_path": "svg/s/staybridge-suites.svg",
-    "sha": "003ff491d611536979f140e4d5be2db82c9e9a9a"
+    "source": "https://en.wikipedia.org/wiki/File:Staybridge_Suites_by_IHG_logo.svg",
+    "upstream_path": "Staybridge_Suites_by_IHG_logo.svg",
+    "sha": "5a1d01905f5c654c6f2886921bc3eda61d327acb"
   },
   {
     "name": "Candlewood Suites",
@@ -695,9 +695,9 @@
   {
     "name": "Days Inn by Wyndham",
     "file": "days-inn-by-wyndham.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/d/days-inn.svg",
-    "upstream_path": "svg/d/days-inn.svg",
-    "sha": "306045a0f58986316bda07a46cfe70182cb68ce2"
+    "source": "https://en.wikipedia.org/wiki/File:Days_Inn_logo.svg",
+    "upstream_path": "Days_Inn_logo.svg",
+    "sha": "da417f258c28ba30b0393e0b03a83ff83671cae2"
   },
   {
     "name": "Hawthorn Suites by Wyndham",
@@ -744,9 +744,9 @@
   {
     "name": "Sleep Inn",
     "file": "sleep-inn.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/s/sleep-inn.svg",
-    "upstream_path": "svg/s/sleep-inn.svg",
-    "sha": "95fa13de450fbb24cab6f87c863fa85b0c98cf03"
+    "source": "https://commons.wikimedia.org/wiki/File:Sleep_in_2019.svg",
+    "upstream_path": "Sleep in 2019.svg",
+    "sha": "671a5fbf4c7f9a4219c96da074dd9f4fc66c8d52"
   },
   {
     "name": "MainStay Suites",
