@@ -123,7 +123,7 @@
     <span>{loadError}</span><Button variant="outline" onclick={load}>Try again</Button>
   </AlertDescription></Alert>
 {:else if shown === null}
-  <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading"></div>
+  <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else}
   {#if trips && trips.length > 0}
     <form class="mb-6 flex flex-col gap-3 rounded-[18px] border border-border bg-black/25 p-3 md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-3 md:p-4" role="search" aria-label="Find a trip" onsubmit={(e) => e.preventDefault()}>

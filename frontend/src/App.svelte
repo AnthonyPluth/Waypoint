@@ -85,7 +85,7 @@
         {:else if app.state && Page}
           <Page />
         {:else}
-          <div class="space-y-4" aria-busy="true" aria-label="Loading">
+          <div class="space-y-4" role="progressbar" aria-busy="true" aria-label="Loading">
             <div class="h-9 w-48 animate-pulse rounded-lg bg-muted motion-reduce:animate-none"></div>
             <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"></div>
           </div>

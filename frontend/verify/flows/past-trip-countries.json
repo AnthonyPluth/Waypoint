@@ -19,7 +19,7 @@
     { "scroll_to": "form[data-editor]" },
     { "screenshot": "form" },
     { "click": "form[data-editor] button[type=submit]" },
-    { "wait_for": "text=Trip to Ecuador, Peru and Bolivia" },
+    { "wait_for": "h1:has-text('Trip to Ecuador, Peru and Bolivia')" },
     { "screenshot": "trip" },
     { "goto": "#stats" },
     { "expect_text": { "selector": "h1", "text": "Stats" } },

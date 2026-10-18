@@ -7,7 +7,7 @@ from .. import monitoring, oidc
 from ..domain import flightstatus, reminders
 from ..domain.mail import scan
 from ..providers import gmail
-from ..storage import db
+from ..storage import db, roads, states
 
 SUBJECT = "mailto:waypoint@localhost"
 SWEEP_EVERY = 3600
@@ -15,6 +15,14 @@ FLIGHT_STATUS_EVERY = 300
 REMINDERS_EVERY = 300
 SCAN_EVERY = 4 * 3600
 SCAN_FIRST = 300
+
+
+def warm_map_data() -> None:
+    try:
+        roads.highways()
+        states.state_lines()
+    except Exception as e:
+        monitoring.report(e, values=False)
 
 
 def sweep_lapsed() -> None:
@@ -81,7 +89,8 @@ def start(stop: threading.Event) -> list[threading.Thread]:
             flightstatus.forget_key_pause(conn)
     except Exception as e:
         monitoring.report(e, values=False)
-    threads = [threading.Thread(target=every, args=(SWEEP_EVERY, sweep_lapsed), daemon=True, name="gmail-lapse-sweep"),
+    threads = [threading.Thread(target=warm_map_data, daemon=True, name="map-data"),
+               threading.Thread(target=every, args=(SWEEP_EVERY, sweep_lapsed), daemon=True, name="gmail-lapse-sweep"),
                threading.Thread(target=every, args=(FLIGHT_STATUS_EVERY, check_flights), daemon=True, name="flight-status"),
                threading.Thread(target=every, args=(REMINDERS_EVERY, send_reminders), daemon=True, name="reminders"),
                threading.Thread(target=every, args=(SCAN_EVERY, scan_mailboxes, SCAN_FIRST), daemon=True, name="mail-scan")]

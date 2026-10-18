@@ -533,7 +533,7 @@
     <span>{loadError}</span><Button variant="outline" onclick={load}>Try again</Button>
   </AlertDescription></Alert>
 {:else if review === null}
-  <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading"></div>
+  <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else if review.items.length === 0 && review.who.length === 0 && review.matches.length === 0}
   <div class="flex flex-col items-start gap-3 rounded-2xl border border-dashed p-6 text-muted-foreground">
     <CircleCheck class="size-6 text-primary" aria-hidden="true" />

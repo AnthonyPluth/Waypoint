@@ -227,7 +227,7 @@
 {#if problem}
   <Alert role="alert"><AlertDescription class="flex flex-wrap items-center justify-between gap-3"><span>Couldn’t load the stats: {problem}</span><Button variant="outline" size="sm" onclick={() => load(key, statsPath(sel))}>Try again</Button></AlertDescription></Alert>
 {:else if !current}
-  <div class="space-y-4" aria-busy="true" aria-label="Loading">
+  <div class="space-y-4" role="progressbar" aria-busy="true" aria-label="Loading">
     <div class="h-28 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"></div>
     <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"></div>
   </div>

@@ -239,7 +239,7 @@
     <span>{loadError}</span><Button variant="outline" onclick={load}>Try again</Button>
   </AlertDescription></Alert>
 {:else if people === null}
-  <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading"></div>
+  <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else if people.length === 0}
   <p class="text-muted-foreground">Nobody yet. Household members appear here when they sign in; add a guest for someone who travels with you but has no login.</p>
 {:else}
