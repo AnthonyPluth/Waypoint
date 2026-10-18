@@ -363,7 +363,7 @@
                     </li>
                   {/each}
                 </ul>
-                <a class="flex min-h-11 items-center justify-between border-t border-border px-4 text-sm font-medium underline-offset-2 hover:underline" href="#trips?when=upcoming">All trips<ChevronRight class="size-4 text-muted-foreground" aria-hidden="true" /></a>
+                <a class="flex min-h-11 items-center justify-between border-t border-border px-4 text-sm font-medium underline-offset-2 hover:underline" href="#trips">All trips<ChevronRight class="size-4 text-muted-foreground" aria-hidden="true" /></a>
               </section>
             {/if}
           {/if}
