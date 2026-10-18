@@ -172,8 +172,6 @@ export function splitTrips(trips: Trip[], today: string): { upcoming: Trip[]; pa
   return { upcoming, past };
 }
 
-export type TripWhen = "upcoming" | "past";
-
 export function matchesText(trip: Trip, text: string): boolean {
   const terms = text.toLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return true;

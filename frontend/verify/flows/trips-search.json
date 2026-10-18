@@ -12,7 +12,6 @@
     { "fill": { "selector": "input[type=search]", "text": "Lisbon" } },
     { "expect_text": { "selector": "[role=status]", "text": " OF " } },
     { "screenshot": "searched" },
-    { "click": "[role='group'][aria-label='Show'] button:has-text('Past')" },
     { "click_if_present": "button:has-text('Filters')" },
     { "click": "[role='group'][aria-label='Year'] button >> nth=1" },
     { "screenshot": "filtered" },
