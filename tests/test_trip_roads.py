@@ -4,7 +4,8 @@ from unittest import mock
 from tests.privacy import no_leaks
 from tests.test_trips import HOTEL, RouteCase
 from waypoint.domain import tripmap
-from waypoint.storage import roads
+from waypoint.server import jobs
+from waypoint.storage import roads, states
 
 DENVER = {**HOTEL, "origin": "Mile High Inn", "destination": "Denver", "start_local": "2026-06-02T15:00", "end_local": "2026-06-04T10:00",
           "start_zone": "America/Denver", "end_zone": "America/Denver"}
@@ -178,6 +179,22 @@ class BacktrackingRuleTests(unittest.TestCase):
         bare = roads.Route([(39.8, -105.0), (40.7, -111.8)], ["I-25"], 600.0, 1.0, 1.0)
         self.assertIsNone(tripmap._section(bare, self.DENVER, self.SALT_LAKE))
         self.assertIsNone(tripmap._retrace([], self.DENVER, self.SALT_LAKE))
+
+
+class WarmMapDataTests(unittest.TestCase):
+    def test_the_server_loads_the_highways_and_state_lines_before_the_first_trip_map_asks(self):
+        with mock.patch.object(roads, "highways") as highways, mock.patch.object(states, "state_lines") as lines:
+            jobs.warm_map_data()
+        highways.assert_called_once_with()
+        lines.assert_called_once_with()
+
+    def test_a_failed_load_is_reported_without_values_and_does_not_stop_the_server(self):
+        boom = OSError("disk")
+        with mock.patch.object(roads, "highways", side_effect=boom), mock.patch.object(states, "state_lines") as lines, \
+                mock.patch.object(jobs.monitoring, "report") as report:
+            jobs.warm_map_data()
+        report.assert_called_once_with(boom, values=False)
+        lines.assert_not_called()
 
 
 if __name__ == "__main__":

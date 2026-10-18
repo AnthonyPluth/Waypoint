@@ -278,7 +278,7 @@
     <span>{loadError}</span><Button variant="outline" onclick={load}>Try again</Button>
   </AlertDescription></Alert>
 {:else if trip === null}
-  <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading"></div>
+  <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else}
   {@const t = trip}
   <div class="mb-6 flex flex-wrap items-start justify-between gap-3">

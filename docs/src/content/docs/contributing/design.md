@@ -7,7 +7,7 @@ sidebar:
 
 Waypoint is dark only. There is no light palette and no theme setting. Lint rejects a `dark:` variant, a light palette and `prefers-color-scheme` in `frontend/` (and `make fleet-checks` rejects them in the static files), so a new screen never needs to think about themes.
 
-The specimen page at `#design` (Settings, then Design) shows everything below on one screen. `make verify` captures it at phone, tablet and desktop widths: `poetry run python run.py verify design`.
+The specimen page at `#design` (Settings, then Design) shows everything below on one screen. `make verify` captures it at phone and desktop widths: `poetry run python run.py verify design`.
 
 ## Tokens
 

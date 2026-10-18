@@ -828,6 +828,21 @@ describe("Upcoming side column", () => {
     expect(screen.getByTestId("trip-totals")).toBeInTheDocument();
   });
 
+  it("keeps the map on screen while the same trip’s places load again", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    let held = false;
+    serveWith([london], (path) => (path === "/api/trips/1/places" ? (held ? new Promise(() => {}) : places) : undefined));
+    render(Upcoming);
+    await screen.findByRole("img", { name: /^Route map/ });
+    held = true;
+    viewport.phone = true;
+    await vi.advanceTimersByTimeAsync(0);
+    viewport.phone = false;
+    await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => expect(placesCalls().length).toBeGreaterThan(1));
+    expect(screen.getByRole("img", { name: /^Route map/ })).toBeInTheDocument();
+  });
+
   it("leaves the map out when the places reply is malformed", async () => {
     at("2026-11-20T09:00:00-05:00");
     serveWith([london], (path) => (path === "/api/trips/1/places" ? { trips: [] } : undefined));

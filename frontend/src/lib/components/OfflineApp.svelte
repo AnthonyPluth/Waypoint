@@ -33,7 +33,7 @@
 </script>
 
 {#if !offline.checked}
-  <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading"></div>
+  <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else if !savedTripPage}
   <Card.Root class="mx-auto mt-10 max-w-md" data-testid="needs-connection">
     <Card.Header>

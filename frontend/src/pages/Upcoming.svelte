@@ -106,10 +106,12 @@
   const stops = $derived(featured && places ? stopsOf(featured, places) : []);
   const totals = $derived(featured ? tripTotals(featured, places) : null);
   let placesRequest = 0;
+  let placesFor: number | null = null;
   $effect(() => {
     const mine = ++placesRequest;
     const id = featuredId;
-    places = null;
+    if (id !== placesFor) places = null;
+    placesFor = id;
     if (id === null || viewport.phone) return;
     apiCall<"GET /api/trips/{id}/places">(`/api/trips/${id}/places`).then(
       (found) => { if (mine === placesRequest && usablePlaces(found)) places = found; },
@@ -197,7 +199,7 @@
     <span>{loadError}</span><Button variant="outline" onclick={load}>Try again</Button>
   </AlertDescription></Alert>
 {:else if trips === null}
-  <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading"></div>
+  <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else if trips.length === 0}
   {#if guests.length}
     <section class="rows mb-6" aria-labelledby="claim-title">

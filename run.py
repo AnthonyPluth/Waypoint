@@ -16,10 +16,12 @@ if __name__ == "__main__":
     p.add_argument("command", nargs="?", choices=["serve", "backup", "restore", "demo", "verify"], default="serve")
     p.add_argument("file", nargs="*", help="backup file (for backup / restore), or the pages to visit (for verify; default all)")
     p.add_argument("--yes", action="store_true", help="restore without asking")
+    p.add_argument("--jobs", "-j", type=int, help="for verify: how many servers and browsers to run at once (default VERIFY_JOBS, else the CPU count, at most 4)")
+    p.add_argument("--flow", action="append", default=[], help="for verify: run only this scripted flow (repeat for more), with no page visits")
     a = p.parse_args()
     if a.command == "verify":
         from waypoint import verify
-        sys.exit(verify.run(a.file))
+        sys.exit(verify.run(a.file, a.jobs, a.flow))
     if len(a.file) > 1:
         p.error("only one file, please")
     a.file = a.file[0] if a.file else None

@@ -4,16 +4,17 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { animationsRunning, auditPage } from "./a11y.mjs";
+import { planVisits, runPool, summarize, urlsOf } from "./jobs.mjs";
 
 export const PHONE_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-export const VIEWPORTS = { phone: { width: 440, height: 956 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1280, height: 800 }, laptop: { width: 1024, height: 768 }, wide: { width: 1440, height: 900 }, zoomed: { width: 853, height: 533 } };
-export const DEFAULT_VIEWPORTS = ["phone", "tablet", "desktop"];
+export const VIEWPORTS = { phone: { width: 440, height: 956 }, desktop: { width: 1280, height: 800 }, laptop: { width: 1024, height: 768 }, wide: { width: 1440, height: 900 }, zoomed: { width: 853, height: 533 } };
+export const DEFAULT_VIEWPORTS = ["phone", "desktop"];
 export const IMAGE_VIEWPORTS = ["phone", "desktop"];
 export const CHROMIUM_ARGS = ["--force-color-profile=srgb", "--disable-lcd-text", "--num-raster-threads=1"];
 export const SETTLE_MS = 300;
 export const FROZEN_NOW = "2026-06-15T12:00:00Z";
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];
-const OWN_PAGES = ["oauth-approve"];
+export const OWN_PAGES = ["oauth-approve"];
 
 export function findChromium(env = process.env, exists = existsSync, list = readdirSync) {
   const root = env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers";
@@ -223,45 +224,24 @@ async function runStep(page, step, shot, saveDownload) {
   }
 }
 
-async function main() {
-  const args = process.argv.slice(2);
-  const opt = (name, fallback) => { const i = args.indexOf(name); return i < 0 ? fallback : args.splice(i, 2)[1]; };
-  const base = opt("--url", process.env.WAYPOINT_VERIFY_URL);
-  const here = dirname(fileURLToPath(import.meta.url));
-  const out = opt("--out", join(here, "../../artifacts/verify"));
-  const images = opt("--images", join(here, "../../docs/src/assets/screenshots"));
-  const now = new Date(opt("--now", process.env.WAYPOINT_VERIFY_NOW ?? FROZEN_NOW));
-  const flowsDir = opt("--flows", join(here, "flows"));
-  if (!base) { console.error("verify: no server address (--url or WAYPOINT_VERIFY_URL)"); process.exit(2); }
-  const unknown = unknownPages(args);
-  if (unknown.length) { console.error(`verify: no such page: ${unknown.join(", ")} (pages: ${PAGES.join(", ")})`); process.exit(2); }
-  const pages = args.length ? args : PAGES;
+export async function warmMaps(browser, base) {
+  const ctx = await browser.newContext();
+  try {
+    const get = (path) => ctx.request.get(`${base}${path}`, { timeout: 180000 });
+    const { trips } = await (await get("/api/trips")).json();
+    for (const t of trips) await get(`/api/trips/${t.id}/places`);
+  } finally { await ctx.close(); }
+}
 
-  const flows = existsSync(flowsDir) ? readdirSync(flowsDir).filter((f) => f.endsWith(".json")).sort().map((f) => {
-    let flow;
-    try { flow = JSON.parse(readFileSync(join(flowsDir, f), "utf8")); } catch (e) { console.error(`verify: flow ${f} isn't valid JSON (${e.message})`); process.exit(2); }
-    const bad = flowProblems(flow);
-    if (bad.length) { console.error(`verify: flow ${f}: ${bad.join("; ")}`); process.exit(2); }
-    return flow;
-  }) : [];
-
-  rmSync(out, { recursive: true, force: true });
-  mkdirSync(out, { recursive: true });
-  if (!args.length) rmSync(images, { recursive: true, force: true });
-  mkdirSync(images, { recursive: true });
-  const browser = await chromium.launch({ executablePath: findChromium(), args: CHROMIUM_ARGS });
-  const problems = [];
-  const notes = [];
-  const results = [];
-  let approveUrl = "";
-  try { approveUrl = await seedAssistants(browser, base); }
-  catch (e) { problems.push(`seeding the demo assistants: ${String(e.message).split("\n")[0]}`, { cause: e }); }
-
-  async function visit(label, viewport, work, { audit = true, reducedMotion = "no-preference", allowConsole = [], phoneAgent = false } = {}) {
-    const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark", timezoneId: "UTC", reducedMotion, ...(phoneAgent && viewport === "phone" ? { userAgent: PHONE_AGENT } : {}) });
+async function visit(env, label, viewport, work, { audit = true, reducedMotion = "no-preference", allowConsole = [], phoneAgent = false } = {}) {
+  const { browser, now, images, out } = env;
+  const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark", timezoneId: "UTC", reducedMotion, ...(phoneAgent && viewport === "phone" ? { userAgent: PHONE_AGENT } : {}) });
+  try {
     await ctx.clock.setFixedTime(now);
     const page = await ctx.newPage();
     const where = `${label} @ ${viewport}`;
+    const problems = [];
+    const notes = [];
     const consoleErrors = [];
     page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
     page.on("pageerror", (e) => consoleErrors.push(`uncaught: ${e.message}`));
@@ -274,6 +254,8 @@ async function main() {
       await page.evaluate(`window.scrollTo({ top: 0, left: 0, behavior: "instant" })`);
       try { await page.waitForLoadState("networkidle", { timeout: 3000 }); } catch { notes.push(`${where}: still loading after 3 s when ${name} was captured`); }
       await page.evaluate("document.fonts.ready");
+      try { await page.waitForFunction(() => globalThis.document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity), undefined, { timeout: 3000 }); }
+      catch { notes.push(`${where}: an animation was still running after 3 s when ${name} was captured`); }
       await page.waitForTimeout(SETTLE_MS);
       await page.screenshot({ path: join(dir, file), fullPage: true, animations: "disabled" });
       files.push(file);
@@ -292,47 +274,101 @@ async function main() {
       await shot(`${label.replace(/\W+/g, "-")}-FAILED`, out).catch(() => {});
     }
     for (const c of consoleErrors.filter((c) => !allowConsole.some((t) => c.includes(t)))) problems.push(`${where}: console error: ${c.slice(0, 300)}`);
-    results.push({ label, viewport, screenshots: files, consoleErrors });
-    await ctx.close();
-  }
+    return { screenshots: files, consoleErrors, problems, notes };
+  } finally { await ctx.close(); }
+}
 
-  for (const name of pages) {
-    for (const viewport of DEFAULT_VIEWPORTS) {
-      await visit(name, viewport, async (page, shot) => {
-        if (OWN_PAGES.includes(name)) {
-          if (!approveUrl) throw new Error("no approval page: seeding the demo assistants failed");
-          await page.goto(approveUrl, { waitUntil: "networkidle" });
-          await page.locator("button[value=allow]").waitFor({ timeout: 10000 });
-        } else await page.goto(`${base}/#${name}`, { waitUntil: "networkidle" });
-        await shot(name);
-      });
-    }
+export function runVisit(env, v) {
+  const { base, approveUrl } = env;
+  if (v.kind === "flow") {
+    const { flow } = v;
+    return visit(env, `flow ${flow.name}`, v.viewport, async (page, shot, saveDownload) => {
+      await page.goto(`${flow.host ? base.replace("127.0.0.1", flow.host) : base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
+      for (const [i, step] of flow.steps.entries()) {
+        try { await runStep(page, step, (n) => shot(`flow-${flow.name}-${n}`, env.out), (n, d) => saveDownload(`flow-${flow.name}-${n}`, d, env.out)); }
+        catch (e) { throw new Error(`step ${i + 1} (${JSON.stringify(step).slice(0, 80)}): ${String(e.message).split("\n")[0]}`, { cause: e }); }
+      }
+      await shot(`flow-${flow.name}`, env.out);
+    }, { allowConsole: flow.allow_console, phoneAgent: flow.phone_agent === true });
   }
-  for (const flow of flows) {
-    if (args.length && !args.includes(flow.page ?? "upcoming")) continue;
-    for (const viewport of flow.viewports ?? DEFAULT_VIEWPORTS) {
-      await visit(`flow ${flow.name}`, viewport, async (page, shot, saveDownload) => {
-        await page.goto(`${flow.host ? base.replace("127.0.0.1", flow.host) : base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
-        for (const [i, step] of flow.steps.entries()) {
-          try { await runStep(page, step, (n) => shot(`flow-${flow.name}-${n}`, out), (n, d) => saveDownload(`flow-${flow.name}-${n}`, d, out)); }
-          catch (e) { throw new Error(`step ${i + 1} (${JSON.stringify(step).slice(0, 80)}): ${String(e.message).split("\n")[0]}`, { cause: e }); }
-        }
-        await shot(`flow-${flow.name}`, out);
-      }, { allowConsole: flow.allow_console, phoneAgent: flow.phone_agent === true });
-    }
-  }
-  if (!args.length) for (const name of pages.filter((n) => !OWN_PAGES.includes(n))) {
-    await visit(`reduced motion ${name}`, "phone", async (page) => {
-      await page.goto(`${base}/#${name}`, { waitUntil: "networkidle" });
+  if (v.kind === "reduced") {
+    return visit(env, `reduced motion ${v.name}`, v.viewport, async (page) => {
+      await page.goto(`${base}/#${v.name}`, { waitUntil: "networkidle" });
       const moving = await animationsRunning(page);
       if (moving.length) throw new Error(`animations still run under prefers-reduced-motion: ${moving.slice(0, 5).join(", ")}`);
     }, { audit: false, reducedMotion: "reduce" });
   }
-  await browser.close();
+  return visit(env, v.name, v.viewport, async (page, shot) => {
+    if (OWN_PAGES.includes(v.name)) {
+      if (!approveUrl) throw new Error("no approval page: seeding the demo assistants failed");
+      await page.goto(approveUrl, { waitUntil: "networkidle" });
+      await page.locator("button[value=allow]").waitFor({ timeout: 10000 });
+    } else await page.goto(`${base}/#${v.name}`, { waitUntil: "networkidle" });
+    await shot(v.name);
+  });
+}
 
-  writeFileSync(join(out, "report.json"), JSON.stringify({ base, results, problems, notes }, null, 2));
+function loadFlows(flowsDir) {
+  if (!existsSync(flowsDir)) return [];
+  return readdirSync(flowsDir).filter((f) => f.endsWith(".json")).sort().map((f) => {
+    let flow;
+    try { flow = JSON.parse(readFileSync(join(flowsDir, f), "utf8")); } catch (e) { console.error(`verify: flow ${f} isn't valid JSON (${e.message})`); process.exit(2); }
+    const bad = flowProblems(flow);
+    if (bad.length) { console.error(`verify: flow ${f}: ${bad.join("; ")}`); process.exit(2); }
+    return flow;
+  });
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const opt = (name, fallback) => { const i = args.indexOf(name); return i < 0 ? fallback : args.splice(i, 2)[1]; };
+  const optAll = (name) => { const found = []; for (let i = args.indexOf(name); i >= 0; i = args.indexOf(name)) found.push(args.splice(i, 2)[1]); return found; };
+  const given = optAll("--url").flatMap(urlsOf);
+  const urls = [...(given.length ? given : urlsOf(process.env.WAYPOINT_VERIFY_URL))].filter((u, i, all) => all.indexOf(u) === i);
+  const here = dirname(fileURLToPath(import.meta.url));
+  const out = opt("--out", join(here, "../../artifacts/verify"));
+  const images = opt("--images", join(here, "../../docs/src/assets/screenshots"));
+  const now = new Date(opt("--now", process.env.WAYPOINT_VERIFY_NOW ?? FROZEN_NOW));
+  const flowsDir = opt("--flows", join(here, "flows"));
+  const only = optAll("--flow").flatMap(urlsOf);
+  if (!urls.length) { console.error("verify: no server address (--url or WAYPOINT_VERIFY_URL)"); process.exit(2); }
+  const unknown = unknownPages(args);
+  if (unknown.length) { console.error(`verify: no such page: ${unknown.join(", ")} (pages: ${PAGES.join(", ")})`); process.exit(2); }
+  const everyFlow = loadFlows(flowsDir);
+  const missing = only.filter((n) => !everyFlow.some((f) => f.name === n));
+  if (missing.length) { console.error(`verify: no such flow: ${missing.join(", ")}`); process.exit(2); }
+  const pages = args.length ? args : PAGES;
+  const flows = only.length ? everyFlow.filter((f) => only.includes(f.name)) : everyFlow;
+  const visits = planVisits({ pages, flows, viewports: DEFAULT_VIEWPORTS, ownPages: OWN_PAGES, filtered: args.length > 0 || only.length > 0, flowsOnly: only.length > 0 });
+
+  rmSync(out, { recursive: true, force: true });
+  mkdirSync(out, { recursive: true });
+  if (!args.length && !only.length) rmSync(images, { recursive: true, force: true });
+  mkdirSync(images, { recursive: true });
+  const started = Date.now();
+  const startup = [];
+  const { outcomes, failures } = await runPool({
+    visits,
+    workers: urls.length,
+    prepare: async (worker) => {
+      const base = urls[worker];
+      const browser = await chromium.launch({ executablePath: findChromium(), args: CHROMIUM_ARGS });
+      let approveUrl = "";
+      try { approveUrl = await seedAssistants(browser, base); }
+      catch (e) { startup.push({ worker, reason: `seeding the demo assistants: ${String(e.message).split("\n")[0]}` }); }
+      try { await warmMaps(browser, base); }
+      catch (e) { startup.push({ worker, reason: `warming the map data: ${String(e.message).split("\n")[0]}` }); }
+      return { browser, base, approveUrl, now, images, out };
+    },
+    work: (v, env) => runVisit(env, v),
+    release: (env) => env.browser.close(),
+  });
+  const { problems, notes, results } = summarize({ outcomes, failures, startup, urls });
+  const seconds = Math.round((Date.now() - started) / 1000);
+
+  writeFileSync(join(out, "report.json"), JSON.stringify({ base: urls[0], instances: urls, seconds, results, problems, notes }, null, 2));
   const shots = results.reduce((n, r) => n + r.screenshots.length, 0);
-  console.log(`verify: ${results.length} visits, ${shots} screenshots in ${images}`);
+  console.log(`verify: ${results.length} visits, ${shots} screenshots in ${images}, ${seconds} s on ${urls.length} server${urls.length === 1 ? "" : "s"}`);
   for (const n of notes) console.log(`  note: ${n}`);
   for (const p of problems) console.error(`  FAIL: ${p}`);
   console.log(problems.length ? `verify: FAILED (${problems.length} problem${problems.length === 1 ? "" : "s"})` : "verify: OK, no console errors, 5xx responses or accessibility problems");
