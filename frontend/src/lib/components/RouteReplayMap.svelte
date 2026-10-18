@@ -115,7 +115,7 @@
     <svg viewBox="{box.x} {box.y} {box.w} {box.h}" data-zoomed={zoomed} role="img" aria-label="Map of the route, stop by stop; the stops are listed below" class="block h-full w-full">
       <path d={sphere} class="fill-map-sea" />
       <g class="fill-map-land stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke">
-        {#each land as c (c.id)}<path d={c.d} />{/each}
+        {#each land as c, i (i)}<path d={c.d} />{/each}
       </g>
       {#if stateLines.length}
         <g aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" opacity="0.8" data-testid="state-lines">

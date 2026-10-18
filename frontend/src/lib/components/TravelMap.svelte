@@ -112,7 +112,7 @@
         <path d={sphere} class="fill-map-sea" />
         <g transform="translate({t.x} {t.y}) scale({t.k})" data-testid="map-layer">
           <g role="presentation" class="stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke" onclick={() => { if (!dragged) picked = null; }}>
-            {#each outlines as c (c.id ?? c.name)}
+            {#each outlines as c, i (i)}
               {@const shaded = visited.has(c.id ?? "") && !(byState && c.id === US_ID)}
               <path d={c.d} class={shaded ? "fill-map-visited" : "fill-map-land"} data-visited={shaded ? "true" : undefined}><title>{c.name}</title></path>
             {/each}

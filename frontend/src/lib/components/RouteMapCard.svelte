@@ -22,7 +22,7 @@
   <svg viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-label={routeDescription(stops)} class="block h-[180px] w-full">
     <path d={sphere} class="fill-map-sea" />
     <g class="fill-map-land stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke">
-      {#each land as c (c.id)}<path d={c.d} />{/each}
+      {#each land as c, i (i)}<path d={c.d} />{/each}
     </g>
     <g fill="none" stroke-linecap="round" stroke-linejoin="round">
       {#each legs as leg, i (i)}
