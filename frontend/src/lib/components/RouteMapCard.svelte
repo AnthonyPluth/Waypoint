@@ -1,6 +1,6 @@
 <script lang="ts">
   import { geoPath } from "d3-geo";
-  import { loadCountries, type Country } from "$lib/map";
+  import { landFor } from "$lib/land.svelte";
   import { legsOf, NO_ROADS, positions, routeProjection, type Roads, type Stop } from "$lib/route-replay";
   import { routeDescription } from "$lib/side-column";
 
@@ -13,9 +13,8 @@
   const legs = $derived(legsOf(stops, projection, roads));
   const spots = $derived(positions(stops, projection));
   const sphere = $derived(path({ type: "Sphere" }) ?? "");
-  let countries = $state<Country[]>([]);
-  const land = $derived(countries.map((c) => ({ id: c.id ?? c.properties?.name ?? "", d: path(c) ?? "" })));
-  $effect(() => { loadCountries().then((c) => { countries = c; }, () => { countries = []; }); });
+  const terrain = landFor(() => ({ projection, width: WIDTH, height: HEIGHT }));
+  const land = $derived(terrain.features.map((c) => ({ id: c.id ?? c.properties?.name ?? "", d: path(c) ?? "" })));
   const label = (s: Stop): string => s.code ?? s.city;
 </script>
 
@@ -23,7 +22,7 @@
   <svg viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-label={routeDescription(stops)} class="block h-[180px] w-full">
     <path d={sphere} class="fill-map-sea" />
     <g class="fill-map-land stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke">
-      {#each land as c (c.id)}<path d={c.d} />{/each}
+      {#each land as c, i (i)}<path d={c.d} />{/each}
     </g>
     <g fill="none" stroke-linecap="round" stroke-linejoin="round">
       {#each legs as leg, i (i)}

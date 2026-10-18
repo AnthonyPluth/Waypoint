@@ -1,7 +1,7 @@
 <script lang="ts">
   import { geoPath } from "d3-geo";
   import { Button } from "$lib/components/ui/button";
-  import { loadCountries, type Country } from "$lib/map";
+  import { landFor } from "$lib/land.svelte";
   import { viewport } from "$lib/phone.svelte";
   import { activeStop, boundariesShown, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, roadShapes, roadsShown, SCRUB_STEPS, shieldsOf, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Roads, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
@@ -29,9 +29,6 @@
   const lines = $derived(boundaryShapes(boundaries, projection));
   const spots = $derived(positions(stops, projection));
   const sphere = $derived(path({ type: "Sphere" }) ?? "");
-  let countries = $state<Country[]>([]);
-  const land = $derived(countries.map((c) => ({ id: c.id ?? c.properties?.name ?? "", d: path(c) ?? "" })));
-  $effect(() => { loadCountries().then((c) => { countries = c; }, () => { countries = []; }); });
 
   let progress = $state(0);
   let playing = $state(false);
@@ -74,6 +71,8 @@
   const showing = (i: number) => calm || reached(i, stops.length, progress);
   const lit = (i: number) => calm || (i === stops.length - 1 ? progress >= 1 && playing && tail < LABEL_HOLD_MS : labelLit(i, stops.length, progress, !playing));
   const box = $derived(calm ? { x: 0, y: 0, w: width, h: height } : cameraAt(stops, spots, width, height, progress, legs));
+  const terrain = landFor(() => ({ projection, width, height, box, zoom: width / box.w }));
+  const land = $derived(terrain.features.map((c, i) => ({ id: i, d: path(c) ?? "" })));
   const zoom = $derived(box.w / width);
   const drawn = $derived(roadsShown(projection, zoom) ? shapes.filter((r) => inView(r, box)) : []);
   const stateLines = $derived(boundariesShown(projection, zoom) ? lines.filter((l) => inView(l, box)) : []);
@@ -116,7 +115,7 @@
     <svg viewBox="{box.x} {box.y} {box.w} {box.h}" data-zoomed={zoomed} role="img" aria-label="Map of the route, stop by stop; the stops are listed below" class="block h-full w-full">
       <path d={sphere} class="fill-map-sea" />
       <g class="fill-map-land stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke">
-        {#each land as c (c.id)}<path d={c.d} />{/each}
+        {#each land as c, i (i)}<path d={c.d} />{/each}
       </g>
       {#if stateLines.length}
         <g aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" opacity="0.8" data-testid="state-lines">

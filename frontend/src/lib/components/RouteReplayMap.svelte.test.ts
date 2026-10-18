@@ -6,7 +6,7 @@ import { replayMs, SCRUB_STEPS, stopsOf } from "$lib/route-replay";
 import { segment, trip } from "../../test/fixtures";
 import RouteReplayMap from "./RouteReplayMap.svelte";
 
-vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [] }));
+vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [], loadDetailedCountries: async () => [], loadFineCountries: async () => [] }));
 
 const places: TripPlaces = {
   home: null,

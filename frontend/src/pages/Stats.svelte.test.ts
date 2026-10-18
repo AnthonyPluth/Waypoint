@@ -12,6 +12,11 @@ import { viewport } from "$lib/phone.svelte";
 import { state } from "../test/fixtures";
 import Stats_ from "./Stats.svelte";
 
+vi.mock("$lib/map", async (original) => {
+  const real = await original<typeof import("$lib/map")>();
+  return { ...real, loadDetailedCountries: real.loadCountries, loadFineCountries: real.loadCountries };
+});
+
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
 const sam: Person = { id: 2, display_name: "Sam Doe", first_name: "Sam", legal_name: null, aliases: [], member: true, links: [] };
 

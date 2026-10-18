@@ -3,6 +3,7 @@
   import { errMsg } from "$lib/act";
   import type { StatsFlights, StatsMapTrip, StatsPlacePoint, StatsStayPin, StatsVisit } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
+  import { landFor } from "$lib/land.svelte";
   import { clampPan, fitBox, flownBounds, IDENTITY, loadCountries, loadStates, MAP_HEIGHT, MAP_WIDTH, mapData, pins as stayPins, stateSources, US_ID, visitedFeatureIds, visitedPoints, visitedStateTrips, worldProjection, zoomAt, type Country, type Transform } from "$lib/map";
   import { dateLabel } from "$lib/trips";
   import Minus from "@lucide/svelte/icons/minus";
@@ -26,7 +27,9 @@
   const world = $derived(mapData(flights, projection));
   const stayDots = $derived(stayPins(stays, projection));
   const places = $derived(visitedPoints(flights.airports, stays, visits));
-  const outlines = $derived((countries ?? []).map((c) => ({ id: c.id, name: c.properties?.name ?? "", d: path(c) ?? "" })));
+  let t = $state<Transform>(IDENTITY);
+  const terrain = landFor(() => ({ projection, width: MAP_WIDTH, height: MAP_HEIGHT, zoom: t.k, box: { x: -t.x / t.k, y: -t.y / t.k, w: MAP_WIDTH / t.k, h: MAP_HEIGHT / t.k } }));
+  const outlines = $derived(terrain.features.map((c) => ({ id: c.id, name: c.properties?.name ?? "", d: path(c) ?? "" })));
   const visited = $derived(countries ? visitedFeatureIds(places, countries, (f, p) => geoContains(f, p)) : new Set<string | number>());
   const stateOutlines = $derived(states.map((c) => ({ id: c.id, name: c.properties?.name ?? "", d: path(c) ?? "" })));
   const stateTrips = $derived(states.length ? visitedStateTrips(stateSources(flights, stays, points, visits), states, (f, p) => geoContains(f, p)) : new Map<string | number, StatsMapTrip[]>());
@@ -41,7 +44,6 @@
   const when = (t: StatsMapTrip) => (t.start === t.end ? dateLabel(t.start) : `${dateLabel(t.start)} – ${dateLabel(t.end)}`);
 
   const framed = $derived(fitBox(flownBounds(flights, projection, stays, [...points, ...visits.filter((v) => v.state)])));
-  let t = $state<Transform>(IDENTITY);
   $effect(() => { t = framed; picked = null; });
   let svg = $state<SVGSVGElement>();
   const pointers = new Map<number, { x: number; y: number }>();
@@ -110,7 +112,7 @@
         <path d={sphere} class="fill-map-sea" />
         <g transform="translate({t.x} {t.y}) scale({t.k})" data-testid="map-layer">
           <g role="presentation" class="stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke" onclick={() => { if (!dragged) picked = null; }}>
-            {#each outlines as c (c.id ?? c.name)}
+            {#each outlines as c, i (i)}
               {@const shaded = visited.has(c.id ?? "") && !(byState && c.id === US_ID)}
               <path d={c.d} class={shaded ? "fill-map-visited" : "fill-map-land"} data-visited={shaded ? "true" : undefined}><title>{c.name}</title></path>
             {/each}

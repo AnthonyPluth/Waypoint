@@ -1,4 +1,4 @@
-import { geoBounds, geoContains, geoEqualEarth, geoPath, type GeoProjection } from "d3-geo";
+import { geoArea, geoBounds, geoContains, geoDistance, geoEqualEarth, geoPath, type GeoProjection } from "d3-geo";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import type { StatsAirport, StatsFlights, StatsMapTrip, StatsPlacePoint, StatsRoute, StatsStayPin, StatsVisit } from "./api-types";
@@ -180,6 +180,91 @@ export async function loadCountries(): Promise<Country[]> {
   const [{ feature }, atlas] = await Promise.all([import("topojson-client"), import("world-atlas/countries-110m.json")]);
   const topology = atlas.default as unknown as Topology<{ countries: GeometryCollection<{ name?: string }> }>;
   return (feature(topology, topology.objects.countries) as FeatureCollection<Geometry, { name?: string }>).features as Country[];
+}
+
+export async function loadDetailedCountries(): Promise<Country[]> {
+  const [{ feature }, atlas] = await Promise.all([import("topojson-client"), import("world-atlas/countries-50m.json")]);
+  const topology = atlas.default as unknown as Topology<{ countries: GeometryCollection<{ name?: string }> }>;
+  return (feature(topology, topology.objects.countries) as FeatureCollection<Geometry, { name?: string }>).features as Country[];
+}
+
+export async function loadFineCountries(): Promise<Country[]> {
+  const [{ feature }, atlas] = await Promise.all([import("topojson-client"), import("world-atlas/countries-10m.json")]);
+  const topology = atlas.default as unknown as Topology<{ countries: GeometryCollection<{ name?: string }> }>;
+  return (feature(topology, topology.objects.countries) as FeatureCollection<Geometry, { name?: string }>).features as Country[];
+}
+
+export type Detail = "coarse" | "medium" | "fine";
+
+export const COARSE_FROM_KM = 35;
+export const MEDIUM_FROM_KM = 12;
+
+export const detailFor = (kmPerPixel: number): Detail => (kmPerPixel >= COARSE_FROM_KM ? "coarse" : kmPerPixel >= MEDIUM_FROM_KM ? "medium" : "fine");
+
+const EARTH_KM = 6371;
+
+export function kmPerPixel(projection: GeoProjection, width: number, height: number): number {
+  const a = projection.invert?.([width / 2 - 0.5, height / 2]);
+  const b = projection.invert?.([width / 2 + 0.5, height / 2]);
+  return a && b ? geoDistance(a, b) * EARTH_KM : Infinity;
+}
+
+export type Window = { west: number; south: number; east: number; north: number };
+
+export function windowOf(projection: GeoProjection, box: { x: number; y: number; w: number; h: number }): Window | null {
+  if (!projection.invert) return null;
+  const at = [0, 0.5, 1];
+  const corners = at.flatMap((u) => at.map((v) => projection.invert!([box.x + box.w * u, box.y + box.h * v])));
+  if (corners.some((c) => !c || !Number.isFinite(c[0]) || !Number.isFinite(c[1]))) return null;
+  const lons = corners.map((c) => c![0]);
+  const lats = corners.map((c) => c![1]);
+  const west = Math.min(...lons);
+  const east = Math.max(...lons);
+  if (east - west > 170) return null;
+  const pad = 0.1;
+  const spanX = (east - west) * pad;
+  const spanY = (Math.max(...lats) - Math.min(...lats)) * pad;
+  return { west: west - spanX, south: Math.min(...lats) - spanY, east: east + spanX, north: Math.max(...lats) + spanY };
+}
+
+type PolygonFacts = { box: [[number, number], [number, number]]; real: boolean };
+
+const factsOfPolygon = new WeakMap<object, PolygonFacts>();
+
+function polygonFacts(coordinates: number[][][]): PolygonFacts {
+  let facts = factsOfPolygon.get(coordinates);
+  if (!facts) {
+    const polygon = { type: "Polygon" as const, coordinates };
+    facts = { box: geoBounds(polygon), real: geoArea(polygon) <= 2 * Math.PI };
+    factsOfPolygon.set(coordinates, facts);
+  }
+  return facts;
+}
+
+const meets = (box: [[number, number], [number, number]], w: Window): boolean => {
+  const [[west, south], [east, north]] = box;
+  if (west > east) return true;
+  return east >= w.west && west <= w.east && north >= w.south && south <= w.north;
+};
+
+const wanted = (coordinates: number[][][], window: Window | null): boolean => {
+  const facts = polygonFacts(coordinates);
+  return facts.real && (window === null || meets(facts.box, window));
+};
+
+export function clipToWindow(countries: Country[], window: Window | null): Country[] {
+  const out: Country[] = [];
+  for (const c of countries) {
+    const g = c.geometry;
+    if (g.type === "Polygon") {
+      if (wanted(g.coordinates, window)) out.push(c);
+    } else if (g.type === "MultiPolygon") {
+      const kept = g.coordinates.filter((poly) => wanted(poly, window));
+      if (kept.length === g.coordinates.length) out.push(c);
+      else if (kept.length) out.push({ ...c, geometry: { type: "MultiPolygon", coordinates: kept } });
+    } else out.push(c);
+  }
+  return out;
 }
 
 export async function loadStates(): Promise<Country[]> {
