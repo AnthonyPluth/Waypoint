@@ -208,7 +208,8 @@ def check_tests(base: str, messages: list[str]) -> list[str]:
 
 IMAGE = re.compile(r"\.(png|jpe?g|gif|webp|avif|ico|heic|bmp|tiff?)$", re.IGNORECASE)
 SCREENSHOTS = "docs/src/assets/screenshots/"
-IMAGE_HOMES = ("docs/public/", "waypoint/static/", "waypoint/storage/logos/", "docs/src/assets/logo.")
+IMAGE_HOMES = ("docs/public/", "waypoint/static/", "waypoint/storage/logos/")
+IMAGE_FILES = ("docs/src/assets/logo.png",)
 VERIFY = ROOT / "frontend/verify/verify.mjs"
 VERIFY_PAGES = re.compile(r"export const PAGES = \[([^\]]*)\]")
 VERIFY_WIDTHS = ("phone", "desktop")
@@ -220,7 +221,7 @@ def verify_pages(text: str | None = None) -> list[str]:
 
 
 def added_images(base: str) -> list[str]:
-    return [path for path in _git("diff", "--name-only", "--diff-filter=AMR", base, "HEAD").splitlines() if IMAGE.search(path)]
+    return [path for path in _git("diff", "--name-only", "-z", "--diff-filter=AMR", base, "HEAD").split("\0") if IMAGE.search(path)]
 
 
 def check_images(paths: list[str], pages: list[str]) -> list[str]:
@@ -228,7 +229,7 @@ def check_images(paths: list[str], pages: list[str]) -> list[str]:
     return [f"{path}: the only images a change commits are the page images make verify writes to {SCREENSHOTS} "
             "(one <page>-phone.png or <page>-desktop.png per page in frontend/verify/verify.mjs; they are the visual regression "
             "baselines); show a before and after through those images' diff, not a hand-made file"
-            for path in paths if not (path in made or path.startswith(IMAGE_HOMES))]
+            for path in paths if not (path in made or path in IMAGE_FILES or path.startswith(IMAGE_HOMES))]
 
 
 PARSER_FIXTURES = ("booking", "change", "cancellation")

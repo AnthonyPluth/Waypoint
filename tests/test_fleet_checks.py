@@ -313,6 +313,11 @@ class Images(unittest.TestCase):
     def test_the_logo_catalogue_icons_and_docs_public_files_pass(self):
         self.assertEqual(self.problems("waypoint/storage/logos/delta.png", "waypoint/static/icon-192.png", "docs/public/screenshots/x.png", "docs/src/assets/logo.png"), [])
 
+    def test_only_the_logo_itself_is_exempt_not_files_that_start_with_its_name(self):
+        self.assertEqual(self.problems("docs/src/assets/logo.png"), [])
+        self.assertEqual(len(self.problems("docs/src/assets/logo.png-before.png")), 1)
+        self.assertEqual(len(self.problems("docs/src/assets/logo.before.png")), 1)
+
     def test_a_hand_made_comparison_image_fails(self):
         problems = self.problems("docs/src/assets/tabbar-glass-before-after.png", "docs/src/assets/screenshots/trips-phone.png")
         self.assertEqual(len(problems), 1)
@@ -323,9 +328,9 @@ class Images(unittest.TestCase):
         self.assertEqual([p for p in [*raster, "l.svg", "m.md"] if fc.IMAGE.search(p)], raster)
 
     def test_the_branch_s_added_images_are_read_from_git(self):
-        with mock.patch.object(fc, "_git", return_value="docs/src/assets/x.png\nREADME.md\nfrontend/a.svg\n") as git:
-            self.assertEqual(fc.added_images("base"), ["docs/src/assets/x.png"])
-        git.assert_called_once_with("diff", "--name-only", "--diff-filter=AMR", "base", "HEAD")
+        with mock.patch.object(fc, "_git", return_value="docs/src/assets/x.png\0README.md\0docs/new-é.png\0frontend/a.svg\0") as git:
+            self.assertEqual(fc.added_images("base"), ["docs/src/assets/x.png", "docs/new-é.png"])
+        git.assert_called_once_with("diff", "--name-only", "-z", "--diff-filter=AMR", "base", "HEAD")
 
 
 if __name__ == "__main__":
