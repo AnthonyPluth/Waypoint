@@ -707,11 +707,26 @@ describe("on a phone", () => {
   });
 
   it("keeps a form opened by the add link open while the filters change", async () => {
+    location.hash = "#trips?add=trip";
     route.query = "add=trip";
     render(Trips);
     expect(await screen.findByLabelText("Where to, or a name")).toBeInTheDocument();
     await user().type(screen.getByLabelText("Search trips"), "x");
+    await tick();
+    expect(route.query).toContain("add=trip");
     expect(screen.getByLabelText("Where to, or a name")).toBeInTheDocument();
+  });
+
+  it("keeps the filters chosen after the add link when the form is cancelled", async () => {
+    viewport.phone = false;
+    location.hash = "#trips?add=trip";
+    route.query = "add=trip";
+    render(Trips);
+    await screen.findByLabelText("Where to, or a name");
+    await user().type(screen.getByLabelText("Search trips"), "x");
+    await user().click(screen.getByRole("button", { name: "Cancel" }));
+    expect(new URLSearchParams(route.query).get("q")).toBe("x");
+    expect(new URLSearchParams(route.query).get("add")).toBeNull();
   });
 
   it("keeps a trip with no bookings under the traveller it was made for", async () => {

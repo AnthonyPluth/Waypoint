@@ -34,7 +34,7 @@
   const addQuery = new URLSearchParams(route.query).get("add");
   let adding = $state<"trip" | "booking" | "past" | null>(addQuery === "trip" || addQuery === "booking" || addQuery === "past" ? addQuery : null);
   let openedByQuery = $state(addQuery === "trip" || addQuery === "booking" || addQuery === "past");
-  const closeForm = () => { adding = null; openedByQuery = false; if (param("add")) setQuery(""); };
+  const closeForm = () => { adding = null; openedByQuery = false; if (param("add")) setQuery(queryFor({})); };
 
   let latest = 0;
   async function load() {
@@ -50,8 +50,7 @@
 
   const param = (key: string) => new URLSearchParams(route.query).get(key);
   $effect(() => {
-    const wanted = param("add");
-    if (wanted === "trip" || wanted === "booking" || wanted === "past") { adding = wanted; openedByQuery = true; }
+    const wanted = param("add");    if (wanted === "trip" || wanted === "booking" || wanted === "past") { adding = wanted; openedByQuery = true; }
     else if (untrack(() => openedByQuery)) { adding = null; openedByQuery = false; }
   });
   const who = $derived(Number(param("who")) || null);
