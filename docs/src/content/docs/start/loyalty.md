@@ -9,28 +9,26 @@ Each person on the [People](/Waypoint/start/people/) page, member or guest, has 
 
 ## What you can keep
 
-A membership has a **kind**, a **program**, a **number**, and optionally notes. Known Traveler and redress numbers can also have an expiry date; an airline, hotel, car or cruise program’s number doesn’t expire, so those have none.
+A membership has a **kind**, a **program**, a **number** and optional notes. Known Traveler and redress numbers can also have an expiry date.
 
 - **Airline**, **hotel** and **car** programs, such as American AAdvantage, Marriott Bonvoy or Hertz Gold Plus Rewards.
-- **Cruise**: a cruise line's club, such as Disney Castaway Club, Royal Caribbean Crown & Anchor Society, Celebrity Captain's Club, Norwegian Latitudes Rewards, Princess Captain's Circle, Holland America Mariner Society, MSC Voyagers Club, Virgin Voyages Sailing Club, Cunard World Club, Oceania Club or Carnival Rewards (the program that replaced the VIFP Club). The number is kept as you type it; Waypoint doesn't check its format. On a cruise booking from that line, the trip page shows the traveller's number, masked, under **Loyalty**.
+- **Cruise**: a cruise line’s club, such as Disney Castaway Club or Carnival Rewards. The number is kept as you type it, unchecked. On a cruise booking from that line, the trip page shows the traveller’s number, masked, under **Loyalty**.
 - **Known Traveler**: TSA PreCheck, Global Entry, NEXUS or SENTRI.
 - **Redress**: a DHS TRIP number.
 
-Each kind has a fixed list of programs. Choose **Other** for one that isn’t listed, and say which in the notes.
-
-A person has one membership in each program: once one is saved, that program is no longer offered for them under **Add loyalty or traveler number**, and Waypoint refuses a second one (edit the first instead). **Other** can be used more than once, since it can stand for any program. A person who ended up with two numbers for one program by claiming a guest keeps both, flagged on the People page, and can still edit either.
+Each kind has a fixed list of programs. Choose **Other** for one that isn’t listed and say which in the notes. A person has one membership per program, so Waypoint refuses a second; **Other** can be used more than once.
 
 ## How the numbers are protected
 
-- A number is **encrypted** in the database, with the same key as Waypoint’s other secrets (`WAYPOINT_SECRET_KEY`).
-- The People page shows it **masked**, with only its last four characters. Choose **Show** to reveal it and **Copy** to copy it. The People page and the form say, before you save, that every signed-in household member can see saved numbers. Revealing is its own request, so loading the page never carries your numbers.
-- A program shows its company’s or agency’s logo from the [bundled catalog](/Waypoint/start/logos/), without setup or network requests. A program without one shows a small letter circle in its place when others of its kind have a logo, and otherwise it looks as it always did. Your number is never used to look up a logo.
-- Numbers are never written to the log, to reports or notifications, and never sent to an AI.
-- Waypoint keeps nothing in your browser: a number you revealed is gone when you leave the page.
-- An [AI assistant you connect](/Waypoint/start/mcp/) can’t reach loyalty or Known Traveler numbers at all, not even their last four characters.
+- A number is **encrypted** in the database with the same key as Waypoint’s other secrets (`WAYPOINT_SECRET_KEY`).
+- The People page shows it **masked**, with only its last four characters. **Show** reveals it and **Copy** copies it. Revealing is its own request, so loading the page never carries your numbers.
+- Numbers are never written to the log, to reports or notifications, and never sent to an AI. Waypoint keeps nothing in your browser, so a number you revealed is gone when you leave the page.
+- An [AI assistant you connect](/Waypoint/start/mcp/) can’t reach them at all, not even the last four characters.
 
-Anyone you let sign in can see every number, as with the rest of the household’s data. See [SECURITY.md](https://github.com/AnthonyPluth/waypoint/blob/main/SECURITY.md).
+Anyone you let sign in can see every number, as with the rest of the household’s data; the page and the form say so before you save. See [SECURITY.md](https://github.com/AnthonyPluth/Waypoint/blob/main/SECURITY.md).
+
+A program shows its company’s logo from the [bundled catalog](/Waypoint/start/logos/), without network requests. Your number is never used to look one up.
 
 ## In a backup
 
-Memberships are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine), and their numbers stay encrypted in the file and come back exactly as they were. Restoring on a machine with a different key can’t read them: the restore lists “loyalty numbers” among the secrets to enter again. Set the key the backup was made with as `WAYPOINT_SECRET_KEY_OLD` for one start and they’re re-encrypted with the current one.
+Memberships are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine), with their numbers still encrypted. Restoring under a different key can’t read them, and the restore lists “loyalty numbers” among the secrets to enter again. Set the key the backup was made with as `WAYPOINT_SECRET_KEY_OLD` for one start and they’re re-encrypted with the current one.

@@ -3,53 +3,57 @@ title: Waypoint
 description: "A self-hosted travel app for a household: flights, hotels and rental cars from your email, read privately on your own server."
 template: splash
 hero:
-  tagline: A self-hosted travel app for your household. See the trips you're on (flights, hotels, rental cars, confirmation numbers) and keep everyone's loyalty and TSA PreCheck numbers in one place, on your own hardware.
+  tagline: A self-hosted travel app for your household. See the trips you’re on, with every confirmation number, and keep everyone’s loyalty and Known Traveler numbers in one place, on your own hardware.
   image:
     file: ../../assets/logo.svg
   actions:
     - text: Install with Docker
       link: /Waypoint/start/docker/
       icon: right-arrow
+    - text: Try the demo
+      link: https://anthonypluth.github.io/Waypoint/demo/
+      icon: rocket
+      variant: secondary
     - text: View on GitHub
-      link: https://github.com/AnthonyPluth/waypoint
+      link: https://github.com/AnthonyPluth/Waypoint
       icon: external
       variant: minimal
 ---
 
-import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## What Waypoint is for
 
-Planning a family trip means a dozen confirmation emails, and the one you need at the airport is never the one you can find. Waypoint gathers them for the household: who is flying where and when, in which seat, which hotel and which rental car, and the confirmation numbers for each. It also remembers everyone’s frequent-flyer, hotel-loyalty and TSA PreCheck (Known Traveler) numbers, so anyone in the family can book for anyone else.
+A family trip is a dozen confirmation emails, and the one you need at the airport is never the one you can find. Waypoint gathers them for the household: who is flying where and when, which hotel and which rental car, and the confirmation number for each. It also keeps everyone’s frequent-flyer, hotel-loyalty and TSA PreCheck numbers, so anyone in the family can book for anyone else.
 
-You see only the trips you’re on or that you booked. Bookings arrive by [scanning Gmail privately](/Waypoint/privacy/email-scanning/): read-only, searched on the server, a message is kept, encrypted, only while a review item or a booking needs it.
+Each person sees the trips they’re on or booked. Bookings arrive by [scanning Gmail](/Waypoint/privacy/email-scanning/) read-only on your own server, or you add them by hand.
 
 ## What it does
 
 <CardGrid>
   <Card title="Trips" icon="rocket">
-    Flights, stays, rental cars, trains, cruises and parking, with confirmation numbers, travellers and times where they happen.
+    Flights, stays, rental cars, trains, cruises and parking, with confirmation numbers, travellers, costs and times shown where they happen.
   </Card>
-  <Card title="Gmail scanning" icon="envelope">
+  <Card title="Gmail scanning" icon="email">
     Read-only, private scanning of booking emails, with a Review queue for what couldn’t be read.
   </Card>
-  <Card title="Optional AI" icon="star">
-    Off by default; a local Ollama, or OpenRouter with zero data retention, suggests a booking you then confirm.
-  </Card>
   <Card title="People and loyalty IDs" icon="open-book">
-    Household members, guests and their loyalty and Known Traveler numbers, encrypted and masked.
+    Members and guests, with their loyalty and Known Traveler numbers, encrypted and masked.
   </Card>
-  <Card title="Reminders and offline" icon="random">
-    Live flight status, push reminders, a calendar feed, and your upcoming trips available offline.
+  <Card title="Before and during a trip" icon="random">
+    Live flight status, check-in reminders, a private calendar feed, and your upcoming trips available offline.
   </Card>
-  <Card title="Stats and assistants" icon="setting">
-    Travel stats with a map, and AI assistants (MCP) that read your trips and, if you allow it, change them.
+  <Card title="Stats" icon="bars">
+    Flights, distance, airlines, hotel nights and the places you’ve been, on a map.
+  </Card>
+  <Card title="Optional AI" icon="star">
+    Off by default. A local Ollama or OpenRouter reads the mail Waypoint couldn’t, and assistants like Claude can connect over MCP.
   </Card>
 </CardGrid>
 
 ## Where to go next
 
-<LinkCard title="Install with Docker" description="Register Waypoint with your sign-in provider, start it, and put it on the internet safely." href="/Waypoint/start/docker/" />
+<LinkCard title="Install with Docker" description="Start locally in a minute, add sign-in if you want it, and put it on the internet safely." href="/Waypoint/start/docker/" />
 <LinkCard title="Email scanning and privacy" description="What Waypoint will and won’t do with your mailbox." href="/Waypoint/privacy/email-scanning/" />
 <LinkCard title="Configuration" description="Every environment variable Waypoint reads." href="/Waypoint/reference/configuration/" />
 <LinkCard title="Contributing" description="Set up a checkout, run the checks and find your way around the code." href="/Waypoint/contributing/development/" />

@@ -19,7 +19,7 @@ AREA_DOCS = {
     "people": "start/people", "loyalty": "start/loyalty", "review": "start/review",
     "trips": "start/trips", "segments": "start/trips", "import": "start/import", "airports": "start/trips", "flight-status": "start/flight-status",
     "reminders": "start/reminders", "feed": "start/reminders",
-    "stats": "start/stats", "show-costs": "start/trips", "mcp-settings": "start/mcp", "assistant": "start/mcp", "offline": "start/offline",
+    "stats": "start/stats", "distance-unit": "start/stats", "home": "start/trips", "show-costs": "start/trips", "mcp-settings": "start/mcp", "assistant": "start/mcp", "offline": "start/offline",
 }
 
 CALL = re.compile(r"\b(?:apiCall|api|fetch|EventSource)\s*(?:<[^>(]*>)?\(\s*([`\"'])(/api/[^`\"']*)\1")

@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-Settings that belong to the app live in **Settings** and are stored in the database. Settings opens on an index of six task groups, each kept in its address (`#settings/mail`): **Account** (who you are and an Advanced part with the version, the database and whether live flight status is enabled), **Mail & review** (Gmail, AI suggestions), **Travel preferences** (home, distances, trip costs), **Offline & notifications** (offline access, reminders, the calendar feed), **Connected assistants** (AI assistants) and **Backup & import** (backup and restore, importing past flights). An older `#settings/data` link opens Backup & import. Everything about how and where Waypoint runs is set with environment variables, in `.env` for Docker (start from [`.env.example`](https://github.com/AnthonyPluth/waypoint/blob/main/.env.example)) or in the environment for a source checkout.
+Anything that belongs to the app, such as Gmail, AI suggestions, distances and backups, lives in **Settings** and is stored in the database. How and where Waypoint runs is set with environment variables: in `.env` for Docker (start from [`.env.example`](https://github.com/AnthonyPluth/Waypoint/blob/main/.env.example)) or in the environment for a source checkout.
 
 | Variable | Default | What it does |
 |---|---|---|
@@ -17,7 +17,7 @@ Settings that belong to the app live in **Settings** and are stored in the datab
 | `OIDC_ALLOW_ANY_USER` | | `1` lets in anyone your provider signs in. Only for a provider you fully control. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | | The OAuth client you create in your own Google Cloud project, so members can connect their Gmail from Settings (read-only). Both are needed; see [Google OAuth client for Gmail](/Waypoint/start/gmail/). |
 | `RAPIDAPI_KEY` | | Turns on [live flight status](/Waypoint/start/flight-status/): your RapidAPI key, subscribed to AeroDataBox. It stays in the environment and is never saved or logged. Only a flight number and a date are sent. |
-| `OPENROUTER_API_KEY` | | An OpenRouter key for the optional [AI suggestions](/Waypoint/start/ai/) (Settings → Mail & review → AI). It wins over a key saved in Settings, and is never logged. |
+| `OPENROUTER_API_KEY` | | An OpenRouter key for the optional [AI suggestions](/Waypoint/start/ai/) (**Settings → Mail & review → AI**). It wins over a key saved in Settings, and is never logged. |
 | `WAYPOINT_FLIGHT_STATUS_MONTHLY_LIMIT` | `400` | The calls a month your RapidAPI plan allows. At 90% scheduled checks stop except the one-hour check; at 100% nothing is fetched until the 1st. |
 | `WAYPOINT_SESSION_DAYS` | `14` | Days a session lasts unused. Using Waypoint keeps it going, for up to 90 days after signing in. |
 | `WAYPOINT_SECRET_KEY` | | Encrypts the secrets Waypoint saves (at least 32 characters: `openssl rand -base64 32`). Without it, Waypoint makes `secret.key` in `WAYPOINT_DATA`. |
@@ -29,9 +29,7 @@ Settings that belong to the app live in **Settings** and are stored in the datab
 | `WAYPOINT_HOST` / `WAYPOINT_PORT` | `127.0.0.1` / `8765` | Address and port to listen on (`0.0.0.0` in Docker). |
 | `TZ` | America/New_York (Docker image); the system’s otherwise | The time zone Waypoint uses for “today” and for its logs. |
 
-Waypoint has no error-reporting service: errors go to its own log. See [Errors and logs](/Waypoint/start/docker/#errors-and-logs).
-
-With no `OIDC_ISSUER`, a source checkout refuses to listen beyond `localhost` unless `WAYPOINT_ALLOW_NO_AUTH` is set. Compose sets it for the container’s internal listener and publishes the port only on localhost. See [Install with Docker](/Waypoint/start/docker/) and [SECURITY.md](https://github.com/AnthonyPluth/waypoint/blob/main/SECURITY.md).
+Waypoint has no error-reporting service: errors go to its own log ([Errors and logs](/Waypoint/start/docker/#errors-and-logs)). With no `OIDC_ISSUER`, a source checkout refuses to listen beyond `localhost` unless `WAYPOINT_ALLOW_NO_AUTH` is set. Compose sets it for the container’s internal listener and publishes the port only on localhost. See [Install with Docker](/Waypoint/start/docker/) and [SECURITY.md](https://github.com/AnthonyPluth/Waypoint/blob/main/SECURITY.md).
 
 ## Advanced
 
@@ -43,4 +41,4 @@ Rarely needed, so `.env.example` leaves them out. They work when set in `.env` (
 | `OIDC_TRUST_UNVERIFIED_EMAIL` | | `1` lets `OIDC_ALLOWED_EMAILS` match an email your provider doesn’t mark verified. Only for a provider where nobody can register or change their own email (Microsoft Entra ID never sends `email_verified`). |
 | `WAYPOINT_ALLOWED_HOSTS` | | Extra host names Waypoint answers to (local IPs, `*.local`, bare names and Tailscale names always work). |
 
-Waypoint also sets `WAYPOINT_VERSION` itself in the Docker image; it’s shown in Settings and tagged on error reports, and you don’t set it.
+The Docker image sets `WAYPOINT_VERSION` itself; Settings shows it, and you don’t set it.

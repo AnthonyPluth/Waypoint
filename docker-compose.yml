@@ -2,7 +2,7 @@
 # Open:    http://localhost:8765. Sign-in and integrations are optional.
 services:
   waypoint:
-    image: ghcr.io/anthonypluth/waypoint:latest   # or pin a version: :1.2.3, :1.2 or :1 (see Releases on GitHub)
+    image: ghcr.io/anthonypluth/waypoint:latest   # or pin a version: :2.131.5, :2.131 or :2 (see Releases on GitHub)
     # build: .                                  # or build it yourself from this folder instead
     container_name: waypoint
     restart: unless-stopped
@@ -17,7 +17,7 @@ services:
       - path: .env       # every variable in it reaches Waypoint, so advanced ones (see the Configuration page) need no line here
         required: false
     environment:         # what needs a default or a check, and what's costly to lose; .env fills in the rest
-      TZ: ${TZ:-America/New_York}                       # decides "today" for forecasts and budgets
+      TZ: ${TZ:-America/New_York}                       # decides "today" and when the day-of reminder goes out
       WAYPOINT_PUBLIC_URL: ${WAYPOINT_PUBLIC_URL:-}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
