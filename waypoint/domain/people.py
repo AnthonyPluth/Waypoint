@@ -178,7 +178,7 @@ def _new_names(known: list[str], extra: list[str]) -> list[str]:
 
 
 def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) -> Listed:
-    me = conn.orm.get(Person, member_id)
+    me = conn.orm.get(Person, member_id, with_for_update=True)
     if me is None or me.user_sub is None:
         raise NotAMember()
     guest = conn.orm.get(Person, guest_id)
