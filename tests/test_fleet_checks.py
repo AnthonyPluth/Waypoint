@@ -304,6 +304,11 @@ class Images(unittest.TestCase):
     def test_a_page_image_make_verify_writes_passes(self):
         self.assertEqual(self.problems("docs/src/assets/screenshots/trips-phone.png", "docs/src/assets/screenshots/oauth-approve-desktop.png"), [])
 
+    def test_a_page_s_first_screen_image_passes(self):
+        self.assertEqual(self.problems("docs/src/assets/screenshots/trips-phone-hero.png", "docs/src/assets/screenshots/upcoming-desktop-hero.png"), [])
+        self.assertEqual(len(self.problems("docs/src/assets/screenshots/trips-hero.png")), 1)
+        self.assertEqual(len(self.problems("docs/src/assets/screenshots/nope-phone-hero.png")), 1)
+
     def test_a_file_in_the_screenshots_folder_make_verify_would_not_write_fails(self):
         self.assertEqual(len(self.problems("docs/src/assets/screenshots/before-after.png")), 1)
         self.assertEqual(len(self.problems("docs/src/assets/screenshots/trips-tablet.png")), 1)

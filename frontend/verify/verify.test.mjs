@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, IMAGE_VIEWPORTS, lengthenNames, PAGES, screenshotFile, unknownPages, writesImage } from "./verify.mjs";
+import { DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, lengthenNames, localBase, OFFLINE_SAVED, PAGES, screenshotFile, unknownPages, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -116,6 +116,18 @@ describe("screenshotFile", () => {
     expect(screenshotFile("upcoming", "phone")).toBe("upcoming-phone.png");
     expect(screenshotFile("flow-open-settings-settings-open", "desktop")).toBe("flow-open-settings-settings-open-desktop.png");
     expect(screenshotFile("upcoming", "phone")).not.toContain("-top");
+  });
+
+  it("names a page's first-screen image beside its full-page one", () => {
+    expect(heroFile("upcoming", "phone")).toBe("upcoming-phone-hero.png");
+    expect(heroFile("trips", "desktop")).toBe("trips-desktop-hero.png");
+  });
+
+  it("sets up offline access on localhost with a passkey that has PRF, and waits for the saved line", () => {
+    expect(localBase("http://127.0.0.1:8765")).toBe("http://localhost:8765");
+    expect(localBase("http://localhost:8765")).toBe("http://localhost:8765");
+    expect(VIRTUAL_AUTHENTICATOR).toMatchObject({ transport: "internal", hasPrf: true, isUserVerified: true, hasUserVerification: true });
+    expect(OFFLINE_SAVED).toContain("offline-saved");
   });
 
   it("writes images at phone and desktop only, and checks the extra widths without one", () => {

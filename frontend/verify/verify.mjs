@@ -29,7 +29,11 @@ export function findChromium(env = process.env, exists = existsSync, list = read
 }
 
 export const screenshotFile = (name, viewport) => `${name}-${viewport}.png`;
+export const heroFile = (name, viewport) => `${name}-${viewport}-hero.png`;
 export const writesImage = (viewport) => IMAGE_VIEWPORTS.includes(viewport);
+export const localBase = (base) => base.replace("127.0.0.1", "localhost");
+export const VIRTUAL_AUTHENTICATOR = { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true, hasPrf: true };
+export const OFFLINE_SAVED = "[data-testid='offline-saved']:text-matches('^\\s*Saved [0-9]|^\\s*Saved just now')";
 
 const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
@@ -113,13 +117,25 @@ export async function seedAssistants(browser, base) {
   } finally { await ctx.close(); }
 }
 
+async function addAuthenticator(page) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", { options: VIRTUAL_AUTHENTICATOR });
+}
+
+export async function setUpOffline(page, base, timeout = 10000) {
+  await addAuthenticator(page);
+  await page.goto(`${localBase(base)}/#settings/offline`, { waitUntil: "networkidle" });
+  await page.locator("button:has-text('Set up offline access')").first().click({ timeout });
+  await page.locator("button:has-text('Turn on with')").first().click({ timeout });
+  await page.locator(OFFLINE_SAVED).first().waitFor({ timeout });
+  await page.mouse.move(0, 0);
+}
+
 async function runStep(page, step, shot, saveDownload) {
   const timeout = step.timeout ?? 10000;
   if ("authenticator" in step) {
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send("WebAuthn.enable");
-    await cdp.send("WebAuthn.addVirtualAuthenticator", { options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true,
-      hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true, hasPrf: true } });
+    await addAuthenticator(page);
   } else if ("offline" in step) {
     await page.context().setOffline(step.offline);
   } else if ("reload" in step) {
@@ -248,7 +264,7 @@ async function visit(env, label, viewport, work, { audit = true, reducedMotion =
     page.on("response", (r) => { if (r.status() >= 500) problems.push(`${where}: ${r.status()} from ${r.request().method()} ${new URL(r.url()).pathname}`); });
     page.on("requestfailed", (r) => { if (r.failure()?.errorText !== "net::ERR_ABORTED") notes.push(`${where}: request failed (${r.failure()?.errorText}) ${new URL(r.url()).pathname}`); });
     const files = [];
-    const shot = async (name, dir = images) => {
+    const shot = async (name, dir = images, hero = false) => {
       if (!writesImage(viewport)) return;
       const file = screenshotFile(name, viewport);
       await page.evaluate(`window.scrollTo({ top: 0, left: 0, behavior: "instant" })`);
@@ -259,6 +275,10 @@ async function visit(env, label, viewport, work, { audit = true, reducedMotion =
       await page.waitForTimeout(SETTLE_MS);
       await page.screenshot({ path: join(dir, file), fullPage: true, animations: "disabled" });
       files.push(file);
+      if (!hero) return;
+      const top = heroFile(name, viewport);
+      await page.screenshot({ path: join(dir, top), fullPage: false, animations: "disabled" });
+      files.push(top);
     };
     const saveDownload = async (name, download, dir = images) => {
       if (!writesImage(viewport)) return;
@@ -303,8 +323,12 @@ export function runVisit(env, v) {
       if (!approveUrl) throw new Error("no approval page: seeding the demo assistants failed");
       await page.goto(approveUrl, { waitUntil: "networkidle" });
       await page.locator("button[value=allow]").waitFor({ timeout: 10000 });
-    } else await page.goto(`${base}/#${v.name}`, { waitUntil: "networkidle" });
-    await shot(v.name);
+    } else {
+      await setUpOffline(page, base);
+      await page.goto("about:blank");
+      await page.goto(`${localBase(base)}/#${v.name}`, { waitUntil: "networkidle" });
+    }
+    await shot(v.name, env.images, true);
   });
 }
 
