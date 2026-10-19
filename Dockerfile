@@ -4,7 +4,7 @@
 
 # 1. Install the dependencies (pyproject.toml / poetry.lock) into a virtualenv with Poetry. The virtualenv gets no pip:
 #    Waypoint never installs anything at run time, and pip's bundled libraries only add to what the image scan flags.
-FROM python:3.14-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d AS deps
+FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS deps
 ENV PIP_NO_CACHE_DIR=1 \
     POETRY_VIRTUALENVS_IN_PROJECT=true \
     POETRY_VIRTUALENVS_OPTIONS_NO_PIP=true \
@@ -24,7 +24,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # 3. The image itself: Python, that virtualenv and Waypoint, without Poetry or pip.
-FROM python:3.14-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d
+FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
 
 LABEL org.opencontainers.image.source="https://github.com/AnthonyPluth/waypoint" \
       org.opencontainers.image.description="Waypoint: a household's travel, read privately from its email"
