@@ -69,7 +69,7 @@ Waypoint tries the most reliable method first, and the first that yields a compl
 | Trains | Both stations, dates and times, in a message about a train and not a flight | Arrival after departure, within 96 hours. An outbound and a return give two bookings |
 | Cruises | The ship or the line, both ports and both dates | Disembarkation after embarkation, within 200 days. Without times it takes noon to embark and 8:00 to disembark. Ports of call aren’t read |
 
-Whatever no method understands goes to Review, with the reason it couldn’t be read. Nothing is guessed silently.
+Whatever no method understands goes to Review with the reason it couldn’t be read, except a message from an unknown sender with only a weak travel signal, which is skipped and nothing of it kept ([which messages are read](/Waypoint/start/gmail/#which-messages-are-read)). Nothing is guessed silently.
 
 ### Languages the generic readers understand
 
