@@ -127,9 +127,9 @@
   <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else}
   {#if trips && trips.length > 0}
-    <form class="mb-6 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-3 md:rounded-[18px] md:border md:border-border md:bg-black/25 md:p-4" role="search" aria-label="Find a trip" onsubmit={(e) => e.preventDefault()}>
-      <div class="flex items-center gap-2 md:contents">
-        <div class="relative min-w-0 flex-1 md:max-w-sm md:min-w-56">
+    <form class="mb-6 flex flex-col gap-3 desktop:flex-row desktop:flex-wrap desktop:items-center desktop:gap-x-5 desktop:gap-y-3 desktop:rounded-[18px] desktop:border desktop:border-border desktop:bg-black/25 desktop:p-4" role="search" aria-label="Find a trip" onsubmit={(e) => e.preventDefault()}>
+      <div class="flex items-center gap-2 desktop:contents">
+        <div class="relative min-w-0 flex-1 desktop:max-w-sm desktop:min-w-56">
           <label for="trip-search" class="sr-only">Search trips</label>
           <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input id="trip-search" type="search" class="pl-9 phone:h-11" value={text} oninput={search} placeholder="Name, destination or airline" autocomplete="off" />
@@ -145,7 +145,7 @@
         {#if years.length > 1 || year}<YearChips {years} selected={year} onpick={(y) => refine({ year: y })} />{/if}
         {#if people.length > 1}<TravellerAvatars {people} selected={who} onpick={(id) => refine({ who: id })} />{/if}
       {/if}
-      {#if filtering}<Button type="button" variant="outline" class="md:ml-auto" onclick={clearFilters}>Clear filters</Button>{/if}
+      {#if filtering}<Button type="button" variant="outline" class="desktop:ml-auto" onclick={clearFilters}>Clear filters</Button>{/if}
     </form>
     {#if viewport.phone}
       <Sheet bind:open={filtersOpen} title="Filters">
