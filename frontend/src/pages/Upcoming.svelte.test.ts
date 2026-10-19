@@ -761,16 +761,6 @@ describe("Upcoming side column", () => {
   const placesCalls = () => vi.mocked(api).mock.calls.map(([path]) => path as string).filter((p) => p.startsWith("/api/trips/"));
   const withPlaces = (path: string) => (path === "/api/trips/1/places" ? places : undefined);
 
-  it("draws the featured trip’s route small, with a description built from its legs, and links it to the trip", async () => {
-    at("2026-11-20T09:00:00-05:00");
-    serveWith([london], withPlaces);
-    render(Upcoming);
-    const map = await screen.findByRole("img", { name: "Route map: New York to London, flight back to New York" });
-    expect(map.closest("a")).toHaveAttribute("href", "#trip/1");
-    expect(map.querySelector('[data-leg="flight"]')).toHaveAttribute("stroke-dasharray");
-    expect(map.querySelector('[data-stop="New York"] text')).toHaveTextContent("JFK");
-  });
-
   it("counts nights, live bookings and distinct cities", async () => {
     at("2026-11-20T09:00:00-05:00");
     const cancelled = segment({ id: 9, kind: "hotel", status: "cancelled", origin: "Gone Inn", destination: "Paris", start_local: "2026-11-21T15:00", end_local: "2026-11-22T10:00" });
@@ -786,7 +776,8 @@ describe("Upcoming side column", () => {
     at("2026-11-20T09:00:00-05:00");
     serveWith([london], withPlaces);
     render(Upcoming);
-    await screen.findByRole("img", { name: /^Route map/ });
+    await waitFor(() => expect(placesCalls()).toEqual(["/api/trips/1/places"]));
+    await vi.advanceTimersByTimeAsync(0);
     expect(screen.getByTestId("trip-totals").children[2]).toHaveTextContent("Cities2");
   });
 
@@ -816,49 +807,48 @@ describe("Upcoming side column", () => {
     expect(screen.queryByRole("link", { name: "All trips" })).toBeNull();
   });
 
-  it("leaves the map out, without an error, when the places request fails, and keeps the totals", async () => {
+  it("keeps the totals, without an error, when the places request fails", async () => {
     at("2026-11-20T09:00:00-05:00");
     serveWith([london], (path) => { if (path === "/api/trips/1/places") throw new Error("offline"); return undefined; });
     render(Upcoming);
     await screen.findByTestId("trip-totals");
     await waitFor(() => expect(placesCalls()).toEqual(["/api/trips/1/places"]));
     await vi.advanceTimersByTimeAsync(0);
-    expect(screen.queryByRole("img", { name: /^Route map/ })).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByTestId("trip-totals")).toBeInTheDocument();
   });
 
-  it("keeps the map on screen while the same trip’s places load again", async () => {
+  it("keeps the city count while the same trip’s places load again", async () => {
     at("2026-11-20T09:00:00-05:00");
     let held = false;
     serveWith([london], (path) => (path === "/api/trips/1/places" ? (held ? new Promise(() => {}) : places) : undefined));
     render(Upcoming);
-    await screen.findByRole("img", { name: /^Route map/ });
+    await screen.findByTestId("trip-totals");
+    await waitFor(() => expect(screen.getByTestId("trip-totals").children[2]).toHaveTextContent("Cities2"));
     held = true;
     viewport.phone = true;
     await vi.advanceTimersByTimeAsync(0);
     viewport.phone = false;
     await vi.advanceTimersByTimeAsync(0);
     await waitFor(() => expect(placesCalls().length).toBeGreaterThan(1));
-    expect(screen.getByRole("img", { name: /^Route map/ })).toBeInTheDocument();
+    expect(screen.getByTestId("trip-totals").children[2]).toHaveTextContent("Cities2");
   });
 
-  it("leaves the map out when the places reply is malformed", async () => {
+  it("keeps the page when the places reply is malformed", async () => {
     at("2026-11-20T09:00:00-05:00");
     serveWith([london], (path) => (path === "/api/trips/1/places" ? { trips: [] } : undefined));
     render(Upcoming);
     await screen.findByTestId("trip-totals");
     await vi.advanceTimersByTimeAsync(0);
-    expect(screen.queryByRole("img", { name: /^Route map/ })).toBeNull();
+    expect(screen.getByTestId("trip-totals")).toBeInTheDocument();
   });
 
-  it("leaves the map out, and keeps the page, when the places reply lacks a collection the route needs", async () => {
+  it("keeps the page when the places reply lacks a collection", async () => {
     at("2026-11-20T09:00:00-05:00");
     serveWith([london], (path) => (path === "/api/trips/1/places" ? { ...places, stays: undefined } : undefined));
     render(Upcoming);
     await screen.findByTestId("trip-totals");
     await vi.advanceTimersByTimeAsync(0);
-    expect(screen.queryByRole("img", { name: /^Route map/ })).toBeNull();
     expect(screen.getByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
   });
 
@@ -880,13 +870,13 @@ describe("Upcoming side column", () => {
     const outside = vi.spyOn(globalThis, "fetch");
     serveWith([london, lisbon], withPlaces);
     render(Upcoming);
-    await screen.findByRole("img", { name: /^Route map/ });
-    expect(placesCalls()).toEqual(["/api/trips/1/places"]);
+    await screen.findByTestId("trip-totals");
+    await waitFor(() => expect(placesCalls()).toEqual(["/api/trips/1/places"]));
     expect(outside).not.toHaveBeenCalled();
     outside.mockRestore();
   });
 
-  it("shows only the Later tiles on a phone, with no map, no totals and no places request", async () => {
+  it("shows only the Later tiles on a phone, with no totals and no places request", async () => {
     viewport.phone = true;
     at("2026-11-20T09:00:00-05:00");
     serveWith([london, lisbon, porto], withPlaces);
@@ -899,7 +889,6 @@ describe("Upcoming side column", () => {
     expect(tiles[0]).toHaveTextContent("In 40 days");
     expect(tiles[0]).not.toHaveTextContent("Lisbon in winter · ");
     expect(screen.queryByTestId("trip-totals")).toBeNull();
-    expect(screen.queryByTestId("route-map")).toBeNull();
     expect(placesCalls()).toEqual([]);
     viewport.phone = false;
   });
