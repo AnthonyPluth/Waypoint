@@ -20,7 +20,7 @@ ACTIONS = ROOT / ".github/actions"
 TESTED_FROM = "0001"
 
 REVISION = re.compile(r"^\d{4}$")
-MODEL_FAMILIES = ("Opus", "Sonnet", "Haiku")
+MODEL_FAMILIES = ("Opus", "Sonnet", "Haiku", "Fable")
 CO_AUTHOR = re.compile(r"^co-authored-by:\s*(.*)$", re.IGNORECASE | re.MULTILINE)
 SESSION = re.compile(r"^claude-session:\s*\S", re.IGNORECASE | re.MULTILINE)
 GOOD_CO_AUTHOR = re.compile(r"^Claude (" + "|".join(MODEL_FAMILIES) + r") \d+(\.\d+)* <noreply@anthropic\.com>$")
