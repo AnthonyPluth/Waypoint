@@ -19,7 +19,7 @@ package-mode = false   # an application, not a library: `poetry install` just in
 # The tools CI runs (docker.yml, security.yml) and `make check` runs, pinned so every run uses the same versions;
 # Dependabot updates them here. `poetry install` adds them; the Docker image installs only the main dependencies.
 [tool.poetry.group.dev.dependencies]
-ruff = "0.16.10"
+ruff = "0.17.0"
 mypy = "2.4.0"
 types-python-dateutil = "2.9.0.20260807"
 coverage = "7.16.2"
