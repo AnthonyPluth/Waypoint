@@ -78,6 +78,8 @@ def api_person_claim(conn, _q, _b, person_id) -> Person:
         raise ApiError("No such person", 404) from None
     except people.NotAGuest:
         raise ApiError("That person is a household member, not a guest.", 409) from None
+    except people.AlreadyClaimed:
+        raise ApiError("You’ve already linked a guest to yourself, and can only do it once.", 409) from None
     except people.NotAMember:
         raise ApiError("Sign in as a household member to link a guest to yourself.", 403) from None
 

@@ -50,6 +50,10 @@ class NotAGuest(Exception):
     pass
 
 
+class AlreadyClaimed(Exception):
+    pass
+
+
 def decode_aliases(raw: str | None) -> list[str]:
     try:
         found = json.loads(raw) if raw else []
@@ -174,7 +178,7 @@ def _new_names(known: list[str], extra: list[str]) -> list[str]:
 
 
 def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) -> Listed:
-    me = conn.orm.get(Person, member_id)
+    me = conn.orm.get(Person, member_id, with_for_update=True)
     if me is None or me.user_sub is None:
         raise NotAMember()
     guest = conn.orm.get(Person, guest_id)
@@ -182,6 +186,8 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
         raise NoSuchGuest()
     if guest.user_sub is not None:
         raise NotAGuest()
+    if decode_links(me.links):
+        raise AlreadyClaimed()
     mine = select(SegmentTraveler.segment_id).where(SegmentTraveler.person_id == member_id)
     conn.execute(delete(SegmentTraveler).where(SegmentTraveler.person_id == guest_id, SegmentTraveler.segment_id.in_(mine)))
     conn.execute(update(SegmentTraveler).where(SegmentTraveler.person_id == guest_id).values(person_id=member_id))
@@ -212,7 +218,7 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
 def claim_suggestions(conn: db.Connection, member_id: int, sign_in_name: str | None) -> list[Listed]:
     me = conn.orm.get(Person, member_id)
     wanted = normalize(sign_in_name or "")
-    if me is None or me.user_sub is None or me.claim_dismissed or not wanted:
+    if me is None or me.user_sub is None or me.claim_dismissed or decode_links(me.links) or not wanted:
         return []
     if visibility.visible_trips(conn, visibility.Viewer(member_id)):
         return []

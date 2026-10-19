@@ -25,7 +25,7 @@ Waypoint matches a booking’s passengers against these names. When a name match
 A booking whose passenger matches nobody is added as a guest. When that person later signs in they become a member of their own, and without a link between the two they would see none of those trips.
 
 - If you have no trips and a guest’s name, legal name or an alias matches yours, Upcoming asks “Are you one of these?”. **This is me** links you to that guest; **None of these** hides the question.
-- A guest on the People page has a **This is me** button too. You can only link a guest to yourself, never to someone else.
+- A guest on the People page has a **This is me** button too. You can only link a guest to yourself, never to someone else, and only once: after that the button goes away.
 
 Linking moves everything on the guest to you: their trips and bookings, loyalty and Known Traveler numbers, and legal name and aliases, added to yours without repeats. You keep your own name and first name, and the guest is removed. If you both had a different number for the same program, both are kept and People says “Two numbers for …” so you can remove the wrong one.
 
