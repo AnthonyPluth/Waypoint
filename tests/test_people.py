@@ -326,6 +326,17 @@ class ClaimRouteTests(DbCase):
         self.assertEqual((done["id"], done["links"][0]["guest"]), (self.jane, "Jane D"))
         self.assertIsNone(people.get(self.c, self.guest))
 
+    def test_a_member_who_has_claimed_a_guest_cannot_claim_another(self):
+        self.sign_in()
+        second = people.add_guest(self.c, guest(display_name="Jane Again", legal_name=None, aliases=[]))["id"]
+        api.api_person_claim(self.c, {}, {}, str(self.guest))
+        with self.assertRaises(ApiError) as caught:
+            api.api_person_claim(self.c, {}, {}, str(second))
+        self.assertEqual(caught.exception.status, 409)
+        self.assertIsNotNone(people.get(self.c, second))
+        self.assertEqual(len(people.get(self.c, self.jane)["links"]), 1)   # type: ignore[index]
+        self.assertEqual(api.api_claim_suggestions(self.c, {}, {}), {"guests": []})
+
     def test_the_request_cannot_name_another_member_to_link_to(self):
         self.sign_in("u2", "Bo Example")
         api.api_person_claim(self.c, {}, {"person_id": self.jane, "member": self.jane}, str(self.guest))
