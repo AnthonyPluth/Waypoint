@@ -20,7 +20,7 @@ ACTIONS = ROOT / ".github/actions"
 TESTED_FROM = "0001"
 
 REVISION = re.compile(r"^\d{4}$")
-MODEL_FAMILIES = ("Opus", "Sonnet", "Haiku")
+MODEL_FAMILIES = ("Opus", "Sonnet", "Haiku", "Fable")
 CO_AUTHOR = re.compile(r"^co-authored-by:\s*(.*)$", re.IGNORECASE | re.MULTILINE)
 SESSION = re.compile(r"^claude-session:\s*\S", re.IGNORECASE | re.MULTILINE)
 GOOD_CO_AUTHOR = re.compile(r"^Claude (" + "|".join(MODEL_FAMILIES) + r") \d+(\.\d+)* <noreply@anthropic\.com>$")
@@ -232,10 +232,10 @@ def added_images(base: str, head: str = "HEAD") -> list[str]:
 
 
 def check_images(paths: list[str], pages: list[str]) -> list[str]:
-    made = {f"{SCREENSHOTS}{page}-{width}.png" for page in pages for width in VERIFY_WIDTHS}
+    made = {f"{SCREENSHOTS}{page}-{width}{kind}.png" for page in pages for width in VERIFY_WIDTHS for kind in ("", "-hero")}
     return [f"{path}: the only images a change commits are the page images make verify writes to {SCREENSHOTS} "
-            "(one <page>-phone.png or <page>-desktop.png per page in frontend/verify/verify.mjs; they are the visual regression "
-            "baselines); show a before and after through those images' diff, not a hand-made file"
+            "(<page>-phone.png, <page>-desktop.png and their -hero first screens, per page in frontend/verify/verify.mjs; they are "
+            "the visual regression baselines); show a before and after through those images' diff, not a hand-made file"
             for path in paths if not (path in made or path in IMAGE_FILES or path.startswith(IMAGE_HOMES))]
 
 

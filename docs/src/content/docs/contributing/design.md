@@ -38,46 +38,88 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 
 ## Route line
 
-`RouteLine.svelte` draws origin, destination and an arched dashed line between them with a plane riding the arc at `progress` (a quadratic curve in a stretched SVG, so x is linear in progress and the plane's height is `1 − 2t(1 − t)` of the box; it tilts up on the way out and down on the way in), from 0 (departure) to 1 (arrival). Out-of-range or missing values clamp to 0 and 1 (`clampProgress`). Progress comes from the booked times; Waypoint does not need live data for it. Pass `label` to give the line an accessible description, otherwise it is hidden from assistive tech.
+`RouteLine.svelte` draws the origin, the destination and an arched dashed line between them, with a plane riding the arc at `progress`, from 0 (departure) to 1 (arrival).
+
+- The arc is a quadratic curve in a stretched SVG, so x is linear in progress and the plane’s height is `1 − 2t(1 − t)` of the box. The plane tilts up on the way out and down on the way in.
+- Out-of-range or missing values clamp to 0 and 1 (`clampProgress`).
+- Progress comes from the booked times, so the line needs no live data.
+- Pass `label` to give the line an accessible description; otherwise it is hidden from assistive technology.
 
 ## Pass card
 
-`PassCard.svelte` is the one card for a booking you are planning or checking in for, with a variant for each kind (flight, hotel, car, train, cruise). Top to bottom: a headline line, the confirmation code as the largest element (the first focusable control, tap to copy), the flight and its date and departure time, the booking link, then the airport codes with the route line and the times at each airport. Below the tear line are the terminal, gate, seat and cabin, the booking chip and, when live flight status is on, the live chip and a quiet line.
+`PassCard.svelte` is the one card for a booking you are planning or checking in for, with a variant for each kind (flight, hotel, car, train, cruise). Top to bottom:
 
-- The headline comes from `passHeadline(segment, now, live, online)` in `frontend/src/lib/trips.ts`. A terminal live status (landed, cancelled, diverted) always wins, at any age; any other live status wins only while fresh (`flightEvidence`): “Delayed … min, …”, “Departed, expected to arrive in …”, “Diverted”, “Landed” and “Cancelled by the airline” (red). Without live status, or when it is older than `LIVE_STALE_HOURS`, or when the device is offline, the clock decides: a flight reads “Check-in opens in …” until `CHECK_IN_WINDOW_HOURS` before departure, then “Check-in is open, departs in …”, then “Under way, arrives in …”, then “Landed”. A cancelled booking reads “Cancelled”.
-- The plane comes from `routeProgress(segment, now)`: `(now − departure) ÷ (arrival − departure)` on the segment's instants, clamped to 0–1, and 0 for a segment with no times. Only live "landed" moves it to the end and live "cancelled" parks it at the start. `RouteLine` spans the full width between the two airport codes; the airports' city and name sit in a row of their own beneath, wrapping within each side, so they never narrow the line. The card carries no "Based on schedule" label.
-- The Next up card on Upcoming is chosen by `nextUp` in `frontend/src/lib/trips.ts`, in this order: (1) a flight, train, cruise or visit that is under way (earliest start first); (2) otherwise the booking that starts soonest; (3) otherwise, when only background reservations remain, the hotel, rental car or parking booking that ends soonest. Hotels, rental cars and parking are background reservations: while one is under way and something else is still ahead, it never takes the card. It appears under "Also under way", soonest end first, with its check-out, drop-off or exit time, and opens like any booking (QR code included). Ties break by segment id. Times are compared as instants from each place's own zone, across every trip the person can see.
-- Times are the wall-clock times at each place, as stored, and are never shown in the viewer's own zone.
-- On the Next up (boarding) card a flight draws the same arched `RouteLine` as the standard card, with the plane at `routeProgress` (at the start before departure, at the end once the arrival has passed). A train keeps a straight line with a train icon. The departure and arrival times sit side by side on one row at every width (two equal columns), each with the time, then the day, then the zone's city ("New York time") on lines of their own, so a phone as narrow as an iPhone 17 Pro Max (440 px) never wraps them onto two rows.
-- The card does not read the API for gate or city: a gate shows only from live flight status, and the airport name is not shown.
+- a headline line;
+- the confirmation code as the largest element (the first focusable control, tap to copy);
+- the flight, its date and departure time, and the booking link;
+- the airport codes with the route line and the times at each airport;
+- below the tear line, the terminal, gate, seat and cabin, the booking chip and, when live flight status is on, the live chip and a quiet line.
+
+The headline, the plane and the Next up card follow set rules:
+
+- **Headline.** It comes from `passHeadline(segment, now, live, online)` in `frontend/src/lib/trips.ts`.
+  - A terminal live status (landed, cancelled, diverted) always wins, at any age. Any other live status wins only while fresh (`flightEvidence`): “Delayed … min, …”, “Departed, expected to arrive in …”, “Diverted”, “Landed” and “Cancelled by the airline” (red).
+  - Without live status, or when it is older than `LIVE_STALE_HOURS`, or when the device is offline, the clock decides. A flight reads “Check-in opens in …” until `CHECK_IN_WINDOW_HOURS` before departure, then “Check-in is open, departs in …”, then “Under way, arrives in …”, then “Landed”. A cancelled booking reads “Cancelled”.
+- **Plane.** It comes from `routeProgress(segment, now)`: `(now − departure) ÷ (arrival − departure)` on the segment’s instants, clamped to 0–1, and 0 for a segment with no times. Only live “landed” moves it to the end and live “cancelled” parks it at the start.
+- **Layout.** `RouteLine` spans the full width between the two airport codes. The airports’ city and name sit in a row of their own beneath, wrapping within each side, so they never narrow the line. The card carries no “Based on schedule” label.
+- **Next up.** The Next up card on Upcoming is chosen by `nextUp` in `frontend/src/lib/trips.ts`, in this order:
+  1. a flight, train, cruise or visit that is under way (earliest start first);
+  2. otherwise the booking that starts soonest;
+  3. otherwise, when only background reservations remain, the hotel, rental car or parking booking that ends soonest.
+
+  Hotels, rental cars and parking are background reservations: while one is under way and something else is still ahead, it never takes the card. It appears under “Also under way”, soonest end first, with its check-out, drop-off or exit time, and opens like any booking (QR code included). Ties break by segment id. Times are compared as instants from each place’s own zone, across every trip the person can see.
+- **Times.** They are the wall-clock times at each place, as stored, and are never shown in the viewer’s own zone.
+- **Boarding card.** On the Next up (boarding) card a flight draws the same arched `RouteLine` as the standard card, with the plane at `routeProgress` (at the start before departure, at the end once the arrival has passed). A train keeps a straight line with a train icon. The departure and arrival times sit side by side on one row at every width (two equal columns), each with the time, then the day, then the zone’s city (“New York time”) on lines of their own, so a phone as narrow as an iPhone 17 Pro Max (440 px) never wraps them onto two rows.
+- **Data.** The card does not read the API for gate or city: a gate shows only from live flight status, and the airport name is not shown.
 
 ## Kind tiles and avatar stacks
 
-`KindTile.svelte` is a 28 or 36 px square holding a booking kind's icon on its tint. The kinds use `--kind-flight`, `--kind-stay`, `--kind-train` and `--kind-car`; cruise, parking and past visit use `--kind-quiet`. Each has a `-soft` tint for the background. A tile has an accessible name matching its kind's label in `TripKinds`, unless you pass `decorative`. `TripKinds.svelte` is a row of them.
+`KindTile.svelte` is a 28 or 36 px square holding a booking kind’s icon on its tint. The kinds use `--kind-flight`, `--kind-stay`, `--kind-train` and `--kind-car`; cruise, parking and past visit use `--kind-quiet`. Each has a `-soft` tint for the background. A tile has an accessible name matching its kind’s label in `TripKinds`, unless you pass `decorative`. `TripKinds.svelte` is a row of them.
 
-`AvatarStack.svelte` overlaps up to four initials circles and then shows a "+N" circle. `avatarTone(person)` in `frontend/src/lib/avatar.ts` picks each person's tone: by id when they have one, otherwise by name, so the same person keeps the same colour. The six tones are `--avatar-1` to `--avatar-6` with their `-ink` text, all in `app.css`. Give the stack one accessible label; its circles are hidden from assistive technology.
+`AvatarStack.svelte` overlaps up to four initials circles and then shows a “+N” circle.
+
+- `avatarTone(person)` in `frontend/src/lib/avatar.ts` picks each person’s tone: by id when they have one, otherwise by name, so the same person keeps the same colour.
+- The six tones are `--avatar-1` to `--avatar-6` with their `-ink` text, all in `app.css`.
+- Give the stack one accessible label; its circles are hidden from assistive technology.
 
 ## Monospace type
 
-Times, airport codes, confirmation codes and seat numbers use `font-mono`, Geist Mono bundled under `waypoint/static/fonts`, with tabular and slashed-zero figures. The `.mono` class sets them on any element, and `.code` adds the confirmation-code style. No font is loaded from outside Waypoint.
+Times, airport codes, confirmation codes and seat numbers use `font-mono`: Geist Mono, bundled under `waypoint/static/fonts`, with tabular and slashed-zero figures. The `.mono` class sets them on any element, and `.code` adds the confirmation-code style. No font is loaded from outside Waypoint.
 
 ## Navigation
 
-Below the `lg` breakpoint (phones and tablets) `TabBar.svelte` shows Upcoming, Trips, Stats and Review (with its count of items waiting) and a More button. More is a disclosure (`aria-expanded`, `aria-controls`) that opens a list with People and Settings; it closes on Escape (focus returns to the button), on a tap elsewhere and when the page changes. While People or Settings is the current page, More is marked with `aria-current` and says which page in its accessible name, and the page's link in the list carries `aria-current="page"`. The Settings avatar link in `TopBar.svelte` stays at every width. From `lg` up, `SideNav.svelte` lists all six pages. Which page goes where is `TABS` and `MORE` in `frontend/src/lib/nav.ts`.
+Which page goes where is `TABS` and `MORE` in `frontend/src/lib/nav.ts`.
 
-The phone tab bar is a frosted glass bar: a 4% white tint over a 28px backdrop blur with `saturate(2)` and `brightness(1.1)`, no outline (the border is transparent) and a faint inner top highlight for the edge, so content scrolling behind it shows through blurred and slightly lightened. Over this dark UI the labels measure about 4.4:1 or better at the brightest blurred spot. Bright content (an expanded email preview is white) scrolling behind it lowers that contrast; if you need the labels guaranteed readable over any content, raise the tint and drop the brightness, at the cost of the glass look. Browsers without `backdrop-filter` get the solid `surface-2` background.
+- **Below the `lg` breakpoint** (phones and tablets), `TabBar.svelte` shows Upcoming, Trips, Stats and Review (with its count of items waiting) and a More button.
+  - More is a disclosure (`aria-expanded`, `aria-controls`) that opens a list with People and Settings. It closes on Escape (focus returns to the button), on a tap elsewhere and when the page changes.
+  - While People or Settings is the current page, More is marked with `aria-current` and says which page in its accessible name, and the page’s link in the list carries `aria-current="page"`.
+  - The Settings avatar link in `TopBar.svelte` stays at every width.
+- **From `lg` up**, `SideNav.svelte` lists all six pages.
+
+The phone tab bar is a frosted glass bar: a 4% white tint over a 28px backdrop blur with `saturate(2)` and `brightness(1.1)`, no outline (the border is transparent) and a faint inner top highlight for the edge. Content scrolling behind it shows through blurred and slightly lightened. Browsers without `backdrop-filter` get the solid `surface-2` background.
+
+Over this dark UI the labels measure about 4.4:1 or better at the brightest blurred spot. Bright content scrolling behind the bar (an expanded email preview is white) lowers that. To guarantee the labels readable over any content, raise the tint and drop the brightness, at the cost of the glass look.
 
 ## Sheet
 
-`ui/sheet/Sheet.svelte` is the one panel for detail and editing that sits over a page. It is built on bits-ui's `Dialog`, the primitive `ConfirmDialog` uses, with its own layout: `ConfirmDialog` is a centred confirmation with a fixed form, so it could not be extended into a sheet and the two share only the primitive. Pass `title` (the dialog's name), an optional `description` and bind `open`.
+`ui/sheet/Sheet.svelte` is the one panel for detail and editing that sits over a page. It is built on bits-ui’s `Dialog`, the primitive `ConfirmDialog` uses, with its own layout: `ConfirmDialog` is a centred confirmation with a fixed form, so it could not be extended into a sheet and the two share only the primitive. Pass `title` (the dialog’s name), an optional `description` and bind `open`.
 
-- On a phone (`viewport.phone`, the same query as the `phone:` variant) it slides up from the bottom, capped at 92% of the screen height, over a dimmed page, with a grab handle: dragging the handle down 96 px or more closes it, less springs back. On a wider screen it is a side panel on the right, 34 rem at most.
-- It closes with the close button, Escape, a tap on the dimmed page or the swipe. Focus is trapped inside while it is open and returns to the control that opened it.
-- With `prefers-reduced-motion: reduce` it fades in and out and does not slide.
-- Content that already has a heading of its own should drop it (`SegmentForm`'s `titled={false}`), since the sheet's title names the dialog.
-- Trip page: **Edit** (and **Add address**) opens `SegmentForm` in the sheet on a phone and inline under the booking on a computer. Which one is decided when it opens, so a form being filled in does not jump if the window is resized. Upcoming: a booking in the day-by-day list opens its pass card in the sheet at every width (a modified click still follows the link to the trip page). The Next up card passes `boarding` to `PassCard`, which draws it as a boarding pass (a header strip with the eyebrow, trip name, status chips and countdown; the route or place and times; a stub with the confirmation code, the details and the travellers); every other `PassCard` keeps the full pass; the list is split at today in `Upcoming.svelte`, with earlier days in a native `<details>` so the toggle is keyboard accessible without script.
-- Review: the add-by-hand and check-suggestion form, with the email, opens in the sheet at every width, with `wide` (a side sheet of up to 40rem), `split` (from 1100px, `SPLIT_QUERY` in `phone.svelte.ts`, up to 72rem with the email beside the form) and `onOpenAutoFocus` to choose where focus lands; closing a changed form asks "Discard changes?" first. On a phone the sheet switches between the email and the form with two buttons, and the action bar is sticky at the bottom of the sheet (`scroll-padding-bottom` keeps a focused field above it) rather than fixed to the screen, so it never sits over the keyboard.
-- Review's page groups its items by the decision they need (Check suggestions, Add missing details, Match bookings, Match people), each with a count and one prominent button per row. Less common actions go in `ActionMenu.svelte`, a disclosure (`details`) labelled More that closes on Escape (focus returns to its button) and on an outside click; the Review page passes `returnFocus` to `ConfirmDialog` so a cancelled question returns focus to it.
-- Drafts: every form that can hold typing (a booking being added or edited, a trip’s details, a person, a membership, a Review form) registers a draft guard (`frontend/src/lib/drafts.svelte.ts`) and shows `DiscardDialog`. Dismissing a sheet (Escape, the close button, the backdrop, a swipe down), Cancel, starting another edit, picking another trip or changing the trips filter, browser Back or any other change of the address, and closing or reloading the tab all ask first, with **Keep editing** and **Discard changes**, and only when the form was changed. Nothing leaves a form while it is saving. Drafts live in memory only, never in browser storage, so a loyalty number typed into a form is never kept anywhere else. A `Sheet` takes the guard of its form (`guard`), or picks up the guards of forms inside it.
-- Session expiry: while a form is changed, **Sign in** opens in a new tab so the form stays on this page, and coming back to the tab clears the banner once you are signed in.
-- People: the forms (a guest, a membership) open in the sheet on a phone and inline on a computer, decided when they open. Page titles use `text-display`.
+- **Placement.** On a phone (`viewport.phone`, the same query as the `phone:` variant) it slides up from the bottom, capped at 92% of the screen height, over a dimmed page, with a grab handle. Dragging the handle down 96 px or more closes it; less springs back. On a wider screen it is a side panel on the right, 34 rem at most.
+- **Closing and focus.** It closes with the close button, Escape, a tap on the dimmed page or the swipe. Focus is trapped inside while it is open and returns to the control that opened it.
+- **Reduced motion.** With `prefers-reduced-motion: reduce` it fades in and out and does not slide.
+- **Headings.** Content that already has a heading of its own should drop it (`SegmentForm`’s `titled={false}`), since the sheet’s title names the dialog.
+- **Trip page.** **Edit** (and **Add address**) opens `SegmentForm` in the sheet on a phone and inline under the booking on a computer. Which one is decided when it opens, so a form being filled in does not jump if the window is resized.
+- **Upcoming.** A booking in the day-by-day list opens its pass card in the sheet at every width (a modified click still follows the link to the trip page).
+  - The Next up card passes `boarding` to `PassCard`, which draws it as a boarding pass: a header strip with the eyebrow, trip name, status chips and countdown; the route or place and times; and a stub with the confirmation code, the details and the travellers. Every other `PassCard` keeps the full pass.
+  - `Upcoming.svelte` splits the list at today, with earlier days in a native `<details>` so the toggle is keyboard accessible without script.
+- **Review: the form.** The add-by-hand and check-suggestion form, with the email, opens in the sheet at every width.
+  - It takes `wide` (a side sheet of up to 40rem), `split` (from 1100px, `SPLIT_QUERY` in `phone.svelte.ts`, up to 72rem with the email beside the form) and `onOpenAutoFocus` to choose where focus lands.
+  - Closing a changed form asks “Discard changes?” first.
+  - On a phone the sheet switches between the email and the form with two buttons. The action bar is sticky at the bottom of the sheet (`scroll-padding-bottom` keeps a focused field above it) rather than fixed to the screen, so it never sits over the keyboard.
+- **Review: the page.** Items are grouped by the decision they need (Check suggestions, Add missing details, Match bookings, Match people), each with a count and one prominent button per row. Less common actions go in `ActionMenu.svelte`, a disclosure (`details`) labelled More that closes on Escape (focus returns to its button) and on an outside click. The page passes `returnFocus` to `ConfirmDialog` so a cancelled question returns focus to it.
+- **Drafts.** Every form that can hold typing (a booking being added or edited, a trip’s details, a person, a membership, a Review form) registers a draft guard (`frontend/src/lib/drafts.svelte.ts`) and shows `DiscardDialog`.
+  - These ask first, with **Keep editing** and **Discard changes**, and only when the form was changed: dismissing a sheet (Escape, the close button, the backdrop, a swipe down), Cancel, starting another edit, picking another trip or changing the trips filter, browser Back or any other change of the address, and closing or reloading the tab. Nothing leaves a form while it is saving.
+  - Drafts live in memory only, never in browser storage, so a loyalty number typed into a form is never kept anywhere else.
+  - A `Sheet` takes the guard of its form (`guard`), or picks up the guards of forms inside it.
+- **Session expiry.** While a form is changed, **Sign in** opens in a new tab so the form stays on this page, and coming back to the tab clears the banner once you are signed in.
+- **People.** The forms (a guest, a membership) open in the sheet on a phone and inline on a computer, decided when they open. Page titles use `text-display`.

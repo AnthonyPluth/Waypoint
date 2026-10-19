@@ -7,34 +7,34 @@ sidebar:
 
 The **People** page lists everyone who travels with your household. Every signed-in member sees all of it, so anyone can add or fix a name.
 
+![People on a desktop: each household member with their loyalty and Known Traveler programs, numbers masked to the last four characters, and an Add a guest button](../../../assets/screenshots/people-desktop-hero.png)
+
 ## Members and guests
 
-- **Members** are the people who sign in. Waypoint adds someone to People the first time they sign in, using the name their sign-in provider gives. Later sign-ins don’t change it, so a name you’ve corrected stays corrected. You can edit a member’s names, but not remove them, and their link to their login can’t be changed from the page: they’re in the household because they sign in.
-- **Guests** have no login: children, grandparents, a friend who comes along. Any member can add a guest, rename them or remove them. Removing a guest asks first.
-
-## If you were already a guest
-
-Waypoint can add someone as a guest before they ever sign in: a booking’s passenger matches nobody, so it’s added as a guest, and a booking then points to that guest. When that person signs in for the first time they become a member of their own, and without a link between the two they would see none of those trips.
-
-- **After you sign in**, if you have no trips and a guest’s name matches yours (their name, legal name or an alias), Upcoming asks “Are you one of these?”. **This is me** links you to that guest; **None of these** hides the question for you.
-- **On the People page**, a guest has a **This is me** button too. You can only link a guest to yourself, never to someone else, and a member can’t be linked this way. Once you have linked a guest, the button is hidden on every guest for you.
-
-Linking moves everything on the guest to you in one step: their trips and bookings (including the ones they booked), their loyalty and Known Traveler numbers, and their legal name and aliases, which are added to yours without repeats. You keep your own name and first name (a missing one is filled in from the guest), and the guest is removed. If you both had a number for the same program and they differ, both are kept and People says “Two numbers for …” so you can remove the one that’s wrong. People then shows “Linked from guest … by … on …”.
-
-Linking can’t be undone in Waypoint; restoring a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) is the way back. Merging two members, or two guests, isn’t supported.
-
-## Adding and editing
-
-**Add a guest** and the pencil beside a person open the name form at the top of the page on a computer, and in a sheet that slides up over the dimmed page on a phone. **Add loyalty or traveler number** on a person (and the pencil beside a membership) opens the [membership](/Waypoint/start/loyalty/) form under that person on a computer and in a sheet on a phone. Either way a save that fails keeps what you typed and says why inside the form, and **Cancel**, swiping the sheet down, tapping outside it or Escape closes it without saving. If you changed anything, it first asks **Discard changes?** (also before Back, another page or another form replaces it), and **Keep editing** returns to the form; nothing closes it while it is saving. What you type is kept in the page only, never in the browser’s storage, so a loyalty number typed here is gone if you discard it. Which one it is is decided when the form opens, so a form being filled in doesn’t jump if the window is resized.
+- **Members** are the people who sign in. Waypoint adds someone the first time they sign in, using the name their provider gives; later sign-ins don’t change it, so a corrected name stays corrected. You can edit a member’s names but not remove them.
+- **Guests** have no login: children, grandparents, a friend who comes along. Any member can add, rename or remove a guest.
 
 ## Names
 
-Each person has:
+Each person has a **display name**, a **first name** and a **legal name**, the name on their ID and bookings. Under **Advanced matching** you can add **name aliases**, one per line: the ways an airline prints their name, such as `DOE/JANE MS`.
 
-- a **display name** (how Waypoint shows them) and a **first name**;
-- a **legal name**, the name on their ID and bookings, used to match them;
-- **name aliases**, under **Advanced matching**: the ways an airline prints their name on a booking, such as `DOE/JANE MS`. Add one per line; Waypoint will match bookings against them. When a name matches both a member and a guest, the booking goes to the member; when it matches two members, or two guests, Waypoint doesn’t guess and asks in Review.
+Waypoint matches a booking’s passengers against these names. When a name matches both a member and a guest, the booking goes to the member. When it matches two members, or two guests, Waypoint doesn’t guess and asks in Review.
+
+## If you were already a guest
+
+A booking whose passenger matches nobody is added as a guest. When that person later signs in they become a member of their own, and without a link between the two they would see none of those trips.
+
+- If you have no trips and a guest’s name, legal name or an alias matches yours, Upcoming asks “Are you one of these?”. **This is me** links you to that guest; **None of these** hides the question.
+- A guest on the People page has a **This is me** button too. You can only link a guest to yourself, never to someone else.
+
+Linking moves everything on the guest to you: their trips and bookings, loyalty and Known Traveler numbers, and legal name and aliases, added to yours without repeats. You keep your own name and first name, and the guest is removed. If you both had a different number for the same program, both are kept and People says “Two numbers for …” so you can remove the wrong one.
+
+Linking can’t be undone in Waypoint; restoring a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) is the way back. Merging two members, or two guests, isn’t supported.
+
+## Editing
+
+**Add a guest** and the pencil beside a person open the name form; **Add loyalty or traveler number** opens the [membership](/Waypoint/start/loyalty/) form. What you type is held in the page only, never in the browser’s storage, so a loyalty number you discard is gone.
 
 ## In a backup
 
-People are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, with each member still linked to their sign-in.
+People are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back as they were, each member still linked to their sign-in.
