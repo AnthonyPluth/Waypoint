@@ -333,5 +333,55 @@ class Images(unittest.TestCase):
         git.assert_called_once_with("diff", "--name-only", "-z", "--diff-filter=AMR", "base", "HEAD")
 
 
+class StaleBase(unittest.TestCase):
+    TESTS = "class T(unittest.TestCase):\n    def test_one(self): ...\n    def test_two(self): ...\n"
+
+    def git(self, trees):
+        def fake(*args):
+            if args[:3] == ("ls-tree", "-r", "--name-only"):
+                return "tests/test_a.py\n"
+            if args[0] == "show":
+                rev, path = args[1].split(":", 1)
+                if rev in trees and path in trees[rev]:
+                    return trees[rev][path]
+                raise fc.subprocess.CalledProcessError(128, "git show")
+            raise AssertionError(args)
+        return fake
+
+    def test_a_test_removed_on_main_after_the_branch_was_cut_is_not_this_branch_s(self):
+        trees = {"base": {"tests/test_a.py": self.TESTS}, "head": {"tests/test_a.py": self.TESTS}}
+        with mock.patch.object(fc, "_git", self.git(trees)):
+            self.assertEqual(fc.removed_tests("base", "head"), [])
+
+    def test_a_test_the_branch_removes_is_found_from_its_own_head(self):
+        trees = {"base": {"tests/test_a.py": self.TESTS}, "head": {"tests/test_a.py": "class T(unittest.TestCase):\n    def test_one(self): ...\n"}}
+        with mock.patch.object(fc, "_git", self.git(trees)):
+            self.assertEqual(fc.removed_tests("base", "head"), ["tests/test_a.py::T.test_two"])
+
+    def test_a_test_file_the_branch_deletes_counts_as_all_removed(self):
+        with mock.patch.object(fc, "_git", self.git({"base": {"tests/test_a.py": self.TESTS}, "head": {}})):
+            self.assertEqual(fc.removed_tests("base", "head"), ["tests/test_a.py::T.test_one", "tests/test_a.py::T.test_two"])
+
+    def test_the_branch_s_head_is_read_from_the_range(self):
+        with mock.patch.object(fc, "commits", return_value=[]), mock.patch.object(fc, "check_tests", return_value=[]) as tests, \
+                mock.patch.object(fc, "added_images", return_value=[]) as images, mock.patch.object(fc, "_git", return_value="base\n"):
+            fc.main(["--commits", "origin/main..abc123"])
+        self.assertEqual(tests.call_args.args[2], "abc123")
+        images.assert_called_once_with("base", "abc123")
+
+    def test_the_page_list_is_read_from_the_branch_s_head_too(self):
+        shown = []
+
+        def show(rev, path):
+            shown.append((rev, path))
+            return "export const PAGES = ['old-page'];"
+
+        with mock.patch.object(fc, "commits", return_value=[]), mock.patch.object(fc, "check_tests", return_value=[]), \
+                mock.patch.object(fc, "added_images", return_value=["docs/src/assets/screenshots/old-page-phone.png"]), \
+                mock.patch.object(fc, "_show", show), mock.patch.object(fc, "_git", return_value="base\n"):
+            self.assertEqual(fc.main(["--commits", "origin/main..abc123"]), 0)
+        self.assertIn(("abc123", "frontend/verify/verify.mjs"), shown)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -132,14 +132,21 @@ def _git(*args: str) -> str:
     return subprocess.run(["git", *args], cwd=ROOT, check=True, capture_output=True, text=True).stdout
 
 
-def removed_tests(base: str) -> list[str]:
+def _show(rev: str, path: str) -> str | None:
+    try:
+        return _git("show", f"{rev}:{path}")
+    except subprocess.CalledProcessError:
+        return None
+
+
+def removed_tests(base: str, head: str = "HEAD") -> list[str]:
     gone = []
     for path in _git("ls-tree", "-r", "--name-only", base).splitlines():
         if not is_test_file(path):
             continue
         before = test_names(path, _git("show", f"{base}:{path}"))
-        now_file = ROOT / path
-        now = test_names(path, now_file.read_text()) if now_file.exists() else set()
+        text = _show(head, path)
+        now = test_names(path, text) if text is not None else set()
         gone += sorted(before - now)
     return gone
 
@@ -163,9 +170,9 @@ def skipped_name(path: str, lines: list[str], index: int) -> str:
     return m.group(2) if m else ""
 
 
-def added_skips(base: str) -> list[tuple[str, str, str]]:
+def added_skips(base: str, head: str = "HEAD") -> list[tuple[str, str, str]]:
     out = []
-    diff = _git("diff", "--unified=0", f"{base}", "--", "tests", "frontend")
+    diff = _git("diff", "--unified=0", base, head, "--", "tests", "frontend")
     path, line_no = "", 0
     for line in diff.splitlines():
         if line.startswith("+++ "):
@@ -174,7 +181,7 @@ def added_skips(base: str) -> list[tuple[str, str, str]]:
             line_no = int(m.group(1))
         elif line.startswith("+") and not line.startswith("+++"):
             if path and is_test_file(path) and SKIP.search(STRING.sub("", line)):
-                lines = (ROOT / path).read_text().splitlines()
+                lines = (_show(head, path) or "").splitlines()
                 out.append((path, skipped_name(path, lines, line_no - 1), line[1:].strip()[:100]))
             line_no += 1
     return out
@@ -189,16 +196,16 @@ def _names(declared: list[str]) -> set[str]:
     return out
 
 
-def check_tests(base: str, messages: list[str]) -> list[str]:
+def check_tests(base: str, messages: list[str], head: str = "HEAD") -> list[str]:
     removals = _names([r for m in messages for r in REMOVES.findall(m)])
     skips = _names([r for m in messages for r in SKIPS.findall(m)])
     problems = []
-    for name in removed_tests(base):
+    for name in removed_tests(base, head):
         short = name.split("::", 1)[1]
         if not {name, short, short.rsplit(".", 1)[-1]} & removals:
             problems.append(f"the test {name} is gone: keep it, or say why on a commit with a "
                             f"'Removes-Test: {short} — <why>' trailer")
-    for path, test, text in added_skips(base):
+    for path, test, text in added_skips(base, head):
         names = {f"{path}::{test}", test} if test else {path, Path(path).name}
         if not names & skips:
             problems.append(f"a test is skipped or narrowed ({path}: {text}): say why on a commit with a "
@@ -220,8 +227,8 @@ def verify_pages(text: str | None = None) -> list[str]:
     return re.findall(r"""["']([\w-]+)["']""", found.group(1)) if found else []
 
 
-def added_images(base: str) -> list[str]:
-    return [path for path in _git("diff", "--name-only", "-z", "--diff-filter=AMR", base, "HEAD").split("\0") if IMAGE.search(path)]
+def added_images(base: str, head: str = "HEAD") -> list[str]:
+    return [path for path in _git("diff", "--name-only", "-z", "--diff-filter=AMR", base, head).split("\0") if IMAGE.search(path)]
 
 
 def check_images(paths: list[str], pages: list[str]) -> list[str]:
@@ -343,8 +350,9 @@ def main(argv: list[str] | None = None) -> int:
         for sha, message in found:
             problems += check_commit(sha, message)
         base = _git("merge-base", *args.commits.split("..", 1)).strip() if ".." in args.commits else args.commits
-        problems += check_tests(base, [message for _, message in found])
-        problems += check_images(added_images(base), verify_pages())
+        head = args.commits.split("..", 1)[1] or "HEAD" if ".." in args.commits else "HEAD"
+        problems += check_tests(base, [message for _, message in found], head)
+        problems += check_images(added_images(base, head), verify_pages(_show(head, "frontend/verify/verify.mjs")))
     for p in problems:
         print(f"::error::{p}" if "GITHUB_ACTIONS" in os.environ else p, file=sys.stderr)
     if not problems:
