@@ -1,5 +1,4 @@
 import type { Segment, Trip, TripPlaces } from "./api-types";
-import type { Stop } from "./route-replay";
 import { daysBetween, dayParts, placeOf, splitTrips } from "./trips";
 
 const AIRPORT_CODE = /^[A-Za-z]{3}$/;
@@ -66,16 +65,3 @@ export const usablePlaces = (found: unknown): found is TripPlaces => {
   return !!p && Array.isArray(p.airports) && Array.isArray(p.cities) && Array.isArray(p.stays)
     && Array.isArray(p.roads?.legs) && Array.isArray(p.roads?.interstates) && Array.isArray(p.boundaries);
 };
-
-const VERB: Partial<Record<NonNullable<Stop["via"]>, string>> = { flight: "flight", train: "train", cruise: "cruise" };
-
-export function routeDescription(stops: Stop[]): string {
-  const first = stops[0];
-  if (!first) return "Route map";
-  const legs = stops.slice(1).map((s, i) => {
-    const target = i > 0 && s.city.toLowerCase() === first.city.toLowerCase() ? `back to ${s.city}` : `to ${s.city}`;
-    if (i === 0) return `${first.city} ${target}`;
-    return `${(s.via && VERB[s.via]) ?? "on"} ${target}`;
-  });
-  return `Route map: ${legs.join(", ")}`;
-}

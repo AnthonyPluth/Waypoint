@@ -13,8 +13,6 @@
   import { flightStatus, loadFlightStatus, statusFor } from "$lib/flightstatus.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
-  import RouteMapCard from "$lib/components/RouteMapCard.svelte";
-  import { NO_ROADS, stopsOf } from "$lib/route-replay";
   import { dateTile, usablePlaces, laterLine, laterTrips, startsIn, tripTotals } from "$lib/side-column";
   import { type Day, type DayItem, dayIn, dayLabel, dayParts, END_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import KindTile from "$lib/components/KindTile.svelte";
@@ -103,7 +101,6 @@
   const featuredId = $derived(featured?.id ?? null);
   const later = $derived(trips && featured ? laterTrips(trips, featured, today) : []);
   let places = $state<TripPlaces | null>(null);
-  const stops = $derived(featured && places ? stopsOf(featured, places) : []);
   const totals = $derived(featured ? tripTotals(featured, places) : null);
   let placesRequest = 0;
   let placesFor: number | null = null;
@@ -321,7 +318,6 @@
         </div>
         <aside class="flex min-w-0 flex-col gap-4" aria-label="Trip summary" data-testid="side-column">
           {#if !viewport.phone}
-            {#if stops.length >= 2}<RouteMapCard tripId={featured.id} {stops} roads={places?.roads ?? NO_ROADS} />{/if}
             {#if totals}
               <dl class="grid grid-cols-3 divide-x divide-border overflow-hidden rounded-[18px] border border-border bg-surface-1 text-center" data-testid="trip-totals">
                 <div class="flex flex-col-reverse px-2 py-3"><dt class="eyebrow">{totals.nights === 1 ? "Night" : "Nights"}</dt><dd class="text-title">{totals.nights}</dd></div>
