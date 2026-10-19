@@ -369,6 +369,19 @@ class StaleBase(unittest.TestCase):
         self.assertEqual(tests.call_args.args[2], "abc123")
         images.assert_called_once_with("base", "abc123")
 
+    def test_the_page_list_is_read_from_the_branch_s_head_too(self):
+        shown = []
+
+        def show(rev, path):
+            shown.append((rev, path))
+            return "export const PAGES = ['old-page'];"
+
+        with mock.patch.object(fc, "commits", return_value=[]), mock.patch.object(fc, "check_tests", return_value=[]), \
+                mock.patch.object(fc, "added_images", return_value=["docs/src/assets/screenshots/old-page-phone.png"]), \
+                mock.patch.object(fc, "_show", show), mock.patch.object(fc, "_git", return_value="base\n"):
+            self.assertEqual(fc.main(["--commits", "origin/main..abc123"]), 0)
+        self.assertIn(("abc123", "frontend/verify/verify.mjs"), shown)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -352,7 +352,7 @@ def main(argv: list[str] | None = None) -> int:
         base = _git("merge-base", *args.commits.split("..", 1)).strip() if ".." in args.commits else args.commits
         head = args.commits.split("..", 1)[1] or "HEAD" if ".." in args.commits else "HEAD"
         problems += check_tests(base, [message for _, message in found], head)
-        problems += check_images(added_images(base, head), verify_pages())
+        problems += check_images(added_images(base, head), verify_pages(_show(head, "frontend/verify/verify.mjs")))
     for p in problems:
         print(f"::error::{p}" if "GITHUB_ACTIONS" in os.environ else p, file=sys.stderr)
     if not problems:
