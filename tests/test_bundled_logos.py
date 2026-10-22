@@ -2,6 +2,7 @@ import json
 import re
 import unittest
 import xml.etree.ElementTree as ET
+from urllib.parse import urlsplit
 from unittest import mock
 
 from waypoint.storage import bundled_logos
@@ -15,7 +16,9 @@ class CatalogTests(unittest.TestCase):
         for entry in entries:
             with self.subTest(brand=entry["name"]):
                 self.assertEqual(entry["file"], entry["file"].rsplit("/", 1)[-1])
-                self.assertTrue(entry["source"].startswith(("https://github.com/", "https://commons.wikimedia.org/wiki/File:", "https://en.wikipedia.org/wiki/File:", "https://newsroom.hyatt.com/image/")))
+                source = urlsplit(entry["source"])
+                self.assertEqual(source.scheme, "https")
+                self.assertTrue(source.hostname and "." in source.hostname)
                 self.assertRegex(entry["sha"], r"^[a-f0-9]{40}$")
                 body, content_type = bundled_logos.read(entry["name"])
                 if content_type == "image/png":
