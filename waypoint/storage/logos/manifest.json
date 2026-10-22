@@ -477,10 +477,10 @@
   },
   {
     "name": "Hyatt Regency",
-    "file": "hyatt-regency.svg",
-    "source": "https://github.com/detain/svg-logos/blob/master/svg/h/hyatt-regency.svg",
-    "upstream_path": "svg/h/hyatt-regency.svg",
-    "sha": "ab4c25aeb9f34c3e3f535d1d9dbfaaaf0c22b89b"
+    "file": "hyatt-regency.png",
+    "source": "https://newsroom.hyatt.com/image/HR-L001b-ctr-R-color-CMYK+%281%29.jpg",
+    "upstream_path": "HR-L001b-ctr-R-color-CMYK (1).jpg",
+    "sha": "13d41cbb3433f501bfcfe9c5cbf0633c62c40743"
   },
   {
     "name": "Hyatt Place",
