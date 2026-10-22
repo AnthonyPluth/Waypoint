@@ -474,6 +474,14 @@ describe("Trip", () => {
     expect(screen.queryByRole("link", { name: "Wallet" })).toBeNull();
   });
 
+  it("labels a flight’s directions to its airport plain Directions, like every other booking’s", async () => {
+    held = trip([{ ...flight, links: { ...flight.links, directions: "https://www.google.com/maps/search/?api=1&query=JFK%20Airport" } }]);
+    render(TripPage);
+    const group = within(await screen.findByRole("group", { name: /Actions for JFK → LHR/ }));
+    expect(group.getByRole("link", { name: "Directions" })).toHaveAttribute("href", "https://www.google.com/maps/search/?api=1&query=JFK%20Airport");
+    expect(group.queryByRole("link", { name: /Directions to/ })).toBeNull();
+  });
+
   it("offers a phone the vendor's app or website on a booking with no manage link, in the actions row and without a new tab", async () => {
     vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)");
     held = trip([{ ...stay, links: { app: null, open: "https://www.example-vendor.example/", open_kind: "website", directions: null, call: null } }]);
