@@ -34,8 +34,9 @@ fi
 # Waypoint's dependencies and the tools CI runs (ruff, mypy, coverage, ...: pyproject.toml's dev group).
 poetry install --no-root --no-interaction
 
-# The web app's packages (npm install, not ci: the container's cache keeps them between sessions).
-(cd frontend && npm install --no-audit --no-fund)
+# The web app's packages (npm install, not ci: the container's cache keeps them between sessions; --no-save: this npm
+# would otherwise rewrite the committed lockfile).
+(cd frontend && npm install --no-save --no-audit --no-fund)
 
 # make verify freezes the clock with libfaketime (the screenshots are committed, so they must not change from run to run).
 if ! ls /usr/lib/*/faketime/libfaketime.so.1 /usr/lib/faketime/libfaketime.so.1 >/dev/null 2>&1; then
