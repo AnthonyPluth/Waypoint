@@ -62,7 +62,7 @@
     {#if list.paused}
       <span class="text-muted-foreground" role="status">{pausedText(list.paused)}</span>
     {:else if !over}
-      <Button variant="ghost" size="sm" disabled={busy} onclick={refresh}>{busy ? "Refreshing…" : s ? "Refresh" : "Check live status"}</Button>
+      <Button variant="outline" size="sm" disabled={busy} onclick={refresh}>{busy ? "Refreshing…" : s ? "Refresh" : "Check live status"}</Button>
     {/if}
   </div>
 {/if}

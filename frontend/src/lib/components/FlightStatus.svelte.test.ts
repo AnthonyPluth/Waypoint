@@ -12,6 +12,7 @@ import { flightStatus } from "$lib/flightstatus.svelte";
 import { toast } from "svelte-sonner";
 import { segment } from "../../test/fixtures";
 import FlightStatus from "./FlightStatus.svelte";
+import { buttonVariants } from "./ui/button";
 
 const seg = segment({ id: 7 });
 const status = (extra: Partial<Status> = {}): Status => ({
@@ -42,6 +43,15 @@ describe("a flight’s live status", () => {
     expect(card).toHaveTextContent("Arrival terminal 5 · gate a10");
     expect(card).toHaveTextContent(/as of \d?\d:\d\d [AP]M/);
     expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
+  });
+
+  it("draws Refresh and Check live status as outlined buttons, like the booking’s other actions", async () => {
+    const { unmount } = render(FlightStatus, { segment: seg });
+    expect(screen.getByRole("button", { name: "Refresh" })).toHaveClass(...buttonVariants({ variant: "outline", size: "sm" }).split(" "));
+    unmount();
+    flightStatus.list = list({ statuses: [] });
+    render(FlightStatus, { segment: seg });
+    expect(screen.getByRole("button", { name: "Check live status" })).toHaveClass(...buttonVariants({ variant: "outline", size: "sm" }).split(" "));
   });
 
   it("says on time, departed, landed, cancelled and diverted in words", () => {

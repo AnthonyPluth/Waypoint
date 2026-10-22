@@ -415,7 +415,7 @@
     <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
       {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>
       {:else if vendor}<Button variant="outline" size="sm" href={vendor.href}>{vendor.label}</Button>{/if}
-      {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">{s.kind === "flight" && s.origin ? `Directions to ${s.origin}` : "Directions"}</Button>{/if}
+      {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
       {#if s.status !== "cancelled" && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
       <GateCode segment={s} {now} onchanged={() => void load()} />
       {#if s.has_email}
