@@ -15,6 +15,7 @@ Reason = Literal["no_markup", "incomplete", "broken", "match", "generic"]
 UNKNOWN_SENDER = ""
 IGNORED = "ignored"
 GROUPED: tuple[Reason, ...] = ("no_markup", "incomplete", "broken")
+HOLDING: tuple[Reason, ...] = ("incomplete", "match")
 
 
 class OtherOut(TypedDict):
@@ -126,7 +127,8 @@ def visible(conn: db.Connection, owner: str, item_id: int) -> Any:
 
 def arrived(conn: db.Connection, owner: str, since: float) -> list[str]:
     rows = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id).join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
-                        .where(_seen_by(owner), ReviewItem.created >= since).order_by(ReviewItem.id)).fetchall()
+                        .where(_seen_by(owner), ReviewItem.created >= since,
+                               or_(ReviewItem.reason.in_(HOLDING), ReviewItem.suggestion.is_not(None))).order_by(ReviewItem.id)).fetchall()
     return [f"{r['mailbox_id']}/{r['message_id']}" for r in rows]
 
 
