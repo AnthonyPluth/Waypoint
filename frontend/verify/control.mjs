@@ -359,6 +359,8 @@ export function allowedRequest(url, base) {
   return ["data:", "blob:", "about:"].includes(u.protocol) || sameServer(u, base);
 }
 
+export const isGuardedPath = (pathname) => /^\/(api|auth|oauth|mcp)(\/|$)/.test(pathname);
+
 export const ACTING_COMMANDS = ["goto", "viewport", "offline", "click", "type", "press", "scroll", "flow", "reset"];
 
 export const onHost = (base, host) => base.replace(/^(https?:\/\/)[^:/]+/, `$1${host}`);

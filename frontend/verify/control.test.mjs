@@ -129,6 +129,11 @@ describe("what the browser may reach", () => {
     }
   });
 
+  it("guards the paths the server changes data on, and leaves pages and assets to the service worker", () => {
+    for (const path of ["/api/trips", "/api", "/auth/logout", "/oauth/token", "/mcp"]) expect(c.isGuardedPath(path), path).toBe(true);
+    for (const path of ["/", "/assets/app.js", "/sw.js", "/apiary", "/feed/x.ics"]) expect(c.isGuardedPath(path), path).toBe(false);
+  });
+
   it("lets only commands that act as a person, or eval --write, change data", () => {
     for (const name of c.ACTING_COMMANDS) expect(c.COMMANDS[name]).toBeDefined();
     for (const name of ["eval", "snapshot", "screenshot", "info", "console", "network", "wait-settle", "start", "stop"]) expect(c.ACTING_COMMANDS).not.toContain(name);

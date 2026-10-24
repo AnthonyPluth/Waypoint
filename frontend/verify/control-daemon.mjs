@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ACTING_COMMANDS, ARTIFACTS, ControlError, allowedRequest, LOOPBACK_HOSTS, PROG, ROOT, closest, errorResult, jsExpression, lastShotNumber, onHost, parseTarget, readState, rel, removeState, routeUrl, sameServer, scrubText, scrubUrl, shotName, socketPath, writeState } from "./control.mjs";
+import { ACTING_COMMANDS, ARTIFACTS, ControlError, allowedRequest, isGuardedPath, LOOPBACK_HOSTS, PROG, ROOT, closest, errorResult, jsExpression, lastShotNumber, onHost, parseTarget, readState, rel, removeState, routeUrl, sameServer, scrubText, scrubUrl, shotName, socketPath, writeState } from "./control.mjs";
 import { startServer } from "./control-server.mjs";
 import { VIEWPORTS, checksAfter, contextOptions, launchOptions, prepareContext, readFlows, recheck, runStep, screenshotFile, setUpOffline, settlePage } from "./verify.mjs";
 
@@ -90,21 +90,33 @@ async function main() {
 
   const keep = (list, entry) => { list.push(entry); if (list.length > BUFFER) list.shift(); };
 
+  const guardsWrites = (url) => allowedRequest(url.href, base) && isGuardedPath(url.pathname);
+  const refuseWrites = (route) => {
+    const request = route.request();
+    if (["GET", "HEAD", "OPTIONS"].includes(request.method())) return route.fallback();
+    refused.push(`${request.method()} ${scrubUrl(request.url(), base)}`);
+    return route.abort("blockedbyclient");
+  };
+  let guarded = null;
+
+  async function guardWrites(on) {
+    if (guarded && (!on || guarded !== ctx)) {
+      await guarded.unroute(guardsWrites, refuseWrites).catch(() => null);
+      guarded = null;
+    }
+    if (on && !guarded && ctx) {
+      await ctx.route(guardsWrites, refuseWrites);
+      guarded = ctx;
+    }
+  }
+
   async function openPage(viewport, phoneAgent = false) {
     const previous = ctx;
     const fresh = await browser.newContext(contextOptions(viewport, { phoneAgent }));
     await prepareContext(fresh, opt.now);
-    await fresh.route("**/*", (route) => {
-      const request = route.request();
-      if (!allowedRequest(request.url(), base)) {
-        blockedHosts.push(scrubUrl(request.url(), base) ?? "a data address");
-        return route.abort("blockedbyclient");
-      }
-      if (!["GET", "HEAD", "OPTIONS"].includes(request.method()) && !acting) {
-        refused.push(`${request.method()} ${scrubUrl(request.url(), base)}`);
-        return route.abort("blockedbyclient");
-      }
-      return route.fallback();
+    await fresh.route((url) => !allowedRequest(url.href, base), (route) => {
+      blockedHosts.push(scrubUrl(route.request().url(), base) ?? "a data address");
+      return route.abort("blockedbyclient");
     });
     const tab = await fresh.newPage();
     tab.setDefaultTimeout(30000);
@@ -401,6 +413,7 @@ async function main() {
     log(`${request.command}`);
     clearTimeout(idle);
     acting = ACTING_COMMANDS.includes(request.command) || (request.command === "eval" && !!request.options?.write);
+    await guardWrites(!acting);
     try {
       const reply = await handler({ args: request.args ?? [], options: request.options ?? {}, path: request.path });
       const away = offsite.splice(0);
@@ -417,6 +430,7 @@ async function main() {
       return { ...errorResult(request.command, err), ...(e.data ?? {}) };
     } finally {
       acting = false;
+      await guardWrites(true).catch((e) => log(`guarding writes: ${firstLine(e)}`));
       touch();
     }
   }
@@ -438,6 +452,7 @@ async function main() {
   await new Promise((resolve, reject) => { listener.once("error", reject); listener.listen(socket, resolve); });
   chmodSync(socket, 0o600);
   try { shots = lastShotNumber(readdirSync(join(dir, "shots"))); } catch { shots = 0; }
+  await guardWrites(true);
   touch();
   save({ status: "ready", base, port: server.port, route: route(), clock: { frozenNow: opt.now, browser: await page.evaluate(() => new Date().toString()) } });
   log(`ready at ${base}`);
