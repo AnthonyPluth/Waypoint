@@ -179,8 +179,7 @@
   const missing = $derived(shown.filter((i) => i.suggestions.length === 0));
   const unasked = $derived(askable(shown));
   const unaskedElsewhere = $derived(only ? askable(review?.items ?? []).length - unasked.length : 0);
-  const aiWhere = $derived(review?.ai_mode === "local" ? "your own Ollama server, unredacted" : "OpenRouter, redacted first");
-  const aiNote = (n: number) => `The text of ${n === 1 ? "this email goes" : `these ${n} emails goes`} to ${aiWhere}.`;
+  const aiNote = (n: number) => `The text of ${n === 1 ? "this email goes" : `these ${n} emails goes`} to your own Ollama server, unredacted.`;
   const askAll = (items: ReviewItem[]) => act(async () => {
     let done = 0;
     let dismissed = 0;

@@ -207,7 +207,7 @@ class AskAiDismissTests(DismissCase):
         [kept] = self.items()
         self.assertEqual(kept["suggestion_error"], ai.UNREACHABLE)
 
-    def test_hosted_mode_dismisses_the_same_way_and_sends_nothing_it_should_not(self):
+    def test_hosted_mode_never_reads_the_email_so_nothing_is_dismissed(self):
         import os
         env = mock.patch.dict(os.environ, {ai.KEY_ENV: KEY})
         env.start()
@@ -221,10 +221,10 @@ class AskAiDismissTests(DismissCase):
         [item] = self.items()
         self.fake.content = VERDICT
         with mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True)):
-            with no_leaks(self, *IDS, QUOTED, FOOTER, database=self.path):
-                note = scan.suggest_now("u-jane", item["id"], NOW)
-        self.assertEqual(note, PROMOTION)
-        self.assertEqual(self.items(), [])
+            with self.assertRaises(scan.NoAi):
+                scan.suggest_now("u-jane", item["id"], NOW)
+        self.assertEqual(self.fake.requests, [])
+        self.assertEqual([i["id"] for i in self.items()], [item["id"]])
 
 
 class AutomaticDismissTests(DismissCase):

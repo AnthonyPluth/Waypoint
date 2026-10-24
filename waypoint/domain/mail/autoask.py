@@ -19,7 +19,7 @@ def chosen(conn: db.Connection) -> bool:
 
 
 def fills_gaps(conn: db.Connection) -> bool:
-    return ai.config(conn) is not None and db.get_setting(conn, sk.AI_AUTO) == GAPS
+    return ai.mail_config(conn) is not None and db.get_setting(conn, sk.AI_AUTO) == GAPS
 
 
 def save_choice(conn: db.Connection, on: bool) -> None:
@@ -30,7 +30,7 @@ def save_choice(conn: db.Connection, on: bool) -> None:
 
 
 def switched_on(conn: db.Connection) -> bool:
-    return ai.config(conn) is not None and chosen(conn)
+    return ai.mail_config(conn) is not None and chosen(conn)
 
 
 def wait(conn: db.Connection, mailbox_id: int, message_id: str) -> None:
