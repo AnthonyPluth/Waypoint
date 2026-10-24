@@ -11,6 +11,9 @@ export const VIEWPORTS = { phone: { width: 440, height: 956 }, desktop: { width:
 export const DEFAULT_VIEWPORTS = ["phone", "desktop"];
 export const IMAGE_VIEWPORTS = ["phone", "desktop"];
 export const CHROMIUM_ARGS = ["--force-color-profile=srgb", "--disable-lcd-text", "--num-raster-threads=1", "--disable-partial-raster"];
+export const launchOptions = () => ({ executablePath: findChromium(), args: CHROMIUM_ARGS });
+export const contextOptions = (viewport, { reducedMotion = "no-preference", phoneAgent = false } = {}) => ({ viewport: VIEWPORTS[viewport], colorScheme: "dark", timezoneId: "UTC", reducedMotion, ...(phoneAgent && viewport === "phone" ? { userAgent: PHONE_AGENT } : {}) });
+export const prepareContext = (ctx, now) => ctx.clock.setFixedTime(now);
 export const SETTLE_MS = 300;
 export const FROZEN_NOW = "2026-06-15T12:00:00Z";
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];
@@ -132,7 +135,7 @@ export async function setUpOffline(page, base, timeout = 10000) {
   await page.mouse.move(0, 0);
 }
 
-async function runStep(page, step, shot, saveDownload) {
+export async function runStep(page, step, shot, saveDownload) {
   const timeout = step.timeout ?? 10000;
   if ("authenticator" in step) {
     await addAuthenticator(page);
@@ -240,6 +243,22 @@ async function runStep(page, step, shot, saveDownload) {
   }
 }
 
+const NEUTRAL_STEPS = ["wait_for", "screenshot", "scroll_to"];
+
+export function checksAfter(checks, step) {
+  const action = Object.keys(step).find((k) => k !== "timeout");
+  if (action === "expect_text") return [...checks, step];
+  return NEUTRAL_STEPS.includes(action) ? checks : [];
+}
+
+export async function recheck(page, checks, timeout = 2000) {
+  for (const step of checks) {
+    try { await runStep(page, { ...step, timeout }, null, null); }
+    catch (e) { return `${JSON.stringify(step).slice(0, 80)} no longer holds after the screenshot: ${String(e.message).split("\n")[0]}`; }
+  }
+  return null;
+}
+
 export async function warmMaps(browser, base) {
   const ctx = await browser.newContext();
   try {
@@ -249,11 +268,20 @@ export async function warmMaps(browser, base) {
   } finally { await ctx.close(); }
 }
 
+export async function settlePage(page, name, where, notes, scrollToTop = true) {
+  if (scrollToTop) await page.evaluate(`window.scrollTo({ top: 0, left: 0, behavior: "instant" })`);
+  try { await page.waitForLoadState("networkidle", { timeout: 3000 }); } catch { notes.push(`${where}: still loading after 3 s when ${name} was captured`); }
+  await page.evaluate("document.fonts.ready");
+  try { await page.waitForFunction(() => globalThis.document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity), undefined, { timeout: 3000 }); }
+  catch { notes.push(`${where}: an animation was still running after 3 s when ${name} was captured`); }
+  await page.waitForTimeout(SETTLE_MS);
+}
+
 async function visit(env, label, viewport, work, { audit = true, reducedMotion = "no-preference", allowConsole = [], phoneAgent = false } = {}) {
   const { browser, now, images, out } = env;
-  const ctx = await browser.newContext({ viewport: VIEWPORTS[viewport], colorScheme: "dark", timezoneId: "UTC", reducedMotion, ...(phoneAgent && viewport === "phone" ? { userAgent: PHONE_AGENT } : {}) });
+  const ctx = await browser.newContext(contextOptions(viewport, { reducedMotion, phoneAgent }));
   try {
-    await ctx.clock.setFixedTime(now);
+    await prepareContext(ctx, now);
     const page = await ctx.newPage();
     const where = `${label} @ ${viewport}`;
     const problems = [];
@@ -267,12 +295,7 @@ async function visit(env, label, viewport, work, { audit = true, reducedMotion =
     const shot = async (name, dir = images, hero = false) => {
       if (!writesImage(viewport)) return;
       const file = screenshotFile(name, viewport);
-      await page.evaluate(`window.scrollTo({ top: 0, left: 0, behavior: "instant" })`);
-      try { await page.waitForLoadState("networkidle", { timeout: 3000 }); } catch { notes.push(`${where}: still loading after 3 s when ${name} was captured`); }
-      await page.evaluate("document.fonts.ready");
-      try { await page.waitForFunction(() => globalThis.document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity), undefined, { timeout: 3000 }); }
-      catch { notes.push(`${where}: an animation was still running after 3 s when ${name} was captured`); }
-      await page.waitForTimeout(SETTLE_MS);
+      await settlePage(page, name, where, notes);
       await page.screenshot({ path: join(dir, file), fullPage: true, animations: "disabled" });
       files.push(file);
       if (!hero) return;
@@ -304,11 +327,18 @@ export function runVisit(env, v) {
     const { flow } = v;
     return visit(env, `flow ${flow.name}`, v.viewport, async (page, shot, saveDownload) => {
       await page.goto(`${flow.host ? base.replace("127.0.0.1", flow.host) : base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
+      let checks = [];
+      const shotChecked = async (file) => {
+        await shot(file, env.out);
+        const lost = await recheck(page, checks);
+        if (lost) throw new Error(lost);
+      };
       for (const [i, step] of flow.steps.entries()) {
-        try { await runStep(page, step, (n) => shot(`flow-${flow.name}-${n}`, env.out), (n, d) => saveDownload(`flow-${flow.name}-${n}`, d, env.out)); }
+        try { await runStep(page, step, (n) => shotChecked(`flow-${flow.name}-${n}`), (n, d) => saveDownload(`flow-${flow.name}-${n}`, d, env.out)); }
         catch (e) { throw new Error(`step ${i + 1} (${JSON.stringify(step).slice(0, 80)}): ${String(e.message).split("\n")[0]}`, { cause: e }); }
+        checks = checksAfter(checks, step);
       }
-      await shot(`flow-${flow.name}`, env.out);
+      await shotChecked(`flow-${flow.name}`);
     }, { allowConsole: flow.allow_console, phoneAgent: flow.phone_agent === true });
   }
   if (v.kind === "reduced") {
@@ -332,15 +362,17 @@ export function runVisit(env, v) {
   });
 }
 
-function loadFlows(flowsDir) {
-  if (!existsSync(flowsDir)) return [];
-  return readdirSync(flowsDir).filter((f) => f.endsWith(".json")).sort().map((f) => {
+export function readFlows(flowsDir) {
+  if (!existsSync(flowsDir)) return { flows: [] };
+  const flows = [];
+  for (const f of readdirSync(flowsDir).filter((x) => x.endsWith(".json")).sort()) {
     let flow;
-    try { flow = JSON.parse(readFileSync(join(flowsDir, f), "utf8")); } catch (e) { console.error(`verify: flow ${f} isn't valid JSON (${e.message})`); process.exit(2); }
+    try { flow = JSON.parse(readFileSync(join(flowsDir, f), "utf8")); } catch (e) { return { error: `flow ${f} isn't valid JSON (${e.message})` }; }
     const bad = flowProblems(flow);
-    if (bad.length) { console.error(`verify: flow ${f}: ${bad.join("; ")}`); process.exit(2); }
-    return flow;
-  });
+    if (bad.length) return { error: `flow ${f}: ${bad.join("; ")}` };
+    flows.push(flow);
+  }
+  return { flows };
 }
 
 async function main() {
@@ -358,7 +390,8 @@ async function main() {
   if (!urls.length) { console.error("verify: no server address (--url or WAYPOINT_VERIFY_URL)"); process.exit(2); }
   const unknown = unknownPages(args);
   if (unknown.length) { console.error(`verify: no such page: ${unknown.join(", ")} (pages: ${PAGES.join(", ")})`); process.exit(2); }
-  const everyFlow = loadFlows(flowsDir);
+  const { flows: everyFlow, error: flowError } = readFlows(flowsDir);
+  if (flowError) { console.error(`verify: ${flowError}`); process.exit(2); }
   const missing = only.filter((n) => !everyFlow.some((f) => f.name === n));
   if (missing.length) { console.error(`verify: no such flow: ${missing.join(", ")}`); process.exit(2); }
   const pages = args.length ? args : PAGES;
@@ -376,7 +409,7 @@ async function main() {
     workers: urls.length,
     prepare: async (worker) => {
       const base = urls[worker];
-      const browser = await chromium.launch({ executablePath: findChromium(), args: CHROMIUM_ARGS });
+      const browser = await chromium.launch(launchOptions());
       let approveUrl = "";
       try { approveUrl = await seedAssistants(browser, base); }
       catch (e) { startup.push({ worker, reason: `seeding the demo assistants: ${String(e.message).split("\n")[0]}` }); }
