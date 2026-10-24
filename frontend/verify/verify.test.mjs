@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, lengthenNames, localBase, OFFLINE_SAVED, PAGES, screenshotFile, unknownPages, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { afterAll, describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, PAGES, PHONE_AGENT, readFlows, recheck, screenshotFile, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -153,5 +156,68 @@ describe("findChromium", () => {
     const { exists, list } = tree(["/x/chromium-1194/chrome-linux/chrome"]);
     expect(findChromium({ PLAYWRIGHT_BROWSERS_PATH: "/x" }, exists, list)).toBe("/x/chromium-1194/chrome-linux/chrome");
     expect(findChromium({ PLAYWRIGHT_BROWSERS_PATH: "/nowhere" }, exists, list)).toBeUndefined();
+  });
+});
+
+describe("launchOptions and contextOptions", () => {
+  it("launch the browser the same way for a run and for a control session", () => {
+    expect(launchOptions().args).toEqual(CHROMIUM_ARGS);
+  });
+
+  it("make the dark UTC context a visit gets, with the phone agent only at phone width", () => {
+    expect(contextOptions("desktop")).toEqual({ viewport: VIEWPORTS.desktop, colorScheme: "dark", timezoneId: "UTC", reducedMotion: "no-preference" });
+    expect(contextOptions("phone", { phoneAgent: true }).userAgent).toBe(PHONE_AGENT);
+    expect(contextOptions("desktop", { phoneAgent: true }).userAgent).toBeUndefined();
+    expect(contextOptions("phone", { reducedMotion: "reduce" }).reducedMotion).toBe("reduce");
+  });
+});
+
+describe("readFlows", () => {
+  const folder = mkdtempSync(join(tmpdir(), "waypoint-flows-"));
+  const write = (name, text) => writeFileSync(join(folder, name), text);
+  afterAll(() => rmSync(folder, { recursive: true, force: true }));
+
+  it("reads every flow of the repository", () => {
+    const { flows, error } = readFlows(join(import.meta.dirname, "flows"));
+    expect(error).toBeUndefined();
+    expect(flows.length).toBeGreaterThan(50);
+  });
+
+  it("says which file is not JSON or not a flow, instead of ending the process", () => {
+    write("a.json", JSON.stringify({ name: "a", steps: [{ goto: "#trips" }] }));
+    write("b.json", "{ nope");
+    expect(readFlows(folder).error).toMatch(/^flow b\.json isn't valid JSON/);
+    write("b.json", JSON.stringify({ name: "b", steps: [] }));
+    expect(readFlows(folder).error).toBe("flow b.json: needs a list of steps");
+    write("b.json", JSON.stringify({ name: "b", steps: [{ goto: "#people" }] }));
+    expect(readFlows(folder).flows.map((f) => f.name)).toEqual(["a", "b"]);
+    expect(readFlows(join(folder, "none"))).toEqual({ flows: [] });
+  });
+});
+
+describe("the assertions a screenshot must not undo", () => {
+  const expectText = { expect_text: { selector: "h1", text: "Trips" } };
+
+  it("are the expect_text steps since the last action", () => {
+    let checks = [];
+    checks = checksAfter(checks, expectText);
+    checks = checksAfter(checks, { wait_for: "ul" });
+    checks = checksAfter(checks, { screenshot: "a" });
+    checks = checksAfter(checks, { scroll_to: "#x" });
+    checks = checksAfter(checks, { expect_text: { selector: "main", text: "Jane" }, timeout: 500 });
+    expect(checks).toHaveLength(2);
+    expect(checksAfter(checks, { click: "a" })).toEqual([]);
+    expect(checksAfter(checks, { goto: "#people" })).toEqual([]);
+    expect(checksAfter(checks, { reload: true })).toEqual([]);
+  });
+
+  const pageShowing = (text) => ({ waitForTimeout: async () => {}, locator: () => ({ first: () => ({ waitFor: async () => {}, innerText: async () => text }) }) });
+
+  it("hold, or are named when the page no longer shows them", async () => {
+    expect(await recheck(pageShowing("Trips and more"), [expectText])).toBeNull();
+    expect(await recheck(pageShowing("Settings"), [])).toBeNull();
+    const lost = await recheck(pageShowing("Settings"), [expectText], 1);
+    expect(lost).toContain("no longer holds after the screenshot");
+    expect(lost).toContain('expected "Trips" in h1, found "Settings"');
   });
 });
