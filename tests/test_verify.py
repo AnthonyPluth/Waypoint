@@ -235,6 +235,10 @@ class FrozenClockTests(unittest.TestCase):
 
 
 class ControlSessionTests(unittest.TestCase):
+    def test_every_route_that_changes_data_is_under_api_which_the_control_session_guards(self):
+        from waypoint.server import routes
+        self.assertEqual([path for method, path, _ in routes.ROUTES if method != "GET" and not path.startswith("/api/")], [])
+
     def test_seed_runs_run_py_demo_frozen_in_a_new_folder(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"), \
                 mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)) as ran:
