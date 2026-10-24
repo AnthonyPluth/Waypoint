@@ -388,5 +388,45 @@ class StaleBase(unittest.TestCase):
         self.assertIn(("abc123", "frontend/verify/verify.mjs"), shown)
 
 
+GOOD_SKILL = "---\nname: verify-waypoint\ndescription: Drive the app.\n---\n\n# Body\n\nSee [cli](references/cli.md).\n"
+
+
+class Skills(unittest.TestCase):
+    def test_the_repository_passes(self):
+        self.assertEqual(fc.check_skills(), [])
+
+    def test_a_well_formed_skill_passes(self):
+        self.assertEqual(fc.check_skill("verify-waypoint", GOOD_SKILL), [])
+
+    def test_frontmatter_that_is_missing_or_malformed_fails(self):
+        self.assertIn("no frontmatter", fc.check_skill("verify-waypoint", "# Just a body\n")[0])
+        self.assertIn("isn't `key: value`", fc.check_skill("verify-waypoint", GOOD_SKILL.replace("description:", "description"))[0])
+
+    def test_the_name_is_the_folder_s_and_the_description_is_there_and_short(self):
+        self.assertIn("`name` should be 'verify-waypoint'", fc.check_skill("verify-waypoint", GOOD_SKILL.replace("name: verify-waypoint", "name: other"))[0])
+        self.assertIn("no `description`", fc.check_skill("verify-waypoint", GOOD_SKILL.replace("Drive the app.", ""))[0])
+        self.assertIn("at most 1024", fc.check_skill("verify-waypoint", GOOD_SKILL.replace("Drive the app.", "x" * 1025))[0])
+        self.assertIn("without < or >", fc.check_skill("verify-waypoint", GOOD_SKILL.replace("Drive the app.", "Use <this>"))[0])
+
+    def test_a_body_is_needed_and_its_links_must_lead_somewhere(self):
+        self.assertIn("no body", fc.check_skill("verify-waypoint", "---\nname: verify-waypoint\ndescription: x\n---\n\n")[0])
+        self.assertEqual(fc.check_skill("verify-waypoint", GOOD_SKILL, exists=lambda rel: False),
+                         [".claude/skills/verify-waypoint/SKILL.md: links to references/cli.md, which isn't there"])
+        self.assertEqual(fc.check_skill("verify-waypoint", GOOD_SKILL.replace("references/cli.md", "https://x.dev/a"), exists=lambda rel: False), [])
+
+    def test_the_cli_reference_is_what_the_help_generates(self):
+        generated, why = fc.generated_cli_reference()
+        self.assertIsNotNone(generated, why)
+        self.assertEqual(fc.check_cli_reference(fc.CLI_REFERENCE.read_text(), generated), [])
+
+    def test_a_hand_edited_missing_or_ungenerated_reference_fails(self):
+        self.assertIn("run make verify-skill", fc.check_cli_reference("old\n", "new\n")[0])
+        self.assertIn("missing", fc.check_cli_reference(None, "new\n")[0])
+        self.assertIn("needs Node", fc.check_cli_reference("x", None, "node: not found")[0])
+
+    def test_the_user_feature_map_is_current(self):
+        self.assertEqual(fc.check_user_feature_map(), [])
+
+
 if __name__ == "__main__":
     unittest.main()

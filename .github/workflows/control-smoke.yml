@@ -1,0 +1,50 @@
+name: Control smoke
+
+# tools/control (the session agents drive the app with) end to end on the real demo server under the frozen clock:
+# doctor, start, snapshot, screenshot, a few flows, reset, stop, and nothing left running
+# (frontend/verify/control-smoke.mjs; `make control-smoke` runs it locally). It runs only for changes to what it exercises.
+on:
+  push:
+    branches: [main]
+    paths: [frontend/verify/**, waypoint/verify.py, tools/control, poetry.lock, frontend/package-lock.json, .github/workflows/control-smoke.yml]
+  pull_request:
+    branches: [main]
+    paths: [frontend/verify/**, waypoint/verify.py, tools/control, poetry.lock, frontend/package-lock.json, .github/workflows/control-smoke.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# bash, which runs each step with -eo pipefail: a command that fails inside a pipeline fails the step.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  smoke:
+    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python-poetry   # zizmor: ignore[self-repository] -- GitHub's documented form for a local action
+      - uses: ./.github/actions/setup-node-app   # zizmor: ignore[self-repository] -- local action
+        with:
+          directory: frontend
+      - name: Install libfaketime, which freezes the clock
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfaketime
+      - name: Install the browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Build the web app
+        working-directory: frontend
+        run: npm run build
+      - name: Drive the app with tools/control
+        run: WAYPOINT_PYTHON="$(poetry run python -c 'import sys; print(sys.executable)')" node frontend/verify/control-smoke.mjs

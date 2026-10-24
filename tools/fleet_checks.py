@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import importlib.util
 import os
 import re
 import subprocess
@@ -324,6 +325,78 @@ def check_dark_only(files: dict[str, str]) -> list[str]:
             for name, text in files.items() if LIGHT_THEME.search(text)]
 
 
+SKILLS = ROOT / ".claude/skills"
+CONTROL = ROOT / "frontend/verify/control.mjs"
+CLI_REFERENCE = SKILLS / "verify-waypoint/references/cli.md"
+SKILL_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n(.*)\Z", re.DOTALL)
+MD_LINK = re.compile(r"\]\(([^)#\s]+)(?:#[^)]*)?\)")
+
+
+def check_skill(folder: str, text: str, exists=lambda rel: True) -> list[str]:
+    where = f".claude/skills/{folder}/SKILL.md"
+    found = FRONTMATTER.match(text)
+    if not found:
+        return [f"{where}: no frontmatter (a --- line, `name:` and `description:`, then a --- line)"]
+    fields: dict[str, str] = {}
+    problems = []
+    for line in found.group(1).splitlines():
+        key, sep, value = line.partition(":")
+        if not sep or not key.strip() or key != key.strip():
+            problems.append(f"{where}: frontmatter line isn't `key: value`: {line[:60]!r}")
+            continue
+        fields[key.strip()] = value.strip()
+    if fields.get("name") != folder or not SKILL_NAME.match(folder):
+        problems.append(f"{where}: `name` should be {folder!r}, its folder's name (lowercase letters, digits and -), not {fields.get('name')!r}")
+    description = fields.get("description", "")
+    if not description:
+        problems.append(f"{where}: no `description` (it is what makes an agent use the skill)")
+    elif len(description) > 1024 or "<" in description or ">" in description:
+        problems.append(f"{where}: `description` is at most 1024 characters, without < or > ({len(description)} now)")
+    if not found.group(2).strip():
+        problems.append(f"{where}: no body after the frontmatter")
+    for target in MD_LINK.findall(found.group(2)):
+        if "://" not in target and not target.startswith("/") and not exists(target):
+            problems.append(f"{where}: links to {target}, which isn't there")
+    return problems
+
+
+def check_skills(directory: Path = SKILLS) -> list[str]:
+    problems = []
+    for skill in sorted(directory.glob("*/SKILL.md")):
+        problems += check_skill(skill.parent.name, skill.read_text(), lambda rel, base=skill.parent: (base / rel).exists())
+    return problems
+
+
+def check_cli_reference(committed: str | None, generated: str | None, why: str = "") -> list[str]:
+    name = str(CLI_REFERENCE.relative_to(ROOT))
+    if generated is None:
+        return [f"{name}: couldn't generate it to compare ({why}); it needs Node"]
+    if committed is None:
+        return [f"{name}: missing; run make verify-skill and commit it"]
+    if committed != generated:
+        return [f"{name} isn't what tools/control's help generates: run make verify-skill and commit the result "
+                "(edit the help in frontend/verify/control.mjs, never the file)"]
+    return []
+
+
+def generated_cli_reference() -> tuple[str | None, str]:
+    try:
+        done = subprocess.run(["node", str(CONTROL), "help", "--markdown"], cwd=ROOT, capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, str(e)
+    return (done.stdout, "") if done.returncode == 0 else (None, (done.stderr or done.stdout).strip()[-200:])
+
+
+def check_user_feature_map() -> list[str]:
+    spec = importlib.util.spec_from_file_location("user_feature_map", ROOT / "tools" / "user_feature_map.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    text, problems = module.generate()
+    return problems + module.check(module.OUT.read_text() if module.OUT.exists() else None, text)
+
+
 def check_manage_links(table: dict, tests_text: str) -> list[str]:
     problems = []
     for provider, (host, _path) in table.items():
@@ -342,6 +415,10 @@ def main(argv: list[str] | None = None) -> int:
     problems += check_parsers(parser_vendors(), (PARSERS / "__init__.py").read_text())
     problems += check_workflows()
     problems += check_dark_only(dark_only_files())
+    problems += check_skills()
+    generated, why = generated_cli_reference()
+    problems += check_cli_reference(CLI_REFERENCE.read_text() if CLI_REFERENCE.exists() else None, generated, why)
+    problems += check_user_feature_map()
     sys.path.insert(0, str(ROOT))
     from waypoint.domain import links
     problems += check_manage_links(links.MANAGE, (ROOT / "tests/test_links.py").read_text())
@@ -358,7 +435,7 @@ def main(argv: list[str] | None = None) -> int:
     if not problems:
         print("Fleet checks passed: one migration head, migrations tested, mail parsers registered with fixtures and a test"
               + (", commit trailers, no test removed or skipped without a reason, images only where make verify puts them" if args.commits else "")
-              + ", workflow conventions, dark only, manage links tested.")
+              + ", workflow conventions, dark only, manage links tested, skills well formed, tools/control's reference generated from its help and the user feature map current.")
     return 1 if problems else 0
 
 
