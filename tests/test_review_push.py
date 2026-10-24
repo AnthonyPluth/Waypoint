@@ -96,7 +96,7 @@ class WhenItGoesOutTests(PushCase):
             review.add(conn, self.mailbox, "m-held", "example-air.example", "2026-10-18", "match", time.time(),
                        [({"kind": "hotel"}, [1])])   # type: ignore[list-item]
         with db.session() as conn:
-            reminders.review_due(conn, 0.0, time.time(), self.send)
+            reminders.review_due(conn, 0.0, time.time(), self.send, [self.mailbox])
         self.assertEqual(self.bodies(), [ONE, ONE])
 
     def test_a_chained_scan_of_a_big_mailbox_is_still_one_notification(self):
@@ -155,7 +155,7 @@ class WhenItDoesNotTests(PushCase):
             review.add(conn, self.mailbox, "m-emptied", "example-air.example", "2026-10-18", "broken", time.time())
             review.set_suggestions(conn, self.mailbox, "m-emptied", [], None)
         with db.session() as conn:
-            found = review.arrived(conn, "u-jane", 0.0)
+            found = review.arrived(conn, "u-jane", 0.0, [self.mailbox])
         self.assertEqual(sorted(found), sorted(f"{self.mailbox}/m-{each}" for each in ("incomplete", "match", "suggested")))
 
     def test_a_scan_that_only_dismissed_emails_as_not_bookings_sends_nothing(self):
@@ -185,7 +185,7 @@ class WhenItDoesNotTests(PushCase):
         self.scan_job()
         self.assertEqual(self.bodies(), [ONE])
         with db.session() as conn:
-            self.assertEqual(reminders.review_due(conn, 0.0, time.time(), self.send), 0)
+            self.assertEqual(reminders.review_due(conn, 0.0, time.time(), self.send, [self.mailbox]), 0)
         self.assertEqual(len(self.sent), 1)
 
     def test_a_later_scan_counts_only_its_own_new_items(self):
@@ -257,6 +257,29 @@ class WhoIsToldTests(PushCase):
         self.assertTrue(other)
         self.assertEqual(self.bodies(), [TWO])
 
+    def test_a_scan_counts_only_the_mailboxes_it_scanned(self):
+        other = self.connect("u-jane", "jane2@gmail.example", "refresh-jane-2")
+        self.device()
+        with db.session() as conn:
+            review.add(conn, other, "m-elsewhere", "example-air.example", "2026-10-18", "incomplete", time.time())
+        with db.session() as conn:
+            self.assertEqual(reminders.review_due(conn, 0.0, time.time(), self.send, [self.mailbox]), 0)
+            self.assertEqual(reminders.review_due(conn, 0.0, time.time(), self.send, []), 0)
+        self.assertEqual(self.sent, [])
+        with db.session() as conn:
+            self.assertEqual(reminders.review_due(conn, 0.0, time.time(), self.send, [self.mailbox, other]), 1)
+        self.assertEqual(self.bodies(), [ONE])
+
+    def test_a_mailbox_another_scan_is_still_reading_is_left_to_that_scan(self):
+        other = self.connect("u-jane", "jane2@gmail.example", "refresh-jane-2")
+        self.device()
+        self.incomplete()
+        with db.session() as conn:
+            review.add(conn, other, "m-elsewhere", "example-air.example", "2026-10-18", "incomplete", time.time())
+        with mock.patch.object(scan, "_running", {other}):
+            self.scan_job()
+        self.assertEqual(self.bodies(), [ONE])
+
     def test_a_person_who_can_no_longer_sign_in_is_told_nothing(self):
         self.device()
         self.incomplete()
@@ -278,7 +301,7 @@ class FailureTests(PushCase):
         self.assertEqual(self.read(lambda conn: [d.id for d in conn.orm.scalars(select(PushDevice)).all()]), [device])
         self.failing = None
         with db.session() as conn:
-            self.assertEqual(reminders.review_due(conn, started, time.time(), self.send), 1)
+            self.assertEqual(reminders.review_due(conn, started, time.time(), self.send, [self.mailbox]), 1)
         self.assertEqual(self.bodies(), [ONE])
 
     def test_a_device_the_push_service_has_forgotten_is_dropped_and_the_scan_goes_on(self):
@@ -312,13 +335,14 @@ class FailureTests(PushCase):
             time.sleep(0.1)
         self.assertEqual(self.bodies(), [ONE])
         with mock.patch.object(reminders, "review_due", side_effect=RuntimeError("boom")), mock.patch.object(jobs.monitoring, "report") as report:
-            jobs.notify_review(0.0)
+            jobs.notify_review(0.0, [self.mailbox])
         report.assert_called_once()
 
     def test_a_scan_that_fails_part_way_still_tells_about_what_it_queued(self):
         self.device()
         self.incomplete()
-        def partly(today):
+        def partly(today, scanned):
+            scanned.append(self.mailbox)
             scan.run(self.mailbox, today)
             raise RuntimeError("boom")
         with mock.patch.object(scan, "scan_all", side_effect=partly), mock.patch.object(jobs.monitoring, "report"):

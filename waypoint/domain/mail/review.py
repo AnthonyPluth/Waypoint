@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Collection
 from typing import Any, Literal, TypedDict
 
 from sqlalchemy import and_, delete, or_, select, update
@@ -125,9 +126,11 @@ def visible(conn: db.Connection, owner: str, item_id: int) -> Any:
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
 
 
-def arrived(conn: db.Connection, owner: str, since: float) -> list[str]:
+def arrived(conn: db.Connection, owner: str, since: float, mailbox_ids: Collection[int]) -> list[str]:
+    if not mailbox_ids:
+        return []
     rows = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id).join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
-                        .where(_seen_by(owner), ReviewItem.created >= since,
+                        .where(_seen_by(owner), ReviewItem.created >= since, ReviewItem.mailbox_id.in_(sorted(mailbox_ids)),
                                or_(ReviewItem.reason.in_(HOLDING), ReviewItem.suggestion.is_not(None))).order_by(ReviewItem.id)).fetchall()
     return [f"{r['mailbox_id']}/{r['message_id']}" for r in rows]
 

@@ -705,7 +705,15 @@ def run(mailbox_id: int, today: date, again: bool = False, backfill: bool = Fals
     return result
 
 
-def scan_all(today: date) -> list[Result]:
+def scan_all(today: date, scanned: list[int] | None = None) -> list[Result]:
     with db.session() as conn:
         ids = list(conn.execute(select(Mailbox.id).where(Mailbox.status != gmail.RECONNECT).order_by(Mailbox.id)).scalars())
-    return [run(i, today) for i in ids]
+    covered = [] if scanned is None else scanned
+    results = []
+    for i in ids:
+        covered.append(i)
+        result = run(i, today)
+        if result.state == "busy":
+            covered.remove(i)
+        results.append(result)
+    return results

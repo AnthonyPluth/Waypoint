@@ -5,7 +5,7 @@ import ipaddress
 import secrets
 import time
 import urllib.parse
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Literal, TypedDict
@@ -278,13 +278,13 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
     return sent
 
 
-def review_due(conn: db.Connection, since: float, now: float, send: Send) -> int:
+def review_due(conn: db.Connection, since: float, now: float, send: Send, mailbox_ids: Collection[int]) -> int:
     end_lapsed(conn, now)
     sent = 0
     for owner in sorted(set(conn.execute(select(PushDevice.owner_sub)).scalars())):
         if not prefs(conn, owner)["review"]:
             continue
-        arrived = review.arrived(conn, owner, since)
+        arrived = review.arrived(conn, owner, since, mailbox_ids)
         told = set(conn.execute(select(ReminderSent.ref).where(ReminderSent.owner_sub == owner, ReminderSent.kind == "review",
                                                                ReminderSent.ref.in_(arrived))).scalars()) if arrived else set()
         fresh = [ref for ref in arrived if ref not in told]
