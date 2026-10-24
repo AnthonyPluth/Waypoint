@@ -22,7 +22,7 @@ A self-hosted travel app for a household. Waypoint shows each person the trips t
 - **People and loyalty IDs.** Household members and guests, with frequent-flyer, hotel, car, cruise, TSA PreCheck and Global Entry numbers, encrypted at rest and masked until asked for.
 - **Before and during a trip.** Upcoming leads with what’s next. Live flight status, check-in and day-of reminders and a private calendar feed are optional, and your upcoming trips open offline, encrypted on the device.
 - **Stats.** Flights, distance, airlines, hotel nights, rental days, cruises and the places you’ve been, on a map.
-- **Optional AI.** Off by default. A local Ollama, or OpenRouter with zero data retention, can read the booking in an email Waypoint couldn’t; what it can’t complete waits in Review for you to check. Claude and other assistants can connect over MCP to read your trips and, if you allow it, change them.
+- **Optional AI.** Off by default. A local Ollama on your own network can read the booking in an email Waypoint couldn’t (email never goes to a hosted AI); what it can’t complete waits in Review for you to check. Claude and other assistants can connect over MCP to read your trips and, if you allow it, change them.
 - **Your own infrastructure.** SQLite or Postgres, downloadable and restorable backups, and optional OpenID Connect sign-in with the provider you already run (Authentik, Keycloak, Pocket ID, Google, …).
 
 <p>

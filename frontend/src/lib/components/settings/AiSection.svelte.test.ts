@@ -90,6 +90,25 @@ describe("Settings → AI", () => {
     expect(JSON.stringify(vi.mocked(api).mock.calls.at(-1))).not.toContain("openrouter_key");
   });
 
+  it("says email is read only by a local AI when OpenRouter is chosen, and offers no automatic reading", async () => {
+    serve({ ...off, mode: "openrouter", openrouter_model: "some/model", key: "saved" });
+    render(AiSection);
+    expect(await screen.findByRole("note")).toHaveTextContent("Reading email with AI needs Local (Ollama). OpenRouter is used only for trip destinations");
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(vi.mocked(api).mock.calls.at(-1)?.[1]).toMatchObject({ body: { mode: "openrouter", auto: false } });
+  });
+
+  it("offers automatic reading with a local AI only", async () => {
+    serve({ ...off, mode: "local", ollama_url: "http://ollama.example:11434", ollama_model: "llama3.1" });
+    render(AiSection);
+    await userEvent.click(await screen.findByRole("checkbox", { name: /Read unreadable mail with AI automatically/ }));
+    expect(screen.getByRole("note")).toHaveTextContent("Waypoint will send the text of travel emails");
+    await userEvent.click(screen.getByRole("radio", { name: /OpenRouter/ }));
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
   it("says where a key from the environment comes from, and offers no field for it", async () => {
     serve({ ...off, mode: "openrouter", openrouter_model: "some/model", key: "env" });
     render(AiSection);

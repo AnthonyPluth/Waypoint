@@ -176,6 +176,22 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/domain/mail/ai.py"]
 
+  - id: waypoint-mail-ai-local-only
+    message: >-
+      Email reaches an AI only in Local (Ollama) mode, the household's own server. Mail code and the Review API get
+      their AI config from ai.mail_config(), which is None unless the mode is Local; ai.config() can also return the
+      hosted OpenRouter config, which is for the trip-destination button alone (AGENTS.md, "Email stays on the server").
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: ai.config(...)
+      - pattern: ai.config
+      - pattern: ai.Config("openrouter", ...)
+      - pattern-regex: \bfrom\s+[.\w]*\bai\s+import\b[^\n]*\bconfig\b
+    paths:
+      include: ["/waypoint/domain/mail/", "/waypoint/server/api/review.py"]
+      exclude: ["/waypoint/domain/mail/ai.py"]
+
   - id: waypoint-message-body
     message: >-
       A message's body (Gmail's `payload`, `raw` and `parts`, the decoded text, an email parsed into parts) is read

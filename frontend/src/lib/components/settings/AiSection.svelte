@@ -28,15 +28,15 @@
   onMount(load);
 
   const MODES: { value: Mode; name: string; hint: string }[] = [
-    { value: "off", name: "Off", hint: "Email never goes to an AI." },
-    { value: "local", name: "Local (Ollama)", hint: "An Ollama server on your own network reads it. Email never leaves your network." },
-    { value: "openrouter", name: "OpenRouter", hint: "Sent to OpenRouter, only to providers that keep nothing and don’t train on it. If none can answer, nothing is sent." },
+    { value: "off", name: "Off", hint: "Email never goes to an AI, and nothing is sent for trip destinations." },
+    { value: "local", name: "Local (Ollama)", hint: "An Ollama server on your own network reads email. It never leaves your network." },
+    { value: "openrouter", name: "OpenRouter", hint: "Suggests a trip’s destination from its name and places, only with providers that keep nothing and don’t train on it. It never reads email." },
   ];
 
   async function save(e: SubmitEvent) {
     e.preventDefault();
     formError = "";
-    const body = { mode, ollama_url: url, ollama_model: ollamaModel, openrouter_model: routerModel, auto: mode !== "off" && auto, ...(key ? { openrouter_key: key } : {}) };
+    const body = { mode, ollama_url: url, ollama_model: ollamaModel, openrouter_model: routerModel, auto: mode === "local" && auto, ...(key ? { openrouter_key: key } : {}) };
     await act(async () => {
       adopt(await apiCall<"POST /api/ai">("/api/ai", { method: "POST", body }));
       toast.success(mode === "off" ? "AI is off" : "AI settings saved");
@@ -51,8 +51,8 @@
 
 <section aria-labelledby="ai-title" class="space-y-2">
   <h2 id="ai-title" class="eyebrow px-1">AI</h2>
-  <p class="px-1 text-sm text-muted-foreground">Use AI to extract bookings from emails Waypoint couldn’t read.</p>
-  <details class="px-1 text-sm text-muted-foreground"><summary class="cursor-pointer py-1">How email is shared</summary><p class="mt-2">Applies to all household mailboxes. Emails are sent only when you choose Ask AI or enable automatic reading. OpenRouter removes quoted replies, footers and sensitive numbers first; Local receives the original text. Complete bookings are added automatically; missing details stay in Review.</p></details>
+  <p class="px-1 text-sm text-muted-foreground">Use AI to extract bookings from emails Waypoint couldn’t read, and to suggest a trip’s destination.</p>
+  <details class="px-1 text-sm text-muted-foreground"><summary class="cursor-pointer py-1">How email is shared</summary><p class="mt-2">Applies to all household mailboxes. Email is read with AI only in Local (Ollama) mode, and only when you choose Ask AI or enable automatic reading: the original text goes to your own Ollama server and nowhere else. OpenRouter never sees email; it is used only for trip destinations. Complete bookings are added automatically; missing details stay in Review.</p></details>
   <div class="rows">
     {#if problem}
       <div class="row"><p class="text-sm text-signal-ink" role="status">{problem}</p><Button variant="outline" onclick={load}>Try again</Button></div>
@@ -87,7 +87,9 @@
             {/if}
           </div>
         {/if}
-        {#if mode !== "off"}
+        {#if mode === "openrouter"}
+          <p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="note">Reading email with AI needs Local (Ollama). OpenRouter is used only for trip destinations, so Ask AI and automatic reading are off while it is chosen.</p>
+        {:else if mode === "local"}
           <div class="space-y-2">
             <label class="flex items-start gap-3 text-sm">
               <input type="checkbox" bind:checked={auto} class="mt-1" />

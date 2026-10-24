@@ -5893,12 +5893,6 @@
           },
           "ai": {
             "type": "boolean"
-          },
-          "ai_mode": {
-            "enum": [
-              "local",
-              "openrouter"
-            ]
           }
         },
         "required": [

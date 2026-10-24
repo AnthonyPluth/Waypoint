@@ -33,3 +33,15 @@ text = part.get_payload(decode=True)
 found = extract.read(message)
 # ok: waypoint-message-body
 sender = found.sender_domain
+
+# Mail code gets its AI config from ai.mail_config(), which is Local (Ollama) or nothing; ai.config() can be the hosted one.
+# ruleid: waypoint-mail-ai-local-only
+cfg = ai.config(conn)
+# ruleid: waypoint-mail-ai-local-only
+hosted = ai.Config("openrouter", "some/model", key=key)
+# ruleid: waypoint-mail-ai-local-only
+from .ai import config
+# ok: waypoint-mail-ai-local-only
+cfg = ai.mail_config(conn)
+# ok: waypoint-mail-ai-local-only
+local = ai.Config("local", "llama3", url=url)

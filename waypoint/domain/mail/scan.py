@@ -17,7 +17,7 @@ from ...providers import gmail, mailimages
 from ...storage import db, gate_codes, stored_mail
 from ...storage.models import Mailbox, ReviewItem, ScannedMessage
 from ...storage.stored_mail import Content
-from .. import airports, loyalty, people, trips
+from .. import airports, people, trips
 from ..visibility import Viewer
 from . import ai, autoask, extract, followup, glance, ingest, query, review, triage
 from .booking import Passenger
@@ -290,7 +290,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
 
 UNREAD_WITH_SUGGESTION = "Something else in this email couldn’t be read. Add it by hand if you need it."
 SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
-NO_AI = "Turn on AI suggestions in Settings first."
+NO_AI = ai.NEEDS_LOCAL
 
 
 class NoAi(Exception):
@@ -329,7 +329,7 @@ def suggest_now(owner: str, item_id: int, now: float) -> str | None:
             raise NotAskable(HOLDS_BOOKINGS)
         if review.is_generic(conn, mailbox_id, message_id):
             raise NotAskable(READ_ALREADY)
-        if ai.config(conn) is None:
+        if ai.mail_config(conn) is None:
             raise NoAi(NO_AI)
         kept = None if mine else stored_mail.get(conn, mailbox_id, message_id)
         token = None if mine or kept is not None else gmail.access_token(conn, mailbox_id, time.time())
@@ -347,9 +347,9 @@ class Read(NamedTuple):
     not_a_booking: str | None = None
 
 
-def _read(cfg: ai.Config, text: str, known: tuple[str, ...], timeout: float | None = None) -> Read:
+def _read(cfg: ai.Config, text: str, timeout: float | None = None) -> Read:
     try:
-        reading = ai.suggest(cfg, text, known, timeout)
+        reading = ai.suggest(cfg, text, timeout)
         return Read(reading.bookings, reading.error, False, reading.not_a_booking)
     except ai.AiError as e:
         return Read([], str(e), str(e) != ai.NO_BOOKING and not e.retried)
@@ -365,12 +365,11 @@ def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) 
 
 def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> str | None:
     with db.session() as conn:
-        cfg = ai.config(conn)
-        known = tuple(loyalty.known_numbers(conn)) if cfg else ()
+        cfg = ai.mail_config(conn)
         asking = not review.is_match(conn, mailbox_id, message_id)
     if cfg is None or not asking:
         return None
-    read = _read(cfg, text, known)
+    read = _read(cfg, text)
     with db.session() as conn:
         filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, False, now, read.not_a_booking)
     return ai.dismissed_note(read.not_a_booking) if filed.dismissed and read.not_a_booking else None
@@ -463,10 +462,9 @@ def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message
     asked = 0
     for message_id in message_ids:
         with db.session() as conn:
-            cfg = ai.config(conn)
+            cfg = ai.mail_config(conn)
             if cfg is None or not autoask.fills_gaps(conn):
                 return asked
-            known = tuple(loyalty.known_numbers(conn))
         left = BUDGET - (_clock() - started)
         if left <= 0:
             return asked
@@ -475,7 +473,7 @@ def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message
         except gmail.GmailError:
             continue
         asked += 1
-        read = _read(cfg, extract.plain_text(raw), known, left)
+        read = _read(cfg, extract.plain_text(raw), left)
         if not read.suggestions:
             continue
         with db.session() as conn:
@@ -498,11 +496,10 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> t
     passed: set[str] = set()
     while True:
         with db.session() as conn:
-            cfg = ai.config(conn)
+            cfg = ai.mail_config(conn)
             if cfg is None or not autoask.chosen(conn):
                 return asked, made, cleared, dismissed
             message_id = autoask.next_waiting(conn, mailbox_id, passed)
-            known = tuple(loyalty.known_numbers(conn))
         if message_id is None:
             return asked, made, cleared, dismissed
         passed.add(message_id)
@@ -518,7 +515,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> t
         if left <= 0:
             return asked, made, cleared, dismissed
         asked += 1
-        read = _read(cfg, extract.plain_text(raw), known, left)
+        read = _read(cfg, extract.plain_text(raw), left)
         with db.session() as conn:
             filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, None if read.failed else True, time.time(), read.not_a_booking)
             made, cleared, dismissed = made + filed.added, cleared + filed.cleared, dismissed + filed.dismissed
