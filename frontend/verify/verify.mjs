@@ -10,7 +10,7 @@ export const PHONE_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS 
 export const VIEWPORTS = { phone: { width: 440, height: 956 }, desktop: { width: 1280, height: 800 }, laptop: { width: 1024, height: 768 }, wide: { width: 1440, height: 900 }, zoomed: { width: 853, height: 533 } };
 export const DEFAULT_VIEWPORTS = ["phone", "desktop"];
 export const IMAGE_VIEWPORTS = ["phone", "desktop"];
-export const CHROMIUM_ARGS = ["--force-color-profile=srgb", "--disable-lcd-text", "--num-raster-threads=1"];
+export const CHROMIUM_ARGS = ["--force-color-profile=srgb", "--disable-lcd-text", "--num-raster-threads=1", "--disable-partial-raster"];
 export const launchOptions = () => ({ executablePath: findChromium(), args: CHROMIUM_ARGS });
 export const contextOptions = (viewport, { reducedMotion = "no-preference", phoneAgent = false } = {}) => ({ viewport: VIEWPORTS[viewport], colorScheme: "dark", timezoneId: "UTC", reducedMotion, ...(phoneAgent && viewport === "phone" ? { userAgent: PHONE_AGENT } : {}) });
 export const prepareContext = (ctx, now) => ctx.clock.setFixedTime(now);
