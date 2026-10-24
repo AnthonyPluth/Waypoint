@@ -359,6 +359,8 @@ export function allowedRequest(url, base) {
   return ["data:", "blob:", "about:"].includes(u.protocol) || sameServer(u, base);
 }
 
+export const UNREACHABLE_ARGS = ["--proxy-server=http://127.0.0.1:1", "--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost , EXCLUDE 127.0.0.1"];
+
 export const isGuardedPath = (pathname) => /^\/(api|auth|oauth|mcp)(\/|$)/.test(pathname);
 
 export const ACTING_COMMANDS = ["goto", "viewport", "offline", "click", "type", "press", "scroll", "flow", "reset"];

@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ACTING_COMMANDS, ARTIFACTS, ControlError, allowedRequest, isGuardedPath, LOOPBACK_HOSTS, PROG, ROOT, closest, errorResult, jsExpression, lastShotNumber, onHost, parseTarget, readState, rel, removeState, routeUrl, sameServer, scrubText, scrubUrl, shotName, socketPath, writeState } from "./control.mjs";
+import { ACTING_COMMANDS, ARTIFACTS, UNREACHABLE_ARGS, ControlError, allowedRequest, isGuardedPath, LOOPBACK_HOSTS, PROG, ROOT, closest, errorResult, jsExpression, lastShotNumber, onHost, parseTarget, readState, rel, removeState, routeUrl, sameServer, scrubText, scrubUrl, shotName, socketPath, writeState } from "./control.mjs";
 import { startServer } from "./control-server.mjs";
 import { VIEWPORTS, checksAfter, contextOptions, launchOptions, prepareContext, readFlows, recheck, runStep, screenshotFile, setUpOffline, settlePage } from "./verify.mjs";
 
@@ -98,6 +98,25 @@ async function main() {
     return route.abort("blockedbyclient");
   };
   let guarded = null;
+  let blocking = null;
+  let wantBlock = true;
+  const offServer = (url) => !allowedRequest(url.href, base);
+  const abortOffServer = (route) => {
+    blockedHosts.push(scrubUrl(route.request().url(), base) ?? "a data address");
+    return route.abort("blockedbyclient");
+  };
+
+  async function blockOffServer(on) {
+    wantBlock = on;
+    if (blocking && (!on || blocking !== ctx)) {
+      await blocking.unroute(offServer, abortOffServer).catch(() => null);
+      blocking = null;
+    }
+    if (on && !blocking && ctx) {
+      await ctx.route(offServer, abortOffServer);
+      blocking = ctx;
+    }
+  }
 
   async function guardWrites(on) {
     if (guarded && (!on || guarded !== ctx)) {
@@ -114,10 +133,10 @@ async function main() {
     const previous = ctx;
     const fresh = await browser.newContext(contextOptions(viewport, { phoneAgent }));
     await prepareContext(fresh, opt.now);
-    await fresh.route((url) => !allowedRequest(url.href, base), (route) => {
-      blockedHosts.push(scrubUrl(route.request().url(), base) ?? "a data address");
-      return route.abort("blockedbyclient");
-    });
+    if (wantBlock) {
+      await fresh.route(offServer, abortOffServer);
+      blocking = fresh;
+    }
     const tab = await fresh.newPage();
     tab.setDefaultTimeout(30000);
     tab.setDefaultNavigationTimeout(30000);
@@ -152,7 +171,8 @@ async function main() {
     await runToEnd(opt.python, ["-m", "waypoint.verify", "seed", "--data", seedDir], process.env);
     await newServer();
     log(`demo server at ${base}`);
-    browser = await chromium.launch(launchOptions());
+    const launch = launchOptions();
+    browser = await chromium.launch({ ...launch, args: [...launch.args, ...UNREACHABLE_ARGS] });
     browser.on("disconnected", () => shutdown("the browser closed", 1));
     await openPage(opt.viewport);
     await page.goto(`${base}/${START_ROUTE}`, { waitUntil: "networkidle" });
@@ -344,6 +364,12 @@ async function main() {
     },
   };
 
+  async function usesOfflineSwitch(request) {
+    if (request.command !== "flow") return false;
+    const { flows } = readFlows(join(HERE, "flows"));
+    return !!flows?.find((f) => f.name === request.args?.[0])?.steps.some((step) => "offline" in step);
+  }
+
   async function runFlow(name, o) {
     const { flows, error } = readFlows(join(HERE, "flows"));
     if (error) throw new ControlError("bad_flow", error, "fix the flow file (frontend/verify/flows/README.md has the format)");
@@ -414,6 +440,7 @@ async function main() {
     clearTimeout(idle);
     acting = ACTING_COMMANDS.includes(request.command) || (request.command === "eval" && !!request.options?.write);
     await guardWrites(!acting);
+    await blockOffServer(!(await usesOfflineSwitch(request)));
     try {
       const reply = await handler({ args: request.args ?? [], options: request.options ?? {}, path: request.path });
       const away = offsite.splice(0);
@@ -431,6 +458,7 @@ async function main() {
     } finally {
       acting = false;
       await guardWrites(true).catch((e) => log(`guarding writes: ${firstLine(e)}`));
+      await blockOffServer(true).catch((e) => log(`blocking other addresses: ${firstLine(e)}`));
       touch();
     }
   }
@@ -453,6 +481,7 @@ async function main() {
   chmodSync(socket, 0o600);
   try { shots = lastShotNumber(readdirSync(join(dir, "shots"))); } catch { shots = 0; }
   await guardWrites(true);
+  await blockOffServer(true);
   touch();
   save({ status: "ready", base, port: server.port, route: route(), clock: { frozenNow: opt.now, browser: await page.evaluate(() => new Date().toString()) } });
   log(`ready at ${base}`);

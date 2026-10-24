@@ -129,6 +129,10 @@ describe("what the browser may reach", () => {
     }
   });
 
+  it("also launches the browser with every address but the loopback ones unreachable, so nothing leaves the machine even where a route is off", () => {
+    expect(c.UNREACHABLE_ARGS).toEqual(["--proxy-server=http://127.0.0.1:1", "--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost , EXCLUDE 127.0.0.1"]);
+  });
+
   it("guards the paths the server changes data on, and leaves pages and assets to the service worker", () => {
     for (const path of ["/api/trips", "/api", "/auth/logout", "/oauth/token", "/mcp"]) expect(c.isGuardedPath(path), path).toBe(true);
     for (const path of ["/", "/assets/app.js", "/sw.js", "/apiary", "/feed/x.ics"]) expect(c.isGuardedPath(path), path).toBe(false);
