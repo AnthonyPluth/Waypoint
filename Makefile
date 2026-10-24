@@ -23,7 +23,7 @@ SEMGREP ?= pipx run semgrep==1.146.0
 
 .PHONY: setup check lint python-lint frontend-lint semgrep test test-parallel test-pg test-timings fix \
 	frontend-check frontend-typecheck frontend-test frontend-build docs docs-build verify feature-map feature-map-check \
-	fleet-checks api-contract api-contract-check verify-skill control-smoke
+	fleet-checks api-contract api-contract-check verify-skill user-feature-map control-smoke
 
 # frontend-lint is a prerequisite of both lint and frontend-check, and make runs it once.
 check: lint feature-map-check api-contract-check fleet-checks test-parallel frontend-check docs-build
@@ -120,6 +120,12 @@ verify: frontend/node_modules frontend-build
 # from the CLI's own help: run it after changing a command. make fleet-checks fails when it's out of date.
 verify-skill:
 	node frontend/verify/control.mjs help --markdown > .claude/skills/verify-waypoint/references/cli.md
+
+# The user feature map (.claude/skills/verify-waypoint/references/feature-map.md): what a person can do, by page and flow, from
+# the verify pages and flows plus references/feature-gotchas.md (hand-edited). make fleet-checks fails when it's out of date.
+# Not make feature-map, which goes by API route.
+user-feature-map:
+	$(PYTHON) tools/user_feature_map.py
 
 # tools/control end to end on the real demo server under the frozen clock: doctor, start, snapshot, screenshot (compared with
 # docs/src/assets/screenshots/upcoming-phone.png), flows, reset and stop (frontend/verify/control-smoke.mjs; the Control smoke

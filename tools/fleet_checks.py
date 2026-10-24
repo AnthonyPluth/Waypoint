@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import importlib.util
 import os
 import re
 import subprocess
@@ -387,6 +388,15 @@ def generated_cli_reference() -> tuple[str | None, str]:
     return (done.stdout, "") if done.returncode == 0 else (None, (done.stderr or done.stdout).strip()[-200:])
 
 
+def check_user_feature_map() -> list[str]:
+    spec = importlib.util.spec_from_file_location("user_feature_map", ROOT / "tools" / "user_feature_map.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    text, problems = module.generate()
+    return problems + module.check(module.OUT.read_text() if module.OUT.exists() else None, text)
+
+
 def check_manage_links(table: dict, tests_text: str) -> list[str]:
     problems = []
     for provider, (host, _path) in table.items():
@@ -408,6 +418,7 @@ def main(argv: list[str] | None = None) -> int:
     problems += check_skills()
     generated, why = generated_cli_reference()
     problems += check_cli_reference(CLI_REFERENCE.read_text() if CLI_REFERENCE.exists() else None, generated, why)
+    problems += check_user_feature_map()
     sys.path.insert(0, str(ROOT))
     from waypoint.domain import links
     problems += check_manage_links(links.MANAGE, (ROOT / "tests/test_links.py").read_text())
@@ -424,7 +435,7 @@ def main(argv: list[str] | None = None) -> int:
     if not problems:
         print("Fleet checks passed: one migration head, migrations tested, mail parsers registered with fixtures and a test"
               + (", commit trailers, no test removed or skipped without a reason, images only where make verify puts them" if args.commits else "")
-              + ", workflow conventions, dark only, manage links tested, skills well formed and tools/control's reference generated from its help.")
+              + ", workflow conventions, dark only, manage links tested, skills well formed, tools/control's reference generated from its help and the user feature map current.")
     return 1 if problems else 0
 
 
