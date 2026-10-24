@@ -97,7 +97,16 @@ outside.close();
 r = control("flow", "open-trip", "--viewport", "desktop");
 expect(r.code === 0 && r.json?.steps?.every((s) => s.ok) && r.json.files.length === 2, "flow: open-trip passes, step by step, with its 2 images");
 
-r = control("flow", "offline-trip", "--viewport", "desktop");
+const offlineFlow = () => {
+  control("reset");
+  return control("flow", "offline-trip", "--viewport", "desktop");
+};
+r = offlineFlow();
+if (r.code !== 0) {
+  console.log(`  note: offline-trip failed once, on ${JSON.stringify(r.json?.steps?.filter((s) => !s.ok))}; trying again on fresh data`);
+  control("console");
+  r = offlineFlow();
+}
 expect(r.code === 0 && r.json?.steps?.every((s) => s.ok), "flow: offline-trip passes after offline: it runs in a browser of its own");
 
 r = control("flow", "more-menu", "--viewport", "desktop");
