@@ -15,9 +15,8 @@ function controlWith(withEnv, ...args) {
   const r = spawnSync(process.execPath, [join(here, "control.mjs"), ...args], { cwd: root, env: withEnv, encoding: "utf8", timeout: 300000 });
   const out = (r.stdout ?? "").trim();
   console.log(out.length > 1500 ? `${out.slice(0, 1500)}…` : out);
-  let json = null;
-  try { json = JSON.parse(out); } catch { json = null; }
-  return { code: r.status, json, out };
+  const parse = () => { try { return JSON.parse(out); } catch { return null; } };
+  return { code: r.status, json: parse(), out };
 }
 
 function expect(ok, what) {
