@@ -5,7 +5,7 @@ import ipaddress
 import secrets
 import time
 import urllib.parse
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Literal, TypedDict
@@ -17,10 +17,11 @@ from ..providers import webpush
 from ..storage import db
 from ..storage.models import CalendarFeed, PushDevice, ReminderPrefs, ReminderSent, User
 from . import calendar, people, trips
+from .mail import review
 from .trips import SegmentOut, TripOut
 from .visibility import Viewer
 
-Kind = Literal["check_in", "day_of"]
+Kind = Literal["check_in", "day_of", "review"]
 CHECK_IN_AHEAD = timedelta(hours=24)
 DAY_OF_HOUR = 7
 LOCAL_OWNER = "local"
@@ -37,6 +38,7 @@ class Invalid(ValueError):
 class Prefs(TypedDict):
     check_in: bool
     day_of: bool
+    review: bool
 
 
 class DeviceOut(TypedDict):
@@ -85,7 +87,7 @@ def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
 
 def prefs(conn: db.Connection, owner: str) -> Prefs:
     row = conn.orm.get(ReminderPrefs, owner)
-    return {"check_in": row.check_in, "day_of": row.day_of} if row else {"check_in": True, "day_of": True}
+    return {"check_in": row.check_in, "day_of": row.day_of, "review": row.review} if row else {"check_in": True, "day_of": True, "review": True}
 
 
 def set_prefs(conn: db.Connection, owner: str, chosen: Prefs) -> Prefs:
@@ -214,6 +216,11 @@ def day_of_message(today_trips: list[tuple[SegmentOut, TripOut]], day: str) -> d
             "body": "\n".join(lines)}
 
 
+def review_message(waiting: int) -> dict[str, Any]:
+    return {"title": "Booking emails to review", "tag": "review", "url": "/#review",
+            "body": f"{waiting} booking email{' needs' if waiting == 1 else 's need'} your review"}
+
+
 def _deliver(conn: db.Connection, owner: str, message: dict[str, Any], send: Send) -> bool:
     rows = conn.orm.scalars(select(PushDevice).where(PushDevice.owner_sub == owner).order_by(PushDevice.id)).all()
     reached, tried = 0, 0
@@ -268,6 +275,23 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
             if starting and _deliver(conn, owner, day_of_message(starting, day), send):
                 _record(conn, owner, "day_of", day, stamp)
                 sent += 1
+    return sent
+
+
+def review_due(conn: db.Connection, since: float, now: float, send: Send, mailbox_ids: Collection[int]) -> int:
+    end_lapsed(conn, now)
+    sent = 0
+    for owner in sorted(set(conn.execute(select(PushDevice.owner_sub)).scalars())):
+        if not prefs(conn, owner)["review"]:
+            continue
+        arrived = review.arrived(conn, owner, since, mailbox_ids)
+        told = set(conn.execute(select(ReminderSent.ref).where(ReminderSent.owner_sub == owner, ReminderSent.kind == "review",
+                                                               ReminderSent.ref.in_(arrived))).scalars()) if arrived else set()
+        fresh = [ref for ref in arrived if ref not in told]
+        if fresh and _deliver(conn, owner, review_message(len(fresh)), send):
+            for ref in fresh:
+                _record(conn, owner, "review", ref, now)
+            sent += 1
     return sent
 
 

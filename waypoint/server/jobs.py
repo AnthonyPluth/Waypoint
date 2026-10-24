@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from datetime import UTC, date, datetime
 
 from .. import monitoring, oidc
@@ -46,6 +47,14 @@ def send_reminders() -> None:
         monitoring.report(e, values=False)
 
 
+def notify_review(since: float, mailbox_ids: list[int]) -> None:
+    try:
+        with db.session() as conn:
+            reminders.review_due(conn, since, time.time(), reminders.sender(conn, oidc.config()["public_url"] or SUBJECT), mailbox_ids)
+    except Exception as e:
+        monitoring.report(e, values=False)
+
+
 def check_flights() -> None:
     try:
         with db.session() as conn:
@@ -57,10 +66,13 @@ def check_flights() -> None:
 def scan_mailboxes() -> None:
     if not gmail.configured():
         return
+    started = time.time()
+    scanned: list[int] = []
     try:
-        scan.scan_all(date.today())
+        scan.scan_all(date.today(), scanned)
     except Exception as e:
         monitoring.report(e, values=False)
+    notify_review(started, scanned)
 
 
 def scan_now(mailbox_id: int, again: bool = False, backfill: bool = False, sender: str | None = None) -> bool:
@@ -68,10 +80,13 @@ def scan_now(mailbox_id: int, again: bool = False, backfill: bool = False, sende
         return False
 
     def run() -> None:
+        started, scanned = time.time(), [mailbox_id]
         try:
-            scan.run(mailbox_id, date.today(), again, backfill, sender)
+            if scan.run(mailbox_id, date.today(), again, backfill, sender).state == "busy":
+                scanned = []
         except Exception as e:
             monitoring.report(e, values=False)
+        notify_review(started, scanned)
     threading.Thread(target=run, daemon=True, name="mail-scan-now").start()
     return True
 

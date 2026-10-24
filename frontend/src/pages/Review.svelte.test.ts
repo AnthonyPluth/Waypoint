@@ -39,6 +39,7 @@ const PREVIEW = "Hello Jane,\nYour flight EX 410 leaves Boston at 7:15 am on 2 J
 let previewFails = "";
 let suggestFails = "";
 let suggestOkFirst = 0;
+let dismissedOnAsk: Record<number, string> = {};
 let suggestGate: Promise<void> | null = null;
 let segmentsMade = 0;
 let secondSegmentFails = "";
@@ -63,7 +64,7 @@ function serve(failOn?: string) {
     if (path.endsWith("/same")) { if (sameFails) throw new Error(sameFails); return { booking: sameQueue.length ? sameQueue.shift() ?? null : sameAs } as never; }
     if (path.endsWith("/attach")) return { ok: true, segment_id: 99 } as never;
     if (path.endsWith("/preview")) { if (previewFails) throw new Error(previewFails); return { text: PREVIEW, html: null, truncated } as never; }
-    if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails && suggestOkFirst-- <= 0) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestions: [SUGGESTION] })) }; return { ok: true } as never; }
+    if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails && suggestOkFirst-- <= 0) throw new Error(suggestFails); const id = Number(path.split("/")[3]); if (dismissedOnAsk[id]) { held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true, dismissed: dismissedOnAsk[id] } as never; } held = { ...held, items: held.items.map((i) => ({ ...i, suggestions: [SUGGESTION] })) }; return { ok: true } as never; }
     if (path.endsWith("/unignore")) return { started: true } as never;
     if (path.endsWith("/ignore")) { const id = Number(path.split("/")[3]); const domain = held.items.find((i) => i.id === id)?.sender_domain ?? ""; held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true, mailbox_id: 5, domain } as never; }
     if (opts?.method === "DELETE" && path.includes("?suggestion=")) { const id = Number(path.split("/")[3]?.split("?")[0]); const gone = path.split("?")[1]?.split("&").map((q) => Number(q.split("=")[1])) ?? []; held = { ...held, items: held.items.map((i) => (i.id === id ? { ...i, suggestions: i.suggestions.filter((_, n) => !gone.includes(n + 1)) } : i)) }; return { ok: true } as never; }
@@ -76,7 +77,7 @@ function serve(failOn?: string) {
 }
 
 afterEach(() => { setQuery(""); });
-beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestOkFirst = 0; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
+beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestOkFirst = 0; dismissedOnAsk = {}; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
@@ -921,6 +922,32 @@ describe("Review: Ask AI", () => {
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1/suggest", "POST", undefined]));
     expect(await screen.findByRole("button", { name: /Check suggestion: / })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^(Ask AI|Ask again): / })).toHaveTextContent("Ask again");
+  });
+
+  it("says why the AI dismissed an email, and the item leaves the list", async () => {
+    held = { matches: [], items: [item(), item({ id: 2 })], who: [], ai: true };
+    dismissedOnAsk = { 1: "Dismissed: a promotion, not a booking." };
+    render(ReviewPage);
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Ask AI: “/ }))[0]);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Dismissed: a promotion, not a booking."));
+    await waitFor(() => expect(screen.getAllByTestId("review-item")).toHaveLength(1));
+  });
+
+  it("says nothing of a dismissal when the AI left the item in Review", async () => {
+    held = { matches: [], items: [item()], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /^(Ask AI|Ask again): / }));
+    await screen.findByRole("button", { name: /Check suggestion: / });
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("counts the emails the AI dismissed when it was asked about several", async () => {
+    held = { matches: [], items: [item(), item({ id: 2 }), item({ id: 3 })], who: [], ai: true };
+    dismissedOnAsk = { 1: "Dismissed: a newsletter, not a booking.", 3: "Dismissed: a promotion, not a booking." };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 3" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 3 messages; dismissed 2 as not bookings"));
+    expect(screen.getAllByTestId("review-item")).toHaveLength(1);
   });
 
   it("asks about several messages at once, each showing its own progress", async () => {

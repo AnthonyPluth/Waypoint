@@ -1,6 +1,6 @@
 ---
 title: Reminders and calendar
-description: Notifications before a flight and on the day, and a private calendar feed of your trips.
+description: Notifications before a flight, on the day and when booking emails need review, and a private calendar feed of your trips.
 sidebar:
   order: 6
 ---
@@ -9,12 +9,13 @@ sidebar:
 
 ## Reminders
 
-Waypoint sends two kinds of notification, and each person chooses which they get (both are on until you choose):
+Waypoint sends three kinds of notification, and each person chooses which they get (all are on until you choose):
 
 - **Check-in opens**, 24 hours before a flight leaves. It names the flight, the airports and the departure time at the airport. A flight moved to another time gets a new reminder.
 - **Day-of summary**, from 7:00 on Waypoint’s clock (`TZ`) on any day something starts: your flights, hotel check-ins, car pickups, trains, cruises and parking entries, each with its own local time.
+- **Booking emails to review**, after a mail scan that finds a booking email you need to settle in [Review](/Waypoint/start/review/): a booking Waypoint couldn’t finish (**Some details missing**), a match to confirm or a suggestion from the [AI](/Waypoint/start/ai/) to check. An email Waypoint couldn’t read at all, or that the AI read and found no booking in, only might be a booking, so it doesn’t send one. It says only how many (“2 booking emails need your review”) and opens Review. It is one notification per person per scan, goes to the people who can see those items, and an email is never announced twice. Emails the AI dismissed as not bookings aren’t counted, and **Ask AI** doesn’t send one, since you’re already there.
 
-Reminders cover only the trips you can see, the ones you’re on and the ones you booked. They never carry a loyalty or Known Traveler number or a confirmation code.
+Reminders cover only the trips you can see, the ones you’re on and the ones you booked. They never carry a loyalty or Known Traveler number or a confirmation code, and the one about Review carries no subject, sender or text, only a count.
 
 To get them on a phone or computer, open Settings there and choose **Register this device**; your browser asks for permission. On an iPhone or iPad, add Waypoint to the Home Screen first (iOS 16.4 or later). **Remove device** unregisters it. A person can have up to 10 devices.
 

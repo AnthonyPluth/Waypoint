@@ -2591,7 +2591,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "$ref": "#/components/schemas/Asked"
                 }
               }
             }
@@ -3358,6 +3358,25 @@
         },
         "required": [
           "airports"
+        ],
+        "additionalProperties": false
+      },
+      "Asked": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "dismissed": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "dismissed"
         ],
         "additionalProperties": false
       },
@@ -5750,6 +5769,9 @@
           "day_of": {
             "type": "boolean"
           },
+          "review": {
+            "type": "boolean"
+          },
           "devices": {
             "type": "array",
             "items": {
@@ -5764,6 +5786,7 @@
           "public_key",
           "check_in",
           "day_of",
+          "review",
           "devices",
           "feed"
         ],
@@ -5776,6 +5799,9 @@
             "type": "boolean"
           },
           "day_of": {
+            "type": "boolean"
+          },
+          "review": {
             "type": "boolean"
           }
         },
@@ -6284,6 +6310,9 @@
           },
           "ai_asked": {
             "type": "integer"
+          },
+          "dismissed": {
+            "type": "integer"
           }
         },
         "required": [
@@ -6300,7 +6329,8 @@
           "followups",
           "with_facts",
           "attached",
-          "ai_asked"
+          "ai_asked",
+          "dismissed"
         ],
         "additionalProperties": false
       },

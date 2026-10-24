@@ -24,7 +24,7 @@ def _view(conn) -> Reminders:
     me = owner()
     chosen = reminders.prefs(conn, me)
     return {"public_key": webpush.vapid_keys(conn)[1], "check_in": chosen["check_in"], "day_of": chosen["day_of"],
-            "devices": [ReminderDevice(**d) for d in reminders.devices(conn, me)], "feed": reminders.feed_on(conn, me)}
+            "review": chosen["review"], "devices": [ReminderDevice(**d) for d in reminders.devices(conn, me)], "feed": reminders.feed_on(conn, me)}
 
 
 def api_reminders(conn, _q, _b) -> Reminders:
@@ -33,7 +33,8 @@ def api_reminders(conn, _q, _b) -> Reminders:
 
 
 def api_reminders_set(conn, _q, body: RemindersBody) -> Reminders:
-    reminders.set_prefs(conn, owner(), {"check_in": _flag(body, "check_in"), "day_of": _flag(body, "day_of")})
+    review = _flag(body, "review") if "review" in body else reminders.prefs(conn, owner())["review"]
+    reminders.set_prefs(conn, owner(), {"check_in": _flag(body, "check_in"), "day_of": _flag(body, "day_of"), "review": review})
     return _view(conn)
 
 

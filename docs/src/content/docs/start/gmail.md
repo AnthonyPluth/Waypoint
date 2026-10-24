@@ -88,7 +88,7 @@ Some airlines write a flight’s times as UTC (`…T09:00:00Z`) when they mean t
 
 ### After a scan
 
-Each mailbox in Settings shows when its last scan finished and its counts: found, read, bookings added or changed, couldn’t be read (waiting in Review), skipped, and whether more are waiting, plus how many messages the AI was asked about when it reads mail automatically. Only counts are shown, kept or logged, never a subject, sender or text; the log gives counts by reason (“12 × no structured booking data”).
+Each mailbox in Settings shows when its last scan finished and its counts: found, read, bookings added or changed, couldn’t be read (waiting in Review), skipped, and whether more are waiting, plus how many messages the AI was asked about, and how many it dismissed as not bookings, when it reads mail automatically. Only counts are shown, kept or logged, never a subject, sender or text; the log gives counts by reason (“12 × no structured booking data”).
 
 - A scan that **couldn’t start** (the connection needs reconnecting, or Google couldn’t be reached) says why under the mailbox until one does. That isn’t a failed scan.
 - A scan that **stops halfway** keeps what it had read, leaves the last good state as it was and says what failed. The next one carries on.

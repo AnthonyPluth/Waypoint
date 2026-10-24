@@ -250,6 +250,20 @@ class MigrationTests(unittest.TestCase):
         db.init(self.path)
         self.assertEqual(rows_of(self.path, "settings"), [("distance_unit", "km")])
 
+    def test_0037_adds_the_review_reminder_choice_on_for_everyone_who_already_chose_and_takes_it_away(self):
+        from alembic import command
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0036")
+            old = sa.table("reminder_prefs", sa.column("owner_sub"), sa.column("check_in"), sa.column("day_of"))
+            c.execute(old.insert(), [{"owner_sub": "sub-a", "check_in": True, "day_of": False}, {"owner_sub": "sub-b", "check_in": False, "day_of": True}])
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual(sorted(rows_of(self.path, "reminder_prefs")), [("sub-a", True, False, True), ("sub-b", False, True, True)])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0036")
+        self.assertEqual(sorted(rows_of(self.path, "reminder_prefs")), [("sub-a", True, False), ("sub-b", False, True)])
+        self.assertNotIn("review", [col[0] for col in shape(self.path)["reminder_prefs"]["columns"]])
+
     def test_a_cruises_ports_go_with_the_cruise(self):
         db.init(self.path)
         with db.session(self.path) as conn:

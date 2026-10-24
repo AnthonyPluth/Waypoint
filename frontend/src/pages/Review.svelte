@@ -167,8 +167,9 @@
 
   const asking_ai = new SvelteSet<number>();
   const askAi = (item: ReviewItem) => act(async () => {
-    await apiCall<"POST /api/review/{id}/suggest">(`/api/review/${item.id}/suggest`, { method: "POST" });
+    const r = await apiCall<"POST /api/review/{id}/suggest">(`/api/review/${item.id}/suggest`, { method: "POST" });
     await settle();
+    if (r.dismissed) toast.success(r.dismissed);
   }, { busy: (on) => (on ? asking_ai.add(item.id) : asking_ai.delete(item.id)) });
 
   let asking_all = $state(false);
@@ -182,17 +183,19 @@
   const aiNote = (n: number) => `The text of ${n === 1 ? "this email goes" : `these ${n} emails goes`} to ${aiWhere}.`;
   const askAll = (items: ReviewItem[]) => act(async () => {
     let done = 0;
+    let dismissed = 0;
     try {
       for (const item of items) {
-        await apiCall<"POST /api/review/{id}/suggest">(`/api/review/${item.id}/suggest`, { method: "POST" });
+        const r = await apiCall<"POST /api/review/{id}/suggest">(`/api/review/${item.id}/suggest`, { method: "POST" });
         done++;
+        if (r.dismissed) dismissed++;
       }
     } catch (err) {
       await settle();
       throw new Error(`Asked about ${done} of ${items.length}: ${errMsg(err)}`, { cause: err });
     }
     await settle();
-    toast.success(`Asked the AI about ${done} ${done === 1 ? "message" : "messages"}`);
+    toast.success(`Asked the AI about ${done} ${done === 1 ? "message" : "messages"}${dismissed ? `; dismissed ${dismissed} as not ${dismissed === 1 ? "a booking" : "bookings"}` : ""}`);
   }, { busy: (on) => (asking_all = on) });
 
   const placeLabels = (kind: string) => kind === "flight" ? ["From (airport code)", "To (airport code)"] : kind === "hotel" ? ["Hotel", ""] : kind === "parking" ? ["Lot", ""] : kind === "car" ? ["Pick-up", "Drop-off"] : kind === "cruise" ? ["Embarkation port", "Disembarkation port"] : ["From (station)", "To (station)"];

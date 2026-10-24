@@ -11,7 +11,7 @@ from ...domain.mail import ai, review, scan
 from ...providers import gmail
 from ...storage import db
 from ..common import NO_IMAGE, ApiError, Response, image_response, own_session, position, row_id
-from ..contract import Attached, Ignoring, Matched, MatchBody, Ok, Preview, Review, ReviewCandidate, ReviewItem, ReviewMatch, SameBooking, SegmentBody, WhoBody
+from ..contract import Asked, Attached, Ignoring, Matched, MatchBody, Ok, Preview, Review, ReviewCandidate, ReviewItem, ReviewMatch, SameBooking, SegmentBody, WhoBody
 from .mailboxes import owner
 from .trips import segment_fields, viewer
 
@@ -165,9 +165,9 @@ def api_review_image(conn, _q, _b, item_id: str, index: str) -> Response:
 
 
 @own_session
-def api_review_suggest(_conn, _q, _b, item_id: str) -> Ok:
+def api_review_suggest(_conn, _q, _b, item_id: str) -> Asked:
     try:
-        scan.suggest_now(owner(), row_id(item_id, NO_ITEM), time.time())
+        dismissed = scan.suggest_now(owner(), row_id(item_id, NO_ITEM), time.time())
     except KeyError:
         raise ApiError(NO_ITEM, 404) from None
     except (scan.NoAi, scan.NotAskable) as e:
@@ -176,4 +176,4 @@ def api_review_suggest(_conn, _q, _b, item_id: str) -> Ok:
         raise ApiError(GONE, 404) from None
     except gmail.GmailError as e:
         raise ApiError(str(e), 502) from e
-    return {"ok": True}
+    return {"ok": True, "dismissed": dismissed}

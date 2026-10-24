@@ -173,7 +173,7 @@ class Replies(DbCase):
                                                   last_scan=1790000000.0, created=1.0,
                                                   scan_summary='{"found":3,"read":2,"bookings":1,"review":1,"skipped":1,"capped":false}' if status == "connected" else None))
         reply = mailboxes.api_mailboxes(self.c, {}, {})
-        self.assertEqual(reply["mailboxes"][0]["scan_summary"], {"found": 3, "read": 2, "bookings": 1, "review": 1, "skipped": 1, "capped": False, "labels_dropped": 0, "triaged": 0, "total": 0, "not_travel": 0, "followups": 0, "with_facts": 0, "attached": 0, "ai_asked": 0})
+        self.assertEqual(reply["mailboxes"][0]["scan_summary"], {"found": 3, "read": 2, "bookings": 1, "review": 1, "skipped": 1, "capped": False, "labels_dropped": 0, "triaged": 0, "total": 0, "not_travel": 0, "followups": 0, "with_facts": 0, "attached": 0, "ai_asked": 0, "dismissed": 0})
         self.assertIsNone(reply["mailboxes"][1]["scan_summary"])
         self.assertEqual([m["status"] for m in reply["mailboxes"]], ["connected", "reconnect", "error"])
         self.check("GET /api/mailboxes", reply)
@@ -244,7 +244,7 @@ class Replies(DbCase):
         with mock.patch.object(scan, "preview", return_value={"subject": None, "sender_domain": None, "received": None, "text": "Hello.",
                                                                   "html": "<p>Hello.</p>", "truncated": False, "original": True, "images": 0}):
             self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][2]["id"])))
-        with mock.patch.object(scan, "suggest_now"):
+        with mock.patch.object(scan, "suggest_now", return_value=None):
             self.check("POST /api/review/{id}/suggest", review_api.api_review_suggest(None, {}, {}, str(listed["items"][1]["id"])))
         self.check("DELETE /api/review/{id}", review_api.api_review_dismiss(self.c, {}, {}, str(listed["items"][1]["id"])))
         stay = {"kind": "hotel", "origin": "Harbour Hotel", "destination": None, "start_local": "2026-11-21T15:00", "end_local": "2026-11-27T10:00",

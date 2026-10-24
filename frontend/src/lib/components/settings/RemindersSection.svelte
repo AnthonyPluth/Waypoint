@@ -25,9 +25,9 @@
   }
   onMount(load);
 
-  const choose = (change: { check_in?: boolean; day_of?: boolean }) => act(async () => {
+  const choose = (change: { check_in?: boolean; day_of?: boolean; review?: boolean }) => act(async () => {
     if (!list) return;
-    list = await apiCall<"POST /api/reminders">("/api/reminders", { method: "POST", body: { check_in: list.check_in, day_of: list.day_of, ...change }, failed: "Couldn’t save that" });
+    list = await apiCall<"POST /api/reminders">("/api/reminders", { method: "POST", body: { check_in: list.check_in, day_of: list.day_of, review: list.review, ...change }, failed: "Couldn’t save that" });
   }, { busy: (on) => (busy = on) });
 
   const keyBytes = (b64u: string) => Uint8Array.from(atob(b64u.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
@@ -91,6 +91,10 @@
       <label class="row cursor-pointer flex-nowrap">
         <span class="min-w-0"><span class="block font-medium">Day-of summary</span><span class="block text-sm text-muted-foreground">Today’s bookings at 7:00 (server time).</span></span>
         <input type="checkbox" class="size-5 shrink-0" checked={list.day_of} disabled={busy} onchange={(e) => choose({ day_of: e.currentTarget.checked })} />
+      </label>
+      <label class="row cursor-pointer flex-nowrap">
+        <span class="min-w-0"><span class="block font-medium">Booking emails to review</span><span class="block text-sm text-muted-foreground">After a mail scan, how many emails need you. Only a count.</span></span>
+        <input type="checkbox" class="size-5 shrink-0" checked={list.review} disabled={busy} onchange={(e) => choose({ review: e.currentTarget.checked })} />
       </label>
 
       {#each devices as d (d.id)}

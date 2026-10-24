@@ -11,7 +11,7 @@ import type { Reminders } from "$lib/api-types";
 import { toast } from "svelte-sonner";
 import RemindersSection from "./RemindersSection.svelte";
 
-const view = (extra: Partial<Reminders> = {}): Reminders => ({ public_key: "BAUQ", check_in: true, day_of: true, devices: [], feed: false, ...extra });
+const view = (extra: Partial<Reminders> = {}): Reminders => ({ public_key: "BAUQ", check_in: true, day_of: true, review: true, devices: [], feed: false, ...extra });
 const serve = (current: () => Reminders, others: (path: string, opts?: { method?: string; body?: unknown }) => unknown = () => ({})) =>
   vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string; body?: unknown }) =>
     (path === "/api/reminders" && !opts?.method ? current() : others(path, opts)) as never);
@@ -25,6 +25,16 @@ describe("Settings → Reminders", () => {
     render(RemindersSection);
     expect(await screen.findByRole("checkbox", { name: /Check-in opens/ })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /Day-of summary/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Booking emails to review/ })).toBeChecked();
+  });
+
+  it("turns the booking-emails notification off without touching the other two", async () => {
+    let now = view();
+    serve(() => now, (path, opts) => { if (opts?.method === "POST") now = view({ ...(opts.body as object) }); return now; });
+    render(RemindersSection);
+    await userEvent.click(await screen.findByRole("checkbox", { name: /Booking emails to review/ }));
+    expect(api).toHaveBeenCalledWith("/api/reminders", expect.objectContaining({ method: "POST", body: { check_in: true, day_of: true, review: false } }));
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /Booking emails to review/ })).not.toBeChecked());
   });
 
   it("saves a choice with the other one as it was, and shows what the server kept", async () => {
@@ -32,7 +42,7 @@ describe("Settings → Reminders", () => {
     serve(() => now, (path, opts) => { if (opts?.method === "POST") now = view({ ...(opts.body as object) }); return now; });
     render(RemindersSection);
     await userEvent.click(await screen.findByRole("checkbox", { name: /Check-in opens/ }));
-    expect(api).toHaveBeenCalledWith("/api/reminders", expect.objectContaining({ method: "POST", body: { check_in: false, day_of: true } }));
+    expect(api).toHaveBeenCalledWith("/api/reminders", expect.objectContaining({ method: "POST", body: { check_in: false, day_of: true, review: true } }));
     await waitFor(() => expect(screen.getByRole("checkbox", { name: /Check-in opens/ })).not.toBeChecked());
   });
 

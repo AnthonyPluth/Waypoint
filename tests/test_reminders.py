@@ -242,7 +242,7 @@ class LapseTests(Reminders):
     def test_a_device_and_a_feed_end_when_their_owner_can_no_longer_sign_in(self):
         self.device("u-jane", ENDPOINT)
         self.device("u-sam", "https://push.example.com/send/sam")
-        reminders.set_prefs(self.c, "u-sam", {"check_in": True, "day_of": False})
+        reminders.set_prefs(self.c, "u-sam", {"check_in": True, "day_of": False, "review": True})
         jane_key = reminders.new_feed_key(self.c, "u-jane", 1.0)
         sam_key = reminders.new_feed_key(self.c, "u-sam", 1.0)
         with mock.patch.dict(os.environ, self.ALLOWED):
@@ -253,7 +253,7 @@ class LapseTests(Reminders):
         self.assertEqual([d["id"] for d in reminders.devices(self.c, "u-sam")], [])
         self.assertEqual(len(reminders.devices(self.c, "u-jane")), 1)
         self.assertFalse(reminders.feed_on(self.c, "u-sam"))
-        self.assertEqual(reminders.prefs(self.c, "u-sam"), {"check_in": True, "day_of": True})
+        self.assertEqual(reminders.prefs(self.c, "u-sam"), {"check_in": True, "day_of": True, "review": True})
 
     def test_a_feed_is_gone_the_moment_it_is_asked_for_after_the_owner_lapses_and_not_before(self):
         key = reminders.new_feed_key(self.c, "u-sam", 1.0)
@@ -366,17 +366,17 @@ class SendingTests(Reminders):
 
     def test_people_choose_which_reminders_they_get(self):
         self.device()
-        reminders.set_prefs(self.c, "u-jane", {"check_in": False, "day_of": True})
+        reminders.set_prefs(self.c, "u-jane", {"check_in": False, "day_of": True, "review": True})
         self.due(datetime(2026, 11, 20, 1, 0, tzinfo=UTC), hour=8)
         self.assertEqual([m["title"] for _i, m in self.sent], ["Today"])
         self.sent.clear()
         self.c.execute(delete(ReminderSent))
-        reminders.set_prefs(self.c, "u-jane", {"check_in": True, "day_of": False})
+        reminders.set_prefs(self.c, "u-jane", {"check_in": True, "day_of": False, "review": True})
         self.due(datetime(2026, 11, 20, 1, 0, tzinfo=UTC), hour=8)
         self.assertEqual([m["title"] for _i, m in self.sent], ["Check-in opens"])
         self.sent.clear()
         self.c.execute(delete(ReminderSent))
-        reminders.set_prefs(self.c, "u-jane", {"check_in": False, "day_of": False})
+        reminders.set_prefs(self.c, "u-jane", {"check_in": False, "day_of": False, "review": True})
         self.assertEqual(self.due(datetime(2026, 11, 20, 1, 0, tzinfo=UTC), hour=8), 0)
 
     def test_everyone_is_told_about_their_own_trips_only(self):
@@ -521,11 +521,19 @@ class ApiTests(RouteCase):
         status, got = self.call("ana", "GET", "/api/reminders")
         self.assertEqual(status, 200)
         self.assertTrue(webpush.valid_public_key(got.pop("public_key")))
-        self.assertEqual(got, {"check_in": True, "day_of": True, "devices": [], "feed": False})
+        self.assertEqual(got, {"check_in": True, "day_of": True, "review": True, "devices": [], "feed": False})
 
     def test_a_member_chooses_their_reminders_and_only_their_own(self):
         self.assertEqual(self.call("ana", "POST", "/api/reminders", {"check_in": False, "day_of": True})[0], 200)
         self.assertEqual(self.call("ana", "GET", "/api/reminders")[1]["check_in"], False)
+        self.assertEqual(self.call("ana", "GET", "/api/reminders")[1]["review"], True)
+        self.assertEqual(self.call("ana", "POST", "/api/reminders", {"check_in": False, "day_of": True, "review": False})[0], 200)
+        self.assertEqual(self.call("ana", "GET", "/api/reminders")[1]["review"], False)
+        self.assertEqual(self.call("ana", "POST", "/api/reminders", {"check_in": True, "day_of": True})[0], 200)
+        self.assertEqual(self.call("ana", "GET", "/api/reminders")[1]["review"], False)
+        self.assertEqual(self.call("ana", "POST", "/api/reminders", {"check_in": True, "day_of": True, "review": "yes"})[0], 400)
+        self.assertEqual(self.call("ben", "GET", "/api/reminders")[1]["review"], True)
+        self.call("ana", "POST", "/api/reminders", {"check_in": False, "day_of": True})
         self.assertEqual(self.call("ben", "GET", "/api/reminders")[1]["check_in"], True)
         for body in ({}, {"check_in": "yes", "day_of": True}, {"check_in": True, "day_of": 1}):
             self.assertEqual(self.call("ana", "POST", "/api/reminders", body)[0], 400)

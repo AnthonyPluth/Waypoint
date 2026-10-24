@@ -69,6 +69,7 @@ class ScanSummary(TypedDict):
     with_facts: int
     attached: int
     ai_asked: int
+    dismissed: int
 
 
 class Mailbox(TypedDict):
@@ -281,6 +282,11 @@ class SameBooking(TypedDict):
 class Attached(TypedDict):
     ok: bool
     segment_id: int
+
+
+class Asked(TypedDict):
+    ok: bool
+    dismissed: str | None
 
 
 class Review(TypedDict):
@@ -978,6 +984,7 @@ class Reminders(TypedDict):
     public_key: str
     check_in: bool
     day_of: bool
+    review: bool
     devices: list[ReminderDevice]
     feed: bool
 
@@ -985,6 +992,7 @@ class Reminders(TypedDict):
 class RemindersBody(TypedDict):
     check_in: bool
     day_of: bool
+    review: NotRequired[bool]
 
 
 class DeviceBody(TypedDict):

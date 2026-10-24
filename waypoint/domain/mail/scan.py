@@ -8,7 +8,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 from sqlalchemy import delete, select, update
 
@@ -64,6 +64,7 @@ class Summary:
     with_facts: int = 0
     attached: int = 0
     ai_asked: int = 0
+    dismissed: int = 0
 
 
 _running: set[int] = set()
@@ -114,7 +115,7 @@ def encode(found: Summary) -> str:
                        "skipped": found.skipped, "capped": found.capped, "labels_dropped": found.labels_dropped,
                        "triaged": found.triaged, "total": found.total, "not_travel": found.not_travel,
                        "followups": found.followups, "with_facts": found.with_facts, "attached": found.attached,
-                       "ai_asked": found.ai_asked}, separators=(",", ":"))
+                       "ai_asked": found.ai_asked, "dismissed": found.dismissed}, separators=(",", ":"))
 
 
 def decode(text: str | None) -> Summary | None:
@@ -126,7 +127,7 @@ def decode(text: str | None) -> Summary | None:
     if not isinstance(raw, dict) or not all(isinstance(raw.get(k), int) and not isinstance(raw.get(k), bool) for k in counts) \
             or not isinstance(raw.get("capped"), bool):
         return None
-    extra = [raw.get(k, 0) for k in ("labels_dropped", "triaged", "total", "not_travel", "followups", "with_facts", "attached", "ai_asked")]
+    extra = [raw.get(k, 0) for k in ("labels_dropped", "triaged", "total", "not_travel", "followups", "with_facts", "attached", "ai_asked", "dismissed")]
     return Summary(raw["found"], raw["read"], raw["bookings"], raw["review"], raw["skipped"], raw["capped"],
                    *(n if isinstance(n, int) and not isinstance(n, bool) else 0 for n in extra))
 
@@ -318,7 +319,7 @@ def preview(owner: str, item_id: int) -> Content:
     return keep_message(mailbox_id, message_id, raw, [], time.time())
 
 
-def suggest_now(owner: str, item_id: int, now: float) -> None:
+def suggest_now(owner: str, item_id: int, now: float) -> str | None:
     with db.session() as conn:
         found = review.seen_message(conn, owner, item_id)
         if found is None:
@@ -333,39 +334,46 @@ def suggest_now(owner: str, item_id: int, now: float) -> None:
         kept = None if mine else stored_mail.get(conn, mailbox_id, message_id)
         token = None if mine or kept is not None else gmail.access_token(conn, mailbox_id, time.time())
     if kept is not None:
-        _ask(mailbox_id, message_id, kept["text"], now)
-    elif token is not None:
-        _suggest(mailbox_id, message_id, gmail.fetch(token, message_id), now)
-    else:
-        _suggest(mailbox_id, message_id, _again(owner, item_id)[2], now)
+        return _ask(mailbox_id, message_id, kept["text"], now)
+    if token is not None:
+        return _suggest(mailbox_id, message_id, gmail.fetch(token, message_id), now)
+    return _suggest(mailbox_id, message_id, _again(owner, item_id)[2], now)
 
 
-def _read(cfg: ai.Config, text: str, known: tuple[str, ...], timeout: float | None = None) -> tuple[list[ai.Suggestion], str | None, bool]:
+class Read(NamedTuple):
+    suggestions: list[ai.Suggestion]
+    error: str | None
+    failed: bool
+    not_a_booking: str | None = None
+
+
+def _read(cfg: ai.Config, text: str, known: tuple[str, ...], timeout: float | None = None) -> Read:
     try:
         reading = ai.suggest(cfg, text, known, timeout)
-        return reading.bookings, reading.error, False
+        return Read(reading.bookings, reading.error, False, reading.not_a_booking)
     except ai.AiError as e:
-        return [], str(e), str(e) != ai.NO_BOOKING and not e.retried
+        return Read([], str(e), str(e) != ai.NO_BOOKING and not e.retried)
     except Exception as e:
         monitoring.report(e, values=False)
-        return [], SUGGESTION_FAILED, True
+        return Read([], SUGGESTION_FAILED, True)
 
 
-def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) -> None:
+def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) -> str | None:
     content = keep_message(mailbox_id, message_id, raw, [], now)
-    _ask(mailbox_id, message_id, content["text"], now)
+    return _ask(mailbox_id, message_id, content["text"], now)
 
 
-def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> None:
+def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> str | None:
     with db.session() as conn:
         cfg = ai.config(conn)
         known = tuple(loyalty.known_numbers(conn)) if cfg else ()
         asking = not review.is_match(conn, mailbox_id, message_id)
     if cfg is None or not asking:
-        return
-    suggestions, error, _ = _read(cfg, text, known)
+        return None
+    read = _read(cfg, text, known)
     with db.session() as conn:
-        _file_ai(conn, mailbox_id, message_id, suggestions, error, False, now)
+        filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, False, now, read.not_a_booking)
+    return ai.dismissed_note(read.not_a_booking) if filed.dismissed and read.not_a_booking else None
 
 
 def _ai_fields(conn: db.Connection, s: ai.Suggestion) -> trips.SegmentIn | None:
@@ -399,14 +407,24 @@ def _ai_fields(conn: db.Connection, s: ai.Suggestion) -> trips.SegmentIn | None:
     return fields
 
 
+class Filed(NamedTuple):
+    added: int = 0
+    cleared: int = 0
+    dismissed: int = 0
+
+
 def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions: list[ai.Suggestion], error: str | None,
-             auto: bool | None, now: float) -> tuple[int, int]:
+             auto: bool | None, now: float, not_a_booking: str | None = None) -> Filed:
     row = conn.execute(select(ReviewItem.id, ReviewItem.sender_domain, ReviewItem.received, ReviewItem.matches, Mailbox.owner_sub)
                        .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                        .where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).fetchone()
     viewer = _viewer(row["owner_sub"], conn) if row else None
     if row is None or viewer is None or row["matches"]:
-        return 0, 0
+        return Filed()
+    if not_a_booking and not suggestions and error is None:
+        review.dismiss(conn, row["owner_sub"], row["id"], only_this=True)
+        _record(conn, mailbox_id, message_id, UNREADABLE, now)
+        return Filed(cleared=1, dismissed=1)
     pending: list[ai.Suggestion] = []
     touched: list[int] = []
     held: list[ingest.Held] = []
@@ -433,12 +451,12 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
         conn.execute(update(ReviewItem).where(ReviewItem.id == row["id"]).values(reason="incomplete" if pending or error else "match", matches=matches))
     if pending or error or held or not suggestions:
         review.set_suggestions(conn, mailbox_id, message_id, pending, error, auto=auto)
-        return added, 0
+        return Filed(added)
     else:
         review.dismiss(conn, row["owner_sub"], row["id"], (viewer, touched))
         conn.execute(update(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id)
                      .values(outcome=BOOKING, scanned=now, segment_id=touched[0] if touched else None))
-        return added, 1
+        return Filed(added, 1)
 
 
 def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message_ids: list[str]) -> int:
@@ -457,11 +475,11 @@ def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message
         except gmail.GmailError:
             continue
         asked += 1
-        suggestions, _, _ = _read(cfg, extract.plain_text(raw), known, left)
-        if not suggestions:
+        read = _read(cfg, extract.plain_text(raw), known, left)
+        if not read.suggestions:
             continue
         with db.session() as conn:
-            for suggestion in suggestions:
+            for suggestion in read.suggestions:
                 fields = _ai_fields(conn, suggestion)
                 if fields is None:
                     continue
@@ -475,18 +493,18 @@ def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message
     return asked
 
 
-def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> tuple[int, int, int]:
-    asked = made = cleared = 0
+def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> tuple[int, int, int, int]:
+    asked = made = cleared = dismissed = 0
     passed: set[str] = set()
     while True:
         with db.session() as conn:
             cfg = ai.config(conn)
             if cfg is None or not autoask.chosen(conn):
-                return asked, made, cleared
+                return asked, made, cleared, dismissed
             message_id = autoask.next_waiting(conn, mailbox_id, passed)
             known = tuple(loyalty.known_numbers(conn))
         if message_id is None:
-            return asked, made, cleared
+            return asked, made, cleared, dismissed
         passed.add(message_id)
         try:
             raw = gmail.fetch(token(), message_id)
@@ -498,13 +516,13 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> t
             continue
         left = BUDGET - (_clock() - started)
         if left <= 0:
-            return asked, made, cleared
+            return asked, made, cleared, dismissed
         asked += 1
-        suggestions, error, failed = _read(cfg, extract.plain_text(raw), known, left)
+        read = _read(cfg, extract.plain_text(raw), known, left)
         with db.session() as conn:
-            added, removed = _file_ai(conn, mailbox_id, message_id, suggestions, error, None if failed else True, time.time())
-            made, cleared = made + added, cleared + removed
-            if failed:
+            filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, None if read.failed else True, time.time(), read.not_a_booking)
+            made, cleared, dismissed = made + filed.added, cleared + filed.cleared, dismissed + filed.dismissed
+            if read.failed:
                 autoask.failed(conn, mailbox_id, message_id)
             else:
                 autoask.stop_waiting(conn, mailbox_id, message_id)
@@ -531,7 +549,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             return Result("not_started", str(e))
         ignored = review.ignored(conn, mailbox_id)
     history, last_scan = row["history_id"], row["last_scan"]
-    read = made = queued = skipped = dropped = handled = not_travel = followups = with_facts = attached = asked_by_ai = 0
+    read = made = queued = skipped = dropped = handled = not_travel = followups = with_facts = attached = asked_by_ai = dismissed = 0
     gaps: list[str] = []
     with db.session() as conn:
         filling = not again and not backfill and autoask.fills_gaps(conn)
@@ -656,7 +674,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             attached += bool(joined) and not a
             read, made, queued, handled = read + 1, made + a, queued + b, handled + 1
         if not capped:
-            asked_by_ai, ai_made, ai_cleared = _ask_waiting(mailbox_id, current, started)
+            asked_by_ai, ai_made, ai_cleared, dismissed = _ask_waiting(mailbox_id, current, started)
             asked_by_ai += _fill_gaps(current, started, viewer, gaps)
             made, queued = made + ai_made, max(0, queued - ai_cleared)
         if not again and not backfill:
@@ -670,9 +688,9 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
         return _fail(mailbox_id, FAILED_GENERALLY, (read, made, queued))
     if not again and not backfill:
         remember(mailbox_id, Summary(tally["pending"], read, made, queued, skipped, capped, dropped, tally["found"] - tally["pending"] + handled, tally["found"], not_travel, followups, with_facts, attached,
-                                     asked_by_ai))
+                                     asked_by_ai, dismissed))
     monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {tally['pending']} message(s) found, "
-                   f"{read} read, {made} booking(s) added or changed, {queued} to review, {f'{followups} follow-up(s) attached ({with_facts} with details not applied), ' if followups else ''}{f'{attached} email(s) attached to an existing booking, ' if attached else ''}{f'{asked_by_ai} sent to the AI, ' if asked_by_ai else ''}{skipped} skipped ({not_travel} as not travel){', more waiting' if capped else ''}.")
+                   f"{read} read, {made} booking(s) added or changed, {queued} to review, {f'{followups} follow-up(s) attached ({with_facts} with details not applied), ' if followups else ''}{f'{attached} email(s) attached to an existing booking, ' if attached else ''}{f'{asked_by_ai} sent to the AI, ' if asked_by_ai else ''}{f'{dismissed} dismissed as not bookings, ' if dismissed else ''}{skipped} skipped ({not_travel} as not travel){', more waiting' if capped else ''}.")
     if why:
         monitoring.log("What stopped messages being read: " + "; ".join(f"{n} × {what}" for what, n in sorted(why.items())) + ".")
     return Result("done", None, read, made, queued, tally["pending"], skipped, capped)
@@ -687,7 +705,15 @@ def run(mailbox_id: int, today: date, again: bool = False, backfill: bool = Fals
     return result
 
 
-def scan_all(today: date) -> list[Result]:
+def scan_all(today: date, scanned: list[int] | None = None) -> list[Result]:
     with db.session() as conn:
         ids = list(conn.execute(select(Mailbox.id).where(Mailbox.status != gmail.RECONNECT).order_by(Mailbox.id)).scalars())
-    return [run(i, today) for i in ids]
+    covered = [] if scanned is None else scanned
+    results = []
+    for i in ids:
+        covered.append(i)
+        result = run(i, today)
+        if result.state == "busy":
+            covered.remove(i)
+        results.append(result)
+    return results
