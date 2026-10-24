@@ -27,6 +27,17 @@ class CleanEnvTests(unittest.TestCase):
         self.assertEqual(env, {"PATH": "/bin", "WAYPOINT_DATA": "/tmp/demo", "PYTHONUNBUFFERED": "1",
                                "RAPIDAPI_KEY": verify.DEMO_KEY, "HTTPS_PROXY": verify.NO_OUTSIDE, "https_proxy": verify.NO_OUTSIDE})
 
+    def test_the_demo_server_gets_only_the_variables_it_needs_never_a_provider_credential(self):
+        secrets = {"GOOGLE_CLIENT_ID": "real-id", "GOOGLE_CLIENT_SECRET": "real-secret", "OPENROUTER_API_KEY": "sk-real", "GITHUB_TOKEN": "ghp_real",
+                   "AWS_SECRET_ACCESS_KEY": "aws", "NODE_AUTH_TOKEN": "npm", "ANTHROPIC_API_KEY": "sk-ant", "VAPID_PRIVATE_KEY": "vapid",
+                   "WAYPOINT_SECRET_KEY": "k", "SOMETHING_NEW_TOKEN": "t"}
+        needed = {"PATH": "/bin", "HOME": "/root", "LANG": "C.UTF-8", "LC_ALL": "C", "PYTHONPATH": "/x", "PLAYWRIGHT_BROWSERS_PATH": "/opt/pw", "VIRTUAL_ENV": "/venv"}
+        env = verify.clean_env("/tmp/demo", {**secrets, **needed})
+        self.assertFalse(set(secrets) & set(env))
+        self.assertEqual({k: env[k] for k in needed}, needed)
+        with mock.patch.dict("os.environ", secrets, clear=False):
+            self.assertFalse(set(secrets) & set(verify.frozen_env(verify.clean_env("/tmp/demo"), "/lib/f.so")))
+
     def test_the_demo_server_has_a_made_up_flight_status_key_and_reaches_nobody(self):
         base = {"RAPIDAPI_KEY": "real-key-12345678", "HTTPS_PROXY": "http://proxy:3128", "HTTP_PROXY": "http://proxy:3128",
                 "all_proxy": "socks5://proxy"}

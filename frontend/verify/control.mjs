@@ -168,7 +168,7 @@ export const COMMANDS = {
     args: [{ name: "js", required: true, variadic: true }],
     options: { write: { type: "boolean", help: "allow it to change the app's data (requests other than GET)" } },
     details: ["An expression (`document.title`) or a function (`() => [...document.querySelectorAll('h2')].map(h => h.textContent)`); the result as JSON.",
-      "Read-only by default: a request it makes other than GET or HEAD is blocked, and a change it makes to the page is reported (domChanges).",
+      "Read-only by default: a request other than GET or HEAD is blocked, one the expression schedules for later too (the session blocks every change the page tries to make unless a command that acts as a person is running: goto, click, type, press, scroll, viewport, offline, flow, reset, or eval --write). A change it makes to the page is reported (domChanges).",
       "Prefer snapshot, click and type: they act as a person would."],
     examples: ["eval document.title", "eval \"() => getComputedStyle(document.body).backgroundColor\""],
   },
@@ -247,7 +247,7 @@ export function overviewHelp() {
     lines.push("", `${title}:`);
     for (const [name, c] of Object.entries(COMMANDS)) if (c.group === group) lines.push(`  ${name.padEnd(12)} ${c.summary}`);
   }
-  lines.push("", "Localhost and demo data only: it drives only the demo server it started, and writes only under artifacts/control/ (never committed).");
+  lines.push("", "Localhost and demo data only: it drives only the demo server it started (a request to any other address is blocked before it is sent), and writes only under artifacts/control/ (never committed).");
   return lines.join("\n");
 }
 
@@ -352,6 +352,14 @@ export function sameServer(url, base) {
   const own = new URL(base);
   return url.protocol === own.protocol && url.port === own.port && LOOPBACK_HOSTS.includes(url.hostname);
 }
+
+export function allowedRequest(url, base) {
+  let u;
+  try { u = new URL(url); } catch { return false; }
+  return ["data:", "blob:", "about:"].includes(u.protocol) || sameServer(u, base);
+}
+
+export const ACTING_COMMANDS = ["goto", "viewport", "offline", "click", "type", "press", "scroll", "flow", "reset"];
 
 export const onHost = (base, host) => base.replace(/^(https?:\/\/)[^:/]+/, `$1${host}`);
 

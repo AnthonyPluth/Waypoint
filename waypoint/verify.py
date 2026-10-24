@@ -33,6 +33,9 @@ FAKETIME_INSTALL = "sudo apt-get install libfaketime"
 
 MAX_JOBS = 4
 JOBS_ENV = "VERIFY_JOBS"
+KEPT_ENV = frozenset({"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TMPDIR", "LANG", "LANGUAGE", "TZDIR", "VIRTUAL_ENV", "LD_LIBRARY_PATH",
+                      "NODE_PATH", "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR", "CI"})
+KEPT_ENV_PREFIXES = ("LC_", "PYTHON", "PLAYWRIGHT_", "XDG_", "FONTCONFIG_")
 DEMO_KEY = "demo-key-not-real"
 NO_OUTSIDE = "http://127.0.0.1:9"
 BUSY = 1.5
@@ -47,12 +50,8 @@ class Instance(NamedTuple):
 
 
 def clean_env(data: str, base: dict[str, str] | None = None) -> dict[str, str]:
-    env = {k: v for k, v in (os.environ if base is None else base).items()
-           if not k.startswith(("OIDC_", "WAYPOINT_SECRET_KEY"))
-           and k not in ("DATABASE_URL", "WAYPOINT_PUBLIC_URL", "WAYPOINT_ALLOW_NO_AUTH")}
+    env = {k: v for k, v in (os.environ if base is None else base).items() if k in KEPT_ENV or k.startswith(KEPT_ENV_PREFIXES)}
     env.update(WAYPOINT_DATA=data, PYTHONUNBUFFERED="1", RAPIDAPI_KEY=DEMO_KEY, HTTPS_PROXY=NO_OUTSIDE, https_proxy=NO_OUTSIDE)
-    for name in ("HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"):
-        env.pop(name, None)
     return env
 
 

@@ -46,7 +46,7 @@ Flows:
 Help:
   help         This overview, or one command's help (`help <command>`, the same as `<command> --help`).
 
-Localhost and demo data only: it drives only the demo server it started, and writes only under artifacts/control/ (never committed).
+Localhost and demo data only: it drives only the demo server it started (a request to any other address is blocked before it is sent), and writes only under artifacts/control/ (never committed).
 ```
 
 ## Session
@@ -345,7 +345,7 @@ tools/control eval <js…> [options]
 Evaluate JavaScript in the page and print the result (read-only unless --write).
 
 An expression (`document.title`) or a function (`() => [...document.querySelectorAll('h2')].map(h => h.textContent)`); the result as JSON.
-Read-only by default: a request it makes other than GET or HEAD is blocked, and a change it makes to the page is reported (domChanges).
+Read-only by default: a request other than GET or HEAD is blocked, one the expression schedules for later too (the session blocks every change the page tries to make unless a command that acts as a person is running: goto, click, type, press, scroll, viewport, offline, flow, reset, or eval --write). A change it makes to the page is reported (domChanges).
 Prefer snapshot, click and type: they act as a person would.
 
 Options:

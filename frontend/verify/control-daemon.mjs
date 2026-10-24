@@ -5,15 +5,17 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ARTIFACTS, ControlError, LOOPBACK_HOSTS, PROG, ROOT, closest, errorResult, jsExpression, lastShotNumber, onHost, parseTarget, readState, rel, removeState, routeUrl, sameServer, scrubText, scrubUrl, shotName, socketPath, writeState } from "./control.mjs";
+import { ACTING_COMMANDS, ARTIFACTS, ControlError, allowedRequest, LOOPBACK_HOSTS, PROG, ROOT, closest, errorResult, jsExpression, lastShotNumber, onHost, parseTarget, readState, rel, removeState, routeUrl, sameServer, scrubText, scrubUrl, shotName, socketPath, writeState } from "./control.mjs";
 import { startServer } from "./control-server.mjs";
 import { VIEWPORTS, checksAfter, contextOptions, launchOptions, prepareContext, readFlows, recheck, runStep, screenshotFile, setUpOffline, settlePage } from "./verify.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BUFFER = 500;
 const START_ROUTE = "#upcoming";
+const EVAL_SETTLE_MS = 500;
 
 const log = (line) => console.log(`${new Date().toISOString()} ${line}`);
+const uniqueList = (items) => [...new Set(items)];
 const firstLine = (e) => String(e?.message ?? e).split("\n")[0];
 
 function options(argv) {
@@ -48,7 +50,8 @@ async function main() {
   save();
 
   let server = null, browser = null, listener = null, page = null, ctx = null, base = "", servers = 0, idle = null, ending = false;
-  const consoleBuffer = [], requests = [], offsite = [];
+  const consoleBuffer = [], requests = [], offsite = [], refused = [], blockedHosts = [];
+  let acting = false;
   let shots = 0;
 
   async function shutdown(reason, code = 0, { keepState = false } = {}) {
@@ -91,6 +94,18 @@ async function main() {
     const previous = ctx;
     const fresh = await browser.newContext(contextOptions(viewport, { phoneAgent }));
     await prepareContext(fresh, opt.now);
+    await fresh.route("**/*", (route) => {
+      const request = route.request();
+      if (!allowedRequest(request.url(), base)) {
+        blockedHosts.push(scrubUrl(request.url(), base) ?? "a data address");
+        return route.abort("blockedbyclient");
+      }
+      if (!["GET", "HEAD", "OPTIONS"].includes(request.method()) && !acting) {
+        refused.push(`${request.method()} ${scrubUrl(request.url(), base)}`);
+        return route.abort("blockedbyclient");
+      }
+      return route.fallback();
+    });
     const tab = await fresh.newPage();
     tab.setDefaultTimeout(30000);
     tab.setDefaultNavigationTimeout(30000);
@@ -105,7 +120,9 @@ async function main() {
       if (frame !== tab.mainFrame() || ending) return;
       let url;
       try { url = new URL(frame.url()); } catch { return; }
-      if (url.origin !== "null" && url.protocol.startsWith("http") && !sameServer(url, base)) {
+      if (url.protocol === "chrome-error:") {
+        tab.goBack().catch(() => tab.goto(`${base}/${START_ROUTE}`)).catch((e) => log(`coming back from a blocked address: ${firstLine(e)}`));
+      } else if (url.protocol.startsWith("http") && !sameServer(url, base)) {
         offsite.push(url.origin);
         tab.goto(`${base}/${START_ROUTE}`).catch((e) => log(`coming back from ${url.origin}: ${firstLine(e)}`));
       }
@@ -265,14 +282,7 @@ async function main() {
     },
     async eval({ args, options: o }) {
       const code = args.join(" ");
-      const blocked = [];
-      const guard = (r) => {
-        const m = r.request().method();
-        if (["GET", "HEAD", "OPTIONS"].includes(m)) return r.fallback();
-        blocked.push(`${m} ${scrubUrl(r.request().url(), base)}`);
-        return r.abort("blockedbyclient");
-      };
-      if (!o.write) await page.route("**/*", guard);
+      const before = refused.length;
       await page.evaluate(() => {
         globalThis.__controlChanges = 0;
         globalThis.__controlObserver?.disconnect();
@@ -283,11 +293,12 @@ async function main() {
       try {
         value = await page.evaluate(jsExpression(code));
       } catch (e) {
-        if (blocked.length) throw notReadOnly(blocked);
+        if (refused.length > before) throw notReadOnly(refused.splice(before));
         throw new ControlError("eval_error", scrubText(firstLine(e)).replace(/^page\.evaluate: /, ""), "check the expression: it runs in the page (document, window), as an expression or a () => function");
-      } finally {
-        if (!o.write) await page.unroute("**/*", guard);
       }
+      await page.waitForTimeout(EVAL_SETTLE_MS);
+      await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => null);
+      const blocked = refused.splice(before);
       const domChanges = await page.evaluate(() => { globalThis.__controlObserver?.disconnect(); return globalThis.__controlChanges ?? 0; }).catch(() => 0);
       if (blocked.length) throw notReadOnly(blocked);
       const json = JSON.stringify(value);
@@ -389,14 +400,23 @@ async function main() {
     if (!handler) { touch(); return errorResult(request.command, new ControlError("usage", `the session has no command ${request.command}`, `\`${PROG} --help\``, 2)); }
     log(`${request.command}`);
     clearTimeout(idle);
+    acting = ACTING_COMMANDS.includes(request.command) || (request.command === "eval" && !!request.options?.write);
     try {
       const reply = await handler({ args: request.args ?? [], options: request.options ?? {}, path: request.path });
       const away = offsite.splice(0);
-      return { ok: true, ...reply, ...(away.length ? { warning: `the page went to ${away.join(", ")}, which isn't the session's server: it was brought back` } : {}) };
+      const stopped = blockedHosts.splice(0);
+      const idleWrites = refused.splice(0);
+      const warnings = [
+        ...(away.length ? [`the page went to ${away.join(", ")}, which isn't the session's server: it was brought back`] : []),
+        ...(stopped.length ? [`requests to ${uniqueList(stopped).join(", ")}, which isn't the session's server, were blocked before they were sent`] : []),
+        ...(idleWrites.length && request.command !== "eval" ? [`${idleWrites.length} change(s) the page tried to make while no command was acting were blocked (${uniqueList(idleWrites).slice(0, 3).join(", ")})`] : []),
+      ];
+      return { ok: true, ...reply, ...(warnings.length ? { warning: warnings.join("; ") } : {}) };
     } catch (e) {
       const err = bad(e);
       return { ...errorResult(request.command, err), ...(e.data ?? {}) };
     } finally {
+      acting = false;
       touch();
     }
   }

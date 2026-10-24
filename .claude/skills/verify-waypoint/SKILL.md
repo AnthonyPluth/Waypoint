@@ -24,11 +24,11 @@ Use it while you work, to see what you changed. `make verify` is still the batch
 
 ## Safety
 
-- Demo data only, on the session's own loopback server, with none of your real settings (no `DATABASE_URL`, sign-in or secret key reaches it) and no way out to the internet. It refuses other URLs and never touches a real instance.
+- Demo data only, on the session's own loopback server, with none of your real settings (no `DATABASE_URL`, sign-in or secret key reaches it) and no way out to the internet: the browser blocks every request to an address other than the session's server before it is sent, and the server gets only a short list of environment variables (no provider credentials). It refuses other URLs and never touches a real instance.
 - The repository is public: put no real data (names, confirmation codes, loyalty numbers) in commands, flows, screenshots or PR text.
 - What it reports is scrubbed: requests as paths with ids as `:id` and never a query string, calendar feed addresses as `/feed/…`, console text without amounts, email addresses or long tokens.
 - Everything it writes is under `artifacts/control/`, ignored by git. Never commit it, and never copy an image into `docs/src/assets/screenshots/` by hand.
-- `eval` is read-only unless you pass `--write`. `reset`, `stop` and `cleanup` take `--dry-run`.
+- `eval` is read-only unless you pass `--write`; changes the page tries to make while a command that only looks (snapshot, screenshot, eval) is running, or between commands, are blocked and reported. `reset`, `stop` and `cleanup` take `--dry-run`.
 
 ## References
 
