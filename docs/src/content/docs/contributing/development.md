@@ -148,7 +148,7 @@ A pull request that changes the UI commits the images `make verify` changed, so 
 Running `make verify` twice on one tree gives identical files, so an image changes only when the UI or its data does:
 
 - The clock is frozen. The server and the demo seed run under `libfaketime` on a fixed date (`FROZEN_NOW` in `waypoint/verify.py`), and the browser’s clock is set to the same date.
-- Each image is taken from the top of the page with animations finished, after the page’s requests settle, with a fixed colour profile, one raster thread and no sub-pixel text.
+- Each image is taken from the top of the page with animations finished, after the page’s requests settle, with a fixed colour profile, one raster thread, no partial raster (which rarely drew a card’s edge a level off between runs) and no sub-pixel text.
 - It needs Linux (the dev container and CI; macOS doesn’t support `LD_PRELOAD`) and fails with the install line when `libfaketime` is missing.
 
 ```bash

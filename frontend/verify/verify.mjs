@@ -10,7 +10,7 @@ export const PHONE_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS 
 export const VIEWPORTS = { phone: { width: 440, height: 956 }, desktop: { width: 1280, height: 800 }, laptop: { width: 1024, height: 768 }, wide: { width: 1440, height: 900 }, zoomed: { width: 853, height: 533 } };
 export const DEFAULT_VIEWPORTS = ["phone", "desktop"];
 export const IMAGE_VIEWPORTS = ["phone", "desktop"];
-export const CHROMIUM_ARGS = ["--force-color-profile=srgb", "--disable-lcd-text", "--num-raster-threads=1"];
+export const CHROMIUM_ARGS = ["--force-color-profile=srgb", "--disable-lcd-text", "--num-raster-threads=1", "--disable-partial-raster"];
 export const SETTLE_MS = 300;
 export const FROZEN_NOW = "2026-06-15T12:00:00Z";
 export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];

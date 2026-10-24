@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, lengthenNames, localBase, OFFLINE_SAVED, PAGES, screenshotFile, unknownPages, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { CHROMIUM_ARGS, DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, lengthenNames, localBase, OFFLINE_SAVED, PAGES, screenshotFile, unknownPages, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -137,6 +137,12 @@ describe("screenshotFile", () => {
   });
 
   it("freezes the clock on a fixed date", () => expect(FROZEN_NOW).toBe("2026-06-15T12:00:00Z"));
+});
+
+describe("CHROMIUM_ARGS", () => {
+  it("rasters in one thread, without partial raster and with a fixed colour profile and no sub-pixel text, so an edge comes out the same every run", () => {
+    expect(CHROMIUM_ARGS).toEqual(["--force-color-profile=srgb", "--disable-lcd-text", "--num-raster-threads=1", "--disable-partial-raster"]);
+  });
 });
 
 describe("findChromium", () => {
