@@ -124,6 +124,12 @@ def visible(conn: db.Connection, owner: str, item_id: int) -> Any:
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
 
 
+def arrived(conn: db.Connection, owner: str, since: float) -> list[str]:
+    rows = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id).join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
+                        .where(_seen_by(owner), ReviewItem.created >= since).order_by(ReviewItem.id)).fetchall()
+    return [f"{r['mailbox_id']}/{r['message_id']}" for r in rows]
+
+
 def count(conn: db.Connection, owner: str) -> int:
     rows = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.sender_domain, ReviewItem.reference, ReviewItem.reason, ReviewItem.matches)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(_seen_by(owner))).fetchall()
@@ -165,7 +171,8 @@ def stored_image(conn: db.Connection, owner: str, item_id: int, index: int) -> s
     return None if found is None else stored_mail.image_of(conn, *found, index)
 
 
-def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewer, list[int]] | None = None, trust: bool = False) -> bool:
+def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewer, list[int]] | None = None, trust: bool = False,
+            only_this: bool = False) -> bool:
     seen = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.sender_domain,
                                ReviewItem.reference, ReviewItem.matches)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
@@ -178,7 +185,7 @@ def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewe
     if trust and made and seen["reason"] == "generic" and seen["sender_domain"] != UNKNOWN_SENDER:
         db.insert_ignore(conn, TrustedSender, {"mailbox_id": seen["mailbox_id"], "domain": seen["sender_domain"]}, key=["mailbox_id", "domain"])
     same = [ReviewItem.id == item_id]
-    if _group_key(seen, 0)[0] != "alone":
+    if not only_this and _group_key(seen, 0)[0] != "alone":
         same.append(and_(ReviewItem.mailbox_id == seen["mailbox_id"], ReviewItem.sender_domain == seen["sender_domain"],
                          ReviewItem.reference == seen["reference"], ReviewItem.reason.in_(GROUPED), ReviewItem.matches.is_(None)))
     conn.execute(delete(ReviewItem).where(or_(*same)))

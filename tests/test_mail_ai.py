@@ -428,7 +428,7 @@ class BookingListTests(unittest.TestCase):
         self.assertEqual(reading.bookings, [STAY])
 
     def test_the_prompt_asks_for_a_list_with_one_booking_per_flight(self):
-        self.assertIn('with only the key "bookings"', ai.SYSTEM)
+        self.assertIn('with the key "bookings"', ai.SYSTEM)
         self.assertIn("A round trip is two flights", ai.SYSTEM)
         self.assertIn("a flight never leaves from and arrives at the same airport", ai.SYSTEM)
 

@@ -314,6 +314,7 @@ class ReminderPrefs(Base):
     owner_sub: Mapped[str]
     check_in: Mapped[bool]
     day_of: Mapped[bool]
+    review: Mapped[bool]
 
 
 class ReminderSent(Base):

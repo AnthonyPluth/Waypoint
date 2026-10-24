@@ -29,9 +29,20 @@ Both switches are needed: with either off, a scan sends no email text anywhere, 
 
 A message a reader did turn into a booking is also sent when that booking lacks a detail the AI can read, such as a flight’s cabin, a hotel’s address or phone, a cruise’s ship, or the total. The AI only fills in what is missing: it never changes a time, place or code a reader found, and never adds a booking. Messages with nothing missing aren’t sent. Filling gaps this way needs the consent in the warning as it now reads: a household that turned the switch on under its earlier wording keeps the narrower behaviour (unreadable mail only) until someone turns the switch off and on again.
 
-There is no limit on how many messages a scan asks about. A request that fails leaves the item as it was, with a note that the AI couldn’t be asked, and is tried again on the next scans, at most twice more. Each mailbox’s last-scan line in Settings says how many messages the AI was asked about, a count only.
+There is no limit on how many messages a scan asks about. A request that fails leaves the item as it was, with a note that the AI couldn’t be asked, and is tried again on the next scans, at most twice more. Each mailbox’s last-scan line in Settings says how many messages the AI was asked about and how many it dismissed as not bookings, counts only.
 
 What is sent, whether it is redacted and where it goes are exactly as for **Ask AI**. The item in Review shows the suggestion with a **read automatically** label, and a complete result is added to your trips by itself.
+
+## Emails that aren’t bookings
+
+When the AI finds no booking in a message and judges it plainly not about a booking at all, Waypoint dismisses the Review item itself, with no step for you. This applies to **Ask AI** and to the automatic reading alike. The model can say so for three kinds of email: a **promotion** (a sale, a discount or another offer), a **loyalty or account statement**, and a **newsletter**.
+
+- **Ask AI** takes the item off the list and says why, for example “Dismissed: a promotion, not a booking.”
+- A scan counts these in the mailbox’s last-scan line in Settings (“AI dismissed 3 emails as not bookings”), never with a subject, sender or text.
+- Only that one item is dismissed, not others that Review groups with it. The stored copy of the email is deleted, as for any dismissal, and the scan remembers the message so it isn’t queued again.
+- Only an answer with no bookings at all and that verdict dismisses anything. “No booking found” without the verdict leaves the item in Review as before, and so does an error, a timeout, an answer Waypoint can’t read or a result with a booking in it. The model is told to leave the verdict out for a confirmation, a cancellation, a change, a reminder or anything about a trip, and whenever it is unsure.
+
+An AI assistant connected over [MCP](/Waypoint/start/mcp/) never dismisses this way: it still asks you before every change.
 
 ## What is sent
 

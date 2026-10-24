@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, LargeBinary, MetaData, Table, Text, UniqueConstraint, false, text
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, LargeBinary, MetaData, Table, Text, UniqueConstraint, false, text, true
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 
@@ -375,7 +375,8 @@ reminder_prefs = Table(
     Column('owner_sub', Text, primary_key=True),
     Column('check_in', Boolean, nullable=False),
     Column('day_of', Boolean, nullable=False),
-    info={'doc': "which reminders a member gets: \"Check-in opens\" 24 hours before a flight, and the day-of summary"},
+    Column('review', Boolean, nullable=False, server_default=true()),
+    info={'doc': "which reminders a member gets: \"Check-in opens\" 24 hours before a flight, the day-of summary, and a count of booking emails that need review"},
 )
 
 reminders_sent = Table(
@@ -386,7 +387,7 @@ reminders_sent = Table(
     Column('ref', Text, nullable=False),
     Column('sent', Float, nullable=False),
     UniqueConstraint('owner_sub', 'kind', 'ref', name='uq_reminders_sent_owner_kind_ref'),
-    info={'doc': "each reminder already sent (a flight's check-in, a day's summary), so none goes out twice; holds no content"},
+    info={'doc': "each reminder already sent (a flight's check-in, a day's summary, a booking email waiting for review), so none goes out twice; holds no content"},
 )
 
 calendar_feeds = Table(

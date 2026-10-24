@@ -95,6 +95,8 @@ Off by default (**Settings → Mail & review → AI**; see [AI suggestions](/Way
 - **Local (Ollama)** on your own network. The text goes unredacted and untrimmed and never leaves your network, so loyalty and Known Traveler numbers in it reach your own server.
 - **OpenRouter**, restricted to providers with zero data retention. The text goes with every email address replaced by `[email]`, quoted replies and footers removed, and labelled or number-shaped loyalty, Known Traveler and card numbers removed, as well as the numbers saved under Loyalty.
 
+When the model finds no booking and says the email is plainly a promotion, a loyalty or account statement or a newsletter, Waypoint dismisses that one Review item, which deletes the stored copy of the email as any dismissal does; a scan reports only how many it dismissed.
+
 Only plain text goes out, never images or markup, and prompts and replies are never logged. What is sent, and what comes back, is under [AI suggestions](/Waypoint/start/ai/).
 
 The same setting powers one small button that involves no email: the sparkle beside a trip’s destination. It sends only the trip’s name (without its dates) and the cities, states and countries of its bookings with their kinds, and only when you press it ([the destination button](/Waypoint/start/ai/#the-destination-button-on-a-trip)).

@@ -50,6 +50,8 @@ Saving adds the booking to your trips, takes the item off the list and keeps the
 
 When the optional [AI suggestions](/Waypoint/start/ai/) are on, **Ask AI** asks the model about this one message now. Complete results are added to trips automatically; partial ones stay here to complete. A suggestion a scan asked for by itself arrives filled in, with a **read automatically** label ([Reading unreadable mail automatically](/Waypoint/start/ai/#reading-unreadable-mail-automatically)).
 
+When the model finds no booking and judges the email plainly not one (a promotion, a loyalty or account statement or a newsletter), the item is dismissed for you and a message says why. The same happens during a scan when the AI reads automatically ([Emails that aren’t bookings](/Waypoint/start/ai/#emails-that-arent-bookings)).
+
 When two or more items have no suggestion yet, **Ask AI about all** asks about each in turn, stops at the first failure and says how many it got through. A line beside it says where the text goes (OpenRouter, redacted, or your own Ollama server, unredacted). When the list is narrowed to one sender or mailbox, it becomes **Ask AI about these N emails** and asks only about those. Any member who can see an item can ask ([who can ask](/Waypoint/start/ai/#who-can-ask)).
 
 ### Not travel and Dismiss
