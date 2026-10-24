@@ -424,6 +424,9 @@ class Skills(unittest.TestCase):
         self.assertIn("missing", fc.check_cli_reference(None, "new\n")[0])
         self.assertIn("needs Node", fc.check_cli_reference("x", None, "node: not found")[0])
 
+    def test_the_user_feature_map_is_current(self):
+        self.assertEqual(fc.check_user_feature_map(), [])
+
 
 if __name__ == "__main__":
     unittest.main()
