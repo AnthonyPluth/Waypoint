@@ -15,7 +15,7 @@ def _settings(conn) -> AiSettings:
     stored = db.get_settings(conn, [sk.AI_OLLAMA_URL, sk.AI_OLLAMA_MODEL, sk.AI_OPENROUTER_MODEL])
     return {"mode": ai.mode(conn), "ollama_url": stored[sk.AI_OLLAMA_URL] or "", "ollama_model": stored[sk.AI_OLLAMA_MODEL] or "",
             "openrouter_model": stored[sk.AI_OPENROUTER_MODEL] or "", "key": key_source,
-            "auto": ai.mode(conn) != ai.OFF and autoask.chosen(conn)}
+            "auto": ai.mode(conn) == ai.LOCAL and autoask.chosen(conn)}
 
 
 def api_ai(conn, _q, _b) -> AiSettings:
@@ -60,7 +60,7 @@ def api_ai_save(conn, _q, body: AiBody) -> AiSettings:
         if not (key or (key is None and ai.saved_key(conn)[0])):
             raise ApiError(f"Enter an OpenRouter key (or set {ai.KEY_ENV} where Waypoint runs)")
     db.set_setting(conn, sk.AI_MODE, mode)
-    if mode == ai.OFF:
+    if mode != ai.LOCAL:
         autoask.save_choice(conn, False)
     elif "auto" in body:
         autoask.save_choice(conn, validate.on(body["auto"]))

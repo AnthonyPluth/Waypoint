@@ -114,6 +114,27 @@ describe("targets, routes and what's reported", () => {
   });
 });
 
+describe("what the browser may reach", () => {
+  const base = "http://127.0.0.1:4000";
+
+  it("allows the session's server on either loopback name, and data, blob and about addresses", () => {
+    for (const url of [`${base}/api/trips`, "http://localhost:4000/assets/a.js", "data:image/png;base64,AAAA", "blob:http://127.0.0.1:4000/x", "about:blank"]) {
+      expect(c.allowedRequest(url, base), url).toBe(true);
+    }
+  });
+
+  it("refuses every other address before it is sent", () => {
+    for (const url of ["https://example.com/x", "http://127.0.0.1:9/hit", "http://localhost:4001/", "http://192.168.1.5:4000/", "https://127.0.0.1:4000/", "ws://127.0.0.1:4000/", "file:///etc/passwd", "not a url"]) {
+      expect(c.allowedRequest(url, base), url).toBe(false);
+    }
+  });
+
+  it("lets only commands that act as a person, or eval --write, change data", () => {
+    for (const name of c.ACTING_COMMANDS) expect(c.COMMANDS[name]).toBeDefined();
+    for (const name of ["eval", "snapshot", "screenshot", "info", "console", "network", "wait-settle", "start", "stop"]) expect(c.ACTING_COMMANDS).not.toContain(name);
+  });
+});
+
 describe("the JSON error shape", () => {
   it("is ok: false with a code, a message and what to do, never a stack", () => {
     const e = c.errorResult("click", new c.ControlError("no_match", "nothing matches", "run snapshot"));

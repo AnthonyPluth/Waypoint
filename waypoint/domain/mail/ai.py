@@ -27,13 +27,13 @@ MODES: tuple[Mode, ...] = (OFF, LOCAL, OPENROUTER)
 KEY_ENV = "OPENROUTER_API_KEY"
 TIMEOUT = 30
 LOCAL_TIMEOUT = 3600
-MAX_SENT = 12_000
 MAX_REPLY = 1_000_000
 MAX_BOOKINGS = 10
 KINDS = ("flight", "hotel", "car", "train", "cruise", "parking")
 NOT_BOOKINGS = {"promotion": "a promotion", "statement": "a loyalty or account statement", "newsletter": "a newsletter"}
 REMOVED = "[removed]"
 EMAIL_REMOVED = "[email]"
+NEEDS_LOCAL = "Reading email with AI needs Local (Ollama) in Settings → AI."
 
 
 @dataclass(frozen=True)
@@ -116,6 +116,10 @@ def config(conn: db.Connection) -> Config | None:
     return None
 
 
+def mail_config(conn: db.Connection) -> Config | None:
+    return config(conn) if mode(conn) == LOCAL else None
+
+
 MODEL_NAME = re.compile(r"[\w.:/@+-]{1,100}")
 
 
@@ -145,17 +149,10 @@ LABELLED = re.compile(
 CARD = re.compile(r"\b\d{4}[ -]\d{4}[ -]\d{4}[ -]\d{1,4}\b|\b\d{4}[ -]\d{6}[ -]\d{4,5}\b")
 LONG = re.compile(r"\b\d{9,}\b")
 PREFIXED = re.compile(r"\b[A-Z]{1,4}-?\d{7,}\b")
-CUT = re.compile(r"(?im)^(?:on .{5,200} wrote:|-{2,}\s*(?:original message|reply message)\s*-{2,}|-- ?)\s*$")
-FOOTER = re.compile(r"(?i)unsubscribe|manage (?:your )?(?:email )?(?:preferences|subscriptions)|privacy (?:policy|notice)|"
-                    r"you(?:'re| are) receiving this|view (?:this email )?in (?:your )?browser")
 
 
 def redact(text: str, known: tuple[str, ...] = ()) -> str:
-    text = EMAIL.sub(EMAIL_REMOVED, text)
-    cut = CUT.search(text)
-    lines = [ln for ln in (text[:cut.start()] if cut else text).splitlines()
-             if not ln.lstrip().startswith(">") and not FOOTER.search(ln)]
-    out = "\n".join(ln.rstrip() for ln in lines)
+    out = EMAIL.sub(EMAIL_REMOVED, text)
     for number in known:
         letters = [c for c in number if c.isalnum()]
         if len(letters) >= 4:
@@ -164,7 +161,7 @@ def redact(text: str, known: tuple[str, ...] = ()) -> str:
     out = CARD.sub(REMOVED, out)
     out = LONG.sub(REMOVED, out)
     out = PREFIXED.sub(REMOVED, out)
-    return re.sub(r"\n{3,}", "\n\n", out).strip()[:MAX_SENT]
+    return out.strip()
 
 
 SYSTEM = (
@@ -201,8 +198,7 @@ SYSTEM_SEATS = (
     'flight: never choose, guess, assign or suggest a seat, and leave out a passenger with no printed seat. Leave out "travelers" when the email prints none.')
 
 
-def system_for(cfg: Config) -> str:
-    return SYSTEM + SYSTEM_SEATS if cfg.mode == LOCAL else SYSTEM
+MAIL_SYSTEM = SYSTEM + SYSTEM_SEATS
 
 
 def request(cfg: Config, text: str, system: str = SYSTEM, thinking: bool = False) -> tuple[str, dict[str, str], dict[str, Any], bool]:
@@ -524,22 +520,19 @@ def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY, timeout: flo
     return _answer(cfg, reply)
 
 
-def prepare(cfg: Config, text: str, known: tuple[str, ...] = ()) -> str:
-    return text if cfg.mode == LOCAL else redact(text, known)
-
-
-def suggest(cfg: Config, text: str, known: tuple[str, ...] = (), timeout: float | None = None) -> Reading:
-    sent = prepare(cfg, text, known)
-    if not sent.strip():
+def suggest(cfg: Config, text: str, timeout: float | None = None) -> Reading:
+    if cfg.mode != LOCAL:
+        raise AiError(NEEDS_LOCAL)
+    if not text.strip():
         raise AiError(NO_BOOKING)
     began = time.monotonic()
-    first = _attempt(cfg, sent, timeout)
-    if cfg.mode != LOCAL or not _doubtful(first, sent):
+    first = _attempt(cfg, text, timeout)
+    if not _doubtful(first, text):
         return _reading(first)
     left = None if timeout is None else timeout - (time.monotonic() - began)
     if left is not None and left <= 0:
         return _reading(first)
-    final = _better(first, _attempt(cfg, sent, left, thinking=True))
+    final = _better(first, _attempt(cfg, text, left, thinking=True))
     if isinstance(final, AiError):
         final.retried = True
     return _reading(final)
@@ -547,7 +540,7 @@ def suggest(cfg: Config, text: str, known: tuple[str, ...] = (), timeout: float 
 
 def _attempt(cfg: Config, sent: str, timeout: float | None, thinking: bool = False) -> Reading | AiError:
     try:
-        return parse(_ask(cfg, sent, system_for(cfg), timeout=timeout, thinking=thinking), sent, cfg.mode == LOCAL)
+        return parse(_ask(cfg, sent, MAIL_SYSTEM, timeout=timeout, thinking=thinking), sent, True)
     except AiError as e:
         return e
 

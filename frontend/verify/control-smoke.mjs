@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createServer } from "node:http";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -72,6 +73,26 @@ r = control("eval", "() => fetch('/api/control-smoke', { method: 'POST' }).then(
 expect(r.code === 1 && r.json?.error?.code === "not_read_only", "eval is read-only without --write: a POST is blocked, and said so");
 control("console");
 control("network");
+
+let hits = 0;
+const outside = createServer((req, res) => { hits++; res.end("hit"); });
+await new Promise((resolve) => outside.listen(0, "127.0.0.1", resolve));
+const outsideUrl = `http://127.0.0.1:${outside.address().port}`;
+r = control("eval", `() => fetch('${outsideUrl}/hit', { mode: 'no-cors' }).then(() => 'sent', () => 'refused')`);
+expect(r.json?.value === "refused" && hits === 0, "a fetch to another address sends nothing");
+r = control("eval", "--write", `() => { const a = document.createElement('a'); a.href = '${outsideUrl}/link'; document.body.append(a); a.click(); return 'clicked'; }`);
+expect(/blocked before they were sent/.test(r.json?.warning ?? ""), "a click on a link to another address is reported as blocked before it was sent");
+await new Promise((resolve) => setTimeout(resolve, 1500));
+r = control("info");
+expect(hits === 0 && r.json?.ok && r.json.session.server.startsWith("http://127.0.0.1:"), "nothing reached that address (the page never asked), and the page is still on the session's server");
+r = control("eval", "() => { setTimeout(() => fetch('/api/control-smoke', { method: 'POST' }), 100); return 'scheduled'; }");
+expect(r.code === 1 && r.json?.error?.code === "not_read_only", "a write that eval schedules for later is blocked too");
+r = control("eval", "() => { setTimeout(() => fetch('/api/control-smoke', { method: 'POST' }), 2500); return 'scheduled'; }");
+expect(r.code === 0, "a read-only eval whose write comes after it returned is accepted");
+await new Promise((resolve) => setTimeout(resolve, 3500));
+r = control("info");
+expect(/change\(s\) the page tried to make while no command was acting were blocked/.test(r.json?.warning ?? ""), "that late write was blocked, and the next command says so");
+outside.close();
 
 r = control("flow", "open-trip", "--viewport", "desktop");
 expect(r.code === 0 && r.json?.steps?.every((s) => s.ok) && r.json.files.length === 2, "flow: open-trip passes, step by step, with its 2 images");

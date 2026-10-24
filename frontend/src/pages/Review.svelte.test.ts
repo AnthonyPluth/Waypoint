@@ -985,7 +985,7 @@ describe("Review: Ask AI", () => {
   });
 
   it("asks only about the filtered emails, not the ones the filter hides", async () => {
-    held = { matches: [], who: [], ai: true, ai_mode: "openrouter", items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "seaside-stays.example" }),
+    held = { matches: [], who: [], ai: true, items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "seaside-stays.example" }),
       item({ id: 3, sender_domain: "seaside-stays.example" }), item({ id: 4, sender_domain: "other.example" })] };
     setQuery("sender=seaside-stays.example");
     render(ReviewPage);
@@ -995,13 +995,9 @@ describe("Review: Ask AI", () => {
   });
 
   it("says where the text goes next to the bulk button", async () => {
-    held = { matches: [], who: [], ai: true, ai_mode: "openrouter", items: [item(), item({ id: 2 })] };
-    const view = render(ReviewPage);
-    expect(await screen.findByTestId("ask-all")).toHaveTextContent("The text of these 2 emails goes to OpenRouter, redacted first.");
-    view.unmount();
-    held = { ...held, ai_mode: "local" };
+    held = { matches: [], who: [], ai: true, items: [item(), item({ id: 2 })] };
     render(ReviewPage);
-    expect(await screen.findByTestId("ask-all")).toHaveTextContent("to your own Ollama server, unredacted.");
+    expect(await screen.findByTestId("ask-all")).toHaveTextContent("The text of these 2 emails goes to your own Ollama server, unredacted.");
   });
 
   it("does not widen the scope when the filter has nothing to ask about", async () => {
@@ -1015,7 +1011,7 @@ describe("Review: Ask AI", () => {
   });
 
   it("offers the filtered bulk ask for a single email, and keeps the count when stopped by a failure", async () => {
-    held = { matches: [], who: [], ai: true, ai_mode: "local", items: [item({ id: 1, sender_domain: "a.example" }), item({ id: 2, sender_domain: "b.example" }), item({ id: 3, sender_domain: "b.example" })] };
+    held = { matches: [], who: [], ai: true, items: [item({ id: 1, sender_domain: "a.example" }), item({ id: 2, sender_domain: "b.example" }), item({ id: 3, sender_domain: "b.example" })] };
     suggestFails = "Turn on AI suggestions in Settings first.";
     setQuery("sender=b.example");
     render(ReviewPage);
@@ -1914,7 +1910,7 @@ describe("Review as a queue of decisions", () => {
     render(ReviewPage);
     const ask = await screen.findByTestId("ask-all");
     expect(within(ask).getByRole("button", { name: "Ask AI about all 2" })).toBeInTheDocument();
-    expect(ask).toHaveTextContent("OpenRouter, redacted first");
+    expect(ask).toHaveTextContent("your own Ollama server, unredacted");
     expect(screen.getByRole("list", { name: "Add missing details" })).toBeInTheDocument();
   });
 
