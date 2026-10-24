@@ -15,7 +15,7 @@ function controlWith(withEnv, ...args) {
   console.log(`$ tools/control ${args.join(" ")}`);
   const r = spawnSync(process.execPath, [join(here, "control.mjs"), ...args], { cwd: root, env: withEnv, encoding: "utf8", timeout: 300000 });
   const out = (r.stdout ?? "").trim();
-  console.log(out.length > 1500 ? `${out.slice(0, 1500)}…` : out);
+  console.log(out.length > 6000 ? `${out.slice(0, 6000)}…` : out);
   const parse = () => { try { return JSON.parse(out); } catch { return null; } };
   return { code: r.status, json: parse(), out };
 }
@@ -97,15 +97,12 @@ outside.close();
 r = control("flow", "open-trip", "--viewport", "desktop");
 expect(r.code === 0 && r.json?.steps?.every((s) => s.ok) && r.json.files.length === 2, "flow: open-trip passes, step by step, with its 2 images");
 
-const offlineFlow = () => {
-  control("reset");
-  return control("flow", "offline-trip", "--viewport", "desktop");
-};
-r = offlineFlow();
+control("reset");
+r = control("flow", "offline-trip", "--viewport", "desktop");
 if (r.code !== 0) {
-  console.log(`  note: offline-trip failed once, on ${JSON.stringify(r.json?.steps?.filter((s) => !s.ok))}; trying again on fresh data`);
-  control("console");
-  r = offlineFlow();
+  console.log(`  failed steps: ${JSON.stringify(r.json?.steps?.filter((s) => !s.ok))}`);
+  const lines = control("console").json?.messages ?? [];
+  console.log(lines.slice(-20).map((m) => `  console ${m.type}: ${m.text}`).join("\n"));
 }
 expect(r.code === 0 && r.json?.steps?.every((s) => s.ok), "flow: offline-trip passes after offline: it runs in a browser of its own");
 
