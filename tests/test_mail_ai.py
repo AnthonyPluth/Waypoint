@@ -9,14 +9,15 @@ from unittest import mock
 from sqlalchemy import select
 
 from tests.privacy import no_leaks
-from tests.test_mail_scan import ScanCase, eml
+from tests.test_mail_scan import NOW, ScanCase, eml, refusing_ai_hosts
 from tests.test_trips import RouteCase
 from waypoint import monitoring
 from waypoint.domain import trips
 from waypoint.domain.mail import ai, autoask, extract, review, scan
+from waypoint.providers import gmail
 from waypoint.storage import db
 from waypoint.storage import settings_keys as sk
-from waypoint.storage.models import ReviewItem, Setting, StoredMessage
+from waypoint.storage.models import ReviewItem, ScannedMessage, Setting, StoredMessage
 
 BODY = "CANARY-BODY-AI-5J2K"
 IDS = ("TT87654321", "4111 1111 1111 1111", "2207781905", "FXLOY-4400123")
@@ -77,7 +78,7 @@ def serve_fake_ai(case) -> FakeAi:
 class RedactTests(unittest.TestCase):
     TEXT = (f"Hello. {BODY}\nFlight EX 303 departs 2026-12-02T07:15 from BOS.\nFrequent flyer: FXLOY-4400123\n"
             "SkyMiles number: 2207781905\nKnown Traveler Number: TT87654321\nCard 4111 1111 1111 1111 on 2026-10-18.\n"
-            f"Confirmation code: QW4R7T\n> {QUOTED}\nUnsubscribe here\n-- \n{FOOTER}\n")
+            "Confirmation code: QW4R7T\n")
 
     def test_numbers_that_look_like_loyalty_known_traveler_or_card_numbers_are_removed(self):
         out = ai.redact(self.TEXT)
@@ -96,12 +97,6 @@ class RedactTests(unittest.TestCase):
         out = ai.redact(self.TEXT)
         for kept in (BODY, "EX 303", "2026-12-02T07:15", "BOS", "QW4R7T", "2026-10-18"):
             self.assertIn(kept, out)
-
-    def test_quoted_replies_footers_and_signatures_are_cut(self):
-        out = ai.redact(self.TEXT)
-        for gone in (QUOTED, FOOTER, "Unsubscribe"):
-            self.assertNotIn(gone, out)
-        self.assertNotIn(QUOTED, ai.redact(f"Booked.\nOn Mon, 5 Oct 2026, Jane Doe wrote:\n{QUOTED}\nmore"))
 
     def test_the_households_saved_numbers_go_wherever_they_are_written(self):
         out = ai.redact("Member FX LOY-44 00123 and fxloy4400123 and ABCD-9 here", known=("FXLOY-4400123", "ABCD-9"))
@@ -168,10 +163,6 @@ class RedactTests(unittest.TestCase):
         text = ("Depart 10:30, follow @airline on social, meet @ gate B7, flight EX 303 @10:30.\n"
                 "Hotel website: www.harbour-hotel.example.com, harbour-hotel.example.com/book\nPhone: +44 117 555 0100\nuser@localhost")
         self.assertEqual(ai.redact(text), text)
-
-    def test_only_so_much_goes_out(self):
-        self.assertEqual(len(ai.redact("word " * 10_000)), ai.MAX_SENT)
-        self.assertEqual(ai.redact("   \n"), "")
 
 
 class ParseTests(unittest.TestCase):
@@ -454,6 +445,21 @@ class ConfigTests(unittest.TestCase):
         db.set_setting(self.c, sk.AI_MODE, "bogus")
         self.assertIsNone(ai.config(self.c))
 
+    def test_mail_reading_has_a_config_only_in_local_mode(self):
+        for key, value in ((sk.AI_OLLAMA_URL, "http://ollama.example:1234"), (sk.AI_OLLAMA_MODEL, "llama3"), (sk.AI_OPENROUTER_MODEL, "some/model"),
+                           (sk.AI_OPENROUTER_KEY, KEY)):
+            db.set_setting(self.c, key, value)
+        cases = (("off", None, None), ("bogus", None, None), ("local", ai.Config("local", "llama3", url="http://ollama.example:1234"), None),
+                 ("openrouter", None, ai.Config("openrouter", "some/model", key=KEY)))
+        for chosen, mail, hosted in cases:
+            with self.subTest(mode=chosen):
+                db.set_setting(self.c, sk.AI_MODE, chosen)
+                self.assertEqual(ai.mail_config(self.c), mail)
+                self.assertEqual(ai.config(self.c), mail or hosted)
+        db.set_setting(self.c, sk.AI_MODE, "local")
+        db.set_setting(self.c, sk.AI_OLLAMA_MODEL, None)
+        self.assertIsNone(ai.mail_config(self.c))
+
     def test_the_key_is_stored_encrypted_and_the_environments_wins(self):
         db.set_setting(self.c, sk.AI_MODE, "openrouter")
         db.set_setting(self.c, sk.AI_OPENROUTER_MODEL, "some/model")
@@ -504,13 +510,11 @@ class SuggestTests(unittest.TestCase):
     def test_a_local_request_asks_the_model_not_to_think_and_waits_far_longer_than_openrouter(self):
         ai.suggest(self.local, "Confirmation code: QW4R7T flight BOS DEN")
         self.assertIs(self.fake.requests[0][2]["think"], False)
-        ai.suggest(self.router, "Confirmation code: QW4R7T flight BOS DEN")
-        self.assertNotIn("think", self.fake.requests[1][2])
-        for cfg, expected in ((self.local, ai.LOCAL_TIMEOUT), (self.router, ai.TIMEOUT)):
-            with mock.patch.object(ai.tls, "urlopen", side_effect=OSError) as opened:
-                with self.assertRaises(ai.AiError):
-                    ai.suggest(cfg, "Confirmation code: QW4R7T flight BOS DEN")
-            self.assertEqual(opened.call_args.args[1], expected)
+        self.assertNotIn("think", ai.request(self.router, "text")[2])
+        with mock.patch.object(ai.tls, "urlopen", side_effect=OSError) as opened:
+            with self.assertRaises(ai.AiError):
+                ai.suggest(self.local, "Confirmation code: QW4R7T flight BOS DEN")
+        self.assertEqual(opened.call_args.args[1], ai.LOCAL_TIMEOUT)
         self.assertGreater(ai.LOCAL_TIMEOUT, ai.TIMEOUT)
 
     def answers(self, *contents):
@@ -556,12 +560,6 @@ class SuggestTests(unittest.TestCase):
             ai.suggest(self.local, "Confirmation code: QW4R7T flight BOS DEN")
         self.assertEqual(self.asked_to_think(), [False])
 
-    def test_openrouter_is_not_asked_a_second_time(self):
-        self.answers("not json")
-        with self.assertRaises(ai.AiError):
-            ai.suggest(self.router, "Confirmation code: QW4R7T flight BOS DEN")
-        self.assertEqual(len(self.fake.requests), 1)
-
     def test_the_second_ask_gets_only_the_time_a_scan_has_left(self):
         self.answers("not json", json.dumps(GOOD))
         clock = mock.Mock(monotonic=mock.Mock(side_effect=[0.0, 40.0]))
@@ -581,46 +579,17 @@ class SuggestTests(unittest.TestCase):
         self.assertEqual(ai._wait(self.local, 10 * ai.LOCAL_TIMEOUT), ai.LOCAL_TIMEOUT)
         self.assertEqual(ai._wait(self.router, 600.0), ai.TIMEOUT)
 
-    def test_an_openrouter_request_denies_data_collection_and_allows_only_zero_retention(self):
-        ai.suggest(self.router, "Confirmation code: QW4R7T flight BOS DEN")
-        path, headers, body = self.fake.requests[0]
-        self.assertEqual(path, "/api/v1/chat/completions")
-        self.assertEqual(body["provider"], {"data_collection": "deny", "zdr": True})
-        self.assertEqual((body["model"], body["response_format"]), ("some/model", {"type": "json_object"}))
-        self.assertEqual(headers["Authorization"], f"Bearer {KEY}")
-
     def test_openrouter_is_only_reached_over_https_unless_a_test_says_otherwise(self):
         self.assertFalse(ai.request(self.router, "text")[3] and not ai.HOSTS.allow_http)
         self.assertEqual(ai.Hosts().openrouter, "https://openrouter.ai/api/v1")
         self.assertFalse(ai.Hosts().allow_http)
-
-    def test_an_email_address_in_the_body_never_reaches_the_request(self):
-        address = "canary.traveller+5k2m@canary-mail.example.com"
-        text = (f"From: Example Air <{address}>\nTo: {address.upper()}\nConfirmation code: QW4R7T flight BOS DEN\n"
-                f"Questions: mailto:{address}")
-        for cfg in (self.router,):
-            self.fake.reset()
-            with no_leaks(self, address, address.upper(), "canary-mail"):
-                reading = ai.suggest(cfg, text)
-            sent = json.dumps(self.fake.requests[0][2])
-            self.assertNotIn("canary", sent)
-            self.assertNotIn("@", sent.replace(ai.SYSTEM, ""))
-            self.assertIn(ai.EMAIL_REMOVED, sent)
-            self.assertEqual(reading.bookings, [GOOD])
-
-    def test_what_is_sent_is_the_redacted_text_only(self):
-        ai.suggest(self.router, f"Confirmation code: QW4R7T BOS DEN\nKnown Traveler Number: TT87654321\n> {QUOTED}")
-        sent = json.dumps(self.fake.requests[0][2])
-        self.assertIn("QW4R7T", sent)
-        self.assertNotIn("TT87654321", sent)
-        self.assertNotIn(QUOTED, sent)
 
     def test_a_local_request_carries_the_text_verbatim(self):
         address = "canary.traveller+5k2m@canary-mail.example.com"
         text = (f"From: Example Air <{address}>\nConfirmation code: QW4R7T flight BOS DEN\nKnown Traveler Number: TT87654321\n"
                 f"Member FX LOY-44 00123 and 4111222233334444\n> {QUOTED}\nOn Mon, 5 Oct 2026, Jane Doe wrote:\nearlier\n-- \n"
                 "Unsubscribe here\nSaved fxloy4400123\n")
-        reading = ai.suggest(self.local, text, known=("FXLOY-4400123",))
+        reading = ai.suggest(self.local, text)
         sent = self.fake.requests[0][2]["messages"][1]["content"]
         self.assertEqual(sent, text)
         self.assertEqual(reading.bookings, [GOOD])
@@ -639,13 +608,6 @@ class SuggestTests(unittest.TestCase):
             ai.suggest(self.local, "  \n ")
         self.assertEqual((str(caught.exception), self.fake.requests), (ai.NO_BOOKING, []))
 
-    def test_hosted_still_removes_what_local_keeps(self):
-        text = "Confirmation code: QW4R7T BOS DEN\nKnown Traveler Number: TT87654321\nSaved fxloy4400123 mail a@b.example"
-        ai.suggest(self.router, text, known=("FXLOY-4400123",))
-        sent = self.fake.requests[0][2]["messages"][1]["content"]
-        for gone in ("TT87654321", "fxloy4400123", "a@b.example"):
-            self.assertNotIn(gone, sent)
-
     def test_a_service_that_refuses_or_fails_is_a_fixed_message(self):
         for status, text in ((401, ai.REFUSED), (403, ai.REFUSED), (429, ai.LIMITED), (500, ai.FAILED)):
             self.fake.status = status
@@ -654,8 +616,14 @@ class SuggestTests(unittest.TestCase):
             self.assertEqual(str(caught.exception), text)
         self.fake.status = 404
         with self.assertRaises(ai.AiError) as caught:
-            ai.suggest(self.router, "Confirmation code: QW4R7T")
+            ai.destination(self.router, {"name": "Trip", "stops": [{"kind": "flight", "place": "Denver"}]})
         self.assertEqual(str(caught.exception), ai.NO_PRIVATE_PROVIDER)
+
+    def test_a_hosted_config_is_refused_before_anything_is_sent(self):
+        with mock.patch.object(ai.tls, "urlopen", side_effect=AssertionError("sent")), self.assertRaises(ai.AiError) as caught:
+            ai.suggest(self.router, "Confirmation code: QW4R7T flight BOS DEN")
+        self.assertEqual(str(caught.exception), ai.NEEDS_LOCAL)
+        self.assertEqual(self.fake.requests, [])
 
     def test_a_service_that_cant_be_reached_is_a_fixed_message(self):
         gone = ai.Config("local", "llama3", url="http://127.0.0.1:1")
@@ -745,21 +713,6 @@ class ScanTests(ScanAiCase):
         self.assertEqual(self.scan().bookings, 2)
         self.assertEqual((len(self.segments()), self.items()), (2, []))
 
-    def test_the_request_carries_the_body_but_none_of_the_ids_and_nothing_else_leaks(self):
-        os.environ[ai.KEY_ENV] = KEY
-        self.turn_on("openrouter")
-        with db.session() as conn:
-            db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "some/model")
-        self.put("no_markup_ids")
-        with mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True)):
-            with no_leaks(self, *IDS, QUOTED, FOOTER, database=self.path):
-                with no_leaks(self, BODY, database=self.path, sent_ok=True):
-                    self.scan()
-        sent = json.dumps(self.fake.requests[0][2])
-        self.assertIn(BODY, sent)
-        for private in (*IDS, QUOTED, FOOTER, "CANARY-SUBJECT", "Your trip is booked"):
-            self.assertNotIn(private, sent)
-
     def test_the_local_request_carries_the_whole_text_and_nothing_else_leaks(self):
         self.turn_on()
         self.put("no_markup_ids")
@@ -772,20 +725,6 @@ class ScanTests(ScanAiCase):
         self.assertNotIn("CANARY-SUBJECT", sent)
         self.assertNotIn(ai.REMOVED, sent)
         self.assertEqual(result.state, "done")
-
-    def test_openrouter_is_asked_with_zero_data_retention_and_its_key(self):
-        os.environ[ai.KEY_ENV] = KEY
-        self.turn_on("openrouter")
-        with db.session() as conn:
-            db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "some/model")
-        self.put("no_markup_ids")
-        with mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True)):
-            with no_leaks(self, KEY, *IDS, database=self.path, sent_ok=True):
-                self.scan()
-        [(path, headers, body)] = self.fake.requests
-        self.assertEqual((path, body["provider"]), ("/api/v1/chat/completions", {"data_collection": "deny", "zdr": True}))
-        self.assertEqual(headers["Authorization"], f"Bearer {KEY}")
-        self.assertNotIn(KEY, json.dumps(body))
 
     def test_a_hostile_reply_is_no_suggestion_and_an_error_the_person_sees(self):
         self.turn_on()
@@ -838,6 +777,79 @@ class ScanTests(ScanAiCase):
             kept = conn.execute(select(ReviewItem.suggestion, ReviewItem.suggestion_error)).fetchone()
         self.assertEqual(json.loads(kept[0]), [GOOD])
         self.assertEqual(review.count(self.c, "u-jane"), 1)
+
+
+class HostedModeTests(ScanAiCase):
+    def hosted(self, gaps=False):
+        os.environ[ai.KEY_ENV] = KEY
+        self.turn_on("openrouter", gaps=gaps)
+        with db.session() as conn:
+            db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "some/model")
+        patch = mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True))
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def token(self):
+        token = self.read(lambda conn: gmail.access_token(conn, self.mailbox, NOW))
+        return lambda: token
+
+    def unread(self):
+        return self.read(lambda conn: conn.execute(select(ReviewItem.message_id, ReviewItem.suggestion, ReviewItem.suggestion_error,
+                                                          ReviewItem.auto_state)).fetchall())
+
+    def test_a_scan_sends_nothing_whichever_automatic_reading_is_chosen(self):
+        for gaps in (False, True):
+            with self.subTest(gaps=gaps):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                    conn.execute(ScannedMessage.__table__.delete())
+                self.fake.reset()
+                self.hosted(gaps)
+                self.put("no_markup_ids", "flight_jsonld")
+                asked: list[str] = []
+                with refusing_ai_hosts(self, asked), no_leaks(self, BODY, QUOTED, FOOTER, *IDS, database=self.path):
+                    result = self.scan()
+                self.assertEqual((result.state, result.review), ("done", 1))
+                self.assertEqual((asked, self.fake.requests), ([], []))
+                self.assertEqual([(r[1], r[2], r[3]) for r in self.unread()], [(None, None, None)])
+                self.assertEqual(scan.summary(self.mailbox).ai_asked, 0)
+
+    def test_messages_that_were_waiting_for_the_ai_stay_unasked(self):
+        self.put("no_markup_ids")
+        self.scan()
+        [(message_id, *_)] = self.unread()
+        with db.session() as conn:
+            autoask.wait(conn, self.mailbox, message_id)
+        self.hosted()
+        asked: list[str] = []
+        with refusing_ai_hosts(self, asked):
+            self.assertEqual(scan._ask_waiting(self.mailbox, self.token(), scan._clock()), (0, 0, 0, 0))
+            self.assertEqual(self.scan(again=True).state, "done")
+        self.assertEqual((asked, self.fake.requests), ([], []))
+        self.assertEqual([(r[1], r[2], r[3]) for r in self.unread()], [(None, None, "waiting")])
+
+    def test_filling_gaps_asks_nothing(self):
+        self.hosted(gaps=True)
+        self.put("flight_jsonld")
+        asked: list[str] = []
+        with refusing_ai_hosts(self, asked):
+            self.assertEqual(scan._fill_gaps(self.token(), scan._clock(), self.jane, ["msg-flight_jsonld"]), 0)
+        self.assertEqual((asked, self.fake.requests), ([], []))
+
+    def test_ask_ai_is_refused_with_a_clear_message_and_nothing_is_sent(self):
+        self.put("no_markup_ids")
+        self.scan()
+        [(message_id, *_)] = self.unread()
+        [item] = self.items()
+        self.hosted(gaps=True)
+        asked: list[str] = []
+        with refusing_ai_hosts(self, asked):
+            with self.assertRaises(scan.NoAi) as caught:
+                scan.suggest_now("u-jane", item["id"], NOW)
+            self.assertIsNone(scan._ask(self.mailbox, message_id, "Confirmation code: QW4R7T flight BOS DEN", NOW))
+        self.assertEqual(str(caught.exception), "Reading email with AI needs Local (Ollama) in Settings → AI.")
+        self.assertEqual((asked, self.fake.requests), ([], []))
+        self.assertEqual([(r[1], r[2]) for r in self.unread()], [(None, None)])
 
 
 class RoundTripScanTests(ScanAiCase):
@@ -993,6 +1005,21 @@ class AiApiTests(RouteCase):
         self.assertFalse(self.ok("ana", "POST", "/api/ai", {"mode": "off", "auto": True})["auto"])
         self.assertFalse(self.ok("ana", "POST", "/api/ai", local)["auto"])
 
+    def test_the_automatic_switch_is_not_available_with_openrouter_and_is_cleared_by_choosing_it(self):
+        local = {"mode": "local", "ollama_url": "http://ollama.example:11434", "ollama_model": "llama3"}
+        router = {"mode": "openrouter", "openrouter_model": "some/model", "openrouter_key": KEY}
+        self.assertTrue(self.ok("ana", "POST", "/api/ai", {**local, "auto": True})["auto"])
+        self.assertFalse(self.ok("ana", "POST", "/api/ai", {**router, "auto": True})["auto"])
+        with db.session() as conn:
+            self.assertIsNone(db.get_setting(conn, sk.AI_AUTO))
+        self.assertFalse(self.ok("ana", "POST", "/api/ai", local)["auto"])
+        with db.session() as conn:
+            db.set_setting(conn, sk.AI_AUTO, autoask.ON)
+        self.assertTrue(self.ok("ana", "GET", "/api/ai")["auto"])
+        self.assertFalse(self.ok("ana", "POST", "/api/ai", {"mode": "openrouter", "openrouter_model": "some/model"})["auto"])
+        with db.session() as conn:
+            self.assertIsNone(db.get_setting(conn, sk.AI_AUTO))
+
     def test_turning_it_on_consents_to_filling_gaps_but_saving_again_does_not_widen_an_older_consent(self):
         local = {"mode": "local", "ollama_url": "http://ollama.example:11434", "ollama_model": "llama3"}
         self.ok("ana", "POST", "/api/ai", {**local, "auto": True})
@@ -1098,14 +1125,10 @@ class SeatTests(unittest.TestCase):
     def setUp(self):
         self.fake.reset()
         self.local = ai.Config("local", "llama3", url=self.fake.url)
-        self.router = ai.Config("openrouter", "some/model", key=KEY)
-        patch = mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True))
-        patch.start()
-        self.addCleanup(patch.stop)
 
-    def read(self, travelers, sent=SEAT_SENT, cfg=None, base=GOOD):
+    def read(self, travelers, sent=SEAT_SENT, base=GOOD):
         self.fake.content = json.dumps({"bookings": [{**base, "travelers": travelers}]})
-        return ai.suggest(cfg or self.local, sent).bookings[0]
+        return ai.suggest(self.local, sent).bookings[0]
 
     def test_ollama_is_asked_for_seats_and_each_seat_lands_on_its_traveller(self):
         found = self.read([{"name": "Ada Example", "seat": "23A"}, {"name": "ben sample", "seat": "23 b"}])
@@ -1113,12 +1136,6 @@ class SeatTests(unittest.TestCase):
         system = self.fake.requests[0][2]["messages"][0]["content"]
         self.assertEqual(system, ai.SYSTEM + ai.SYSTEM_SEATS)
         self.assertIn("never choose, guess, assign or suggest a seat", system)
-
-    def test_openrouter_is_not_asked_and_ignores_seats_it_is_given(self):
-        found = self.read([{"name": "Ada Example", "seat": "23A"}], cfg=self.router)
-        self.assertEqual(found, GOOD)
-        self.assertEqual(self.fake.requests[0][2]["messages"][0]["content"], ai.SYSTEM)
-        self.assertNotIn("travelers", self.fake.requests[0][2]["messages"][0]["content"])
 
     def test_a_seat_or_name_that_is_not_in_the_text_is_dropped_and_the_rest_kept(self):
         found = self.read([{"name": "Ada Example", "seat": "23A"}, {"name": "Ben Sample", "seat": "31F"}, {"name": "Dee Madeup", "seat": "23B"},
@@ -1190,17 +1207,3 @@ class ScanSeatTests(ScanAiCase):
         item = self.ask_with("local")
         self.assertEqual([{k:t[k] for k in ("name", "seat")} for t in item["travelers"]], self.TRAVELERS)
         self.assertIn(ai.SYSTEM_SEATS, self.fake.requests[0][2]["messages"][0]["content"])
-
-    def test_with_openrouter_nothing_about_seats_is_asked_or_kept(self):
-        with db.session() as conn:
-            db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "some/model")
-            db.set_setting(conn, sk.AI_OPENROUTER_KEY, KEY)
-        with mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True)):
-            item = self.ask_with("openrouter")
-        self.assertEqual(item["details"]["flight_number"], OUTBOUND["flight_number"])
-        self.assertFalse(any(t["seat"] for t in item["travelers"]))
-        self.assertNotIn("travelers", json.dumps(self.fake.requests[0][2]))
-
-
-if __name__ == "__main__":
-    unittest.main()

@@ -109,24 +109,6 @@ class TwoSwitchTests(AutoCase):
         self.assertEqual(first[1].get("Authorization"), second[1].get("Authorization"))
         self.assertFalse(self.items()[0]["auto_read"])
 
-    def test_the_automatic_request_carries_the_same_provider_settings_as_ask_ai(self):
-        import os
-        from tests.test_mail_ai import KEY
-        env = mock.patch.dict(os.environ, {ai.KEY_ENV: KEY})
-        env.start()
-        self.addCleanup(env.stop)
-        self.turn_on("openrouter")
-        with db.session() as conn:
-            db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "some/model")
-        self.put("no_markup_ids")
-        with mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True)):
-            self.scan()
-            [item] = self.items()
-            scan.suggest_now("u-jane", item["id"], NOW)
-        first, second = self.fake.requests
-        self.assertEqual(first[2]["provider"], {"data_collection": "deny", "zdr": True})
-        self.assertEqual(first[2], second[2])
-
 
 class WhoIsAskedTests(AutoCase):
     def test_shopping_codes_newsletters_replies_and_weak_mail_are_never_sent(self):

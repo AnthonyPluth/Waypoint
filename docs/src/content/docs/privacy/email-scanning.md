@@ -90,16 +90,15 @@ When a message is read for a booking, Waypoint also looks for the booking’s to
 
 ## Optional AI suggestions
 
-Off by default (**Settings → Mail & review → AI**; see [AI suggestions](/Waypoint/start/ai/)). Email text goes to a model only when you press **Ask AI** on a Review item, unless you also turn on the separate **Read unreadable mail with AI automatically** switch, which has its own warning: then a scan also sends the text of travel mail that no reader could read or that a reader left missing a detail. With either switch off, a scan sends no email text anywhere.
+Off by default (**Settings → Mail & review → AI**; see [AI suggestions](/Waypoint/start/ai/)). Email text goes to a model only in Local (Ollama) mode, and then only when you press **Ask AI** on a Review item, unless you also turn on the separate **Read unreadable mail with AI automatically** switch, which has its own warning: then a scan also sends the text of travel mail that no reader could read or that a reader left missing a detail. With either switch off, a scan sends no email text anywhere.
 
-- **Local (Ollama)** on your own network. The text goes unredacted and untrimmed and never leaves your network, so loyalty and Known Traveler numbers in it reach your own server.
-- **OpenRouter**, restricted to providers with zero data retention. The text goes with every email address replaced by `[email]`, quoted replies and footers removed, and labelled or number-shaped loyalty, Known Traveler and card numbers removed, as well as the numbers saved under Loyalty.
+Local (Ollama) is a server on your own network. The text goes unredacted and untrimmed and never leaves your network, so loyalty and Known Traveler numbers in it reach your own server. A hosted provider (OpenRouter) never receives email: with it chosen, **Ask AI** is not offered, a request for it is refused and a scan sends nothing.
 
 When the model finds no booking and says the email is plainly a promotion, a loyalty or account statement or a newsletter, Waypoint dismisses that one Review item, which deletes the stored copy of the email as any dismissal does; a scan reports only how many it dismissed.
 
 Only plain text goes out, never images or markup, and prompts and replies are never logged. What is sent, and what comes back, is under [AI suggestions](/Waypoint/start/ai/).
 
-The same setting powers one small button that involves no email: the sparkle beside a trip’s destination. It sends only the trip’s name (without its dates) and the cities, states and countries of its bookings with their kinds, and only when you press it ([the destination button](/Waypoint/start/ai/#the-destination-button-on-a-trip)).
+The same setting powers one small button that involves no email: the sparkle beside a trip’s destination. It sends only the trip’s name (without its dates) and the cities, states and countries of its bookings with their kinds, and only when you press it, to Ollama or to OpenRouter, whichever you chose ([the destination button](/Waypoint/start/ai/#the-destination-button-on-a-trip)).
 
 ## Addresses are looked up on your server
 

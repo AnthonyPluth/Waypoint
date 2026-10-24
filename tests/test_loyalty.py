@@ -1,4 +1,5 @@
 import inspect
+import json
 import os
 from unittest import mock
 
@@ -131,8 +132,7 @@ class PrivacyTests(DbCase):
         loyalty.add(self.c, membership(who, kind="cruise", program="Disney Castaway Club", number=CANARY))
         self.assertIn(CANARY, loyalty.known_numbers(self.c))
         with no_leaks(self, CANARY):
-            out = ai.prepare(ai.Config("openrouter", "some/model", key="k"), f"Your Castaway Club member {CANARY} sails soon",
-                             known=tuple(loyalty.known_numbers(self.c)))
+            out = ai.redact(f"Your Castaway Club member {CANARY} sails soon", tuple(loyalty.known_numbers(self.c)))
         self.assertNotIn(CANARY, out)
 
     def test_with_a_local_ai_the_saved_number_goes_to_the_ollama_server_as_written(self):
@@ -140,8 +140,9 @@ class PrivacyTests(DbCase):
         who = guest(self.c)
         loyalty.add(self.c, membership(who, kind="cruise", program="Disney Castaway Club", number=CANARY))
         text = f"Your Castaway Club member {CANARY} sails soon"
-        out = ai.prepare(ai.Config("local", "llama3", url="http://ollama.example:1234"), text, known=tuple(loyalty.known_numbers(self.c)))
-        self.assertEqual(out, text)
+        with mock.patch.object(ai, "_ask", return_value=json.dumps({"bookings": []})) as asked, self.assertRaises(ai.AiError):
+            ai.suggest(ai.Config("local", "llama3", url="http://ollama.example:1234"), text)
+        self.assertEqual(asked.call_args.args[1], text)
 
     def test_a_cruise_number_is_never_logged_or_replied_with_unasked(self):
         who = guest(self.c)
