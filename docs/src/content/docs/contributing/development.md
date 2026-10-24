@@ -141,6 +141,23 @@ It uses the Chromium already installed under `PLAYWRIGHT_BROWSERS_PATH` (`/opt/p
 
 A scripted flow is a small JSON file in `frontend/verify/flows/`: a list of steps such as opening Settings and filling in a field. A pull request that changes the UI adds or edits a flow for it. The format is in [`frontend/verify/flows/README.md`](https://github.com/AnthonyPluth/Waypoint/blob/main/frontend/verify/flows/README.md).
 
+### Driving the app by hand: tools/control
+
+`make verify` checks everything in one batch. While you work, `tools/control` drives the same app one command at a time. `start` launches a session in the background: a demo server on a fresh copy of the demo data, under the same frozen clock, and a Chromium on it, set up the way `make verify`’s browsers are. Later commands connect to it: `goto trips`, `snapshot` (the accessibility tree, with the names to click), `click link Trips`, `type textbox Search london`, `viewport desktop`, `offline` (offline access as `make verify` sets it up before each page), `screenshot`, `console`, `network`, `flow open-trip` (one of the flows, step by step) and `reset` (fresh data). `stop` ends it, and so do 30 idle minutes.
+
+```bash
+tools/control doctor --text    # what's missing, and how to fix it
+tools/control start
+tools/control goto trips
+tools/control snapshot --text
+tools/control screenshot       # artifacts/control/shots/…png
+tools/control stop
+```
+
+Output is JSON, or text with `--text`. Errors carry a code and a hint that says what to do instead. `reset`, `stop` and `cleanup` take `--dry-run`, and `eval` is read-only unless you pass `--write`. A session drives only its own loopback demo server and refuses other addresses, writes only under `artifacts/control/`, uses ports and data of its own, and refuses to start on a busy machine unless you pass `--anyway`. If a session crashes, the next command says the state is stale, and `cleanup` removes what it left. A screenshot is taken the way `make verify` takes one, so after `offline` a page’s image is byte for byte the same as its file in `docs/src/assets/screenshots/` on the same Chromium. Those files still only ever come from `make verify`, and a session doesn’t run its accessibility audit.
+
+For agents, the `verify-waypoint` skill (`.claude/skills/verify-waypoint/`) says when to use it, what evidence to attach, what usually breaks, and gives recipes to copy. Its command reference, `references/cli.md`, is generated from the CLI’s own help with `make verify-skill`, and `make fleet-checks` fails when it’s out of date. `make control-smoke` (also run by the Control smoke workflow) runs `doctor`, `start`, `snapshot`, `screenshot`, flows, `reset` and `stop` against the real demo server.
+
 ### Screenshots in a pull request
 
 A pull request that changes the UI commits the images `make verify` changed, so its diff shows each page before and after. A pull request with no UI change has nothing to commit, and says so.

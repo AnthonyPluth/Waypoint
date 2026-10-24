@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -220,6 +221,98 @@ class FrozenClockTests(unittest.TestCase):
     def test_images_go_to_the_docs_assets_and_the_report_stays_in_artifacts(self):
         self.assertTrue(verify.IMAGES.endswith(os.path.join("docs", "src", "assets", "screenshots")))
         self.assertTrue(verify.OUT.endswith(os.path.join("artifacts", "verify")))
+
+
+class ControlSessionTests(unittest.TestCase):
+    def test_seed_runs_run_py_demo_frozen_in_a_new_folder(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"), \
+                mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)) as ran:
+            self.assertEqual(verify.seed(["--data", os.path.join(tmp, "seed")]), 0)
+            argv, env = ran.call_args.args[0], ran.call_args.kwargs["env"]
+            self.assertEqual(argv[-1], "demo")
+            self.assertEqual((env["FAKETIME"], env["WAYPOINT_DATA"], env["LD_PRELOAD"]), (verify.FROZEN_NOW, os.path.join(tmp, "seed"), "/lib/f.so"))
+            self.assertTrue(os.path.isdir(os.path.join(tmp, "seed")))
+
+    def test_seed_never_goes_on_top_of_data_that_is_there_and_needs_the_clock(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch("subprocess.run") as ran, mock.patch("sys.stderr"):
+            with mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"):
+                self.assertEqual(verify.seed(["--data", tmp]), 2)
+            with mock.patch.object(verify, "find_faketime", return_value=None):
+                self.assertEqual(verify.seed(["--data", os.path.join(tmp, "new")]), 2)
+            ran.assert_not_called()
+
+    def test_a_seed_that_fails_leaves_no_folder(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"), \
+                mock.patch("subprocess.run", return_value=mock.Mock(returncode=1, stdout="", stderr="boom")), mock.patch("sys.stderr"):
+            self.assertEqual(verify.seed(["--data", os.path.join(tmp, "seed")]), 2)
+            self.assertFalse(os.path.exists(os.path.join(tmp, "seed")))
+
+    def test_serve_copies_the_seed_and_becomes_the_server_on_demo_data_only(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"), \
+                mock.patch.object(verify, "die_with_parent") as dies, mock.patch("os.execve") as execve, mock.patch("os.chdir"), \
+                mock.patch("os.dup2"), mock.patch("signal.signal"), mock.patch.dict("os.environ", {"DATABASE_URL": "postgresql://real", "OIDC_ISSUER": "https://idp"}):
+            seed = os.path.join(tmp, "seed")
+            os.mkdir(seed)
+            with open(os.path.join(seed, "waypoint.db"), "w") as f:
+                f.write("seeded")
+            data = os.path.join(tmp, "data")
+            verify.serve(["--parent", "42", "--seed", seed, "--data", data, "--port", "9200"])
+            dies.assert_called_once_with(42)
+            with open(os.path.join(data, "waypoint.db")) as f:
+                self.assertEqual(f.read(), "seeded")
+            command, env = execve.call_args.args[1], execve.call_args.args[2]
+            self.assertEqual(command[-4:], ["--host", "127.0.0.1", "--port", "9200"])
+            self.assertEqual((env["WAYPOINT_DATA"], env["FAKETIME"], env["HTTPS_PROXY"]), (data, verify.FROZEN_NOW, verify.NO_OUTSIDE))
+            self.assertFalse({"DATABASE_URL", "OIDC_ISSUER"} & set(env))
+
+    def test_serve_refuses_a_folder_that_exists_and_does_not_remove_it(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"), \
+                mock.patch.object(verify, "die_with_parent"), mock.patch("os.execve") as execve, mock.patch("signal.signal"), mock.patch("sys.stderr"):
+            seed = os.path.join(tmp, "seed")
+            os.mkdir(seed)
+            self.assertEqual(verify.serve(["--parent", "42", "--seed", seed, "--data", tmp, "--port", "9200"]), 2)
+            self.assertTrue(os.path.isdir(tmp))
+            execve.assert_not_called()
+
+    def test_a_child_whose_parent_is_already_gone_is_sent_the_signal(self):
+        with mock.patch("os.getppid", return_value=1), mock.patch("os.kill") as kill:
+            verify.die_with_parent(parent=4242)
+        kill.assert_called_once_with(os.getpid(), verify.signal.SIGTERM)
+        with mock.patch("os.getppid", return_value=4242), mock.patch("os.kill") as kill:
+            verify.die_with_parent(parent=4242)
+        kill.assert_not_called()
+
+    def test_a_running_verify_is_found_by_its_command_line(self):
+        self.assertTrue(verify.is_verify(["node", "/r/frontend/verify/verify.mjs", "--url", "x"]))
+        self.assertTrue(verify.is_verify(["python", "/r/run.py", "verify", "trips"]))
+        self.assertFalse(verify.is_verify(["python", "/r/run.py", "--port", "1"]))
+        self.assertFalse(verify.is_verify(["node", "/r/frontend/verify/control-daemon.mjs", "--dir", "d"]))
+        with tempfile.TemporaryDirectory() as proc:
+            for pid, argv in ((11, ["python", "run.py", "--port", "1"]), (12, ["node", "/r/frontend/verify/verify.mjs"])):
+                os.makedirs(os.path.join(proc, str(pid)))
+                with open(os.path.join(proc, str(pid), "cmdline"), "wb") as f:
+                    f.write("\0".join(argv).encode())
+            self.assertIn("pid 12", verify.verify_running(proc) or "")
+            os.remove(os.path.join(proc, "12", "cmdline"))
+            self.assertIsNone(verify.verify_running(proc))
+        self.assertIsNone(verify.verify_running("/no/such/proc"))
+
+    def test_status_reports_the_clock_the_load_and_a_running_verify(self):
+        with mock.patch.object(verify, "busy_now", return_value=2.0), mock.patch.object(verify, "verify_running", return_value=None), \
+                mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"):
+            got = verify.status()
+        self.assertEqual((got["frozen_now"], got["frozen_now_iso"], got["busy"], got["busy_limit"], got["verify_running"]),
+                         (verify.FROZEN_NOW, verify.FROZEN_NOW_ISO, True, verify.BUSY, None))
+        json.dumps(got)
+        with mock.patch.object(verify, "busy_now", return_value=0.5), mock.patch.object(verify, "verify_running", return_value=None):
+            self.assertFalse(verify.status()["busy"])
+
+    def test_the_control_commands_run_from_the_command_line(self):
+        out = subprocess.run([sys.executable, "-m", "waypoint.verify", "status"], cwd=verify.ROOT, capture_output=True, text=True, check=True).stdout
+        self.assertEqual(json.loads(out)["frozen_now"], verify.FROZEN_NOW)
+        usage = subprocess.run([sys.executable, "-m", "waypoint.verify"], cwd=verify.ROOT, capture_output=True, text=True)
+        self.assertEqual(usage.returncode, 1)
+        self.assertIn("usage: python -m waypoint.verify serve", usage.stderr)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,10 @@
+import argparse
+import contextlib
+import ctypes
+import json
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -8,7 +13,7 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from . import tls
 
@@ -30,6 +35,8 @@ MAX_JOBS = 4
 JOBS_ENV = "VERIFY_JOBS"
 DEMO_KEY = "demo-key-not-real"
 NO_OUTSIDE = "http://127.0.0.1:9"
+BUSY = 1.5
+PR_SET_PDEATHSIG = 1
 
 
 class Instance(NamedTuple):
@@ -130,11 +137,15 @@ def stop_instances(instances: list[Instance]) -> None:
             instance.server.kill()
 
 
+def seed_demo(folder: str, library: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run([sys.executable, os.path.join(ROOT, "run.py"), "demo"], env=frozen_env(clean_env(folder), library), cwd=ROOT,
+                          capture_output=True, text=True)
+
+
 def start_instances(root: str, jobs: int, library: str) -> list[Instance]:
     folders = [os.path.join(root, f"instance-{i + 1}") for i in range(jobs)]
     os.mkdir(folders[0])
-    seeded = subprocess.run([sys.executable, os.path.join(ROOT, "run.py"), "demo"], env=frozen_env(clean_env(folders[0]), library), cwd=ROOT,
-                            capture_output=True, text=True)
+    seeded = seed_demo(folders[0], library)
     if seeded.returncode:
         raise RuntimeError(f"couldn't fill the demo database:\n{seeded.stdout}{seeded.stderr}")
     for folder in folders[1:]:
@@ -198,3 +209,115 @@ def run(pages: list[str], jobs: int | None = None, flows: list[str] | None = Non
     finally:
         stop_instances(instances)
         shutil.rmtree(root, ignore_errors=True)
+
+
+def die_with_parent(parent: int | None = None, sig: int = signal.SIGTERM) -> None:
+    with contextlib.suppress(OSError, AttributeError):
+        ctypes.CDLL(None, use_errno=True).prctl(PR_SET_PDEATHSIG, int(sig))
+    if parent is not None and os.getppid() != parent:
+        os.kill(os.getpid(), sig)
+
+
+def seed(argv: list[str]) -> int:
+    p = argparse.ArgumentParser(prog="python -m waypoint.verify seed")
+    p.add_argument("--data", required=True)
+    a = p.parse_args(argv)
+    library = find_faketime()
+    if not library:
+        print(missing_faketime_message(), file=sys.stderr)
+        return 2
+    try:
+        os.makedirs(a.data)
+    except OSError as e:
+        print(f"verify: couldn't make {a.data} for the demo data: {e.strerror or e}", file=sys.stderr)
+        return 2
+    done = seed_demo(a.data, library)
+    if done.returncode:
+        shutil.rmtree(a.data, ignore_errors=True)
+        print(f"verify: couldn't fill the demo database:\n{done.stdout}{done.stderr}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def serve(argv: list[str]) -> int:
+    p = argparse.ArgumentParser(prog="python -m waypoint.verify serve")
+    p.add_argument("--parent", type=int, required=True)
+    p.add_argument("--seed", required=True)
+    p.add_argument("--data", required=True)
+    p.add_argument("--port", type=int, required=True)
+    a = p.parse_args(argv)
+    made = [False]
+
+    def ended(signum: int, _frame: object) -> None:
+        if made[0]:
+            shutil.rmtree(a.data, ignore_errors=True)
+        os._exit(128 + signum)
+    signal.signal(signal.SIGTERM, ended)
+    die_with_parent(a.parent)
+    library = find_faketime()
+    if not library:
+        print(missing_faketime_message(), file=sys.stderr)
+        return 2
+    try:
+        made[0] = not os.path.lexists(a.data)
+        shutil.copytree(a.seed, a.data)
+    except OSError as e:
+        if made[0]:
+            shutil.rmtree(a.data, ignore_errors=True)
+        print(f"verify: couldn't copy the demo data into {a.data}: {e.strerror or e}", file=sys.stderr)
+        return 2
+    log = os.open(os.path.join(a.data, "server.log"), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.dup2(log, 1)
+    os.dup2(log, 2)
+    os.close(log)
+    os.chdir(ROOT)
+    command = server_command(a.port)
+    os.execve(command[0], command, frozen_env(clean_env(a.data), library))
+    return 1
+
+
+def cpu_count() -> int:
+    return os.process_cpu_count() or 1
+
+
+def busy_now() -> float:
+    return os.getloadavg()[0] / cpu_count()
+
+
+def is_verify(argv: list[str]) -> bool:
+    names = [os.path.basename(a) for a in argv]
+    return "verify.mjs" in names or ("run.py" in names and "verify" in argv)
+
+
+def verify_running(proc: str = "/proc") -> str | None:
+    try:
+        pids = sorted(int(n) for n in os.listdir(proc) if n.isdigit())
+    except OSError:
+        return None
+    for pid in pids:
+        try:
+            with open(f"{proc}/{pid}/cmdline", "rb") as f:
+                argv = f.read().decode(errors="replace").split("\0")
+        except OSError:
+            continue
+        if pid != os.getpid() and is_verify(argv):
+            return f"pid {pid}: {' '.join(argv).strip()[:120]}"
+    return None
+
+
+def status() -> dict[str, Any]:
+    ratio = busy_now()
+    return {"libfaketime": find_faketime(), "libfaketime_install": FAKETIME_INSTALL, "frozen_now": FROZEN_NOW, "frozen_now_iso": FROZEN_NOW_ISO,
+            "cpus": cpu_count(), "busy_per_cpu": round(ratio, 2), "busy_limit": BUSY, "busy": ratio > BUSY, "verify_running": verify_running()}
+
+
+if __name__ == "__main__":
+    if sys.argv[1:2] == ["serve"]:
+        sys.exit(serve(sys.argv[2:]))
+    if sys.argv[1:2] == ["seed"]:
+        sys.exit(seed(sys.argv[2:]))
+    if sys.argv[1:2] == ["status"]:
+        print(json.dumps(status()))
+        sys.exit(0)
+    sys.exit("usage: python -m waypoint.verify serve --parent PID --seed S --data D --port P (make verify runs it), "
+             "or seed --data D, or status (frontend/verify/control.mjs runs those)")
