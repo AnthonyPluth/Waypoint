@@ -1,5 +1,6 @@
 import json
 import re
+import struct
 import unittest
 import xml.etree.ElementTree as ET
 from urllib.parse import urlsplit
@@ -36,6 +37,29 @@ class CatalogTests(unittest.TestCase):
                         if node.tag.endswith("}style"):
                             self.assertNotIn("@import", node.text or "")
                             self.assertNotIn("http", node.text or "")
+
+    def test_each_brand_shows_its_mark_cut_from_its_logo(self):
+        def png_size(path):
+            width, height = struct.unpack(">II", path.read_bytes()[16:24])
+            return width, height
+
+        for entry in json.loads((bundled_logos.ROOT / "manifest.json").read_text()):
+            with self.subTest(brand=entry["name"]):
+                x, y, w, h = entry["mark"]
+                self.assertTrue(x >= 0 and y >= 0 and w > 0 and h > 0 and x + w <= 1.0001 and y + h <= 1.0001)
+                mark = bundled_logos.ROOT / "marks" / entry["file"]
+                self.assertEqual(bundled_logos.read(entry["name"])[0], mark.read_bytes())
+                if entry["file"].endswith(".png"):
+                    whole, cut = png_size(bundled_logos.ROOT / entry["file"]), png_size(mark)
+                    self.assertLessEqual(abs(cut[0] - w * whole[0]), 1)
+                    self.assertLessEqual(abs(cut[1] - h * whole[1]), 1)
+                else:
+                    outer = ET.fromstring(mark.read_bytes())
+                    inner = outer.find("{http://www.w3.org/2000/svg}svg")
+                    full = (float(inner.get("width")), float(inner.get("height")))
+                    shown = [float(v) for v in outer.get("viewBox").split()]
+                    for got, want in zip(shown, (x * full[0], y * full[1], w * full[0], h * full[1]), strict=True):
+                        self.assertAlmostEqual(got, want, delta=0.01)
 
     def test_major_travel_brands_work_without_network_access(self):
         with mock.patch("waypoint.tls.urlopen", side_effect=AssertionError("Logos must be local")):

@@ -13,6 +13,16 @@ describe("BrandLogo", () => {
     expect(img.getAttribute("width")).toBe("32");
   });
 
+  it("fits the logo inside a white tile of its size, whatever the image's own shape", () => {
+    const { container } = render(BrandLogo, { src: "/api/segments/4/logo", size: 36 });
+    const tile = container.querySelector("img")!.parentElement as HTMLElement;
+    expect(tile.style.width).toBe("36px");
+    expect(tile.style.height).toBe("36px");
+    expect(tile.style.padding).toBe("5px");
+    expect(tile).toHaveClass("bg-white", "overflow-hidden");
+    expect(container.querySelector("img")).toHaveClass("h-full", "w-full", "object-contain");
+  });
+
   it("names the hotel brand under its group's logo, and only when it is given one", async () => {
     const { container, rerender } = render(BrandLogo, { src: "/api/segments/4/logo", label: "Hyatt Regency" });
     expect(container.textContent).toContain("Hyatt Regency");

@@ -83,4 +83,4 @@ def read(name: str | None) -> tuple[bytes, str] | None:
     if file is None:
         return None
     content_type = "image/svg+xml" if file.endswith(".svg") else "image/png"
-    return (ROOT / file).read_bytes(), content_type
+    return (ROOT / "marks" / file).read_bytes(), content_type
