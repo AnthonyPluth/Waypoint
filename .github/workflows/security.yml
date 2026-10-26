@@ -99,7 +99,7 @@ jobs:
       # Semgrep puts a finding with an inline `nosemgrep` in the SARIF as suppressed, and code scanning still alerts on it.
       - name: Drop the findings suppressed in source
         run: python3 .semgrep/drop_suppressed.py semgrep.sarif
-      - uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d   # v4.38.3
+      - uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee   # v4.39.0
         if: ${{ !cancelled() && hashFiles('semgrep.sarif') != '' }}
         with:
           sarif_file: semgrep.sarif
@@ -140,7 +140,7 @@ jobs:
           format: sarif
           output: trivy-fs.sarif
           severity: CRITICAL,HIGH
-      - uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d   # v4.38.3
+      - uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee   # v4.39.0
         if: ${{ !cancelled() && hashFiles('trivy-fs.sarif') != '' }}
         with:
           sarif_file: trivy-fs.sarif
@@ -176,7 +176,7 @@ jobs:
           output: trivy-image.sarif
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-      - uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d   # v4.38.3
+      - uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee   # v4.39.0
         if: ${{ !cancelled() && hashFiles('trivy-image.sarif') != '' }}
         with:
           sarif_file: trivy-image.sarif
@@ -203,7 +203,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: poetry run zizmor --format sarif . > zizmor.sarif
-      - uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d   # v4.38.3
+      - uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee   # v4.39.0
         if: ${{ !cancelled() && hashFiles('zizmor.sarif') != '' }}
         with:
           sarif_file: zizmor.sarif
@@ -227,7 +227,7 @@ jobs:
           results_file: scorecard.sarif
           results_format: sarif
           publish_results: true
-      - uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d   # v4.38.3
+      - uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee   # v4.39.0
         with:
           sarif_file: scorecard.sarif
           category: scorecard
