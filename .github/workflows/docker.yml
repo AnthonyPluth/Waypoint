@@ -45,6 +45,7 @@ jobs:
   # runs everything, and so does every push to main and every manual run.
   changes:
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read      # the pull request's list of changed files
@@ -95,6 +96,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false         # one database failing still shows what the other found
       matrix:
@@ -242,6 +244,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.web == 'true'
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 20
     defaults:
       run:
         shell: bash
@@ -300,6 +303,7 @@ jobs:
   build:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 45
     outputs:
       version: ${{ steps.next.outputs.version }}
       new: ${{ steps.next.outputs.new }}
@@ -361,6 +365,7 @@ jobs:
     needs: [test, web, build]
     if: needs.build.outputs.skip != 'true'
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 30
     permissions:
       contents: write          # create the tag and the release
       packages: write          # publish to ghcr.io
@@ -430,6 +435,7 @@ jobs:
   cleanup:
     needs: publish
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 10
     permissions:
       packages: write          # delete old versions from ghcr.io
     steps:
