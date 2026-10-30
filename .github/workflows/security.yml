@@ -35,6 +35,7 @@ jobs:
   # a secret can be committed in any file.
   changes:
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read      # the pull request's list of changed files
@@ -80,6 +81,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 15
     permissions:
       contents: read
       security-events: write
@@ -110,6 +112,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.web_deps == 'true'
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
         with:
@@ -125,6 +128,7 @@ jobs:
   trivy:
     name: Trivy (files)
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 15
     permissions:
       contents: read
       security-events: write
@@ -151,6 +155,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.image == 'true'
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 30
     permissions:
       contents: read
       security-events: write
@@ -187,6 +192,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.workflows == 'true'
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 10
     permissions:
       contents: read
       security-events: write
@@ -213,6 +219,7 @@ jobs:
     name: OpenSSF Scorecard
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest   # hosted: Scorecard publishes its results only from GitHub's runners
+    timeout-minutes: 15
     permissions:
       contents: read
       actions: read

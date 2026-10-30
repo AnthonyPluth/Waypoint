@@ -38,6 +38,7 @@ concurrency:
 jobs:
   tidy:
     runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 10
     permissions:
       contents: write          # delete releases and tags
       packages: write          # move image tags and delete image versions
