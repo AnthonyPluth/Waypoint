@@ -66,17 +66,6 @@ updates:
     commit-message:
       prefix: docs
 
-  # The Claude Code that the independent review runs (.github/agent-review/package.json)
-  - package-ecosystem: npm
-    directory: /.github/agent-review
-    schedule:
-      interval: weekly
-      day: monday
-    cooldown:
-      default-days: 7
-    commit-message:
-      prefix: ci
-
   # The base images in the Dockerfile (python:3.14-slim, node:26-slim)
   - package-ecosystem: docker
     directory: /
