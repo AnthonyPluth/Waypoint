@@ -21,7 +21,7 @@ package-mode = false   # an application, not a library: `poetry install` just in
 [tool.poetry.group.dev.dependencies]
 ruff = "0.17.1"
 mypy = "2.4.0"
-types-python-dateutil = "2.9.0.20260807"
+types-python-dateutil = "2.9.0.20261021"
 coverage = "7.16.2"
 unittest-parallel = "1.8.6"
 pip-audit = "2.10.1"
