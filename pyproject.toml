@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14,<4.0"
 dependencies = [
     "sqlalchemy (>=2.1.6,<3.0)",           # database engine for SQLite and Postgres
-    "alembic (>=1.13,<2.0)",             # schema migrations
+    "alembic (>=1.20.1,<2.0)",             # schema migrations
     "psycopg[binary] (>=3.1,<4.0)",      # Postgres driver (only used when DATABASE_URL is set)
     "pyjwt[crypto] (>=2.15.1,<3.0)",        # verifying sign-in (OIDC) ID tokens
     "pywebpush (>=2.0,<3.0)",            # push notifications (VAPID + encrypted payloads)
@@ -19,10 +19,10 @@ package-mode = false   # an application, not a library: `poetry install` just in
 # The tools CI runs (docker.yml, security.yml) and `make check` runs, pinned so every run uses the same versions;
 # Dependabot updates them here. `poetry install` adds them; the Docker image installs only the main dependencies.
 [tool.poetry.group.dev.dependencies]
-ruff = "0.17.1"
+ruff = "0.17.2"
 mypy = "2.4.0"
-types-python-dateutil = "2.9.0.20260807"
-coverage = "7.16.2"
+types-python-dateutil = "2.9.0.20261021"
+coverage = "7.17.0"
 unittest-parallel = "1.8.6"
 pip-audit = "2.10.1"
 zizmor = "1.31.1"
