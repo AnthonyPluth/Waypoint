@@ -509,7 +509,7 @@ describe("Upcoming booking detail", () => {
     expect(within(sheet).getByRole("link", { name: "Open trip" })).toHaveAttribute("href", `#trip/${london.id}?segment=2`);
     expect(location.hash).not.toContain("#trip/");
     await u.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => { vi.advanceTimersByTime(20); expect(screen.queryByRole("dialog")).toBeNull(); });
     await waitFor(() => expect(link).toHaveFocus());
   });
 

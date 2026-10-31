@@ -153,7 +153,7 @@ describe("SegmentForm: the time zone field", () => {
     const field = screen.getByLabelText("Time zone");
     await chooseZone(field, "America/Chicago");
     expect(field).toHaveValue("America/Chicago");
-    expect(screen.queryAllByRole("listbox", { hidden: true })).toHaveLength(0);
+    await waitFor(() => expect(screen.queryAllByRole("listbox", { hidden: true })).toHaveLength(0));
   });
 
   it("searches a cruise port’s zone with one list open at a time", async () => {
@@ -164,7 +164,7 @@ describe("SegmentForm: the time zone field", () => {
     expect(screen.getAllByRole("listbox", { hidden: true })).toHaveLength(1);
     await userEvent.keyboard("{Enter}");
     expect(port).toHaveValue("America/Nassau");
-    expect(screen.queryAllByRole("listbox", { hidden: true })).toHaveLength(0);
+    await waitFor(() => expect(screen.queryAllByRole("listbox", { hidden: true })).toHaveLength(0));
   });
 });
 

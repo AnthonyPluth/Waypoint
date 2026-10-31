@@ -190,7 +190,7 @@ describe("People", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "This is me" }));
     expect(api).toHaveBeenCalledWith("/api/people/2/claim", { method: "POST" });
     expect(await screen.findByText("Linked from guest Mia Doe by Jane Doe on 2026-10-05")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /This is me/ })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("button", { name: /This is me/ })).toBeNull());
   });
 
   it("Cancel keeps the guest unlinked", async () => {

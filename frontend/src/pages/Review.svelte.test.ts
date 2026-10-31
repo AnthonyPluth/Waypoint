@@ -369,7 +369,7 @@ describe("Review", () => {
     await userEvent.type(screen.getByLabelText(/^Ship/), "Example Voyager");
     expect(screen.getByLabelText(/^Cabin/)).toBeInTheDocument();
     await chooseZone(screen.getByLabelText("Time zone where it starts"), "America/New_York");
-    expect(screen.queryAllByRole("listbox", { hidden: true })).toHaveLength(0);
+    await waitFor(() => expect(screen.queryAllByRole("listbox", { hidden: true })).toHaveLength(0));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({
@@ -1529,7 +1529,7 @@ describe("Review: several legs or bookings added by hand from one email", () => 
       { kind: "flight", start_local: "2027-01-09T16:00", end_local: "2027-01-09T21:30", provider: "Example Air", confirmation: "ZZ9Y8X", origin: "DEN", destination: "BOS" }]);
     expect(calls.filter(([p]) => p.endsWith("/same"))).toHaveLength(2);
     expect(takeOffs()).toEqual(["/api/review/1?segment=42&segment=43"]);
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("adds a flight and a hotel from one email, clearing the flight’s places when the kind changes", async () => {
