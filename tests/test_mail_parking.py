@@ -62,6 +62,34 @@ class ParkingReaderTests(unittest.TestCase):
         parsed, why = parking.read(f"<html><body>{BODY.replace('03/04/2027', '13/45/2027')}</body></html>", "")
         self.assertEqual((parsed.bookings, why), ((), "no entry date found"))
 
+    def test_a_cancellation_gives_a_cancelled_booking_and_a_cancellation_policy_does_not(self):
+        cancelled = BODY.replace("is confirmed", "has been cancelled")
+        self.assertEqual(parking.read(f"<html><body>{cancelled}</body></html>", "")[0].bookings[0].status, "cancelled")
+        policy = BODY + "<p>See our cancellation policy for refunds.</p>"
+        self.assertEqual(parking.read(f"<html><body>{policy}</body></html>", "")[0].bookings[0].status, "confirmed")
+
+    def test_separate_entry_and_exit_time_rows_are_used(self):
+        body = (BODY.replace("06:30 AM 03/04/2027", "03/04/2027").replace("10:30 AM 03/11/2027", "03/11/2027")
+                .replace("<tr><td>Booking Date", "<tr><td>Entry Time: </td><td>06:30 AM</td></tr><tr><td>Exit Time: </td><td>10:30 AM</td></tr><tr><td>Booking Date"))
+        [b] = parking.read(f"<html><body>{body}</body></html>", "")[0].bookings
+        self.assertEqual((b.start, b.end), ("2027-03-04T06:30", "2027-03-11T10:30"))
+
+    def test_a_bare_lot_label_and_a_lot_address_on_the_next_row_are_read(self):
+        body = (BODY.replace("Parking Ramp:", "Lot:").replace("Terminal 2 Garage", "Economy").replace("<p>The parking ramp address is Terminal 2, 100 Example Way, St. Paul, MN 55111</p>", "")
+                .replace("Dear Pat Example", "Pat").replace("Your parking reservation at Example Airport is confirmed.", "Booked.")
+                + "<table><tr><td>Lot address:</td></tr><tr><td>100 Example Way, St. Paul, MN 55111</td></tr></table>")
+        [b] = parking.read(f"<html><body>{body}</body></html>", "")[0].bookings
+        self.assertEqual((b.origin, b.start_zone, dict(b.details)["address"]), ("Economy", "America/Chicago", "100 Example Way, St. Paul, MN 55111"))
+
+    def test_an_impossible_us_date_is_unreadable_not_an_error(self):
+        parsed, why = parking.read(f"<html><body>{BODY.replace('03/04/2027', '02/30/2027')}</body></html>", "")
+        self.assertEqual((parsed.bookings, why), ((), "no entry date found"))
+
+    def test_a_hotel_stay_with_a_parking_garage_is_not_a_parking_booking(self):
+        html = ("<p>Check-in date: Mar 4, 2027</p><p>Check-out date: Mar 6, 2027</p><p>Parking garage: Main Street Garage</p>"
+                "<p>Garage address: 100 Example Way, St. Paul, MN 55111</p>")
+        self.assertEqual(parking.read(html, ""), (parking.Parsed(), ""))
+
     def test_a_hotel_email_that_mentions_parking_is_not_a_parking_booking(self):
         html = "<p>Your stay</p><p>Check-in: Mar 4, 2027</p><p>Check-out: Mar 6, 2027</p><p>Free parking on site.</p>"
         self.assertEqual(parking.read(html, ""), (parking.Parsed(), ""))
@@ -76,6 +104,10 @@ class ParkingTriageTests(unittest.TestCase):
     def test_a_parking_confirmation_from_an_unknown_sender_is_read(self):
         head = triage.Head("Fwd: Example Airport Parking Confirmation - EXP-77-1234567", "example.test", "Forwarded message Booking Confirmation", frozenset())
         self.assertEqual(triage.decide(head), "read")
+
+    def test_a_parking_confirmation_is_a_strong_signal_so_an_unreadable_one_reaches_review(self):
+        head = triage.Head("Parking reservation confirmation", "example.test", "", frozenset())
+        self.assertTrue(triage.strong(head))
 
     def test_a_parking_ticket_notice_is_still_skipped(self):
         head = triage.Head("Your parking ticket", "example.test", "Pay your fine online", frozenset())
