@@ -39,11 +39,17 @@ describe("KindTile", () => {
     expect(cls).toContain("bg-kind-train-soft");
     expect(cls).toContain("text-kind-train");
   });
-  it("uses the quiet pair for cruise, parking and a past visit", () => {
-    for (const kind of ["cruise", "parking", "visit"] as const) {
+  it("gives cruise and parking colours of their own", () => {
+    for (const kind of ["cruise", "parking"] as const) {
       const { container, unmount } = render(KindTile, { kind });
-      expect(container.querySelector("[data-tile]")!.className).toContain("bg-kind-quiet-soft");
+      const cls = container.querySelector("[data-tile]")!.className;
+      expect(cls).toContain(`bg-kind-${kind}-soft`);
+      expect(cls).toContain(`text-kind-${kind}`);
       unmount();
     }
+  });
+  it("uses the quiet pair for a past visit", () => {
+    const { container } = render(KindTile, { kind: "visit" });
+    expect(container.querySelector("[data-tile]")!.className).toContain("bg-kind-quiet-soft");
   });
 });

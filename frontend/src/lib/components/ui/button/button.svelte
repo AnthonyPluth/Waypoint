@@ -8,6 +8,7 @@
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        action: "bg-action text-action-foreground hover:bg-action/90",
         destructive: "bg-destructive/60 shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/40 text-white",
         outline: "border border-input bg-secondary hover:bg-input/60 hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
@@ -22,8 +23,8 @@
       },
     },
     compoundVariants: [
-      { variant: ["default", "destructive", "outline", "secondary", "ghost"], size: ["default", "sm", "lg"], class: "phone:min-h-11" },
-      { variant: ["default", "destructive", "outline", "secondary", "ghost"], size: "icon", class: "phone:min-h-11 phone:min-w-11" },
+      { variant: ["default", "action", "destructive", "outline", "secondary", "ghost"], size: ["default", "sm", "lg"], class: "phone:min-h-11" },
+      { variant: ["default", "action", "destructive", "outline", "secondary", "ghost"], size: "icon", class: "phone:min-h-11 phone:min-w-11" },
     ],
     defaultVariants: { variant: "default", size: "default" },
   });
