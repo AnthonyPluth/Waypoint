@@ -323,7 +323,8 @@ describe("Upcoming", () => {
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "Harbour Hotel" })).closest("section")!;
     expect(within(card).getByText("Check-in in 7 h")).toBeInTheDocument();
-    expect(within(card).getByText("London", { selector: "dd" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Copy address 1 Quay Street, London and get directions" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: /1 Quay Street, London/ })).toHaveTextContent("London");
     expect(within(card).getByText("3:00 PM")).toBeInTheDocument();
   });
 
@@ -338,7 +339,7 @@ describe("Upcoming", () => {
       const card = (await screen.findByRole("heading", { name: "Example Long-Term Lot" })).closest("section")!;
       expect(within(card).getByText("Next up")).toBeInTheDocument();
       expect(within(card).getByText("Entry in 6 h")).toBeInTheDocument();
-      expect(within(card).getByText("Jamaica, NY", { selector: "dd" })).toBeInTheDocument();
+      expect(within(card).getByRole("button", { name: "Copy address 1 Terminal Road, Jamaica, NY and get directions" })).toBeInTheDocument();
       expect(within(card).getByText("Exit")).toBeInTheDocument();
     });
 

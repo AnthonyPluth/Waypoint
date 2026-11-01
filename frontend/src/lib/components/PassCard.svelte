@@ -4,6 +4,7 @@
   import { app as appState } from "$lib/app.svelte";
   import AirportCode from "$lib/components/AirportCode.svelte";
   import AirportName from "$lib/components/AirportName.svelte";
+  import AddressLink from "$lib/components/AddressLink.svelte";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import DayTime from "$lib/components/DayTime.svelte";
@@ -62,6 +63,10 @@
           : s.kind === "cruise" ? [["Ship", s.details.ship], ["Cabin", s.details.room], ["Deck", s.details.deck]]
             : [["Seat", seat], ["Cabin", s.details.cabin]],
   );
+  const fullAddress = $derived<Record<string, string | undefined>>({
+    Address: s.kind === "hotel" || s.kind === "parking" ? s.details.address?.trim() : undefined,
+    "Pick-up address": s.kind === "car" ? extraAddress(s)?.trim() : undefined,
+  });
   const cost = $derived(showCost && appState.state?.show_costs !== false && bookings.length === 1 && s.price ? formatMoney(s.price.amount_minor, s.price.currency) : "");
   const COMPACT_OMIT = ["Cost", "Room", "Cabin", "Notes", "Vehicle", "Space", "Car", "Deck", "Ship"];
   const facts = $derived([...rows, ["Cost", cost] as [string, string]].filter((f): f is [string, string] => !!f[1] && !omit.includes(f[0]) && !(compact && COMPACT_OMIT.includes(f[0]))));
@@ -197,7 +202,7 @@
         {#each boardFacts as [name, value], i (name)}
           <div class={`min-w-0 ${i >= (hasCode ? 3 : 4) ? "phone:hidden" : ""}`}>
             <dt class="eyebrow">{name}</dt>
-            {#if value}<dd class="mt-1 break-words text-base font-medium" class:line-through={name === "Cost" && cancelled}>{value}</dd>{:else}<dd class="mt-1 text-base text-muted-foreground">Not yet</dd>{/if}
+            {#if value}<dd class="mt-1 break-words text-base font-medium" class:line-through={name === "Cost" && cancelled}>{#if fullAddress[name]}<AddressLink address={fullAddress[name] ?? ""} text={value} />{:else}{value}{/if}</dd>{:else}<dd class="mt-1 text-base text-muted-foreground">Not yet</dd>{/if}
             {#if name === "Cost" && cancelled}<dd class="text-sm text-muted-foreground">Cancelled, so not in the trip’s total</dd>{/if}
           </div>
         {/each}
@@ -291,7 +296,7 @@
     {#if facts.length}
       <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
         {#each facts as [label, value] (label)}
-          <div class="min-w-0"><dt class="eyebrow">{label}</dt><dd class="mt-1 break-words text-base font-medium" class:line-through={label === "Cost" && cancelled}>{value}</dd>
+          <div class="min-w-0"><dt class="eyebrow">{label}</dt><dd class="mt-1 break-words text-base font-medium" class:line-through={label === "Cost" && cancelled}>{#if fullAddress[label]}<AddressLink address={fullAddress[label] ?? ""} text={value} />{:else}{value}{/if}</dd>
             {#if label === "Cost" && cancelled}<dd class="text-sm text-muted-foreground">Cancelled, so not in the trip’s total</dd>{/if}</div>
         {/each}
       </dl>
