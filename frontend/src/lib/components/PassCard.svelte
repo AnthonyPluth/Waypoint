@@ -182,9 +182,9 @@
       {#if (showApp && (app || vendor)) || footer}
         <div class="flex flex-wrap items-center gap-2">
           {#if app && showApp}
-            <Button href={app} target="_blank" rel="noopener noreferrer" size="sm" class="phone:flex-1">{appLabel}</Button>
+            <Button variant="action" href={app} target="_blank" rel="noopener noreferrer" size="sm" class="phone:flex-1">{appLabel}</Button>
           {:else if vendor && showApp}
-            <Button href={vendor.href} size="sm" class="phone:flex-1">{vendor.label}</Button>
+            <Button variant="action" href={vendor.href} size="sm" class="phone:flex-1">{vendor.label}</Button>
           {/if}
           {#if footer}{@render footer()}{/if}
         </div>
@@ -243,9 +243,9 @@
     </div>
 
     {#if app && showApp}
-      <div><Button variant="outline" href={app} target="_blank" rel="noopener noreferrer">{appLabel}</Button></div>
+      <div><Button variant="action" href={app} target="_blank" rel="noopener noreferrer">{appLabel}</Button></div>
     {:else if vendor && showApp}
-      <div><Button variant="outline" href={vendor.href}>{vendor.label}</Button></div>
+      <div><Button variant="action" href={vendor.href}>{vendor.label}</Button></div>
     {/if}
 
     {#if flight}

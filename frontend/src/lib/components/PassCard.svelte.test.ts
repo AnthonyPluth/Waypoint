@@ -485,7 +485,7 @@ describe("the boarding-pass variant", () => {
     const footer = createRawSnippet(() => ({ render: () => "<a href='#trip/1'>Open trip</a>" }));
     render(PassCard, board({ footer }, { links: { app: "https://example.test/app", open: null, open_kind: null, directions: null, call: null } }));
     const primary = screen.getByRole("link", { name: "Check in" });
-    expect(primary).toHaveClass("bg-primary");
+    expect(primary).toHaveClass("bg-action");
     expect(primary.compareDocumentPosition(screen.getByRole("link", { name: "Open trip" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
   it("puts the plane at the destination once live status says landed, before the booked arrival", () => {

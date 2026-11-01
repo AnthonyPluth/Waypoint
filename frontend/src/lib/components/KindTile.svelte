@@ -18,8 +18,8 @@
     hotel: "bg-kind-stay-soft text-kind-stay",
     train: "bg-kind-train-soft text-kind-train",
     car: "bg-kind-car-soft text-kind-car",
-    cruise: "bg-kind-quiet-soft text-kind-quiet",
-    parking: "bg-kind-quiet-soft text-kind-quiet",
+    cruise: "bg-kind-cruise-soft text-kind-cruise",
+    parking: "bg-kind-parking-soft text-kind-parking",
     visit: "bg-kind-quiet-soft text-kind-quiet",
   } as const;
   const Icon = $derived(ICONS[kind]);

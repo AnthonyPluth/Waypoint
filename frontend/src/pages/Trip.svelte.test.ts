@@ -973,13 +973,26 @@ describe("Trip", () => {
   describe("a stay’s address", () => {
     it("shows it as written, copies it on a tap, and Directions uses it", async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
-      vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
       held = trip([{ ...stay, details: { address: "1 Quay Street\nLondon E1 0AA" } }]);
       render(TripPage);
       await userEvent.click(await screen.findByRole("button", { name: /Copy address 1 Quay Street/ }));
       expect(writeText).toHaveBeenCalledWith("1 Quay Street\nLondon E1 0AA");
       expect(screen.queryByRole("button", { name: /Add address/ })).toBeNull();
       expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", stay.links.directions!);
+    });
+
+    it("offers the directions sheet on a tap, but only copies for a cancelled stay", async () => {
+      Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
+      held = trip([{ ...stay, details: { address: "1 Quay Street\nLondon E1 0AA" } }]);
+      const first = render(TripPage);
+      await userEvent.click(await screen.findByRole("button", { name: /Copy address 1 Quay Street/ }));
+      expect(await screen.findByRole("link", { name: "Google Maps" })).toBeTruthy();
+      first.unmount();
+      held = trip([{ ...stay, status: "cancelled", details: { address: "1 Quay Street\nLondon E1 0AA" } }]);
+      render(TripPage);
+      await userEvent.click(await screen.findByRole("button", { name: /Copy address 1 Quay Street/ }));
+      expect(screen.queryByRole("link", { name: "Google Maps" })).toBeNull();
     });
 
     it("shows no address line for a rental whose address is its pick-up, and never offers Add address for it", async () => {

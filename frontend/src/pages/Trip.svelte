@@ -9,6 +9,7 @@
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { OptionsMenu } from "$lib/components/ui/options-menu";
+  import AddressLink from "$lib/components/AddressLink.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import DayTime from "$lib/components/DayTime.svelte";
@@ -404,7 +405,8 @@
   {#if s.kind === "hotel" || s.kind === "car" || s.kind === "cruise" || s.kind === "parking"}
     {#if s.details.address && !(s.kind === "car" && samePlace(s.details.address, s.origin))}
       <div class="mt-2 text-sm"><p class="eyebrow">{s.kind === "car" ? "Pick-up address" : s.kind === "cruise" ? "Terminal address" : "Address"}</p>
-        <CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" /></div>
+        {#if s.status === "cancelled"}<CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" />
+        {:else}<AddressLink address={s.details.address} multiline class="mt-1 text-base font-medium" />{/if}</div>
     {:else if s.kind !== "car" && !s.details.address && s.status !== "cancelled" && !over}
       <p class="mt-2 text-sm"><button type="button" class="underline underline-offset-2 phone:min-h-11" onclick={() => edit(s, "segment-address")}
         aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
@@ -413,8 +415,8 @@
   {@const vendor = vendorLink(s, isMobile())}
   {#if (!over || staticDemo) && (s.links.app || vendor || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email || s.gate_code)}
     <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
-      {#if s.links.app}<Button variant="outline" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>
-      {:else if vendor}<Button variant="outline" size="sm" href={vendor.href}>{vendor.label}</Button>{/if}
+      {#if s.links.app}<Button variant="action" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>
+      {:else if vendor}<Button variant="action" size="sm" href={vendor.href}>{vendor.label}</Button>{/if}
       {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
       {#if s.status !== "cancelled" && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
       <GateCode segment={s} {now} onchanged={() => void load()} />

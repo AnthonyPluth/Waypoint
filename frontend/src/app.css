@@ -19,6 +19,8 @@
   --popover-foreground: #f3f5f9;
   --primary: #4f9dff;
   --primary-foreground: #04101f;
+  --action: #3563e0;
+  --action-foreground: #ffffff;
   --secondary: #1a1e29;
   --secondary-foreground: #f3f5f9;
   --muted: #1a1e29;
@@ -56,6 +58,8 @@
   --chart-2: #f6b73c;
   --chart-3: #4fd1b0;
   --chart-4: #c79bff;
+  --chart-5: #ff8fab;
+  --chart-6: #9be15d;
   --kind-flight: var(--primary);
   --kind-flight-soft: color-mix(in srgb, var(--kind-flight) 15%, transparent);
   --kind-stay: var(--chart-3);
@@ -64,6 +68,10 @@
   --kind-train-soft: color-mix(in srgb, var(--kind-train) 15%, transparent);
   --kind-car: var(--signal);
   --kind-car-soft: color-mix(in srgb, var(--kind-car) 15%, transparent);
+  --kind-cruise: var(--chart-5);
+  --kind-cruise-soft: color-mix(in srgb, var(--kind-cruise) 15%, transparent);
+  --kind-parking: var(--chart-6);
+  --kind-parking-soft: color-mix(in srgb, var(--kind-parking) 15%, transparent);
   --kind-quiet: var(--muted-foreground);
   --kind-quiet-soft: var(--surface-3);
   --avatar-1: #1d3a63;
@@ -107,6 +115,8 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-action: var(--action);
+  --color-action-foreground: var(--action-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -152,6 +162,10 @@
   --color-kind-train-soft: var(--kind-train-soft);
   --color-kind-car: var(--kind-car);
   --color-kind-car-soft: var(--kind-car-soft);
+  --color-kind-cruise: var(--kind-cruise);
+  --color-kind-cruise-soft: var(--kind-cruise-soft);
+  --color-kind-parking: var(--kind-parking);
+  --color-kind-parking-soft: var(--kind-parking-soft);
   --color-kind-quiet: var(--kind-quiet);
   --color-kind-quiet-soft: var(--kind-quiet-soft);
   --color-avatar-1: var(--avatar-1);
