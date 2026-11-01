@@ -9,6 +9,7 @@
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { OptionsMenu } from "$lib/components/ui/options-menu";
+  import AddressLink from "$lib/components/AddressLink.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import DayTime from "$lib/components/DayTime.svelte";
@@ -404,7 +405,8 @@
   {#if s.kind === "hotel" || s.kind === "car" || s.kind === "cruise" || s.kind === "parking"}
     {#if s.details.address && !(s.kind === "car" && samePlace(s.details.address, s.origin))}
       <div class="mt-2 text-sm"><p class="eyebrow">{s.kind === "car" ? "Pick-up address" : s.kind === "cruise" ? "Terminal address" : "Address"}</p>
-        <CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" /></div>
+        {#if s.status === "cancelled"}<CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" />
+        {:else}<AddressLink address={s.details.address} multiline class="mt-1 text-base font-medium" />{/if}</div>
     {:else if s.kind !== "car" && !s.details.address && s.status !== "cancelled" && !over}
       <p class="mt-2 text-sm"><button type="button" class="underline underline-offset-2 phone:min-h-11" onclick={() => edit(s, "segment-address")}
         aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
