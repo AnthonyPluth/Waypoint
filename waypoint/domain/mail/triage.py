@@ -7,6 +7,7 @@ from typing import Literal
 from . import query
 
 Decision = Literal["read", "skip"]
+PARKING = re.compile(r"parking (?:confirmation|reservation|booking|pass)", re.IGNORECASE)
 CATEGORY_SIGNALS = frozenset({"CATEGORY_RESERVATIONS", "CATEGORY_PURCHASES"})
 TRAVEL = (
     re.compile(r"\bflights?\b", re.IGNORECASE),
@@ -21,6 +22,7 @@ TRAVEL = (
     re.compile(r"cruise|sailing", re.IGNORECASE),
     re.compile(r"rental car|car rental|car hire|pick-?up (?:location|date|time)", re.IGNORECASE),
     re.compile(r"\btrain\b", re.IGNORECASE),
+    PARKING,
     re.compile(r"trip is|your trip", re.IGNORECASE),
 )
 PLACE = re.compile(r"\b(?:inn|resort|lodge|lodging|suites?|villa|apartment|cabin|guest ?house|motel|b&b|bnb)\b", re.IGNORECASE)
@@ -63,7 +65,7 @@ def _categorised(head: Head) -> bool:
 
 
 def strong(head: Head) -> bool:
-    return sender_in(head.sender_domain, query.SENDERS) or travel_words(f"{head.subject} {head.snippet}") >= 2 or _categorised(head)
+    return bool(PARKING.search(f"{head.subject} {head.snippet}")) or sender_in(head.sender_domain, query.SENDERS) or travel_words(f"{head.subject} {head.snippet}") >= 2 or _categorised(head)
 
 
 def shopping(head: Head) -> bool:
