@@ -50,6 +50,18 @@ class ParkingReaderTests(unittest.TestCase):
         parsed, why = parking.read(f"<html><body>{body}</body></html>", "")
         self.assertEqual((parsed.bookings, why), ((), "parking lot's time zone unknown"))
 
+    def test_an_address_wrapped_over_lines_is_read_whole(self):
+        wrapped = PLAIN.replace("Terminal 2, 100 Example Way, St. Paul, MN 55111", "Terminal 2,\n100 Example Way, St. Paul,\nMN 55111")
+        parsed, why = parking.read("", wrapped)
+        self.assertIsNone(why)
+        [b] = parsed.bookings
+        self.assertEqual((b.start_zone, dict(b.details)), ("America/Chicago", {"address": "Terminal 2, 100 Example Way, St. Paul, MN 55111"}))
+
+    def test_a_row_after_a_complete_address_is_not_added_to_it(self):
+        extra = PLAIN + "Payment Details, St. Paul, MN\n"
+        [b] = parking.read("", extra)[0].bookings
+        self.assertEqual(dict(b.details), {"address": "Terminal 2, 100 Example Way, St. Paul, MN 55111"})
+
     def test_a_missing_lot_exit_or_an_exit_before_entry_is_unreadable(self):
         for body, reason in ((BODY.replace("Parking Ramp:", "Spot:"), "no parking lot found"),
                              (BODY.replace("Exit Date: </td><td>10:30 AM 03/11/2027", "Exit Date: </td><td>soon"), "no exit date found"),
