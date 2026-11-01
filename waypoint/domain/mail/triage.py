@@ -21,6 +21,7 @@ TRAVEL = (
     re.compile(r"cruise|sailing", re.IGNORECASE),
     re.compile(r"rental car|car rental|car hire|pick-?up (?:location|date|time)", re.IGNORECASE),
     re.compile(r"\btrain\b", re.IGNORECASE),
+    re.compile(r"parking (?:confirmation|reservation|booking|pass)", re.IGNORECASE),
     re.compile(r"trip is|your trip", re.IGNORECASE),
 )
 PLACE = re.compile(r"\b(?:inn|resort|lodge|lodging|suites?|villa|apartment|cabin|guest ?house|motel|b&b|bnb)\b", re.IGNORECASE)

@@ -20,7 +20,7 @@ from ... import monitoring
 from ...providers import mailimages
 from ...storage.stored_mail import Content, Image
 from .. import money, seatmaps
-from . import cars, cruises, flights, ics, lodging, parsers, price, references, safe_html, seats, trains, triage, words
+from . import cars, cruises, flights, ics, lodging, parking, parsers, price, references, safe_html, seats, trains, triage, words
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger
@@ -30,7 +30,7 @@ from .booking import Status
 RESERVATIONS: dict[str, Kind] = {"FlightReservation": "flight", "LodgingReservation": "hotel",
                                  "RentalCarReservation": "car", "TrainReservation": "train"}
 MAX_PART = 2_000_000
-GENERIC_READERS: tuple[Callable[[str, str], tuple[Parsed, str | None]], ...] = (lodging.read, flights.read, cars.read, trains.read, cruises.read)
+GENERIC_READERS: tuple[Callable[[str, str], tuple[Parsed, str | None]], ...] = (parking.read, lodging.read, flights.read, cars.read, trains.read, cruises.read)
 CALENDAR_TYPES = ("text/calendar", "application/ics")
 MAX_NODES = 200
 IATA = re.compile(r"[A-Z]{3}")
