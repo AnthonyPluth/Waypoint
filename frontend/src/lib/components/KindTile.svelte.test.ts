@@ -50,6 +50,8 @@ describe("KindTile", () => {
   });
   it("uses the quiet pair for a past visit", () => {
     const { container } = render(KindTile, { kind: "visit" });
-    expect(container.querySelector("[data-tile]")!.className).toContain("bg-kind-quiet-soft");
+    const cls = container.querySelector("[data-tile]")!.className;
+    expect(cls).toContain("bg-kind-quiet-soft");
+    expect(cls).toContain("text-kind-quiet");
   });
 });
