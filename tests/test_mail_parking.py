@@ -62,6 +62,11 @@ class ParkingReaderTests(unittest.TestCase):
         [b] = parking.read("", extra)[0].bookings
         self.assertEqual(dict(b.details), {"address": "Terminal 2, 100 Example Way, St. Paul, MN 55111"})
 
+    def test_an_unrelated_row_with_a_state_does_not_complete_a_broken_address(self):
+        broken = PLAIN.replace("Terminal 2, 100 Example Way, St. Paul, MN 55111", "Terminal 2,\nPayment Details, St. Paul, MN\n")
+        parsed, why = parking.read("", broken)
+        self.assertEqual((parsed.bookings, why), ((), "parking lot's time zone unknown"))
+
     def test_a_missing_lot_exit_or_an_exit_before_entry_is_unreadable(self):
         for body, reason in ((BODY.replace("Parking Ramp:", "Spot:"), "no parking lot found"),
                              (BODY.replace("Exit Date: </td><td>10:30 AM 03/11/2027", "Exit Date: </td><td>soon"), "no exit date found"),
