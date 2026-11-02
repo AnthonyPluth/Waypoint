@@ -18,7 +18,7 @@ Waypoint learns about bookings mainly by reading confirmation emails in a Gmail 
 
 ## What is kept
 
-A message’s body is fetched and parsed in memory. Waypoint keeps what it found (a flight number, a time, a confirmation code) and a reference to the message, its Gmail id.
+A message’s body is fetched and parsed in memory. Waypoint keeps what it found (a flight number, a time, a confirmation code) and a reference to the message, its Gmail id. A Review item whose booking Waypoint read except for its time zone also holds those fields, in the same place as an AI suggestion, until the item is added or dismissed, for the people who can see the item; nothing is sent to an AI to get them.
 
 - **The connection.** The Gmail address, a refresh token, and where its scans had got to (the point in Gmail’s history, and when the last one finished or what stopped it). The refresh token is encrypted with `WAYPOINT_SECRET_KEY` (in backups too), decrypted only to refresh or revoke it, and never appears in logs or error pages. Access tokens aren’t kept. Restoring a backup needs the same key; otherwise the connections turn to **Reconnect** ([Configuration](/Waypoint/reference/configuration/)).
 - **Messages already read.** Their Gmail ids, so none is read twice. For a message from a sender you ignored, that record also keeps the sender’s domain, and stopping the ignore deletes it.
