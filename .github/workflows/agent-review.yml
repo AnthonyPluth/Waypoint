@@ -43,41 +43,26 @@ jobs:
         docs/src/content/docs/contributing/feature-map.md
       budget-usd: ${{ vars.AGENT_REVIEW_BUDGET_USD || '3' }}
       max-turns: ${{ vars.AGENT_REVIEW_MAX_TURNS || '60' }}
-      # A change to any of these is risky and gets the second review (.github/** and .claude/** always count): sign-in,
-      # encryption and backups, what reads, stores and shows mail (the Review queue's module and routes included: they
-      # serve a kept message's subject, text, markup and images to those who may see it), visibility, the assistant and
-      # offline copies, and the photos epic's files as they appear.
+      # A change to any of these is risky and gets the second review (.github/** and .claude/** always count). The mail
+      # code is covered by its directories, not file by file (every file under domain/mail/, every HTTP handler and
+      # route in server/, every outside service in providers/, and the storage layer, where kept messages and gate codes
+      # are sealed): a new module that serves a kept message is risky from its first line. tests/test_agent_review_paths.py
+      # holds the list to the layout, so a file that reads kept mail or a gate code can't fall outside it. Beside them,
+      # by file: sign-in, outbound TLS, visibility, loyalty numbers, the offline copy, the demo data and trips (which
+      # serve a booking's emails), and the photos epic's files as they appear.
       second-review-paths: |
         waypoint/oidc.py
         waypoint/tls.py
-        waypoint/storage/secretbox.py
-        waypoint/storage/stored_mail.py
-        waypoint/storage/gate_codes.py
-        waypoint/storage/backup.py
+        waypoint/storage/*.py
+        waypoint/domain/mail/**
+        waypoint/providers/**
+        waypoint/server/**
         waypoint/domain/visibility.py
         waypoint/domain/trippeople.py
         waypoint/domain/loyalty.py
         waypoint/domain/offline.py
-        waypoint/domain/mail/scan.py
-        waypoint/domain/mail/extract.py
-        waypoint/domain/mail/safe_html.py
-        waypoint/domain/mail/ai.py
-        waypoint/domain/mail/autoask.py
-        waypoint/domain/mail/review.py
-        waypoint/providers/gmail.py
-        waypoint/providers/mailimages.py
-        waypoint/providers/immich.py
-        waypoint/server/handler.py
-        waypoint/server/routes.py
-        waypoint/server/mcp_*.py
-        waypoint/server/oauth_http.py
-        waypoint/server/api/mailboxes.py
-        waypoint/server/api/review.py
-        waypoint/server/api/offline.py
-        waypoint/server/api/assistant.py
-        waypoint/server/api/backups.py
-        waypoint/server/api/photos.py
-        waypoint/storage/photo_sources.py
+        waypoint/domain/trips.py
+        waypoint/domain/demo.py
         waypoint/domain/photos.py
         frontend/src/lib/email-render.ts
         frontend/src/lib/offline*.ts
