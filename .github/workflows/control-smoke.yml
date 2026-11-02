@@ -9,10 +9,10 @@ name: Control smoke
 on:
   push:
     branches: [main]
-    paths: [frontend/verify/**, waypoint/verify.py, tools/control, poetry.lock, frontend/package-lock.json, .github/workflows/control-smoke.yml]
+    paths: [frontend/verify/**, waypoint/verify.py, tools/control, Makefile, poetry.lock, frontend/package-lock.json, .github/workflows/control-smoke.yml]
   pull_request:
     branches: [main]
-    paths: [frontend/verify/**, waypoint/verify.py, tools/control, poetry.lock, frontend/package-lock.json, .github/workflows/control-smoke.yml]
+    paths: [frontend/verify/**, waypoint/verify.py, tools/control, Makefile, poetry.lock, frontend/package-lock.json, .github/workflows/control-smoke.yml]
   workflow_dispatch:
 
 permissions: {}
