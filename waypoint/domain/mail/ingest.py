@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from datetime import datetime
 from typing import Literal
 
 from ...storage import db
@@ -136,6 +138,17 @@ def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:
 
 
 NO_ZONE = "place's time zone unknown"
+LOCAL_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?")
+SUGGESTED_KINDS = ("hotel", "parking")
+
+
+def only_the_zone_is_missing(b: extract.Booking) -> bool:
+    if b.kind not in SUGGESTED_KINDS or b.status != "confirmed" or not (LOCAL_TIME.fullmatch(b.start) and LOCAL_TIME.fullmatch(b.end)):
+        return False
+    try:
+        return datetime.fromisoformat(b.end) > datetime.fromisoformat(b.start)
+    except ValueError:
+        return False
 
 
 def explain(conn: db.Connection, b: extract.Booking) -> str:

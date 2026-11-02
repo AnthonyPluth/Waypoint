@@ -6,12 +6,41 @@ from sqlalchemy import select
 from tests.privacy import no_leaks
 from tests.test_mail_ai import ScanAiCase
 from tests.test_mail_scan import NOW
-from waypoint.domain.mail import review
+from waypoint.domain.mail import ingest, review
+from waypoint.domain.mail.booking import Booking
 from waypoint.storage.models import ReviewItem
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mail" / "spothero" / "booking.eml"
 CANARIES = ("CANARY-BODY-SPOTHERO-BOOKING-6P2D", "CANARY-PLATE-SPOTHERO-5M9X")
 LOT = "Example Plaza Garage"
+
+
+def stay(**extra) -> Booking:
+    return Booking(**{"kind": "parking", "status": "confirmed", "confirmation": "100200300", "provider": "SpotHero", "start": "2027-03-05T15:00:00",
+                      "end": "2027-03-09T15:00:00", "origin": LOT, "destination": None, **extra})
+
+
+class RuleTests(unittest.TestCase):
+    def test_a_stay_or_parking_lot_with_plain_local_times_in_order_may_be_suggested(self):
+        for kind in ("hotel", "parking"):
+            with self.subTest(kind=kind):
+                self.assertTrue(ingest.only_the_zone_is_missing(stay(kind=kind)))
+        self.assertTrue(ingest.only_the_zone_is_missing(stay(start="2027-03-05T15:00", end="2027-03-09T15:00")))
+
+    def test_a_cancelled_booking_is_not_suggested(self):
+        self.assertFalse(ingest.only_the_zone_is_missing(stay(status="cancelled")))
+
+    def test_kinds_with_two_places_are_not_suggested(self):
+        for kind in ("flight", "car", "train", "cruise"):
+            with self.subTest(kind=kind):
+                self.assertFalse(ingest.only_the_zone_is_missing(stay(kind=kind)))
+
+    def test_times_with_an_offset_or_a_bad_range_are_not_suggested(self):
+        for start, end in (("2027-03-05T15:00:00Z", "2027-03-09T15:00:00Z"), ("2027-03-05T15:00:00+01:00", "2027-03-09T15:00:00+01:00"),
+                           ("2027-03-09T15:00:00", "2027-03-05T15:00:00"), ("2027-03-05T15:00:00", "2027-03-05T15:00:00"),
+                           ("2027-02-30T15:00:00", "2027-03-09T15:00:00"), ("2027-03-05", "2027-03-09"), ("soon", "later")):
+            with self.subTest(start=start, end=end):
+                self.assertFalse(ingest.only_the_zone_is_missing(stay(start=start, end=end)))
 
 
 class ReadSuggestionTests(ScanAiCase):
@@ -61,6 +90,13 @@ class ReadSuggestionTests(ScanAiCase):
                                                                                           "end_local": "2027-03-10T09:00:00", "origin": LOT, "parsed": True}]))
         [item] = self.items()
         self.assertEqual(item["suggestions"][0]["start_local"], "2027-03-06T09:00:00")
+
+    def test_a_cancellation_that_cannot_be_placed_waits_without_a_suggestion(self):
+        self.add_mail("cancel", (FIXTURE.parent / "cancellation.eml").read_bytes())
+        result = self.scan()
+        self.assertEqual((result.bookings, result.review), (0, 1))
+        [item] = self.items()
+        self.assertEqual(item["suggestions"], [])
 
     def test_a_booking_that_files_straight_in_leaves_no_item(self):
         self.add_mail("spot", FIXTURE.read_bytes().replace(b"1 Example Avenue", b"1 Example Avenue, Austin, TX 78701"))

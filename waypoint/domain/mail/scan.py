@@ -256,7 +256,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
             failed += 1
             lacks.append(ingest.explain(conn, booking))
             why[lacks[-1]] += 1
-            if lacks[-1] == ingest.NO_ZONE and booking.kind != "flight":
+            if lacks[-1] == ingest.NO_ZONE and ingest.only_the_zone_is_missing(booking):
                 read.append(ingest.suggestion(conn, booking))
         elif filed == "attached":
             if joined is not None:
