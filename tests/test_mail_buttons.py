@@ -50,7 +50,7 @@ class ButtonTests(unittest.TestCase):
 
     def test_a_link_that_is_not_a_plain_https_address_is_not_taken(self):
         for href in ("http://example.test/m", "mailto:a@example.test", "javascript:alert(1)", "https://", "#", "", "//example.test/m",
-                     "https://example.test/" + "a" * buttons.LIMIT, "https://example.test/unsubscribe?u=1"):
+                     "https://example.test/" + "a" * buttons.LIMIT, "https://example.test/unsubscribe?u=1", "https://[", "https://[::1", "https://a]b"):
             with self.subTest(href=href[:40]):
                 self.assertIsNone(buttons.manage_link([anchor("Manage booking", href)]))
 
@@ -82,6 +82,18 @@ class ExtractTests(unittest.TestCase):
         found = read(mail(body)).bookings
         self.assertEqual(sorted({b.confirmation for b in found}), ["K7QW2N", "ZZ9999"])
         self.assertEqual([b.manage_url for b in found], [None, None])
+
+    def test_several_bookings_with_no_code_are_given_no_one_link_but_a_single_one_is(self):
+        body = jsonld("").replace('"reservationNumber":"",', "") + anchor("Manage booking")
+        [single] = read(mail(body)).bookings
+        self.assertEqual((single.confirmation, single.manage_url), (None, URL))
+        two = jsonld("").replace('"reservationNumber":"",', "") + jsonld("").replace('"reservationNumber":"",', "").replace("WN 5", "WN 6") + anchor("Manage booking")
+        found = read(mail(two)).bookings
+        self.assertEqual([(b.confirmation, b.manage_url) for b in found], [(None, None), (None, None)])
+
+    def test_a_message_with_a_malformed_button_address_is_still_read(self):
+        [b] = read(mail(jsonld("K7QW2N") + anchor("Manage booking", "https://["))).bookings
+        self.assertEqual((b.confirmation, b.manage_url), ("K7QW2N", None))
 
     def test_an_email_without_a_button_leaves_the_link_empty(self):
         [b] = read(mail(jsonld("K7QW2N") + anchor("Unsubscribe"))).bookings

@@ -611,7 +611,7 @@ def read(message: Mapping[str, Any]) -> Message:
             if why:
                 gaps.append(f"generic reader: {why}")
     bookings = price.assign(bookings, visible)
-    if bookings and len({b.confirmation for b in bookings}) == 1 and not all(b.manage_url for b in bookings) and (button := buttons.manage_link(htmls)):
+    if bookings and (len(bookings) == 1 or (len(codes := {b.confirmation for b in bookings}) == 1 and None not in codes)) and not all(b.manage_url for b in bookings) and (button := buttons.manage_link(htmls)):
         bookings = [replace(b, manage_url=b.manage_url or button) for b in bookings]
     if any(utc_marked(t) for b in bookings for t in (b.start, b.end)):
         shown = clock_times(_visible(htmls, texts))

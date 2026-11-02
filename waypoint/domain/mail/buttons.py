@@ -37,8 +37,11 @@ class _Anchors(HTMLParser):
 
 
 def _usable(href: str) -> bool:
-    parts = urlsplit(href)
-    return parts.scheme == "https" and bool(parts.hostname) and len(href) <= LIMIT
+    try:
+        parts = urlsplit(href)
+        return parts.scheme == "https" and bool(parts.hostname) and len(href) <= LIMIT
+    except ValueError:
+        return False
 
 
 def manage_link(htmls: Iterable[str]) -> str | None:
