@@ -1,0 +1,33 @@
+name: Screenshot diff
+
+# Which pixels of the committed screenshots (docs/src/assets/screenshots/, written by make verify) a pull request
+# changed: a self-contained report and a summary as artifacts, and one sticky comment with the link, found again by its
+# marker. Informational, never a verdict: the merge gate ignores it. fleet's reusable workflow (AnthonyPluth/fleet,
+# .github/workflows/screenshot-diff.yml) installs the tool from fleet's checkout at the pin below and runs it with
+# python -I, so the pull request's files can't change what reports on them; the images are the only pull request
+# content it reads. It runs on every pull request, not only ones that touch the screenshots, so a push that reverts a
+# change updates the comment. A fork's read-only token skips the comment and keeps the artifact.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+concurrency:
+  group: screenshot-diff-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# Every step runs in fleet's workflow; the default is here so the workflow conventions check reads the same shape in
+# every file.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  diff:
+    permissions:
+      contents: read
+      pull-requests: write     # the comment
+    uses: AnthonyPluth/fleet/.github/workflows/screenshot-diff.yml@281821f17c9a84d59412c33badf5cfdf9cc31d3b   # v1.0.0
+    with:
+      dir: docs/src/assets/screenshots/

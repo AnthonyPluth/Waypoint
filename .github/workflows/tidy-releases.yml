@@ -1,8 +1,9 @@
 name: Tidy releases
 
 # Run by hand (Actions → Tidy releases → Run workflow) to take back versions that shouldn't have been released: each
-# one's GitHub release, its tag and its image in the GitHub Container Registry. It can first point floating image
-# tags (:2, :1.0, ...) at other versions, for when a stray release moved them.
+# one's GitHub release, its tag and its image in the GitHub Container Registry, through fleet's reusable workflow
+# (AnthonyPluth/fleet, .github/workflows/tidy-releases.yml). It can first point floating image tags (:2, :1.0, ...) at
+# other versions, for when a stray release moved them.
 #
 # Written for 2026-09-30, when main's history was rewritten and the release job cut v1.0.2 to v1.0.11, v2.0.3 and
 # v2.0.4 below v2.3.21 (docker.yml now steps from the highest version ever tagged, so that can't happen again).
@@ -27,9 +28,11 @@ on:
 
 permissions: {}
 
+# Every step runs in fleet's workflow; the default is here so the workflow conventions check reads the same shape in
+# every file.
 defaults:
   run:
-    shell: bash                # -eo pipefail: a failed gh call fails the step instead of passing an empty result on
+    shell: bash
 
 concurrency:
   group: docker-image-refs/heads/main
@@ -37,79 +40,15 @@ concurrency:
 
 jobs:
   tidy:
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
-    timeout-minutes: 10
     permissions:
       contents: write          # delete releases and tags
       packages: write          # move image tags and delete image versions
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GH_REPO: ${{ github.repository }}
-      OWNER: ${{ github.repository_owner }}
-      VERSIONS: ${{ inputs.versions }}
-      RETAG: ${{ inputs.retag }}
-      CONFIRM: ${{ inputs.confirm }}
-    steps:
-      - name: Check what's asked
-        run: |
-          [ "$CONFIRM" = delete ] || { echo "::error::Type delete in the confirm box."; exit 1; }
-          highest=$(gh api --paginate "repos/$GH_REPO/tags" --jq '.[].name' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
-          [ -n "$highest" ] || { echo "::error::Couldn't find the newest version."; exit 1; }
-          for v in $VERSIONS; do
-            [[ "$v" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::$v isn't a version like v1.2.3."; exit 1; }
-            [ "v${v#v}" != "$highest" ] || { echo "::error::$v is the newest version, which is never deleted."; exit 1; }
-          done
-          for pair in $RETAG; do
-            [[ "$pair" =~ ^[0-9]+(\.[0-9]+)?=v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::$pair should look like 2=2.3.21."; exit 1; }
-            to=${pair#*=}
-            for v in $VERSIONS; do
-              [ "${v#v}" != "${to#v}" ] || { echo "::error::$pair points at a version being deleted."; exit 1; }
-            done
-          done
-          echo "Deleting: $VERSIONS"; echo "Moving: ${RETAG:-nothing}"
-
-      - name: Point floating image tags elsewhere
-        if: inputs.retag != ''
-        run: |
-          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          img="ghcr.io/${OWNER,,}/waypoint"
-          for pair in $RETAG; do
-            tag=${pair%%=*}; to=${pair#*=}; to=${to#v}
-            docker buildx imagetools create -t "$img:$tag" "$img:$to"
-            echo "$img:$tag now points at $to"
-          done
-
-      - name: Delete the releases and their tags
-        run: |
-          for v in $VERSIONS; do
-            v="v${v#v}"
-            if gh release view "$v" >/dev/null 2>&1; then
-              gh release delete "$v" --cleanup-tag --yes
-              echo "Deleted the release and tag $v"
-            elif gh api "repos/$GH_REPO/git/ref/tags/$v" >/dev/null 2>&1; then
-              gh api -X DELETE "repos/$GH_REPO/git/refs/tags/$v"
-              echo "Deleted the tag $v (it had no release)"
-            else
-              echo "Nothing named $v"
-            fi
-          done
-
-      - name: Delete their images
-        run: |
-          # Each image version with its tags, one per line: id<TAB>tag,tag,...
-          images=$(gh api --paginate "users/$OWNER/packages/container/waypoint/versions" \
-                     --jq '.[] | "\(.id)\t\(.metadata.container.tags | join(","))"')
-          for v in $VERSIONS; do
-            v=${v#v}
-            row=$(awk -F'\t' -v v="$v" '{ n = split($2, t, ","); for (i = 1; i <= n; i++) if (t[i] == v) print }' <<< "$images")
-            if [ -z "$row" ]; then echo "No image tagged $v"; continue; fi
-            id=${row%%$'\t'*}; tags=${row#*$'\t'}
-            # Only its own tags (1.0.2 and v1.0.2): anything else (latest, a floating tag) means it's still in use.
-            others=$(tr ',' '\n' <<< "$tags" | grep -vxF -e "$v" -e "v$v" || true)
-            if [ -n "$others" ]; then
-              echo "::warning::Kept the image for $v: it's also tagged $(tr '\n' ' ' <<< "$others")(move those first)."
-              continue
-            fi
-            gh api -X DELETE "users/$OWNER/packages/container/waypoint/versions/$id"
-            echo "Deleted the image for $v"
-          done
+    uses: AnthonyPluth/fleet/.github/workflows/tidy-releases.yml@281821f17c9a84d59412c33badf5cfdf9cc31d3b   # v1.0.0
+    with:
+      image: waypoint
+      versions: ${{ inputs.versions }}
+      retag: ${{ inputs.retag }}
+      confirm: ${{ inputs.confirm }}
+      # The runner, as JSON. The key is quoted because the workflow conventions check holds every `runs-on:` line to a
+      # job's form, and this one is an input.
+      "runs-on": ${{ vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"' }}
