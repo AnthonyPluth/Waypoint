@@ -1,0 +1,26 @@
+From: SpotHero <support_at_spothero_com_ab12cd34ef_a1b2c3d4@privaterelay.appleid.com>
+To: traveller@gmail.example
+Subject: SpotHero Reservation Cancelled - #1234567890
+Date: Wed, 03 Mar 2027 10:00:00 -0600
+Message-ID: <fx-spothero-cancellation@privaterelay.appleid.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head><title>x</title><style>p { margin: 0 }</style></head><body>
+<p>Happy Parking! CANARY-BODY-SPOTHERO-CANCEL-3W7R</p>
+<h2>Reservation Cancelled</h2>
+<p>Rental ID: 100200300</p>
+<p><a href="https://example.test/lot">Example Plaza Garage</a></p>
+<div><p>Sat Mar 6, 9:00 AM - Wed Mar 10, 9:00 AM</p><a href="https://example.test/change">Change</a></div>
+<div><span class="vehicle-and-no-lp"><span class="make-model-name">Example Wagon</span>
+<span>CANARY-PLATE-SPOTHERO-5M9X</span></span></div>
+<div><p>(555) 010-0100</p></div>
+<a href="https://example.test/pass">View Parking Pass</a>
+<h2>Getting There</h2>
+<div>Enter at: <a href="https://example.test/enter">1 Example Avenue</a><a href="https://example.test/directions">Get Directions</a></div>
+<h2>Cancellation Policy</h2>
+<div>Cancel up to the start of your reservation for a full refund.</div>
+<h2>Payment</h2>
+<table><tr><td>Subtotal</td><td>$110.00</td></tr><tr><td>Total</td><td>$120.00</td></tr></table>
+<p>1 Example Street - Example City</p>
+</body></html>
