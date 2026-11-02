@@ -1,13 +1,17 @@
 name: Merge gate threads
 
-# The merge gate fails while a review thread opened by Codex with a P1 or P2 badge is unresolved. Resolving or
-# reopening a thread, or a new review or review comment, starts no workflow the gate listens to, so this one asks the
-# gate to decide the pull request again (fleet's merge-gate-threads.yml starts merge-gate.yml on main with the pull
-# request's number). It checks out nothing and runs nothing of the pull request's. A pull request from a fork is
-# skipped: its token is read-only, and its gate looks again on its next push or check, or by hand.
+# The merge gate fails while a review thread opened by Codex with a P1 or P2 badge is unresolved. A new review or review
+# comment starts no workflow the gate listens to, so this one asks the gate to decide the pull request again (fleet's
+# merge-gate-threads.yml starts merge-gate.yml on main with the pull request's number). It checks out nothing and runs
+# nothing of the pull request's. A pull request from a fork is skipped: its token is read-only, and its gate looks again
+# on its next push or check, or by hand.
+#
+# Resolving a thread by itself starts nothing: GitHub sends a pull_request_review_thread webhook for it, but Actions has
+# no such trigger (its events reference lists only pull_request_review and pull_request_review_comment for reviews, and
+# a workflow naming an unknown event is invalid). So a thread is resolved after replying on it (AGENTS.md, "Git and
+# PRs"): the reply's pull_request_review_comment event runs this; a resolution with no reply and no push is decided by
+# running "Merge gate" by hand with the pull request's number.
 on:
-  pull_request_review_thread:
-    types: [resolved, unresolved]
   pull_request_review:
     types: [submitted]
   pull_request_review_comment:

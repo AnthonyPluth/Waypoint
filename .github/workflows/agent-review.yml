@@ -44,8 +44,9 @@ jobs:
       budget-usd: ${{ vars.AGENT_REVIEW_BUDGET_USD || '3' }}
       max-turns: ${{ vars.AGENT_REVIEW_MAX_TURNS || '60' }}
       # A change to any of these is risky and gets the second review (.github/** and .claude/** always count): sign-in,
-      # encryption and backups, what reads, stores and shows mail, visibility, the assistant and offline copies, and the
-      # photos epic's files as they appear.
+      # encryption and backups, what reads, stores and shows mail (the Review queue's module and routes included: they
+      # serve a kept message's subject, text, markup and images to those who may see it), visibility, the assistant and
+      # offline copies, and the photos epic's files as they appear.
       second-review-paths: |
         waypoint/oidc.py
         waypoint/tls.py
@@ -62,6 +63,7 @@ jobs:
         waypoint/domain/mail/safe_html.py
         waypoint/domain/mail/ai.py
         waypoint/domain/mail/autoask.py
+        waypoint/domain/mail/review.py
         waypoint/providers/gmail.py
         waypoint/providers/mailimages.py
         waypoint/providers/immich.py
@@ -70,6 +72,7 @@ jobs:
         waypoint/server/mcp_*.py
         waypoint/server/oauth_http.py
         waypoint/server/api/mailboxes.py
+        waypoint/server/api/review.py
         waypoint/server/api/offline.py
         waypoint/server/api/assistant.py
         waypoint/server/api/backups.py
