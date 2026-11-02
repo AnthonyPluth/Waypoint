@@ -6,6 +6,8 @@
 
 PYTHON ?= poetry run python
 NPM ?= npm
+# fleet's `fleet` command (AnthonyPluth/fleet) at the version .fleet/version names, through the vendored shim (uvx).
+FLEET ?= tools/fleet
 # The tools come from the Poetry environment (pyproject.toml's dev group, which `poetry install` adds), at the
 # versions CI runs. mypy has to run there anyway, to see Waypoint's dependencies.
 RUFF ?= poetry run ruff
@@ -23,7 +25,7 @@ SEMGREP ?= pipx run semgrep==1.146.0
 
 .PHONY: setup check lint python-lint frontend-lint semgrep test test-parallel test-pg test-timings fix \
 	frontend-check frontend-typecheck frontend-test frontend-build docs docs-build verify feature-map feature-map-check \
-	fleet-checks api-contract api-contract-check verify-skill user-feature-map control-smoke
+	fleet-checks fleet-sync api-contract api-contract-check verify-skill verify-skill-print user-feature-map control-smoke
 
 # frontend-lint is a prerequisite of both lint and frontend-check, and make runs it once.
 check: lint feature-map-check api-contract-check fleet-checks test-parallel frontend-check docs-build
@@ -36,7 +38,7 @@ python-lint:
 	$(RUFF) check .
 	$(MYPY)
 	$(LINT_IMPORTS)
-	$(PYTHON) tools/no_comments.py
+	$(FLEET) no-comments
 
 # Waypoint's own rules for the paved paths (.semgrep/waypoint.yml): first that each rule flags its failing examples and only
 # those (.semgrep/examples/), then the code. The ESLint rules' examples are frontend/src/lint-rules.test.ts.
@@ -48,11 +50,11 @@ test:
 	$(PYTHON) -m unittest discover tests
 
 # The tests across 4 processes, the command CI runs (about 3x faster than `make test`), measuring coverage, and the
-# floor it must meet (tools/coverage_floor.py): new code comes with the tests that run it.
+# floor it must meet (`fleet coverage-floor`, from [tool.fleet.coverage] in pyproject.toml): new code comes with the tests that run it.
 test-parallel:
 	$(UNITTEST_PARALLEL) --coverage --coverage-rcfile pyproject.toml
 	poetry run coverage json -q -o coverage.json
-	$(PYTHON) tools/coverage_floor.py coverage.json
+	$(FLEET) coverage-floor coverage.json
 
 # The same, against the Postgres at $$DATABASE_URL (an empty database is fine; see docs/src/content/docs/contributing/development.md).
 test-pg:
@@ -64,14 +66,15 @@ test-pg:
 test-timings:
 	rm -rf .timings
 	TIMINGS_DIR=.timings PYTHONPATH=. $(UNITTEST_PARALLEL) --result tests.timing_result.TimingResult || status=$$?; \
-	$(PYTHON) tools/test_timings.py .timings; exit $${status:-0}
+	$(FLEET) test-timings .timings; exit $${status:-0}
 
 # Applies ruff's safe fixes (unused imports and the like); review the diff before committing.
 fix:
 	$(RUFF) check --fix .
 
 # A fresh checkout's dependencies: Poetry's environment (Python and its dev tools) and the web app's packages. The cloud
-# container does this itself (.claude/hooks/session-start.sh); on your own machine it's the first command to run.
+# container does this itself (fleet's .claude/hooks/fleet-session-start.sh, configured by .claude/hooks/fleet.conf); on
+# your own machine it's the first command to run.
 setup:
 	poetry install --no-root --no-interaction
 	cd frontend && $(NPM) ci --no-audit --no-fund
@@ -117,9 +120,13 @@ verify: frontend/node_modules frontend-build
 	$(PYTHON) run.py verify $(PAGES)
 
 # tools/control's command reference in the verify-waypoint skill (.claude/skills/verify-waypoint/references/cli.md), generated
-# from the CLI's own help: run it after changing a command. make fleet-checks fails when it's out of date.
+# from the CLI's own help: run it after changing a command. make fleet-checks fails when it's out of date (the
+# [[tool.fleet.generated]] entry in pyproject.toml compares the file with what verify-skill-print prints).
 verify-skill:
 	node frontend/verify/control.mjs help --markdown > .claude/skills/verify-waypoint/references/cli.md
+
+verify-skill-print:
+	@node frontend/verify/control.mjs help --markdown
 
 # The user feature map (.claude/skills/verify-waypoint/references/feature-map.md): what a person can do, by page and flow, from
 # the verify pages and flows plus references/feature-gotchas.md (hand-edited). make fleet-checks fails when it's out of date.
@@ -149,7 +156,17 @@ api-contract:
 api-contract-check:
 	$(PYTHON) tools/api_contract.py --check
 
-# Checks that replaced instructions (tools/fleet_checks.py): one Alembic head, a test for each new migration, the
-# workflows' conventions, and the Co-Authored-By trailer on your commits since main, as CI checks a pull request's.
+# Checks that replaced instructions (`fleet checks`, configured by [tool.fleet] in pyproject.toml, plus Waypoint's own in
+# tools/app_checks.py): one Alembic head, a test for each new migration, the workflows' conventions, the skills and
+# generated references, and the Co-Authored-By trailer on your commits since main, as CI checks a pull request's. Then
+# `fleet drift`: the AGENTS.md blocks, the vendored .claude/ files and tools/fleet are fleet's at .fleet/version.
 fleet-checks:
-	$(PYTHON) tools/fleet_checks.py --commits origin/main..HEAD
+	$(FLEET) checks --commits origin/main..HEAD
+	$(FLEET) drift
+
+# Moves fleet's content here (the AGENTS.md blocks, .claude/skills/fleet-*, .claude/agents/fleet-reviewer.md,
+# .claude/hooks/fleet-session-start.sh, tools/fleet and .fleet/version) to a fleet release: `make fleet-sync version=v1.2.3`.
+# The workflow pins in .github/workflows/ move with Dependabot, and fleet-sync.yml normally runs this after they do.
+fleet-sync:
+	@test -n "$(version)" || { echo "Say which release: make fleet-sync version=v1.2.3" >&2; exit 1; }
+	$(FLEET) sync --to $(version)

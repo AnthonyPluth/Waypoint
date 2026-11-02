@@ -158,3 +158,37 @@ strict_equality = true
 [[tool.mypy.overrides]]
 module = ["py_vapid", "pywebpush"]
 ignore_missing_imports = true
+
+# fleet's checks (`tools/fleet checks`, `make fleet-checks`): a check runs only where its key is set. Waypoint's own
+# checks are tools/app_checks.py (extra-checks).
+[tool.fleet]
+migrations = "waypoint/storage/migrations/versions"
+migration-tests = "tests/test_migrations.py"
+tested-from = "0001"
+image-homes = ["docs/public/", "waypoint/static/", "waypoint/storage/logos/"]
+image-files = ["docs/src/assets/logo.png"]
+skills = ".claude/skills"
+feature-maps = ["tools/user_feature_map.py"]
+extra-checks = "tools.app_checks:CHECKS"
+
+[tool.fleet.screenshots]
+dir = "docs/src/assets/screenshots/"
+names = "pages"
+verify = "frontend/verify/verify.mjs"
+flows = "frontend/verify/flows"
+
+# tools/control's command reference in the verify-waypoint skill, generated from the CLI's own help.
+[[tool.fleet.generated]]
+path = ".claude/skills/verify-waypoint/references/cli.md"
+command = "make --no-print-directory -s verify-skill-print"
+fix = "make verify-skill"
+
+# Every tracked Python, CSS and Svelte file that holds code (`tools/fleet no-comments`; .semgrep/examples/ is skipped by
+# default: its code is wrong on purpose).
+[tool.fleet.no-comments]
+paths = ["waypoint", "tests", "tools", "frontend/src", "frontend/demo", "docs/src", "run.py", ".semgrep"]
+
+# The coverage floors `tools/fleet coverage-floor` holds the Python tests to (make test-parallel and CI).
+[tool.fleet.coverage]
+overall = 85
+modules = { "waypoint/domain/" = 90, "waypoint/providers/" = 90, "waypoint/server/api/" = 90 }
