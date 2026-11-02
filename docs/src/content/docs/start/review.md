@@ -21,7 +21,7 @@ What is waiting is grouped by the decision it needs, each group titled with its 
 A message lands here when it looks like a booking (from an airline, hotel, rental company, railway or booking site, with a confirmation word in it) but Waypoint can’t get a booking out of it. Each item shows who it came from, the day it was sent, the message’s subject and why:
 
 - **No booking details found**: the email carries no machine-readable booking, and Waypoint has no parser for that sender.
-- **Some details missing**: it has booking markup, but not enough for a segment (no arrival time, an unknown airport, a hotel whose time zone can’t be worked out, or times marked UTC that could be the local clock).
+- **Some details missing**: it has booking markup, but not enough for a segment (no arrival time, an unknown airport, a hotel or parking lot whose time zone can’t be worked out, or times marked UTC that could be the local clock). When the only thing missing is the time zone of a stay or a parking lot (and its times are plain local times, in order, and it isn’t a cancellation), Waypoint keeps what it did read (the place, the dates and times, the confirmation code, the address and phone) and shows it as a suggestion marked **Read from the email**: **Check suggestion** opens the form filled in, and adding the city and state to the address, or choosing the time zone, is all that is left.
 - **Couldn’t be opened**: the message itself was damaged.
 
 Most senders put no machine-readable booking in their emails; those are the ones to add by hand or ignore. Messages Gmail files under Purchases or Reservations can also land here, such as a restaurant or an appointment: dismiss them. How a scan chooses what to read is under [Scanning](/Waypoint/start/gmail/#scanning).

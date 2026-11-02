@@ -75,6 +75,7 @@ class Suggestion(TypedDict, total=False):
     price_minor: int
     price_currency: str
     sources: dict[str, str]
+    parsed: bool
 
 
 @dataclass(frozen=True)

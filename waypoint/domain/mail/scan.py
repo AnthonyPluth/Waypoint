@@ -248,6 +248,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     touched: list[int] = []
     held: list[ingest.Held] = []
     lacks: list[str] = []
+    read: list[ai.Suggestion] = []
     for booking in message.bookings:
         before = len(touched)
         filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill, held)
@@ -255,6 +256,8 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
             failed += 1
             lacks.append(ingest.explain(conn, booking))
             why[lacks[-1]] += 1
+            if lacks[-1] == ingest.NO_ZONE and ingest.only_the_zone_is_missing(booking):
+                read.append(ingest.suggestion(conn, booking))
         elif filed == "attached":
             if joined is not None:
                 joined.append(1)
@@ -279,6 +282,8 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
         reason: review.Reason = "broken" if message.broken else "incomplete" if message.markup or message.bookings else "no_markup"
         review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, reason, now, held,
                    reference=message.found.reference, gap=glance.gap_of(lacks + list(message.gaps)) if reason == "incomplete" else None)
+        if read:
+            review.set_read_suggestions(conn, mailbox_id, message_id, read)
         if not usable and (strong or message.markup or message.bookings) and autoask.switched_on(conn):
             autoask.wait(conn, mailbox_id, message_id)
         queued = 1

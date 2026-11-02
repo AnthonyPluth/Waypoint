@@ -3292,6 +3292,9 @@
             "additionalProperties": {
               "type": "string"
             }
+          },
+          "parsed": {
+            "type": "boolean"
           }
         },
         "required": [

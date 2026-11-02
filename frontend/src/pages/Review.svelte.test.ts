@@ -781,6 +781,40 @@ describe("Review: the AI’s suggestion", () => {
   });
 });
 
+describe("Review: a booking Waypoint read but couldn’t place", () => {
+  const read = { kind: "parking" as const, provider: "SpotHero", confirmation: "100200300", origin: "Example Plaza Garage", start_local: "2027-03-05T15:00:00",
+    end_local: "2027-03-09T15:00:00", address: "1 Example Avenue", phone: "(555) 010-0100", sources: {}, parsed: true } as unknown as ReviewItem["suggestions"][number];
+
+  it("says it was read from the email, not suggested by the AI", async () => {
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [read] })], who: [], ai: true };
+    render(ReviewPage);
+    await screen.findByTestId("review-item");
+    expect(screen.getByText("Read from the email")).toBeInTheDocument();
+    expect(screen.queryByText("AI suggestion")).toBeNull();
+  });
+
+  it("still calls an AI suggestion that", async () => {
+    held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [], ai: true };
+    render(ReviewPage);
+    await screen.findByTestId("review-item");
+    expect(screen.getByText("AI suggestion")).toBeInTheDocument();
+    expect(screen.queryByText("Read from the email")).toBeNull();
+  });
+
+  it("fills the form with what the email gave and leaves the zone for the address to settle", async () => {
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [read] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
+    expect(screen.getByLabelText("Confirmation code")).toHaveValue("100200300");
+    expect(screen.getByLabelText(/^Address/)).toHaveValue("1 Example Avenue");
+    await userEvent.clear(screen.getByLabelText(/^Address/));
+    await userEvent.type(screen.getByLabelText(/^Address/), "1 Example Avenue, Austin, TX 78701");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({
+      kind: "parking", start_zone: null, confirmation: "100200300", details: expect.objectContaining({ address: "1 Example Avenue, Austin, TX 78701" }) })]));
+  });
+});
+
 describe("Review: the message beside the form", () => {
   it("shows the message's subject above its text beside the form", async () => {
     vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview") ? { subject: "Your itinerary", text: "Gate B12", html: null, truncated: false }

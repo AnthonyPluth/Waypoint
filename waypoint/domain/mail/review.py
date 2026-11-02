@@ -73,6 +73,12 @@ def set_suggestions(conn: db.Connection, mailbox_id: int, message_id: str, sugge
                  .values(suggestion=json.dumps(suggestions) if suggestions else None, suggestion_error=error, **kept))
 
 
+def set_read_suggestions(conn: db.Connection, mailbox_id: int, message_id: str, suggestions: list[ai.Suggestion]) -> None:
+    held = conn.execute(select(ReviewItem.suggestion).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).scalar()
+    if all(x.get("parsed") for x in suggestions_of(held)):
+        set_suggestions(conn, mailbox_id, message_id, suggestions, None)
+
+
 def suggestions_of(stored: str | None) -> list[ai.Suggestion]:
     if not stored:
         return []

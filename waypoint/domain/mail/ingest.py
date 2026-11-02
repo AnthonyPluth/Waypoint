@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from datetime import datetime
 from typing import Literal
 
 from ...storage import db
@@ -111,7 +113,7 @@ def segments_lack_details(conn: db.Connection, segment_ids: list[int]) -> bool:
 
 
 def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:
-    out: ai.Suggestion = {"kind": b.kind, "start_local": b.start, "end_local": b.end, "origin": b.origin or "", "sources": dict(b.generic)}
+    out: ai.Suggestion = {"kind": b.kind, "start_local": b.start, "end_local": b.end, "origin": b.origin or "", "sources": dict(b.generic), "parsed": True}
     if b.provider:
         out["provider"] = b.provider
     if b.confirmation:
@@ -120,6 +122,8 @@ def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:
         out["destination"] = b.destination or b.origin or ""
     if address := dict(b.details).get("address"):
         out["address"] = address
+    if phone := dict(b.details).get("phone"):
+        out["phone"] = phone
     if b.kind == "flight" and (number := dict(b.details).get("flight_number")):
         out["flight_number"] = number
     if ship := dict(b.details).get("ship"):
@@ -133,9 +137,23 @@ def suggestion(conn: db.Connection, b: extract.Booking) -> ai.Suggestion:
     return out
 
 
+NO_ZONE = "place's time zone unknown"
+LOCAL_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?")
+SUGGESTED_KINDS = ("hotel", "parking")
+
+
+def only_the_zone_is_missing(b: extract.Booking) -> bool:
+    if b.kind not in SUGGESTED_KINDS or b.status != "confirmed" or not (LOCAL_TIME.fullmatch(b.start) and LOCAL_TIME.fullmatch(b.end)):
+        return False
+    try:
+        return datetime.fromisoformat(b.end) > datetime.fromisoformat(b.start)
+    except ValueError:
+        return False
+
+
 def explain(conn: db.Connection, b: extract.Booking) -> str:
     if not _zone(conn, b, b.origin, b.start_place) or not _zone(conn, b, b.destination, b.end_place):
-        return "unknown airport" if b.kind == "flight" else "place's time zone unknown"
+        return "unknown airport" if b.kind == "flight" else NO_ZONE
     try:
         if _times(conn, b, _zone(conn, b, b.origin, b.start_place) or "", _zone(conn, b, b.destination, b.end_place) or "") is None:
             return "time isn't a date and time"
