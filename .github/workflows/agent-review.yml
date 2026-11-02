@@ -49,8 +49,43 @@ jobs:
       # are sealed): a new module that serves a kept message is risky from its first line. tests/test_agent_review_paths.py
       # holds the list to the layout, so a file that reads kept mail or a gate code can't fall outside it. Beside them,
       # by file: sign-in, outbound TLS, visibility, loyalty numbers, the offline copy, the demo data and trips (which
-      # serve a booking's emails), and the photos epic's files as they appear.
+      # serve a booking's emails), and the photos epic's files as they appear. Then the checks that hold the promises,
+      # as .github/agent-review/invariants.md names them (the same test keeps every file it names in this list): a change
+      # that weakens one of those checks is what the second review is for, so a pull request touching only the check is
+      # risky too. AGENTS.md is what every review is judged by.
       second-review-paths: |
+        AGENTS.md
+        tools/feature_map_allowlist.txt
+        waypoint/dates.py
+        frontend/src/lib/offline-vault.ts
+        frontend/src/lib/email-render.test.ts
+        tests/hostile_markup.py
+        tests/privacy.py
+        tests/test_backup.py
+        tests/test_dates.py
+        tests/test_every_route.py
+        tests/test_gate_codes.py
+        tests/test_geocode.py
+        tests/test_gmail.py
+        tests/test_hardening.py
+        tests/test_hostile_markup.py
+        tests/test_loyalty.py
+        tests/test_mail_ai.py
+        tests/test_mail_ai_auto.py
+        tests/test_mail_ai_dismiss.py
+        tests/test_mcp_oauth.py
+        tests/test_mcp_oauth_http.py
+        tests/test_mcp_review.py
+        tests/test_mcp_routes.py
+        tests/test_offline.py
+        tests/test_reminders.py
+        tests/test_review_push.py
+        tests/test_roads.py
+        tests/test_states.py
+        tests/test_trip_destination.py
+        tests/test_trip_people.py
+        tests/test_trip_roads.py
+        tests/test_trip_states.py
         waypoint/oidc.py
         waypoint/tls.py
         waypoint/storage/*.py

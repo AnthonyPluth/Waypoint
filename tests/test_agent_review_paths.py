@@ -8,6 +8,8 @@ BLOCK = re.compile(r"^      second-review-paths: \|\n((?:        \S.*\n)+)", re.
 READS_KEPT_MAIL = re.compile(r"\b(stored_mail|gate_codes|mailimages)\b")
 ALWAYS_RISKY_DIRS = ("waypoint/domain/mail", "waypoint/server", "waypoint/providers")
 NOT_YET_IN_THE_TREE = {"waypoint/domain/photos.py"}
+INVARIANTS = ROOT / ".github/agent-review/invariants.md"
+NAMED = re.compile(r"`([A-Za-z0-9_./-]+)`")
 
 
 def second_review_paths(text: str | None = None) -> list[str]:
@@ -33,6 +35,11 @@ def glob_to_regex(pattern: str) -> re.Pattern[str]:
 
 def matches(path: str, patterns: list[str]) -> bool:
     return any(glob_to_regex(p).match(path) for p in patterns)
+
+
+def files_named_by_invariants() -> list[str]:
+    tokens = set(NAMED.findall(INVARIANTS.read_text(encoding="utf-8")))
+    return sorted(t for t in tokens if "/" in t or "." in t if (ROOT / t).is_file())
 
 
 def backend_files() -> list[str]:
@@ -65,6 +72,20 @@ class SecondReviewPaths(unittest.TestCase):
         missing = [name for name in backend_files()
                    if name.startswith(tuple(d + "/" for d in ALWAYS_RISKY_DIRS)) and not matches(name, paths)]
         self.assertEqual(missing, [])
+
+    def test_every_check_invariants_md_names_is_risky(self):
+        named = files_named_by_invariants()
+        self.assertIn("tests/privacy.py", named)
+        self.assertIn("tests/test_every_route.py", named)
+        self.assertIn("frontend/src/lib/email-render.test.ts", named)
+        self.assertIn("waypoint/server/contract.py", named)
+        paths = second_review_paths()
+        missing = [name for name in named if not matches(name, paths)]
+        self.assertEqual(missing, [], "invariants.md names these checks but no second-review path covers them")
+
+    def test_a_check_dropped_from_the_list_would_fail(self):
+        text = WORKFLOW.read_text(encoding="utf-8").replace("        tests/privacy.py\n", "")
+        self.assertFalse(matches("tests/privacy.py", second_review_paths(text)))
 
     def test_the_file_entries_name_files_in_the_tree_or_ones_the_list_expects(self):
         for entry in second_review_paths():
