@@ -20,7 +20,7 @@ from ... import monitoring
 from ...providers import mailimages
 from ...storage.stored_mail import Content, Image
 from .. import money, seatmaps
-from . import cars, cruises, flights, ics, lodging, parking, parsers, price, references, safe_html, seats, trains, triage, words
+from . import buttons, cars, cruises, flights, ics, lodging, parking, parsers, price, references, safe_html, seats, trains, triage, words
 from .booking import Booking as Booking
 from .booking import Kind, Parsed
 from .booking import Passenger as Passenger
@@ -611,6 +611,8 @@ def read(message: Mapping[str, Any]) -> Message:
             if why:
                 gaps.append(f"generic reader: {why}")
     bookings = price.assign(bookings, visible)
+    if bookings and (len(bookings) == 1 or (len(codes := {b.confirmation for b in bookings}) == 1 and None not in codes)) and not all(b.manage_url for b in bookings) and (button := buttons.manage_link(htmls)):
+        bookings = [replace(b, manage_url=b.manage_url or button) for b in bookings]
     if any(utc_marked(t) for b in bookings for t in (b.start, b.end)):
         shown = clock_times(_visible(htmls, texts))
         bookings = [replace(b, clock_times=shown) if utc_marked(b.start) or utc_marked(b.end) else b for b in bookings]
