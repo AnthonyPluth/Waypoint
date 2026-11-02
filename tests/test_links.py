@@ -157,7 +157,7 @@ class VendorLinkTests(unittest.TestCase):
             self.assertTrue(any(host == d or host.endswith("." + d) for d in vendor["domains"]), vendor["url"])
             self.assertIn(vendor["kind"], ("app", "website"))
             self.assertTrue(vendor["source"] and vendor["checked"], vendor["url"])
-            self.assertFalse(set(vendor["kinds"]) - set(app_links.ALL), vendor["url"])
+            self.assertFalse(set(vendor["kinds"]) - set(app_links.KINDS), vendor["url"])
 
     def test_no_link_ever_uses_a_custom_scheme_and_names_are_unique(self):
         names = [n for v in app_links.ALL_VENDORS for n in v["names"]]

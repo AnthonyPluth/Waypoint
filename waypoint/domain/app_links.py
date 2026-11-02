@@ -5,6 +5,7 @@ from typing import Literal, TypedDict
 from . import chains
 
 ALL = ("flight", "hotel", "car", "train", "cruise")
+KINDS = (*ALL, "parking")
 CHECKED = "2026-10-13"
 
 
@@ -26,7 +27,7 @@ def _site(names: tuple[str, ...], domain: str, kinds: tuple[str, ...], source: s
     return {"names": names, "domains": (domain,), "kinds": kinds, "url": f"https://{'www.' if www else ''}{domain}/", "kind": "website", "checked": CHECKED, "source": source}
 
 
-FLIGHT, HOTEL, CAR, TRAIN, CRUISE = ("flight",), ("hotel",), ("car",), ("train",), ("cruise",)
+FLIGHT, HOTEL, CAR, TRAIN, CRUISE, PARKING = ("flight",), ("hotel",), ("car",), ("train",), ("cruise",), ("parking",)
 APP_ONLY_CLAIMS = "the vendor's app claims only account, check-in or parameter-driven paths, none a neutral page: the vendor's home page"
 
 VENDORS: tuple[Vendor, ...] = (
@@ -95,7 +96,7 @@ TAIL: tuple[tuple[tuple[str, ...], str, tuple[str, ...]], ...] = (
     (("ponant",), "ponant.com", CRUISE), (("lindblad expeditions", "lindblad"), "lindblad.com", CRUISE),
     (("costa cruises", "costa"), "costacruises.com", CRUISE), (("avalon waterways",), "avalonwaterways.com", CRUISE),
     (("uniworld", "uniworld boutique river cruises"), "uniworld.com", CRUISE), (("amawaterways", "ama waterways"), "amawaterways.com", CRUISE),
-    (("vacations to go",), "vacationstogo.com", CRUISE),
+    (("vacations to go",), "vacationstogo.com", CRUISE), (("spothero",), "spothero.com", PARKING),
 )
 ALIASED_DOMAINS = {"familyvacations-disneycruise.com": "disneycruise.com", "airnz.co.nz": "airnewzealand.com"}
 

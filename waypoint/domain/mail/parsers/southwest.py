@@ -41,7 +41,7 @@ def _leg(code: str | None, status: str, first: re.Match[str], dep: re.Match[str]
                    details=(("flight_number", f"WN {first[1]}"), *((("aircraft", aircraft),) if aircraft else ())), passengers=passengers)
 
 
-def parse(html: str, text: str) -> Parsed:
+def parse(html: str, text: str, received: str | None = None) -> Parsed:
     rows = lines(html, text)
     code = next((m[1].upper() for r in rows if (m := CONFIRMATION.fullmatch(r))), None)
     names = [m[1].strip() for r in rows if (m := PASSENGER.fullmatch(r))]

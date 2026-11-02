@@ -487,9 +487,13 @@ def _decode(raw: Any) -> bytes | None:
         return None
 
 
+RELAY = re.compile(r"^[^@]*?_at_([a-z0-9][a-z0-9_-]*?_[a-z]{2,})_[a-z0-9]{10}_[a-z0-9]{8}@privaterelay\.appleid\.com$")
+
+
 def _domain(header: Any) -> str | None:
     address = email.utils.parseaddr(str(header or ""))[1]
-    domain = address.rpartition("@")[2].strip().strip(">").lower()
+    relayed = RELAY.match(address.strip().lower())
+    domain = relayed[1].replace("_", ".") if relayed else address.rpartition("@")[2].strip().strip(">").lower()
     return domain if domain and "." in domain else None
 
 
@@ -562,7 +566,7 @@ def read(message: Mapping[str, Any]) -> Message:
     parse = parsers.for_sender(sender)
     if parse is not None:
         try:
-            found = parse("\n".join(htmls), "\n".join(texts))
+            found = parse("\n".join(htmls), "\n".join(texts), received)
         except Exception as e:
             monitoring.report(e, values=False)
             found = Parsed(unread=0 if bookings else 1)

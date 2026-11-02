@@ -92,7 +92,7 @@ def _days(rows: list[str], embark: date, debark: date) -> list[_Day] | None:
     return found
 
 
-def parse(html: str, text: str) -> Parsed:
+def parse(html: str, text: str, received: str | None = None) -> Parsed:
     rows = lines(html, text)
     code = next((m[1].upper() for r in rows if (m := RESERVATION.fullmatch(r))), None)
     if code is None:

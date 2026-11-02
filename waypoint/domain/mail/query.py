@@ -21,6 +21,7 @@ SENDERS = (
     "virginvoyages.com", "vikingcruises.com", "disneycruise.com", "familyvacations-disneycruise.com", "cunard.com", "seabourn.com", "azamara.com", "oceaniacruises.com",
     "rssc.com", "silversea.com", "windstarcruises.com", "ponant.com", "lindblad.com", "costacruises.com", "avalonwaterways.com",
     "uniworld.com", "amawaterways.com", "vacationstogo.com",
+    "spothero.com",
 )
 RETAIL_SENDERS = (
     "amazon.com", "amazon.co.uk", "amazon.co.jp", "amazon.de", "amazon.ca", "ebay.com", "etsy.com", "walmart.com", "target.com", "bestbuy.com",
