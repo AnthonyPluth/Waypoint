@@ -12,6 +12,7 @@ ENTRY = time(0, 0)
 EXIT = time(23, 59)
 ABOUT = re.compile(r"\bparking\b|\bcar park\b|\b(?:ramp|lot|garage) address\b", re.IGNORECASE)
 ADDRESS = re.compile(r"(?:ramp|lot|garage|facility|car park) address(?: is|\s*:)?\s*(.*)", re.IGNORECASE)
+TAIL = re.compile(r"\d|[A-Z]{2}\s*\d")
 CANCELLED = re.compile(r"status\s*:\s*cancell?ed|(?:has been|was|is|successfully)\s+cancell?ed|(?:reservation|booking)\s+cancell?ed|cancell?ation confirmation", re.IGNORECASE)
 TABLE = fields.Table({
     "confirmation": ("booking id", "booking reference", "booking number", "confirmation number", "confirmation code", "confirmation #",
@@ -40,8 +41,14 @@ def _address(rows: list[fields.Row]) -> str | None:
         if fields.skipped(cells):
             continue
         if m := ADDRESS.search(" ".join(cells)):
-            value = m[1] or (" ".join(rows[n + 1]) if n + 1 < len(rows) and not fields.skipped(rows[n + 1]) else "")
-            if text := fields.clean(value)[:200]:
+            lines = [m[1]] if m[1] else []
+            for following in rows[n + 1:n + 4]:
+                row = " ".join(following)
+                if fields.skipped(following) or (lines and (len(following) > 1 or not TAIL.match(row))):
+                    break
+                lines.append(row)
+            whole = next((lines[:k] for k in range(1, len(lines) + 1) if STATE.search(" ".join(lines[:k]))), lines[:1])
+            if text := fields.clean(" ".join(whole))[:200]:
                 return text
     return None
 
