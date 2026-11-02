@@ -5,7 +5,7 @@ from unittest import mock
 
 from tests.privacy import no_leaks
 from tests.test_mail_scan import NOW, ScanCase
-from waypoint.domain.mail import extract, parsers
+from waypoint.domain.mail import extract, parsers, query, triage
 from waypoint.domain.mail.booking import Parsed
 from waypoint.domain.mail.parsers import spothero
 
@@ -69,6 +69,10 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(spothero.parse("", "Fri Mar 5, 3:00 PM - Tue Mar 9, 3:00 PM\n", "2027-03-01"), Parsed((), 1))
         self.assertEqual(spothero.parse("", page("Fri Mar 5, 3:00 PM - Tue Mar 9, 3:00 PM", lot="Rental ID: 100200300"), "2027-03-01"), Parsed((), 1))
 
+    def test_a_very_long_line_above_the_range_is_cut_to_a_lot_name(self):
+        [b] = spothero.parse("", page("Fri Mar 5, 3:00 PM - Tue Mar 9, 3:00 PM", lot="L" * 5000), "2027-03-01").bookings
+        self.assertEqual(b.origin, "L" * spothero.LOT_LIMIT)
+
     def test_an_email_without_a_range_finds_nothing(self):
         self.assertEqual(spothero.parse("<p>Hello</p>", "", "2027-03-01"), Parsed())
 
@@ -77,6 +81,13 @@ class ParserTests(unittest.TestCase):
             self.assertIs(parsers.for_sender(domain), spothero.parse)
         for domain in ("notspothero.com", "spothero.com.example", "privaterelay.appleid.com"):
             self.assertIsNone(parsers.for_sender(domain))
+
+
+class TriageTests(unittest.TestCase):
+    def test_spothero_mail_is_read_on_its_sender_alone(self):
+        self.assertIn("spothero.com", query.SENDERS)
+        for domain in ("spothero.com", extract._domain("x_at_spothero_com_ab12cd34ef_a1b2c3d4@privaterelay.appleid.com")):
+            self.assertEqual(triage.decide(triage.Head("Reservation Confirmed", domain, "Happy Parking!", frozenset())), "read")
 
 
 class RelayTests(unittest.TestCase):

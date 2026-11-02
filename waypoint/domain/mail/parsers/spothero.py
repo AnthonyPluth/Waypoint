@@ -18,6 +18,7 @@ PHONE = re.compile(r"^\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}$")
 CANCELLED = re.compile(r"reservation\s+(?:has\s+been\s+)?cancell?ed|cancell?ation\s+confirm", re.IGNORECASE)
 HEADLINE = 6
 WINDOW = 800
+LOT_LIMIT = 100
 
 
 def _day(stamp: tuple[str, ...], received: date, after: date | None = None) -> date | None:
@@ -52,7 +53,7 @@ def parse(html: str, text: str, received: str | None = None) -> Parsed:
         sent = date.fromisoformat(received or "")
     except ValueError:
         return Parsed((), 1)
-    lot = rows[spot - 1] if spot else ""
+    lot = rows[spot - 1][:LOT_LIMIT].strip() if spot else ""
     both = RANGE.match(rows[spot])
     if not lot or CONFIRMATION.match(lot) or both is None:
         return Parsed((), 1)
