@@ -1,5 +1,5 @@
 ---
-# vendored from fleet v2.0.0 (plugins/fleet/skills/agent-task/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v2.1.0 (plugins/fleet/skills/agent-task/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-agent-task
 description: Use when writing or drafting a GitHub issue that an AI coding agent will carry out - an issue finished in one session and one pull request, with the sections Context, Scope, Out of scope, Acceptance criteria, Tests, Depends on and Model, and the model chosen by the rules here.
 ---
