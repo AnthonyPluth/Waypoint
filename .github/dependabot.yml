@@ -1,7 +1,6 @@
 # Dependabot keeps the build's moving parts up to date with weekly pull requests (daily for GitHub Actions). Each waits
 # until a release is a week old (cooldown): the merge gate merges Dependabot's pull requests by itself, and a
-# compromised release is usually caught and pulled within days. Security updates for a known vulnerability don't wait,
-# nor do fleet's pins (below).
+# compromised release is usually caught and pulled within days. Security updates for a known vulnerability don't wait.
 version: 2
 updates:
   # Python dependencies (pyproject.toml / poetry.lock)
@@ -21,9 +20,8 @@ updates:
   # Actions used by the workflows (.github/workflows/) and by the composite actions they share (.github/actions/). The
   # fleet reusable workflows (AnthonyPluth/fleet) move together in one group, first so they join it: the merge gate
   # passes such a bump but leaves it for the owner to merge, and merging it starts fleet-sync.yml, which opens the
-  # content's pull request. This entry runs daily and fleet's pins skip the cooldown, so a fleet release gets its bump
-  # within a weekday: fleet is the owner's own repository and its bumps are never merged by the gate, so the week's wait
-  # guards nothing there. Other actions still wait the week.
+  # content's pull request. This entry runs daily with the same 7-day cooldown, fleet's pins included, so a fleet
+  # release gets its bump PR about a week after it rather than up to two weeks.
   - package-ecosystem: github-actions
     directories:
       - /
@@ -32,10 +30,9 @@ updates:
       interval: daily
     cooldown:
       default-days: 7
-      exclude: ["AnthonyPluth/fleet", "AnthonyPluth/fleet/*"]   # by repository alone or with the workflow path
     groups:
       fleet:
-        patterns: ["AnthonyPluth/fleet", "AnthonyPluth/fleet/*"]
+        patterns: ["AnthonyPluth/fleet", "AnthonyPluth/fleet/*"]   # by repository alone or with the workflow path
       actions:
         patterns: ["*"]
     commit-message:
