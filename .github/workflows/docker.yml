@@ -308,6 +308,11 @@ jobs:
           fetch-depth: 0       # full history and tags, to find the last version
           persist-credentials: false
 
+      # The shim runs fleet through uvx, which a self-hosted runner may not have.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884   # v10.3.0
+        with:
+          enable-cache: false
+
       # fleet next-version (the same outputs .github/scripts/next-version.sh wrote: newest, then version and new, or skip),
       # from the commits since the last tag, stepping from the highest version ever tagged.
       - name: Work out the next version
