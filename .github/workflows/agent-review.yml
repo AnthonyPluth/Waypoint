@@ -1,12 +1,13 @@
 name: Agent review
 
-# The independent reviews of every pull request an AI agent wrote, run by fleet's reusable workflow
-# (AnthonyPluth/fleet, .github/workflows/agent-review.yml; docs/agent-review.md there): a fresh Claude Code session on
-# Sonnet reads the change against main's AGENTS.md and .github/agent-review/context.md and sets the "Agent review"
-# status; a risky pull request (labelled safety-critical or security, or changing .github/**, .claude/** or one of the
-# files below) is read a second time by a different model, as the "Second review" status, against
-# .github/agent-review/invariants.md. The merge gate requires both statuses. A pull request that isn't risky gets a
-# passing "Second review" saying so.
+# The Claude review of a risky pull request an AI agent wrote, run by fleet's reusable workflow (AnthonyPluth/fleet,
+# .github/workflows/agent-review.yml; docs/agent-review.md there). The independent first review of every pull request
+# is off (first-review: false below: no "Agent review" status, no comment); Codex reviews every pull request instead. A
+# risky pull request (labelled safety-critical or security, or changing .github/**, .claude/** or one of the files
+# below) is read by a fresh Claude Code session against main's AGENTS.md, .github/agent-review/context.md and
+# .github/agent-review/invariants.md, as the "Second review" status; one that isn't risky gets a passing "Second
+# review" saying so, without running Claude, so only a risky pull request needs the ANTHROPIC_API_KEY or
+# CLAUDE_CODE_OAUTH_TOKEN secret. The merge gate requires "Second review".
 #
 # This caller declares the triggers (a called workflow can't) and passes the two secrets by name (secrets: inherit
 # would hand over every secret). pull_request_target runs main's copy of this file and of fleet's workflow at the pin
@@ -31,7 +32,7 @@ jobs:
     permissions:
       contents: read           # main's instructions and the pull request's code
       pull-requests: write     # the comment (and the pull request's commits and comments)
-      statuses: write          # the "Agent review" and "Second review" statuses
+      statuses: write          # the "Second review" status (and "Agent review" when the first review is on)
       actions: write           # start the merge gate
     uses: AnthonyPluth/fleet/.github/workflows/agent-review.yml@281821f17c9a84d59412c33badf5cfdf9cc31d3b   # v1.0.0
     with:
@@ -41,16 +42,21 @@ jobs:
         frontend/src/lib/api-types.ts
         docs/feature-map.json
         docs/src/content/docs/contributing/feature-map.md
+      # The first review is off; to turn it back on, drop this line and require "Agent review" in merge-gate.yml again.
+      first-review: false
+      # The first review's bounds, used only while it is on.
       budget-usd: ${{ vars.AGENT_REVIEW_BUDGET_USD || '3' }}
       max-turns: ${{ vars.AGENT_REVIEW_MAX_TURNS || '60' }}
       # A change to one of these files is risky and gets the second review, beside the labels (safety-critical,
-      # security) and .github/** and .claude/**, which always count. The list is short on purpose: the exact files that
-      # implement the security promises (sign-in, outbound TLS, visibility, a trip's people, loyalty numbers, the
-      # offline copy and its encrypted store, the handlers and modules that serve a kept message, log scrubbing), the
-      # Semgrep rules, SECURITY.md and the image's Dockerfile. It doesn't name every file a promise depends on: the full
-      # set of invariants, and the checks that hold each, is in .github/agent-review/invariants.md, which the second
-      # review reads; a pull request outside this list that touches one gets the second review only when labelled.
-      # tests/test_agent_review_paths.py checks each file listed here exists.
+      # security) and .github/** and .claude/**, which always count. The list is short on purpose (#518): the exact
+      # files that directly implement the security promises (sign-in, outbound TLS, visibility, a trip's people, loyalty
+      # numbers, the offline copy and its encrypted store, log scrubbing), the mail review and assist modules and the
+      # two handlers that serve a kept message (server/api/review.py, server/api/trips.py), the Semgrep rules,
+      # SECURITY.md and the image's Dockerfile. It doesn't name every file a promise depends on: every other mail module,
+      # handler, provider and the storage layer rely on Codex's review and the CI checks, and a pull request touching
+      # one gets the second review only when labelled. The full set of invariants, and the checks that hold each, is in
+      # .github/agent-review/invariants.md, which the second review reads. tests/test_agent_review_paths.py checks each
+      # file listed here exists.
       second-review-paths: |
         waypoint/oidc.py
         waypoint/tls.py
