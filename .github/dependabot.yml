@@ -1,6 +1,7 @@
-# Dependabot keeps the build's moving parts up to date with weekly pull requests. Each waits until a release is a week
-# old (cooldown): the merge gate merges Dependabot's pull requests by itself, and a compromised release is usually
-# caught and pulled within days. Security updates for a known vulnerability don't wait, nor do fleet's pins (below).
+# Dependabot keeps the build's moving parts up to date with weekly pull requests (daily for GitHub Actions). Each waits
+# until a release is a week old (cooldown): the merge gate merges Dependabot's pull requests by itself, and a
+# compromised release is usually caught and pulled within days. Security updates for a known vulnerability don't wait,
+# nor do fleet's pins (below).
 version: 2
 updates:
   # Python dependencies (pyproject.toml / poetry.lock)
@@ -31,10 +32,10 @@ updates:
       interval: daily
     cooldown:
       default-days: 7
-      exclude: ["AnthonyPluth/fleet/*"]
+      exclude: ["AnthonyPluth/fleet", "AnthonyPluth/fleet/*"]   # by repository alone or with the workflow path
     groups:
       fleet:
-        patterns: ["AnthonyPluth/fleet/*"]
+        patterns: ["AnthonyPluth/fleet", "AnthonyPluth/fleet/*"]
       actions:
         patterns: ["*"]
     commit-message:
