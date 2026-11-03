@@ -2,8 +2,8 @@ name: Agent review
 
 # The Claude review of a risky pull request an AI agent wrote, run by fleet's reusable workflow (AnthonyPluth/fleet,
 # .github/workflows/agent-review.yml; docs/agent-review.md there). The independent first review of every pull request
-# is off (first-review: false below: no "Agent review" status, no comment); Codex reviews every pull request instead. A
-# risky pull request (labelled safety-critical or security, or changing .github/**, .claude/** or one of the files
+# is off, fleet's default since v2.0.0 (no "Agent review" status, no comment); Codex reviews every pull request instead.
+# A risky pull request (labelled safety-critical or security, or changing .github/**, .claude/** or one of the files
 # below) is read by a fresh Claude Code session against main's AGENTS.md, .github/agent-review/context.md and
 # .github/agent-review/invariants.md, as the "Second review" status; one that isn't risky gets a passing "Second
 # review" saying so, without running Claude, so only a risky pull request needs the ANTHROPIC_API_KEY or
@@ -34,7 +34,7 @@ jobs:
       pull-requests: write     # the comment (and the pull request's commits and comments)
       statuses: write          # the "Second review" status (and "Agent review" when the first review is on)
       actions: write           # start the merge gate
-    uses: AnthonyPluth/fleet/.github/workflows/agent-review.yml@acfb09312e648eb5dde4ace69e8c849c7a33e789   # v1.1.0
+    uses: AnthonyPluth/fleet/.github/workflows/agent-review.yml@c5cafc050fda88714f1cb1fb1129487ef0f2b117   # v2.0.0
     with:
       # Left out of the diff the reviewer reads (still listed for it): the generated API contract and feature map.
       generated: |
@@ -42,8 +42,8 @@ jobs:
         frontend/src/lib/api-types.ts
         docs/feature-map.json
         docs/src/content/docs/contributing/feature-map.md
-      # The first review is off; to turn it back on, drop this line and require "Agent review" in merge-gate.yml again.
-      first-review: false
+      # The first review is off by fleet's default; to turn it back on, add `first-review: true` here and require both
+      # "Agent review" and "Second review" in merge-gate.yml's required-statuses.
       # The first review's bounds, used only while it is on.
       budget-usd: ${{ vars.AGENT_REVIEW_BUDGET_USD || '3' }}
       max-turns: ${{ vars.AGENT_REVIEW_MAX_TURNS || '60' }}

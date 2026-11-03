@@ -1,26 +1,29 @@
 name: Merge gate threads
 
-# The merge gate fails while a review thread opened by Codex with a P1 or P2 badge is unresolved. A new review or review
-# comment starts no workflow the gate listens to, so this one asks the gate to decide the pull request again (fleet's
-# merge-gate-threads.yml starts merge-gate.yml on main with the pull request's number). It checks out nothing and runs
-# nothing of the pull request's. A pull request from a fork is skipped: its token is read-only, and its gate looks again
-# on its next push or check, or by hand.
+# The merge gate fails while a review thread opened by Codex with a P1 or P2 badge is unresolved, and (with
+# require-codex-review in merge-gate.yml) stays pending until Codex has reviewed the head commit. A new review, review
+# comment or Codex conversation comment starts no workflow the gate listens to, so this one asks the gate to decide the
+# pull request again (fleet's merge-gate-threads.yml starts merge-gate.yml on main with the pull request's number). It
+# checks out nothing and runs nothing of the pull request's. A review or review comment on a pull request from a fork is
+# skipped: its token is read-only, and its gate looks again on its next push or check, or by hand. A comment's workflow
+# runs with the base repository's token, so the codex-comment job has no fork to skip; only Codex's own comments on a
+# pull request start it (a review that finds nothing arrives as such a comment).
 #
-# Resolving a thread by itself starts nothing: GitHub sends a pull_request_review_thread webhook for it, but Actions has
-# no such trigger (its events reference lists only pull_request_review and pull_request_review_comment for reviews, and
-# a workflow naming an unknown event is invalid). So a thread is resolved after replying on it (AGENTS.md, "Git and
-# PRs"): the reply's pull_request_review_comment event runs this; a resolution with no reply and no push is decided by
-# running "Merge gate" by hand with the pull request's number.
-on:
+# Resolving a thread by itself starts nothing: GitHub Actions has no event for resolving or reopening one. So a thread
+# is resolved after replying on it (AGENTS.md, "Git and PRs"): the reply's pull_request_review_comment event runs this;
+# a resolution with no reply and no push is decided by running "Merge gate" by hand with the pull request's number.
+on:  # zizmor: ignore[dangerous-triggers] -- checks out and runs nothing of the pull request; only starts the merge gate
   pull_request_review:
     types: [submitted]
   pull_request_review_comment:
     types: [created, edited, deleted]
+  issue_comment:
+    types: [created, edited]
 
 permissions: {}
 
 concurrency:
-  group: merge-gate-threads-${{ github.event.pull_request.number }}
+  group: merge-gate-threads-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 # Every step runs in fleet's workflow; the default is here so the workflow conventions check reads the same shape in
@@ -31,9 +34,17 @@ defaults:
 
 jobs:
   decide:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'issue_comment' && github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       actions: write   # start the merge gate
-    uses: AnthonyPluth/fleet/.github/workflows/merge-gate-threads.yml@acfb09312e648eb5dde4ace69e8c849c7a33e789   # v1.1.0
+    uses: AnthonyPluth/fleet/.github/workflows/merge-gate-threads.yml@c5cafc050fda88714f1cb1fb1129487ef0f2b117   # v2.0.0
     with:
       pr: ${{ github.event.pull_request.number }}
+
+  codex-comment:
+    if: github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.user.login == 'chatgpt-codex-connector[bot]'
+    permissions:
+      actions: write   # start the merge gate
+    uses: AnthonyPluth/fleet/.github/workflows/merge-gate-threads.yml@c5cafc050fda88714f1cb1fb1129487ef0f2b117   # v2.0.0
+    with:
+      pr: ${{ github.event.issue.number }}

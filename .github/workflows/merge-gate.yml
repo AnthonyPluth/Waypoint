@@ -54,7 +54,7 @@ jobs:
       statuses: write          # the "Merge gate" status
       actions: write           # read the pull request's workflow runs, and start main's release after a merge
       checks: read             # other apps' check runs
-    uses: AnthonyPluth/fleet/.github/workflows/merge-gate.yml@acfb09312e648eb5dde4ace69e8c849c7a33e789   # v1.1.0
+    uses: AnthonyPluth/fleet/.github/workflows/merge-gate.yml@c5cafc050fda88714f1cb1fb1129487ef0f2b117   # v2.0.0
     with:
       sha: ${{ github.event.workflow_run.head_sha || github.event.check_suite.head_sha }}
       pr: ${{ inputs.pr }}
@@ -62,9 +62,11 @@ jobs:
         Docker image
         Security scans
         CodeQL
-      # The second review alone: agent-review.yml keeps the first review off (`first-review: false`), so no "Agent
-      # review" status is set. To switch it back on, add "Agent review" here and drop `first-review: false` there.
-      required-statuses: |
-        Second review
+      # required-statuses is left at fleet's default, "Second review" alone: the first review is off (fleet's default),
+      # so no "Agent review" status is set. To switch it back on, pass `first-review: true` in agent-review.yml and
+      # required-statuses here listing both "Agent review" and "Second review".
+      # Hold the gate until Codex has reviewed the head commit (a review on it, or its comment naming it); Dependabot's
+      # pull requests are exempt. merge-gate-threads.yml's codex-comment job re-runs the gate when that comment lands.
+      require-codex-review: true
       # Informational: the screenshot diff never decides a merge.
       ignored-workflows: Screenshot diff
