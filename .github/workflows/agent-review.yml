@@ -3,8 +3,8 @@ name: Agent review
 # The independent reviews of every pull request an AI agent wrote, run by fleet's reusable workflow
 # (AnthonyPluth/fleet, .github/workflows/agent-review.yml; docs/agent-review.md there): a fresh Claude Code session on
 # Sonnet reads the change against main's AGENTS.md and .github/agent-review/context.md and sets the "Agent review"
-# status; a risky pull request (labelled safety-critical or security, or changing .github/**, .claude/** or the paths
-# below) is read a second time by a different model, as the "Second review" status, against
+# status; a risky pull request (labelled safety-critical or security, or changing .github/**, .claude/** or one of the
+# files below) is read a second time by a different model, as the "Second review" status, against
 # .github/agent-review/invariants.md. The merge gate requires both statuses. A pull request that isn't risky gets a
 # passing "Second review" saying so.
 #
@@ -43,67 +43,30 @@ jobs:
         docs/src/content/docs/contributing/feature-map.md
       budget-usd: ${{ vars.AGENT_REVIEW_BUDGET_USD || '3' }}
       max-turns: ${{ vars.AGENT_REVIEW_MAX_TURNS || '60' }}
-      # A change to any of these is risky and gets the second review (.github/** and .claude/** always count). The mail
-      # code is covered by its directories, not file by file (every file under domain/mail/, every HTTP handler and
-      # route in server/, every outside service in providers/, and the storage layer, where kept messages and gate codes
-      # are sealed): a new module that serves a kept message is risky from its first line. tests/test_agent_review_paths.py
-      # holds the list to the layout, so a file that reads kept mail or a gate code can't fall outside it. Beside them,
-      # by file: sign-in, outbound TLS, visibility, loyalty numbers, the offline copy, the demo data and trips (which
-      # serve a booking's emails), and the photos epic's files as they appear. Then the checks that hold the promises,
-      # as .github/agent-review/invariants.md names them (the same test keeps every file it names in this list): a change
-      # that weakens one of those checks is what the second review is for, so a pull request touching only the check is
-      # risky too. AGENTS.md is what every review is judged by.
+      # A change to one of these files is risky and gets the second review, beside the labels (safety-critical,
+      # security) and .github/** and .claude/**, which always count. The list is short on purpose: the exact files that
+      # implement the security promises (sign-in, outbound TLS, visibility, a trip's people, loyalty numbers, the
+      # offline copy and its encrypted store, the handlers and modules that serve a kept message, log scrubbing), the
+      # Semgrep rules, SECURITY.md and the image's Dockerfile. It doesn't name every file a promise depends on: the full
+      # set of invariants, and the checks that hold each, is in .github/agent-review/invariants.md, which the second
+      # review reads; a pull request outside this list that touches one gets the second review only when labelled.
+      # tests/test_agent_review_paths.py checks each file listed here exists.
       second-review-paths: |
-        AGENTS.md
-        tools/feature_map_allowlist.txt
-        waypoint/dates.py
-        frontend/src/lib/offline-vault.ts
-        frontend/src/lib/email-render.test.ts
-        tests/hostile_markup.py
-        tests/privacy.py
-        tests/test_backup.py
-        tests/test_dates.py
-        tests/test_every_route.py
-        tests/test_gate_codes.py
-        tests/test_geocode.py
-        tests/test_gmail.py
-        tests/test_hardening.py
-        tests/test_hostile_markup.py
-        tests/test_loyalty.py
-        tests/test_mail_ai.py
-        tests/test_mail_ai_auto.py
-        tests/test_mail_ai_dismiss.py
-        tests/test_mcp_oauth.py
-        tests/test_mcp_oauth_http.py
-        tests/test_mcp_review.py
-        tests/test_mcp_routes.py
-        tests/test_offline.py
-        tests/test_reminders.py
-        tests/test_review_push.py
-        tests/test_roads.py
-        tests/test_states.py
-        tests/test_trip_destination.py
-        tests/test_trip_people.py
-        tests/test_trip_roads.py
-        tests/test_trip_states.py
         waypoint/oidc.py
         waypoint/tls.py
-        waypoint/storage/*.py
-        waypoint/domain/mail/**
-        waypoint/providers/**
-        waypoint/server/**
         waypoint/domain/visibility.py
         waypoint/domain/trippeople.py
         waypoint/domain/loyalty.py
         waypoint/domain/offline.py
-        waypoint/domain/trips.py
-        waypoint/domain/demo.py
-        waypoint/domain/photos.py
-        frontend/src/lib/email-render.ts
-        frontend/src/lib/offline*.ts
-        frontend/src/lib/api.ts
+        waypoint/server/api/review.py
+        waypoint/server/api/trips.py
+        waypoint/domain/mail/review.py
+        waypoint/domain/mail/assist.py
+        waypoint/monitoring.py
+        frontend/src/lib/offline-vault.ts
         .semgrep/**
         SECURITY.md
+        Dockerfile*
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

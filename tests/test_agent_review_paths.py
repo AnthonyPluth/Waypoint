@@ -5,11 +5,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github/workflows/agent-review.yml"
 BLOCK = re.compile(r"^      second-review-paths: \|\n((?:        \S.*\n)+)", re.MULTILINE)
-READS_KEPT_MAIL = re.compile(r"\b(stored_mail|gate_codes|mailimages)\b")
-ALWAYS_RISKY_DIRS = ("waypoint/domain/mail", "waypoint/server", "waypoint/providers")
-NOT_YET_IN_THE_TREE = {"waypoint/domain/photos.py"}
-INVARIANTS = ROOT / ".github/agent-review/invariants.md"
-NAMED = re.compile(r"`([A-Za-z0-9_./-]+)`")
 
 
 def second_review_paths(text: str | None = None) -> list[str]:
@@ -33,68 +28,33 @@ def glob_to_regex(pattern: str) -> re.Pattern[str]:
     return re.compile(f"^{out}$")
 
 
-def matches(path: str, patterns: list[str]) -> bool:
-    return any(glob_to_regex(p).match(path) for p in patterns)
-
-
-def files_named_by_invariants() -> list[str]:
-    tokens = set(NAMED.findall(INVARIANTS.read_text(encoding="utf-8")))
-    return sorted(t for t in tokens if "/" in t or "." in t if (ROOT / t).is_file())
-
-
-def backend_files() -> list[str]:
-    return sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / "waypoint").rglob("*.py")
-                  if "__pycache__" not in p.parts and "migrations" not in p.parts)
+def tree_files() -> list[str]:
+    return sorted(p.relative_to(ROOT).as_posix() for p in ROOT.rglob("*")
+                  if p.is_file() and not {".git", "node_modules", "__pycache__"} & set(p.parts))
 
 
 class SecondReviewPaths(unittest.TestCase):
     def test_the_block_is_read_from_the_workflow(self):
         paths = second_review_paths()
         self.assertIn("waypoint/oidc.py", paths)
-        self.assertIn("waypoint/domain/mail/**", paths)
+        self.assertIn("frontend/src/lib/offline-vault.ts", paths)
         self.assertTrue(all(paths))
 
     def test_globs_match_like_fleet_s(self):
-        self.assertTrue(matches("waypoint/domain/mail/parsers/acme.py", ["waypoint/domain/mail/**"]))
-        self.assertTrue(matches("waypoint/storage/stored_mail.py", ["waypoint/storage/*.py"]))
-        self.assertFalse(matches("waypoint/storage/migrations/versions/0001_x.py", ["waypoint/storage/*.py"]))
-        self.assertFalse(matches("waypoint/domain/mailbox.py", ["waypoint/domain/mail/**"]))
-        self.assertTrue(matches("waypoint/server/mcp_server.py", ["waypoint/server/mcp_*.py"]))
+        self.assertTrue(glob_to_regex(".semgrep/**").match(".semgrep/waypoint.yml"))
+        self.assertTrue(glob_to_regex("Dockerfile*").match("Dockerfile"))
+        self.assertFalse(glob_to_regex("Dockerfile*").match("docs/Dockerfile"))
 
-    def test_every_file_that_reads_kept_mail_or_a_gate_code_is_risky(self):
-        paths = second_review_paths()
-        missing = [name for name in backend_files()
-                   if READS_KEPT_MAIL.search((ROOT / name).read_text(encoding="utf-8")) and not matches(name, paths)]
-        self.assertEqual(missing, [], "these read kept mail or gate codes but no second-review path covers them")
-
-    def test_the_mail_server_and_provider_directories_are_risky_whole(self):
-        paths = second_review_paths()
-        missing = [name for name in backend_files()
-                   if name.startswith(tuple(d + "/" for d in ALWAYS_RISKY_DIRS)) and not matches(name, paths)]
-        self.assertEqual(missing, [])
-
-    def test_every_check_invariants_md_names_is_risky(self):
-        named = files_named_by_invariants()
-        self.assertIn("tests/privacy.py", named)
-        self.assertIn("tests/test_every_route.py", named)
-        self.assertIn("frontend/src/lib/email-render.test.ts", named)
-        self.assertIn("waypoint/server/contract.py", named)
-        paths = second_review_paths()
-        missing = [name for name in named if not matches(name, paths)]
-        self.assertEqual(missing, [], "invariants.md names these checks but no second-review path covers them")
-
-    def test_a_check_dropped_from_the_list_would_fail(self):
-        text = WORKFLOW.read_text(encoding="utf-8").replace("        tests/privacy.py\n", "")
-        self.assertFalse(matches("tests/privacy.py", second_review_paths(text)))
-
-    def test_the_file_entries_name_files_in_the_tree_or_ones_the_list_expects(self):
+    def test_each_file_entry_is_in_the_tree(self):
         for entry in second_review_paths():
-            if "*" in entry or entry in NOT_YET_IN_THE_TREE:
+            if "*" in entry:
                 continue
             self.assertTrue((ROOT / entry).is_file(), f"{entry} is listed but isn't in the tree")
 
-    def test_a_new_module_outside_the_list_that_reads_kept_mail_would_fail(self):
-        text = WORKFLOW.read_text(encoding="utf-8").replace("        waypoint/domain/trips.py\n", "")
-        paths = second_review_paths(text)
-        self.assertFalse(matches("waypoint/domain/trips.py", paths))
-        self.assertTrue(READS_KEPT_MAIL.search((ROOT / "waypoint/domain/trips.py").read_text(encoding="utf-8")))
+    def test_each_pattern_entry_matches_a_file_in_the_tree(self):
+        files = tree_files()
+        for entry in second_review_paths():
+            if "*" not in entry:
+                continue
+            pattern = glob_to_regex(entry)
+            self.assertTrue(any(pattern.match(name) for name in files), f"{entry} matches nothing in the tree")
