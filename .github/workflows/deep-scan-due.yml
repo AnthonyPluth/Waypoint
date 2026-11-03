@@ -20,5 +20,6 @@ defaults:
 jobs:
   remind:
     permissions:
-      issues: write
-    uses: AnthonyPluth/fleet/.github/workflows/deep-scan-due.yml@acfb09312e648eb5dde4ace69e8c849c7a33e789   # v1.1.0
+      contents: read   # count the commits since the last scan
+      issues: write    # read the earlier issues and open the reminder
+    uses: AnthonyPluth/fleet/.github/workflows/deep-scan-due.yml@c5cafc050fda88714f1cb1fb1129487ef0f2b117   # v2.0.0
