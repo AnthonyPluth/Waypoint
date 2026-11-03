@@ -1,41 +1,29 @@
 name: Cancel runs on close
 
-# When a pull request is merged or closed, stop its runs that are still going: the Docker image build and tests,
-# and the security scans. Nothing is lost, since a merge starts main's own runs.
-#
-# GitHub doesn't cancel a pull request's runs when it closes. Each of those workflows is in a concurrency group per pull
-# request with cancel-in-progress, which is how a new push already replaces an older run. Each job below joins one of
-# those groups (the names must match the workflows'), so starting it cancels the run in progress; the job itself does
-# nothing. The groups are built from the pull request's number, never from github.ref: once a pull request is merged,
-# github.ref on its closed event is main's, and joining main's groups would cancel main's own release and scans.
-# GitHub's own CodeQL checks come from the repository's settings, not a workflow here, so they aren't covered.
-
+# When a pull request is merged or closed, stop its runs that are still going: the Docker image build and tests, and
+# the security scans. Nothing is lost, since a merge starts main's own runs. fleet's reusable workflow
+# (AnthonyPluth/fleet, .github/workflows/cancel-on-close.yml) joins each group below with cancel-in-progress, one job
+# per group; the names must match the workflows' groups, and {0} is the pull request's number, never github.ref (on a
+# merged pull request's closed event that is main's, and joining main's groups would cancel its release and scans).
+# No permission is needed: joining a group is what cancels. GitHub's own CodeQL checks come from the repository's
+# settings, not a workflow here, so they aren't covered.
 on:
   pull_request:
     types: [closed]
 
 permissions: {}
 
-# bash, which runs each step with -eo pipefail: a command that fails inside a pipeline fails the step (without it, only
-# the last command in a pipeline counts, and a failed gh or curl passes silently).
+# Every step runs in fleet's workflow; the default is here so the workflow conventions check reads the same shape in
+# every file.
 defaults:
   run:
     shell: bash
 
 jobs:
-  docker:
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
-    timeout-minutes: 5
-    concurrency:
-      group: docker-image-refs/pull/${{ github.event.pull_request.number }}/merge   # docker.yml
-      cancel-in-progress: true
-    steps:
-      - run: echo "Stopped any Docker image run still going on this pull request."
-  security:
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
-    timeout-minutes: 5
-    concurrency:
-      group: security-refs/pull/${{ github.event.pull_request.number }}/merge   # security.yml
-      cancel-in-progress: true
-    steps:
-      - run: echo "Stopped any security scan still running on this pull request."
+  cancel:
+    uses: AnthonyPluth/fleet/.github/workflows/cancel-on-close.yml@281821f17c9a84d59412c33badf5cfdf9cc31d3b   # v1.0.0
+    with:
+      groups: '["docker-image-refs/pull/{0}/merge", "security-refs/pull/{0}/merge"]'   # docker.yml, security.yml
+      # The runner, as JSON. The key is quoted because the workflow conventions check holds every `runs-on:` line to a
+      # job's form, and this one is an input.
+      "runs-on": ${{ vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"' }}

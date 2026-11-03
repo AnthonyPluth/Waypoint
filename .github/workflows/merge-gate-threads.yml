@@ -1,0 +1,39 @@
+name: Merge gate threads
+
+# The merge gate fails while a review thread opened by Codex with a P1 or P2 badge is unresolved. A new review or review
+# comment starts no workflow the gate listens to, so this one asks the gate to decide the pull request again (fleet's
+# merge-gate-threads.yml starts merge-gate.yml on main with the pull request's number). It checks out nothing and runs
+# nothing of the pull request's. A pull request from a fork is skipped: its token is read-only, and its gate looks again
+# on its next push or check, or by hand.
+#
+# Resolving a thread by itself starts nothing: GitHub sends a pull_request_review_thread webhook for it, but Actions has
+# no such trigger (its events reference lists only pull_request_review and pull_request_review_comment for reviews, and
+# a workflow naming an unknown event is invalid). So a thread is resolved after replying on it (AGENTS.md, "Git and
+# PRs"): the reply's pull_request_review_comment event runs this; a resolution with no reply and no push is decided by
+# running "Merge gate" by hand with the pull request's number.
+on:
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+
+permissions: {}
+
+concurrency:
+  group: merge-gate-threads-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# Every step runs in fleet's workflow; the default is here so the workflow conventions check reads the same shape in
+# every file.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  decide:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      actions: write   # start the merge gate
+    uses: AnthonyPluth/fleet/.github/workflows/merge-gate-threads.yml@281821f17c9a84d59412c33badf5cfdf9cc31d3b   # v1.0.0
+    with:
+      pr: ${{ github.event.pull_request.number }}

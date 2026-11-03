@@ -1,0 +1,50 @@
+name: Sync fleet content
+
+# Keeps fleet's content in this repository (the AGENTS.md blocks, the vendored .claude/ files, tools/fleet,
+# .fleet/version) at the version the workflow pins carry. Dependabot bumps the pins (the `fleet` group in
+# .github/dependabot.yml); after such a bump merges, fleet's reusable workflow (AnthonyPluth/fleet,
+# .github/workflows/sync.yml) reads every fleet pin here (they must agree), and when they are newer than .fleet/version
+# in the same major runs `fleet sync --to <pin>` and opens, or updates, the pull request "chore: fleet content vX.Y.Z"
+# from the branch fleet/sync; pins at a newer major open an issue instead, "fleet vN needs a migration: see CHANGELOG".
+#
+# The pull request is pushed and opened with the fleet-bot GitHub App's token (the FLEET_BOT_APP_ID variable and the
+# FLEET_BOT_PRIVATE_KEY secret, passed by name), because a pull request opened with a workflow's own token starts no
+# workflows and nothing would check it. The token is minted for this repository alone, narrowed to contents and pull
+# requests, used in one step and revoked when the job ends; the App has no Workflows permission, and the sync writes
+# nothing under .github/workflows/. Nothing merges by itself: the merge gate and the owner decide. It always reads main.
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/**]
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Print the plan and the pull request instead of opening it"
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: fleet-sync
+  cancel-in-progress: false
+
+# Every step runs in fleet's workflow; the default is here so the workflow conventions check reads the same shape in
+# every file.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  sync:
+    permissions:
+      contents: read           # the checkout; the pull request is pushed with the App token
+      issues: write            # the migration issue
+    uses: AnthonyPluth/fleet/.github/workflows/sync.yml@281821f17c9a84d59412c33badf5cfdf9cc31d3b   # v1.0.0
+    with:
+      app-id: ${{ vars.FLEET_BOT_APP_ID }}
+      dry-run: ${{ inputs.dry-run || false }}
+    secrets:
+      FLEET_BOT_PRIVATE_KEY: ${{ secrets.FLEET_BOT_PRIVATE_KEY }}
