@@ -62,10 +62,9 @@ jobs:
         Docker image
         Security scans
         CodeQL
-      # Both reviews (agent-review.yml). To keep the first review off (fleet's `first-review: false`), require
-      # "Second review" alone here.
+      # The second review alone: agent-review.yml keeps the first review off (`first-review: false`), so no "Agent
+      # review" status is set. To switch it back on, add "Agent review" here and drop `first-review: false` there.
       required-statuses: |
-        Agent review
         Second review
       # Informational: the screenshot diff never decides a merge.
       ignored-workflows: Screenshot diff
