@@ -1,5 +1,5 @@
 ---
-# vendored from fleet v1.0.0 (plugins/fleet/skills/review-guidance/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v1.1.0 (plugins/fleet/skills/review-guidance/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-review-guidance
 description: Use when a pull request has an "Agent review" or "Second review" comment, when answering review findings, and before pushing a risky change (labelled safety-critical or security, or touching .github/ or .claude/ or the paths the app's second review lists). Says how to fix or answer findings, how to push the fixes, what never to do with the review labels, and when to run the fleet-reviewer agent first.
 ---

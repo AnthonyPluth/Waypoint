@@ -38,7 +38,7 @@ Python goes through Poetry (Python 3.14).
 
 ## Starting work
 
-<!-- fleet:begin starting-work v1.0.0 -->
+<!-- fleet:begin starting-work v1.1.0 -->
 - **One issue, one session, one pull request.** Work starts from an issue written as an agent task: its scope, acceptance criteria, dependencies and the model to use (see [CLAUDE.md](CLAUDE.md)). Start a fresh session for each one, on that model, rather than running many pieces of work through one long session.
 - **Decisions belong in the issue.** If the issue doesn't settle something a user would notice, ask instead of choosing. Otherwise keep existing behaviour exactly; a change that isn't asked for is a regression.
 - **Done means checked.** An issue says how its result is checked (`make check`, a test that fails before the change, `make verify` for anything on screen where the repository has it); the pull request shows that output, not a description of it.
@@ -50,13 +50,13 @@ Python goes through Poetry (Python 3.14).
 
 ## Working in a container
 
-<!-- fleet:begin working-in-a-container v1.0.0 -->
+<!-- fleet:begin working-in-a-container v1.1.0 -->
 - **Start the session in the repository.** The session-start hook (in `.claude/hooks/`) sets up the toolchain, Poetry's environment and the web app's packages, but only for a session whose project directory is this repository. A session started one level up has none of it: the system `python3` lacks the dependencies, and the tests fail on their imports.
 - **Run Python through `poetry run` or `make`** (`make test`, or `poetry run python -m unittest tests.test_x`), never the bare `python3`. `make setup` installs the dependencies by hand.
 - **Subagents make their own worktree** under `.claude/worktrees/` (ignored by `.gitignore`), from the session's checkout, and push from there. A session whose working directory isn't a git repository can't create one for them.
 - **Skills have two homes.** fleet's skills are under `.claude/skills/fleet-*` and are changed in fleet; the app's own are under `.claude/skills/`; skills go nowhere else (`fleet checks` checks it: `skill-homes`).
 <!-- fleet:end working-in-a-container -->
-- **Some checks only run in CI.** Locally: ruff, mypy, import-linter, Waypoint's Semgrep rules, the Python tests on SQLite, the web app's checks, the docs build, and the fleet, feature-map and API-contract checks. Only in CI: the Postgres suites (`make test-pg` needs a database of your own), the Docker image build and run, the security scans, and the independent reviews of the pull request ("Agent review", and "Second review" on a risky one) beside Codex's comments (see "Git and PRs"). A push reaches them; a local run doesn't.
+- **Some checks only run in CI.** Locally: ruff, mypy, import-linter, Waypoint's Semgrep rules, the Python tests on SQLite, the web app's checks, the docs build, and the fleet, feature-map and API-contract checks. Only in CI: the Postgres suites (`make test-pg` needs a database of your own), the Docker image build and run, the security scans, and the reviews of the pull request (they run per `.github/workflows/agent-review.yml`) beside Codex's comments (see "Git and PRs"). A push reaches them; a local run doesn't.
 - **The hook is configured, not edited.** The session-start hook is fleet's (`.claude/hooks/fleet-session-start.sh`, vendored); what it installs here is in `.claude/hooks/fleet.conf` (Python 3.14, the web app's packages, libfaketime for `make verify`).
 
 ## Start from the feature map
@@ -86,7 +86,7 @@ These are what the app is for; a change that breaks one is a blocking bug, whate
 
 ## Mistakes that keep coming back
 
-<!-- fleet:begin mistakes v1.0.0 -->
+<!-- fleet:begin mistakes v1.1.0 -->
 **A mistake that repeats gets a check.** When review flags the same kind of mistake on a second pull request, the fix adds a check that would have caught it: a lint rule (ESLint, or Semgrep in `.semgrep/` with a failing and a passing example), a type (strict mypy, a `NewType` or `Literal`), or a test. The item below then names that check in its parenthesis (`checked: waypoint-trip-visibility`, `checked: tests/test_offline.py`). An item stays *human-judged* only when no check can express it, and says why. Every month the "Repeated review findings" issue lists the kinds that came back; a row there is closed by a check, not by a new sentence here.
 
 Review findings on agents' pull requests fall into the same few kinds: check your change for each before you push. The independent review ("Agent review", and "Second review" on a risky pull request) reads every agent's pull request for the *human-judged* ones, and a blocking finding fails the merge gate.
@@ -107,7 +107,7 @@ Review findings on agents' pull requests fall into the same few kinds: check you
 
 ## Git and PRs
 
-<!-- fleet:begin git-and-prs v1.0.0 -->
+<!-- fleet:begin git-and-prs v1.1.0 -->
 - Work on the branch you were given; never push to `main`.
 - Keep commits focused, with a clear message. An agent's commit ends with a `Co-Authored-By: Claude <Model> <version> <noreply@anthropic.com>` trailer naming the model that wrote it (checked on every pull request).
 - Before pushing to a pull request, run `make check`.

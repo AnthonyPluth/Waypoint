@@ -1,5 +1,5 @@
 ---
-# vendored from fleet v1.0.0 (plugins/fleet/agents/fleet-reviewer.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v1.1.0 (plugins/fleet/agents/fleet-reviewer.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-reviewer
 description: Run before pushing a risky change (labelled safety-critical or security, or touching .github/, .claude/ or the paths the app's second review lists), or when asked for a local review. Reviews the branch's change against origin/main with the same prompt CI's "Agent review" uses and answers with findings in the same shape. Read-only and advisory - CI's reviews decide.
 tools: Read, Grep, Glob, Bash(git diff --no-ext-diff --no-textconv origin/main...HEAD), Bash(git diff --no-ext-diff --no-textconv --name-status origin/main...HEAD), Bash(git log --format=%H%n%B origin/main..HEAD), Bash(git diff --no-ext-diff --no-textconv --stat HEAD)

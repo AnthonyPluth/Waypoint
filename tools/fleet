@@ -1,14 +1,20 @@
 #!/bin/bash
-# vendored from fleet v1.0.0 (shim/fleet) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
-# The fleet command at the version in .fleet/version (the tag the workflow pins carry), run through uvx from fleet's
-# repository, so the app runs exactly the tools its pins name. uv is installed the way the session-start hook does when
-# it's missing.
+# vendored from fleet v1.1.0 (shim/fleet) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# The fleet command at the commit in .fleet/version (line 1 the version, line 2 the commit its tag points at, the same
+# the workflow pins carry), run through uvx from fleet's repository, so the app runs exactly the tools its pins name
+# and a moved tag can't change what runs. uv is installed the way the session-start hook does when it's missing.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-version=$(cat "$root/.fleet/version")
+version=""
+commit=""
+{ read -r version || true; read -r commit || true; } < "$root/.fleet/version"
+if ! [[ "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "tools/fleet: .fleet/version names no commit on its line 2 (fleet ${version:0:40}), and tools/fleet runs fleet only by commit; run \`uvx --from \"git+https://github.com/AnthonyPluth/fleet@<the commit your fleet workflow pins name>\" fleet sync --to ${version:0:40}\`, which writes it" >&2
+  exit 2
+fi
 export PATH="$HOME/.local/bin:$PATH"
 if ! command -v uvx >/dev/null 2>&1; then
   python3 -m pip install --quiet --user "uv==0.12.21"
 fi
-exec uvx --from "git+https://github.com/AnthonyPluth/fleet@$version" fleet "$@"
+exec uvx --from "git+https://github.com/AnthonyPluth/fleet@$commit" fleet "$@"

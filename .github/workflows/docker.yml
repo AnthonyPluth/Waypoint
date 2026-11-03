@@ -225,7 +225,7 @@ jobs:
   fleet-checks:
     permissions:
       contents: read
-    uses: AnthonyPluth/fleet/.github/workflows/checks.yml@281821f17c9a84d59412c33badf5cfdf9cc31d3b   # v1.0.0
+    uses: AnthonyPluth/fleet/.github/workflows/checks.yml@acfb09312e648eb5dde4ace69e8c849c7a33e789   # v1.1.0
     with:
       # The runner, as JSON. The key is quoted because the workflow conventions check holds every `runs-on:` line to a
       # job's form, and this one is an input.

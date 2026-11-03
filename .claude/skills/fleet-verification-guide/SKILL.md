@@ -1,5 +1,5 @@
 ---
-# vendored from fleet v1.0.0 (plugins/fleet/skills/verification-guide/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v1.1.0 (plugins/fleet/skills/verification-guide/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-verification-guide
 description: Use in a repository whose pyproject.toml sets guides under [tool.fleet.verification], to write or update the verification guide for an area the user names, or for the changed paths that the verification-guides check lists as covered by no guide. A guide says which paths an area covers, how to verify a change there (each command, flow, fake or test run once in this session) and what can't be verified yet, why, and what would change that.
 ---

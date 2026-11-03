@@ -1,5 +1,5 @@
 ---
-# vendored from fleet v1.0.0 (plugins/fleet/skills/design-signoff/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v1.1.0 (plugins/fleet/skills/design-signoff/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-design-signoff
 description: Use before changing anything a person sees in the frontend - layout, a flow, visual style, theme tokens or copy a design fixed. No frontend design change ships without the owner's sign-off; this says what counts, how to show the change (make verify images at phone and desktop width, beside the signed-off designs) and what to do when the work would depart from the design.
 ---
