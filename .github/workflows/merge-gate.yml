@@ -5,8 +5,10 @@ name: Merge gate
 # pull request started has succeeded, the required ones ran at all, every other app's check run and every commit
 # status has passed and the required statuses are set; pending while anything still runs; failing otherwise. Require
 # it in a ruleset on main (Settings → Rules → Rulesets → Require status checks to pass → "Merge gate") and it's the one
-# check a merge waits on. It also merges Dependabot's pull requests once it passes, except one that bumps a fleet
-# reference, which the owner merges.
+# check a merge waits on. It also merges Dependabot's pull requests once it passes, fleet's pin bumps included
+# (automerge-fleet-bumps below, the owner's decision, #525). A ruleset on main that required a Code Owner review would
+# still hold every action bump, fleet's included, until the owner gave it (CODEOWNERS covers .github/), whatever these
+# inputs say.
 #
 # The triggers stay here, because a called workflow can't declare them. It runs from main's copy with a write token
 # and never checks out or runs a pull request's code (the only checkout is fleet's script at the pin below), so it
@@ -54,7 +56,7 @@ jobs:
       statuses: write          # the "Merge gate" status
       actions: write           # read the pull request's workflow runs, and start main's release after a merge
       checks: read             # other apps' check runs
-    uses: AnthonyPluth/fleet/.github/workflows/merge-gate.yml@538cdc73efd8604dc3e5e19284ae363dabf640a4   # v2.1.0
+    uses: AnthonyPluth/fleet/.github/workflows/merge-gate.yml@b554ed883ec02bab75af3ba976743a3b4ed3ba5a   # v2.2.0
     with:
       sha: ${{ github.event.workflow_run.head_sha || github.event.check_suite.head_sha }}
       pr: ${{ inputs.pr }}
@@ -68,5 +70,12 @@ jobs:
       # Hold the gate until Codex has reviewed the head commit (a review on it, or its comment naming it); Dependabot's
       # pull requests are exempt. merge-gate-threads.yml's codex-comment job re-runs the gate when that comment lands.
       require-codex-review: true
+      # Merge Dependabot's fleet pin bumps too once the gate passes, like its other pull requests (#525); the checks,
+      # the open Codex P1/P2 threads and the Dependabot-only, same-repository conditions still apply. A merge made with
+      # the gate's token starts no push workflow, so after it the gate starts main's docker.yml and security.yml
+      # (fleet's default) and fleet-sync.yml, which opens the "chore: fleet content" pull request; that one is still
+      # merged by hand.
+      automerge-fleet-bumps: true
+      after-merge-workflows: docker.yml security.yml fleet-sync.yml
       # Informational: the screenshot diff never decides a merge.
       ignored-workflows: Screenshot diff

@@ -1,5 +1,5 @@
 #!/bin/bash
-# vendored from fleet v2.1.0 (plugins/fleet/hooks/session-start.sh) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v2.2.0 (plugins/fleet/hooks/session-start.sh) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 # Claude Code on the web: get a fresh session's container ready to run what CI runs (make check), before the session
 # starts. The union of Waypoint's and Runway's hooks (docs/drift.md), configured by the app's .claude/hooks/fleet.conf:
 #   PYTHON_VERSION  the Python Poetry's environment runs on (uv fetches a build if the container has none); empty skips

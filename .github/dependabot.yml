@@ -20,10 +20,10 @@ updates:
 
   # Actions used by the workflows (.github/workflows/) and by the composite actions they share (.github/actions/). The
   # fleet reusable workflows (AnthonyPluth/fleet) move together in one group, first so they join it: the merge gate
-  # passes such a bump but leaves it for the owner to merge (until the merge gate opts in to merging fleet bumps,
-  # AnthonyPluth/fleet#81), and merging it starts fleet-sync.yml, which opens the content's pull request. This entry
-  # runs daily with a 3-day cooldown for every action, fleet's pins included (the owner's decision, #525), so a
-  # fleet release gets its bump PR 3 days after it.
+  # merges such a bump once it passes, like any other Dependabot pull request (automerge-fleet-bumps in merge-gate.yml),
+  # and then starts fleet-sync.yml, which opens the content's pull request for the owner to merge. This entry runs daily
+  # with a 3-day cooldown for every action, fleet's pins included, so a fleet release gets its bump PR 3 days after it
+  # (both the owner's decision, #525).
   - package-ecosystem: github-actions
     directories:
       - /
