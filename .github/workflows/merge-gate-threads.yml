@@ -13,10 +13,14 @@ name: Merge gate threads
 # is resolved after replying on it (AGENTS.md, "Git and PRs"): the reply's pull_request_review_comment event runs this;
 # a resolution with no reply and no push is decided by running "Merge gate" by hand with the pull request's number.
 #
-# The concurrency groups are the jobs', never the workflow's: a workflow-level group is joined before any job's if: is
-# read, so every comment on the pull request (a person's, the agent's own "@codex review") would cancel a gate restart
-# still in flight and leave the gate pending. decide is keyed on the pull request's number; codex-comment on the issue
-# number and the comment's author, so only runs that start the gate share a group.
+# The caller has no concurrency group, neither the workflow's nor a job's. Codex posts a review and a comment per
+# finding in one burst, all on the same head commit, so a group with cancel-in-progress cancelled each run but the
+# last, and every cancelled job stayed on the pull request's head as a check GitHub lists as failing. Cancelling saves
+# nothing, since each run only starts the gate, and merge-gate.yml's own group (merge-gate-<pull request number> for a
+# workflow_dispatch, with cancel-in-progress) already replaces an older evaluation of the same pull request; those
+# runs belong to main. A workflow-level group would be wrong besides: it is joined before any job's if: is read, so
+# every comment on the pull request (a person's, the agent's own "@codex review") would cancel a gate restart still in
+# flight and leave the gate pending.
 on:
   pull_request_review:
     types: [submitted]
@@ -36,9 +40,6 @@ defaults:
 jobs:
   decide:
     if: github.event_name != 'issue_comment' && github.event.pull_request.head.repo.full_name == github.repository
-    concurrency:
-      group: merge-gate-threads-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
     permissions:
       actions: write   # start the merge gate
     uses: AnthonyPluth/fleet/.github/workflows/merge-gate-threads.yml@b554ed883ec02bab75af3ba976743a3b4ed3ba5a   # v2.2.0
@@ -47,9 +48,6 @@ jobs:
 
   codex-comment:
     if: github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.user.login == 'chatgpt-codex-connector[bot]'
-    concurrency:
-      group: merge-gate-threads-comment-${{ github.event.issue.number }}-${{ github.event.comment.user.login }}
-      cancel-in-progress: true
     permissions:
       actions: write   # start the merge gate
     uses: AnthonyPluth/fleet/.github/workflows/merge-gate-threads.yml@b554ed883ec02bab75af3ba976743a3b4ed3ba5a   # v2.2.0
