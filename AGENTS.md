@@ -131,7 +131,7 @@ The owner runs deep scans with the claude-security plugin by hand, in a local se
 - **Model:** `claude-fable-5-1`, at high effort, from a fresh clone of `main`, as the runbook says.
 - **Findings:** Waypoint is public, so a finding never goes into a public issue, nor into pull request text that describes the exploit. Each confirmed finding gets a draft security advisory (Security → Advisories → New draft advisory). Its fix goes through the advisory's private fork or, once the owner decides disclosure doesn't matter for that finding, a pull request with a neutral title labelled `security` (so it gets the "Second review").
 - **Record:** in the tracking issue, only what the runbook's scan record lists (the revision stamp's file name, the effort, the counts by severity and the stamp's `verification.status`), nothing else from the report. The report directory is never committed.
-- **First scan:** tracked in #503, which closes once the stamp's file name, the effort and the counts by severity are recorded there. Before closing it, retitle it to exactly "Deep security scan due", so the first reminder reads its record (fleet's workflow reads only closed issues with that title).
+- **First scan:** tracked in #503, which closes once the stamp's file name, the effort, the counts by severity and the stamp's `verification.status` are recorded there. Before closing it, retitle it to exactly "Deep security scan due", so the first reminder reads its record (fleet's workflow reads only closed issues with that title).
 
 ## Model routing
 
