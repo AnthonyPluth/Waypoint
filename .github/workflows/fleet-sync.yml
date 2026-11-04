@@ -2,16 +2,19 @@ name: Sync fleet content
 
 # Keeps fleet's content in this repository (the AGENTS.md blocks, the vendored .claude/ files, tools/fleet,
 # .fleet/version) at the version the workflow pins carry. Dependabot bumps the pins (the `fleet` group in
-# .github/dependabot.yml); after such a bump merges, fleet's reusable workflow (AnthonyPluth/fleet,
-# .github/workflows/sync.yml) reads every fleet pin here (they must agree), and when they are newer than .fleet/version
-# in the same major runs `fleet sync --to <pin>` and opens, or updates, the pull request "chore: fleet content vX.Y.Z"
-# from the branch fleet/sync; pins at a newer major open an issue instead, "fleet vN needs a migration: see CHANGELOG".
+# .github/dependabot.yml), and the merge gate merges the bump and then starts this workflow (after-merge-workflows in
+# merge-gate.yml; its merge starts no push workflow), as a push does for a bump merged by hand. Then fleet's reusable
+# workflow (AnthonyPluth/fleet, .github/workflows/sync.yml) reads every fleet pin here (they must agree), and when they
+# are newer than .fleet/version in the same major runs `fleet sync --to <pin>` and opens, or updates, the pull request
+# "chore: fleet content vX.Y.Z" from the branch fleet/sync; pins at a newer major open an issue instead, "fleet vN needs
+# a migration: see CHANGELOG".
 #
 # The pull request is pushed and opened with the fleet-bot GitHub App's token (the FLEET_BOT_APP_ID variable and the
 # FLEET_BOT_PRIVATE_KEY secret, passed by name), because a pull request opened with a workflow's own token starts no
 # workflows and nothing would check it. The token is minted for this repository alone, narrowed to contents and pull
 # requests, used in one step and revoked when the job ends; the App has no Workflows permission, and the sync writes
-# nothing under .github/workflows/. Nothing merges by itself: the merge gate and the owner decide. It always reads main.
+# nothing under .github/workflows/. The content's pull request doesn't merge by itself (the gate merges only
+# Dependabot's): the owner merges it once the merge gate passes. It always reads main.
 on:
   push:
     branches: [main]
@@ -42,7 +45,7 @@ jobs:
     permissions:
       contents: read           # the checkout; the pull request is pushed with the App token
       issues: write            # the migration issue
-    uses: AnthonyPluth/fleet/.github/workflows/sync.yml@538cdc73efd8604dc3e5e19284ae363dabf640a4   # v2.1.0
+    uses: AnthonyPluth/fleet/.github/workflows/sync.yml@b554ed883ec02bab75af3ba976743a3b4ed3ba5a   # v2.2.0
     with:
       app-id: ${{ vars.FLEET_BOT_APP_ID }}
       dry-run: ${{ inputs.dry-run || false }}

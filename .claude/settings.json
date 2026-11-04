@@ -9,6 +9,6 @@
     ]
   },
   "extraKnownMarketplaces": {
-    "fleet": {"source": {"source": "github", "repo": "AnthonyPluth/fleet", "ref": "v2.1.0"}}
+    "fleet": {"source": {"source": "github", "repo": "AnthonyPluth/fleet", "ref": "v2.2.0"}}
   }
 }
