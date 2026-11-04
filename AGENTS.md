@@ -123,6 +123,16 @@ Review findings on agents' pull requests fall into the same few kinds: check you
 - Codex (`chatgpt-codex-connector[bot]`) also comments on every PR, usually within a few minutes of `@codex review` and again after each push. Fix a P0 or P1 finding (or a P2 that is correct) and push, reply on its thread with what changed or why not, and resolve it; an unresolved thread of its with a P1 or P2 badge holds the "Merge gate" until it is. Leave nits alone unless the push already touches those files.
 - In Waypoint the independent "Agent review" is off, so only a risky pull request (a `safety-critical` or `security` label, `.github/**`, `.claude/**` or one of the few files `second-review-paths` lists in `.github/workflows/agent-review.yml`) gets the Claude review, as the "Second review"; Codex reviews every pull request, and the "Merge gate" stays pending until Codex has reviewed the head commit (`require-codex-review` in `.github/workflows/merge-gate.yml`; Dependabot's pull requests are exempt).
 
+## Deep security scans
+
+The owner runs deep scans with the claude-security plugin by hand, in a local session. fleet's [deep-scan runbook](https://github.com/AnthonyPluth/fleet/blob/main/docs/deep-scan.md) is the procedure; what is Waypoint's own is this:
+
+- **When:** each time the quarterly "Deep security scan due" issue opens (fleet's `deep-scan-due` workflow, adopted in `.github/workflows/deep-scan-due.yml`), and once more after the photos epic's security issues (PHOTOS-SOURCES, PHOTOS-API, PHOTOS-PROXY) merge. Close the reminder once the scan is recorded in it.
+- **Model:** `claude-fable-5-1`, at high effort, from a fresh clone of `main`, as the runbook says.
+- **Findings:** Waypoint is public, so a finding never goes into a public issue, nor into pull request text that describes the exploit. Each confirmed finding gets a draft security advisory (Security → Advisories → New draft advisory). Its fix goes through the advisory's private fork or, once the owner decides disclosure doesn't matter for that finding, a pull request with a neutral title labelled `security` (so it gets the "Second review").
+- **Record:** in the tracking issue, only what the runbook's scan record lists (the revision stamp's file name, the effort, the counts by severity and the stamp's `verification.status`), nothing else from the report. The report directory is never committed.
+- **First scan:** tracked in #503, which closes once the stamp's file name, the effort, the counts by severity and the stamp's `verification.status` are recorded there. Before closing it, retitle it to exactly "Deep security scan due", so the first reminder reads its record (fleet's workflow reads only closed issues with that title).
+
 ## Model routing
 
 See [CLAUDE.md](CLAUDE.md) for which model to use for which kind of task.
