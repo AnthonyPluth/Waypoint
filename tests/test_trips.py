@@ -1097,6 +1097,7 @@ class VisibilityRouteTests(RouteCase):
         mine = self.book("cy", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"})
         trip, segs = seg["trip_id"], [seg["id"], second["id"]]
         calls = [("GET", f"/api/trips/{trip}", None), ("GET", f"/api/trips/{trip}/places", None), ("POST", f"/api/trips/{trip}", {"name": "Stolen"}),
+                 ("GET", f"/api/trips/{trip}/summary", None),
                  ("DELETE", f"/api/trips/{trip}", None), ("POST", f"/api/trips/{trip}/emails/clear", None),
                  ("POST", f"/api/trips/{trip}/merge", {"merge": mine["trip_id"]}),
                  ("POST", f"/api/trips/{mine['trip_id']}/merge", {"merge": trip}),
@@ -1126,6 +1127,7 @@ class VisibilityRouteTests(RouteCase):
 
     def test_every_trip_and_segment_route_with_an_id_is_covered_above(self):
         covered = {("GET", "/api/trips/{id}"), ("GET", "/api/trips/{id}/places"), ("POST", "/api/trips/{id}"), ("DELETE", "/api/trips/{id}"),
+                   ("GET", "/api/trips/{id}/summary"),
                    ("POST", "/api/trips/{id}/emails/clear"), ("POST", "/api/trips/{id}/merge"), ("POST", "/api/trips/{id}/split"), ("POST", "/api/segments"),
                    ("POST", "/api/trips/{id}/destination/suggest"),
                    ("GET", "/api/segments/{id}"), ("POST", "/api/segments/{id}"), ("DELETE", "/api/segments/{id}"),
