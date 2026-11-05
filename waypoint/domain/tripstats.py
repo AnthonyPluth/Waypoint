@@ -195,6 +195,6 @@ def summary(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripSummary | 
     photos = _photos(conn, viewer, trip_id)
     states, countries = _places(conn, live, airport_countries, photos)
     return {"days": _days(trip.start_date, trip.end_date) if live or not booked else 0, "nights": _nights(live),
-            "distance_km": round(flight_km + road_km, 1), "flight_km": round(flight_km, 1), "road_km": round(road_km, 1),
+            "distance_km": round(round(flight_km, 1) + round(road_km, 1), 1), "flight_km": round(flight_km, 1), "road_km": round(road_km, 1),
             "road_estimated": estimated, "states": states, "countries": countries,
             "photos": {"total": len(photos), "inferred": sum(1 for p in photos if p["inferred"])}, "kinds": _kinds(live)}

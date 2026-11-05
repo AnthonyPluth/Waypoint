@@ -1,5 +1,6 @@
 import time
 import unittest
+from unittest import mock
 
 from sqlalchemy import insert, select
 
@@ -166,6 +167,12 @@ class TripSummaryTests(TripSummaryCase):
         self.assertEqual((got["distance_km"], got["flight_km"], got["road_km"], got["road_estimated"]), (0.0, 0.0, 0.0, False))
         self.assertEqual((got["states"], got["countries"], got["photos"]), ([], [], {"total": 0, "inferred": 0}))
         self.assertEqual(got["nights"], 2)
+
+    def test_the_total_is_the_sum_of_the_rounded_parts(self):
+        trip = self.mine(SFO_DEN)["trip_id"]
+        with mock.patch.object(tripstats, "_flight_km", return_value=(0.04, set())), mock.patch.object(tripstats, "_road_km", return_value=(0.04, False)):
+            got = self.summary(trip)
+        self.assertEqual((got["flight_km"], got["road_km"], got["distance_km"]), (0.0, 0.0, 0.0))
 
     def test_a_dated_trip_with_no_bookings_keeps_its_days(self):
         trip = trips.create_trip(self.c, self.jane, {"name": "Cabin weekend", "start_date": "2026-07-01", "end_date": "2026-07-04"})["id"]
