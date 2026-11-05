@@ -388,3 +388,54 @@ class OAuthConsent(Base):
     token_hash: Mapped[str]
     params: Mapped[str]
     created: Mapped[float]
+
+
+class PhotoSource(Base):
+    __table__ = schema.photo_sources
+    id: Mapped[int]
+    person_id: Mapped[int]
+    owner_sub: Mapped[str]
+    url: Mapped[str]
+    immich_user_id: Mapped[str]
+    api_key: Mapped[str]
+    label: Mapped[str | None]
+    status: Mapped[str]
+    last_sync: Mapped[float | None]
+    last_error: Mapped[str | None]
+    created: Mapped[float]
+
+
+class Photo(Base):
+    __table__ = schema.photos
+    id: Mapped[int]
+    source_id: Mapped[int]
+    asset_id: Mapped[str]
+    asset_updated: Mapped[str]
+    kind: Mapped[str]
+    taken_utc: Mapped[str]
+    taken_local: Mapped[str]
+    taken_offset: Mapped[int | None]
+    latitude: Mapped[float | None]
+    longitude: Mapped[float | None]
+    location_source: Mapped[str | None]
+    state: Mapped[str | None]
+    country: Mapped[str | None]
+    trip_id: Mapped[int | None]
+    segment_id: Mapped[int | None]
+    match: Mapped[str]
+    distance_km: Mapped[float | None]
+    decided_by: Mapped[str | None]
+    hidden: Mapped[bool]
+    seen: Mapped[float]
+
+
+class PhotoTripSync(Base):
+    __table__ = schema.photo_trip_syncs
+    source_id: Mapped[int]
+    trip_id: Mapped[int]
+    window_start: Mapped[str]
+    window_end: Mapped[str]
+    cursor: Mapped[str | None]
+    resume_page: Mapped[int | None]
+    fetch_started: Mapped[str | None]
+    synced: Mapped[float | None]

@@ -264,6 +264,47 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(sorted(rows_of(self.path, "reminder_prefs")), [("sub-a", True, False), ("sub-b", False, True)])
         self.assertNotIn("review", [col[0] for col in shape(self.path)["reminder_prefs"]["columns"]])
 
+    def test_0038_photos_adds_the_three_tables_and_takes_them_away(self):
+        from alembic import command
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0037")
+        self.assertFalse({"photo_sources", "photos", "photo_trip_syncs"} & set(shape(self.path)))
+        db.init(self.path)
+        self.assertEqual(drift(self.path), [])
+        tables = shape(self.path)
+        self.assertEqual(tables["photo_sources"]["uniques"], [("uq_photo_sources_person_url", ("person_id", "url"))])
+        self.assertEqual(tables["photos"]["uniques"], [("uq_photos_source_asset", ("source_id", "asset_id"))])
+        self.assertEqual([i[0] for i in tables["photos"]["indexes"]], ["ix_photos_source_id_taken_utc", "ix_photos_trip_id"])
+        self.assertEqual(tables["photo_trip_syncs"]["pk"], ["source_id", "trip_id"])
+        ondelete = {(t, fk[0]): fk[4] for t in ("photo_sources", "photos", "photo_trip_syncs") for fk in tables[t]["fks"]}
+        self.assertIn("CASCADE", ondelete[("photo_sources", "fk_photo_sources_person_id")])
+        self.assertIn("CASCADE", ondelete[("photos", "fk_photos_source_id")])
+        self.assertIn("SET NULL", ondelete[("photos", "fk_photos_trip_id")])
+        self.assertIn("SET NULL", ondelete[("photos", "fk_photos_segment_id")])
+        self.assertIn("CASCADE", ondelete[("photo_trip_syncs", "fk_photo_trip_syncs_source_id")])
+        self.assertIn("CASCADE", ondelete[("photo_trip_syncs", "fk_photo_trip_syncs_trip_id")])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0037")
+        self.assertFalse({"photo_sources", "photos", "photo_trip_syncs"} & set(shape(self.path)))
+
+    def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
+        db.init(self.path)
+        with db.session(self.path) as conn:
+            conn.execute(insert(schema.people).values(id=1, display_name="Person"))
+            conn.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
+            conn.execute(insert(schema.photo_sources).values(id=1, person_id=1, owner_sub="local", url="https://photos.example.com",
+                                                             immich_user_id="u", api_key="enc:v1:x", status="ok", created=1.0))
+            conn.execute(insert(schema.photos).values(id=1, source_id=1, asset_id="a", asset_updated="t", kind="image", taken_utc="2026-01-01T00:00:00Z",
+                                                      taken_local="2026-01-01T00:00", trip_id=1, match="time", seen=1.0))
+            conn.execute(insert(schema.photo_trip_syncs).values(source_id=1, trip_id=1, window_start="a", window_end="b"))
+            conn.execute(delete(schema.trips).where(schema.trips.c.id == 1))
+            self.assertIsNone(conn.execute(select(schema.photos.c.trip_id)).scalar())
+            self.assertFalse(conn.execute(select(schema.photos.c.hidden)).scalar())
+            self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.photo_trip_syncs)).scalar(), 0)
+            conn.execute(delete(schema.people).where(schema.people.c.id == 1))
+            for table in ("photo_sources", "photos"):
+                self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.metadata.tables[table])).scalar(), 0, table)
+
     def test_a_cruises_ports_go_with_the_cruise(self):
         db.init(self.path)
         with db.session(self.path) as conn:

@@ -17,7 +17,7 @@ from sqlalchemy import func, insert, select, update
 from waypoint.storage import backup, db, secretbox
 from waypoint import server
 from waypoint.storage import settings_keys as sk
-from waypoint.storage.models import AuthSession, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentTraveler, Setting, Trip, TripPerson, User
+from waypoint.storage.models import AuthSession, LoyaltyId, Mailbox, Person, Photo, PhotoSource, PhotoTripSync, ReviewItem, Segment, SegmentTraveler, Setting, Trip, TripPerson, User
 from tests.shared import add_database, fetch, own_database, serve
 
 db_session = db.session
@@ -197,6 +197,34 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(self.loyalty_rows(dst), self.loyalty_rows(src))
         self.assertEqual(len(self.loyalty_rows(dst)), 3)
         self.assertEqual(backup.unreadable_secrets(dst), [])
+        src.close(); dst.close()
+
+    def test_photo_sources_photos_and_syncs_come_back_exact_with_the_key_still_encrypted(self):
+        src = db.connect(self.a)
+        src.execute(insert(Person).values(id=41, display_name="Zoë"))
+        src.execute(insert(Trip).values(id=7, name="Trip ’ 🐶", auto=True))
+        key = secretbox.encrypt("made-up-immich-key ’ 🐶 %s")
+        src.execute(insert(PhotoSource).values(id=3, person_id=41, owner_sub="a:1|’", url="https://photos.example.com:2283", immich_user_id="u-1",
+                                               api_key=key, label="Zoë’s\nlibrary", status="refused", last_sync=-0.0, last_error=None, created=1e-9))
+        src.execute(insert(Photo).values(id=9, source_id=3, asset_id="asset-%_1", asset_updated="2026-01-02T03:04:05.678Z", kind="video",
+                                         taken_utc="2026-01-02T03:04:05.000Z", taken_local="2026-01-01T22:04", taken_offset=-300,
+                                         latitude=-12.3456789, longitude=0.0, location_source="inferred", state="Ñ", country="",
+                                         trip_id=7, match="far", distance_km=412.5, decided_by="owner", hidden=True, seen=1700000000.5))
+        src.execute(insert(PhotoTripSync).values(source_id=3, trip_id=7, window_start="2026-01-01T00:00:00Z", window_end="2026-01-09T00:00:00Z",
+                                                 cursor="2026-01-05T00:00:00Z", resume_page=4, fetch_started=None, synced=2.5))
+        src.commit()
+        raw = backup.dump(src)
+        self.assertNotIn(b"made-up-immich-key", raw)
+        data = backup.load(raw)
+        stored = data["tables"]["photo_sources"]
+        self.assertTrue(stored["rows"][0][stored["columns"].index("api_key")].startswith("enc:v1:"))
+        dst = db.connect(self.b)
+        backup.restore(dst, data)
+        dst.commit()
+        for model in (PhotoSource, Photo, PhotoTripSync):
+            self.assertEqual(sorted(map(tuple, dst.execute(select(model)))), sorted(map(tuple, src.execute(select(model)))), model.__name__)
+        self.assertEqual(dst.execute(select(PhotoSource.api_key)).scalar(), key)
+        self.assertTrue(dst.execute(select(Photo.hidden)).scalar())
         src.close(); dst.close()
 
     def test_a_cruise_membership_comes_back_exact_and_encrypted(self):
