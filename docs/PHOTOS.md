@@ -195,6 +195,7 @@ Settled by the owner in #484: every item took the default below.
 9. **Who may connect a library for whom**: any signed-in member for any person in People (children without a login). Alternative: only for yourself.
 10. **`far` photos**: shown on the trip with a flag, and listed under "Needs a look". Alternative: held back until the owner confirms.
 11. **States crossed**: Immich's reverse-geocoded state per photo plus the booking addresses is enough. State lines crossed by the route are not counted; that would need data Waypoint doesn't bundle and would be a later issue.
+12. **Merging trips**: the merged-away trip's photos become unassigned, and the sync matches them again on its next run. Nothing moves them to the surviving trip, and a photo the owner placed by hand (`decided_by` owner) is not carried over.
 
 ## Open questions
 
