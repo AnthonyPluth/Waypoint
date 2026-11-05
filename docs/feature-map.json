@@ -292,6 +292,7 @@
       "handler": "waypoint/server/api/trips.py:api_trip_summary",
       "web": [],
       "tests": [
+        "tests/test_api_contract.py",
         "tests/test_trip_summary.py",
         "tests/test_trips.py"
       ],
