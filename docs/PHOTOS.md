@@ -195,7 +195,7 @@ Settled by the owner in #484: every item took the default below.
 9. **Who may connect a library for whom**: any signed-in member for any person in People (children without a login). Alternative: only for yourself.
 10. **`far` photos**: shown on the trip with a flag, and listed under "Needs a look". Alternative: held back until the owner confirms.
 11. **States crossed**: Immich's reverse-geocoded state per photo plus the booking addresses is enough. State lines crossed by the route are not counted from photos in v1, a scope choice; counting them would be a later issue.
-12. **Merging trips**: the merged-away trip's photos become unassigned. The sync matches the automatic ones (`decided_by` auto) again on its next run; the ones the owner placed by hand (`decided_by` owner) stay unassigned, because the sync never overwrites an owner row's trip. Nothing moves either kind to the surviving trip.
+12. **Merging trips**: the merged-away trip's photos become unassigned. The sync matches the automatic ones (`decided_by` auto) again on its next run; the ones the owner placed by hand (`decided_by` owner) stay unassigned, because the sync never overwrites an owner row's trip. The merge itself carries no photos over; an automatic photo may still land on the surviving trip through normal matching.
 
 ## Open questions
 
