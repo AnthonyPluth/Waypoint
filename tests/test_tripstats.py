@@ -167,6 +167,15 @@ class TripSummaryTests(TripSummaryCase):
         self.assertEqual((got["states"], got["countries"], got["photos"]), ([], [], {"total": 0, "inferred": 0}))
         self.assertEqual(got["nights"], 2)
 
+    def test_a_dated_trip_with_no_bookings_keeps_its_days(self):
+        trip = trips.create_trip(self.c, self.jane, {"name": "Cabin weekend", "start_date": "2026-07-01", "end_date": "2026-07-04"})["id"]
+        self.assertEqual(self.summary(trip)["days"], 4)
+
+    def test_an_accented_photo_country_is_the_same_country_as_its_plain_name(self):
+        trip = self.mine({"kind": "visit", "destination": "mx", "start_local": "2026-07-01T00:00", "end_local": "2026-07-03T00:00"})["trip_id"]
+        self.photo(self.library(self.jane.person_id), trip, None, "México")
+        self.assertEqual(self.summary(trip)["countries"], ["Mexico"])
+
     def test_a_trip_with_no_bookings_is_all_zeros(self):
         trip = trips.create_trip(self.c, self.jane, {"name": "Cabin weekend"})["id"]
         self.assertEqual(self.summary(trip), {"days": 0, "nights": 0, "distance_km": 0.0, "flight_km": 0.0, "road_km": 0.0, "road_estimated": False,

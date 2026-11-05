@@ -116,9 +116,9 @@ def _road_km(live: Sequence[Segment]) -> tuple[float, bool]:
 
 @cache
 def _country_codes() -> dict[str, str]:
-    known = {" ".join(name.casefold().split()): code for code, name in reference.country_names().items()}
-    known.update({" ".join(name.casefold().split()): code for name, code in geocode.COUNTRIES.items()})
-    known.update({"united states of america": US})
+    known = {reference.place_key(name): code for code, name in reference.country_names().items()}
+    known.update({reference.place_key(name): code for name, code in geocode.COUNTRIES.items()})
+    known.update({reference.place_key("United States of America"): US})
     return known
 
 
@@ -126,7 +126,7 @@ def _country_of(text: str | None) -> tuple[str | None, str | None]:
     plain = " ".join((text or "").split())
     if not plain:
         return None, None
-    code = plain.upper() if len(plain) == 2 and plain.upper() in reference.country_names() else _country_codes().get(plain.casefold())
+    code = plain.upper() if len(plain) == 2 and plain.upper() in reference.country_names() else _country_codes().get(reference.place_key(plain))
     if code is None:
         return None, plain
     return code, reference.country_names().get(code, plain)
@@ -188,12 +188,13 @@ def summary(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripSummary | 
     trip = visibility.visible_trip(conn, viewer, trip_id)
     if trip is None:
         return None
-    live = [s for s in visibility.visible_segments(conn, viewer, [trip_id]) if s.status != "cancelled"]
+    booked = visibility.visible_segments(conn, viewer, [trip_id])
+    live = [s for s in booked if s.status != "cancelled"]
     flight_km, airport_countries = _flight_km(conn, live)
     road_km, estimated = _road_km(live)
     photos = _photos(conn, viewer, trip_id)
     states, countries = _places(conn, live, airport_countries, photos)
-    return {"days": _days(trip.start_date, trip.end_date) if live else 0, "nights": _nights(live),
+    return {"days": _days(trip.start_date, trip.end_date) if live or not booked else 0, "nights": _nights(live),
             "distance_km": round(flight_km + road_km, 1), "flight_km": round(flight_km, 1), "road_km": round(road_km, 1),
             "road_estimated": estimated, "states": states, "countries": countries,
             "photos": {"total": len(photos), "inferred": sum(1 for p in photos if p["inferred"])}, "kinds": _kinds(live)}
