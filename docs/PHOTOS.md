@@ -198,7 +198,6 @@ Settled by the owner in #484: every item took the default below.
 
 ## Open questions
 
-- Immich reverse-geocodes assets to a city, state and country; is that enough for "states crossed", or does the owner want state lines on the route crossed (needs point-in-polygon data Waypoint doesn't bundle)?
 - Should `get_trip` over `/mcp` say how many photos a trip has (counts only, never pixels)? Left out of v1.
 - Should the household Stats page (`domain/stats.py`) count photos per year? Left out of v1.
 - A trip with photos but no placeable segment (a trip typed in by hand with no addresses) gets a map of pins alone; is that wanted, or should the map need at least one stop?
