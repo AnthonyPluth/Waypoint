@@ -105,8 +105,21 @@ class TripSummaryTests(TripSummaryCase):
         trip = self.mine(VANCOUVER)["trip_id"]
         self.mine(CANCELLED_FLIGHT, trip)
         got = self.summary(trip)
-        self.assertEqual((got["nights"], got["distance_km"], got["flight_km"], got["road_km"]), (0, 0.0, 0.0, 0.0))
+        self.assertEqual((got["days"], got["nights"], got["distance_km"], got["flight_km"], got["road_km"]), (0, 0, 0.0, 0.0, 0.0))
         self.assertEqual((got["states"], got["countries"], got["kinds"]), ([], [], NO_KINDS))
+
+    def test_a_stay_in_a_town_the_airport_table_lacks_still_adds_its_address_country(self):
+        small_town = {**NOWHERE, "details": {"address": "5 Example Road, Examplesville, ID 83201"}}
+        got = self.summary(self.mine(small_town)["trip_id"])
+        self.assertEqual((got["states"], got["countries"]), (["Idaho"], ["United States"]))
+
+    def test_two_reservations_for_one_flight_count_its_distance_once(self):
+        flight = {**SFO_DEN, "details": {"flight_number": "UA 100"}}
+        trip = self.mine({**flight, "confirmation": "ABC123"})["trip_id"]
+        self.mine({**flight, "confirmation": "XYZ789"}, trip)
+        got = self.summary(trip)
+        self.assertAlmostEqual(got["flight_km"], self.great_circle(("SFO", "DEN")), delta=0.1)
+        self.assertEqual(got["kinds"]["flight"], 2)
 
     def test_a_highway_drive_is_measured_along_the_road(self):
         trip = self.mine(DENVER)["trip_id"]

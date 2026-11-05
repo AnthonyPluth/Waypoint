@@ -75,8 +75,22 @@ def _code(text: str | None) -> str:
     return (text or "").strip().upper()
 
 
+def _one_per_flight(flights: Iterable[Segment]) -> list[Segment]:
+    seen: set[tuple[str, str, str, str]] = set()
+    legs: list[Segment] = []
+    for s in flights:
+        number = trips.flight_key(trips.decode_details(s.details).get("flight_number"))
+        if number is not None:
+            key = (number, s.start_local[:10], _code(s.origin), _code(s.destination))
+            if key in seen:
+                continue
+            seen.add(key)
+        legs.append(s)
+    return legs
+
+
 def _flight_km(conn: db.Connection, live: Sequence[Segment]) -> tuple[float, set[str]]:
-    flights = [s for s in live if s.kind == "flight"]
+    flights = _one_per_flight(s for s in live if s.kind == "flight")
     codes = {_code(p) for s in flights for p in (s.origin, s.destination)} - {""}
     known = {a.code: a for a in conn.orm.scalars(select(Airport).where(Airport.code.in_(sorted(codes)))).all()}
     total = 0.0
@@ -147,6 +161,8 @@ def _places(conn: db.Connection, live: Sequence[Segment], airport_countries: Ite
         parsed = place_zones.parse(details.get("address"))
         if parsed.state and (state := place_zones.state_name(parsed.state)):
             states.add(state)
+        if parsed.country:
+            countries.add(names.get(parsed.country, parsed.country))
         if s.kind == "visit" and (nation := _code(s.destination)):
             countries.add(names.get(nation, nation))
             if nation == US and (state := _state_name(details.get(trips.STATE))):
@@ -177,7 +193,7 @@ def summary(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripSummary | 
     road_km, estimated = _road_km(live)
     photos = _photos(conn, viewer, trip_id)
     states, countries = _places(conn, live, airport_countries, photos)
-    return {"days": _days(trip.start_date, trip.end_date), "nights": _nights(live),
+    return {"days": _days(trip.start_date, trip.end_date) if live else 0, "nights": _nights(live),
             "distance_km": round(flight_km + road_km, 1), "flight_km": round(flight_km, 1), "road_km": round(road_km, 1),
             "road_estimated": estimated, "states": states, "countries": countries,
             "photos": {"total": len(photos), "inferred": sum(1 for p in photos if p["inferred"])}, "kinds": _kinds(live)}
