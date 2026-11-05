@@ -13,6 +13,11 @@ STAY = point(1, "hotel", "2026-06-01T15:00", "2026-06-04T11:00", DENVER)
 FLIGHT = point(2, "flight", "2026-06-06T08:00", "2026-06-06T10:00", DENVER, SALT_LAKE)
 RENTAL = point(3, "car", "2026-06-06T11:00", "2026-06-09T11:00")
 TRAIN = point(4, "train", "2026-06-20T09:00", "2026-06-20T18:00", PUEBLO)
+ARRIVING = point(6, "train", "2026-06-20T09:00", "2026-06-20T18:00", to=PUEBLO)
+NEW_YORK = "America/New_York"
+NASSAU = (25.06, -77.34)
+CRUISE_MAIN = point(5, "cruise", "2026-03-01T16:30", "2026-03-08T07:00", (25.77, -80.19), zone=NEW_YORK)
+LAST_PORT = point(5, "cruise", "2026-03-07T08:00", "2026-03-08T07:00", NASSAU, zone=NEW_YORK)
 CHECKOUT = at("2026-06-04T11:00")
 LATER = {**OUT, "start_local": "2026-09-10T19:00", "end_local": "2026-09-11T07:10"}
 
@@ -29,6 +34,9 @@ class WhereWas(unittest.TestCase):
         ("before a flight, its origin", [FLIGHT], at("2026-06-05T09:00"), (*DENVER, 2)),
         ("long before the next booking", [FLIGHT], at("2026-06-04T07:59"), None),
         ("a train under way gives its city", [TRAIN], at("2026-06-20T12:00"), (*PUEBLO, 4)),
+        ("a train stored at its destination gives it under way", [ARRIVING], at("2026-06-20T12:00"), (*PUEBLO, 6)),
+        ("but not before it leaves", [ARRIVING], at("2026-06-20T07:00"), None),
+        ("after a cruise, the last port rather than the first", [CRUISE_MAIN, LAST_PORT], at("2026-03-08T12:00", NEW_YORK), (*NASSAU, 5)),
         ("nothing at all", [], at("2026-06-20T12:00"), None),
     ]
 
@@ -76,6 +84,7 @@ class CandidateWindows(Household):
         (only,) = got.points
         self.assertEqual((only.origin, only.destination), (None, (38.25, -104.6)))
         self.assertIsNone(photos.where_was(got.points, trips.instant("2026-06-20T07:00", "America/Denver")))
+        self.assertEqual(photos.where_was(got.points, trips.instant("2026-06-20T12:00", "America/Denver")), (38.25, -104.6, train["id"]))
         self.assertEqual(photos.where_was(got.points, trips.instant("2026-06-20T20:00", "America/Denver")), (38.25, -104.6, train["id"]))
 
     def test_a_cancelled_booking_doesnt_count(self):

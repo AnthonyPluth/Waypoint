@@ -19,15 +19,20 @@ def _at(point: Point, segment_id: int) -> Located:
     return point[0], point[1], segment_id
 
 
+def _anchor(point: SegmentPoint) -> Point | None:
+    return point.origin if point.origin is not None else point.destination
+
+
 def where_was(points: Sequence[SegmentPoint], instant: datetime) -> Located | None:
     active = [p for p in points if p.start <= instant <= p.end]
     if any(p.kind == "flight" for p in active):
         return None
-    here = min((p for p in active if p.origin is not None), key=lambda p: (p.end - p.start, p.segment_id), default=None)
-    if here is not None and here.origin is not None:
-        return _at(here.origin, here.segment_id)
+    here = min((p for p in active if _anchor(p) is not None), key=lambda p: (p.end - p.start, p.segment_id), default=None)
+    anchor = _anchor(here) if here is not None else None
+    if here is not None and anchor is not None:
+        return _at(anchor, here.segment_id)
     ended = max((p for p in points if p.end < instant <= p.end + GAP and p.destination is not None),
-                key=lambda p: (p.end, -p.segment_id), default=None)
+                key=lambda p: (p.end, -p.segment_id, p.start), default=None)
     if ended is not None and ended.destination is not None:
         return _at(ended.destination, ended.segment_id)
     upcoming = min((p for p in points if instant < p.start <= instant + GAP and p.origin is not None),
