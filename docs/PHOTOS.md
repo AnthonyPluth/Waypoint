@@ -118,9 +118,9 @@ To confirm in the spike (`PHOTOS-SPIKE`): whether `takenAfter`/`takenBefore` com
 
 **Itinerary location for a photo without GPS** (`photos.where_was(trip_segments, instant)`): the point of the segment active at that instant (a stay, rental or parking covering it; a train or cruise under way gives its port or city; a flight under way gives nothing); otherwise the destination of the last segment that ended within GAP hours before, else the origin of the next one starting within GAP hours after; else nothing. The result is stored with `location_source = inferred` and drawn as a hollow pin; it is never promoted to `exif`.
 
-**Proposed thresholds** (constants in `photomatch.py`; the owner settles them in `PHOTOS-DECISIONS`):
+**Thresholds** (constants in `photomatch.py`, settled in #484):
 
-| Name | Proposed | Why |
+| Name | Value | Why |
 | --- | --- | --- |
 | `PAD` | 12 hours | Airport photos before a late-night flight home; the first morning after a trip's dates. |
 | `HOME` | 2 km for an address or coordinates, 8 km for a ZIP or postal code, none for a city | The radius follows how precisely Home is known (`domain/home.py` knows which): a ZIP centroid can sit several kilometres from the house, and a city centroid cannot be trusted at all, so a fixed 2 km would let ordinary home photos through. |
@@ -134,16 +134,16 @@ A re-sync re-runs the matcher on every `auto` row of a source whose trips change
 
 ## Sync job
 
-`photosync.run(conn, source, provider, today, now)`; `jobs.py` runs `sync_all` every `PHOTO_SYNC_EVERY` (proposed 6 hours, first run 10 minutes after start) and a **Sync now** button runs one source in a thread like `scan_now`. One source syncs at a time; a source in `refused` or `off` is skipped until its owner acts.
+`photosync.run(conn, source, provider, today, now)`; `jobs.py` runs `sync_all` every `PHOTO_SYNC_EVERY` (6 hours, first run 10 minutes after start) and a **Sync now** button runs one source in a thread like `scan_now`. One source syncs at a time; a source in `refused` or `off` is skipped until its owner acts.
 
 For each source:
 
 1. Load the person's trips and their windows; drop `photo_trip_syncs` rows for trips the person left, and their photos' `trip_id` (rows then re-match or are deleted on the next re-list).
 2. For each trip window: when the row is missing or the window moved, page `search/metadata` with `takenAfter`, `takenBefore`, `withExif: true`, `visibility: "timeline"`, `size: 1000`, `order: "asc"`, starting at `resume_page` when set (else page 1 with `fetch_started = now`); an incremental run adds `updatedAfter: cursor`. Windows overlap between trips; a photo seen twice is one row. Upsert each asset: time fields, `asset_updated`, GPS, state and country, `seen = now`; run the matcher for `auto` rows. Each finished page stores the next `resume_page`; when `nextPage` is null the traversal is complete: `cursor = fetch_started`, `resume_page` and `fetch_started` cleared. `updatedAfter` only filters; it never resumes a traversal.
-3. Every `FULL_RELIST_DAYS` (proposed 7) a source is fetched without cursors and, once that traversal completes, rows not `seen` are deleted (trashed or deleted in Immich); an interrupted full re-list deletes nothing. A thumbnail or preview 404 from the proxy does not delete a row (see the proxy rules).
+3. Every `FULL_RELIST_DAYS` (7) a source is fetched without cursors and, once that traversal completes, rows not `seen` are deleted (trashed or deleted in Immich); an interrupted full re-list deletes nothing. A thumbnail or preview 404 from the proxy does not delete a row (see the proxy rules).
 4. Record `last_sync`, counts (fetched, new, matched by kind, inferred, ambiguous) in the log through `monitoring.log`, counts only.
 
-Budget: a page of 1000 assets with EXIF is a few megabytes; a two-year window on first fetch is tens of pages. `TIME_BUDGET` (proposed 10 minutes per source per run) stops a run cleanly after the current page; the next run continues from `resume_page`, as the mail scan resumes, and the update watermark moves only when the traversal finishes, so a large library is never left with assets skipped. 429 backs off; 401/403 sets `refused`; a network error sets `unreachable` and the status page says so.
+Budget: a page of 1000 assets with EXIF is a few megabytes; a two-year window on first fetch is tens of pages. `TIME_BUDGET` (10 minutes per source per run) stops a run cleanly after the current page; the next run continues from `resume_page`, as the mail scan resumes, and the update watermark moves only when the traversal finishes, so a large library is never left with assets skipped. 429 backs off; 401/403 sets `refused`; a network error sets `unreachable` and the status page says so.
 
 Darkroom's rescans and sidecars change assets' `updatedAt`, so GPS added later arrives on the next incremental sync and the matcher re-runs for that row.
 
@@ -180,9 +180,9 @@ Rules:
 
 Settings gains a **Photos** section (`PhotosSection.svelte`, after Gmail): one card per source with person, host, status chip, last sync, photo count, **Sync now**, **Change key**, **Pause**, **Remove**; and **Connect an Immich library**: person (from People; defaults to the signed-in member's), Immich address, API key (with the permissions to tick listed), **Test** before **Save**. Permissions to tick: `asset.read`, `asset.view`, `user.read` (and `asset.download` if originals are served). Copy says plainly what Waypoint reads ("photos taken during your trips and the 12 hours around them; Waypoint keeps when and where for each, including photos that turn out not to belong to a trip, never the pictures").
 
-## Decisions for the owner (proposed defaults)
+## Decisions
 
-Collected in `PHOTOS-DECISIONS`; the design assumes the defaults.
+Settled by the owner in #484: every item took the default below.
 
 1. **Thresholds**: the table above.
 2. **A photo that fits two overlapping trips**: GPS decides when it can (MARGIN); otherwise the shorter trip; a tie waits for the owner under "Needs a look".
@@ -194,6 +194,7 @@ Collected in `PHOTOS-DECISIONS`; the design assumes the defaults.
 8. **Archived photos**: skipped (`visibility: timeline` only). Alternative: include archive.
 9. **Who may connect a library for whom**: any signed-in member for any person in People (children without a login). Alternative: only for yourself.
 10. **`far` photos**: shown on the trip with a flag, and listed under "Needs a look". Alternative: held back until the owner confirms.
+11. **States crossed**: Immich's reverse-geocoded state per photo plus the booking addresses is enough. State lines crossed by the route are not counted; that would need data Waypoint doesn't bundle and would be a later issue.
 
 ## Open questions
 
