@@ -178,7 +178,7 @@ Rules:
 
 ## Settings screen
 
-Settings gains a **Photos** section (`PhotosSection.svelte`, after Gmail): one card per source with person, host, status chip, last sync, photo count, **Sync now**, **Change key**, **Pause**, **Remove**; and **Connect an Immich library**: person (from People; defaults to the signed-in member's), Immich address, API key (with the permissions to tick listed), **Test** before **Save**. Permissions to tick: `asset.read`, `asset.view`, `user.read` (and `asset.download` if originals are served). Copy says plainly what Waypoint reads ("photos taken during your trips and the 12 hours around them; Waypoint keeps when and where for each, including photos that turn out not to belong to a trip, never the pictures").
+Settings gains a **Photos** section (`PhotosSection.svelte`, after Gmail): one card per source with person, host, status chip, last sync, photo count, **Sync now**, **Change key**, **Pause**, **Remove**; and **Connect an Immich library**: person (from People; defaults to the signed-in member's), Immich address, API key (with the permissions to tick listed), **Test** before **Save**. Permissions to tick: `asset.read`, `asset.view`, `user.read` and `asset.download` (originals are served through Waypoint). Copy says plainly what Waypoint reads ("photos taken during your trips and the 12 hours around them; Waypoint keeps when and where for each, including photos that turn out not to belong to a trip, never the pictures").
 
 ## Decisions
 
