@@ -71,7 +71,7 @@ Unique on (`person_id`, `url`).
 | `hidden` | bool, not null, default false | Hidden by the library's person (decision 3). Independent of the match: a hidden `auto` row keeps being re-matched, so un-hiding shows the current match, not a stale one. The sync never overwrites it. |
 | `seen` | float, not null | Epoch seconds the sync last saw it in Immich; a full re-list deletes rows not seen. |
 
-Indexes: (`trip_id`), (`source_id`, `taken_utc`), unique (`source_id`, `asset_id`).
+Indexes: (`trip_id`), (`segment_id`, so deleting a booking finds its photos without scanning the table), (`source_id`, `taken_utc`), unique (`source_id`, `asset_id`).
 
 **`photo_trip_syncs`**: what each source has fetched for each trip window, so a changed trip is re-fetched and an unchanged one is paged incrementally.
 

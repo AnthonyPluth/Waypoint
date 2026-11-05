@@ -465,4 +465,63 @@ oauth_consents = Table(
     info={'doc': 'consent pages shown and not yet answered (10 minutes); not in a backup'},
 )
 
+photo_sources = Table(
+    'photo_sources', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('person_id', Integer, refers('photo_sources', 'person_id', 'people.id', 'CASCADE'), nullable=False),
+    Column('owner_sub', Text, nullable=False, doc='the member who connected it (users.sub, or "local" without sign-in)'),
+    Column('url', Text, nullable=False, doc='the Immich base address: scheme, host and port, no path, no credentials'),
+    Column('immich_user_id', Text, nullable=False, doc='the Immich user the key belonged to when connected; a new key must answer the same id'),
+    Column('api_key', Text, nullable=False, doc='the Immich API key, encrypted (waypoint/storage/secretbox.py)'),
+    Column('label', Text),
+    Column('status', Text, nullable=False, doc='ok | refused | unreachable | off'),
+    Column('last_sync', Float, doc='epoch seconds of the last completed sync'),
+    Column('last_error', Text, doc='one of a few fixed sentences, never text from Immich'),
+    Column('created', Float, nullable=False),
+    UniqueConstraint('person_id', 'url', name='uq_photo_sources_person_url'),
+    info={'doc': "an Immich library Waypoint reads photos from, for one person in People; the key is encrypted and never leaves the server"},
+)
+
+photos = Table(
+    'photos', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('source_id', Integer, refers('photos', 'source_id', 'photo_sources.id', 'CASCADE'), nullable=False),
+    Column('asset_id', Text, nullable=False, doc='the Immich asset id'),
+    Column('asset_updated', Text, nullable=False, doc="Immich's updatedAt when last seen"),
+    Column('kind', Text, nullable=False, doc='image | video'),
+    Column('taken_utc', Text, nullable=False, doc="ISO instant in UTC, from Immich's fileCreatedAt"),
+    Column('taken_local', Text, nullable=False, doc="YYYY-MM-DDTHH:MM, the wall clock where it was taken (Immich's localDateTime)"),
+    Column('taken_offset', Integer, doc='minutes from UTC when Immich gives one; display only'),
+    Column('latitude', Float),
+    Column('longitude', Float),
+    Column('location_source', Text, doc='exif | inferred; empty without a location'),
+    Column('state', Text),
+    Column('country', Text),
+    Column('trip_id', Integer, refers('photos', 'trip_id', 'trips.id', 'SET NULL')),
+    Column('segment_id', Integer, refers('photos', 'segment_id', 'segments.id', 'SET NULL')),
+    Column('match', Text, nullable=False, doc='place | time | far | ambiguous | home | none'),
+    Column('distance_km', Float),
+    Column('decided_by', Text, doc='auto | owner; the sync never overwrites the trip of an owner row'),
+    Column('hidden', Boolean, nullable=False, server_default=false(), doc='hidden by the library\'s person; the sync never overwrites it'),
+    Column('seen', Float, nullable=False, doc='epoch seconds the sync last saw it in Immich'),
+    UniqueConstraint('source_id', 'asset_id', name='uq_photos_source_asset'),
+    Index('ix_photos_trip_id', 'trip_id'),
+    Index('ix_photos_segment_id', 'segment_id'),
+    Index('ix_photos_source_id_taken_utc', 'source_id', 'taken_utc'),
+    info={'doc': "a reference to one Immich asset inside some trip's window and how it matched: no pixels, file names or camera data; the owner's decisions (hidden, moved to another trip) live here"},
+)
+
+photo_trip_syncs = Table(
+    'photo_trip_syncs', metadata,
+    Column('source_id', Integer, refers('photo_trip_syncs', 'source_id', 'photo_sources.id', 'CASCADE'), primary_key=True),
+    Column('trip_id', Integer, refers('photo_trip_syncs', 'trip_id', 'trips.id', 'CASCADE'), primary_key=True),
+    Column('window_start', Text, nullable=False),
+    Column('window_end', Text, nullable=False),
+    Column('cursor', Text, doc="Immich's updatedAfter for the next incremental run; moves only when a traversal completes"),
+    Column('resume_page', Integer, doc='the page to continue from when a run stopped inside a traversal'),
+    Column('fetch_started', Text, doc='UTC time the traversal in progress began; becomes the cursor when it completes'),
+    Column('synced', Float),
+    info={'doc': "what each photo source has fetched for each trip's window, so a changed window is fetched again and an unchanged one incrementally"},
+)
+
 AUTO_ID = {t.name for t in metadata.tables.values() if 'id' in t.c and t.c.id.autoincrement is True}
