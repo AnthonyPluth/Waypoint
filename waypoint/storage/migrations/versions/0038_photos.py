@@ -52,6 +52,7 @@ def upgrade() -> None:
     sa.UniqueConstraint('source_id', 'asset_id', name='uq_photos_source_asset'),
     )
     op.create_index('ix_photos_trip_id', 'photos', ['trip_id'], unique=False)
+    op.create_index('ix_photos_segment_id', 'photos', ['segment_id'], unique=False)
     op.create_index('ix_photos_source_id_taken_utc', 'photos', ['source_id', 'taken_utc'], unique=False)
     op.create_table('photo_trip_syncs',
     sa.Column('source_id', sa.Integer(), nullable=False),
@@ -71,6 +72,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table('photo_trip_syncs')
     op.drop_index('ix_photos_source_id_taken_utc', table_name='photos')
+    op.drop_index('ix_photos_segment_id', table_name='photos')
     op.drop_index('ix_photos_trip_id', table_name='photos')
     op.drop_table('photos')
     op.drop_table('photo_sources')

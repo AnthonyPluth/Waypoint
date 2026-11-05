@@ -506,6 +506,7 @@ photos = Table(
     Column('seen', Float, nullable=False, doc='epoch seconds the sync last saw it in Immich'),
     UniqueConstraint('source_id', 'asset_id', name='uq_photos_source_asset'),
     Index('ix_photos_trip_id', 'trip_id'),
+    Index('ix_photos_segment_id', 'segment_id'),
     Index('ix_photos_source_id_taken_utc', 'source_id', 'taken_utc'),
     info={'doc': "a reference to one Immich asset inside some trip's window and how it matched: no pixels, file names or camera data; the owner's decisions (hidden, moved to another trip) live here"},
 )

@@ -274,7 +274,7 @@ class MigrationTests(unittest.TestCase):
         tables = shape(self.path)
         self.assertEqual(tables["photo_sources"]["uniques"], [("uq_photo_sources_person_url", ("person_id", "url"))])
         self.assertEqual(tables["photos"]["uniques"], [("uq_photos_source_asset", ("source_id", "asset_id"))])
-        self.assertEqual([i[0] for i in tables["photos"]["indexes"] if not i[2]], ["ix_photos_source_id_taken_utc", "ix_photos_trip_id"])
+        self.assertEqual([i[0] for i in tables["photos"]["indexes"] if not i[2]], ["ix_photos_segment_id", "ix_photos_source_id_taken_utc", "ix_photos_trip_id"])
         self.assertEqual(tables["photo_trip_syncs"]["pk"], ["source_id", "trip_id"])
         ondelete = {(t, fk[0]): fk[4] for t in ("photo_sources", "photos", "photo_trip_syncs") for fk in tables[t]["fks"]}
         self.assertIn("CASCADE", ondelete[("photo_sources", "fk_photo_sources_person_id")])
