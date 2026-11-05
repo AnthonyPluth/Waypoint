@@ -55,6 +55,12 @@ class Window(unittest.TestCase):
         self.assertEqual((got.start.tzinfo, got.end.tzinfo), (UTC, UTC))
         self.assertEqual([p.segment_id for p in got.points], [11, 12])
 
+    def test_the_padding_is_twelve_elapsed_hours_even_across_a_clock_change(self):
+        zone = "America/New_York"
+        got = built(1, point(13, "hotel", "2026-03-08T08:00", "2026-03-10T11:00", DENVER, zone=zone))
+        self.assertEqual(got.start, datetime(2026, 3, 8, 0, 0, tzinfo=UTC))
+        self.assertEqual(got.end, at("2026-03-10T11:00", zone).astimezone(UTC) + PAD)
+
     def test_a_visit_only_trip_spans_its_dates_in_its_zone(self):
         zone = "Asia/Tokyo"
         visits = [point(50, "visit", "2026-04-02T00:00", "2026-04-05T00:00", zone=zone, timed=False),

@@ -104,7 +104,7 @@ def window(trip: Trip, live_segments: Sequence[SegmentPoint]) -> TripWindow | No
     if trip.start_date and trip.end_date and not any(p.timed for p in live_segments):
         start = datetime.combine(date.fromisoformat(trip.start_date), time(0, 0), first.start.tzinfo)
         end = datetime.combine(date.fromisoformat(trip.end_date), time(23, 59), last.end.tzinfo)
-    return TripWindow(trip.id, (start - PAD).astimezone(UTC), (end + PAD).astimezone(UTC), tuple(live_segments))
+    return TripWindow(trip.id, start.astimezone(UTC) - PAD, end.astimezone(UTC) + PAD, tuple(live_segments))
 
 
 def _nearest(points: Sequence[SegmentPoint], at: datetime, spot: Point) -> Nearest | None:

@@ -48,6 +48,8 @@ def _points(seg: Segment, airport_at: Mapping[str, Point], ports: Sequence[trips
         leaving, arriving = airport_at.get(_code(seg.origin)), airport_at.get(_code(seg.destination))
         return [SegmentPoint(seg.id, seg.kind, start, end, leaving[0] if leaving else None, leaving[1] if leaving else None,
                              arriving[0] if arriving else None, arriving[1] if arriving else None, timed)]
+    if seg.kind == "train":
+        return [SegmentPoint(seg.id, seg.kind, start, end, None, None, seg.latitude, seg.longitude, timed)]
     main = SegmentPoint(seg.id, seg.kind, start, end, seg.latitude, seg.longitude, timed=timed)
     if seg.kind != "cruise":
         return [main]

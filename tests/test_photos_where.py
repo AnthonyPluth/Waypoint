@@ -66,6 +66,18 @@ class CandidateWindows(Household):
         self.assertEqual(got.start, trips.instant(OUT["start_local"], "America/New_York") - PAD)
         self.assertEqual(got.end, trips.instant(HOTEL["end_local"], "Europe/London") + PAD)
 
+    def test_a_train_is_placed_only_at_its_destination(self):
+        train = self.add(self.jane, {"kind": "train", "origin": "Example Central", "destination": "Example Junction", "provider": "Example Rail",
+                                     "start_local": "2026-06-20T09:00", "end_local": "2026-06-20T18:00",
+                                     "start_zone": "America/Denver", "end_zone": "America/Denver"}, None, self.on(self.jid))
+        self.c.execute(update(Segment).where(Segment.id == train["id"]).values(latitude=38.25, longitude=-104.6))
+        self.c.orm.expire_all()
+        got = self.windows(self.jid)[train["trip_id"]]
+        (only,) = got.points
+        self.assertEqual((only.origin, only.destination), (None, (38.25, -104.6)))
+        self.assertIsNone(photos.where_was(got.points, trips.instant("2026-06-20T07:00", "America/Denver")))
+        self.assertEqual(photos.where_was(got.points, trips.instant("2026-06-20T20:00", "America/Denver")), (38.25, -104.6, train["id"]))
+
     def test_a_cancelled_booking_doesnt_count(self):
         flight = self.add(self.jane, OUT, None, self.on(self.jid))
         stay = self.add(self.jane, HOTEL, flight["trip_id"], self.on(self.jid))
