@@ -68,7 +68,7 @@ Unique on (`person_id`, `url`).
 | `match` | text, not null | `place` (GPS within NEAR of a segment of its trip), `time` (one trip's window, no GPS or no close segment), `far` (in a window but more than FAR from every point of that trip; matched, flagged), `ambiguous` (two windows, distance couldn't settle it; not shown on a trip until the owner picks), `home` (within HOME of Home; ignored), `none` (no window). |
 | `distance_km` | float | Distance to `segment_id`'s point, null without GPS. |
 | `decided_by` | text | `auto`, or `owner` when the owner picked its trip (moved it, or chose between ambiguous trips); the sync never overwrites an `owner` row's `trip_id`. Hiding does not set it. |
-| `hidden` | bool, not null, default false | Hidden by the library's person (if the owner keeps this option, see Decisions). Independent of the match: a hidden `auto` row keeps being re-matched, so un-hiding shows the current match, not a stale one. The sync never overwrites it. |
+| `hidden` | bool, not null, default false | Hidden by the library's person (decision 3). Independent of the match: a hidden `auto` row keeps being re-matched, so un-hiding shows the current match, not a stale one. The sync never overwrites it. |
 | `seen` | float, not null | Epoch seconds the sync last saw it in Immich; a full re-list deletes rows not seen. |
 
 Indexes: (`trip_id`), (`source_id`, `taken_utc`), unique (`source_id`, `asset_id`).
@@ -91,7 +91,7 @@ Settings keys (`waypoint/storage/settings_keys.py`): `PHOTOS_LAST_RELIST` (epoch
 
 Checked against the Immich API docs (v1.140 reference) on 2026-11-01; the spike confirms them on the family server, which may run a different version.
 
-- **API keys are per user**, made under Account Settings, sent as the `x-api-key` header, and can be scoped to permissions (from 1.138; older servers need `all`). Waypoint asks for `asset.read` and `asset.view` (thumbnails and previews) and `user.read` (the Test step calls `GET /api/users/me`, which Immich protects with it); `asset.download` only if originals are served through Waypoint (see Decisions).
+- **API keys are per user**, made under Account Settings, sent as the `x-api-key` header, and can be scoped to permissions (from 1.138; older servers need `all`). Waypoint asks for `asset.read` and `asset.view` (thumbnails and previews) and `user.read` (the Test step calls `GET /api/users/me`, which Immich protects with it); `asset.download`, because originals are served through Waypoint (decision 6).
 - **`POST /api/search/metadata`** (searchAssets) takes `takenAfter` and `takenBefore` (date-time), `updatedAfter`, `page` (≥ 1), `size` (1–1000), `withExif`, `order` (`asc`/`desc`), `type` (`IMAGE`, `VIDEO`), `visibility` (`timeline`, `archive`, `hidden`, `locked`), `libraryId`. Reply: `assets.items`, `assets.nextPage`, `assets.total`, `assets.count`. Each asset: `id`, `type`, `localDateTime`, `fileCreatedAt` (UTC), `updatedAt`, `exifInfo.dateTimeOriginal`, `exifInfo.timeZone`, `exifInfo.latitude`, `exifInfo.longitude`, `exifInfo.city`, `exifInfo.state`, `exifInfo.country`.
 - **`GET /api/map/markers`** takes `fileCreatedAfter`, `fileCreatedBefore`, `isArchived`, `isFavorite`, `withPartners`, `withSharedAlbums` and returns `{id, lat, lon, city, state, country}` per located asset. It has no time per marker, so the design uses metadata search as the one source and keeps markers as an optional cheap pre-pass the spike may recommend.
 - **`GET /api/assets/{id}/thumbnail?size=thumbnail|preview|fullsize`** (viewAsset, `asset.view`) and **`GET /api/assets/{id}/original`** (`asset.download`).
@@ -195,7 +195,7 @@ Settled by the owner in #484: every item took the default below.
 9. **Who may connect a library for whom**: any signed-in member for any person in People (children without a login). Alternative: only for yourself.
 10. **`far` photos**: shown on the trip with a flag, and listed under "Needs a look". Alternative: held back until the owner confirms.
 11. **States crossed**: Immich's reverse-geocoded state per photo plus the booking addresses is enough. State lines crossed by the route are not counted from photos in v1, a scope choice; counting them would be a later issue.
-12. **Merging trips**: the merged-away trip's photos become unassigned. The sync matches the automatic ones (`decided_by` auto) again on its next run; the ones the owner placed by hand (`decided_by` owner) stay unassigned, because the sync never overwrites an owner row's trip. The merge itself carries no photos over; an automatic photo may still land on the surviving trip through normal matching.
+12. **Merging trips**: the merged-away trip's photos become unassigned. The sync matches the automatic ones (`decided_by` auto) again when it next fetches them: at once if the survivor's window moved, otherwise at the weekly full re-list at the latest; the ones the owner placed by hand (`decided_by` owner) stay unassigned, because the sync never overwrites an owner row's trip. The merge itself carries no photos over; an automatic photo may still land on the surviving trip through normal matching.
 
 ## Open questions
 
