@@ -88,11 +88,12 @@ def set_label(conn: db.Connection, source_id: int, label: str | None, owner: str
 
 
 def mark(conn: db.Connection, source_id: int, status: Status, error: str | None = None, synced: float | None = None,
-         owner: str | None = None) -> bool:
+         owner: str | None = None, *, keep_off: bool = False) -> bool:
     values: dict[str, object] = {"status": status, "last_error": error}
     if synced is not None:
         values["last_sync"] = synced
-    return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner)).values(**values)).rowcount) > 0
+    paused = [PhotoSource.status != OFF] if keep_off else []
+    return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner), *paused).values(**values)).rowcount) > 0
 
 
 def remove(conn: db.Connection, source_id: int, owner: str | None = None) -> bool:

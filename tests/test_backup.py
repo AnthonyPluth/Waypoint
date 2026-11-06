@@ -212,7 +212,7 @@ class BackupTests(unittest.TestCase):
                                          latitude=-12.3456789, longitude=0.0, location_source="inferred", state="Ñ", country="",
                                          trip_id=7, match="far", distance_km=412.5, decided_by="owner", seen=1700000000.5))
         src.execute(insert(PhotoTripSync).values(source_id=3, trip_id=7, window_start="2026-01-01T00:00:00Z", window_end="2026-01-09T00:00:00Z",
-                                                 cursor="2026-01-05T00:00:00Z", resume_page=4, fetch_started=None, synced=2.5))
+                                                 cursor="2026-01-05T00:00:00Z", resume_after="2026-01-04T00:00:00.000Z", inputs="abc", fetch_started=None, synced=2.5))
         src.execute(insert(PhotoGrant).values(person_id=41, trip_id=7, scope="trip", revoked=1700000001.25, changed=1700000001.25, granted_by="a:1|’"))
         src.execute(insert(PhotoExclusion).values(person_id=41, asset_id="asset-%_1", trip_id=7, created=-1e-9))
         src.execute(insert(PhotoSharingPrefs).values(person_id=41, default_scope="trip", share_all=True, set_by="a:1|’", share_all_since=1700000002.5, steward_sub="b:2|’"))

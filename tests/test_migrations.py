@@ -348,6 +348,27 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(drift(self.path), [])
         self.assertEqual([r[:3] for r in rows_of(self.path, "photo_exclusions")], [(1, "elsewhere", 1), (1, "mine", 2), (1, "shown", 1)])
 
+    def test_0040_pages_photo_syncs_by_capture_time_and_restarts_a_traversal_in_progress(self):
+        from alembic import command
+        old = sa.table("photo_trip_syncs", *(sa.column(n) for n in ("source_id", "trip_id", "window_start", "window_end", "cursor", "resume_page", "fetch_started")))
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0039")
+            c.execute(insert(schema.people).values(id=1, display_name="One"))
+            c.execute(insert(schema.trips), [{"id": 1, "name": "Trip 1", "auto": True}, {"id": 2, "name": "Trip 2", "auto": True}])
+            c.execute(insert(schema.photo_sources).values(id=1, person_id=1, owner_sub="sub-x", url="https://photos.example", immich_user_id="u",
+                                                         api_key="enc:v1:x", status="ok", created=1.0))
+            c.execute(old.insert(), [{"source_id": 1, "trip_id": 1, "window_start": "a", "window_end": "b", "cursor": "c1", "resume_page": None, "fetch_started": None},
+                                     {"source_id": 1, "trip_id": 2, "window_start": "a", "window_end": "b", "cursor": None, "resume_page": 3, "fetch_started": "f"}])
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual([r[:7] for r in rows_of(self.path, "photo_trip_syncs")], [(1, 1, "a", "b", "c1", None, None), (1, 2, "a", "b", None, None, None)])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0039")
+            names = [r[1] for r in c.exec_driver_sql("PRAGMA table_info(photo_trip_syncs)")]
+        self.assertIn("resume_page", names)
+        self.assertFalse({"resume_after", "inputs"} & set(names))
+        self.assertEqual([(r[names.index("cursor")], r[names.index("resume_page")]) for r in rows_of(self.path, "photo_trip_syncs")], [("c1", None), (None, None)])
+
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)
         with db.session(self.path) as conn:

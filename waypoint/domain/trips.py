@@ -1499,6 +1499,7 @@ def split(conn: db.Connection, viewer: Viewer, trip_id: int, segment_ids: Sequen
     conn.orm.expire_all()
     refresh(conn, trip)
     refresh(conn, new)
+    photogrants.split_off(conn, trip.id, new.id)
     photogrants.trips_changed(conn, [trip.id, new.id], windows)
     return _trip_outs(conn, viewer, [new])[0]
 

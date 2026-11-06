@@ -356,6 +356,12 @@ def trips_changed(conn: db.Connection, trip_ids: Iterable[int], windows: Mapping
             _window_changed(conn, trip_id, windows[trip_id], stamp)
 
 
+def split_off(conn: db.Connection, original: int, new: int) -> None:
+    for e in conn.orm.scalars(select(PhotoExclusion).where(PhotoExclusion.trip_id == original).order_by(PhotoExclusion.person_id, PhotoExclusion.asset_id)).all():
+        db.insert_ignore(conn, PhotoExclusion, {"person_id": e.person_id, "asset_id": e.asset_id, "trip_id": new, "created": e.created},
+                         key=["person_id", "asset_id", "trip_id"])
+
+
 def merged(conn: db.Connection, kept: int, gone: int) -> None:
     for e in conn.orm.scalars(select(PhotoExclusion).where(PhotoExclusion.trip_id == gone).order_by(PhotoExclusion.person_id, PhotoExclusion.asset_id)).all():
         db.insert_ignore(conn, PhotoExclusion, {"person_id": e.person_id, "asset_id": e.asset_id, "trip_id": kept, "created": e.created},

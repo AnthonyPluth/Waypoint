@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import threading
 import time
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import Literal, Protocol
 
 from sqlalchemy import select
 
@@ -20,6 +21,11 @@ from . import photogrants, photoqueue, photos, photosources
 from .photomatch import HomeIn, MatchKind, TripWindow
 
 TIME_BUDGET = 600.0
+TOO_DENSE = "Some of your library couldn’t be read."
+Traversal = Literal["done", "stopped", "dense"]
+DONE: Traversal = "done"
+STOPPED: Traversal = "stopped"
+DENSE: Traversal = "dense"
 FULL_RELIST_DAYS = 7
 DAY = 86400.0
 KINDS: tuple[MatchKind, ...] = ("place", "time", "far", "ambiguous", "home")
@@ -149,6 +155,8 @@ def _prepare(run: _Run, restart: bool) -> None:
     conn = run.conn
     conn.orm.expire_all()
     photogrants.lock(conn, run.person, conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == run.person)).scalars())
+    if restart:
+        db.set_setting(conn, _key(sk.PHOTOS_RELIST_STARTED, run.source_id), repr(run.now.timestamp()))
     conn.orm.expire_all()
     run.windows = {w.trip_id: w for w in photos.candidate_windows(conn, run.person)}
     owned = _rows(conn, run.source_id)
@@ -160,14 +168,18 @@ def _prepare(run: _Run, restart: bool) -> None:
             changed = True
     for trip_id, w in run.windows.items():
         row = syncs.get(trip_id)
-        start, end = _iso(w.start), _iso(w.end)
+        start, end, inputs = _iso(w.start), _iso(w.end), _digest(w, run.home)
         if row is None:
-            conn.orm.add(PhotoTripSync(source_id=run.source_id, trip_id=trip_id, window_start=start, window_end=end,
-                                       cursor=None, resume_page=None, fetch_started=None, synced=None))
+            conn.orm.add(PhotoTripSync(source_id=run.source_id, trip_id=trip_id, window_start=start, window_end=end, inputs=inputs,
+                                       cursor=None, resume_after=None, fetch_started=None, synced=None))
             changed = True
-        elif (row.window_start, row.window_end) != (start, end) or restart:
-            changed = changed or (row.window_start, row.window_end) != (start, end)
-            row.window_start, row.window_end, row.cursor, row.resume_page, row.fetch_started = start, end, None, None, None
+            continue
+        moved = (row.window_start, row.window_end) != (start, end)
+        if moved or restart:
+            row.window_start, row.window_end, row.cursor, row.resume_after, row.fetch_started = start, end, None, None, None
+        if moved or row.inputs != inputs:
+            row.inputs = inputs
+            changed = True
     conn.orm.flush()
     windows = list(run.windows.values())
     excluded = _exclusions(conn, run.person, [p.asset_id for p in owned])
@@ -207,6 +219,10 @@ def _upsert(run: _Run, asset: immich.Asset, row: Photo | None, windows: list[Tri
     _tally(run, row)
 
 
+def _digest(window: TripWindow, at_home: HomeIn | None) -> str:
+    return hashlib.sha256(repr((window.start, window.end, window.points, at_home)).encode()).hexdigest()
+
+
 def _write(run: _Run, trip_id: int, got: immich.Page) -> bool:
     conn = run.conn
     conn.orm.expire_all()
@@ -223,32 +239,38 @@ def _write(run: _Run, trip_id: int, got: immich.Page) -> bool:
     for asset in assets:
         _upsert(run, asset, existing.get(asset.id), windows, excluded.get(asset.id, set()))
     if got.next_page is None:
-        row.cursor, row.resume_page, row.fetch_started, row.synced = row.fetch_started, None, None, run.now.timestamp()
-    else:
-        row.resume_page = got.next_page
+        row.cursor, row.resume_after, row.fetch_started, row.synced = row.fetch_started, None, None, run.now.timestamp()
+    elif got.last_taken is not None:
+        row.resume_after = _utc(got.last_taken)
     conn.commit()
     return True
 
 
-def _traverse(run: _Run, trip_id: int) -> bool:
+def _utc(at: datetime) -> str:
+    return at.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _traverse(run: _Run, trip_id: int) -> Traversal:
     conn = run.conn
     row = conn.orm.get(PhotoTripSync, (run.source_id, trip_id))
     if row is None:
-        return True
+        return DONE
     if row.fetch_started is None:
-        row.fetch_started, row.resume_page = _iso(run.now), None
+        row.fetch_started, row.resume_after = _iso(run.now), None
         conn.commit()
-    after = photos.instant(row.cursor) if row.cursor else None
-    page = row.resume_page or 1
+    updated = photos.instant(row.cursor) if row.cursor else None
     window = run.windows[trip_id]
+    after = max(window.start, photos.instant(row.resume_after)) if row.resume_after else window.start
     while True:
-        got = run.provider.search(run.unlocked, window.start, window.end, updated_after=after, page=page)
+        got = run.provider.search(run.unlocked, after, window.end, updated_after=updated, page=1)
         run.summary.pages += 1
         if not _write(run, trip_id, got) or got.next_page is None:
-            return True
-        page = got.next_page
+            return DONE
+        if got.last_taken is None or got.one_instant:
+            return DENSE
+        after = max(after, got.last_taken)
         if _clock() >= run.deadline:
-            return False
+            return STOPPED
 
 
 def _finish_relist(run: _Run, started: float) -> None:
@@ -272,8 +294,6 @@ def _relist(conn: db.Connection, source_id: int, now: datetime, full: bool) -> t
     started = _stamp(conn, sk.PHOTOS_RELIST_STARTED, source_id)
     if started is not None:
         return started, False
-    db.set_setting(conn, _key(sk.PHOTOS_RELIST_STARTED, source_id), repr(now.timestamp()))
-    conn.commit()
     return now.timestamp(), True
 
 
@@ -285,12 +305,12 @@ def _order(conn: db.Connection, source_id: int, trip_ids: list[int]) -> list[int
 def _failed(conn: db.Connection, source: Stored, error: immich.ImmichError) -> None:
     conn.rollback()
     if isinstance(error, immich.Refused | immich.NotConfigured):
-        photo_sources.mark(conn, source["id"], REFUSED, str(error))
+        photo_sources.mark(conn, source["id"], REFUSED, str(error), keep_off=True)
     elif isinstance(error, immich.RateLimited):
-        photo_sources.mark(conn, source["id"], source["status"], source["last_error"] or str(error))
+        photo_sources.mark(conn, source["id"], source["status"], source["last_error"] or str(error), keep_off=True)
     else:
         kept = source["last_error"] if source["status"] == UNREACHABLE and source["last_error"] else str(error)
-        photo_sources.mark(conn, source["id"], UNREACHABLE, kept)
+        photo_sources.mark(conn, source["id"], UNREACHABLE, kept, keep_off=True)
     conn.commit()
 
 
@@ -313,15 +333,22 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
     started, fresh = _relist(conn, source_id, now, full) if trips is None else (None, False)
     _prepare(job, fresh)
     windows = job.windows
-    finished = True
+    finished, dense = True, False
     try:
         for n, trip_id in enumerate(_order(conn, source_id, [t for t in windows if trips is None or t in trips])):
-            if (n and _clock() >= job.deadline) or not _traverse(job, trip_id):
+            outcome = STOPPED if n and _clock() >= job.deadline else _traverse(job, trip_id)
+            if outcome == STOPPED:
                 finished = False
                 break
+            dense = dense or outcome == DENSE
     except immich.ImmichError as e:
         _failed(conn, source, e)
         summary.failed = 1
+        return summary
+    if dense:
+        summary.failed = 1
+        photo_sources.mark(conn, source_id, source["status"], TOO_DENSE, keep_off=True)
+        conn.commit()
         return summary
     if not finished:
         summary.budget_hit = 1
@@ -329,7 +356,7 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
     if trips is None:
         if started is not None:
             _finish_relist(job, started)
-        photo_sources.mark(conn, source_id, OK, None, now.timestamp())
+        photo_sources.mark(conn, source_id, OK, None, now.timestamp(), keep_off=True)
         conn.commit()
     return summary
 
@@ -400,5 +427,12 @@ def start(source_id: int, trips: set[int] | None = None) -> bool:
                 _waiting.setdefault(source_id, set()).update(trips)
             return False
         _running.add(source_id)
-    threading.Thread(target=_now_in_thread, args=(source_id, trips), daemon=True, name="photo-sync-now").start()
+    try:
+        threading.Thread(target=_now_in_thread, args=(source_id, trips), daemon=True, name="photo-sync-now").start()
+    except Exception:
+        with _lock:
+            _running.discard(source_id)
+            _waiting.pop(source_id, None)
+        monitoring.log("Photo sync: 1 library sync could not start; the next scheduled sync reads it.", "warning")
+        return False
     return True

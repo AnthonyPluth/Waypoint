@@ -137,11 +137,11 @@ class FirstRunTests(SyncCase):
         self.assertEqual(rows[self.lib.items[1]["id"]].trip_id, self.b)
         inferred = rows[self.lib.items[2]["id"]]
         self.assertEqual((inferred.trip_id, inferred.match, inferred.location_source), (self.a, "time", "inferred"))
-        windows = {(q["takenAfter"], q["takenBefore"]) for q in self.lib.asked()}
+        windows = {q["takenBefore"] for q in self.lib.asked()}
         self.assertEqual(len(windows), 2)
         self.assertTrue(all("updatedAfter" not in q for q in self.lib.asked()))
         self.assertEqual(set(self.syncs()), {self.a, self.b})
-        self.assertTrue(all(s.cursor == NOW.isoformat() and s.resume_page is None and s.fetch_started is None for s in self.syncs().values()))
+        self.assertTrue(all(s.cursor == NOW.isoformat() and s.resume_after is None and s.fetch_started is None for s in self.syncs().values()))
         self.assertEqual((got.sources, got.new, got.inferred, got.failed, got.budget_hit), (1, 3, 1, 0, 0))
         self.assertEqual(self.stored()["status"], "ok")
         self.assertEqual(self.stored()["last_sync"], NOW.timestamp())
@@ -196,7 +196,7 @@ class FirstRunTests(SyncCase):
         self.lib.items = [asset(1, "2026-06-04T12:00:00Z", gps=SOHO)]
         self.sync()
         self.assertEqual(set(self.syncs()), {self.a})
-        self.assertEqual(len({q["takenAfter"] for q in self.lib.asked()}), 1)
+        self.assertEqual(len({q["takenBefore"] for q in self.lib.asked()}), 1)
         self.assertEqual(self.rows()[self.lib.items[0]["id"]].trip_id, self.a)
 
     def test_home_photos_inside_a_window_are_kept_but_on_no_trip(self):
@@ -334,17 +334,17 @@ class BudgetTests(SyncCase):
             got = self.sync()
             self.assertEqual((got.budget_hit, got.pages, len(self.rows())), (1, 1, 2))
             row = self.syncs()[self.a]
-            self.assertEqual((row.resume_page, row.cursor, row.fetch_started), (2, None, NOW.isoformat()))
+            self.assertEqual((row.resume_after, row.cursor, row.fetch_started), ("2026-06-02T11:00:00.000Z", None, NOW.isoformat()))
             self.assertIsNone(self.stored()["last_sync"])
             self.sync(NOW + timedelta(minutes=20))
-            self.assertEqual(self.lib.asked()[-1]["page"], 2)
-            self.assertEqual(self.syncs()[self.a].resume_page, 3)
+            self.assertEqual((self.lib.asked()[-1]["page"], self.lib.asked()[-1]["takenAfter"]), (1, "2026-06-02T11:00:00.000Z"))
+            self.assertEqual(self.syncs()[self.a].resume_after, "2026-06-02T12:00:00.000Z")
             self.sync(NOW + timedelta(minutes=40))
             self.sync(NOW + timedelta(minutes=60))
         self.assertEqual(len(self.rows()), 5)
         row = self.syncs()[self.a]
-        self.assertEqual((row.cursor, row.resume_page, row.fetch_started), (NOW.isoformat(), None, None))
-        self.assertTrue(all("updatedAfter" not in q for q in self.lib.asked()))
+        self.assertEqual((row.cursor, row.resume_after, row.fetch_started), (NOW.isoformat(), None, None))
+        self.assertTrue(all("updatedAfter" not in q and q["page"] == 1 for q in self.lib.asked()))
 
 
 class FailureTests(SyncCase):
@@ -652,7 +652,7 @@ class ReviewFixTests(SyncCase):
             self.sync()
         self.assertEqual(set(self.syncs()), {self.a})
         self.assertEqual(self.rows()[self.lib.items[0]["id"]].trip_id, self.a)
-        self.assertEqual(len({q["takenAfter"] for q in self.lib.asked()}), 1)
+        self.assertEqual(len({q["takenBefore"] for q in self.lib.asked()}), 1)
 
     def test_a_starter_that_fails_after_commit_is_logged_as_a_count_and_the_rest_still_start(self):
         second = photo_sources.save(self.c, self.jid, "u-jane", "https://second.example", OWNER, KEY, None, 1.0)
@@ -688,3 +688,99 @@ class ReviewFixTests(SyncCase):
         row = self.c.orm.get(PhotoGrant, (self.sid, self.b))
         self.assertEqual((row.scope, row.revoked, row.granted_by), ("trip", None, "u-sam"))
         self.assertIn(((sams, {self.b}),), [c.args and (c.args,) for c in started.call_args_list])
+
+
+class SecondReviewTests(SyncCase):
+    def test_a_relist_whose_preparation_fails_leaves_no_marker_behind(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
+        self.sync()
+        with mock.patch.object(photos, "candidate_windows", side_effect=RuntimeError("down")):
+            with self.assertRaises(RuntimeError):
+                self.sync(NOW + timedelta(days=8))
+        self.c.rollback()
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+        self.lib.items = self.lib.items[:1]
+        self.sync(NOW + timedelta(days=8, hours=1))
+        self.assertEqual(list(self.rows()), [self.lib.items[0]["id"]])
+
+    def test_a_pause_made_during_a_run_survives_its_end(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO)]
+
+        def pause(asked):
+            with db.session() as other:
+                photo_sources.mark(other, self.source, "off")
+        self.lib.on_search = pause
+        self.sync()
+        self.assertEqual(self.stored()["status"], "off")
+        photo_sources.mark(self.c, self.source, "ok")
+        self.c.commit()
+        self.lib.fail(500)
+        self.lib.on_search = None
+        real = photo_sources.mark
+
+        def paused_first(conn, source_id, status, error=None, synced=None, **kw):
+            with db.session() as other:
+                other.execute(update(PhotoSource).values(status="off"))
+            return real(conn, source_id, status, error, synced, **kw)
+        with mock.patch.object(photo_sources, "mark", side_effect=paused_first):
+            self.sync(NOW + timedelta(hours=6))
+        self.assertEqual(self.stored()["status"], "off")
+
+    def test_a_change_to_what_the_matcher_reads_re_places_rows_without_a_new_fetch(self):
+        self.lib.items = [asset(1, "2026-06-04T12:00:00Z", gps=(51.5, -0.12))]
+        self.sync()
+        row = self.rows()[self.lib.items[0]["id"]]
+        self.assertEqual((row.trip_id, row.match), (self.b, "time"))
+        stay = trips.visibility.visible_segments(self.c, self.jane, [self.b])[0]
+        self.c.execute(update(trips.Segment).where(trips.Segment.id == stay.id).values(latitude=51.5, longitude=-0.12))
+        self.c.commit()
+        self.sync(NOW + timedelta(hours=6))
+        row = self.rows()[self.lib.items[0]["id"]]
+        self.assertEqual((row.trip_id, row.match, row.segment_id), (self.b, "place", stay.id))
+        with mock.patch.object(home, "located", return_value=home.geocode.Point(51.5, -0.12, "zip")):
+            self.sync(NOW + timedelta(hours=12))
+        self.assertEqual(self.rows()[self.lib.items[0]["id"]].match, "home")
+
+    def test_keyset_paging_does_not_skip_assets_when_earlier_ones_are_deleted_mid_traversal(self):
+        self.lib.items = [asset(n, f"2026-06-02T1{n}:00:00Z", gps=SOHO) for n in range(6)]
+        first = []
+
+        def delete_early(asked):
+            if not first:
+                first.append(1)
+                return
+            if len(first) == 1:
+                first.append(1)
+                del self.lib.items[0:2]
+        self.lib.on_search = delete_early
+        self.sync()
+        self.assertEqual(sorted(self.rows()), sorted(f"0a000000-0000-4000-8000-{n:012d}" for n in range(6)))
+
+    def test_a_window_too_dense_to_step_past_never_completes(self):
+        self.lib.items = [asset(n, "2026-06-02T12:00:00Z", gps=SOHO) for n in range(3)] + [asset(9, "2026-06-03T12:00:00Z", gps=SOHO)]
+        got = self.sync()
+        row = self.syncs()[self.a]
+        self.assertIsNone(row.cursor)
+        self.assertEqual(row.resume_after, "2026-06-02T12:00:00.000Z")
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"], self.stored()["last_sync"]), ("ok", photosync.TOO_DENSE, None))
+        self.assertEqual(got.failed, 1)
+        self.sync(NOW + timedelta(days=8))
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{self.source}"))
+
+    def test_a_sync_now_whose_thread_cannot_start_frees_the_library(self):
+        photoqueue.enable(photosync.start)
+        self.addCleanup(photoqueue.disable)
+        with mock.patch.object(photosync.threading.Thread, "start", side_effect=RuntimeError("can't start new thread")), \
+                mock.patch.object(monitoring, "log") as logged:
+            self.assertFalse(jobs.sync_photos_now(self.source))
+        self.assertFalse(photosync.running(self.source))
+        self.assertIn("could not start", logged.call_args.args[0])
+
+    def test_a_split_copies_every_exclusion_of_the_original_before_sharing_the_new_trip(self):
+        self.c.orm.add(PhotoSharingPrefs(person_id=self.jid, default_scope="trip", share_all=True, set_by="u-jane"))
+        self.c.orm.add_all([PhotoExclusion(person_id=self.jid, asset_id="removed-anywhere", trip_id=self.a, created=1.0)])
+        self.c.orm.flush()
+        hotel = next(s for s in trips.visibility.visible_segments(self.c, self.jane, [self.a]) if s.kind == "hotel")
+        new = trips.split(self.c, self.jane, self.a, [hotel.id])["id"]
+        self.assertEqual(self.c.execute(select(PhotoExclusion.asset_id).where(PhotoExclusion.trip_id == new)).scalars(), ["removed-anywhere"])
+        self.assertIsNotNone(self.c.orm.get(PhotoGrant, (self.jid, new)))
