@@ -49,6 +49,13 @@ class DeviceTests(Relay):
         app_push.wake(self.c, "u-jane", "x")
         self.assertEqual(self.wake.call_args.args[2], "t" * 43)
 
+    def test_the_secret_is_resealed_when_the_key_is_rotated(self):
+        from waypoint.storage import secretbox
+        self.phone()
+        with mock.patch.object(secretbox, "reencrypt", side_effect=lambda v: "enc:rotated" if v and v.startswith("enc:") else v):
+            self.assertGreaterEqual(secretbox.encrypt_stored(self.c), 1)
+        self.assertEqual(self.c.orm.scalars(select(AppDevice)).one().secret, "enc:rotated")
+
     def test_it_refuses_what_is_not_a_relay_registration(self):
         for device, secret in (("short", SECRET), (DEVICE, "short"), ("bad id!!!!", SECRET), (DEVICE, "bad secret " * 4)):
             with self.assertRaises(app_push.Invalid):
@@ -69,7 +76,7 @@ class DeviceTests(Relay):
         self.assertEqual(app_push.devices(self.c, "u-jane"), [])
 
     def test_the_relay_address_must_be_https_and_is_off_unless_set(self):
-        for value in ("", "http://relay.example.com", "relay.example.com", "https://", "https://u:p@relay.example.com", "https://relay.example.com/?x=1"):
+        for value in ("", "http://relay.example.com", "relay.example.com", "https://", "https://u:p@relay.example.com", "https://:p@relay.example.com", "https://u@relay.example.com", "https://relay.example.com/?x=1"):
             with mock.patch.dict(os.environ, {app_push.RELAY_ENV: value}):
                 self.assertIsNone(app_push.relay_url(), value)
         with mock.patch.dict(os.environ, {app_push.RELAY_ENV: " https://relay.example.com/ "}):
@@ -95,6 +102,15 @@ class SendingTests(Relay):
         self.assertEqual(self.due(), 1)
         self.assertEqual(len(self.sent), 1)
         self.wake.assert_called_once()
+
+    def test_a_failed_phone_wake_is_retried_even_when_the_browser_got_it(self):
+        self.device()
+        self.phone()
+        self.wake.side_effect = RuntimeError("couldn't reach the push relay")
+        with mock.patch.object(monitoring, "report"):
+            self.assertEqual(self.due(), 0)
+        self.wake.side_effect = None
+        self.assertEqual(self.due(), 1)
 
     def test_no_phone_is_woken_when_the_relay_is_off(self):
         self.phone()

@@ -33,7 +33,7 @@ class Invalid(Exception):
 def relay_url() -> str | None:
     value = (os.environ.get(RELAY_ENV) or "").strip().rstrip("/")
     parts = urllib.parse.urlsplit(value)
-    return value if parts.scheme == "https" and parts.hostname and not (parts.query or parts.fragment or parts.username) else None
+    return value if parts.scheme == "https" and parts.hostname and not (parts.query or parts.fragment or parts.username is not None or parts.password is not None) else None
 
 
 def devices(conn: db.Connection, owner: str) -> list[DeviceOut]:

@@ -13,7 +13,7 @@ from sqlalchemy import select, update
 
 from .. import monitoring
 from . import settings_keys
-from .models import LoyaltyId, Mailbox, SegmentCode, Setting, StoredMessage
+from .models import AppDevice, LoyaltyId, Mailbox, SegmentCode, Setting, StoredMessage
 
 PREFIX = "enc:v1:"
 KEY_FILE = "secret.key"
@@ -187,5 +187,14 @@ def encrypt_stored(conn) -> int:
             continue
         if new != c["content"]:
             conn.execute(update(SegmentCode).where(SegmentCode.segment_id == c["segment_id"]).values(content=new))
+            changed += 1
+    for d in conn.execute(select(AppDevice.id, AppDevice.secret)).fetchall():
+        try:
+            new = reencrypt(d["secret"])
+        except InvalidToken:
+            monitoring.log("Warning: a saved iPhone push secret can't be decrypted with the current key; sign in on the phone again.", "warning")
+            continue
+        if new != d["secret"]:
+            conn.execute(update(AppDevice).where(AppDevice.id == d["id"]).values(secret=new))
             changed += 1
     return changed

@@ -237,6 +237,8 @@ def _deliver(conn: db.Connection, owner: str, message: dict[str, Any], send: Sen
         except Exception as e:
             monitoring.report(e, values=False)
     app_reached, app_tried = app_push.wake(conn, owner, str(message.get("tag", "")))
+    if app_tried and not app_reached:
+        return False
     return reached + app_reached > 0 or tried + app_tried == 0
 
 
