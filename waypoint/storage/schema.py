@@ -377,7 +377,7 @@ app_devices = Table(
     Column('device_id', Text, nullable=False, doc="the phone's id at the push relay"),
     Column('secret', Text, nullable=False, doc='what lets this server wake that phone through the relay, encrypted (waypoint/storage/secretbox.py)'),
     Column('created', Float, nullable=False),
-    UniqueConstraint('owner_sub', 'device_id', name='uq_app_devices_owner_device'),
+    UniqueConstraint('device_id', name='uq_app_devices_device'),
     Index('ix_app_devices_owner', 'owner_sub'),
     info={'doc': "iPhones a member turned notifications on for in the app; each ends when its owner can no longer sign in, and doesn't travel in a backup"},
 )

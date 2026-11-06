@@ -287,18 +287,18 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0037")
         self.assertFalse({"photo_sources", "photos", "photo_trip_syncs"} & set(shape(self.path)))
 
-    def test_0039_adds_the_app_devices_table_and_takes_it_away(self):
+    def test_0040_adds_the_app_devices_table_and_takes_it_away(self):
         from alembic import command
         with db.engine(self.path).begin() as c:
-            command.upgrade(db.alembic_config(c), "0038")
+            command.upgrade(db.alembic_config(c), "0039")
         self.assertNotIn("app_devices", shape(self.path))
         db.init(self.path)
         self.assertEqual(drift(self.path), [])
         table = shape(self.path)["app_devices"]
-        self.assertEqual(table["uniques"], [("uq_app_devices_owner_device", ("owner_sub", "device_id"))])
+        self.assertEqual(table["uniques"], [("uq_app_devices_device", ("device_id",))])
         self.assertEqual([i[0] for i in table["indexes"] if not i[2]], ["ix_app_devices_owner"])
         with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0038")
+            command.downgrade(db.alembic_config(c), "0039")
         self.assertNotIn("app_devices", shape(self.path))
 
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):

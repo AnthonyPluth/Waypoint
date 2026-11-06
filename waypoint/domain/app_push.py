@@ -32,7 +32,11 @@ class Invalid(Exception):
 
 def relay_url() -> str | None:
     value = (os.environ.get(RELAY_ENV) or "").strip().rstrip("/")
-    parts = urllib.parse.urlsplit(value)
+    try:
+        parts = urllib.parse.urlsplit(value)
+        _ = parts.port
+    except ValueError:
+        return None
     return value if parts.scheme == "https" and parts.hostname and not (parts.query or parts.fragment or parts.username is not None or parts.password is not None) else None
 
 
@@ -48,8 +52,8 @@ def add_device(conn: db.Connection, owner: str, device_id: str, secret: str, now
     if len(mine) >= MAX_DEVICES and device_id not in {d.device_id for d in mine}:
         raise Invalid(f"Turn notifications off on an iPhone you no longer use first (at most {MAX_DEVICES}).")
     db.upsert(conn, AppDevice, {"owner_sub": owner, "device_id": device_id, "secret": app_devices.seal(secret), "created": now},
-              key=["owner_sub", "device_id"], update=["secret"])
-    found = conn.orm.scalars(select(AppDevice).where(AppDevice.owner_sub == owner, AppDevice.device_id == device_id)).one()
+              key=["device_id"], update=["owner_sub", "secret"])
+    found = conn.orm.scalars(select(AppDevice).where(AppDevice.device_id == device_id)).one()
     conn.orm.refresh(found)
     return {"id": found.id, "service": "iPhone", "created": found.created}
 

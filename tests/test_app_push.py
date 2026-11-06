@@ -69,6 +69,15 @@ class DeviceTests(Relay):
         self.phone(device="device-number-00", secret="u" * 43)
         self.phone(owner="u-sam", device="device-number-extra")
 
+    def test_a_phone_moves_to_the_member_who_registers_it_next(self):
+        self.phone(owner="u-jane")
+        self.phone(owner="u-sam", secret="u" * 43)
+        self.assertEqual(app_push.devices(self.c, "u-jane"), [])
+        self.assertEqual(len(app_push.devices(self.c, "u-sam")), 1)
+        self.assertEqual(app_push.wake(self.c, "u-jane", "check-in"), (0, 0))
+        self.assertEqual(app_push.wake(self.c, "u-sam", "check-in"), (1, 1))
+        self.assertEqual(self.wake.call_args.args[1:2], (DEVICE,))
+
     def test_only_the_owner_removes_a_phone(self):
         added = self.phone()
         self.assertFalse(app_push.remove_device(self.c, "u-sam", added["id"]))
@@ -76,7 +85,7 @@ class DeviceTests(Relay):
         self.assertEqual(app_push.devices(self.c, "u-jane"), [])
 
     def test_the_relay_address_must_be_https_and_is_off_unless_set(self):
-        for value in ("", "http://relay.example.com", "relay.example.com", "https://", "https://u:p@relay.example.com", "https://:p@relay.example.com", "https://u@relay.example.com", "https://relay.example.com/?x=1"):
+        for value in ("", "http://relay.example.com", "relay.example.com", "https://", "https://u:p@relay.example.com", "https://:p@relay.example.com", "https://u@relay.example.com", "https://relay.example.com/?x=1", "https://[", "https://relay.example.com:port"):
             with mock.patch.dict(os.environ, {app_push.RELAY_ENV: value}):
                 self.assertIsNone(app_push.relay_url(), value)
         with mock.patch.dict(os.environ, {app_push.RELAY_ENV: " https://relay.example.com/ "}):
@@ -145,7 +154,7 @@ class LapseTests(Relay):
 
     def test_a_phone_ends_when_its_owner_can_no_longer_sign_in(self):
         self.phone("u-jane")
-        self.phone("u-sam")
+        self.phone("u-sam", device="device-number-sam")
         allowed = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint", "OIDC_ALLOWED_EMAILS": "u-jane@example.com"}
         with mock.patch.dict(os.environ, allowed):
             self.assertEqual(reminders.end_lapsed(self.c), 1)
