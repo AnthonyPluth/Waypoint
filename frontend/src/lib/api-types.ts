@@ -1101,8 +1101,23 @@ export interface TripHome {
   longitude: number;
 }
 
+export interface TripKindCounts {
+  flight: number;
+  hotel: number;
+  car: number;
+  train: number;
+  cruise: number;
+  parking: number;
+  visit: number;
+}
+
 export interface TripList {
   trips: Trip[];
+}
+
+export interface TripPhotoCounts {
+  total: number;
+  inferred: number;
 }
 
 export interface TripPlaces {
@@ -1140,6 +1155,19 @@ export interface TripStayPoint {
   latitude: number;
   longitude: number;
   precision: "airport" | "zip" | "city";
+}
+
+export interface TripSummary {
+  days: number;
+  nights: number;
+  distance_km: number;
+  flight_km: number;
+  road_km: number;
+  road_estimated: boolean;
+  states: string[];
+  countries: string[];
+  photos: TripPhotoCounts;
+  kinds: TripKindCounts;
 }
 
 export interface UnignoreBody {
@@ -1182,6 +1210,7 @@ export interface Endpoints {
   "POST /api/trips/{id}": { body: TripBody; reply: Trip };
   "DELETE /api/trips/{id}": { body: never; reply: Ok };
   "GET /api/trips/{id}/places": { body: never; reply: TripPlaces };
+  "GET /api/trips/{id}/summary": { body: never; reply: TripSummary };
   "POST /api/trips/{id}/emails/clear": { body: never; reply: EmailsCleared };
   "POST /api/trips/{id}/merge": { body: MergeBody; reply: Trip };
   "POST /api/trips/{id}/split": { body: SplitBody; reply: Trip };
