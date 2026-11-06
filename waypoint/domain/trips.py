@@ -1443,6 +1443,7 @@ def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int, conf
         return None
     if not viewer.household and not confirmed:
         _merge_needs_confirmation(conn, trip, other)
+    photogrants.lock_trips(conn, [trip.id, other.id])
     windows = _before(conn, [trip.id])
     aboard = trippeople.of(conn, [trip.id, other.id])
     joined = list(dict.fromkeys([*aboard[trip.id], *aboard[other.id]]))
@@ -1459,10 +1460,10 @@ def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int, conf
     trip.notes = trip.notes or other.notes
     trip.booked_by = trip.booked_by if trip.booked_by is not None else other.booked_by
     conn.orm.flush()
+    refresh(conn, trip)
     photogrants.merged(conn, trip.id, other.id)
     conn.execute(delete(Trip).where(Trip.id == other.id))
     conn.orm.expire(trip)
-    refresh(conn, trip)
     photogrants.trips_changed(conn, [trip.id], windows)
     return _trip_outs(conn, viewer, [trip])[0]
 
@@ -1529,6 +1530,7 @@ def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: 
     if trip_id == seg.trip_id:
         raise Invalid("It’s already in that trip")
     source = conn.orm.get(Trip, seg.trip_id)
+    photogrants.lock_trips(conn, [seg.trip_id, *([trip_id] if trip_id is not None else [])])
     windows = _before(conn, [seg.trip_id, *([trip_id] if trip_id is not None else [])])
     target: Trip | None
     if trip_id is None:

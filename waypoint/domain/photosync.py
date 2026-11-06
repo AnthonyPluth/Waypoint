@@ -16,13 +16,14 @@ from ..providers import immich
 from ..storage import db, photo_sources, secretbox
 from ..storage import settings_keys as sk
 from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoTripSync
-from ..storage.photo_sources import OK, REFUSED, UNREACHABLE, Stored
+from ..storage.photo_sources import OFF, OK, REFUSED, UNREACHABLE, Stored
 from . import photogrants, photoqueue, photos, photosources
 from .photomatch import HomeIn, MatchKind, TripWindow
 
 TIME_BUDGET = 600.0
 TOO_DENSE = "Some of your library couldn’t be read."
-Traversal = Literal["done", "stopped", "dense", "changed"]
+Traversal = Literal["done", "stopped", "dense", "changed", "paused"]
+PAUSED: Traversal = "paused"
 Written = Literal["written", "gone", "changed"]
 CHANGED: Traversal = "changed"
 DONE: Traversal = "done"
@@ -273,6 +274,9 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
     window = run.windows[trip_id]
     after = max(window.start, photos.instant(row.resume_after)) if row.resume_after else window.start
     while True:
+        if photo_sources.status(conn, run.source_id) == OFF:
+            conn.commit()
+            return PAUSED
         got = run.provider.search(run.unlocked, after, window.end, updated_after=updated, page=1)
         run.summary.pages += 1
         written = _write(run, trip_id, got)
@@ -321,7 +325,8 @@ def _failed(conn: db.Connection, source: Stored, error: immich.ImmichError, seal
     if isinstance(error, immich.Refused | immich.NotConfigured):
         photo_sources.mark(conn, source["id"], REFUSED, str(error), keep_off=True, sealed=sealed)
     elif isinstance(error, immich.RateLimited):
-        photo_sources.mark(conn, source["id"], source["status"], source["last_error"] or str(error), keep_off=True, sealed=sealed)
+        photo_sources.mark(conn, source["id"], source["status"], source["last_error"] or str(error), keep_off=True, sealed=sealed,
+                           was=(source["status"], source["last_error"]))
     else:
         kept = source["last_error"] if source["status"] == UNREACHABLE and source["last_error"] else str(error)
         photo_sources.mark(conn, source["id"], UNREACHABLE, kept, keep_off=True, sealed=sealed)
@@ -357,6 +362,8 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
             if outcome == STOPPED:
                 finished = False
                 break
+            if outcome == PAUSED:
+                return summary
             dense = dense or outcome == DENSE
             moved = moved or outcome == CHANGED
     except immich.ImmichError as e:
