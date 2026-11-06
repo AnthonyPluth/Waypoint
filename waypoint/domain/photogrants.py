@@ -68,13 +68,17 @@ def _write(conn: db.Connection, person_id: int, trip_id: int, scope: photos.Scop
 def _person_rows(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> list[Photo]:
     on_trips = Photo.trip_id.in_(list(trip_ids)) if trip_ids else Photo.trip_id.is_(None)
     q = select(Photo).join(PhotoSource, PhotoSource.id == Photo.source_id) \
-        .where(PhotoSource.person_id == person_id, or_(on_trips, and_(Photo.trip_id.is_(None), Photo.match == photos.AMBIGUOUS))).order_by(Photo.id)
+        .where(PhotoSource.person_id == person_id, or_(on_trips, and_(Photo.trip_id.is_(None), Photo.match.in_([photos.AMBIGUOUS, photos.HOME])))).order_by(Photo.id)
     return list(conn.orm.scalars(q).all())
 
 
 def _re_place(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> None:
-    for row in _person_rows(conn, person_id, trip_ids):
-        photos.re_place(conn, row, person_id)
+    rows = _person_rows(conn, person_id, trip_ids)
+    if not rows:
+        return
+    windows, at_home = photos.candidate_windows(conn, person_id), photos.home_in(conn)
+    for row in rows:
+        photos.re_place(conn, row, person_id, windows, home=at_home)
 
 
 def _drop_derived(conn: db.Connection, person_id: int, trip_id: int) -> None:

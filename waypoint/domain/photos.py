@@ -13,7 +13,7 @@ from sqlalchemy import ColumnElement, and_, false, or_, select
 
 from ..storage import db, geocode
 from ..storage.models import Airport, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, Segment, Trip, TripPerson
-from . import photomatch, trippeople, trips, visibility
+from . import home, photomatch, trippeople, trips, visibility
 from .photomatch import CLUSTER, GAP, NEAR, MatchKind, PhotoIn, Point, SegmentPoint, TripWindow, window
 from .stats import EARTH_RADIUS_KM, distance_km
 from .visibility import Viewer
@@ -25,6 +25,7 @@ Found = tuple[Photo, int]
 
 SHOWN: tuple[MatchKind, ...] = ("place", "time", "far")
 AMBIGUOUS: MatchKind = "ambiguous"
+HOME: MatchKind = "home"
 FAR: MatchKind = "far"
 OWNER = "owner"
 AUTO = "auto"
@@ -593,6 +594,13 @@ def _apply(photo: Photo, placed: photomatch.Match, chosen: TripWindow | None, de
 
 def _place(photo: Photo, person: int, chosen: TripWindow | None) -> None:
     _apply(photo, photomatch.settle(_shot(photo, person), chosen), chosen, OWNER)
+
+
+def home_in(conn: db.Connection) -> photomatch.HomeIn | None:
+    found = home.located(conn)
+    if found is None:
+        return None
+    return photomatch.HomeIn(found.latitude, found.longitude, "zip" if found.precision == "zip" else "city")
 
 
 def keep_on(photo: Photo, person: int, chosen: TripWindow) -> None:

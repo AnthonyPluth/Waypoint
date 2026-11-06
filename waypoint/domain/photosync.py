@@ -14,9 +14,9 @@ from .. import monitoring, oidc
 from ..providers import immich
 from ..storage import db, photo_sources, secretbox
 from ..storage import settings_keys as sk
-from ..storage.models import Photo, PhotoExclusion, PhotoTripSync
+from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoTripSync
 from ..storage.photo_sources import OK, REFUSED, UNREACHABLE, Stored
-from . import home, photogrants, photoqueue, photos, photosources
+from . import photogrants, photoqueue, photos, photosources
 from .photomatch import HomeIn, MatchKind, TripWindow
 
 TIME_BUDGET = 600.0
@@ -91,13 +91,6 @@ def _iso(at: datetime) -> str:
     return at.astimezone(UTC).isoformat()
 
 
-def _home(conn: db.Connection) -> HomeIn | None:
-    found = home.located(conn)
-    if found is None:
-        return None
-    return HomeIn(found.latitude, found.longitude, "zip" if found.precision == "zip" else "city")
-
-
 def _key(name: str, source_id: int) -> str:
     return f"{name}:{source_id}"
 
@@ -155,8 +148,10 @@ def _syncs(conn: db.Connection, source_id: int) -> dict[int, PhotoTripSync]:
 def _prepare(run: _Run, restart: bool) -> None:
     conn = run.conn
     conn.orm.expire_all()
+    photogrants.lock(conn, run.person, conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == run.person)).scalars())
+    conn.orm.expire_all()
+    run.windows = {w.trip_id: w for w in photos.candidate_windows(conn, run.person)}
     owned = _rows(conn, run.source_id)
-    photogrants.lock(conn, run.person, set(run.windows) | {p.trip_id for p in owned if p.trip_id is not None})
     syncs = _syncs(conn, run.source_id)
     changed = False
     for trip_id, stale in syncs.items():
@@ -314,10 +309,10 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         return summary
     if unlocked is None:
         return summary
-    windows = {w.trip_id: w for w in photos.candidate_windows(conn, source["person_id"])}
-    job = _Run(conn, source, unlocked, provider, now, _clock() + TIME_BUDGET, _home(conn), windows, summary)
+    job = _Run(conn, source, unlocked, provider, now, _clock() + TIME_BUDGET, photos.home_in(conn), {}, summary)
     started, fresh = _relist(conn, source_id, now, full) if trips is None else (None, False)
     _prepare(job, fresh)
+    windows = job.windows
     finished = True
     try:
         for n, trip_id in enumerate(_order(conn, source_id, [t for t in windows if trips is None or t in trips])):

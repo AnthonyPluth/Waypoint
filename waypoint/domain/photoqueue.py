@@ -41,8 +41,14 @@ def queue(person_id: int, trip_id: int) -> None:
     except Exception as e:
         monitoring.report(e, values=False)
         return
+    failed = 0
     for source_id in ids:
-        start(source_id, {trip_id})
+        try:
+            start(source_id, {trip_id})
+        except Exception:
+            failed += 1
+    if failed:
+        monitoring.log(f"Photo sync: {failed} queued library sync(s) could not start; the next scheduled sync reads them.", "warning")
 
 
 def after_commit(conn: db.Connection, person_id: int, trip_id: int) -> None:

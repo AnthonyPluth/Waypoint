@@ -11,7 +11,7 @@ from tests.test_immich_provider import JSON_HEADERS, serve
 from tests.test_photos_api import SOHO
 from tests.test_trips import HOTEL, OUT, Household
 from waypoint import monitoring
-from waypoint.domain import home, photogrants, photoqueue, photos, photosync, trips
+from waypoint.domain import home, people, photogrants, photoqueue, photos, photosync, trips
 from waypoint.providers import immich
 from waypoint.server import jobs
 from waypoint.storage import db, photo_sources
@@ -596,3 +596,95 @@ class KeyTests(SyncCase):
         with no_leaks(self, KEY, database=self.path, sent_ok=True):
             self.sync()
         self.assertTrue(self.c.execute(select(PhotoSource.api_key)).scalar().startswith("enc:"))
+
+
+HOME_POINT = home.geocode.Point(SOHO[0], SOHO[1], "zip")
+
+
+class ReviewFixTests(SyncCase):
+    def home_row(self, taken):
+        row = Photo(source_id=self.source, asset_id=f"home-{taken}", asset_updated="x", kind="image", taken_utc=taken, taken_local=taken[:16],
+                    latitude=SOHO[0], longitude=SOHO[1], location_source="exif", trip_id=None, match="home", decided_by="auto", seen=1.0)
+        self.c.orm.add(row)
+        self.c.orm.flush()
+        return row.asset_id
+
+    def test_stopping_sharing_drops_home_rows_no_shared_window_still_covers(self):
+        only_a, in_b = self.home_row("2026-06-02T12:00:00.000Z"), self.home_row("2026-06-04T12:00:00.000Z")
+        with mock.patch.object(home, "located", return_value=HOME_POINT):
+            photogrants.stop(self.c, self.jane, self.jid, self.a, 5.0)
+        rows = self.rows()
+        self.assertNotIn(only_a, rows)
+        self.assertEqual((rows[in_b].match, rows[in_b].trip_id), ("home", None))
+        with mock.patch.object(home, "located", return_value=HOME_POINT):
+            photogrants.left(self.c, self.jid, self.b)
+        self.assertNotIn(in_b, self.rows())
+
+    def test_deleting_a_trip_drops_home_rows_it_alone_covered(self):
+        only_a = self.home_row("2026-06-02T12:00:00.000Z")
+        with mock.patch.object(home, "located", return_value=HOME_POINT):
+            photogrants.trip_deleted(self.c, self.a)
+        self.assertNotIn(only_a, self.rows())
+
+    def test_the_sync_drops_home_rows_when_their_window_goes(self):
+        with mock.patch.object(home, "located", return_value=HOME_POINT):
+            self.sync()
+            only_a, in_b = self.home_row("2026-06-02T12:00:00.000Z"), self.home_row("2026-06-04T12:00:00.000Z")
+            self.c.execute(update(PhotoGrant).where(PhotoGrant.trip_id == self.a).values(revoked=9.0))
+            self.c.commit()
+            self.sync(NOW + timedelta(hours=6))
+        rows = self.rows()
+        self.assertNotIn(only_a, rows)
+        self.assertEqual(rows[in_b].match, "home")
+
+    def test_the_prep_reads_the_windows_under_the_grant_locks(self):
+        self.lib.items = [asset(1, "2026-06-04T12:00:00Z", gps=SOHO)]
+        real = photogrants.lock
+        waited = []
+
+        def stopped_while_waiting(conn, person, trip_ids):
+            if not waited:
+                waited.append(1)
+                with db.session() as other:
+                    other.execute(update(PhotoGrant).where(PhotoGrant.trip_id == self.b).values(revoked=9.0))
+            return real(conn, person, trip_ids)
+        with mock.patch.object(photogrants, "lock", side_effect=stopped_while_waiting):
+            self.sync()
+        self.assertEqual(set(self.syncs()), {self.a})
+        self.assertEqual(self.rows()[self.lib.items[0]["id"]].trip_id, self.a)
+        self.assertEqual(len({q["takenAfter"] for q in self.lib.asked()}), 1)
+
+    def test_a_starter_that_fails_after_commit_is_logged_as_a_count_and_the_rest_still_start(self):
+        second = photo_sources.save(self.c, self.jid, "u-jane", "https://second.example", OWNER, KEY, None, 1.0)
+        self.c.commit()
+        photoqueue.enable(photosync.start)
+        self.addCleanup(photoqueue.disable)
+        tried = []
+
+        def boom(source_id, trips):
+            tried.append(source_id)
+            if source_id == self.source:
+                raise RuntimeError(f"can't start thread {TRIP_NAME}")
+            return True
+        with mock.patch.object(photoqueue, "starter", side_effect=boom), mock.patch.object(monitoring, "log") as logged:
+            photogrants.grant(self.c, self.jane, self.jid, self.other, "only_me", 3.0)
+            self.c.commit()
+        self.assertEqual(tried, [self.source, second])
+        line = logged.call_args.args[0]
+        self.assertIn("1", line)
+        self.assertNotIn(TRIP_NAME, line)
+
+    def test_a_claimed_guests_trips_are_shared_by_the_members_standing_setting(self):
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        self.c.orm.add(PhotoSharingPrefs(person_id=self.sid, default_scope="trip", share_all=True, set_by="u-sam"))
+        sams = photo_sources.save(self.c, self.sid, "u-sam", "https://sam.example", OWNER, KEY, None, 1.0)
+        self.c.commit()
+        photoqueue.enable(photosync.start)
+        self.addCleanup(photoqueue.disable)
+        with mock.patch.object(photoqueue, "starter") as started:
+            people.claim_guest(self.c, self.sid, self.mia, "2026-07-01")
+            started.assert_not_called()
+            self.c.commit()
+        row = self.c.orm.get(PhotoGrant, (self.sid, self.b))
+        self.assertEqual((row.scope, row.revoked, row.granted_by), ("trip", None, "u-sam"))
+        self.assertIn(((sams, {self.b}),), [c.args and (c.args,) for c in started.call_args_list])
