@@ -18,7 +18,7 @@ from .. import tls
 HOSTS = {"production": "https://api.push.apple.com", "sandbox": "https://api.sandbox.push.apple.com"}
 BODY = json.dumps({"aps": {"alert": {"title": "Waypoint", "body": "Open Waypoint to see an update."}, "sound": "default"}}).encode()
 JWT_LIFETIME = 40 * 60
-GONE_REASONS = {"BadDeviceToken", "Unregistered", "DeviceTokenNotForTopic"}
+GONE_REASONS = {"Unregistered"}
 
 _lock = threading.Lock()
 _issued: dict[tuple[str, str], tuple[str, float]] = {}

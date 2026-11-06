@@ -131,14 +131,15 @@ class SendingTests(Apple):
         self.assertEqual(len(self.sent), 1)
         self.push.assert_called_once()
 
-    def test_a_failed_phone_wake_is_retried_even_when_the_browser_got_it(self):
+    def test_a_failed_phone_wake_does_not_resend_the_browser_push(self):
         self.device()
         self.phone()
         self.push.side_effect = RuntimeError("couldn't reach Apple's push service")
         with mock.patch.object(monitoring, "report"):
+            self.assertEqual(self.due(), 1)
             self.assertEqual(self.due(), 0)
-        self.push.side_effect = None
-        self.assertEqual(self.due(), 1)
+            self.assertEqual(self.due(), 0)
+        self.assertEqual(len(self.sent), 1)
 
     def test_no_phone_is_woken_when_push_is_off(self):
         self.phone()
@@ -212,10 +213,10 @@ class AppleCallTests(unittest.TestCase):
         self.assertNotIn("apns-collapse-id", posted.call_args_list[1].args[1])
 
     def test_what_apple_says_decides_whether_the_phone_is_kept(self):
-        for status, reason in ((410, "Unregistered"), (400, "BadDeviceToken"), (400, "DeviceTokenNotForTopic")):
+        for status, reason in ((410, "Unregistered"), (400, "Unregistered")):
             with mock.patch.object(apns, "post", return_value=(status, json.dumps({"reason": reason}).encode())), self.assertRaises(apns.Gone):
                 apns.push(self.creds, TOKEN, "production")
-        for status, body in ((403, b'{"reason":"ExpiredProviderToken"}'), (429, b"{}"), (500, b"not json"), (503, b"")):
+        for status, body in ((400, b'{"reason":"BadDeviceToken"}'), (400, b'{"reason":"DeviceTokenNotForTopic"}'), (403, b'{"reason":"InvalidProviderToken"}'), (403, b'{"reason":"ExpiredProviderToken"}'), (429, b"{}"), (500, b"not json"), (503, b"")):
             with mock.patch.object(apns, "post", return_value=(status, body)), self.assertRaises(RuntimeError) as caught:
                 apns.push(self.creds, TOKEN, "production")
             self.assertNotIn(TOKEN, str(caught.exception))
