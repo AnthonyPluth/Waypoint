@@ -425,8 +425,9 @@ details.looks > summary::-webkit-details-marker { display: none; }
             <fieldset style="border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:8px"><legend class="eyebrow" style="margin-bottom:8px">Trips it could belong to</legend>
               <label class="choice"><input type="radio" name="h2trip" checked><span><b>Canyon weekend</b><br><span class="t-caption muted">Sat 13 – Sun 14 Sep 2025 · 21 km from Redstone Gap Cabins</span></span></label>
               <label class="choice"><input type="radio" name="h2trip"><span><b>Redstone weekend</b><br><span class="t-caption muted">Sat 13 – Sun 14 Sep 2025 · 19 km from Gap Trailhead parking</span></span></label>
-              <label class="choice"><input type="radio" name="h2trip"><span><b>Another trip…</b><br><span class="t-caption muted">Choose from all of Ada’s trips</span></span></label>
+              <label class="choice"><input type="radio" name="h2trip"><span><b>Another trip…</b><br><span class="t-caption muted">Choose from the trips Ada shares photos on</span></span></label>
             </fieldset>
+            <p class="t-caption muted">Only trips you have shared photos on are listed. To use another trip, share your photos on it first.</p>
           </div>
           <div class="sheetacts"><button class="btn outline" type="button">Cancel</button><button class="btn" type="button">Put on Canyon weekend</button></div>
         </div></div>
@@ -436,6 +437,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       <div><h3>Accessible names</h3><ul>
         <li>Disclosure: native <code>details</code>, summary <q>Needs a look, 5 photos</q>; list <q>Photos that need a look</q>.</li>
         <li>Per photo, naming its time: <q>Pick a trip for the photo from Sat 13 Sep, 5:40 PM</q>, <q>Leave the photo from … off both trips</q>, and for far photos <q>Remove the photo from … from this trip</q> (the visible label is <q>Remove from this trip</q>) and <q>Keep the photo from … on Four Corners loop</q>.</li>
+        <li>Pick a trip offers only trips the person is on and has shared photos on (an active grant), as in docs/PHOTOS.md. A trip with no grant is never listed, so choosing it can’t apply a default scope or skip the sharing prompt; if one is chosen anyway (a stale list) the request is refused with “Share your photos on that trip first” and the sheet stays open. A photo put on a granted trip follows that grant’s scope as it stands; nothing is widened.</li>
         <li>Sheet: dialog <q>Pick a trip for this photo</q>, described by <q>Waypoint won’t move it again by itself.</q>; radio group <q>Trips it could belong to</q>; <q>Cancel</q>; the confirm button names the choice, <q>Put on Canyon weekend</q>; <q>Close</q>.</li>
         <li>Remove from this trip shows the toast from (k), <q>Removed from Four Corners loop.</q> Leave off shows its own, <q>Left off both trips.</q>, because the photo was on neither trip; its <q>Undo</q> is named <q>Undo leaving the photo from Sat 13 Sep, 5:40 PM off both trips</q> and returns the photo to Needs a look, as it was. Undo on the Remove toast puts the far photo back on its trip and keeps it in Needs a look. Both toasts are <code>role="status"</code>.</li>
       </ul></div>
@@ -590,7 +592,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       marks += '<g transform="translate(' + s.x + " " + s.y + ") scale(" + k.toFixed(2) + ')">' + (s.k === "air" ? '<circle r="6" fill="var(--map-airport)" stroke="var(--map-sea)" stroke-width="2"/>' : '<rect x="-6" y="-6" width="12" height="12" rx="2" transform="rotate(45)" fill="var(--map-stay)" stroke="var(--map-sea)" stroke-width="2"/>') + "</g>";
     });
     if (mover) marks += '<g transform="translate(' + mover.x.toFixed(1) + " " + mover.y.toFixed(1) + ") rotate(" + mover.ang.toFixed(1) + ") scale(" + (1.1 * k).toFixed(2) + ')"><rect x="-9" y="-5" width="18" height="10" rx="3" fill="var(--map-stay)" stroke="var(--map-sea)" stroke-width="1.2"/><rect x="1" y="-3.5" width="4" height="7" rx="1" fill="var(--map-sea)"/></g>';
-    var svg = '<svg viewBox="0 0 800 500" role="img" aria-label="Map of the route, stop by stop, with photo places; the stops are listed below">' + LAND + '<g fill="none" stroke-linecap="round">' + legs + fl + "</g>" + marks + "</svg>";
+    var svg = '<svg viewBox="0 0 800 500" role="img" aria-label="Map of the route, stop by stop, with photo places' + (mode === "replay" ? "; the stops are listed below" : "") + '">' + LAND + '<g fill="none" stroke-linecap="round">' + legs + fl + "</g>" + marks + "</svg>";
     var passed = { p1: 1, p2: 1, p3: 1, p4: 1, p9: 1, p5: 1, p6: 1, p10: 1 };
     var pins = set.map(function (p) {
       var cls = "";

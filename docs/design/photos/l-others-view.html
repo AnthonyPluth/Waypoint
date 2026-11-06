@@ -428,6 +428,15 @@ details.looks > summary::-webkit-details-marker { display: none; }
           <div class="vstage"><div class="gone" role="status"><svg class="ic" aria-hidden="true"><use href="#i-imgoff"/></svg><p class="t-heading" style="color:var(--foreground)">Can’t load this photo right now</p><p class="t-caption">Try again in a moment.</p><div class="src-acts" style="justify-content:center"><button class="btn outline" type="button">Retry</button><button class="btn ghost" type="button">Next photo</button><button class="btn ghost" type="button">Back to the trip</button></div></div></div>
         </div></div>
       </figure>
+      <figure class="fig"><figcaption>l5 · The photo list can’t be refreshed</figcaption>
+        <div class="dev frag"><div class="main">
+          <section class="photos" aria-labelledby="l5h">
+            <div class="photos-head"><h2 id="l5h" class="t-heading">Photos <span class="muted t-caption">248, may be out of date</span></h2></div>
+            <div class="look" role="status"><span class="chip warn small">Not up to date</span><p>Couldn’t check which photos are still shared with you. What’s shown may be out of date.</p><button class="btn outline sm" type="button">Retry</button></div>
+            <div class="strip" data-strip></div>
+          </section>
+        </div></div>
+      </figure>
     </div></div>
     <div class="spec">
       <div><h3>Accessible names</h3><ul>
@@ -439,6 +448,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       <div><h3>Tokens and components</h3><ul>
         <li>Left out for Ada: Theo’s and Mira’s photos in the strip, gallery and day groups (a day with only their photos has no group), pins and pin sizes (Theo’s two hollow clusters and his Juniper Wash day are gone), states from their photos (New Mexico), the inferred count, the replay’s lit clusters and “from Theo’s library” captions.</li>
         <li>Replies are built per viewer, and the proxy answers a photo you may not see with the same 404 as a missing one (<code>NO_IMAGE</code>).</li>
+        <li>When the refetch itself fails (on focus or every 60 s), the page keeps the last list, counts and pins but marks them: a polite <code>role="status"</code> line <q>Couldn’t check which photos are still shared with you. What’s shown may be out of date.</q> with a <q>Retry</q> button, and the Photos count reads <q>248, may be out of date</q> (l5). The next successful fetch clears the line and drops whatever left; the viewer, opened from stale data, always revalidates before showing a picture and shows (l4) if it can’t.</li>
         <li>Live removal: the page fetches its photo list again when it regains focus and every 60 s while visible, and drops tiles and pins that left; the viewer checks again on every move and, when a preview fails, fetches the photo list again before deciding: the notice above (l3) appears only when the photo is no longer on the visible list, and if it is still listed the viewer shows the unavailable state (l4) instead (<code>text-muted-foreground</code> on <code>--lightbox</code>, an image-off icon). Removal also needs the proxy to stop the browser reusing a cached copy: <code>Cache-Control: private, no-cache</code> with the ETag, instead of <code>max-age=86400</code>.</li>
         <li>A picture already on someone’s screen can’t be unseen; everything after that moment honours the removal.</li>
       </ul></div>
@@ -586,7 +596,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       marks += '<g transform="translate(' + s.x + " " + s.y + ") scale(" + k.toFixed(2) + ')">' + (s.k === "air" ? '<circle r="6" fill="var(--map-airport)" stroke="var(--map-sea)" stroke-width="2"/>' : '<rect x="-6" y="-6" width="12" height="12" rx="2" transform="rotate(45)" fill="var(--map-stay)" stroke="var(--map-sea)" stroke-width="2"/>') + "</g>";
     });
     if (mover) marks += '<g transform="translate(' + mover.x.toFixed(1) + " " + mover.y.toFixed(1) + ") rotate(" + mover.ang.toFixed(1) + ") scale(" + (1.1 * k).toFixed(2) + ')"><rect x="-9" y="-5" width="18" height="10" rx="3" fill="var(--map-stay)" stroke="var(--map-sea)" stroke-width="1.2"/><rect x="1" y="-3.5" width="4" height="7" rx="1" fill="var(--map-sea)"/></g>';
-    var svg = '<svg viewBox="0 0 800 500" role="img" aria-label="Map of the route, stop by stop, with photo places; the stops are listed below">' + LAND + '<g fill="none" stroke-linecap="round">' + legs + fl + "</g>" + marks + "</svg>";
+    var svg = '<svg viewBox="0 0 800 500" role="img" aria-label="Map of the route, stop by stop, with photo places' + (mode === "replay" ? "; the stops are listed below" : "") + '">' + LAND + '<g fill="none" stroke-linecap="round">' + legs + fl + "</g>" + marks + "</svg>";
     var passed = { p1: 1, p2: 1, p3: 1, p4: 1, p9: 1, p5: 1, p6: 1, p10: 1 };
     var pins = set.map(function (p) {
       var cls = "";

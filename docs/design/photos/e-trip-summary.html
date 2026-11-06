@@ -558,7 +558,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       marks += '<g transform="translate(' + s.x + " " + s.y + ") scale(" + k.toFixed(2) + ')">' + (s.k === "air" ? '<circle r="6" fill="var(--map-airport)" stroke="var(--map-sea)" stroke-width="2"/>' : '<rect x="-6" y="-6" width="12" height="12" rx="2" transform="rotate(45)" fill="var(--map-stay)" stroke="var(--map-sea)" stroke-width="2"/>') + "</g>";
     });
     if (mover) marks += '<g transform="translate(' + mover.x.toFixed(1) + " " + mover.y.toFixed(1) + ") rotate(" + mover.ang.toFixed(1) + ") scale(" + (1.1 * k).toFixed(2) + ')"><rect x="-9" y="-5" width="18" height="10" rx="3" fill="var(--map-stay)" stroke="var(--map-sea)" stroke-width="1.2"/><rect x="1" y="-3.5" width="4" height="7" rx="1" fill="var(--map-sea)"/></g>';
-    var svg = '<svg viewBox="0 0 800 500" role="img" aria-label="Map of the route, stop by stop, with photo places; the stops are listed below">' + LAND + '<g fill="none" stroke-linecap="round">' + legs + fl + "</g>" + marks + "</svg>";
+    var svg = '<svg viewBox="0 0 800 500" role="img" aria-label="Map of the route, stop by stop, with photo places' + (mode === "replay" ? "; the stops are listed below" : "") + '">' + LAND + '<g fill="none" stroke-linecap="round">' + legs + fl + "</g>" + marks + "</svg>";
     var passed = { p1: 1, p2: 1, p3: 1, p4: 1, p9: 1, p5: 1, p6: 1, p10: 1 };
     var pins = set.map(function (p) {
       var cls = "";
