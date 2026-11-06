@@ -675,9 +675,9 @@ def _place(photo: Photo, person: int, chosen: TripWindow | None) -> None:
     _apply(photo, photomatch.settle(_shot(photo, person), chosen), chosen, OWNER)
 
 
-def re_place(conn: db.Connection, photo: Photo, person: int) -> bool:
+def re_place(conn: db.Connection, photo: Photo, person: int, windows: Sequence[TripWindow] | None = None) -> bool:
     shot = _shot(photo, person)
-    inside = [w for w in candidate_windows(conn, person) if w.start <= shot.taken <= w.end]
+    inside = [w for w in (candidate_windows(conn, person) if windows is None else windows) if w.start <= shot.taken <= w.end]
     left_out = excluded_trips(conn, person, photo.asset_id)
     candidates = [w for w in inside if w.trip_id not in left_out]
     placed = photomatch.match(shot, candidates, None)
