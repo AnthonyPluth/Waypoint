@@ -11,7 +11,7 @@ from waypoint.domain import photos, trips
 from waypoint.domain.visibility import Viewer
 from waypoint.server import mcp_access, mcp_http
 from waypoint.storage import db, secretbox
-from waypoint.storage.models import Photo, PhotoSource, Segment
+from waypoint.storage.models import Photo, PhotoGrant, PhotoSource, Segment
 
 ASSET = "canary-asset-9f3k2x7q"
 URL = "https://immich-canary-8h2k.example:2283"
@@ -20,7 +20,8 @@ LONDON = "Europe/London"
 NEW_YORK = "America/New_York"
 SOHO = (51.5136, -0.1365)
 HEATHROW = (51.4706, -0.4619)
-ROUTES = ("/api/trips/{id}/photos", "/api/photos/review", "/api/photos/{id}")
+ROUTES = ("/api/trips/{id}/photos", "/api/photos/review", "/api/photos/{id}", "/api/trips/{id}/photo-sharing", "/api/trips/{id}/photo-exclusions",
+          "/api/trips/{id}/photo-exclusions/{id}", "/api/photo-grants", "/api/photo-sharing-prefs/{id}")
 ROME = (41.9028, 12.4964)
 PARIS = "Europe/Paris"
 CHICAGO, CANCUN, PUERTO_RICO = "America/Chicago", "America/Cancun", "America/Puerto_Rico"
@@ -48,19 +49,24 @@ def source_row(person_id, owner):
                        status="ok", created=1.0)
 
 
-def photo_row(source_id, trip_id, local, zone=LONDON, *, match="place", where=None, segment_id=None, hidden=False, offset=None,
-              decided=None, located=None, kind="image", distance=None, taken_utc=None):
+def photo_row(source_id, trip_id, local, zone=LONDON, *, match="place", where=None, segment_id=None, offset=None,
+              decided=None, located=None, kind="image", distance=None, taken_utc=None, asset=None):
     lat, lon = where or (None, None)
-    return Photo(source_id=source_id, asset_id=f"{ASSET}-{next(_assets)}", asset_updated="2026-06-02T00:00:00Z", kind=kind, taken_utc=taken_utc or utc(local, zone), taken_local=local,
+    return Photo(source_id=source_id, asset_id=asset or f"{ASSET}-{next(_assets)}", asset_updated="2026-06-02T00:00:00Z", kind=kind, taken_utc=taken_utc or utc(local, zone), taken_local=local,
                  taken_offset=offset, latitude=lat, longitude=lon, location_source=located or ("exif" if where else None), state=None, country=None,
-                 trip_id=trip_id, segment_id=segment_id, match=match, distance_km=distance, decided_by=decided, hidden=hidden, seen=1.0)
+                 trip_id=trip_id, segment_id=segment_id, match=match, distance_km=distance, decided_by=decided, seen=1.0)
+
+
+def grant_row(person_id, trip_id, scope="trip", revoked=None, by="sub-x"):
+    return PhotoGrant(person_id=person_id, trip_id=trip_id, scope=scope, revoked=revoked, changed=1.0, granted_by=by)
 
 
 def stored(photo_id):
     with db.session() as conn:
         row = conn.orm.get(Photo, photo_id)
-        assert row is not None
-        return {k: getattr(row, k) for k in ("trip_id", "segment_id", "match", "distance_km", "decided_by", "hidden", "latitude", "longitude", "location_source")}
+        if row is None:
+            return None
+        return {k: getattr(row, k) for k in ("trip_id", "segment_id", "match", "distance_km", "decided_by", "latitude", "longitude", "location_source")}
 
 
 class PhotoRoutes(RouteCase):
@@ -71,15 +77,20 @@ class PhotoRoutes(RouteCase):
         self.stay = self.book("ana", HOTEL, trip_id=self.trip)
         self.ana = self.source("ana")
         self.ben = self.source("ben")
+        self.share("ana", self.trip)
+        self.share("ben", self.trip)
 
     def keep(self, row):
         with db.session() as conn:
             conn.orm.add(row)
             conn.orm.flush()
-            return row.id
+            return getattr(row, "id", None)
 
     def source(self, who):
         return self.keep(source_row(self.person[who], f"sub-{who}"))
+
+    def share(self, who, trip, scope="trip", revoked=None):
+        self.keep(grant_row(self.person[who], trip, scope, revoked, f"sub-{who}"))
 
     def photo(self, source, trip, local, zone=LONDON, **fields):
         return self.keep(photo_row(source, trip, local, zone, **fields))
@@ -87,8 +98,16 @@ class PhotoRoutes(RouteCase):
     def listing(self, who, trip=None):
         return self.ok(who, "GET", f"/api/trips/{self.trip if trip is None else trip}/photos")
 
-    def own_trip(self, who, name="Later"):
-        return self.ok(who, "POST", "/api/trips", {"name": name, "people": [self.person[who]]})["id"]
+    def own_trip(self, who, name="Later", shared=True):
+        trip = self.ok(who, "POST", "/api/trips", {"name": name, "people": [self.person[who]]})["id"]
+        if shared:
+            self.share(who, trip)
+        return trip
+
+    def later(self, who="ana", **fields):
+        seg = self.book(who, {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10", **fields}, travelers=[{"person_id": self.person[who]}])
+        self.share(who, seg["trip_id"])
+        return seg
 
     def test_members_on_the_trip_get_every_librarys_photos_and_a_stranger_the_missing_trips_404(self):
         mine = self.photo(self.ana, self.trip, "2026-06-02T10:00", where=SOHO, segment_id=self.stay["id"], distance=1.2)
@@ -96,14 +115,14 @@ class PhotoRoutes(RouteCase):
         for who in ("ana", "ben"):
             got = self.listing(who)
             self.assertEqual([p["id"] for p in got["photos"]], [theirs, mine], who)
-            self.assertEqual(got["counts"], {"total": 2, "located": 1, "inferred": 0, "far": 0, "hidden": 0})
+            self.assertEqual(got["counts"], {"total": 2, "located": 1, "inferred": 0, "far": 0})
             self.assertEqual(got["people"], [{"person_id": self.person["ana"], "count": 1}, {"person_id": self.person["ben"], "count": 1}])
             self.assertEqual(got["clusters"], [{"latitude": SOHO[0], "longitude": SOHO[1], "count": 1, "first": "2026-06-02T10:00", "last": "2026-06-02T10:00",
                                                 "cover": mine, "inferred": False}])
             self.assertEqual([p["cluster"] for p in got["photos"]], [None, 0])
         self.assertEqual(got["photos"][1], {"id": mine, "person_id": self.person["ana"], "trip_id": self.trip, "kind": "image", "taken_local": "2026-06-02T10:00", "zone": LONDON,
                                             "latitude": SOHO[0], "longitude": SOHO[1], "location_source": "exif", "segment_id": self.stay["id"],
-                                            "match": "place", "distance_km": 1.2, "cluster": 0, "hidden": False})
+                                            "match": "place", "distance_km": 1.2, "cluster": 0})
         stranger = self.call("cy", "GET", f"/api/trips/{self.trip}/photos")
         self.assertEqual(stranger, (404, {"error": "No such trip"}))
         self.assertEqual(self.call("ana", "GET", "/api/trips/99999/photos"), stranger)
@@ -111,21 +130,11 @@ class PhotoRoutes(RouteCase):
 
     def test_whoever_booked_a_segment_of_the_trip_gets_its_photos_too(self):
         booked = self.book("ana", {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, travelers=[{"person_id": self.person["ben"]}])
+        self.share("ben", booked["trip_id"])
         only = self.photo(self.ben, booked["trip_id"], "2026-09-02T09:00", segment_id=booked["id"])
         self.assertEqual([p["id"] for p in self.listing("ana", booked["trip_id"])["photos"]], [only])
         self.assertEqual([p["id"] for p in self.listing("ben", booked["trip_id"])["photos"]], [only])
         self.assertEqual(self.call("cy", "GET", f"/api/trips/{booked['trip_id']}/photos")[0], 404)
-
-    def test_a_hidden_photo_is_seen_by_its_librarys_person_alone(self):
-        shown = self.photo(self.ana, self.trip, "2026-06-02T10:00", where=SOHO)
-        hidden = self.photo(self.ana, self.trip, "2026-06-02T11:00", where=SOHO, hidden=True)
-        got = self.listing("ana")
-        self.assertEqual([(p["id"], p["hidden"]) for p in got["photos"]], [(shown, False), (hidden, True)])
-        self.assertEqual((got["counts"]["total"], got["counts"]["hidden"], got["clusters"][0]["count"]), (2, 1, 2))
-        got = self.listing("ben")
-        self.assertEqual([(p["id"], p["hidden"]) for p in got["photos"]], [(shown, False)])
-        self.assertEqual((got["counts"]["total"], got["counts"]["hidden"], got["clusters"][0]["count"]), (1, 0, 1))
-        self.assertEqual(got["people"], [{"person_id": self.person["ana"], "count": 1}])
 
     def test_ambiguous_home_and_unmatched_rows_never_show_on_a_trip(self):
         for match in ("ambiguous", "home", "none"):
@@ -134,7 +143,7 @@ class PhotoRoutes(RouteCase):
         timed = self.photo(self.ben, self.trip, "2026-06-04T10:00", match="time")
         got = self.listing("ana")
         self.assertEqual([(p["id"], p["match"]) for p in got["photos"]], [(far, "far"), (timed, "time")])
-        self.assertEqual(got["counts"], {"total": 2, "located": 1, "inferred": 0, "far": 1, "hidden": 0})
+        self.assertEqual(got["counts"], {"total": 2, "located": 1, "inferred": 0, "far": 1})
 
     def test_the_zone_label_comes_with_the_photo_or_else_from_its_booking(self):
         cases = [(self.photo(self.ana, self.trip, "2026-06-02T03:00", offset=-420), "UTC−07:00"),
@@ -252,49 +261,58 @@ class PhotoRoutes(RouteCase):
         self.assertEqual([p["count"] for p in got["people"]], [1, 1])
         self.assertEqual(got["clusters"][0]["count"], 2)
 
-    def test_decide_refuses_another_persons_photo_and_a_trip_they_are_not_on(self):
+    def test_decide_refuses_another_persons_photo_and_a_trip_they_are_not_on_or_have_not_shared(self):
         mine = self.photo(self.ana, self.trip, "2026-06-02T10:00", where=SOHO)
-        self.assertEqual(self.call("ben", "POST", f"/api/photos/{mine}", {"hidden": True}), (404, {"error": "No such photo"}))
+        self.assertEqual(self.call("ben", "POST", f"/api/photos/{mine}", {"excluded": True}), (404, {"error": "No such photo"}))
         self.assertEqual(self.call("ben", "POST", f"/api/photos/{mine}", {"trip_id": self.trip}), (404, {"error": "No such photo"}))
-        self.assertEqual(self.call("ana", "POST", "/api/photos/99999", {"hidden": True}), (404, {"error": "No such photo"}))
-        self.assertEqual(self.call("ana", "POST", "/api/photos/abc", {"hidden": True}), (404, {"error": "No such photo"}))
+        self.assertEqual(self.call("ana", "POST", "/api/photos/99999", {"trip_id": self.trip}), (404, {"error": "No such photo"}))
+        self.assertEqual(self.call("ana", "POST", "/api/photos/abc", {"trip_id": self.trip}), (404, {"error": "No such photo"}))
         cys = self.book("cy", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"})
         booked_for_ben = self.book("ana", {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, travelers=[{"person_id": self.person["ben"]}])
         self.assertEqual(self.ok("ana", "GET", f"/api/trips/{booked_for_ben['trip_id']}")["people"], [self.person["ben"]])
         for trip in (cys["trip_id"], booked_for_ben["trip_id"], 99999):
             self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"trip_id": trip}), (400, {"error": "Choose a trip you are on"}), trip)
+        unshared = self.own_trip("ana", "Unshared", shared=False)
+        self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"trip_id": unshared}), (400, {"error": "Share your photos on that trip first"}))
+        self.share("ana", unshared, revoked=5.0)
+        self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"trip_id": unshared}), (400, {"error": "Share your photos on that trip first"}))
         for odd in ("abc", True, 1.5, 0, [1]):
             self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"trip_id": odd})[0], 400, odd)
         self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"trip_id": "abc"}), (400, {"error": "The trip must be a whole number"}))
-        self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"hidden": "yes"}), (400, {"error": 'Send "hidden" as true or false'}))
-        self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {})[0], 400)
-        self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"trip_id": None, "hidden": None})[0], 400)
-        self.assertEqual(stored(mine)["trip_id"], self.trip)
-        self.assertEqual((stored(mine)["decided_by"], stored(mine)["hidden"]), (None, False))
+        self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"excluded": "yes"}), (400, {"error": 'Send "excluded" as true or false'}))
+        self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"excluded": True}), (400, {"error": "Only a photo waiting under Needs a look can be left off"}))
+        for body in ({}, {"trip_id": None, "excluded": None}, {"trip_id": None, "excluded": False}, {"hidden": True}, {"trip_id": self.trip, "hidden": False}):
+            self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", body), (400, {"error": 'Send "trip_id" to put the photo on a trip, or "excluded" to leave it off'}), body)
+        self.assertEqual((stored(mine)["trip_id"], stored(mine)["decided_by"]), (self.trip, None))
 
     def test_the_owner_places_a_photo_and_the_row_remembers_it_was_their_choice(self):
-        later = self.book("ana", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"}, travelers=[{"person_id": self.person["ana"]}])
+        later = self.later()
         unsettled = self.photo(self.ana, None, "2027-01-02T09:00", where=SOHO, match="ambiguous")
         got = self.ok("ana", "POST", f"/api/photos/{unsettled}", {"trip_id": later["trip_id"]})
-        self.assertEqual((got["trip_id"], got["match"], got["segment_id"], got["zone"], got["hidden"], got["cluster"]), (later["trip_id"], "place", later["id"], LONDON, False, None))
+        self.assertEqual((got["trip_id"], got["match"], got["segment_id"], got["zone"], got["cluster"]), (later["trip_id"], "place", later["id"], LONDON, None))
         self.assertAlmostEqual(got["distance_km"], 23.0, delta=1.5)
         self.assertEqual([p["id"] for p in self.listing("ana", later["trip_id"])["photos"]], [unsettled])
         self.assertEqual(self.listing("ana")["photos"], [])
         row = stored(unsettled)
         self.assertEqual((row["trip_id"], row["decided_by"], row["match"], row["location_source"]), (later["trip_id"], "owner", "place", "exif"))
         self.assertEqual((row["latitude"], row["longitude"]), SOHO)
-        hidden = self.ok("ana", "POST", f"/api/photos/{unsettled}", {"hidden": True})
-        self.assertEqual((hidden["hidden"], hidden["match"]), (True, "place"))
-        self.assertEqual((stored(unsettled)["decided_by"], stored(unsettled)["hidden"]), ("owner", True))
-        self.assertEqual([p["hidden"] for p in self.listing("ana", later["trip_id"])["photos"]], [True])
-        shown = self.ok("ana", "POST", f"/api/photos/{unsettled}", {"hidden": False})
-        self.assertEqual(shown["hidden"], False)
 
-    def test_hiding_alone_leaves_the_match_to_the_sync(self):
-        auto = self.photo(self.ana, self.trip, "2026-06-02T10:00", where=SOHO, decided="auto")
-        got = self.ok("ana", "POST", f"/api/photos/{auto}", {"trip_id": None, "hidden": True})
-        self.assertEqual((got["hidden"], got["match"], got["segment_id"]), (True, "place", None))
-        self.assertEqual((stored(auto)["decided_by"], stored(auto)["hidden"], stored(auto)["trip_id"]), ("auto", True, self.trip))
+    def test_an_unsettled_photo_can_be_left_off_every_trip_it_could_join(self):
+        week = self.own_trip("ana", "Week")
+        self.book("ana", {**HOTEL, "start_local": "2026-06-03T15:00", "end_local": "2026-06-05T10:00"}, trip_id=week)
+        torn = self.photo(self.ana, None, "2026-06-04T12:00", match="ambiguous", where=SOHO)
+        self.assertEqual([c["id"] for c in self.ok("ana", "GET", "/api/photos/review")["photos"][0]["candidates"]], [self.trip, week])
+        got = self.ok("ana", "POST", f"/api/photos/{torn}", {"excluded": True})
+        self.assertEqual((got["trip_id"], got["match"]), (None, "ambiguous"))
+        self.assertEqual(self.ok("ana", "GET", "/api/photos/review")["photos"], [])
+        for trip in (self.trip, week):
+            self.assertEqual([p["id"] for p in self.ok("ana", "GET", f"/api/trips/{trip}/photo-sharing")["removed"]], [torn], trip)
+            self.assertEqual(self.listing("ana", trip)["photos"], [])
+        self.assertEqual(self.call("ana", "POST", f"/api/photos/{torn}", {"excluded": True}), (404, {"error": "No such photo"}))
+        self.assertEqual(self.call("ana", "POST", f"/api/photos/{torn}", {"trip_id": week}), (404, {"error": "No such photo"}))
+        self.ok("ana", "DELETE", f"/api/trips/{week}/photo-exclusions/{torn}")
+        self.assertEqual([p["id"] for p in self.listing("ana", week)["photos"]], [torn])
+        self.assertEqual(stored(torn)["decided_by"], "auto")
 
     def test_a_far_photo_the_owner_accepts_stays_flagged_but_leaves_needs_a_look(self):
         far = self.photo(self.ana, self.trip, "2026-06-03T10:00", match="far", where=ROME, segment_id=self.stay["id"], distance=1400.0)
@@ -307,7 +325,7 @@ class PhotoRoutes(RouteCase):
         self.assertEqual(stored(far)["decided_by"], "owner")
 
     def test_a_photo_without_gps_is_placed_from_the_itinerary_of_the_trip_it_moves_to(self):
-        later = self.book("ana", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"}, travelers=[{"person_id": self.person["ana"]}])
+        later = self.later()
         guessed = self.photo(self.ana, self.trip, "2027-01-02T12:00", where=SOHO, located="inferred", segment_id=self.stay["id"], match="time")
         got = self.ok("ana", "POST", f"/api/photos/{guessed}", {"trip_id": later["trip_id"]})
         self.assertEqual((got["match"], got["segment_id"], got["location_source"], got["distance_km"], got["zone"]), ("time", later["id"], "inferred", None, LONDON))
@@ -323,7 +341,7 @@ class PhotoRoutes(RouteCase):
         self.assertEqual((got["match"], got["segment_id"], got["location_source"]), ("time", later["id"], "inferred"))
 
     def test_moving_to_a_trip_whose_bookings_are_all_cancelled_keeps_the_time_match(self):
-        later = self.book("ana", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"}, travelers=[{"person_id": self.person["ana"]}])
+        later = self.later()
         self.ok("ana", "POST", f"/api/segments/{later['id']}", {"status": "cancelled"})
         mine = self.photo(self.ana, self.trip, "2027-01-02T09:00", where=SOHO, segment_id=self.stay["id"], distance=1.0)
         got = self.ok("ana", "POST", f"/api/photos/{mine}", {"trip_id": later["trip_id"]})
@@ -356,9 +374,12 @@ class PhotoRoutes(RouteCase):
         mine = self.photo(self.ana, self.trip, "2026-06-02T10:00", where=SOHO, segment_id=self.stay["id"])
         torn = self.photo(self.ana, None, "2026-06-04T12:00", match="ambiguous")
         with no_leaks(self, ASSET, URL, KEY, "immich-user-1"):
-            replies = [self.listing("ana"), self.ok("ana", "GET", "/api/photos/review"), self.ok("ana", "POST", f"/api/photos/{mine}", {"hidden": True}),
-                       self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": self.trip}), self.call("ben", "POST", f"/api/photos/{mine}", {"hidden": False})[1],
-                       self.call("cy", "GET", f"/api/trips/{self.trip}/photos")[1]]
+            replies = [self.listing("ana"), self.ok("ana", "GET", "/api/photos/review"), self.ok("ana", "POST", f"/api/photos/{mine}", {"trip_id": self.trip}),
+                       self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": self.trip}), self.call("ben", "POST", f"/api/photos/{mine}", {"trip_id": self.trip})[1],
+                       self.call("cy", "GET", f"/api/trips/{self.trip}/photos")[1], self.ok("ana", "GET", f"/api/trips/{self.trip}/photo-sharing"),
+                       self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-exclusions", {"photo_ids": [mine]}), self.ok("ana", "GET", "/api/photo-grants"),
+                       self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-exclusions/{mine}"), self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-sharing"),
+                       self.ok("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {"share_all": True})]
         text = json.dumps(replies)
         for canary in (ASSET, URL, KEY, "immich-user-1", "asset", "api_key", "source_id"):
             self.assertNotIn(canary, text, canary)
@@ -366,7 +387,7 @@ class PhotoRoutes(RouteCase):
     def test_assistants_never_reach_the_photo_routes(self):
         for pattern in ROUTES:
             self.assertTrue(mcp_access.blocked(pattern), pattern)
-            for method in ("GET", "POST"):
+            for method in ("GET", "POST", "DELETE"):
                 self.assertIsNone(mcp_http.needs(method, pattern), f"{method} {pattern}")
 
 
@@ -378,7 +399,8 @@ class PhotoViewers(Household):
         self.trip = self.flight["trip_id"]
         self.sams = self.add(self.sam, {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, None, self.on(self.sid))
         self.household = Viewer(None, household=True)
-        self.c.orm.add_all([source_row(self.jid, "u-jane"), source_row(self.sid, "u-sam")])
+        self.c.orm.add_all([source_row(self.jid, "u-jane"), source_row(self.sid, "u-sam"), grant_row(self.jid, self.trip, by="u-jane"),
+                            grant_row(self.sid, self.sams["trip_id"], by="u-sam")])
         self.c.orm.flush()
         self.janes, self.sams_source = [s.id for s in self.c.orm.scalars(select(PhotoSource).order_by(PhotoSource.id)).all()]
 
@@ -393,29 +415,25 @@ class PhotoViewers(Household):
         nobody = Viewer(None)
         self.assertIsNone(photos.for_trip(self.c, nobody, self.trip))
         self.assertEqual(photos.needs_a_look(self.c, nobody), {"photos": []})
-        self.assertIsNone(photos.decide(self.c, nobody, mine, None, True))
-        self.assertFalse(stored_hidden(self.c, mine))
+        self.assertIsNone(photos.decide(self.c, nobody, mine, self.trip, None))
+        self.assertEqual(stored_decided(self.c, mine), None)
 
-    def test_without_sign_in_the_household_stands_for_every_library(self):
-        hidden = self.photo(self.janes, self.trip, "2026-06-02T10:00", where=SOHO, hidden=True)
+    def test_without_sign_in_photos_are_off(self):
+        mine = self.photo(self.janes, self.trip, "2026-06-02T10:00", where=SOHO)
         torn = self.photo(self.sams_source, None, "2026-09-02T12:00", match="ambiguous")
-        self.assertEqual([(p["id"], p["hidden"]) for p in photos.for_trip(self.c, self.household, self.trip)["photos"]], [(hidden, True)])
-        self.assertEqual([p["id"] for p in photos.needs_a_look(self.c, self.household)["photos"]], [torn])
-        self.assertEqual(photos.needs_a_look(self.c, self.household)["photos"][0]["candidates"], [{"id": self.sams["trip_id"], "name": trips.get(self.c, self.sam, self.sams["trip_id"])["name"]}])
-        with self.assertRaises(trips.Invalid) as refused:
-            photos.decide(self.c, self.household, torn, self.trip, None)
-        self.assertEqual(str(refused.exception), photos.NOT_ON_TRIP)
-        placed = photos.decide(self.c, self.household, torn, self.sams["trip_id"], None)
-        self.assertEqual((placed["match"], placed["segment_id"]), ("time", self.sams["id"]))
+        self.assertIsNone(photos.for_trip(self.c, self.household, self.trip))
         self.assertEqual(photos.needs_a_look(self.c, self.household), {"photos": []})
+        self.assertIsNone(photos.decide(self.c, self.household, torn, self.sams["trip_id"], None))
+        self.assertIsNone(photos.decide(self.c, self.household, mine, self.trip, None))
+        self.assertEqual((stored_decided(self.c, mine), stored_decided(self.c, torn)), (None, None))
 
     def test_a_person_decides_only_their_own_librarys_photos(self):
         hers = self.photo(self.janes, self.trip, "2026-06-02T10:00", where=SOHO)
-        self.assertIsNone(photos.decide(self.c, self.sam, hers, None, True))
+        self.assertIsNone(photos.decide(self.c, self.sam, hers, self.trip, None))
         self.assertEqual(photos.needs_a_look(self.c, self.sam), {"photos": []})
         self.assertIsNone(photos.for_trip(self.c, self.sam, self.trip))
-        got = photos.decide(self.c, self.jane, hers, None, True)
-        self.assertEqual((got["id"], got["hidden"]), (hers, True))
+        got = photos.decide(self.c, self.jane, hers, self.trip, None)
+        self.assertEqual((got["id"], got["trip_id"], stored_decided(self.c, hers)), (hers, self.trip, "owner"))
 
     def test_the_offset_label_reads_as_utc_plus_or_minus(self):
         self.assertEqual([photos.offset_label(m) for m in (0, 60, -60, 330, -570, 765, -720)],
@@ -426,10 +444,10 @@ class PhotoViewers(Household):
             self.assertEqual(photos.instant(text).isoformat(), "2026-06-02T09:00:00+00:00", text)
 
 
-def stored_hidden(conn, photo_id):
+def stored_decided(conn, photo_id):
     row = conn.orm.get(Photo, photo_id)
     assert row is not None
-    return row.hidden
+    return row.decided_by
 
 
 if __name__ == "__main__":

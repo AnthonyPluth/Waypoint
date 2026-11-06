@@ -8,7 +8,7 @@ from sqlalchemy import delete, select, update
 
 from ..storage import db
 from ..storage.models import LoyaltyId, Person, Segment, SegmentRecipient, SegmentTraveler, Trip, TripPerson
-from . import visibility
+from . import photogrants, visibility
 
 
 class Fields(TypedDict):
@@ -210,6 +210,7 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
     me.links = json.dumps([*decode_links(me.links), {"guest": guest.display_name, "by": me.display_name, "on": today}],
                           ensure_ascii=False)
     conn.orm.flush()
+    photogrants.claim(conn, guest_id, member_id, me.user_sub)
     conn.execute(delete(Person).where(Person.id == guest_id, Person.user_sub.is_(None)))
     conn.orm.expire_all()
     return listed(me)

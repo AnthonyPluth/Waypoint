@@ -905,6 +905,292 @@
         }
       }
     },
+    "/api/trips/{id}/photo-sharing": {
+      "get": {
+        "operationId": "api_photo_sharing",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_sharing",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSharing"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_photo_sharing_set",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_sharing_set",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoSharingBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSharing"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "api_photo_sharing_stop",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_sharing_stop",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSharing"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/photo-exclusions": {
+      "post": {
+        "operationId": "api_photo_exclude",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_exclude",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoExclusionsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSharing"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/photo-exclusions/{id2}": {
+      "delete": {
+        "operationId": "api_photo_put_back",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_put_back",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id2",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSharing"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/photo-grants": {
+      "get": {
+        "operationId": "api_photo_grants",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_grants",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoGrants"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/photo-sharing-prefs/{id}": {
+      "post": {
+        "operationId": "api_photo_prefs_set",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_prefs_set",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoPrefsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoPrefs"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/segments": {
       "post": {
         "operationId": "api_segment_add",
@@ -5775,7 +6061,7 @@
               "null"
             ]
           },
-          "hidden": {
+          "excluded": {
             "type": "boolean"
           }
         },
@@ -5848,17 +6134,119 @@
           },
           "far": {
             "type": "integer"
-          },
-          "hidden": {
-            "type": "integer"
           }
         },
         "required": [
           "total",
           "located",
           "inferred",
-          "far",
-          "hidden"
+          "far"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoExclusionsBody": {
+        "type": "object",
+        "properties": {
+          "photo_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": [
+          "photo_ids"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoGrantPerson": {
+        "type": "object",
+        "properties": {
+          "person_id": {
+            "type": "integer"
+          },
+          "prefs": {
+            "$ref": "#/components/schemas/PhotoPrefs"
+          },
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoGrantTrip"
+            }
+          }
+        },
+        "required": [
+          "person_id",
+          "prefs",
+          "trips"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoGrantTrip": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "enum": [
+              "shared",
+              "declined"
+            ]
+          },
+          "scope": {
+            "enum": [
+              "only_me",
+              "trip",
+              null
+            ]
+          },
+          "count": {
+            "type": "integer"
+          },
+          "removed_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "trip_id",
+          "name",
+          "start_date",
+          "end_date",
+          "state",
+          "scope",
+          "count",
+          "removed_count"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoGrants": {
+        "type": "object",
+        "properties": {
+          "people": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoGrantPerson"
+            }
+          }
+        },
+        "required": [
+          "people"
         ],
         "additionalProperties": false
       },
@@ -5878,6 +6266,41 @@
         ],
         "additionalProperties": false
       },
+      "PhotoPrefs": {
+        "type": "object",
+        "properties": {
+          "default_scope": {
+            "enum": [
+              "only_me",
+              "trip"
+            ]
+          },
+          "share_all": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "default_scope",
+          "share_all"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoPrefsBody": {
+        "type": "object",
+        "properties": {
+          "default_scope": {
+            "enum": [
+              "only_me",
+              "trip"
+            ]
+          },
+          "share_all": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
       "PhotoReview": {
         "type": "object",
         "properties": {
@@ -5891,6 +6314,65 @@
         "required": [
           "photos"
         ],
+        "additionalProperties": false
+      },
+      "PhotoSharing": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "enum": [
+              "shared",
+              "declined",
+              "ask",
+              "none"
+            ]
+          },
+          "scope": {
+            "enum": [
+              "only_me",
+              "trip",
+              null
+            ]
+          },
+          "count": {
+            "type": "integer"
+          },
+          "removed_count": {
+            "type": "integer"
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripPhoto"
+            }
+          }
+        },
+        "required": [
+          "state",
+          "scope",
+          "count",
+          "removed_count",
+          "removed"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoSharingBody": {
+        "type": "object",
+        "properties": {
+          "person_id": {
+            "type": "integer"
+          },
+          "scope": {
+            "enum": [
+              "only_me",
+              "trip"
+            ]
+          },
+          "declined": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
         "additionalProperties": false
       },
       "Port": {
@@ -6569,9 +7051,6 @@
               "null"
             ]
           },
-          "hidden": {
-            "type": "boolean"
-          },
           "candidates": {
             "type": "array",
             "items": {
@@ -6593,7 +7072,6 @@
           "match",
           "distance_km",
           "cluster",
-          "hidden",
           "candidates"
         ],
         "additionalProperties": false
@@ -8549,9 +9027,6 @@
               "integer",
               "null"
             ]
-          },
-          "hidden": {
-            "type": "boolean"
           }
         },
         "required": [
@@ -8567,8 +9042,7 @@
           "segment_id",
           "match",
           "distance_km",
-          "cluster",
-          "hidden"
+          "cluster"
         ],
         "additionalProperties": false
       },
