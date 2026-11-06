@@ -39,6 +39,7 @@ MARKERS = "/api/map/markers"
 ASSETS = "/api/assets/"
 
 PAGE_SIZE = 1000
+LAST_PAGE = None
 SEARCH_FILTERS: dict[str, Any] = {"withExif": True, "visibility": "timeline", "order": "asc", "size": PAGE_SIZE}
 MARKER_FILTERS = {"isArchived": "false", "withPartners": "false", "withSharedAlbums": "false"}
 KINDS: dict[str, Literal["image", "video"]] = {"IMAGE": "image", "VIDEO": "video"}
@@ -234,22 +235,36 @@ def _open(source: Source, req: urllib.request.Request, timeout: float) -> Any | 
     raise _failure(code, wait)
 
 
+def _wait_at_most(response: Any, seconds: float) -> None:
+    sock = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
+    settimeout = getattr(sock, "settimeout", None)
+    if callable(settimeout):
+        settimeout(seconds)
+
+
 def _read(response: Any, cap: int, seconds: float) -> bytes:
-    began = time.monotonic()
+    deadline = time.monotonic() + seconds
     declared = response.headers.get("Content-Length") or ""
     if DIGITS.fullmatch(declared) and int(declared) > cap:
         raise Unavailable(TOO_LARGE)
     data = bytearray()
     problem = None
     try:
-        while chunk := response.read(CHUNK):
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                problem = TOO_SLOW
+                break
+            _wait_at_most(response, remaining)
+            chunk = response.read1(CHUNK)
+            if not chunk:
+                break
             data += chunk
             if len(data) > cap:
                 problem = TOO_LARGE
                 break
-            if time.monotonic() - began > seconds:
-                problem = TOO_SLOW
-                break
+    except TimeoutError:
+        problem = TOO_SLOW
     except tls.NETWORK_ERRORS:
         problem = UNREACHABLE
     if problem is not None:
@@ -359,19 +374,17 @@ def parse_asset(item: Any, owner: str) -> Asset | None:
 
 
 def next_page(value: Any, page: int) -> int | None:
-    if isinstance(value, str) and DIGITS.fullmatch(value):
-        number = int(value)
-    elif isinstance(value, int) and not isinstance(value, bool):
-        number = value
-    else:
+    if value is LAST_PAGE:
         return None
-    return number if number > page else None
+    if isinstance(value, str) and DIGITS.fullmatch(value) and int(value) == page + 1:
+        return page + 1
+    raise Unavailable(UNREADABLE)
 
 
 def parse_page(body: Any, page: int, owner: str) -> Page:
     assets = body.get("assets") if isinstance(body, dict) else None
     items = assets.get("items") if isinstance(assets, dict) else None
-    if not isinstance(assets, dict) or not isinstance(items, list):
+    if not isinstance(assets, dict) or not isinstance(items, list) or "nextPage" not in assets:
         raise Unavailable(UNREADABLE)
     found = tuple(a for item in items if (a := parse_asset(item, owner)))
     return Page(assets=found, next_page=next_page(assets.get("nextPage"), page))

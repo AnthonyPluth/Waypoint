@@ -53,7 +53,17 @@ class FakeImmich(ThreadingHTTPServer):
                 if "Content-Length" not in headers and not headers.get("_no_length"):
                     self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(body)
+                pause = float(headers.get("_trickle") or 0)
+                if not pause:
+                    self.wfile.write(body)
+                    return
+                for i in range(len(body)):
+                    try:
+                        self.wfile.write(body[i:i + 1])
+                        self.wfile.flush()
+                    except OSError:
+                        return
+                    time.sleep(pause)
 
             do_GET = answer
             do_POST = answer
@@ -252,10 +262,21 @@ class ParseTests(unittest.TestCase):
                 self.assertEqual(immich.zone_offset(name, at), offset)
 
     def test_next_page(self):
-        for value, page, expected in (("2", 1, 2), (3, 2, 3), (None, 1, None), ("", 1, None), ("next", 1, None), ("1", 1, None),
-                                      ("0", 1, None), (1, 4, None), (True, 0, None), ("-2", 1, None), (2.0, 1, None)):
+        for value, page, expected in (("2", 1, 2), ("5", 4, 5), (None, 1, None), (None, 7, None)):
             with self.subTest(value=value, page=page):
                 self.assertEqual(immich.next_page(value, page), expected)
+
+    def test_pagination_that_does_not_advance_by_one_is_unreadable(self):
+        for value, page in (("", 1), ("next", 1), ("1", 1), ("0", 1), ("3", 1), ("-2", 1), (" 2", 1), (2, 1), (3, 2), (True, 0),
+                            (2.0, 1), ([], 1), ({}, 1)):
+            with self.subTest(value=value, page=page), self.assertRaises(immich.Unavailable) as e:
+                immich.next_page(value, page)
+            self.assertEqual(str(e.exception), immich.UNREADABLE)
+
+    def test_a_page_without_next_page_is_unreadable_not_the_last(self):
+        with self.assertRaises(immich.Unavailable) as e:
+            immich.parse_page({"assets": {"items": []}}, 1, OWNER)
+        self.assertEqual(str(e.exception), immich.UNREADABLE)
 
     def test_an_empty_last_page(self):
         self.assertEqual(immich.parse_page({"assets": {"items": [], "nextPage": None}}, 3, OWNER), immich.Page(assets=(), next_page=None))
@@ -410,21 +431,43 @@ class RequestTests(unittest.TestCase):
         with self.assertRaises(immich.Unavailable) as e:
             immich._read(response, immich.CAPS["thumbnail"], 5)
         self.assertEqual(str(e.exception), immich.TOO_LARGE)
-        response.read.assert_not_called()
+        response.read1.assert_not_called()
 
     def test_a_body_that_takes_too_long_is_refused(self):
         response = mock.Mock()
         response.headers = {}
-        response.read.side_effect = [b"x" * 10] * 5 + [b""]
+        response.read1.side_effect = [b"x" * 10] * 5 + [b""]
         clock = iter([0.0, 1.0, 2.0, 30.0, 31.0])
         with mock.patch.object(immich.time, "monotonic", lambda: next(clock)), self.assertRaises(immich.Unavailable) as e:
             immich._read(response, 1000, immich.IMAGE_SECONDS)
         self.assertEqual(str(e.exception), immich.TOO_SLOW)
 
+    def _slow(self, call):
+        began = time.monotonic()
+        with self.assertRaises(immich.Unavailable) as e:
+            call()
+        self.assertEqual(str(e.exception), immich.TOO_SLOW)
+        self.assertLess(time.monotonic() - began, 2.0)
+
+    def test_a_thumbnail_that_trickles_stops_at_its_budget(self):
+        self.fake.routes[f"/api/assets/{ASSET}/thumbnail"] = (200, {"_trickle": "0.02"}, JPEG + b"\x00" * 400)
+        with mock.patch.object(immich, "IMAGE_SECONDS", 0.5):
+            self._slow(lambda: immich.thumbnail(self.fake.source, ASSET, "thumbnail"))
+
+    def test_a_thumbnail_that_stalls_part_way_stops_at_its_budget(self):
+        self.fake.routes[f"/api/assets/{ASSET}/thumbnail"] = (200, {"_trickle": "4"}, JPEG[:2])
+        with mock.patch.object(immich, "IMAGE_SECONDS", 0.5):
+            self._slow(lambda: immich.thumbnail(self.fake.source, ASSET, "thumbnail"))
+
+    def test_a_search_reply_that_trickles_stops_at_its_budget(self):
+        self.fake.routes["/api/search/metadata"] = (200, {**JSON_HEADERS, "_trickle": "0.02"}, b'{"assets": {"items": [], "nextPage": null}}' + b" " * 400)
+        with mock.patch.object(immich, "JSON_SECONDS", 0.5):
+            self._slow(lambda: immich.search(self.fake.source, AFTER, BEFORE))
+
     def test_a_connection_cut_while_reading_is_unreachable(self):
         response = mock.Mock()
         response.headers = {}
-        response.read.side_effect = [b"x", ConnectionResetError(f"reset by {KEY}")]
+        response.read1.side_effect = [b"x", ConnectionResetError(f"reset by {KEY}")]
         with self.assertRaises(immich.Unavailable) as e:
             immich._read(response, 1000, 5)
         self.assertEqual(str(e.exception), immich.UNREACHABLE)
