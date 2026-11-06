@@ -354,19 +354,18 @@ class MigrationTests(unittest.TestCase):
                     (6, 3, "stopped", 1), (7, 3, "ok", 3), (8, 3, "ungranted", 2), (9, 3, "left", 4), (10, 1, "members_only", 5)]
             conn.execute(insert(schema.photos), [{"id": id, "source_id": source, "asset_id": asset, "asset_updated": "t", "kind": "image", "taken_utc": "2026-01-01T00:00:00Z",
                                                   "taken_local": "2026-01-01T00:00", "trip_id": trip, "match": "time", "seen": 1.0} for id, source, asset, trip in rows])
+            conn.execute(insert(schema.photo_trip_syncs).values(source_id=1, trip_id=1, window_start="a", window_end="b"))
         with migrating(self.path) as c:
             command.downgrade(db.alembic_config(c), "0038")
         self.assertFalse({"photo_grants", "photo_exclusions", "photo_sharing_prefs"} & set(shape(self.path)))
         self.assertEqual(shape(self.path)["photo_sources"]["uniques"], [("uq_photo_sources_person_url", ("person_id", "url"))])
         self.assertEqual([r[0] for r in rows_of(self.path, "photo_sources") if r[3] == "https://two-accounts.example"], [8])
-        columns = [col[0] for col in shape(self.path)["photos"]["columns"]]
-        self.assertIn("hidden", columns)
-        kept = {r[columns.index("asset_id")]: bool(r[columns.index("hidden")]) for r in rows_of(self.path, "photos")}
-        self.assertEqual(kept, {"shown": True, "elsewhere": True, "mine": True, "ok": False, "members_only": False})
+        self.assertIn("hidden", [col[0] for col in shape(self.path)["photos"]["columns"]])
+        self.assertEqual((rows_of(self.path, "photos"), rows_of(self.path, "photo_trip_syncs")), ([], []))
         with migrating(self.path) as c:
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
-        self.assertEqual([r[:3] for r in rows_of(self.path, "photo_exclusions")], [(1, "elsewhere", 1), (1, "mine", 2), (1, "shown", 1)])
+        self.assertEqual(rows_of(self.path, "photo_exclusions"), [])
 
     def test_0040_pages_photo_syncs_by_capture_time_and_restarts_a_traversal_in_progress(self):
         from alembic import command

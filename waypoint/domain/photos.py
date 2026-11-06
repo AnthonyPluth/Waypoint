@@ -298,6 +298,12 @@ def trip_window(conn: db.Connection, trip_id: int) -> TripWindow | None:
     return window(trip, [p for s in live for p in placed[s.id]])
 
 
+def trip_points(conn: db.Connection, trip_id: int) -> tuple[SegmentPoint, ...]:
+    live = [s for s in conn.orm.scalars(select(Segment).where(Segment.trip_id == trip_id).order_by(Segment.id)).all() if s.status != "cancelled"]
+    placed = segment_points(conn, live)
+    return tuple(p for s in live for p in placed[s.id])
+
+
 def window_holds(conn: db.Connection, trip_id: int, photo: Photo) -> bool:
     found = trip_window(conn, trip_id)
     return found is not None and found.start <= instant(photo.taken_utc) <= found.end
@@ -690,23 +696,18 @@ def _own_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | No
     return found if found is not None and acts_for(conn, viewer, found[1]) else None
 
 
-LOCK_ROUNDS = 3
-
-
 def _settled_under_lock(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None) -> Found | None:
     found = _own_photo(conn, viewer, photo_id)
-    locked: set[int] = set()
-    for _ in range(LOCK_ROUNDS):
-        if found is None:
-            return None
-        wanted = {t for t in (found[0].trip_id, trip_id) if t is not None}
-        if wanted <= locked:
-            return found
-        locked |= wanted
-        lock_grants(conn, found[1], sorted(locked))
-        conn.orm.expire_all()
-        found = _own_photo(conn, viewer, photo_id)
-    return None
+    if found is None:
+        return None
+    person = found[1]
+    locked = granted_trips(conn, person) | {t for t in (found[0].trip_id, trip_id) if t is not None}
+    lock_grants(conn, person, sorted(locked))
+    conn.orm.expire_all()
+    found = _own_photo(conn, viewer, photo_id)
+    if found is None or (found[0].trip_id is not None and found[0].trip_id not in locked):
+        return None
+    return found
 
 
 def _same_asset(conn: db.Connection, photo: Photo, person: int) -> list[Photo]:
@@ -716,9 +717,13 @@ def _same_asset(conn: db.Connection, photo: Photo, person: int) -> list[Photo]:
 
 
 def copy_placement(conn: db.Connection, photo: Photo, person: int) -> None:
+    chosen = next((w for w in candidate_windows(conn, person) if w.trip_id == photo.trip_id), None) if photo.trip_id is not None else None
     for twin in _same_asset(conn, photo, person):
-        for field in ("trip_id", "match", "segment_id", "distance_km", "decided_by", "latitude", "longitude", "location_source"):
-            setattr(twin, field, getattr(photo, field))
+        twin.trip_id = photo.trip_id
+        if photo.decided_by == OWNER:
+            _place(twin, person, chosen)
+        else:
+            _apply(twin, photomatch.settle(_shot(twin, person), chosen) if chosen is not None else photomatch.Match(cast(MatchKind, photo.match)), chosen, AUTO)
     conn.orm.flush()
 
 
