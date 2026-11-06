@@ -330,7 +330,9 @@ class StewardTests(AccessCase):
 
     def test_needs_a_look_shows_a_steward_nothing_whose_only_trips_they_cannot_see(self):
         theirs = self.book("ben", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"}, travelers=[{"person_id": self.kid}])
+        cys = self.book("cy", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"}, travelers=[{"person_id": self.kid}])
         self.keep(grant_row(self.kid, theirs["trip_id"], "trip", by="sub-ben"))
+        self.keep(grant_row(self.kid, cys["trip_id"], "trip", by="sub-cy"))
         torn = self.keep(photo_row(self.sources["kid"], None, "2027-01-02T09:00", where=SOHO, match="ambiguous"))
         self.assertEqual(self.ok("ana", "GET", "/api/photos/review")["photos"], [])
         self.assertEqual(self.ok("ben", "GET", "/api/photos/review")["photos"], [])

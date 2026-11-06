@@ -92,6 +92,33 @@ class GrantTests(GrantCase):
             self.assertEqual(self.grant(self.jid, self.a), ("trip", 11.0, "u-jane"))
         self.assertEqual(self.c.execute(select(PhotoGrant.trip_id)).fetchall(), [(self.a,)])
 
+    def test_a_stewards_share_that_races_with_the_steward_leaving_the_trip_writes_nothing(self):
+        self.steward(self.mia, "u-jane")
+        flight = self.add(self.sam, {**OUT, "start_local": "2027-03-01T19:00", "end_local": "2027-03-02T07:10"}, None, self.on(self.sid, self.jid, self.mia))
+        theirs = flight["trip_id"]
+        trips.edit_segment(self.c, self.sam, flight["id"], {"travelers": self.on(self.sid, self.mia)})
+        self.assertIsNotNone(visibility.visible_trip(self.c, self.jane, theirs))
+        real, gone = photogrants._lock_trip, []
+
+        def steward_leaves_first(conn, trip_id):
+            if not gone:
+                gone.append(True)
+                trips.edit_trip(self.c, self.sam, theirs, {"people": [self.sid, self.mia]}, confirmed=True)
+            return real(conn, trip_id)
+        with mock.patch.object(photogrants, "_lock_trip", side_effect=steward_leaves_first):
+            self.assertIsNone(photogrants.grant(self.c, self.jane, self.mia, theirs, "trip", 13.0))
+        self.assertIsNone(self.grant(self.mia, theirs))
+        self.assertIsNone(visibility.visible_trip(self.c, self.jane, theirs))
+        gone.clear()
+        trips.edit_trip(self.c, self.sam, theirs, {"people": [self.sid, self.jid, self.mia]}, confirmed=True)
+        photogrants.set_prefs(self.c, self.jane, self.mia, "trip", True, 14.0)
+        self.assertEqual(self.grant(self.mia, theirs), ("trip", None, "u-jane"))
+        photogrants.stop(self.c, self.jane, self.mia, theirs, 15.0)
+        self.c.execute(update(PhotoGrant).where(PhotoGrant.person_id == self.mia, PhotoGrant.trip_id == theirs).values(revoked=1.0))
+        with mock.patch.object(photogrants, "_lock_trip", side_effect=steward_leaves_first):
+            self.assertFalse(photogrants.joined(self.c, self.mia, theirs, 16.0))
+        self.assertEqual(self.grant(self.mia, theirs)[1], 1.0)
+
     def test_a_first_share_that_races_with_leaving_the_trip_writes_nothing(self):
         real, removed = photogrants._lock_trip, []
 
@@ -375,6 +402,20 @@ class TripChangeTests(GrantCase):
         self.assertEqual(self.row(inside.id).trip_id, trip)
         self.assertIsNone(self.row(late.id))
 
+    def test_a_bookings_place_changing_without_the_window_re_places_automatic_rows_and_keeps_hand_placements(self):
+        flight = self.only_flight(self.jid)
+        trip = flight["trip_id"]
+        near = self.photo(trip, "2027-06-02T09:00")
+        by_hand = self.photo(trip, "2027-06-02T10:00", decided="owner")
+        self.assertEqual(photos.decide(self.c, self.jane, near.id, trip, None)["match"], "place")
+        self.c.execute(update(Photo).where(Photo.id == near.id).values(decided_by="auto"))
+        before = self.row(near.id).distance_km
+        trips.edit_segment(self.c, self.jane, flight["id"], {"destination": "CDG", "end_zone": "Europe/London"})
+        moved = self.row(near.id)
+        self.assertEqual((moved.trip_id, moved.decided_by), (trip, "auto"))
+        self.assertNotEqual(moved.distance_km, before)
+        self.assertEqual((self.row(by_hand.id).decided_by, self.row(by_hand.id).distance_km), ("owner", None))
+
     def test_someone_taken_off_a_trip_loses_their_grant_there(self):
         flight = self.only_flight(self.jid, self.sid)
         trip = flight["trip_id"]
@@ -565,13 +606,17 @@ class DecisionTests(GrantCase):
         c = trips.create_trip(self.c, self.jane, {"name": "Shortest", "people": [self.jid]})["id"]
         self.add(self.jane, {**HOTEL, "start_local": "2026-06-03T15:00", "end_local": "2026-06-04T10:00"}, c)
         self.share(self.jid, c)
-        row = photo_row(self.janes, self.b, INSIDE_B)
-        self.c.orm.add(row)
-        self.c.orm.flush()
+        row = self.photo(self.b, INSIDE_B)
         with self.stopping_first(self.b, 74.0), mock.patch.object(photos, "lock_grants", wraps=photos.lock_grants) as lock:
             got = photos.decide(self.c, self.jane, row.id, self.a, None)
         self.assertEqual((got["trip_id"], self.row(row.id).decided_by), (self.a, "owner"))
-        self.assertEqual([call.args[1:] for call in lock.call_args_list], [(self.jid, [self.a, self.b]), (self.jid, [self.b]), (self.jid, [self.a, self.b, c])])
+        self.assertEqual([call.args[1:] for call in lock.call_args_list], [(self.jid, [self.a, self.b, c]), (self.jid, [self.b])])
+        self.share(self.jid, self.b)
+        moved = self.photo(self.b, INSIDE_B)
+        self.c.execute(update(PhotoGrant).where(PhotoGrant.trip_id == c).values(revoked=75.0))
+        with self.stopping_first(self.b, 76.0), mock.patch.object(photos, "lock_grants", wraps=photos.lock_grants) as lock:
+            self.assertEqual(photos.decide(self.c, self.jane, moved.id, self.a, None)["trip_id"], self.a)
+        self.assertEqual(lock.call_args_list[0].args[1:], (self.jid, [self.a, self.b]))
 
     def test_a_hand_placement_is_written_to_every_row_of_the_same_asset(self):
         self.share(self.jid, self.a)
@@ -616,11 +661,30 @@ class DecisionTests(GrantCase):
                 settled.append(True)
                 photos.decide(self.c, self.jane, torn.id, self.b, None)
             return real(conn, person, trip_ids)
-        with mock.patch.object(photos, "lock_grants", side_effect=settle_first) as lock:
-            self.assertIsNone(photos.decide(self.c, self.jane, torn.id, None, True))
+        with mock.patch.object(photos, "lock_grants", side_effect=settle_first) as lock, self.assertRaises(trips.Invalid) as refused:
+            photos.decide(self.c, self.jane, torn.id, None, True)
+        self.assertEqual(str(refused.exception), photos.NOT_UNSETTLED)
         self.assertEqual(lock.call_args_list[0].args[1:], (self.jid, [self.a, self.b]))
         self.assertEqual((self.row(torn.id).trip_id, self.row(torn.id).decided_by), (self.b, "owner"))
         self.assertEqual(self.c.execute(select(PhotoExclusion.asset_id)).fetchall(), [])
+
+    def test_a_twin_row_keeps_its_own_coordinates_and_match_when_placed_by_hand(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        self.c.orm.add(PhotoSource(person_id=self.jid, owner_sub="u-jane", url="https://second.example", immich_user_id="u", api_key="enc:v1:x", status="ok", created=1.0))
+        self.c.orm.flush()
+        second = self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.url == "https://second.example")).one()
+        blind = photo_row(self.janes, self.b, INSIDE_B, asset="twin-9k3m")
+        self.c.orm.add(blind)
+        self.c.orm.flush()
+        sighted = self.photo(self.b, source=second, asset="twin-9k3m")
+        got = photos.decide(self.c, self.jane, blind.id, self.a, None)
+        self.assertEqual((got["location_source"], got["latitude"], got["match"]), (None, None, "time"))
+        twin = self.row(sighted.id)
+        self.assertEqual((twin.trip_id, twin.decided_by, twin.location_source, twin.latitude, twin.longitude, twin.match), (self.a, "owner", "exif", *SOHO, "place"))
+        self.assertAlmostEqual(twin.distance_km, 23.0, delta=1.5)
+        self.c.execute(update(PhotoSource).where(PhotoSource.id == self.janes).values(status="refused"))
+        self.assertEqual([(p.id, p.latitude) for p, _ in photos.visible_rows(self.c, self.jane, self.a)], [(sighted.id, SOHO[0])])
 
     def test_a_decision_locks_the_grants_of_both_trips_in_order(self):
         self.share(self.jid, self.a)
