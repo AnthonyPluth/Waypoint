@@ -137,6 +137,9 @@ class PhotoRoutes(RouteCase):
         self.assertEqual([p["id"] for p in self.listing("ben", booked["trip_id"])["photos"]], [only])
         self.assertEqual(self.call("cy", "GET", f"/api/trips/{booked['trip_id']}/photos")[0], 404)
         self.ok("ben", "POST", f"/api/segments/{booked['id']}", {"travelers": [{"person_id": self.person["ben"]}, {"person_id": self.person["ana"]}]})
+        self.assertEqual(self.listing("ana", booked["trip_id"])["photos"], [])
+        self.assertEqual(self.ok("ben", "GET", f"/api/trips/{booked['trip_id']}/photo-sharing")["state"], "ask")
+        self.ok("ben", "POST", f"/api/trips/{booked['trip_id']}/photo-sharing", {"scope": "trip"})
         self.assertEqual([p["id"] for p in self.listing("ana", booked["trip_id"])["photos"]], [only])
 
     def test_the_canonical_row_is_chosen_before_needs_a_look_filters_so_an_asset_shows_once(self):
@@ -378,9 +381,8 @@ class PhotoRoutes(RouteCase):
         self.assertAlmostEqual(got["longitude"], HEATHROW[1], delta=0.05)
         self.assertEqual(self.listing("ana", later["trip_id"])["clusters"][0]["inferred"], True)
         empty = self.own_trip("ana")
-        got = self.ok("ana", "POST", f"/api/photos/{guessed}", {"trip_id": empty})
-        self.assertEqual((got["match"], got["segment_id"], got["latitude"], got["longitude"], got["location_source"], got["zone"]), ("time", None, None, None, None, None))
-        self.assertEqual(stored(guessed)["trip_id"], empty)
+        self.assertEqual(self.call("ana", "POST", f"/api/photos/{guessed}", {"trip_id": empty}), (409, {"error": "That trip’s dates don’t cover this photo"}))
+        self.assertEqual(stored(guessed)["trip_id"], later["trip_id"])
         blank = self.photo(self.ana, None, "2027-01-02T12:00", match="ambiguous")
         got = self.ok("ana", "POST", f"/api/photos/{blank}", {"trip_id": later["trip_id"]})
         self.assertEqual((got["match"], got["segment_id"], got["location_source"]), ("time", later["id"], "inferred"))

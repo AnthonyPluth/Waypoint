@@ -6,14 +6,15 @@ import time
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time as clock
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import Literal, TypedDict, cast
 
 from sqlalchemy import ColumnElement, and_, false, or_, select
 
 from ..storage import db, geocode
 from ..storage.models import Airport, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, Segment, Trip, TripPerson
-from . import home, photomatch, trippeople, trips, visibility
+from . import home, photomatch, place_zones, trippeople, trips, visibility
 from .photomatch import CLUSTER, GAP, NEAR, MatchKind, PhotoIn, Point, SegmentPoint, TripWindow, window
 from .stats import EARTH_RADIUS_KM, distance_km
 from .visibility import Viewer
@@ -38,6 +39,11 @@ NOT_ON_TRIP = "Choose a trip you are on"
 SHARE_FIRST = "Share your photos on that trip first"
 PUT_BACK_FIRST = "Put the photo back on that trip first"
 NOT_UNSETTLED = "Only a photo waiting under Needs a look can be left off"
+NOT_IN_WINDOW = "That trip’s dates don’t cover this photo"
+
+
+class OutsideWindow(Exception):
+    pass
 CELL = 0.1
 COLUMNS = round(360 / CELL)
 ROWS = round(180 / CELL)
@@ -263,13 +269,38 @@ def _canonical(conn: db.Connection, rows: Sequence[Found]) -> list[Found]:
     return [(photo, person) for photo, person in rows if photo.id in keep]
 
 
+def _home_zone(conn: db.Connection) -> ZoneInfo:
+    found = home.read(conn)
+    address = ", ".join(part for part in (found["city"], " ".join(p for p in (found["state"], found["zip"]) if p), found["country"]) if part) if found["saved"] else ""
+    try:
+        return ZoneInfo(place_zones.zone_for_address(conn, address) or "UTC")
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
+
+
+def _dated_window(conn: db.Connection, trip: Trip) -> TripWindow | None:
+    if not trip.start_date or not trip.end_date:
+        return None
+    zone = _home_zone(conn)
+    start = datetime.combine(datetime.fromisoformat(trip.start_date).date(), clock(0, 0), zone)
+    end = datetime.combine(datetime.fromisoformat(trip.end_date).date(), clock(23, 59), zone)
+    return TripWindow(trip.id, start.astimezone(UTC) - photomatch.PAD, end.astimezone(UTC) + photomatch.PAD, ())
+
+
 def trip_window(conn: db.Connection, trip_id: int) -> TripWindow | None:
     trip = conn.orm.get(Trip, trip_id)
     if trip is None:
         return None
     live = [s for s in conn.orm.scalars(select(Segment).where(Segment.trip_id == trip.id).order_by(Segment.id)).all() if s.status != "cancelled"]
+    if not live:
+        return _dated_window(conn, trip)
     placed = segment_points(conn, live)
     return window(trip, [p for s in live for p in placed[s.id]])
+
+
+def window_holds(conn: db.Connection, trip_id: int, photo: Photo) -> bool:
+    found = trip_window(conn, trip_id)
+    return found is not None and found.start <= instant(photo.taken_utc) <= found.end
 
 
 def _excluded() -> ColumnElement[bool]:
@@ -335,7 +366,10 @@ def removed(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[Found]:
         return []
     left_out = select(PhotoExclusion.asset_id).where(PhotoExclusion.person_id == PhotoSource.person_id, PhotoExclusion.asset_id == Photo.asset_id,
                                                      PhotoExclusion.trip_id == trip_id).exists()
-    return _rows(conn, PhotoSource.person_id.in_(persons), left_out)
+    found = trip_window(conn, trip_id)
+    if found is None:
+        return []
+    return [(p, person) for p, person in _rows(conn, PhotoSource.person_id.in_(persons), left_out) if found.start <= instant(p.taken_utc) <= found.end]
 
 
 def _zone_by_place(points: Sequence[SegmentPoint], at: datetime, spot: Point) -> str | None:
@@ -681,11 +715,17 @@ def _same_asset(conn: db.Connection, photo: Photo, person: int) -> list[Photo]:
     return list(conn.orm.scalars(q).all())
 
 
-def _copy_placement(conn: db.Connection, photo: Photo, person: int) -> None:
+def copy_placement(conn: db.Connection, photo: Photo, person: int) -> None:
     for twin in _same_asset(conn, photo, person):
         for field in ("trip_id", "match", "segment_id", "distance_km", "decided_by", "latitude", "longitude", "location_source"):
             setattr(twin, field, getattr(photo, field))
     conn.orm.flush()
+
+
+def place_by_hand(conn: db.Connection, photo: Photo, person: int, trip_id: int) -> None:
+    photo.trip_id = trip_id
+    _place(photo, person, next((w for w in candidate_windows(conn, person) if w.trip_id == trip_id), None))
+    copy_placement(conn, photo, person)
 
 
 def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None, excluded: bool | None) -> TripPhoto | None:
@@ -701,14 +741,21 @@ def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | No
             raise trips.Invalid(SHARE_FIRST)
         if trip.id in excluded_trips(conn, person, photo.asset_id):
             raise trips.Invalid(PUT_BACK_FIRST)
-        photo.trip_id = trip.id
-        _place(photo, person, next((w for w in candidate_windows(conn, person) if w.trip_id == trip.id), None))
-        _copy_placement(conn, photo, person)
+        if not window_holds(conn, trip.id, photo):
+            raise OutsideWindow(NOT_IN_WINDOW)
+        place_by_hand(conn, photo, person, trip.id)
     if excluded:
         if photo.match != AMBIGUOUS or photo.trip_id is not None:
             raise trips.Invalid(NOT_UNSETTLED)
-        for w in _candidates(conn, photo, person, candidate_windows(conn, person), _seen(conn, viewer)):
-            db.insert_ignore(conn, PhotoExclusion, {"person_id": person, "asset_id": photo.asset_id, "trip_id": w.trip_id, "created": time.time()},
+        candidates = _candidates(conn, photo, person, candidate_windows(conn, person), _seen(conn, viewer))
+        lock_grants(conn, person, sorted(w.trip_id for w in candidates))
+        conn.orm.expire_all()
+        fresh = next(((p, c) for p, _, c in unsettled(conn, viewer, photo_id)), None)
+        if fresh is None:
+            return None
+        photo, candidates = fresh
+        for w in candidates:
+            db.insert_ignore(conn, PhotoExclusion, {"person_id": person, "asset_id": photo.asset_id, "trip_id": w.trip_id, "created": time.time(), "was_trip_id": None},
                              key=["person_id", "asset_id", "trip_id"])
     conn.orm.flush()
     return photo_out(photo, person, _placed(conn, viewer, [photo.trip_id] if photo.trip_id is not None else []))
