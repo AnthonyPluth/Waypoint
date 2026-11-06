@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.message import Message
 from email.utils import parsedate_to_datetime
-from typing import IO, Any, Literal
+from typing import IO, Any, Literal, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .. import tls
@@ -26,6 +26,7 @@ ORIGINAL_SECONDS = 600.0
 MAX_JSON_BYTES = 32_000_000
 CAPS = {"thumbnail": 2_000_000, "preview": 10_000_000}
 CHUNK = 65_536
+POLL_FLOOR = 0.01
 MAX_URL = 200
 
 USER_AGENT = "Waypoint/1"
@@ -166,19 +167,38 @@ class Original:
         self.content_range = _text(found("Content-Range"))
         self.content_length = int(length) if length is not None and DIGITS.fullmatch(length) else None
         self.accept_ranges = _text(found("Accept-Ranges"), 40)
+        self._fed = time.monotonic()
 
-    def read(self, size: int = CHUNK) -> bytes:
+    def _poll(self, size: int, wait: float) -> bytes | None:
+        owner = getattr(getattr(getattr(self._response, "fp", None), "raw", None), "_owner", None)
+        if owner is None:
+            return cast(bytes, self._response.read1(size))
+        idle = owner.timeout
+        owner.timeout = max(min(wait, idle) if isinstance(idle, int | float) else wait, POLL_FLOOR)
+        try:
+            return cast(bytes, self._response.read1(size))
+        except TimeoutError:
+            return None
+        finally:
+            owner.timeout = idle
+
+    def read(self, size: int = CHUNK, wait: float | None = None) -> bytes | None:
         problem = TOO_SLOW
         chunk = None
-        if self._deadline - time.monotonic() > 0:
+        now = time.monotonic()
+        if self._deadline > now and self._fed + ORIGINAL_TIMEOUT > now:
             try:
-                chunk = self._response.read1(size)
+                chunk = self._response.read1(size) if wait is None else self._poll(size, wait)
             except TimeoutError:
                 chunk = None
             except tls.NETWORK_ERRORS:
                 problem = UNREACHABLE
+            else:
+                if wait is not None and chunk is None:
+                    return None
         if not isinstance(chunk, bytes):
             raise Unavailable(problem)
+        self._fed = time.monotonic()
         return chunk
 
     def close(self) -> None:

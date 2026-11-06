@@ -5,6 +5,7 @@ import threading
 import time
 import unittest
 import urllib.parse
+from types import SimpleNamespace
 from unittest import mock
 
 from sqlalchemy import delete, update
@@ -39,17 +40,26 @@ IMAGE_ROUTES = ("/api/photos/{id}/thumbnail", "/api/photos/{id}/preview", "/api/
 
 
 class Reply:
-    def __init__(self, status, body, headers=None, piece=None, pause=0.0, gate=None, gate_after=0):
+    def __init__(self, status, body, headers=None, piece=None, pause=0.0, gate=None, gate_after=0, idle=30.0):
         self.status = status
         self.headers = {"Content-Length": str(len(body)), **(headers or {})}
         self._body, self._at, self._piece, self._pause = body, 0, piece, pause
-        self._gate, self._gate_after, self._reads = gate, gate_after, 0
+        self._gate, self._gate_after, self._reads, self._due = gate, gate_after, 0, None
+        self.fp = SimpleNamespace(raw=SimpleNamespace(_owner=SimpleNamespace(timeout=idle)))
 
     def read1(self, size=-1):
+        limit = self.fp.raw._owner.timeout
         if self._pause:
-            time.sleep(self._pause)
-        if self._gate is not None and self._reads >= self._gate_after:
-            self._gate.wait(10)
+            now = time.monotonic()
+            due = self._due if self._due is not None else now + self._pause
+            if due - now > limit:
+                time.sleep(limit)
+                self._due = due
+                raise TimeoutError("not yet")
+            time.sleep(max(0.0, due - now))
+            self._due = time.monotonic() + self._pause
+        if self._gate is not None and self._reads >= self._gate_after and not self._gate.wait(limit):
+            raise TimeoutError("stalled")
         self._reads += 1
         take = len(self._body) if size < 0 else size
         if self._piece:
@@ -470,7 +480,7 @@ class OriginalTests(ProxyCase):
     def test_a_stream_is_cut_off_once_the_photo_is_taken_back(self):
         body = bytes(MP4) * 4
         self.immich.routes[f"{self.asset}/original"] = ranged(body, "video/mp4", piece=1024, pause=0.02)
-        with mock.patch.object(photoproxy, "RECHECK_SECONDS", 0.0):
+        with mock.patch.object(photoproxy, "RECHECK_SECONDS", 0.05):
             link = http.client.HTTPConnection("127.0.0.1", self.httpd.server_port, timeout=20)
             self.addCleanup(link.close)
             link.request("GET", f"/api/photos/{self.mine}/original", headers={"X-Waypoint": "1", **self.who["ana"]})
@@ -486,12 +496,12 @@ class OriginalTests(ProxyCase):
         self.assertEqual(bytes(got), body[:len(got)])
         self.missing("ana", f"/api/photos/{self.mine}/original")
 
-    def blocked_stream(self, taken_back):
+    def blocked_stream(self, taken_back, release=True, recheck=0.0, idle=30.0):
         body = bytes(MP4) * 4
         gate = threading.Event()
         self.addCleanup(gate.set)
-        self.immich.routes[f"{self.asset}/original"] = ranged(body, "video/mp4", piece=1024, gate=gate, gate_after=4)
-        with mock.patch.object(photoproxy, "RECHECK_SECONDS", 0.0):
+        self.immich.routes[f"{self.asset}/original"] = ranged(body, "video/mp4", piece=1024, gate=gate, gate_after=4, idle=idle)
+        with mock.patch.object(photoproxy, "RECHECK_SECONDS", recheck):
             link = http.client.HTTPConnection("127.0.0.1", self.httpd.server_port, timeout=20)
             self.addCleanup(link.close)
             link.request("GET", f"/api/photos/{self.mine}/original", headers={"X-Waypoint": "1", **self.who["ana"]})
@@ -500,11 +510,14 @@ class OriginalTests(ProxyCase):
             first = reply.read(4096)
             self.assertEqual(first, body[:4096])
             taken_back()
-            gate.set()
+            if release:
+                gate.set()
+            began = time.monotonic()
             rest = bytearray()
             while piece := reply.read(1024):
                 rest += piece
         self.assertEqual(bytes(rest), b"")
+        return time.monotonic() - began
 
     def test_nothing_more_is_sent_once_the_photo_is_taken_back_while_a_read_is_blocked(self):
         self.blocked_stream(lambda: self.revoke("ben"))
@@ -512,6 +525,17 @@ class OriginalTests(ProxyCase):
     def test_a_stream_stops_when_another_photo_takes_over_its_id(self):
         self.blocked_stream(lambda: self.replace_asset(self.mine))
         self.assertEqual(self.get("ana", f"/api/photos/{self.mine}/original")[0], 404)
+
+    def test_a_stalled_upstream_is_cut_off_at_the_recheck_once_the_photo_is_taken_back_not_at_the_idle_limit(self):
+        took = self.blocked_stream(lambda: self.revoke("ben"), release=False, recheck=0.2, idle=3.0)
+        self.assertLess(took, 1.5)
+
+    def test_a_slow_but_live_upstream_streams_to_the_end_across_rechecks(self):
+        body = bytes(MP4)
+        self.immich.routes[f"{self.asset}/original"] = ranged(body, "video/mp4", piece=2048, pause=0.3)
+        with mock.patch.object(photoproxy, "RECHECK_SECONDS", 0.1):
+            status, headers, raw = self.streamed("ana", f"/api/photos/{self.mine}/original", {})
+        self.assertEqual((status, headers["Content-Length"], raw), (200, str(len(body)), body))
 
 
 class RouteTests(unittest.TestCase):

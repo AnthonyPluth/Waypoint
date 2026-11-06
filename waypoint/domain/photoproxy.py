@@ -193,14 +193,19 @@ def _still_served(viewer: Viewer, served: Served) -> bool:
 
 def _body(viewer: Viewer, served: Served, original: immich.Original, prefix: bytes) -> Body:
     checked = served.checked
-    pending = prefix
+    pending: bytes | None = prefix
     try:
         while True:
             if not pending:
                 try:
-                    pending = original.read()
+                    pending = original.read(wait=RECHECK_SECONDS)
                 except immich.ImmichError:
                     return
+                if pending is None:
+                    if not _still_served(viewer, served):
+                        return
+                    checked = time.monotonic()
+                    continue
                 if not pending:
                     return
             if time.monotonic() - checked >= RECHECK_SECONDS:
