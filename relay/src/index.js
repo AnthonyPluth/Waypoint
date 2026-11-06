@@ -2,6 +2,7 @@ const HEX_TOKEN = /^[0-9a-f]{64,200}$/i;
 const COLLAPSE = /^[A-Za-z0-9-]{1,64}$/;
 const MAX_BODY = 1024;
 const JWT_LIFETIME = 40 * 60;
+const RECORD_TTL = 180 * 86400;
 const HOSTS = { production: "https://api.push.apple.com", development: "https://api.sandbox.push.apple.com" };
 
 const PAYLOADS = {
@@ -40,9 +41,35 @@ function reply(status, body) {
   });
 }
 
+async function readCapped(request) {
+  const declared = Number(request.headers.get("Content-Length"));
+  if (Number.isFinite(declared) && declared > MAX_BODY) return null;
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > MAX_BODY) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.length;
+  }
+  return new TextDecoder().decode(all);
+}
+
 async function readJson(request) {
-  const text = await request.text();
-  if (text.length > MAX_BODY) return { tooBig: true };
+  const text = await readCapped(request);
+  if (text === null) return { tooBig: true };
   if (!text.trim()) return { value: {} };
   try {
     const value = JSON.parse(text);
@@ -80,7 +107,9 @@ async function limited(binding, key) {
 
 async function register(request, env) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-  if (await limited(env.REGISTER_LIMIT, ip)) return reply(429, { error: "Too many registrations. Try again in a minute." });
+  if (await limited(env.REGISTER_LIMIT, ip) || await limited(env.REGISTER_ALL_LIMIT, "all")) {
+    return reply(429, { error: "Too many registrations. Try again in a minute." });
+  }
   const { value, tooBig, bad } = await readJson(request);
   if (tooBig) return reply(413, { error: "Request too large." });
   if (bad) return reply(400, { error: "Send a JSON object." });
@@ -92,8 +121,8 @@ async function register(request, env) {
   const id = (await env.DEVICES.get(byToken)) || random(12);
   const secret = random(32);
   const record = { token, environment, secret: await sha256(secret), created: Date.now() };
-  await env.DEVICES.put(`d:${id}`, JSON.stringify(record));
-  await env.DEVICES.put(byToken, id);
+  await env.DEVICES.put(`d:${id}`, JSON.stringify(record), { expirationTtl: RECORD_TTL });
+  await env.DEVICES.put(byToken, id, { expirationTtl: RECORD_TTL });
   return reply(201, { device_id: id, secret });
 }
 
@@ -137,6 +166,9 @@ async function wake(request, env, deps, id) {
   if (sent.status === 410 || sent.status === 400) {
     const why = await sent.json().catch(() => ({}));
     if (sent.status === 410 || why.reason === "BadDeviceToken" || why.reason === "Unregistered") {
+      if (typeof why.timestamp === "number" && why.timestamp < record.created) {
+        return reply(409, { error: "Apple's answer is older than this registration. Try again." });
+      }
       await forget(env, id, record);
       return reply(410, { error: "That device is no longer registered with Apple. Register it again." });
     }

@@ -9,7 +9,7 @@ const ISSUER = { id: "KEYID12345", team: "TEAMID1234" };
 class FakeKV {
   constructor() { this.map = new Map(); }
   async get(k) { return this.map.get(k) ?? null; }
-  async put(k, v) { this.map.set(k, v); }
+  async put(k, v, opts) { this.map.set(k, v); (this.options ??= new Map()).set(k, opts); }
   async delete(k) { this.map.delete(k); }
 }
 
@@ -160,12 +160,40 @@ describe("waking a device", () => {
     assert.equal(ctx.env.DEVICES.map.size, 0);
   });
 
+  test("keeps a registration newer than Apple's invalidation", async () => {
+    const { id, auth } = await registered();
+    appleStatus = 410;
+    appleBody = { reason: "Unregistered", timestamp: 1 };
+    const r = await handle(post(`/v1/devices/${id}/wake`, {}, auth), ctx.env, deps());
+    assert.equal(r.status, 409);
+    assert.notEqual(await ctx.env.DEVICES.get(`d:${id}`), null);
+  });
+
   test("reports another Apple failure without forgetting the device", async () => {
     const { id, auth } = await registered();
     appleStatus = 503;
     const r = await handle(post(`/v1/devices/${id}/wake`, {}, auth), ctx.env, deps());
     assert.equal(r.status, 502);
     assert.notEqual(await ctx.env.DEVICES.get(`d:${id}`), null);
+  });
+});
+
+describe("limits on what is kept and read", () => {
+  test("records expire", async () => {
+    const { body } = await register();
+    assert.ok(ctx.env.DEVICES.options.get(`d:${body.device_id}`).expirationTtl >= 86400);
+  });
+
+  test("refuses a declared oversize body and one that streams past the cap", async () => {
+    const declared = new Request("https://relay.test/v1/devices", { method: "POST", body: "{}", headers: { "Content-Length": "5000" } });
+    assert.equal((await handle(declared, ctx.env, deps())).status, 413);
+    const big = JSON.stringify({ apns_token: TOKEN, pad: "x".repeat(2000) });
+    assert.equal((await handle(new Request("https://relay.test/v1/devices", { method: "POST", body: big }), ctx.env, deps())).status, 413);
+  });
+
+  test("has a global registration limit", async () => {
+    ctx.env.REGISTER_ALL_LIMIT = limiter(() => false);
+    assert.equal((await register()).status, 429);
   });
 });
 

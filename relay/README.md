@@ -33,4 +33,6 @@ A small Cloudflare Worker that holds the Apple Push Notification key so a self-h
 
 - Sending to Apple from a Worker: the code uses `fetch` to `api.push.apple.com`, which needs HTTP/2. Tests use a fake. Try it with a real device on the sandbox (`environment: "development"`) before relying on it.
 - The `ratelimit` bindings in `wrangler.toml` follow Cloudflare's documented shape; `wrangler deploy` hasn't been run.
-- Workers KV is eventually consistent: a registration can take a few seconds to be seen from another location.
+- Workers KV is eventually consistent: a registration can take a few seconds (Cloudflare says 60 seconds or more) to be seen from another location, so a replaced secret or a deleted device can still be accepted elsewhere for that long, and two registrations of one new token made at once from different locations can each get an id. Making these strictly ordered needs a Durable Object per device; not built yet.
+- The rate limits are per Cloudflare location and approximate, not global. Registration also has a global limit of 60 a minute, and records expire after 180 days (the app registers again when it opens), so a flood of made-up tokens cannot fill storage for good; it can still use up a free account's daily KV writes.
+- Apple's `410` carries the time the token was last known invalid; the relay keeps a registration newer than that.
