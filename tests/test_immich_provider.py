@@ -47,6 +47,16 @@ class FakeImmich(ThreadingHTTPServer):
                 code, headers, body = self.server.routes.get(path, (404, {}, b'{"message":"Not Found"}'))   # type: ignore[attr-defined]
                 if callable(body):
                     body = body()
+                if headers.get("_trickle_head"):
+                    raw = (f"HTTP/1.0 {code} OK\r\nContent-Length: {len(body)}\r\nX-Pad: {'y' * 120}\r\n\r\n").encode() + body
+                    for i in range(len(raw)):
+                        try:
+                            self.wfile.write(raw[i:i + 1])
+                            self.wfile.flush()
+                        except OSError:
+                            return
+                        time.sleep(float(headers["_trickle_head"]))
+                    return
                 self.send_response(code)
                 for name, value in headers.items():
                     self.send_header(name, value)
@@ -433,7 +443,7 @@ class RequestTests(unittest.TestCase):
         response = mock.Mock()
         response.headers = {"Content-Length": str(immich.CAPS["thumbnail"] + 1)}
         with self.assertRaises(immich.Unavailable) as e:
-            immich._read(response, immich.CAPS["thumbnail"], 5)
+            immich._read(response, immich.CAPS["thumbnail"], time.monotonic() + 5)
         self.assertEqual(str(e.exception), immich.TOO_LARGE)
         response.read1.assert_not_called()
 
@@ -485,30 +495,12 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(immich.thumbnail(self.fake.source, ASSET, "thumbnail"), ("image/jpeg", JPEG))
         self.assertEqual(len(immich.search(self.fake.source, AFTER, BEFORE).assets), 8)
 
-    def test_each_read_below_the_parser_gets_only_the_time_left(self):
-        source = io.BufferedReader(io.BytesIO(b"abcdef"))
-        buffer = bytearray(4)
-        self.assertEqual(immich._Deadline(source, time.monotonic() + 5).readinto(buffer), 4)
-        self.assertEqual(bytes(buffer), b"abcd")
-        with self.assertRaises(TimeoutError):
-            immich._Deadline(source, time.monotonic() - 0.001).readinto(buffer)
-        sock = mock.Mock()
-        raw = mock.Mock(_sock=sock)
-        buffered = mock.Mock(raw=raw)
-        buffered.readinto1.return_value = 2
-        wrapped = immich._Deadline(buffered, time.monotonic() + 3)
-        self.assertEqual(wrapped.readinto(bytearray(2)), 2)
-        [(timeout,), _] = sock.settimeout.call_args
-        self.assertTrue(2 < timeout <= 3)
-        wrapped.close()
-        buffered.close.assert_called_once()
-
     def test_a_connection_cut_while_reading_is_unreachable(self):
         response = mock.Mock()
         response.headers = {}
         response.read1.side_effect = [b"x", ConnectionResetError(f"reset by {KEY}")]
         with self.assertRaises(immich.Unavailable) as e:
-            immich._read(response, 1000, 5)
+            immich._read(response, 1000, time.monotonic() + 5)
         self.assertEqual(str(e.exception), immich.UNREACHABLE)
         self.assertIsNone(e.exception.__context__)
 

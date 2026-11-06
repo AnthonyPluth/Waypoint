@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 import ipaddress
 import json
 import math
@@ -224,16 +223,17 @@ def _request(source: Source, path: str, accept: str, *, query: dict[str, str] | 
     return urllib.request.Request(url, data=data, headers=headers, method="GET" if data is None else "POST")
 
 
-def _open(source: Source, req: urllib.request.Request, timeout: float) -> Any | None:
+def _open(source: Source, req: urllib.request.Request, timeout: float, deadline: float) -> Any | None:
     code: int | None
     wait: str | None
+    slow = False
     try:
-        response = tls.urlopen(req, timeout, allow_http=source.allow_http, handlers=(_NoRedirects(),))
+        response = tls.urlopen(req, timeout, allow_http=source.allow_http, handlers=(_NoRedirects(),), deadline=deadline)
     except urllib.error.HTTPError as e:
         code, wait = e.code, e.headers.get("Retry-After") if e.headers is not None else None
         e.close()
     except tls.NETWORK_ERRORS:
-        code, wait = None, None
+        code, wait, slow = None, None, time.monotonic() >= deadline
     else:
         if response.status == 200:
             return response
@@ -241,45 +241,15 @@ def _open(source: Source, req: urllib.request.Request, timeout: float) -> Any | 
         code, wait = response.status, None
     if code == 404:
         return None
-    raise _failure(code, wait)
+    raise Unavailable(TOO_SLOW) if slow else _failure(code, wait)
 
 
-class _Deadline(io.RawIOBase):
-    def __init__(self, buffered: Any, deadline: float) -> None:
-        super().__init__()
-        self._buffered = buffered
-        self._settimeout = getattr(getattr(getattr(buffered, "raw", None), "_sock", None), "settimeout", None)
-        self._deadline = deadline
-
-    def readable(self) -> bool:
-        return True
-
-    def readinto(self, buffer: Any) -> int:
-        remaining = self._deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError
-        if callable(self._settimeout):
-            self._settimeout(remaining)
-        return int(self._buffered.readinto1(buffer))
-
-    def close(self) -> None:
-        self._buffered.close()
-        super().close()
-
-
-def _hold_to(response: Any, deadline: float) -> None:
-    if callable(getattr(getattr(response, "fp", None), "readinto1", None)):
-        response.fp = io.BufferedReader(_Deadline(response.fp, deadline))
-
-
-def _read(response: Any, cap: int, seconds: float) -> bytes:
-    deadline = time.monotonic() + seconds
+def _read(response: Any, cap: int, deadline: float) -> bytes:
     declared = response.headers.get("Content-Length") or ""
     if DIGITS.fullmatch(declared) and int(declared) > cap:
         raise Unavailable(TOO_LARGE)
     data = bytearray()
     problem = None
-    _hold_to(response, deadline)
     try:
         while True:
             if deadline - time.monotonic() <= 0:
@@ -302,11 +272,12 @@ def _read(response: Any, cap: int, seconds: float) -> bytes:
 
 
 def _json(source: Source, req: urllib.request.Request) -> Any:
-    response = _open(source, req, TIMEOUT)
+    deadline = time.monotonic() + JSON_SECONDS
+    response = _open(source, req, TIMEOUT, deadline)
     if response is None:
         raise Unavailable(UNAVAILABLE)
     with response:
-        raw = _read(response, MAX_JSON_BYTES, JSON_SECONDS)
+        raw = _read(response, MAX_JSON_BYTES, deadline)
     try:
         return json.loads(raw)
     except (ValueError, RecursionError):
@@ -476,11 +447,12 @@ def markers(source: Source, after: datetime, before: datetime) -> list[Marker]:
 def thumbnail(source: Source, asset_id: str, size: Size) -> tuple[str, bytes] | None:
     if not ASSET_ID.fullmatch(asset_id) or size not in CAPS:
         return None
-    response = _open(source, _request(source, f"{ASSETS}{asset_id}/thumbnail", IMAGE_TYPES, query={"size": size}), IMAGE_TIMEOUT)
+    deadline = time.monotonic() + IMAGE_SECONDS
+    response = _open(source, _request(source, f"{ASSETS}{asset_id}/thumbnail", IMAGE_TYPES, query={"size": size}), IMAGE_TIMEOUT, deadline)
     if response is None:
         return None
     with response:
-        data = _read(response, CAPS[size], IMAGE_SECONDS)
+        data = _read(response, CAPS[size], deadline)
     kind = sniff(data)
     if kind is None:
         raise Unavailable(NOT_AN_IMAGE)
@@ -491,8 +463,5 @@ def open_original(source: Source, asset_id: str, *, seconds: float = ORIGINAL_SE
     if not ASSET_ID.fullmatch(asset_id):
         return None
     deadline = time.monotonic() + seconds
-    response = _open(source, _request(source, f"{ASSETS}{asset_id}/original", ORIGINAL_TYPES), ORIGINAL_TIMEOUT)
-    if response is None:
-        return None
-    _hold_to(response, deadline)
-    return Original(response, deadline)
+    response = _open(source, _request(source, f"{ASSETS}{asset_id}/original", ORIGINAL_TYPES), ORIGINAL_TIMEOUT, deadline)
+    return None if response is None else Original(response, deadline)

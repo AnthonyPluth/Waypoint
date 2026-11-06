@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import functools
 import http.client
+import io
 import ipaddress
 import socket
 import ssl
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -96,9 +98,115 @@ class _PublicHandler(urllib.request.HTTPSHandler):
         return self.do_open(_PublicConnection, req, context=ssl_context())
 
 
+def _left(deadline: float) -> float:
+    left = deadline - time.monotonic()
+    if left <= 0:
+        raise TimeoutError("the time for this request ran out")
+    return left
+
+
+class _DeadlineReader(io.RawIOBase):
+    def __init__(self, owner: _DeadlineSocket):
+        super().__init__()
+        self._owner = owner
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, buffer) -> int:
+        sock = self._owner.sock
+        sock.settimeout(self._owner.wait())
+        return sock.recv_into(buffer)
+
+    def close(self) -> None:
+        if not self.closed:
+            self._owner.reader_closed()
+        super().close()
+
+
+class _DeadlineSocket:
+    def __init__(self, sock: socket.socket, deadline: float, timeout):
+        self.sock = sock
+        self.deadline = deadline
+        self.timeout = timeout
+        self._readers = 0
+        self._closing = False
+
+    def makefile(self, *args, **kwargs) -> io.BufferedReader:
+        self._readers += 1
+        return io.BufferedReader(_DeadlineReader(self))
+
+    def wait(self) -> float:
+        return _bounded(self.timeout, self.deadline)
+
+    def sendall(self, data, *args) -> None:
+        self.sock.settimeout(self.wait())
+        self.sock.sendall(data, *args)
+
+    def reader_closed(self) -> None:
+        self._readers -= 1
+        if self._closing and self._readers == 0:
+            self.sock.close()
+
+    def close(self) -> None:
+        self._closing = True
+        if self._readers == 0:
+            self.sock.close()
+
+
+def _bounded(timeout, deadline: float) -> float:
+    left = _left(deadline)
+    return min(timeout, left) if isinstance(timeout, int | float) else left
+
+
+class _DeadlineHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, *args, deadline: float, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.deadline = deadline
+
+    def connect(self) -> None:
+        idle, self.timeout = self.timeout, _bounded(self.timeout, self.deadline)
+        super().connect()
+        self.sock = _DeadlineSocket(self.sock, self.deadline, idle)
+
+
+class _DeadlineHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, *args, deadline: float, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.deadline = deadline
+
+    def connect(self) -> None:
+        idle, self.timeout = self.timeout, _bounded(self.timeout, self.deadline)
+        super().connect()
+        self.sock = _DeadlineSocket(self.sock, self.deadline, idle)
+
+
+class _DeadlineHTTPHandler(urllib.request.HTTPHandler):
+    def __init__(self, deadline: float):
+        super().__init__()
+        self.deadline = deadline
+
+    def http_open(self, req: urllib.request.Request):
+        return self.do_open(functools.partial(_DeadlineHTTPConnection, deadline=self.deadline), req)
+
+
+class _DeadlineHTTPSHandler(urllib.request.HTTPSHandler):
+    def __init__(self, deadline: float):
+        super().__init__(context=ssl_context())
+        self.deadline = deadline
+
+    def https_open(self, req: urllib.request.Request):
+        return self.do_open(functools.partial(_DeadlineHTTPSConnection, deadline=self.deadline), req, context=ssl_context())
+
+
 def urlopen(req: urllib.request.Request | str, timeout: float, *, allow_http: bool = False,
-            handlers: tuple[urllib.request.BaseHandler, ...] = (), public_only: bool = False):
+            handlers: tuple[urllib.request.BaseHandler, ...] = (), public_only: bool = False, deadline: float | None = None):
     check_scheme(req.full_url if isinstance(req, urllib.request.Request) else req, allow_http and not public_only)
+    if deadline is not None:
+        if public_only:
+            raise ValueError("a deadline isn't supported for public-only requests")
+        _left(deadline)
+        handlers = (*handlers, _DeadlineHTTPSHandler(deadline), *((_DeadlineHTTPHandler(deadline),) if allow_http else ()))
     if public_only:
         handlers = (*handlers, urllib.request.ProxyHandler({}), _PublicHandler())
     return opener(*handlers, allow_http=allow_http and not public_only).open(req, timeout=timeout)
