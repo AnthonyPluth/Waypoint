@@ -682,13 +682,17 @@ export interface PhotoSourceEdit {
   paused?: boolean;
 }
 
+export interface PhotoSourceNewTestBody {
+  url: string;
+  key: string;
+}
+
 export interface PhotoSourceTest {
   name: string | null;
   same_account: boolean | null;
 }
 
 export interface PhotoSourceTestBody {
-  url?: string;
   key?: string;
 }
 
@@ -1390,7 +1394,7 @@ export interface Endpoints {
   "POST /api/photos/{id}": { body: PhotoBody; reply: TripPhoto };
   "GET /api/photo-sources": { body: never; reply: PhotoSources };
   "POST /api/photo-sources": { body: PhotoSourceBody; reply: PhotoSource };
-  "POST /api/photo-sources/test": { body: PhotoSourceTestBody; reply: PhotoSourceTest };
+  "POST /api/photo-sources/test": { body: PhotoSourceNewTestBody; reply: PhotoSourceTest };
   "POST /api/photo-sources/{id}": { body: PhotoSourceEdit; reply: PhotoSource };
   "DELETE /api/photo-sources/{id}": { body: never; reply: Ok };
   "POST /api/photo-sources/{id}/test": { body: PhotoSourceTestBody; reply: PhotoSourceTest };

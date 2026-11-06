@@ -236,6 +236,34 @@ class SourceRoutes(RouteCase):
         self.assertEqual(pong.call_args.args[0], immich.Source(url=LAN, key=NEW_KEY, allow_http=True))
         self.assertEqual(len(self.listing("ana")["sources"]), 1)
 
+    def test_testing_a_paused_library_records_the_outcome_without_resuming_it(self):
+        made = self.connect()
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})["status"], "off")
+        with failing(immich.Refused(immich.REFUSED)):
+            self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})[0], 400)
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", immich.REFUSED))
+        with ping():
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})["name"], "Ana Example")
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+        with db.session() as conn:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == made["id"]).values(api_key="enc:v1:not-a-token"))
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})[0], 400)
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", photosources.KEY_LOST))
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False})["status"], "ok")
+
+    def test_a_former_steward_whose_request_is_in_flight_changes_nothing(self):
+        made = self.connect(person_id=self.guest)
+
+        def handed_over(_source):
+            with db.session() as conn:
+                photo_sources.claim(conn, self.guest, self.person["ben"], "sub-ben")
+            return ACCOUNT
+        with mock.patch.object(immich, "ping", side_effect=handed_over):
+            self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"key": NEW_KEY}), (404, {"error": photosources.NO_SOURCE}))
+        self.assertEqual(self.unlocked(made["id"]), KEY)
+        self.assertEqual(self.raw(made["id"])[1:3], ("ok", None))
+        self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{made['id']}", {"label": "Mine now"})["label"], "Mine now")
+
     def test_a_key_that_can_no_longer_be_unlocked_asks_to_be_entered_again(self):
         made = self.connect()
         with db.session() as conn:
@@ -413,6 +441,71 @@ class Storage(DbCase):
         self.assertIsNone(photosources.unlock(self.c, 999))
         self.assertTrue(photosources.allow_http("http://192.168.1.20:2283"))
         self.assertFalse(photosources.allow_http("http://immich-canary.example"))
+
+
+class Races(DbCase):
+    def setUp(self):
+        super().setUp()
+        oidc.remember_user(self.c, "sub-ana", "ana@example.com", "Ana", None)
+        oidc.remember_user(self.c, "sub-ben", "ben@example.com", "Ben", None)
+        self.c.commit()
+        self.ana = photosources.Actor("sub-ana", people.person_for_sub(self.c, "sub-ana"))
+        self.ben = photosources.Actor("sub-ben", people.person_for_sub(self.c, "sub-ben"))
+        self.guest = people.add_guest(self.c, guest("Mia Doe"))["id"]
+        self.c.commit()
+
+    def elsewhere(self, change):
+        def during(_source):
+            with db.session(self.path) as conn:
+                change(conn)
+            return ACCOUNT
+        return mock.patch.object(immich, "ping", side_effect=during)
+
+    def test_two_members_connecting_at_once_cannot_both_become_a_persons_steward(self):
+        with self.elsewhere(lambda conn: photo_sources.save(conn, self.guest, "sub-ben", LAN, ACCOUNT.user_id, KEY, None, 1.0)):
+            with self.assertRaises(photosources.Refused) as refused:
+                photosources.connect(self.c, self.ana, self.guest, URL, KEY, None)
+        self.assertEqual(str(refused.exception), photosources.OTHER_STEWARD)
+        self.c.rollback()
+        self.assertEqual([(s["url"], s["owner_sub"]) for s in photo_sources.list_all(self.c)], [(LAN, "sub-ben")])
+
+    def test_the_same_address_connected_twice_at_once_is_one_library(self):
+        with self.elsewhere(lambda conn: photo_sources.save(conn, self.ana.person_id, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)):
+            with self.assertRaises(photosources.Refused) as refused:
+                photosources.connect(self.c, self.ana, self.ana.person_id, URL, NEW_KEY, None)
+        self.assertEqual(str(refused.exception), photosources.ALREADY)
+        self.c.rollback()
+        self.assertEqual(len(photo_sources.list_all(self.c)), 1)
+
+    def test_a_library_handed_over_mid_request_is_not_changed_by_its_former_steward(self):
+        source = photo_sources.save(self.c, self.guest, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)
+        self.c.commit()
+
+        def moved(conn):
+            photo_sources.claim(conn, self.guest, self.ben.person_id, "sub-ben")
+        with self.elsewhere(moved):
+            with self.assertRaises(photosources.NoSuchSource):
+                photosources.change_key(self.c, self.ana, source, NEW_KEY)
+        self.c.rollback()
+        unlocked = photo_sources.source_for_provider(self.c, source)
+        assert unlocked is not None
+        self.assertEqual(unlocked.key, KEY)
+        checked = photosources.owned
+
+        def owned_then_moved(conn, actor, source_id):
+            found = checked(conn, actor, source_id)
+            with db.session(self.path) as other:
+                photo_sources.claim(other, self.guest, self.ben.person_id, "sub-ben")
+            return found
+        for change in (lambda: photosources.edit(self.c, self.ana, source, "Stolen", None, True), lambda: photosources.edit(self.c, self.ana, source, None, True, False),
+                       lambda: photosources.remove(self.c, self.ana, source), lambda: photosources.test(self.c, self.ana, source, None)):
+            with self.subTest(change=change), mock.patch.object(photosources, "owned", side_effect=owned_then_moved), failing(immich.Refused(immich.REFUSED)):
+                with self.assertRaises(photosources.NoSuchSource):
+                    change()
+                self.c.rollback()
+            found = photo_sources.get(self.c, source)
+            assert found is not None
+            self.assertEqual((found["owner_sub"], found["person_id"], found["label"], found["status"], found["last_error"]), ("sub-ben", self.ben.person_id, None, "ok", None))
 
 
 class Claiming(DbCase):

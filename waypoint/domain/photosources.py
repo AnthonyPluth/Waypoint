@@ -125,12 +125,21 @@ def test_new(url: str, key: str) -> Tested:
     return {"name": _ping(provider_source(url, key)).name, "same_account": None}
 
 
-def connect(conn: db.Connection, actor: Actor, person_id: int, url: str, key: str, label: str | None, now: float | None = None) -> Listed:
-    _steward_ok(conn, actor, person_id)
+def _not_yet(conn: db.Connection, person_id: int, url: str) -> None:
     if any(s["url"] == url for s in photo_sources.for_person(conn, person_id)):
         raise Refused(ALREADY)
+
+
+def connect(conn: db.Connection, actor: Actor, person_id: int, url: str, key: str, label: str | None, now: float | None = None) -> Listed:
+    _steward_ok(conn, actor, person_id)
+    _not_yet(conn, person_id, url)
     account = _ping(provider_source(url, key))
+    if not photo_sources.lock_person(conn, person_id):
+        raise NoSuchPerson()
     source_id = photo_sources.save(conn, person_id, actor.sub, url, account.user_id, key, label, time.time() if now is None else now)
+    if source_id is None:
+        raise Refused(ALREADY)
+    _steward_ok(conn, actor, person_id)
     return listed(conn, actor, source_id)
 
 
@@ -143,7 +152,7 @@ def _unlocked(conn: db.Connection, stored: Stored) -> immich.Source:
     try:
         found = unlock(conn, stored["id"])
     except secretbox.SecretError:
-        photo_sources.mark(conn, stored["id"], REFUSED, KEY_LOST)
+        _record(conn, stored, REFUSED, KEY_LOST)
         conn.commit()
         raise Refused(KEY_LOST) from None
     if found is None:
@@ -151,9 +160,14 @@ def _unlocked(conn: db.Connection, stored: Stored) -> immich.Source:
     return found
 
 
+def _record(conn: db.Connection, source: Stored, status: Status, error: str | None, synced: float | None = None) -> None:
+    kept = OFF if source["status"] == OFF else status
+    if not photo_sources.mark(conn, source["id"], kept, error, synced, owner=source["owner_sub"]):
+        raise NoSuchSource()
+
+
 def _outcome(conn: db.Connection, source: Stored, error: immich.ImmichError) -> None:
-    status: Status = REFUSED if isinstance(error, immich.Refused | immich.NotConfigured) else UNREACHABLE
-    photo_sources.mark(conn, source["id"], status, str(error))
+    _record(conn, source, REFUSED if isinstance(error, immich.Refused | immich.NotConfigured) else UNREACHABLE, str(error))
     conn.commit()
 
 
@@ -167,8 +181,7 @@ def test(conn: db.Connection, actor: Actor, source_id: int, key: str | None) -> 
     except immich.ImmichError as e:
         _outcome(conn, source, e)
         raise
-    if source["status"] != OFF:
-        photo_sources.mark(conn, source["id"], OK, None, source["last_sync"])
+    _record(conn, source, OK, None, source["last_sync"])
     return {"name": account.name, "same_account": account.user_id == source["immich_user_id"]}
 
 
@@ -177,26 +190,31 @@ def change_key(conn: db.Connection, actor: Actor, source_id: int, key: str) -> L
     account = _ping(provider_source(source["url"], key))
     if account.user_id != source["immich_user_id"]:
         raise Refused(OTHER_ACCOUNT)
-    photo_sources.set_key(conn, source_id, key)
-    if source["status"] == OFF:
-        photo_sources.mark(conn, source_id, OFF, None)
+    if not photo_sources.set_key(conn, source_id, key, owner=source["owner_sub"]):
+        raise NoSuchSource()
+    _record(conn, source, OK, None)
     return listed(conn, actor, source_id)
 
 
 def edit(conn: db.Connection, actor: Actor, source_id: int, label: str | None, paused: bool | None, had_label: bool) -> Listed:
     source = owned(conn, actor, source_id)
-    if had_label:
-        photo_sources.set_label(conn, source_id, label)
+    if had_label and not photo_sources.set_label(conn, source_id, label, owner=source["owner_sub"]):
+        raise NoSuchSource()
     if paused is True and source["status"] != OFF:
-        photo_sources.mark(conn, source_id, OFF, None)
+        changed = photo_sources.mark(conn, source_id, OFF, None, owner=source["owner_sub"])
     elif paused is False and source["status"] == OFF:
-        photo_sources.mark(conn, source_id, OK, None)
+        changed = photo_sources.mark(conn, source_id, OK, None, owner=source["owner_sub"])
+    else:
+        changed = True
+    if not changed:
+        raise NoSuchSource()
     return listed(conn, actor, source_id)
 
 
 def remove(conn: db.Connection, actor: Actor, source_id: int) -> None:
-    owned(conn, actor, source_id)
-    photo_sources.remove(conn, source_id)
+    source = owned(conn, actor, source_id)
+    if not photo_sources.remove(conn, source_id, owner=source["owner_sub"]):
+        raise NoSuchSource()
 
 
 def end_lapsed(conn: db.Connection, now: float | None = None) -> int:

@@ -986,7 +986,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PhotoSourceTestBody"
+                "$ref": "#/components/schemas/PhotoSourceNewTestBody"
               }
             }
           }
@@ -6771,6 +6771,22 @@
         "required": [],
         "additionalProperties": false
       },
+      "PhotoSourceNewTestBody": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "key"
+        ],
+        "additionalProperties": false
+      },
       "PhotoSourceTest": {
         "type": "object",
         "properties": {
@@ -6796,9 +6812,6 @@
       "PhotoSourceTestBody": {
         "type": "object",
         "properties": {
-          "url": {
-            "type": "string"
-          },
           "key": {
             "type": "string"
           }
