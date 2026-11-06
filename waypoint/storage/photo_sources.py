@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import ColumnElement, delete, func, select, true, update
 
 from . import db, secretbox
-from .models import Photo, PhotoSource
+from .models import Person, Photo, PhotoSource
 
 Status = Literal["ok", "refused", "unreachable", "off"]
 OK: Status = "ok"
@@ -62,31 +62,41 @@ def for_person(conn: db.Connection, person_id: int) -> list[Stored]:
     return [_stored(r) for r in db.rows(conn.execute(select(*COLUMNS).where(PhotoSource.person_id == person_id).order_by(PhotoSource.id)))]
 
 
-def save(conn: db.Connection, person_id: int, owner_sub: str, url: str, immich_user_id: str, key: str, label: str | None, now: float) -> int:
-    row = PhotoSource(person_id=person_id, owner_sub=owner_sub, url=url, immich_user_id=immich_user_id, api_key=secretbox.encrypt(key) or "",
-                      label=label, status=OK, last_sync=None, last_error=None, created=now)
-    conn.orm.add(row)
-    conn.orm.flush()
-    return int(row.id)
+def lock_person(conn: db.Connection, person_id: int) -> bool:
+    return conn.execute(select(Person.id).where(Person.id == person_id).with_for_update()).fetchone() is not None
 
 
-def set_key(conn: db.Connection, source_id: int, key: str) -> None:
-    conn.execute(update(PhotoSource).where(PhotoSource.id == source_id).values(api_key=secretbox.encrypt(key) or "", status=OK, last_error=None))
+def save(conn: db.Connection, person_id: int, owner_sub: str, url: str, immich_user_id: str, key: str, label: str | None, now: float) -> int | None:
+    values = {"person_id": person_id, "owner_sub": owner_sub, "url": url, "immich_user_id": immich_user_id, "api_key": secretbox.encrypt(key) or "",
+              "label": label, "status": OK, "last_sync": None, "last_error": None, "created": now}
+    if db.insert_ignore(conn, PhotoSource, values, key=["person_id", "url"]).rowcount == 0:
+        return None
+    found = conn.execute(select(PhotoSource.id).where(PhotoSource.person_id == person_id, PhotoSource.url == url, PhotoSource.owner_sub == owner_sub)).scalar()
+    return int(found) if found is not None else None
 
 
-def set_label(conn: db.Connection, source_id: int, label: str | None) -> None:
-    conn.execute(update(PhotoSource).where(PhotoSource.id == source_id).values(label=label))
+def _held_by(source_id: int, owner: str | None) -> tuple[ColumnElement[bool], ColumnElement[bool]]:
+    return PhotoSource.id == source_id, PhotoSource.owner_sub == owner if owner is not None else true()
 
 
-def mark(conn: db.Connection, source_id: int, status: Status, error: str | None = None, synced: float | None = None) -> None:
+def set_key(conn: db.Connection, source_id: int, key: str, owner: str | None = None) -> bool:
+    return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner)).values(api_key=secretbox.encrypt(key) or "")).rowcount) > 0
+
+
+def set_label(conn: db.Connection, source_id: int, label: str | None, owner: str | None = None) -> bool:
+    return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner)).values(label=label)).rowcount) > 0
+
+
+def mark(conn: db.Connection, source_id: int, status: Status, error: str | None = None, synced: float | None = None,
+         owner: str | None = None) -> bool:
     values: dict[str, object] = {"status": status, "last_error": error}
     if synced is not None:
         values["last_sync"] = synced
-    conn.execute(update(PhotoSource).where(PhotoSource.id == source_id).values(**values))
+    return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner)).values(**values)).rowcount) > 0
 
 
-def remove(conn: db.Connection, source_id: int) -> bool:
-    return int(conn.execute(delete(PhotoSource).where(PhotoSource.id == source_id)).rowcount) > 0
+def remove(conn: db.Connection, source_id: int, owner: str | None = None) -> bool:
+    return int(conn.execute(delete(PhotoSource).where(*_held_by(source_id, owner))).rowcount) > 0
 
 
 def source_for_provider(conn: db.Connection, source_id: int) -> Unlocked | None:

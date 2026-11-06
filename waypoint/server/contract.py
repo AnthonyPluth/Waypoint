@@ -668,8 +668,12 @@ class PhotoSourceEdit(TypedDict):
     paused: NotRequired[bool]
 
 
+class PhotoSourceNewTestBody(TypedDict):
+    url: str
+    key: str
+
+
 class PhotoSourceTestBody(TypedDict):
-    url: NotRequired[str]
     key: NotRequired[str]
 
 

@@ -9,7 +9,7 @@ from ...domain.photosources import Actor
 from ...providers import immich
 from .. import jobs
 from ..common import ApiError, _current, row_id
-from ..contract import (Ok, PhotoBody, PhotoReview, PhotoSource, PhotoSourceBody, PhotoSourceEdit, PhotoSources, PhotoSourceTest, PhotoSourceTestBody,
+from ..contract import (Ok, PhotoBody, PhotoReview, PhotoSource, PhotoSourceBody, PhotoSourceEdit, PhotoSourceNewTestBody, PhotoSources, PhotoSourceTest, PhotoSourceTestBody,
                         SyncStarted, TripPhoto, TripPhotos)
 from .trips import NO_TRIP, _run, viewer
 
@@ -115,7 +115,7 @@ def api_photo_source_add(conn, _q, body: PhotoSourceBody) -> PhotoSource:
     return PhotoSource(**_ask(lambda: photosources.connect(conn, me, person, url, key, label)))
 
 
-def api_photo_source_test_new(conn, _q, body: PhotoSourceTestBody) -> PhotoSourceTest:
+def api_photo_source_test_new(conn, _q, body: PhotoSourceNewTestBody) -> PhotoSourceTest:
     actor(conn)
     url, key = _url(body, True), _key(body, True)
     assert url is not None and key is not None
