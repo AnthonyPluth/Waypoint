@@ -182,15 +182,16 @@ def lock(conn: db.Connection, person_id: int) -> bool:
 
 
 def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) -> Listed:
-    me = conn.orm.get(Person, member_id, with_for_update=True)
+    held = {person_id: lock(conn, person_id) for person_id in sorted((member_id, guest_id))}
+    me = conn.orm.get(Person, member_id, with_for_update=True) if held[member_id] else None
     if me is None or me.user_sub is None:
         raise NotAMember()
-    if not lock(conn, guest_id):
+    if not held[guest_id]:
         raise NoSuchGuest()
     guest = conn.orm.get(Person, guest_id)
     if guest is None:
         raise NoSuchGuest()
-    photogrants.lock_trips_of(conn, guest_id)
+    photogrants.lock_trips_of(conn, guest_id, member_id)
     if guest.user_sub is not None:
         raise NotAGuest()
     if decode_links(me.links):
