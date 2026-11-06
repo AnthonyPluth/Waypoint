@@ -1112,3 +1112,39 @@ class TenthReviewTests(SyncCase):
         self.sync(NOW + timedelta(days=8, hours=1))
         self.assertEqual(sorted(self.rows()), sorted(a["id"] for a in self.lib.items))
         self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{self.source}"))
+
+
+class EleventhReviewTests(SyncCase):
+    def setUp(self):
+        super().setUp()
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
+        self.sync()
+        self.broken = {**self.lib.items[0], "localDateTime": "not a time"}
+
+    def test_a_dropped_item_then_a_failing_window_leaves_no_generation_to_finish(self):
+        self.lib.items = [self.broken, self.lib.items[1]]
+        asked = []
+
+        def fail_second(q):
+            asked.append(1)
+            if len(asked) == 1:
+                self.lib.fail(500)
+        self.lib.on_search = fail_second
+        self.assertEqual(self.sync(NOW + timedelta(days=8)).failed, 1)
+        self.assertEqual(len(asked), 1)
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+        self.lib.heal()
+        self.lib.on_search = None
+        photo_sources.mark(self.c, self.source, "ok", None)
+        self.c.commit()
+        self.sync(NOW + timedelta(days=8, hours=1))
+        self.assertIn(self.broken["id"], self.rows())
+
+    def test_a_relist_that_dropped_an_item_records_no_success(self):
+        self.lib.items = [self.broken, self.lib.items[1]]
+        got = self.sync(NOW + timedelta(days=8))
+        self.assertEqual(got.failed, 1)
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"], self.stored()["last_sync"]), ("ok", photosync.TOO_DENSE, NOW.timestamp()))
+        self.lib.items = [{**self.broken, "localDateTime": self.lib.items[1]["localDateTime"].replace("06-04", "06-02")}, self.lib.items[1]]
+        self.sync(NOW + timedelta(days=8, hours=1))
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"], self.stored()["last_sync"]), ("ok", None, (NOW + timedelta(days=8, hours=1)).timestamp()))

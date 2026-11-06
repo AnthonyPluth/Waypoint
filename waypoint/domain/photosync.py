@@ -90,6 +90,7 @@ class _Run:
     summary: Summary
     sealed: str | None = None
     dropped: int = 0
+    relist: float | None = None
 
     @property
     def person(self) -> int:
@@ -251,6 +252,9 @@ def _write(run: _Run, trip_id: int, got: immich.Page) -> Written:
         return "changed"
     windows = [w for t, w in current.items() if t in live]
     run.dropped += got.dropped
+    if got.dropped and run.relist is not None:
+        db.set_setting(conn, _key(sk.PHOTOS_RELIST_STARTED, run.source_id), None)
+        run.relist = None
     assets = list({a.id: a for a in got.assets}.values())
     existing = {p.asset_id: p for p in _rows(conn, run.source_id, [a.id for a in assets])}
     excluded = _exclusions(conn, run.person, [a.id for a in assets])
@@ -379,6 +383,7 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
     if fresh and not job.windows:
         started = None
     windows = job.windows
+    job.relist = started
     finished, dense, moved = True, False, False
     wanted = [t for t in windows if trips is None or t in trips]
     if started is not None:
@@ -397,15 +402,13 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         _failed(conn, source, e, job.sealed)
         summary.failed = 1
         return summary
-    if started is not None and job.dropped:
-        db.set_setting(conn, _key(sk.PHOTOS_RELIST_STARTED, source_id), None)
-        conn.commit()
+    if job.dropped:
         started = None
     if started is not None and not dense and not moved and _done_since(conn, source_id, windows, started) == set(windows):
         if not _finish_relist(job, started):
             return summary
         started = None
-    if dense:
+    if dense or job.dropped:
         summary.failed = 1
         photo_sources.mark(conn, source_id, OK, TOO_DENSE, keep_off=True, sealed=job.sealed, was=(source["status"], source["last_error"]))
         conn.commit()
