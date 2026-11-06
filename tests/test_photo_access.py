@@ -308,6 +308,17 @@ class StewardTests(AccessCase):
         self.assertEqual(self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-sharing?person_id={self.kid}")["state"], "declined")
         self.assertEqual(self.seen_by("ben"), [])
 
+    def test_a_steward_reads_the_childs_sharing_state_and_removed_list_and_nobody_else_does(self):
+        self.keep(grant_row(self.kid, self.trip, "only_me", by="sub-ana"))
+        theirs = self.kids()
+        self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-exclusions", {"photo_ids": [theirs]})
+        got = self.ok("ana", "GET", f"/api/trips/{self.trip}/photo-sharing?person_id={self.kid}")
+        self.assertEqual((got["state"], got["scope"], [p["id"] for p in got["removed"]]), ("shared", "only_me", [theirs]))
+        self.assertEqual(self.sharing("ana")["state"], "none")
+        self.assertEqual(self.call("ben", "GET", f"/api/trips/{self.trip}/photo-sharing?person_id={self.kid}"), (404, NO_TRIP))
+        self.assertEqual(self.call("ana", "GET", f"/api/trips/{self.trip}/photo-sharing?person_id={self.person['ben']}"), (404, NO_TRIP))
+        self.assertEqual(self.call("ana", "GET", f"/api/trips/{self.trip}/photo-sharing?person_id=x")[0], 400)
+
     def test_a_library_alone_makes_nobody_a_steward(self):
         with db.session() as conn:
             conn.execute(delete(PhotoSharingPrefs).where(PhotoSharingPrefs.person_id == self.kid))
