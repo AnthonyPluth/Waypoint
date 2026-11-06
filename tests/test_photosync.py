@@ -553,8 +553,8 @@ class TripChangeTests(SyncCase):
         self.assertIsNone(self.c.orm.get(PhotoGrant, (self.mia, self.b)))
         self.c.orm.add(PhotoGrant(person_id=self.mia, trip_id=self.b, scope="trip", revoked=None, changed=1.0, granted_by="u-unknown"))
         self.c.orm.flush()
-        photogrants.reconcile_all(self.c)
-        self.assertIsNotNone(self.c.orm.get(PhotoGrant, (self.mia, self.b)))
+        self.assertEqual(photogrants.reconcile_all(self.c), 1)
+        self.assertIsNone(self.c.orm.get(PhotoGrant, (self.mia, self.b)))
 
     def test_merging_carries_exclusions_and_re_places_the_rows(self):
         self.lib.items = [asset(1, "2026-06-04T12:00:00Z", gps=SOHO), asset(2, "2026-06-03T12:00:00Z", gps=SOHO)]

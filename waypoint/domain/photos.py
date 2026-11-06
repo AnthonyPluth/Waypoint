@@ -12,7 +12,7 @@ from typing import Literal, TypedDict, cast
 from sqlalchemy import ColumnElement, and_, false, or_, select
 
 from ..storage import db, geocode
-from ..storage.models import Airport, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSource, Segment, Trip, TripPerson
+from ..storage.models import Airport, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, Segment, Trip, TripPerson
 from . import photomatch, trippeople, trips, visibility
 from .photomatch import CLUSTER, GAP, NEAR, MatchKind, PhotoIn, Point, SegmentPoint, TripWindow, window
 from .stats import EARTH_RADIUS_KM, distance_km
@@ -215,8 +215,8 @@ def persons_of(conn: db.Connection, viewer: Viewer) -> list[int]:
     sub = viewer_sub(conn, viewer)
     if sub is None:
         return [viewer.person_id]
-    stewarded = conn.execute(select(PhotoSource.person_id).join(Person, Person.id == PhotoSource.person_id).distinct()
-                             .where(Person.user_sub.is_(None), PhotoSource.owner_sub == sub)).scalars()
+    stewarded = conn.execute(select(PhotoSharingPrefs.person_id).join(Person, Person.id == PhotoSharingPrefs.person_id)
+                             .where(Person.user_sub.is_(None), PhotoSharingPrefs.steward_sub == sub)).scalars()
     return [viewer.person_id, *sorted(p for p in stewarded if p != viewer.person_id)]
 
 
@@ -259,10 +259,21 @@ def visible_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found |
     return found[0] if found else None
 
 
-def _candidates(conn: db.Connection, photo: Photo, person: int, windows: Sequence[TripWindow]) -> list[TripWindow]:
+def _candidates(conn: db.Connection, photo: Photo, person: int, windows: Sequence[TripWindow], seen: set[int] | None = None) -> list[TripWindow]:
     taken = instant(photo.taken_utc)
     left_out = excluded_trips(conn, person, photo.asset_id)
-    return [w for w in windows if w.start <= taken <= w.end and w.trip_id not in left_out]
+    return [w for w in windows if w.start <= taken <= w.end and w.trip_id not in left_out and (seen is None or w.trip_id in seen)]
+
+
+def _seen(conn: db.Connection, viewer: Viewer) -> set[int]:
+    return {t.id for t in visibility.visible_trips(conn, viewer)}
+
+
+def _with_candidates(conn: db.Connection, viewer: Viewer, rows: Sequence[Found]) -> list[tuple[Photo, int, list[TripWindow]]]:
+    seen = _seen(conn, viewer)
+    windows = {person: candidate_windows(conn, person) for person in sorted({person for _, person in rows})}
+    found = [(p, person, _candidates(conn, p, person, windows[person], seen)) for p, person in rows]
+    return [(p, person, candidates) for p, person, candidates in found if candidates]
 
 
 def unsettled(conn: db.Connection, viewer: Viewer, photo_id: int | None = None) -> list[tuple[Photo, int, list[TripWindow]]]:
@@ -270,10 +281,7 @@ def unsettled(conn: db.Connection, viewer: Viewer, photo_id: int | None = None) 
     if not persons:
         return []
     where = [PhotoSource.person_id.in_(persons), Photo.match == AMBIGUOUS, Photo.trip_id.is_(None), or_(Photo.decided_by.is_(None), Photo.decided_by != OWNER)]
-    rows = _rows(conn, *where, *([Photo.id == photo_id] if photo_id is not None else []))
-    windows = {person: candidate_windows(conn, person) for person in sorted({person for _, person in rows})}
-    found = [(p, person, _candidates(conn, p, person, windows[person])) for p, person in rows]
-    return [(p, person, candidates) for p, person, candidates in found if candidates]
+    return _with_candidates(conn, viewer, _rows(conn, *where, *([Photo.id == photo_id] if photo_id is not None else [])))
 
 
 def removed(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[Found]:
@@ -527,8 +535,7 @@ def for_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripPhotos | 
 def _far_rows(conn: db.Connection, viewer: Viewer) -> list[tuple[Photo, int, list[TripWindow]]]:
     persons = persons_of(conn, viewer)
     rows = _query(conn, viewer, PhotoSource.person_id.in_(persons), Photo.match == FAR, or_(Photo.decided_by.is_(None), Photo.decided_by != OWNER))
-    windows = {person: candidate_windows(conn, person) for person in sorted({person for _, person in rows})}
-    return [(p, person, _candidates(conn, p, person, windows[person])) for p, person in rows]
+    return _with_candidates(conn, viewer, rows)
 
 
 def needs_a_look(conn: db.Connection, viewer: Viewer) -> PhotoReview:
@@ -615,7 +622,7 @@ def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | No
     if excluded:
         if photo.match != AMBIGUOUS or photo.trip_id is not None:
             raise trips.Invalid(NOT_UNSETTLED)
-        for w in _candidates(conn, photo, person, candidate_windows(conn, person)):
+        for w in _candidates(conn, photo, person, candidate_windows(conn, person), _seen(conn, viewer)):
             db.insert_ignore(conn, PhotoExclusion, {"person_id": person, "asset_id": photo.asset_id, "trip_id": w.trip_id, "created": time.time()},
                              key=["person_id", "asset_id", "trip_id"])
     conn.orm.flush()

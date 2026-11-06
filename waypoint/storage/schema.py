@@ -539,6 +539,8 @@ photo_sharing_prefs = Table(
     Column('default_scope', Text, nullable=False, server_default=text("'only_me'"), doc='the scope the prompt preselects and Share on all my trips shares with'),
     Column('share_all', Boolean, nullable=False, server_default=false(), doc='Share on all my trips: every trip the person is on, including ones joined later, is shared without asking'),
     Column('set_by', Text, doc='the member who last turned share_all on (users.sub); the setting ends with their access'),
+    Column('share_all_since', Float, doc='epoch seconds share_all was last turned on; null while off. A revoked row older than this was declined before the setting'),
+    Column('steward_sub', Text, doc='for a person without a sign-in, the member who shares for them (users.sub), set with their first library; null for a person with a sign-in'),
     CheckConstraint("default_scope IN ('only_me', 'trip')", name='ck_photo_sharing_prefs_default_scope'),
     info={'doc': "a person's photo sharing preferences: the default scope and the standing Share on all my trips setting"},
 )
