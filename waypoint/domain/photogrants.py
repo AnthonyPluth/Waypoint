@@ -444,9 +444,12 @@ def _active(conn: db.Connection, trip_id: int) -> list[PhotoGrant]:
     return list(conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.trip_id == trip_id, PhotoGrant.revoked.is_(None)).order_by(PhotoGrant.person_id)).all())
 
 
-def _lock_applicable(conn: db.Connection, trip_id: int, aboard: set[int]) -> None:
-    for person in sorted(_photo_people(conn, trip_id) | aboard):
-        lock(conn, person, sorted(photos.granted_trips(conn, person) | {trip_id}))
+def lock_grants_for(conn: db.Connection, trip_ids: Iterable[int]) -> None:
+    ids = sorted(set(trip_ids))
+    aboard = trippeople.of(conn, ids)
+    involved = {person for trip_id in ids for person in _photo_people(conn, trip_id) | set(aboard[trip_id])}
+    for person in sorted(involved):
+        lock(conn, person, sorted(photos.granted_trips(conn, person) | set(ids)))
 
 
 def _re_place_shrunk(conn: db.Connection, trip_id: int, after: TripWindow | None) -> None:
@@ -481,9 +484,10 @@ def _ask_again(conn: db.Connection, trip_id: int, now: float) -> None:
 def trips_changed(conn: db.Connection, trip_ids: Iterable[int], before: Mapping[int, Before] | None = None, now: float | None = None) -> None:
     stamp = time.time() if now is None else now
     settled: list[tuple[int, Before, TripWindow | None]] = []
-    for trip_id in lock_trips(conn, trip_ids):
+    held = lock_trips(conn, trip_ids)
+    lock_grants_for(conn, held)
+    for trip_id in held:
         aboard = set(trippeople.of(conn, [trip_id])[trip_id])
-        _lock_applicable(conn, trip_id, aboard)
         was = before.get(trip_id) if before is not None else None
         after = photos.trip_window(conn, trip_id) if was is not None else None
         if was is not None and (aboard - was.people or _grew(was.window, after)):
