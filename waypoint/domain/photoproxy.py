@@ -121,7 +121,7 @@ def _gone(conn: db.Connection, served: Served, library: Library) -> None:
             return
     except (Missing, Unavailable):
         return
-    photos.forget(conn, served.photo_id)
+    photos.forget(conn, served.photo_id, served.source_id, served.asset_id)
     conn.commit()
 
 
@@ -179,7 +179,8 @@ def _typed(served: Served, data: bytes) -> tuple[str, bool]:
 
 def _still_served(viewer: Viewer, served: Served) -> bool:
     with db.session() as conn:
-        return photos.served(conn, viewer, served.photo_id) is not None
+        found = photos.served(conn, viewer, served.photo_id)
+        return found is not None and (found[0].id, found[0].source_id, found[0].asset_id, found[0].asset_updated) == served.revision
 
 
 def _body(viewer: Viewer, served: Served, original: immich.Original, prefix: bytes) -> Body:

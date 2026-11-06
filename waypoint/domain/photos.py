@@ -12,7 +12,7 @@ from datetime import UTC, datetime, time as clock
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import Literal, TypedDict, cast
 
-from sqlalchemy import ColumnElement, and_, false, or_, select
+from sqlalchemy import ColumnElement, and_, delete, false, or_, select
 
 from ..storage import db, geocode
 from ..storage.models import Airport, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, Segment, Trip, TripPerson
@@ -368,13 +368,10 @@ def served(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | None:
     return visible_photo(conn, viewer, photo_id) or next(((p, person) for p, person, _ in unsettled(conn, viewer, photo_id)), None)
 
 
-def forget(conn: db.Connection, photo_id: int) -> bool:
-    row = conn.orm.get(Photo, photo_id)
-    if row is None:
-        return False
-    conn.orm.delete(row)
-    conn.orm.flush()
-    return True
+def forget(conn: db.Connection, photo_id: int, source_id: int, asset_id: str) -> bool:
+    gone = conn.execute(delete(Photo).where(Photo.id == photo_id, Photo.source_id == source_id, Photo.asset_id == asset_id))
+    conn.orm.expire_all()
+    return int(gone.rowcount) > 0
 
 
 @functools.lru_cache(maxsize=64)

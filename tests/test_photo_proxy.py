@@ -276,6 +276,19 @@ class RenditionTests(ProxyCase):
         self.assertIsNone(stored(self.mine))
         self.missing("ben", f"/api/photos/{self.mine}/preview")
 
+    def test_a_missing_asset_deletes_only_the_row_that_was_served_never_one_that_reused_its_id(self):
+        self.immich.routes[f"{self.asset}/thumbnail"] = failing(http_error(404))
+        replacement = []
+
+        def gone_meanwhile(sent):
+            replacement.append(self.replace_asset(self.mine))
+            raise http_error(404)
+
+        self.immich.routes[self.asset] = gone_meanwhile
+        self.missing("ana", f"/api/photos/{self.mine}/thumbnail")
+        self.assertEqual(f"/api/assets/{self.asset_of(self.mine)}", replacement[0])
+        self.assertIsNotNone(stored(self.mine))
+
     def test_a_missing_original_follows_the_same_rule(self):
         self.immich.routes[f"{self.asset}/original"] = failing(http_error(404))
         self.missing("ana", f"/api/photos/{self.mine}/original")
@@ -443,7 +456,7 @@ class OriginalTests(ProxyCase):
         self.assertEqual(bytes(got), body[:len(got)])
         self.missing("ana", f"/api/photos/{self.mine}/original")
 
-    def test_nothing_more_is_sent_once_the_photo_is_taken_back_while_a_read_is_blocked(self):
+    def blocked_stream(self, taken_back):
         body = bytes(MP4) * 4
         gate = threading.Event()
         self.addCleanup(gate.set)
@@ -456,12 +469,19 @@ class OriginalTests(ProxyCase):
             self.assertEqual(reply.status, 200)
             first = reply.read(4096)
             self.assertEqual(first, body[:4096])
-            self.revoke("ben")
+            taken_back()
             gate.set()
             rest = bytearray()
             while piece := reply.read(1024):
                 rest += piece
         self.assertEqual(bytes(rest), b"")
+
+    def test_nothing_more_is_sent_once_the_photo_is_taken_back_while_a_read_is_blocked(self):
+        self.blocked_stream(lambda: self.revoke("ben"))
+
+    def test_a_stream_stops_when_another_photo_takes_over_its_id(self):
+        self.blocked_stream(lambda: self.replace_asset(self.mine))
+        self.assertEqual(self.get("ana", f"/api/photos/{self.mine}/original")[0], 404)
 
 
 class RouteTests(unittest.TestCase):
