@@ -9,6 +9,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import httpx
+
 
 @functools.cache
 def ssl_context() -> ssl.SSLContext:
@@ -102,3 +104,13 @@ def urlopen(req: urllib.request.Request | str, timeout: float, *, allow_http: bo
     if public_only:
         handlers = (*handlers, urllib.request.ProxyHandler({}), _PublicHandler())
     return opener(*handlers, allow_http=allow_http and not public_only).open(req, timeout=timeout)
+
+
+def post_http2(url: str, headers: dict[str, str], content: bytes, timeout: float) -> tuple[int, bytes]:
+    check_scheme(url)
+    try:
+        with httpx.Client(http2=True, verify=ssl_context(), timeout=timeout, follow_redirects=False) as client:
+            r = client.post(url, headers=headers, content=content)
+            return r.status_code, r.content[:1024]
+    except httpx.HTTPError as e:
+        raise ConnectionError("couldn't reach the server") from e

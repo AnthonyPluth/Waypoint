@@ -19,6 +19,21 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/tls.py"]
 
+  - id: waypoint-raw-httpx
+    message: >-
+      Open outbound connections only in waypoint/tls.py (certificate checks, https only, no stray redirects). Add a
+      helper there, as post_http2, rather than importing httpx or http.client elsewhere.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: import httpx
+      - pattern: import http.client
+      - pattern: from httpx import $X
+      - pattern: http.client.$C(...)
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/tls.py"]
+
   - id: waypoint-unvalidated-body
     message: >-
       Read a request body's fields through waypoint/validate.py (it rejects what isn't the right type with a message

@@ -4,17 +4,19 @@ import os
 import tempfile
 import time
 import unittest
+import urllib.error
 from datetime import UTC, date, datetime
 from unittest import mock
 
-import httpx
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from sqlalchemy import delete, select
 
-from waypoint import monitoring
+import httpx
+
+from waypoint import monitoring, tls
 from waypoint.domain import app_push, reminders
 from waypoint.providers import apns
 from waypoint.storage import db
@@ -220,15 +222,21 @@ class AppleCallTests(unittest.TestCase):
             with mock.patch.object(apns, "post", return_value=(status, body)), self.assertRaises(RuntimeError) as caught:
                 apns.push(self.creds, TOKEN, "production")
             self.assertNotIn(TOKEN, str(caught.exception))
-        with mock.patch.object(apns, "post", side_effect=httpx.ConnectError("down")), self.assertRaises(RuntimeError):
+        with mock.patch.object(apns, "post", side_effect=ConnectionError("down")), self.assertRaises(RuntimeError):
             apns.push(self.creds, TOKEN, "production")
 
     def test_it_does_not_follow_redirects(self):
-        with mock.patch.object(apns.httpx, "Client") as client:
+        with mock.patch.object(tls.httpx, "Client") as client:
             client.return_value.__enter__.return_value.post.return_value = mock.Mock(status_code=200, content=b"")
-            apns.post("https://api.push.apple.com/3/device/x", {}, b"{}", 5)
+            tls.post_http2("https://api.push.apple.com/3/device/x", {}, b"{}", 5)
         self.assertIs(client.call_args.kwargs["follow_redirects"], False)
         self.assertIs(client.call_args.kwargs["http2"], True)
+
+    def test_http2_posts_are_https_only_and_connection_failures_are_connection_errors(self):
+        with self.assertRaises(urllib.error.URLError):
+            tls.post_http2("http://api.push.apple.com/3/device/x", {}, b"{}", 5)
+        with mock.patch.object(tls.httpx, "Client", side_effect=httpx.ConnectError("down")), self.assertRaises(ConnectionError):
+            tls.post_http2("https://api.push.apple.com/3/device/x", {}, b"{}", 5)
 
 
 class ApiTests(base.RouteCase):

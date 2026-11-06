@@ -7,7 +7,6 @@ import time
 
 from dataclasses import dataclass
 
-import httpx
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -57,9 +56,7 @@ def provider_token(creds: Credentials, now: float) -> str:
 
 
 def post(url: str, headers: dict[str, str], content: bytes, timeout: float) -> tuple[int, bytes]:
-    with httpx.Client(http2=True, verify=tls.ssl_context(), timeout=timeout, follow_redirects=False) as client:
-        r = client.post(url, headers=headers, content=content)
-        return r.status_code, r.content[:1024]
+    return tls.post_http2(url, headers, content, timeout)
 
 
 def push(creds: Credentials, token: str, environment: str, collapse_id: str | None = None, timeout: float = 10) -> None:
@@ -70,7 +67,7 @@ def push(creds: Credentials, token: str, environment: str, collapse_id: str | No
         headers["apns-collapse-id"] = collapse_id
     try:
         status, raw = post(f"{HOSTS[environment]}/3/device/{token}", headers, BODY, timeout)
-    except httpx.HTTPError as e:
+    except ConnectionError as e:
         raise RuntimeError("couldn't reach Apple's push service") from e
     if status == 200:
         return
