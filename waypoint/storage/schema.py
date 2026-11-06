@@ -46,6 +46,7 @@ auth_sessions = Table(
     Column('created', Float),
     Column('expires', Float),
     Column('id_token', Text),
+    Column('grant_id', Integer, refers('auth_sessions', 'grant_id', 'oauth_grants.id', 'CASCADE'), doc='the iPhone app grant that asked for this session; such a session ends with the grant and is never renewed'),
     info={'doc': 'signed-in browsers (only a hash of each session token is kept)'},
 )
 

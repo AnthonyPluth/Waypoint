@@ -16,7 +16,7 @@ from sqlalchemy import delete, exists, insert, or_, select, true, update
 
 from .. import oidc
 from ..storage import db
-from ..storage.models import OAuthClient, OAuthCode, OAuthConsent, OAuthGrant, OAuthToken
+from ..storage.models import AuthSession, OAuthClient, OAuthCode, OAuthConsent, OAuthGrant, OAuthToken
 
 SCOPES = ("read", "write")
 SETTINGS_SCOPES = (*SCOPES, "mail", "app")
@@ -514,6 +514,7 @@ def revoke_grant(conn, grant_id: int, reason: str, now: float | None = None) -> 
                         .values(revoked=now, revoked_reason=reason)).rowcount == 1
     conn.execute(delete(OAuthCode).where(OAuthCode.grant_id == grant_id))
     conn.execute(delete(OAuthToken).where(OAuthToken.grant_id == grant_id))
+    conn.execute(delete(AuthSession).where(AuthSession.grant_id == grant_id))
     return done
 
 

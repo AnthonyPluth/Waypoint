@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 from tests import test_mcp_oauth_http as base
 from waypoint.server import mcp_oauth
 from waypoint.storage import db
-from waypoint.storage.models import OAuthClient, OAuthGrant, User
+from waypoint.storage.models import AuthSession, OAuthClient, OAuthGrant, User
 
 APP = {"client_id": mcp_oauth.APP_CLIENT, "redirect_uris": [mcp_oauth.APP_REDIRECT]}
 APP_HEADERS = {"X-Waypoint": "1"}
@@ -152,6 +152,32 @@ class AppSessionTests(AppSignIn):
             r = self.api(t, "POST", "/auth/app-session", b"", APP_HEADERS)
         self.assertEqual(r.status, 200, r.body)
         self.assertLessEqual(r.json["max_age"], 12 * 3600 + 5)
+
+    def minted(self):
+        t = self.app_tokens()
+        cookie = self.api(t["access_token"], "POST", "/auth/app-session", b"", APP_HEADERS).json["value"]
+        return t, {"waypoint_session": cookie}
+
+    def test_using_the_session_does_not_stretch_it(self):
+        _t, cookie = self.minted()
+        with db.session() as conn:
+            before = [r[0] for r in conn.execute(select(AuthSession.expires).where(AuthSession.grant_id.is_not(None)))]
+        for _ in range(2):
+            self.assertEqual(self.http("GET", "/api/trips", cookies=cookie).status, 200)
+        with db.session() as conn:
+            self.assertEqual([r[0] for r in conn.execute(select(AuthSession.expires).where(AuthSession.grant_id.is_not(None)))], before)
+
+    def test_signing_out_of_the_app_ends_its_web_session(self):
+        t, cookie = self.minted()
+        self.assertEqual(self.http("GET", "/api/trips", cookies=cookie).status, 200)
+        self.form("/oauth/revoke", {"token": t["refresh_token"], "client_id": mcp_oauth.APP_CLIENT})
+        self.assertEqual(self.http("GET", "/api/trips", cookies=cookie).status, 401)
+
+    def test_a_revoked_grant_with_a_leftover_session_row_is_refused(self):
+        _t, cookie = self.minted()
+        with db.session() as conn:
+            conn.execute(update(OAuthGrant).where(OAuthGrant.client_id == mcp_oauth.APP_CLIENT).values(revoked=time.time()))
+        self.assertEqual(self.http("GET", "/api/trips", cookies=cookie).status, 401)
 
     def test_it_needs_the_app_header_and_a_valid_app_token(self):
         t = self.app_tokens()["access_token"]
