@@ -93,6 +93,7 @@ class Source:
     url: str = field(repr=False)
     key: str = field(repr=False)
     allow_http: bool = False
+    user_id: str | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True)
@@ -338,15 +339,15 @@ def _position(exif: dict[str, Any]) -> tuple[float, float] | None:
     return lat, lon
 
 
-def parse_asset(item: Any) -> Asset | None:
-    if not isinstance(item, dict):
+def parse_asset(item: Any, owner: str) -> Asset | None:
+    if not isinstance(item, dict) or item.get("ownerId") != owner:
         return None
     asset_id, kind_name = item.get("id"), item.get("type")
     kind = KINDS.get(kind_name) if isinstance(kind_name, str) else None
     if not isinstance(asset_id, str) or not ASSET_ID.fullmatch(asset_id) or kind is None:
         return None
     exif: dict[str, Any] = item["exifInfo"] if isinstance(item.get("exifInfo"), dict) else {}
-    taken = _instant(item.get("fileCreatedAt")) or _instant(exif.get("dateTimeOriginal"))
+    taken = _instant(item.get("fileCreatedAt"))
     local, updated = taken_local(item.get("localDateTime")), _instant(item.get("updatedAt"))
     if taken is None or local is None or updated is None:
         return None
@@ -367,12 +368,13 @@ def next_page(value: Any, page: int) -> int | None:
     return number if number > page else None
 
 
-def parse_page(body: Any, page: int) -> Page:
+def parse_page(body: Any, page: int, owner: str) -> Page:
     assets = body.get("assets") if isinstance(body, dict) else None
     items = assets.get("items") if isinstance(assets, dict) else None
     if not isinstance(assets, dict) or not isinstance(items, list):
         raise Unavailable(UNREADABLE)
-    return Page(assets=tuple(a for item in items if (a := parse_asset(item))), next_page=next_page(assets.get("nextPage"), page))
+    found = tuple(a for item in items if (a := parse_asset(item, owner)))
+    return Page(assets=found, next_page=next_page(assets.get("nextPage"), page))
 
 
 def parse_markers(body: Any) -> list[Marker]:
@@ -418,8 +420,10 @@ def search_body(taken_after: datetime, taken_before: datetime, updated_after: da
 
 def search(source: Source, taken_after: datetime, taken_before: datetime, *, updated_after: datetime | None = None,
            page: int = 1) -> Page:
+    if not source.user_id:
+        raise NotConfigured(NOT_CONFIGURED)
     body = search_body(taken_after, taken_before, updated_after, page)
-    return parse_page(_json(source, _request(source, SEARCH, JSON_TYPE, body=body)), page)
+    return parse_page(_json(source, _request(source, SEARCH, JSON_TYPE, body=body)), page, source.user_id)
 
 
 def markers(source: Source, after: datetime, before: datetime) -> list[Marker]:

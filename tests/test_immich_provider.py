@@ -18,6 +18,8 @@ from waypoint.providers import immich
 FIXTURES = Path(__file__).parent / "fixtures" / "immich"
 KEY = "canary-immich-key-q7v3x9"
 ASSET = "0a000000-0000-4000-8000-000000000001"
+OWNER = "0c000000-0000-4000-8000-000000000001"
+PARTNER = "0c000000-0000-4000-8000-000000000002"
 AFTER = datetime(2026, 7, 1, 4, 0, tzinfo=UTC)
 BEFORE = datetime(2026, 7, 10, 3, 59, 59, tzinfo=UTC)
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -65,7 +67,7 @@ class FakeImmich(ThreadingHTTPServer):
 
     @property
     def source(self) -> immich.Source:
-        return immich.Source(url=f"http://127.0.0.1:{self.server_port}", key=KEY, allow_http=True)
+        return immich.Source(url=f"http://127.0.0.1:{self.server_port}", key=KEY, allow_http=True, user_id=OWNER)
 
 
 def serve(case) -> FakeImmich:
@@ -120,7 +122,7 @@ class CleanUrlTests(unittest.TestCase):
 
 class ParseTests(unittest.TestCase):
     def setUp(self):
-        self.page = immich.parse_page(json.loads(fixture("search_page")), 1)
+        self.page = immich.parse_page(json.loads(fixture("search_page")), 1, OWNER)
         self.by_id = {a.id[-2:]: a for a in self.page.assets}
 
     def test_a_mixed_page_becomes_records_and_drops_what_has_no_time_or_kind(self):
@@ -164,37 +166,48 @@ class ParseTests(unittest.TestCase):
                          ("2026-08-15T08:00:00.000Z", "2026-08-15T10:00", None, None, None))
 
     def test_file_created_wins_over_date_time_original(self):
-        item = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T09:00:00.000Z",
+        item = {"id": "a1", "type": "IMAGE", "ownerId": OWNER, "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T09:00:00.000Z",
                 "updatedAt": "2026-01-02T00:00:00Z", "exifInfo": {"dateTimeOriginal": "2026-01-01T09:00:05.000Z", "timeZone": None}}
-        a = immich.parse_asset(item)
+        a = immich.parse_asset(item, OWNER)
         assert a
         self.assertEqual((a.taken_utc, a.taken_offset), ("2026-01-01T09:00:00.000Z", None))
 
-    def test_date_time_original_is_used_only_when_file_created_is_missing_or_unusable(self):
+    def test_an_asset_without_a_usable_file_created_is_skipped(self):
         for created in (None, "", "yesterday", "2026-01-01T09:00:00"):
-            item = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": created,
-                    "updatedAt": "2026-01-02T00:00:00Z", "exifInfo": {"dateTimeOriginal": "2026-01-01T09:00:00.000Z", "timeZone": "Europe/Paris"}}
-            with self.subTest(created=created):
-                a = immich.parse_asset(item)
-                assert a
-                self.assertEqual((a.taken_utc, a.taken_offset), ("2026-01-01T09:00:00.000Z", 60))
+            for zone in (None, "Europe/Paris"):
+                item = {"id": "a1", "type": "IMAGE", "ownerId": OWNER, "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": created,
+                        "updatedAt": "2026-01-02T00:00:00Z", "exifInfo": {"dateTimeOriginal": "2026-01-01T09:00:00.000Z", "timeZone": zone}}
+                with self.subTest(created=created, zone=zone):
+                    self.assertIsNone(immich.parse_asset(item, OWNER))
+
+    def test_another_owner_s_asset_is_dropped(self):
+        self.assertNotIn("11", self.by_id)
+        good = {"id": "a1", "type": "IMAGE", "ownerId": OWNER, "localDateTime": "2026-01-01T10:00:00.000Z",
+                "fileCreatedAt": "2026-01-01T15:00:00.000Z", "updatedAt": "2026-01-02T00:00:00Z"}
+        self.assertIsNotNone(immich.parse_asset(good, OWNER))
+        for owner in (PARTNER, None, "", 7, OWNER.upper()):
+            with self.subTest(owner=owner):
+                self.assertIsNone(immich.parse_asset({**good, "ownerId": owner}, OWNER))
+        without = dict(good)
+        del without["ownerId"]
+        self.assertIsNone(immich.parse_asset(without, OWNER))
 
     def test_the_offset_comes_only_from_the_time_zone(self):
-        base = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T09:00:00.000Z",
+        base = {"id": "a1", "type": "IMAGE", "ownerId": OWNER, "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T09:00:00.000Z",
                 "updatedAt": "2026-01-02T00:00:00Z"}
         for exif, offset in (({"dateTimeOriginal": "2026-01-01T09:00:00.000Z", "timeZone": None}, None),
                              ({"dateTimeOriginal": "2026-01-01T10:00:00+01:00"}, None),
                              ({"dateTimeOriginal": "2026-01-01T09:00:00.000Z", "timeZone": "Mars/Olympus_Mons"}, None),
                              ({"dateTimeOriginal": "2026-01-01T09:00:00.000Z", "timeZone": "UTC+01:00"}, 60)):
             with self.subTest(exif=exif):
-                a = immich.parse_asset({**base, "exifInfo": exif})
+                a = immich.parse_asset({**base, "exifInfo": exif}, OWNER)
                 assert a
                 self.assertEqual(a.taken_offset, offset)
 
     def test_assets_that_are_not_usable_are_dropped(self):
-        good = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T15:00:00.000Z",
+        good = {"id": "a1", "type": "IMAGE", "ownerId": OWNER, "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T15:00:00.000Z",
                 "updatedAt": "2026-01-02T00:00:00Z"}
-        self.assertIsNotNone(immich.parse_asset(good))
+        self.assertIsNotNone(immich.parse_asset(good, OWNER))
         broken = [None, [], "x", {**good, "id": None}, {**good, "id": ""}, {**good, "id": "../users/me"}, {**good, "id": "a" * 65},
                   {**good, "type": "AUDIO"}, {**good, "type": None}, {**good, "type": ["IMAGE"]}, {**good, "fileCreatedAt": None},
                   {**good, "fileCreatedAt": "2026-01-01T15:00:00"}, {**good, "fileCreatedAt": "yesterday"},
@@ -203,24 +216,24 @@ class ParseTests(unittest.TestCase):
                   {**good, "fileCreatedAt": "0001-01-01T00:00:00+05:00"}]
         for item in broken:
             with self.subTest(item=item):
-                self.assertIsNone(immich.parse_asset(item))
+                self.assertIsNone(immich.parse_asset(item, OWNER))
 
     def test_gps_needs_both_numbers_in_range(self):
-        base = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T15:00:00.000Z",
+        base = {"id": "a1", "type": "IMAGE", "ownerId": OWNER, "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T15:00:00.000Z",
                 "updatedAt": "2026-01-02T00:00:00Z"}
         for lat, lon in ((True, 10), (10, "20"), (10, None), (float("nan"), 10), (10, float("inf")), (10, 180.5), (-90.1, 0), (10**400, 0)):
             with self.subTest(lat=lat, lon=lon):
-                a = immich.parse_asset({**base, "exifInfo": {"latitude": lat, "longitude": lon}})
+                a = immich.parse_asset({**base, "exifInfo": {"latitude": lat, "longitude": lon}}, OWNER)
                 assert a
                 self.assertEqual((a.latitude, a.longitude), (None, None))
 
     def test_state_and_country_are_trimmed_text(self):
-        base = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T15:00:00.000Z",
+        base = {"id": "a1", "type": "IMAGE", "ownerId": OWNER, "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T15:00:00.000Z",
                 "updatedAt": "2026-01-02T00:00:00Z"}
-        a = immich.parse_asset({**base, "exifInfo": {"state": "  Maine ", "country": "x" * 300}})
+        a = immich.parse_asset({**base, "exifInfo": {"state": "  Maine ", "country": "x" * 300}}, OWNER)
         assert a
         self.assertEqual((a.state, a.country), ("Maine", "x" * 100))
-        a = immich.parse_asset({**base, "exifInfo": {"state": "   ", "country": 7}})
+        a = immich.parse_asset({**base, "exifInfo": {"state": "   ", "country": 7}}, OWNER)
         assert a
         self.assertEqual((a.state, a.country), (None, None))
 
@@ -245,12 +258,12 @@ class ParseTests(unittest.TestCase):
                 self.assertEqual(immich.next_page(value, page), expected)
 
     def test_an_empty_last_page(self):
-        self.assertEqual(immich.parse_page({"assets": {"items": [], "nextPage": None}}, 3), immich.Page(assets=(), next_page=None))
+        self.assertEqual(immich.parse_page({"assets": {"items": [], "nextPage": None}}, 3, OWNER), immich.Page(assets=(), next_page=None))
 
     def test_a_reply_that_is_not_a_page_is_unreadable(self):
         for body in (None, [], "x", {}, {"assets": []}, {"assets": {"items": None}}, {"assets": {"items": {}}}):
             with self.subTest(body=body), self.assertRaises(immich.Unavailable) as e:
-                immich.parse_page(body, 1)
+                immich.parse_page(body, 1, OWNER)
             self.assertEqual(str(e.exception), immich.UNREADABLE)
 
     def test_markers(self):
@@ -306,6 +319,20 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(json.loads(call["body"]), {"takenAfter": "2026-07-01T04:00:00.000Z", "takenBefore": "2026-07-10T03:59:59.000Z",
                                                      "withExif": True, "visibility": "timeline", "size": 1000, "order": "asc", "page": 1})
         self.assertNotIn(KEY, call["path"])
+
+    def test_search_keeps_only_the_key_s_own_assets(self):
+        self.fake.routes["/api/search/metadata"] = (200, JSON_HEADERS, fixture("search_page"))
+        ids = [a.id for a in immich.search(self.fake.source, AFTER, BEFORE).assets]
+        self.assertNotIn("0a000000-0000-4000-8000-000000000011", ids)
+        self.assertEqual(len(ids), 8)
+
+    def test_search_needs_the_library_s_immich_user(self):
+        opened = mock.Mock(side_effect=AssertionError("nothing may be opened"))
+        for user_id in (None, ""):
+            source = immich.Source(url=self.fake.source.url, key=KEY, allow_http=True, user_id=user_id)
+            with self.subTest(user_id=user_id), mock.patch.object(tls, "urlopen", opened), self.assertRaises(immich.NotConfigured):
+                immich.search(source, AFTER, BEFORE)
+        opened.assert_not_called()
 
     def test_an_incremental_search_adds_updated_after_and_the_page(self):
         self.fake.routes["/api/search/metadata"] = (200, JSON_HEADERS, b'{"assets": {"items": [], "nextPage": null}}')
@@ -515,7 +542,7 @@ class PrivacyTests(unittest.TestCase):
     HOST = "immich-canary-r4t8.example"
 
     def _failures(self):
-        source = immich.Source(url=f"https://{self.HOST}:2283", key=KEY)
+        source = immich.Source(url=f"https://{self.HOST}:2283", key=KEY, user_id=OWNER)
         where = f"https://{self.HOST}:2283/api/search/metadata?key={KEY}"
         raised = [urllib.error.URLError(f"<urlopen error [Errno -2] Name or service not known: {self.HOST} {KEY}>"),
                   TimeoutError(f"timed out talking to {self.HOST}"), ValueError(f"Invalid header value {KEY!r}"),
@@ -557,7 +584,7 @@ class PrivacyTests(unittest.TestCase):
             sent.append(req)
             raise urllib.error.URLError("down")
 
-        source = immich.Source(url=f"https://{self.HOST}", key=KEY)
+        source = immich.Source(url=f"https://{self.HOST}", key=KEY, user_id=OWNER)
         with mock.patch.object(tls, "urlopen", recording):
             for call in (lambda: immich.ping(source), lambda: immich.search(source, AFTER, BEFORE), lambda: immich.markers(source, AFTER, BEFORE),
                          lambda: immich.thumbnail(source, ASSET, "thumbnail"), lambda: immich.open_original(source, ASSET)):
