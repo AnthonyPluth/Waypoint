@@ -518,6 +518,7 @@ photo_grants = Table(
     Column('revoked', Float, doc='null while the grant is active; epoch seconds when sharing was stopped or the prompt declined'),
     Column('changed', Float, nullable=False, doc='epoch seconds of the last grant, scope change or revoke'),
     Column('granted_by', Text, nullable=False, doc='the member accountable for the grant (users.sub): the person, their steward, or who set Share on all my trips'),
+    Column('ask_again', Boolean, nullable=False, server_default=false(), doc="set when someone else's change made the trip longer and dropped this grant from Trip to Only me; the trip asks the person again"),
     CheckConstraint("scope IN ('only_me', 'trip')", name='ck_photo_grants_scope'),
     Index('ix_photo_grants_trip_id', 'trip_id'),
     info={'doc': "whether a person's photos may be used on a trip, and who sees them; a revoked row grants nothing and is kept so the trip shows a reminder instead of the prompt"},

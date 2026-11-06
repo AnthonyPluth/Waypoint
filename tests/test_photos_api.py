@@ -139,6 +139,22 @@ class PhotoRoutes(RouteCase):
         self.ok("ben", "POST", f"/api/segments/{booked['id']}", {"travelers": [{"person_id": self.person["ben"]}, {"person_id": self.person["ana"]}]})
         self.assertEqual([p["id"] for p in self.listing("ana", booked["trip_id"])["photos"]], [only])
 
+    def test_the_canonical_row_is_chosen_before_needs_a_look_filters_so_an_asset_shows_once(self):
+        with db.session() as conn:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == self.ana).values(status="refused"))
+        second = self.keep(PhotoSource(person_id=self.person["ana"], owner_sub="sub-ana", url=URL + "1", immich_user_id="immich-user-1",
+                                       api_key=secretbox.encrypt(KEY) or "", status="ok", created=1.0))
+        placed = self.photo(self.ana, self.trip, "2026-06-02T10:00", where=SOHO, asset="twice-3p8q")
+        torn = self.photo(second, None, "2026-06-02T10:00", where=SOHO, match="ambiguous", asset="twice-3p8q")
+        self.assertEqual(self.listing("ana")["photos"], [])
+        self.assertEqual([p["id"] for p in self.ok("ana", "GET", "/api/photos/review")["photos"]], [torn])
+        self.assertEqual(self.call("ana", "POST", f"/api/photos/{placed}", {"trip_id": self.trip}), (404, {"error": "No such photo"}))
+        with db.session() as conn:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == self.ana).values(status="ok"))
+        self.assertEqual([p["id"] for p in self.listing("ana")["photos"]], [placed])
+        self.assertEqual(self.ok("ana", "GET", "/api/photos/review")["photos"], [])
+        self.assertEqual(self.call("ana", "POST", f"/api/photos/{torn}", {"excluded": True}), (404, {"error": "No such photo"}))
+
     def test_the_same_asset_through_two_libraries_of_one_person_is_one_photo(self):
         second = self.keep(PhotoSource(person_id=self.person["ana"], owner_sub="sub-ana", url=URL + "1", immich_user_id="immich-user-1",
                                        api_key=secretbox.encrypt(KEY) or "", status="ok", created=1.0))
@@ -167,6 +183,7 @@ class PhotoRoutes(RouteCase):
         self.assertEqual(got["counts"], {"total": 2, "located": 1, "inferred": 0, "far": 1})
 
     def test_the_zone_label_comes_with_the_photo_or_else_from_its_booking(self):
+        self.ok("ana", "POST", f"/api/segments/{self.stay['id']}", {"status": "cancelled"})
         cases = [(self.photo(self.ana, self.trip, "2026-06-02T03:00", offset=-420), "UTC−07:00"),
                  (self.photo(self.ana, self.trip, "2026-06-02T10:00", offset=0), "UTC"),
                  (self.photo(self.ana, self.trip, "2026-06-02T15:30", offset=330), "UTC+05:30"),
@@ -175,7 +192,6 @@ class PhotoRoutes(RouteCase):
                  (self.photo(self.ana, self.trip, "2026-06-02T09:00", segment_id=self.flight["id"]), LONDON),
                  (self.photo(self.ana, self.trip, "2026-06-03T09:00", segment_id=self.stay["id"]), LONDON),
                  (self.photo(self.ana, self.trip, "2026-06-03T09:30"), None)]
-        self.ok("ana", "POST", f"/api/segments/{self.stay['id']}", {"status": "cancelled"})
         labels = {p["id"]: p["zone"] for p in self.listing("ana")["photos"]}
         self.assertEqual([labels[i] for i, _ in cases], [z for _, z in cases])
 
