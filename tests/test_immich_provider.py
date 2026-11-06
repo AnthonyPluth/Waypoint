@@ -495,6 +495,20 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(immich.thumbnail(self.fake.source, ASSET, "thumbnail"), ("image/jpeg", JPEG))
         self.assertEqual(len(immich.search(self.fake.source, AFTER, BEFORE).assets), 8)
 
+    def test_a_thumbnail_whose_status_line_and_headers_trickle_is_too_slow(self):
+        self.fake.routes[f"/api/assets/{ASSET}/thumbnail"] = (200, {"_trickle_head": "0.03"}, JPEG)
+        with mock.patch.object(immich, "IMAGE_SECONDS", 0.5):
+            self._slow(lambda: immich.thumbnail(self.fake.source, ASSET, "preview"))
+
+    def test_a_search_whose_status_line_and_headers_trickle_is_too_slow(self):
+        self.fake.routes["/api/search/metadata"] = (200, {"_trickle_head": "0.03"}, b'{"assets": {"items": [], "nextPage": null}}')
+        with mock.patch.object(immich, "JSON_SECONDS", 0.5):
+            self._slow(lambda: immich.search(self.fake.source, AFTER, BEFORE))
+
+    def test_an_original_whose_status_line_and_headers_trickle_is_too_slow(self):
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (200, {"_trickle_head": "0.03"}, JPEG)
+        self._slow(lambda: immich.open_original(self.fake.source, ASSET, seconds=0.5))
+
     def test_a_connection_cut_while_reading_is_unreachable(self):
         response = mock.Mock()
         response.headers = {}
