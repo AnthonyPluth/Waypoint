@@ -2,6 +2,7 @@ import ast
 import importlib.util
 import json
 import os
+import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
@@ -331,8 +332,14 @@ class Replies(DbCase):
         self.check("GET /api/reminders", reminders_api.api_reminders(self.c, {}, {}))
         self.check("DELETE /api/reminders/devices/{id}", reminders_api.api_device_remove(self.c, {}, {}, str(added["id"])))
         self.check("DELETE /api/feed", reminders_api.api_feed_off(self.c, {}, {}))
-        with mock.patch.dict(os.environ, {"WAYPOINT_PUSH_RELAY_URL": "https://relay.example.com"}):
-            phone = reminders_api.api_app_device_add(self.c, {}, {"device_id": "dev_abcdefgh12345", "secret": "s" * 43})
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        key_path = os.path.join(folder.name, "AuthKey.p8")
+        with open(key_path, "wb") as f:
+            f.write(b"-----BEGIN PRIVATE KEY-----\nMADE-UP\n-----END PRIVATE KEY-----\n")
+        env = {"WAYPOINT_APNS_KEY_FILE": key_path, "WAYPOINT_APNS_KEY_ID": "ABC123DEFG", "WAYPOINT_APNS_TEAM_ID": "TEAM123456", "WAYPOINT_APNS_TOPIC": "com.example.waypoint"}
+        with mock.patch.dict(os.environ, env):
+            phone = reminders_api.api_app_device_add(self.c, {}, {"token": "ab12" * 16, "environment": "production"})
             self.check("POST /api/reminders/app/devices", phone)
             self.check("GET /api/reminders/app", reminders_api.api_app_push(self.c, {}, {}))
             self.check("DELETE /api/reminders/app/devices/{id}", reminders_api.api_app_device_remove(self.c, {}, {}, str(phone["id"])))

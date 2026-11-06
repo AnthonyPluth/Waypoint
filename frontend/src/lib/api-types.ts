@@ -58,12 +58,12 @@ export interface AirportMatches {
 }
 
 export interface AppDeviceBody {
-  device_id: string;
-  secret: string;
+  token: string;
+  environment: string;
 }
 
 export interface AppPush {
-  relay: string | null;
+  enabled: boolean;
   devices: ReminderDevice[];
 }
 

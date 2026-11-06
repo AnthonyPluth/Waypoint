@@ -1095,12 +1095,12 @@ class DeviceBody(TypedDict):
 
 
 class AppDeviceBody(TypedDict):
-    device_id: str
-    secret: str
+    token: str
+    environment: str
 
 
 class AppPush(TypedDict):
-    relay: str | None
+    enabled: bool
     devices: list[ReminderDevice]
 
 

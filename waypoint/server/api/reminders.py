@@ -68,14 +68,14 @@ def api_feed_off(conn, _q, _b) -> Ok:
 
 
 def api_app_push(conn, _q, _b) -> AppPush:
-    return {"relay": app_push.relay_url(), "devices": [ReminderDevice(**d) for d in app_push.devices(conn, owner())]}
+    return {"enabled": app_push.enabled(), "devices": [ReminderDevice(**d) for d in app_push.devices(conn, owner())]}
 
 
 def api_app_device_add(conn, _q, body: AppDeviceBody) -> ReminderDevice:
-    if app_push.relay_url() is None:
-        raise ApiError("This Waypoint has no push relay set up, so the app can't be sent notifications.")
+    if not app_push.enabled():
+        raise ApiError("This Waypoint has no Apple push key set up, so the app can't be sent notifications.")
     texts = []
-    for key in ("device_id", "secret"):
+    for key in ("token", "environment"):
         if not isinstance(body.get(key), str):
             raise ApiError(f'Send "{key}" as text')
         texts.append(body[key])

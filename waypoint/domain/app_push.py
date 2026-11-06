@@ -2,21 +2,25 @@ from __future__ import annotations
 
 import os
 import re
-import urllib.parse
 
 from typing import TypedDict
 
 from sqlalchemy import delete, select
 
 from .. import monitoring
-from ..providers import relay
-from ..storage import app_devices, db
+from ..providers import apns
+from ..storage import db
 from ..storage.models import AppDevice
 
-RELAY_ENV = "WAYPOINT_PUSH_RELAY_URL"
+KEY_FILE_ENV = "WAYPOINT_APNS_KEY_FILE"
+KEY_ID_ENV = "WAYPOINT_APNS_KEY_ID"
+TEAM_ID_ENV = "WAYPOINT_APNS_TEAM_ID"
+TOPIC_ENV = "WAYPOINT_APNS_TOPIC"
 MAX_DEVICES = 10
-_ID = re.compile(r"[A-Za-z0-9_-]{8,64}")
-_SECRET = re.compile(r"[A-Za-z0-9_-]{20,100}")
+ENVIRONMENTS = ("production", "sandbox")
+_TOKEN = re.compile(r"[0-9a-f]{64,200}")
+_APPLE_ID = re.compile(r"[A-Z0-9]{10}")
+_TOPIC = re.compile(r"[A-Za-z0-9.-]{3,155}")
 _TAG = re.compile(r"[A-Za-z0-9-]{1,64}")
 
 
@@ -30,14 +34,20 @@ class Invalid(Exception):
     pass
 
 
-def relay_url() -> str | None:
-    value = (os.environ.get(RELAY_ENV) or "").strip().rstrip("/")
-    try:
-        parts = urllib.parse.urlsplit(value)
-        _ = parts.port
-    except ValueError:
+def credentials() -> apns.Credentials | None:
+    path, key_id, team_id, topic = (os.environ.get(k, "").strip() for k in (KEY_FILE_ENV, KEY_ID_ENV, TEAM_ID_ENV, TOPIC_ENV))
+    if not (path and _APPLE_ID.fullmatch(key_id) and _APPLE_ID.fullmatch(team_id) and _TOPIC.fullmatch(topic)):
         return None
-    return value if parts.scheme == "https" and parts.hostname and not (parts.query or parts.fragment or parts.username is not None or parts.password is not None) else None
+    try:
+        with open(path, "rb") as f:
+            pem = f.read(8192)
+    except OSError:
+        return None
+    return apns.Credentials(pem, key_id, team_id, topic) if b"PRIVATE KEY" in pem else None
+
+
+def enabled() -> bool:
+    return credentials() is not None
 
 
 def devices(conn: db.Connection, owner: str) -> list[DeviceOut]:
@@ -45,15 +55,16 @@ def devices(conn: db.Connection, owner: str) -> list[DeviceOut]:
     return [{"id": d.id, "service": "iPhone", "created": d.created} for d in rows]
 
 
-def add_device(conn: db.Connection, owner: str, device_id: str, secret: str, now: float) -> DeviceOut:
-    if not _ID.fullmatch(device_id) or not _SECRET.fullmatch(secret):
+def add_device(conn: db.Connection, owner: str, token: str, environment: str, now: float) -> DeviceOut:
+    token = token.strip().lower()
+    if not _TOKEN.fullmatch(token) or environment not in ENVIRONMENTS:
         raise Invalid("That isn’t a push registration Waypoint can use.")
     mine = conn.orm.scalars(select(AppDevice).where(AppDevice.owner_sub == owner)).all()
-    if len(mine) >= MAX_DEVICES and device_id not in {d.device_id for d in mine}:
+    if len(mine) >= MAX_DEVICES and token not in {d.token for d in mine}:
         raise Invalid(f"Turn notifications off on an iPhone you no longer use first (at most {MAX_DEVICES}).")
-    db.upsert(conn, AppDevice, {"owner_sub": owner, "device_id": device_id, "secret": app_devices.seal(secret), "created": now},
-              key=["device_id"], update=["owner_sub", "secret"])
-    found = conn.orm.scalars(select(AppDevice).where(AppDevice.device_id == device_id)).one()
+    db.upsert(conn, AppDevice, {"owner_sub": owner, "token": token, "environment": environment, "created": now},
+              key=["token"], update=["owner_sub", "environment"])
+    found = conn.orm.scalars(select(AppDevice).where(AppDevice.token == token)).one()
     conn.orm.refresh(found)
     return {"id": found.id, "service": "iPhone", "created": found.created}
 
@@ -63,7 +74,7 @@ def remove_device(conn: db.Connection, owner: str, device_id: int) -> bool:
 
 
 def owners(conn: db.Connection) -> set[str]:
-    return set(conn.execute(select(AppDevice.owner_sub)).scalars()) if relay_url() else set()
+    return set(conn.execute(select(AppDevice.owner_sub)).scalars()) if enabled() else set()
 
 
 def forget(conn: db.Connection, owner: str) -> None:
@@ -71,16 +82,16 @@ def forget(conn: db.Connection, owner: str) -> None:
 
 
 def wake(conn: db.Connection, owner: str, tag: str) -> tuple[int, int]:
-    base = relay_url()
-    if base is None:
+    creds = credentials()
+    if creds is None:
         return 0, 0
     reached = tried = 0
     for d in conn.orm.scalars(select(AppDevice).where(AppDevice.owner_sub == owner).order_by(AppDevice.id)).all():
         tried += 1
         try:
-            relay.wake(base, d.device_id, app_devices.secret_of(d), tag if _TAG.fullmatch(tag) else None)
+            apns.push(creds, d.token, d.environment, tag if _TAG.fullmatch(tag) else None)
             reached += 1
-        except relay.Gone:
+        except apns.Gone:
             conn.execute(delete(AppDevice).where(AppDevice.id == d.id))
             tried -= 1
         except Exception as e:

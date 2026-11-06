@@ -22,7 +22,10 @@ Anything that belongs to the app, such as Gmail, AI suggestions, distances and b
 | `WAYPOINT_SESSION_DAYS` | `14` | Days a session lasts unused. Using Waypoint keeps it going, for up to 90 days after signing in. |
 | `WAYPOINT_SECRET_KEY` | | Encrypts the secrets Waypoint saves (at least 32 characters: `openssl rand -base64 32`). Without it, Waypoint makes `secret.key` in `WAYPOINT_DATA`. |
 | `WAYPOINT_SECRET_KEY_OLD` | | The previous key, for one start after changing `WAYPOINT_SECRET_KEY`; everything is re-encrypted with the new one. Also the way to restore a backup made under an earlier key. |
-| `WAYPOINT_PUSH_RELAY_URL` | | The `https://` address of a Waypoint push relay (see `relay/` in the repository). Off when unset. With it, the iPhone app can be sent reminders. See [Reminders and calendar](/Waypoint/start/reminders/#on-the-iphone-app). |
+| `WAYPOINT_APNS_KEY_FILE` | | Path to your Apple push key (an `AuthKey_….p8` file from your Apple developer account). With the next three, this Waypoint sends the iPhone app its reminders straight to Apple. Off unless all four are set and the file can be read. Keep the key out of the repository and the image: mount it. See [Reminders and calendar](/Waypoint/start/reminders/#on-the-iphone-app). |
+| `WAYPOINT_APNS_KEY_ID` | | The ten-character id of that key. |
+| `WAYPOINT_APNS_TEAM_ID` | | Your Apple developer team id (ten characters). |
+| `WAYPOINT_APNS_TOPIC` | | The iPhone app’s bundle id. |
 | `WAYPOINT_ALLOW_INSECURE_HTTP` | | `1` allows an `http://` `WAYPOINT_PUBLIC_URL` on an internet address. Don’t. |
 | `WAYPOINT_ALLOW_NO_AUTH` | `1` in Compose | Allows the container to listen without sign-in; Compose publishes it on localhost only. Also usable behind a proxy that handles sign-in. OIDC takes precedence when configured. |
 | `DATABASE_URL` | | `postgresql://user:password@host:5432/db` to use Postgres instead of the built-in SQLite file. |

@@ -375,10 +375,10 @@ app_devices = Table(
     'app_devices', metadata,
     Column('id', Integer, primary_key=True, autoincrement=True),
     Column('owner_sub', Text, nullable=False),
-    Column('device_id', Text, nullable=False, doc="the phone's id at the push relay"),
-    Column('secret', Text, nullable=False, doc='what lets this server wake that phone through the relay, encrypted (waypoint/storage/secretbox.py)'),
+    Column('token', Text, nullable=False, doc="the phone's APNs device token; only the key held by whoever runs this Waypoint can push to it"),
+    Column('environment', Text, nullable=False, doc='production or sandbox (a development build of the app)'),
     Column('created', Float, nullable=False),
-    UniqueConstraint('device_id', name='uq_app_devices_device'),
+    UniqueConstraint('token', name='uq_app_devices_token'),
     Index('ix_app_devices_owner', 'owner_sub'),
     info={'doc': "iPhones a member turned notifications on for in the app; each ends when its owner can no longer sign in, and doesn't travel in a backup"},
 )

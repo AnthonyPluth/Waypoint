@@ -295,7 +295,7 @@ class MigrationTests(unittest.TestCase):
         db.init(self.path)
         self.assertEqual(drift(self.path), [])
         table = shape(self.path)["app_devices"]
-        self.assertEqual(table["uniques"], [("uq_app_devices_device", ("device_id",))])
+        self.assertEqual(table["uniques"], [("uq_app_devices_token", ("token",))])
         self.assertEqual([i[0] for i in table["indexes"] if not i[2]], ["ix_app_devices_owner"])
         with db.engine(self.path).begin() as c:
             command.downgrade(db.alembic_config(c), "0039")

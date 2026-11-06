@@ -3603,27 +3603,24 @@
       "AppDeviceBody": {
         "type": "object",
         "properties": {
-          "device_id": {
+          "token": {
             "type": "string"
           },
-          "secret": {
+          "environment": {
             "type": "string"
           }
         },
         "required": [
-          "device_id",
-          "secret"
+          "token",
+          "environment"
         ],
         "additionalProperties": false
       },
       "AppPush": {
         "type": "object",
         "properties": {
-          "relay": {
-            "type": [
-              "string",
-              "null"
-            ]
+          "enabled": {
+            "type": "boolean"
           },
           "devices": {
             "type": "array",
@@ -3633,7 +3630,7 @@
           }
         },
         "required": [
-          "relay",
+          "enabled",
           "devices"
         ],
         "additionalProperties": false

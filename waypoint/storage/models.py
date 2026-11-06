@@ -314,8 +314,8 @@ class AppDevice(Base):
     __table__ = schema.app_devices
     id: Mapped[int]
     owner_sub: Mapped[str]
-    device_id: Mapped[str]
-    secret: Mapped[str]
+    token: Mapped[str]
+    environment: Mapped[str]
     created: Mapped[float]
 
 

@@ -23,11 +23,11 @@ Notifications go through your browser’s own push service (Google’s, Apple’
 
 ## On the iPhone app
 
-The iPhone app gets the same three reminders through a push relay, if the person who runs this Waypoint sets `WAYPOINT_PUSH_RELAY_URL` (see [Configuration](/Waypoint/reference/configuration/)). It is off until then, and the app is told there is nothing to turn on.
+The iPhone app gets the same three reminders as a push from Apple, if the person who runs this Waypoint sets the four `WAYPOINT_APNS_` values (see [Configuration](/Waypoint/reference/configuration/)). It is off until then, and the app is told there is nothing to turn on. Apple only accepts pushes signed with the key of the app’s publisher, so a Waypoint run by someone else can’t push to the app.
 
-Apple only accepts pushes signed by the app’s publisher, so the relay holds that key. Waypoint tells the relay only the phone’s id and its secret, and the relay sends Apple a fixed “Open Waypoint to see an update.” with the reminder’s tag, a short label such as `check-in-12` (a booking’s number), `day-of-2026-11-20` (the date) or `review`. The text of the reminder never leaves this server: the app opens, asks this Waypoint what is due and shows it. The relay and Apple can’t read your trips, but the tag and the time of each wake show that a member has a flight within a day, or something starting today, and the number of that booking. The relay doesn’t know this server’s address.
+Waypoint sends Apple the phone’s token and a fixed “Open Waypoint to see an update.” with the reminder’s tag, a short label such as `check-in-12` (a booking’s number), `day-of-2026-11-20` (the date) or `review`. The text of the reminder never leaves this server: the app opens, asks this Waypoint what is due and shows it. Apple can’t read your trips, but the tag and the time of each push show that a member has a flight within a day, or something starting today, and the number of that booking.
 
-The phone’s secret is kept encrypted, an iPhone ends when its owner can no longer sign in, and none of it is in a backup. The relay forgets a phone Apple says is gone, and Waypoint forgets one the relay says it doesn’t know.
+An iPhone ends when its owner can no longer sign in, and none of it is in a backup. Waypoint forgets a phone when Apple says its token is no longer valid.
 
 ## Calendar feed
 

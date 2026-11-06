@@ -1,11 +1,14 @@
 import json
 import os
+import tempfile
 import threading
 import time
 import unittest
 from http.server import HTTPServer
 from unittest import mock
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy import insert, select, update
 
 from tests.privacy import no_leaks
@@ -15,7 +18,7 @@ from tests.test_reminders import ENDPOINT, subscription
 from tests.test_webpush import PushService, decrypt, receiver
 from waypoint.domain import app_push, reminders
 from waypoint.domain.mail import ai, review, scan
-from waypoint.providers import relay, webpush
+from waypoint.providers import apns, webpush
 from waypoint.server import jobs
 from waypoint.storage import db
 from waypoint.storage.models import Mailbox, PushDevice, ReminderSent
@@ -391,20 +394,30 @@ class PrivacyTests(PushCase):
     def test_a_phone_alone_is_woken_after_a_scan_with_the_review_tag_and_nothing_of_the_email(self):
         canaries = (self.SUBJECT, self.SENDER, self.CODE, self.NAME)
         with db.session() as conn:
-            app_push.add_device(conn, "u-jane", "dev_abcdefgh12345", "s" * 43, time.time())
+            app_push.add_device(conn, "u-jane", "ab12" * 16, "production", time.time())
         mail = (eml("incomplete")
                 .replace(b"From: Example Air", f"From: Example Air {self.SENDER}".encode())
                 .replace(b"Subject: Your itinerary (partial)", f"Subject: Your itinerary (partial) {self.SUBJECT}".encode())
                 .replace(b"<p>CANARY", f"<p>{self.NAME} CANARY".encode())
                 .replace(b"AB1CD2", self.CODE.encode()))
         self.add_mail("m-canary", mail)
-        with mock.patch.dict(os.environ, {app_push.RELAY_ENV: "https://relay.example.com"}), \
-                mock.patch.object(relay, "wake") as wake, \
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        key_path = os.path.join(folder.name, "AuthKey.p8")
+        with open(key_path, "wb") as f:
+            f.write(ec.generate_private_key(ec.SECP256R1()).private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+        env = {app_push.KEY_FILE_ENV: key_path, app_push.KEY_ID_ENV: "ABC123DEFG", app_push.TEAM_ID_ENV: "TEAM123456", app_push.TOPIC_ENV: "com.example.waypoint"}
+        with mock.patch.dict(os.environ, env), mock.patch.object(apns, "post", return_value=(200, b"")) as posted, \
                 no_leaks(self, "CANARY-BODY-INCOMPLETE-4N7P", *canaries, database=self.path):
             self.scan_job()
-        wake.assert_called_once_with("https://relay.example.com", "dev_abcdefgh12345", "s" * 43, "review")
+        posted.assert_called_once()
+        url, headers, content, _timeout = posted.call_args.args
+        self.assertEqual(url, "https://api.push.apple.com/3/device/" + "ab12" * 16)
+        self.assertEqual(headers["apns-collapse-id"], "review")
+        self.assertEqual(json.loads(content)["aps"]["alert"]["body"], "Open Waypoint to see an update.")
         for canary in canaries:
-            self.assertNotIn(canary, repr(wake.call_args))
+            self.assertNotIn(canary, repr(posted.call_args))
         self.assertEqual(self.sent, [])
 
     def real_sender(self, conn, subject):
