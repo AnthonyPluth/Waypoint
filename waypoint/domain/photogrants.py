@@ -9,7 +9,7 @@ from sqlalchemy import and_, delete, or_, select, update
 from .. import oidc
 from ..storage import db
 from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Trip, TripPerson, User
-from . import people, photos, photosync, trippeople, visibility
+from . import people, photoqueue, photos, trippeople, visibility
 from .photos import AMBIGUOUS, ONLY_ME, OWNER, SCOPES, Scope
 from .visibility import Viewer
 
@@ -67,7 +67,7 @@ def _write(conn: db.Connection, person_id: int, trip_id: int, scope: Scope, by: 
     else:
         row.scope, row.revoked, row.changed, row.granted_by = scope, None, now, by
     conn.orm.flush()
-    photosync.after_commit(conn, person_id, trip_id)
+    photoqueue.after_commit(conn, person_id, trip_id)
 
 
 def _person_rows(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> list[Photo]:
@@ -174,7 +174,7 @@ def put_back(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int) -
     conn.execute(delete(PhotoExclusion).where(PhotoExclusion.person_id == person, PhotoExclusion.asset_id == photo.asset_id, PhotoExclusion.trip_id == trip_id))
     if not (photo.decided_by == OWNER and photo.trip_id not in (None, trip_id)):
         photos.re_place(conn, photo, person)
-    photosync.after_commit(conn, person, trip_id)
+    photoqueue.after_commit(conn, person, trip_id)
     return sharing(conn, viewer, person, trip_id)
 
 

@@ -16,14 +16,12 @@ from ..storage import db, photo_sources, secretbox
 from ..storage import settings_keys as sk
 from ..storage.models import Photo, PhotoExclusion, PhotoTripSync
 from ..storage.photo_sources import OK, REFUSED, UNREACHABLE, Stored
-from . import home, photogrants, photos, photosources
+from . import home, photogrants, photoqueue, photos, photosources
 from .photomatch import HomeIn, MatchKind, TripWindow
 
 TIME_BUDGET = 600.0
 FULL_RELIST_DAYS = 7
 DAY = 86400.0
-DEMO = "demo"
-SYNCED = (OK, UNREACHABLE)
 KINDS: tuple[MatchKind, ...] = ("place", "time", "far", "ambiguous", "home")
 CHUNK = 500
 
@@ -31,7 +29,6 @@ _clock = time.monotonic
 _lock = threading.Lock()
 _running: set[int] = set()
 _waiting: dict[int, set[int]] = {}
-background = threading.Event()
 
 
 class Provider(Protocol):
@@ -305,7 +302,7 @@ def _failed(conn: db.Connection, source: Stored, error: immich.ImmichError) -> N
 def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, *, full: bool = False, trips: set[int] | None = None) -> Summary:
     summary = Summary()
     source = photo_sources.get(conn, source_id)
-    if not oidc.enabled() or source is None or source["status"] not in SYNCED or source["url"] == DEMO:
+    if not oidc.enabled() or source is None or source["status"] not in photoqueue.SYNCED or source["url"] == photoqueue.DEMO:
         return summary
     summary.sources = 1
     try:
@@ -384,7 +381,7 @@ def sync_all(now: datetime, full: bool = False) -> Summary:
     with db.session() as conn:
         photogrants.reconcile_all(conn, now.timestamp())
     with db.session() as conn:
-        ids = [s["id"] for s in photo_sources.list_all(conn) if s["status"] in SYNCED and s["url"] != DEMO]
+        ids = photoqueue.syncing(conn)
     for source_id in ids:
         if _claim(source_id):
             total.add(_sync(source_id, now, full, None))
@@ -400,7 +397,7 @@ def _now_in_thread(source_id: int, trips: set[int] | None) -> None:
 
 
 def start(source_id: int, trips: set[int] | None = None) -> bool:
-    if not background.is_set() or not oidc.enabled():
+    if not photoqueue.background.is_set() or not oidc.enabled():
         return False
     with _lock:
         if source_id in _running:
@@ -410,20 +407,3 @@ def start(source_id: int, trips: set[int] | None = None) -> bool:
         _running.add(source_id)
     threading.Thread(target=_now_in_thread, args=(source_id, trips), daemon=True, name="photo-sync-now").start()
     return True
-
-
-def queue(person_id: int, trip_id: int) -> None:
-    if not background.is_set():
-        return
-    try:
-        with db.session() as conn:
-            ids = [s["id"] for s in photo_sources.for_person(conn, person_id) if s["status"] in SYNCED and s["url"] != DEMO]
-    except Exception as e:
-        monitoring.report(e, values=False)
-        return
-    for source_id in ids:
-        start(source_id, {trip_id})
-
-
-def after_commit(conn: db.Connection, person_id: int, trip_id: int) -> None:
-    conn.after_commit(lambda: queue(person_id, trip_id))

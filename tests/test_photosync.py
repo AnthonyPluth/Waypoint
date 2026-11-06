@@ -11,7 +11,7 @@ from tests.test_immich_provider import JSON_HEADERS, serve
 from tests.test_photos_api import SOHO
 from tests.test_trips import HOTEL, OUT, Household
 from waypoint import monitoring
-from waypoint.domain import home, photogrants, photos, photosync, trips
+from waypoint.domain import home, photogrants, photoqueue, photos, photosync, trips
 from waypoint.providers import immich
 from waypoint.server import jobs
 from waypoint.storage import db, photo_sources
@@ -407,11 +407,11 @@ class FailureTests(SyncCase):
 class BackgroundTests(SyncCase):
     def setUp(self):
         super().setUp()
-        photosync.background.set()
-        self.addCleanup(photosync.background.clear)
+        photoqueue.enable(photosync.start)
+        self.addCleanup(photoqueue.disable)
 
     def test_a_grant_queues_a_sync_of_that_trip_only_after_commit(self):
-        with mock.patch.object(photosync, "start") as started:
+        with mock.patch.object(photoqueue, "starter") as started:
             photogrants.grant(self.c, self.jane, self.jid, self.other, "only_me", 3.0)
             self.c.rollback()
             started.assert_not_called()
@@ -426,15 +426,15 @@ class BackgroundTests(SyncCase):
         row = self.rows()[self.lib.items[0]["id"]]
         photogrants.exclude(self.c, self.jane, self.a, [row.id], 2.0)
         self.c.commit()
-        with mock.patch.object(photosync, "start") as started:
+        with mock.patch.object(photoqueue, "starter") as started:
             photogrants.put_back(self.c, self.jane, self.a, row.id)
             self.c.commit()
         started.assert_called_once_with(self.source, {self.a})
 
     def test_without_the_background_jobs_nothing_is_queued(self):
-        photosync.background.clear()
-        with mock.patch.object(photosync, "start") as started:
-            photosync.queue(self.jid, self.a)
+        photoqueue.disable()
+        with mock.patch.object(photoqueue, "starter") as started:
+            photoqueue.queue(self.jid, self.a)
         started.assert_not_called()
         self.assertFalse(jobs.sync_photos_now(self.source))
 
@@ -477,11 +477,11 @@ class BackgroundTests(SyncCase):
         third = photo_sources.save(self.c, self.jid, "u-jane", "https://third.example", OWNER, KEY, None, 1.0)
         photo_sources.mark(self.c, third, "off")
         self.c.commit()
-        with mock.patch.object(photosync, "start") as started:
-            photosync.queue(self.jid, self.a)
+        with mock.patch.object(photoqueue, "starter") as started:
+            photoqueue.queue(self.jid, self.a)
         self.assertEqual([c.args for c in started.call_args_list], [(self.source, {self.a}), (second, {self.a})])
         with mock.patch.object(db, "session", side_effect=RuntimeError("down")), mock.patch.object(monitoring, "report") as reported:
-            photosync.queue(self.jid, self.a)
+            photoqueue.queue(self.jid, self.a)
         reported.assert_called_once()
 
 
@@ -492,9 +492,10 @@ class JobTests(SyncCase):
         stop.set()
         with mock.patch.object(jobs, "warm_map_data"), mock.patch.object(jobs.flightstatus, "forget_key_pause"):
             started = jobs.start(stop)
-        self.addCleanup(photosync.background.clear)
+        self.addCleanup(photoqueue.disable)
         self.assertIn("photo-sync", [t.name for t in started])
-        self.assertTrue(photosync.background.is_set())
+        self.assertTrue(photoqueue.background.is_set())
+        self.assertIs(photoqueue.starter, photosync.start)
 
     def test_the_scheduled_sync_runs_every_library_and_survives_a_failure(self):
         with mock.patch.object(photosync, "sync_all") as ran:
@@ -532,10 +533,10 @@ class TripChangeTests(SyncCase):
     def test_joining_a_trip_with_share_all_on_grants_it_and_queues_a_sync(self):
         self.c.orm.add(PhotoSharingPrefs(person_id=self.sid, default_scope="trip", share_all=True, set_by="u-sam"))
         self.c.orm.flush()
-        photosync.background.set()
-        self.addCleanup(photosync.background.clear)
+        photoqueue.enable(photosync.start)
+        self.addCleanup(photoqueue.disable)
         sams = photo_sources.save(self.c, self.sid, "u-sam", "https://sam.example", OWNER, KEY, None, 1.0)
-        with mock.patch.object(photosync, "start") as started:
+        with mock.patch.object(photoqueue, "starter") as started:
             trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.sid]}, confirmed=True)
             self.c.commit()
         row = self.c.orm.get(PhotoGrant, (self.sid, self.b))

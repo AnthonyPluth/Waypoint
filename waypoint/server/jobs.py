@@ -5,7 +5,7 @@ import time
 from datetime import UTC, date, datetime
 
 from .. import monitoring, oidc
-from ..domain import flightstatus, photogrants, photosources, photosync, reminders
+from ..domain import flightstatus, photogrants, photoqueue, photosources, photosync, reminders
 from ..domain.mail import scan
 from ..providers import gmail
 from ..storage import db, roads, states
@@ -128,7 +128,7 @@ def start(stop: threading.Event) -> list[threading.Thread]:
                threading.Thread(target=every, args=(REMINDERS_EVERY, send_reminders), daemon=True, name="reminders"),
                threading.Thread(target=every, args=(SCAN_EVERY, scan_mailboxes, SCAN_FIRST), daemon=True, name="mail-scan"),
                threading.Thread(target=every, args=(PHOTO_SYNC_EVERY, sync_photos, PHOTO_SYNC_FIRST), daemon=True, name="photo-sync")]
-    photosync.background.set()
+    photoqueue.enable(photosync.start)
     for t in threads:
         t.start()
     return threads
