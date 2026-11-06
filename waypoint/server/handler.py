@@ -230,7 +230,7 @@ class Handler(BaseHTTPRequestHandler):
             if access is None or not access.has(mcp_oauth.APP_SCOPE):
                 return None
             name = oidc.user_name(conn, access.sub)
-        return {"sub": access.sub, "email": access.email, "name": name}
+        return {"sub": access.sub, "email": access.email, "name": name, "grant_id": access.grant_id}
 
     def _app_session(self) -> None:
         if self.headers.get("X-Waypoint") != "1":
@@ -239,7 +239,7 @@ class Handler(BaseHTTPRequestHandler):
         if user is None:
             return self._json(401, {"error": "Sign in to Waypoint again.", "login": "/auth/login"})
         with db.session() as conn:
-            token, max_age = oidc.create_session(conn, user["sub"], user["email"], user["name"], APP_SESSION_SECONDS)
+            token, max_age = oidc.create_session(conn, user["sub"], user["email"], user["name"], APP_SESSION_SECONDS, user["grant_id"])
         self._json(200, {"name": "waypoint_session", "value": token, "max_age": max_age,
                          "secure": bool(oidc.config()["secure_cookie"])})
 
