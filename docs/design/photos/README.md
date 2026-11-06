@@ -9,7 +9,7 @@ A UI issue builds the screens in the file it points at, and lists the accessible
 | a | [a-trip-page.html](a-trip-page.html) | The trip page with the photo strip, and the gallery opened in place and grouped by day, with the far flag and the inferred-location mark |
 | b | [b-photo-viewer.html](b-photo-viewer.html) | The viewer for a photo with GPS, a video placed from the itinerary, and a far photo; Open original |
 | c | [c-trip-map.html](c-trip-map.html) | The route map with photo cluster pins, a tapped pin, and the replay passing a cluster |
-| d | [d-map-pins-only.html](d-map-pins-only.html) | The map of a trip with no replayable route but with photo pins |
+| d | [d-map-pins-only.html](d-map-pins-only.html) | The map of a trip with no placeable booking: photo pins only (decided) |
 | e | [e-trip-summary.html](e-trip-summary.html) | The trip summary line: days, nights, distance in the household unit, states and countries, photos |
 | f | [f-settings-photos.html](f-settings-photos.html) | Settings, Photos: the source cards and the Connect form with its plain-language note |
 | g | [g-empty-states.html](g-empty-states.html) | No library connected (trip page and Settings), connected but nothing synced yet, a trip with no photos, a refused source, an unreachable source |
