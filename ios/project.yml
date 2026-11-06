@@ -20,7 +20,7 @@ targets:
     resources:
       - path: Waypoint/public
         type: folder
-      - path: Waypoint/capacitor.config.json
+      - path: capacitor.config.json
     dependencies:
       - package: Capacitor
         product: Capacitor

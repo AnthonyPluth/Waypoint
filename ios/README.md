@@ -6,7 +6,7 @@ A native shell around the Waypoint web app. The person types the address of thei
 
 ## Build
 
-Needs a Mac with Xcode 16+, Node 20+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+Needs a Mac with Xcode 16+, Node 22+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```sh
 cd ios

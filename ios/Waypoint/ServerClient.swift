@@ -120,8 +120,10 @@ enum ServerClient {
     }
 
     static func opensWithoutSignIn(_ server: URL) async throws -> Bool {
-        let (_, response) = try await get(server.appendingPathComponent("api/trips"))
-        return response.statusCode == 200
+        let (data, response) = try await get(server.appendingPathComponent("api/trips"))
+        guard response.statusCode == 200 else { return false }
+        let json = try? JSONSerialization.jsonObject(with: data)
+        return json is [Any] || json is [String: Any]
     }
 
     static func endpoints(_ server: URL) async throws -> Endpoints {
