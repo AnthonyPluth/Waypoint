@@ -18,7 +18,8 @@ from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loy
 from .api.assistant import (api_assistant_review, api_assistant_review_create, api_assistant_review_dismiss, api_assistant_review_email,
                             api_assistant_review_item, api_assistant_review_match, api_assistant_segment_emails)
 from .api.mcp import api_mcp_mail, api_mcp_revoke, api_mcp_settings, api_mcp_writes
-from .api.photos import api_photo_decide, api_photo_review, api_trip_photos
+from .api.photos import (api_photo_decide, api_photo_review, api_photo_source_add, api_photo_source_edit, api_photo_source_remove, api_photo_source_sync,
+                         api_photo_source_test, api_photo_source_test_new, api_photo_sources, api_trip_photos)
 from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, api_person_add, api_person_claim,
                           api_person_edit, api_person_remove)
 from .api.logos import api_loyalty_logo, api_segment_logo
@@ -60,6 +61,13 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/trips/{id}/photos", api_trip_photos),
     ("GET", "/api/photos/review", api_photo_review),
     ("POST", "/api/photos/{id}", api_photo_decide),
+    ("GET", "/api/photo-sources", api_photo_sources),
+    ("POST", "/api/photo-sources", api_photo_source_add),
+    ("POST", "/api/photo-sources/test", api_photo_source_test_new),
+    ("POST", "/api/photo-sources/{id}", api_photo_source_edit),
+    ("DELETE", "/api/photo-sources/{id}", api_photo_source_remove),
+    ("POST", "/api/photo-sources/{id}/test", api_photo_source_test),
+    ("POST", "/api/photo-sources/{id}/sync", api_photo_source_sync),
     ("POST", "/api/segments", api_segment_add),
     ("GET", "/api/segments/{id}", api_segment),
     ("GET", "/api/segments/{id}/logo", api_segment_logo),

@@ -451,6 +451,95 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/photo-sources",
+      "handler": "waypoint/server/api/photos.py:api_photo_sources",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photo-sources",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_add",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photo-sources/test",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_test_new",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photo-sources/{id}",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_edit",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/photo-sources/{id}",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_remove",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photo-sources/{id}/test",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_test",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photo-sources/{id}/sync",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_sync",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/segments",
       "handler": "waypoint/server/api/trips.py:api_segment_add",

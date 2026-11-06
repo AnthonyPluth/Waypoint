@@ -13,14 +13,15 @@ from sqlalchemy import select, update
 
 from .. import monitoring
 from . import settings_keys
-from .models import LoyaltyId, Mailbox, SegmentCode, Setting, StoredMessage
+from .models import LoyaltyId, Mailbox, PhotoSource, SegmentCode, Setting, StoredMessage
 
 PREFIX = "enc:v1:"
 KEY_FILE = "secret.key"
 MIN_KEY_LENGTH = 32
 
 SECRET_SETTINGS = settings_keys.SECRETS
-SECRET_COLUMNS = {"mailboxes": ("token",), "loyalty_ids": ("number",), "stored_messages": ("content", "subject"), "segment_codes": ("content",)}
+SECRET_COLUMNS = {"mailboxes": ("token",), "loyalty_ids": ("number",), "stored_messages": ("content", "subject"), "segment_codes": ("content",),
+                  "photo_sources": ("api_key",)}
 
 _lock = threading.Lock()
 _cache: dict[tuple, MultiFernet] = {}
@@ -187,5 +188,14 @@ def encrypt_stored(conn) -> int:
             continue
         if new != c["content"]:
             conn.execute(update(SegmentCode).where(SegmentCode.segment_id == c["segment_id"]).values(content=new))
+            changed += 1
+    for p in conn.execute(select(PhotoSource.id, PhotoSource.api_key)).fetchall():
+        try:
+            new = reencrypt(p["api_key"])
+        except InvalidToken:
+            monitoring.log("Warning: a saved Immich library's key can't be decrypted with the current key; enter it again in Settings.", "warning")
+            continue
+        if new != p["api_key"]:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == p["id"]).values(api_key=new))
             changed += 1
     return changed

@@ -608,6 +608,47 @@ export interface PhotoReview {
   photos: ReviewPhoto[];
 }
 
+export interface PhotoSource {
+  id: number;
+  person_id: number;
+  url: string;
+  label: string | null;
+  status: "ok" | "refused" | "unreachable" | "off";
+  mine: boolean;
+  last_sync: string | null;
+  last_error: string | null;
+  photos: number | null;
+  trips: number | null;
+}
+
+export interface PhotoSourceBody {
+  person_id?: number | null;
+  url: string;
+  key: string;
+  label?: string | null;
+}
+
+export interface PhotoSourceEdit {
+  key?: string;
+  label?: string | null;
+  paused?: boolean;
+}
+
+export interface PhotoSourceTest {
+  name: string | null;
+  same_account: boolean | null;
+}
+
+export interface PhotoSourceTestBody {
+  url?: string;
+  key?: string;
+}
+
+export interface PhotoSources {
+  sources: PhotoSource[];
+  permissions: string[];
+}
+
 export interface Port {
   name: string;
   zone: string;
@@ -1090,6 +1131,10 @@ export interface StoredEmail {
   images: number;
 }
 
+export interface SyncStarted {
+  started: boolean;
+}
+
 export interface Traveler {
   id: number;
   person_id: number | null;
@@ -1297,6 +1342,13 @@ export interface Endpoints {
   "GET /api/trips/{id}/photos": { body: never; reply: TripPhotos };
   "GET /api/photos/review": { body: never; reply: PhotoReview };
   "POST /api/photos/{id}": { body: PhotoBody; reply: TripPhoto };
+  "GET /api/photo-sources": { body: never; reply: PhotoSources };
+  "POST /api/photo-sources": { body: PhotoSourceBody; reply: PhotoSource };
+  "POST /api/photo-sources/test": { body: PhotoSourceTestBody; reply: PhotoSourceTest };
+  "POST /api/photo-sources/{id}": { body: PhotoSourceEdit; reply: PhotoSource };
+  "DELETE /api/photo-sources/{id}": { body: never; reply: Ok };
+  "POST /api/photo-sources/{id}/test": { body: PhotoSourceTestBody; reply: PhotoSourceTest };
+  "POST /api/photo-sources/{id}/sync": { body: never; reply: SyncStarted };
   "POST /api/segments": { body: SegmentBody; reply: Segment };
   "GET /api/segments/{id}": { body: never; reply: Segment };
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };

@@ -637,6 +637,51 @@ class PhotoBody(TypedDict):
     hidden: NotRequired[bool]
 
 
+class PhotoSource(TypedDict):
+    id: int
+    person_id: int
+    url: str
+    label: str | None
+    status: Literal["ok", "refused", "unreachable", "off"]
+    mine: bool
+    last_sync: str | None
+    last_error: str | None
+    photos: int | None
+    trips: int | None
+
+
+class PhotoSources(TypedDict):
+    sources: list[PhotoSource]
+    permissions: list[str]
+
+
+class PhotoSourceBody(TypedDict):
+    person_id: NotRequired[int | None]
+    url: str
+    key: str
+    label: NotRequired[str | None]
+
+
+class PhotoSourceEdit(TypedDict):
+    key: NotRequired[str]
+    label: NotRequired[str | None]
+    paused: NotRequired[bool]
+
+
+class PhotoSourceTestBody(TypedDict):
+    url: NotRequired[str]
+    key: NotRequired[str]
+
+
+class PhotoSourceTest(TypedDict):
+    name: str | None
+    same_account: bool | None
+
+
+class SyncStarted(TypedDict):
+    started: bool
+
+
 class TripPhotoCounts(TypedDict):
     total: int
     inferred: int
