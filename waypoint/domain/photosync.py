@@ -274,7 +274,7 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
     window = run.windows[trip_id]
     after = max(window.start, photos.instant(row.resume_after)) if row.resume_after else window.start
     while True:
-        if photo_sources.status(conn, run.source_id) == OFF:
+        if photo_sources.status(conn, run.source_id) in (OFF, None):
             conn.commit()
             return PAUSED
         got = run.provider.search(run.unlocked, after, window.end, updated_after=updated, page=1)

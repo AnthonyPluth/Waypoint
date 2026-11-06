@@ -959,3 +959,40 @@ class SixthReviewTests(SyncCase):
         self.assertEqual((self.stored()["status"], self.stored()["last_sync"]), ("off", NOW.timestamp()))
         self.assertEqual(len(self.rows()), 6)
         self.assertEqual(got.budget_hit, 0)
+
+
+class SeventhReviewTests(SyncCase):
+    def test_a_library_removed_mid_run_stops_after_one_request(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-02T13:00:00Z", gps=SOHO),
+                          asset(3, "2026-06-02T14:00:00Z", gps=SOHO), asset(4, "2026-06-04T12:00:00Z", gps=SOHO)]
+
+        def removed(asked):
+            with db.session() as other:
+                photo_sources.remove(other, self.source)
+        self.lib.on_search = removed
+        got = self.sync()
+        self.assertEqual(len(self.lib.asked()), 1)
+        self.assertEqual(got.budget_hit, 0)
+        self.assertIsNone(photo_sources.get(self.c, self.source))
+
+    def test_a_library_the_sweep_ended_mid_run_stops_before_its_next_request(self):
+        self.lib.items = [asset(n, f"2026-06-02T1{n}:00:00Z", gps=SOHO) for n in range(5)]
+        gone = []
+        self.lib.on_search = lambda asked: gone.append(1)
+        real = photo_sources.status
+        with mock.patch.object(photo_sources, "status", side_effect=lambda conn, source_id: None if gone else real(conn, source_id)):
+            got = self.sync()
+        self.assertEqual(len(self.lib.asked()), 1)
+        self.assertEqual((got.budget_hit, self.stored()["status"], self.stored()["last_sync"]), (0, "ok", None))
+
+    def test_turning_on_share_all_queues_a_sync_of_each_new_trip_after_commit_only(self):
+        photoqueue.enable(photosync.start)
+        self.addCleanup(photoqueue.disable)
+        with mock.patch.object(photoqueue, "starter") as started:
+            photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 40.0)
+            self.c.rollback()
+            started.assert_not_called()
+            photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 41.0)
+            started.assert_not_called()
+            self.c.commit()
+        self.assertIn((self.source, {self.other}), [c.args for c in started.call_args_list])

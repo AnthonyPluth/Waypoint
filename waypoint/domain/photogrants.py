@@ -321,6 +321,7 @@ def _unshared(conn: db.Connection, person_id: int, by: str) -> list[int]:
 def _share_all(conn: db.Connection, person_id: int, by: str, scope: photos.Scope, now: float, pending: Sequence[int]) -> int:
     for trip_id in pending:
         _upsert_grant(conn, person_id, trip_id, scope, by, now)
+        photoqueue.after_commit(conn, person_id, trip_id)
     return len(pending)
 
 
