@@ -177,13 +177,20 @@ def _new_names(known: list[str], extra: list[str]) -> list[str]:
     return out
 
 
+def lock(conn: db.Connection, person_id: int) -> bool:
+    return int(conn.execute(update(Person).where(Person.id == person_id).values(display_name=Person.display_name)).rowcount) > 0
+
+
 def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) -> Listed:
     me = conn.orm.get(Person, member_id, with_for_update=True)
     if me is None or me.user_sub is None:
         raise NotAMember()
+    if not lock(conn, guest_id):
+        raise NoSuchGuest()
     guest = conn.orm.get(Person, guest_id)
     if guest is None:
         raise NoSuchGuest()
+    photogrants.lock_trips_of(conn, guest_id)
     if guest.user_sub is not None:
         raise NotAGuest()
     if decode_links(me.links):

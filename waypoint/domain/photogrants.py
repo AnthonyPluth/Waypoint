@@ -22,6 +22,19 @@ ASK: State = "ask"
 NONE: State = "none"
 
 
+STALE_SHARE = "The trip changed. Review who sees your photos under Your photos on this trip."
+STALE_REMOVAL = "The trip changed since that photo was removed. Open the removed list again."
+STALE_SETTING = "Your trips changed. Review them before sharing on all."
+
+
+class Stale(Exception):
+    pass
+
+
+def _window_matches(conn: db.Connection, trip_id: int, window: Mapping[str, str]) -> bool:
+    return photos.window_out(photos.trip_window(conn, trip_id)) == {"start": window.get("start"), "end": window.get("end")}
+
+
 class Prefs(TypedDict):
     default_scope: photos.Scope
     share_all: bool
@@ -33,6 +46,8 @@ class Sharing(TypedDict):
     count: int
     removed_count: int
     removed: list[photos.TripPhoto]
+    window: photos.WindowOut | None
+    changed: float | None
 
 
 class GrantedTrip(TypedDict):
@@ -122,8 +137,14 @@ def _end(conn: db.Connection, person_id: int, trip_id: int) -> None:
 def _acting(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) -> tuple[Trip, str] | None:
     if viewer.household or not photos.acts_for(conn, viewer, person_id):
         return None
+    if not people.lock(conn, person_id) or not photos.acts_for(conn, viewer, person_id):
+        return None
     trip, by = visibility.visible_trip(conn, viewer, trip_id), photos.viewer_sub(conn, viewer)
     return (trip, by) if trip is not None and by is not None else None
+
+
+def lock_trips_of(conn: db.Connection, person_id: int) -> list[int]:
+    return [trip_id for trip_id in _reachable(conn, person_id) if _lock_trip(conn, trip_id)]
 
 
 def sharing(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) -> Sharing:
@@ -133,7 +154,8 @@ def sharing(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) -
     count = sum(1 for _, person in photos.visible_rows(conn, viewer, trip_id) if person == person_id)
     state: State = NONE if row is None else DECLINED if row.revoked is not None else ASK if row.ask_again else SHARED
     return {"state": state, "scope": row.scope if row is not None and row.revoked is None else None,  # type: ignore[typeddict-item]
-            "count": count, "removed_count": len(gone), "removed": gone}
+            "count": count, "removed_count": len(gone), "removed": gone, "window": photos.window_out(photos.trip_window(conn, trip_id)),
+            "changed": row.changed if row is not None else None}
 
 
 def state_of(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) -> Sharing | None:
@@ -142,13 +164,19 @@ def state_of(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) 
     return sharing(conn, viewer, person_id, trip_id)
 
 
-def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, scope: photos.Scope, now: float | None = None) -> Sharing | None:
+def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, scope: photos.Scope, now: float | None = None,
+          window: Mapping[str, str] | None = None, expected_changed: float | None = None) -> Sharing | None:
     acting = _acting(conn, viewer, person_id, trip_id)
     if acting is None or scope not in photos.SCOPES:
         return None
     trip, by = acting
     if not _aboard_under_lock(conn, person_id, trip.id) or visibility.visible_trip(conn, viewer, trip.id) is None:
         return None
+    if window is not None and not _window_matches(conn, trip.id, window):
+        raise Stale(STALE_SHARE)
+    row = lock(conn, person_id, [trip.id]).get(trip.id)
+    if expected_changed is not None and (row is None or row.changed != expected_changed):
+        raise Stale(STALE_SHARE)
     _write(conn, person_id, trip.id, scope, by, time.time() if now is None else now)
     return sharing(conn, viewer, person_id, trip.id)
 
@@ -169,6 +197,8 @@ def decline(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, n
     if acting is None:
         return None
     trip, _ = acting
+    if not _lock_trip(conn, trip.id):
+        return None
     row = lock(conn, person_id, [trip.id]).get(trip.id)
     if row is None or row.revoked is not None or not row.ask_again:
         return stop(conn, viewer, person_id, trip_id, now)
@@ -206,7 +236,7 @@ def exclude(conn: db.Connection, viewer: Viewer, trip_id: int, photo_ids: Sequen
     return sharing(conn, viewer, fresh[0][1], trip_id)
 
 
-def put_back(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int) -> Sharing | None:
+def put_back(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int, created: float | None = None) -> Sharing | None:
     if viewer.household:
         return None
     found = next(((p, person) for p, person in photos.removed(conn, viewer, trip_id) if p.id == photo_id), None)
@@ -220,6 +250,8 @@ def put_back(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int) -
         return None
     photo, person = found
     exclusion = conn.orm.get(PhotoExclusion, (person, photo.asset_id, trip_id))
+    if created is not None and (exclusion is None or exclusion.created != created):
+        raise Stale(STALE_REMOVAL)
     was = exclusion.was_trip_id if exclusion is not None else None
     conn.execute(delete(PhotoExclusion).where(PhotoExclusion.person_id == person, PhotoExclusion.asset_id == photo.asset_id, PhotoExclusion.trip_id == trip_id))
     conn.orm.expire_all()
@@ -245,26 +277,30 @@ def _setter(conn: db.Connection, sub: str | None) -> Viewer | None:
     return Viewer(person) if person is not None else None
 
 
-def _share_all(conn: db.Connection, person_id: int, by: str, scope: photos.Scope, now: float) -> int:
+def _unshared(conn: db.Connection, person_id: int, by: str) -> list[int]:
     setter = _setter(conn, by)
     if setter is None:
-        return 0
+        return []
     seen = visibility.visible_trips(conn, setter)
     aboard = trippeople.of(conn, [t.id for t in seen])
-    mine = sorted(t.id for t in seen if person_id in aboard[t.id])
-    written = 0
-    for trip_id in mine:
+    pending: list[int] = []
+    for trip_id in sorted(t.id for t in seen if person_id in aboard[t.id]):
         if not _aboard_under_lock(conn, person_id, trip_id) or visibility.visible_trip(conn, setter, trip_id) is None:
             continue
         row = lock(conn, person_id, [trip_id]).get(trip_id)
         if row is None or row.revoked is not None:
-            _write(conn, person_id, trip_id, scope, by, now)
-            written += 1
-    return written
+            pending.append(trip_id)
+    return pending
+
+
+def _share_all(conn: db.Connection, person_id: int, by: str, scope: photos.Scope, now: float, pending: Sequence[int]) -> int:
+    for trip_id in pending:
+        _write(conn, person_id, trip_id, scope, by, now)
+    return len(pending)
 
 
 def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope: photos.Scope | None, share_all: bool | None,
-              now: float | None = None) -> Prefs | None:
+              now: float | None = None, windows: Mapping[str, Mapping[str, str]] | None = None) -> Prefs | None:
     if viewer.household or not photos.acts_for(conn, viewer, person_id):
         return None
     by = photos.viewer_sub(conn, viewer)
@@ -276,6 +312,9 @@ def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope
     if row is None:
         return None
     was_on, stamp = row.share_all, time.time() if now is None else now
+    pending = _unshared(conn, person_id, by) if share_all and not was_on else []
+    if windows is not None and any(str(t) not in windows or not _window_matches(conn, t, windows[str(t)]) for t in pending):
+        raise Stale(STALE_SETTING)
     if default_scope is not None:
         row.default_scope = default_scope
     if share_all is not None:
@@ -285,7 +324,7 @@ def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope
     if share_all and not was_on:
         row.set_by, row.share_all_since = by, stamp
         conn.orm.flush()
-        _share_all(conn, person_id, by, row.default_scope, stamp)  # type: ignore[arg-type]
+        _share_all(conn, person_id, by, row.default_scope, stamp, pending)  # type: ignore[arg-type]
     conn.orm.flush()
     return prefs_of(conn, person_id)
 
@@ -362,10 +401,13 @@ def snapshot(conn: db.Connection, trip_ids: Iterable[int]) -> dict[int, Before]:
 
 
 def _re_place_automatic(conn: db.Connection, trip_id: int) -> None:
+    found = photos.trip_window(conn, trip_id)
     for g in conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.trip_id == trip_id, PhotoGrant.revoked.is_(None)).order_by(PhotoGrant.person_id)).all():
-        lock(conn, g.person_id, [trip_id])
-        for row in _person_rows(conn, g.person_id, [trip_id]):
-            if row.decided_by != photos.OWNER:
+        lock(conn, g.person_id, sorted(photos.granted_trips(conn, g.person_id) | {trip_id}))
+        q = select(Photo).join(PhotoSource, PhotoSource.id == Photo.source_id).where(PhotoSource.person_id == g.person_id).order_by(Photo.id)
+        for row in conn.orm.scalars(q).all():
+            inside = found is not None and found.start <= photos.instant(row.taken_utc) <= found.end
+            if row.decided_by != photos.OWNER and (inside or row.trip_id == trip_id):
                 photos.re_place(conn, row, g.person_id)
 
 
@@ -392,7 +434,10 @@ def trips_changed(conn: db.Connection, trip_ids: Iterable[int], before: Mapping[
         if was is not None and _shrank(was.window, after):
             for g in conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.trip_id == trip_id, PhotoGrant.revoked.is_(None)).order_by(PhotoGrant.person_id)).all():
                 lock(conn, g.person_id, [trip_id])
-                _re_place(conn, g.person_id, [trip_id])
+                for row in _person_rows(conn, g.person_id, [trip_id]):
+                    held = after is not None and after.start <= photos.instant(row.taken_utc) <= after.end
+                    if not (row.decided_by == photos.OWNER and held):
+                        photos.re_place(conn, row, g.person_id)
         elif was is not None and was.points != photos.trip_points(conn, trip_id):
             _re_place_automatic(conn, trip_id)
 
@@ -482,6 +527,7 @@ def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
 
 def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -> None:
     kept = {p.asset_id: p for p in conn.orm.scalars(select(Photo).where(Photo.source_id == mine.id)).all()}
+    placed: list[Photo] = []
     for p in conn.orm.scalars(select(Photo).where(Photo.source_id == theirs.id).order_by(Photo.id)).all():
         twin = kept.get(p.asset_id)
         if twin is None:
@@ -490,6 +536,7 @@ def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -
         if p.decided_by == photos.OWNER and twin.decided_by != photos.OWNER:
             for field in ("trip_id", "match", "segment_id", "distance_km", "decided_by", "latitude", "longitude", "location_source"):
                 setattr(twin, field, getattr(p, field))
+            placed.append(twin)
         conn.orm.delete(p)
     synced = {s.trip_id for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == mine.id)).all()}
     for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == theirs.id)).all():
@@ -500,6 +547,8 @@ def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -
     conn.orm.flush()
     conn.orm.delete(theirs)
     conn.orm.flush()
+    for twin in placed:
+        photos.copy_placement(conn, twin, mine.person_id)
 
 
 def _claim_sources(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:

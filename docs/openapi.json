@@ -6577,6 +6577,12 @@
           },
           "share_all": {
             "type": "boolean"
+          },
+          "windows": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PhotoWindow"
+            }
           }
         },
         "required": [],
@@ -6626,6 +6632,22 @@
             "items": {
               "$ref": "#/components/schemas/TripPhoto"
             }
+          },
+          "window": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PhotoWindow"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changed": {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         },
         "required": [
@@ -6633,7 +6655,9 @@
           "scope",
           "count",
           "removed_count",
-          "removed"
+          "removed",
+          "window",
+          "changed"
         ],
         "additionalProperties": false
       },
@@ -6651,6 +6675,12 @@
           },
           "declined": {
             "type": "boolean"
+          },
+          "window": {
+            "$ref": "#/components/schemas/PhotoWindow"
+          },
+          "expected_changed": {
+            "type": "number"
           }
         },
         "required": [],
@@ -6838,6 +6868,22 @@
         "required": [
           "sources",
           "permissions"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoWindow": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string"
+          },
+          "end": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
         ],
         "additionalProperties": false
       },
