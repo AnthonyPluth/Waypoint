@@ -18,8 +18,8 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/backup` | `backups.py:api_backup` | - | `test_backup.py`, `test_http_pinned.py` | [start/docker](/Waypoint/start/docker/) |
 | `POST /api/backup/inspect` | `backups.py:api_backup_inspect` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_http_pinned.py`, `test_monitoring.py`, `test_security.py`, `test_server_errors.py` | [start/docker](/Waypoint/start/docker/) |
 | `POST /api/restore` | `backups.py:api_restore` | `lib/components/settings/DataSection.svelte` | `test_api_contract.py`, `test_backup.py`, `test_hardening.py`, `test_http_pinned.py`, `test_http_server.py`, `test_monitoring.py` | [start/docker](/Waypoint/start/docker/) |
-| `GET /api/people` | `people.py:api_people` | `lib/components/settings/ImportSection.svelte`, `pages/People.svelte`, `pages/Review.svelte`, `pages/Stats.svelte`, `pages/Trip.svelte`, `pages/Trips.svelte` | `test_api_contract.py`, `test_mail_scan.py`, `test_mcp_routes.py`, `test_people.py` | [start/people](/Waypoint/start/people/) |
-| `POST /api/people` | `people.py:api_person_add` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp_routes.py`, `test_people.py`, `test_trips.py` | [start/people](/Waypoint/start/people/) |
+| `GET /api/people` | `people.py:api_people` | `lib/components/settings/ImportSection.svelte`, `pages/People.svelte`, `pages/Review.svelte`, `pages/Stats.svelte`, `pages/Trip.svelte`, `pages/Trips.svelte` | `test_api_contract.py`, `test_mail_scan.py`, `test_mcp_routes.py`, `test_people.py`, `test_photo_sources.py` | [start/people](/Waypoint/start/people/) |
+| `POST /api/people` | `people.py:api_person_add` | `pages/People.svelte` | `test_api_contract.py`, `test_loyalty.py`, `test_mcp_routes.py`, `test_people.py`, `test_photo_sources.py`, `test_trips.py` | [start/people](/Waypoint/start/people/) |
 | `POST /api/people/{id}` | `people.py:api_person_edit` | `pages/People.svelte` | `test_api_contract.py`, `test_people.py` | [start/people](/Waypoint/start/people/) |
 | `DELETE /api/people/{id}` | `people.py:api_person_remove` | `pages/People.svelte` | `test_api_contract.py`, `test_mcp_routes.py`, `test_people.py` | [start/people](/Waypoint/start/people/) |
 | `POST /api/people/{id}/claim` | `people.py:api_person_claim` | `pages/People.svelte`, `pages/Upcoming.svelte` | `test_api_contract.py`, `test_mcp_routes.py`, `test_people.py` | [start/people](/Waypoint/start/people/) |
@@ -39,13 +39,13 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/trips/{id}/photos` | `photos.py:api_trip_photos` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/photos/review` | `photos.py:api_photo_review` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photos_api.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photos/{id}` | `photos.py:api_photo_decide` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photos_api.py` | [start/photos](/Waypoint/start/photos/) |
-| `GET /api/photo-sources` | `photos.py:api_photo_sources` | - | `test_api_contract.py`, `test_mcp_routes.py` | [start/photos](/Waypoint/start/photos/) |
-| `POST /api/photo-sources` | `photos.py:api_photo_source_add` | - | `test_api_contract.py`, `test_mcp_routes.py` | [start/photos](/Waypoint/start/photos/) |
-| `POST /api/photo-sources/test` | `photos.py:api_photo_source_test_new` | - | `test_api_contract.py` | [start/photos](/Waypoint/start/photos/) |
-| `POST /api/photo-sources/{id}` | `photos.py:api_photo_source_edit` | - | `test_api_contract.py`, `test_mcp_routes.py` | [start/photos](/Waypoint/start/photos/) |
-| `DELETE /api/photo-sources/{id}` | `photos.py:api_photo_source_remove` | - | `test_api_contract.py`, `test_mcp_routes.py` | [start/photos](/Waypoint/start/photos/) |
-| `POST /api/photo-sources/{id}/test` | `photos.py:api_photo_source_test` | - | `test_api_contract.py` | [start/photos](/Waypoint/start/photos/) |
-| `POST /api/photo-sources/{id}/sync` | `photos.py:api_photo_source_sync` | - | `test_api_contract.py`, `test_mcp_routes.py` | [start/photos](/Waypoint/start/photos/) |
+| `GET /api/photo-sources` | `photos.py:api_photo_sources` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
+| `POST /api/photo-sources` | `photos.py:api_photo_source_add` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
+| `POST /api/photo-sources/test` | `photos.py:api_photo_source_test_new` | - | `test_api_contract.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
+| `POST /api/photo-sources/{id}` | `photos.py:api_photo_source_edit` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
+| `DELETE /api/photo-sources/{id}` | `photos.py:api_photo_source_remove` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
+| `POST /api/photo-sources/{id}/test` | `photos.py:api_photo_source_test` | - | `test_api_contract.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
+| `POST /api/photo-sources/{id}/sync` | `photos.py:api_photo_source_sync` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/segments` | `trips.py:api_segment_add` | `lib/components/SegmentForm.svelte`, `pages/Review.svelte` | `test_api_contract.py`, `test_gate_codes.py`, `test_mail_scan.py`, `test_mcp_routes.py`, `test_offline.py`, `test_onboarding.py`, `test_reminders.py`, `test_trip_emails_clear.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/segments/{id}` | `trips.py:api_segment` | - | `test_api_contract.py`, `test_gate_codes.py`, `test_logos.py`, `test_mail_scan.py`, `test_mcp.py`, `test_offline.py`, `test_trip_emails_clear.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/segments/{id}/logo` | `logos.py:api_segment_logo` | - | `test_logos.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |

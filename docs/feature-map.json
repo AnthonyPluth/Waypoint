@@ -97,7 +97,8 @@
         "tests/test_api_contract.py",
         "tests/test_mail_scan.py",
         "tests/test_mcp_routes.py",
-        "tests/test_people.py"
+        "tests/test_people.py",
+        "tests/test_photo_sources.py"
       ],
       "docs": [
         "start/people"
@@ -115,6 +116,7 @@
         "tests/test_loyalty.py",
         "tests/test_mcp_routes.py",
         "tests/test_people.py",
+        "tests/test_photo_sources.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -457,7 +459,8 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_mcp_routes.py"
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_sources.py"
       ],
       "docs": [
         "start/photos"
@@ -470,7 +473,8 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_mcp_routes.py"
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_sources.py"
       ],
       "docs": [
         "start/photos"
@@ -482,7 +486,8 @@
       "handler": "waypoint/server/api/photos.py:api_photo_source_test_new",
       "web": [],
       "tests": [
-        "tests/test_api_contract.py"
+        "tests/test_api_contract.py",
+        "tests/test_photo_sources.py"
       ],
       "docs": [
         "start/photos"
@@ -495,7 +500,8 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_mcp_routes.py"
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_sources.py"
       ],
       "docs": [
         "start/photos"
@@ -508,7 +514,8 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_mcp_routes.py"
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_sources.py"
       ],
       "docs": [
         "start/photos"
@@ -520,7 +527,8 @@
       "handler": "waypoint/server/api/photos.py:api_photo_source_test",
       "web": [],
       "tests": [
-        "tests/test_api_contract.py"
+        "tests/test_api_contract.py",
+        "tests/test_photo_sources.py"
       ],
       "docs": [
         "start/photos"
@@ -533,7 +541,8 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
-        "tests/test_mcp_routes.py"
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_sources.py"
       ],
       "docs": [
         "start/photos"
