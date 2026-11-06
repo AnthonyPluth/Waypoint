@@ -34,6 +34,8 @@ A UI issue builds the screens in the file it points at, and lists the accessible
 - Immediate removal needs `private, no-cache` thumbnails with the ETag, and open pages refetch on focus and every 60 s.
 - A library for someone without a login is shared by whoever connected it.
 
+The rules behind these screens (grants, scope, removal, caching) are in `docs/PHOTOS.md`. The user-facing page `docs/src/content/docs/start/photos.md` describes what the code does today and is rewritten with the code that implements these rules.
+
 ## Fonts
 
 The pages load Geist and Geist Mono from Google Fonts when you are online and fall back to system fonts otherwise. This is for viewing these design files only; the app bundles its own fonts and loads nothing from outside.

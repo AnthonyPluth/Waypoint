@@ -532,7 +532,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
     var el = document.querySelector('[data-grid="' + k + '"]');
     if (el) el.innerHTML = GROUPS[k].map(tile).join("");
   });
-  var STRIP = [GROUPS.d1[1], GROUPS.d1[4], GROUPS.d3[1], GROUPS.d3[4], GROUPS.d3[5], GROUPS.d5[0], GROUPS.d3[9], GROUPS.d5[4], GROUPS.d1[7], GROUPS.d3[6]];
+  var STRIP = [GROUPS.d1[1], GROUPS.d1[4], GROUPS.d1[7], GROUPS.d3[1], GROUPS.d3[4], GROUPS.d3[5], GROUPS.d3[6], GROUPS.d3[9], GROUPS.d5[0], GROUPS.d5[4]];
   var ADA_ONLY = [].concat(GROUPS.d1, GROUPS.d3, GROUPS.d5).filter(function (t) { return t.who === A; }).slice(0, 10);
   document.querySelectorAll("[data-strip]").forEach(function (el) {
     var off = el.getAttribute("data-strip") === "off";
