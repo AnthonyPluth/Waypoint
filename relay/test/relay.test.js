@@ -178,6 +178,14 @@ describe("waking a device", () => {
     assert.equal(r.status, 502);
     assert.notEqual(await ctx.env.DEVICES.get(`d:${id}`), null);
   });
+
+  test("answers 502 when Apple cannot be reached, without forgetting the device", async () => {
+    const { id, auth } = await registered();
+    const down = { fetch: async () => { throw new TypeError("connection reset"); } };
+    const r = await handle(post(`/v1/devices/${id}/wake`, {}, auth), ctx.env, down);
+    assert.equal(r.status, 502);
+    assert.notEqual(await ctx.env.DEVICES.get(`d:${id}`), null);
+  });
 });
 
 describe("limits on what is kept and read", () => {

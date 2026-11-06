@@ -157,11 +157,16 @@ async function wake(request, env, deps, id) {
     "content-type": "application/json",
   };
   if (collapse) headers["apns-collapse-id"] = collapse;
-  const sent = await deps.fetch(`${HOSTS[record.environment]}/3/device/${record.token}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(shape.body),
-  });
+  let sent;
+  try {
+    sent = await deps.fetch(`${HOSTS[record.environment]}/3/device/${record.token}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(shape.body),
+    });
+  } catch {
+    return reply(502, { error: "Couldn't reach Apple's push service." });
+  }
   if (sent.status === 200) return reply(200, { ok: true });
   if (sent.status === 410 || sent.status === 400) {
     const why = await sent.json().catch(() => ({}));
