@@ -128,6 +128,18 @@ A trip that has ended, with at least two stops Waypoint can place, shows its rou
 
 A road trip (stays, rental cars or visits but no flight, train or cruise) has no booking for getting there and back. Set a **Home** under **Settings → Travel preferences → Home** and the replay starts there and returns there. Home is a city, a state or region, an optional ZIP or postal code and a country, placed on the map from the lists that ship with Waypoint ([Places](/Waypoint/reference/data-sources/#places)); there is no street address and none is kept. The map labels the stop with the city’s name and a house icon, never the word “Home”. Home is one household setting, in backups, read by the browser only with a trip’s map data; it is not used for Stats, distances, the calendar feed or reminders, is never logged or sent to the AI fallback, and an [assistant](/Waypoint/start/mcp/) can’t reach it.
 
+## A trip's numbers
+
+Waypoint works out a few numbers for each trip, from its bookings and its photos, on your server (`GET /api/trips/{id}/summary`, answered only to someone who can see the trip; anyone else gets “No such trip”). The web app doesn’t show them yet.
+
+- **Days**: the trip’s dates, first and last day included. **Nights**: the nights spent in a stay or aboard a cruise, each night counted once when bookings overlap.
+- **Distance**, in kilometres, split in two. Flights are the great-circle distance between their two airports. Driving is measured between consecutive stays and rental cars in time order (a flight, train or cruise in between starts a new drive): along US highways where the [highway list](/Waypoint/reference/data-sources/#highways) has a route, as the replay draws it, otherwise as a straight line, and then the road figure is marked as an estimate.
+- **States and countries**, by name, each once, in alphabetical order. States are the US states of the bookings’ addresses, the states of [past visits](#past-trips-you-only-remember) and the states Immich gives for the trip’s photos taken in the United States. Countries are the flights’ airports, the stays’ cities, past visits and the countries Immich gives for the photos. A photo flagged as far from every booking adds no place until you accept it or move it. Waypoint doesn’t count the state lines a drive crosses.
+- **Photos**: how many of the trip’s photos you can see, and how many of those were placed from the itinerary rather than their own location. A photo its person hid counts only for that person.
+- **Bookings by kind**: how many flights, stays, rental cars, trains, cruises, parking bookings and past visits the trip has.
+
+Cancelled bookings count for nothing. A trip with no booking Waypoint can place gets zero distance and no places. [Assistants](/Waypoint/start/mcp/) can’t read these numbers.
+
 ## In a backup
 
 Trips, bookings, their costs and their travellers are part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine) and come back exactly as they were, times and zones included. The airport list and the lists used to place bookings on the map aren’t: every Waypoint has them already.

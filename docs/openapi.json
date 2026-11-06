@@ -582,6 +582,37 @@
         }
       }
     },
+    "/api/trips/{id}/summary": {
+      "get": {
+        "operationId": "api_trip_summary",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_summary",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripSummary"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/trips/{id}/emails/clear": {
       "post": {
         "operationId": "api_trip_emails_clear",
@@ -8388,6 +8419,42 @@
         ],
         "additionalProperties": false
       },
+      "TripKindCounts": {
+        "type": "object",
+        "properties": {
+          "flight": {
+            "type": "integer"
+          },
+          "hotel": {
+            "type": "integer"
+          },
+          "car": {
+            "type": "integer"
+          },
+          "train": {
+            "type": "integer"
+          },
+          "cruise": {
+            "type": "integer"
+          },
+          "parking": {
+            "type": "integer"
+          },
+          "visit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "flight",
+          "hotel",
+          "car",
+          "train",
+          "cruise",
+          "parking",
+          "visit"
+        ],
+        "additionalProperties": false
+      },
       "TripList": {
         "type": "object",
         "properties": {
@@ -8499,6 +8566,22 @@
           "distance_km",
           "cluster",
           "hidden"
+        ],
+        "additionalProperties": false
+      },
+      "TripPhotoCounts": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "inferred": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "inferred"
         ],
         "additionalProperties": false
       },
@@ -8706,6 +8789,60 @@
           "latitude",
           "longitude",
           "precision"
+        ],
+        "additionalProperties": false
+      },
+      "TripSummary": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer"
+          },
+          "nights": {
+            "type": "integer"
+          },
+          "distance_km": {
+            "type": "number"
+          },
+          "flight_km": {
+            "type": "number"
+          },
+          "road_km": {
+            "type": "number"
+          },
+          "road_estimated": {
+            "type": "boolean"
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "photos": {
+            "$ref": "#/components/schemas/TripPhotoCounts"
+          },
+          "kinds": {
+            "$ref": "#/components/schemas/TripKindCounts"
+          }
+        },
+        "required": [
+          "days",
+          "nights",
+          "distance_km",
+          "flight_km",
+          "road_km",
+          "road_estimated",
+          "states",
+          "countries",
+          "photos",
+          "kinds"
         ],
         "additionalProperties": false
       },

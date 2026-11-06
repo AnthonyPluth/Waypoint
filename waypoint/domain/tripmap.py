@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from datetime import datetime
 from typing import TypedDict, cast
 
 from sqlalchemy import select
@@ -115,20 +116,23 @@ def _retrace(followed: list[roads.Route], point: roads.Point, other: roads.Point
     return min(sections, key=lambda r: r.start_link_miles + r.end_link_miles, default=None)
 
 
-def _pairs(live: list[trips.SegmentOut], located: dict[int, roads.Point]) -> list[tuple[int, int]]:
-    ordered = sorted(live, key=lambda s: (trips.instant(s["start_local"], s["start_zone"]), s["id"]))
+Stop = tuple[int, str, datetime]
+Drive = tuple[int, int, roads.Route | None]
+
+
+def _pairs(stops: list[Stop], located: dict[int, roads.Point]) -> list[tuple[int, int]]:
     pairs: list[tuple[int, int]] = []
     last: int | None = None
-    for s in ordered:
-        if s["kind"] in BREAKING_KINDS:
+    for segment_id, kind, _ in sorted(stops, key=lambda s: (s[2], s[0])):
+        if kind in BREAKING_KINDS:
             last = None
-        elif s["kind"] in ROAD_KINDS:
-            if s["id"] not in located:
+        elif kind in ROAD_KINDS:
+            if segment_id not in located:
                 last = None
                 continue
             if last is not None:
-                pairs.append((last, s["id"]))
-            last = s["id"]
+                pairs.append((last, segment_id))
+            last = segment_id
     return pairs
 
 
@@ -136,17 +140,31 @@ def _round(points: list[roads.Point]) -> list[list[float]]:
     return [[round(lat, 3), round(lon, 3)] for lat, lon in points]
 
 
-def road_legs(live: list[trips.SegmentOut], located: dict[int, roads.Point]) -> Roads:
-    legs: list[RoadLeg] = []
+def stops_of(live: list[trips.SegmentOut]) -> list[Stop]:
+    return [(s["id"], s["kind"], trips.instant(s["start_local"], s["start_zone"])) for s in live]
+
+
+def _routes(stops: list[Stop], located: dict[int, roads.Point]) -> tuple[list[Drive], list[roads.Route]]:
+    found_drives: list[Drive] = []
     followed: list[roads.Route] = []
-    for first, second in _pairs(live, located):
+    for first, second in _pairs(stops, located):
         found = _retrace(followed, located[first], located[second])
         if found is None:
             found = _drive(located[first], located[second])
             if found is not None:
                 followed.append(found)
-        if found is not None:
-            legs.append({"from_segment_id": first, "to_segment_id": second, "refs": found.refs, "points": _round(found.points)})
+        found_drives.append((first, second, found))
+    return found_drives, followed
+
+
+def drives(stops: list[Stop], located: dict[int, roads.Point]) -> list[Drive]:
+    return _routes(stops, located)[0]
+
+
+def road_legs(live: list[trips.SegmentOut], located: dict[int, roads.Point]) -> Roads:
+    found_drives, followed = _routes(stops_of(live), located)
+    legs: list[RoadLeg] = [{"from_segment_id": first, "to_segment_id": second, "refs": found.refs, "points": _round(found.points)}
+                           for first, second, found in found_drives if found is not None]
     nearby = roads.highways().near([line.points for line in followed]) if followed else []
     return {"legs": legs, "interstates": [{"ref": ref, "points": _round(line)} for ref, line in nearby]}
 

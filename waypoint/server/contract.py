@@ -637,6 +637,34 @@ class PhotoBody(TypedDict):
     hidden: NotRequired[bool]
 
 
+class TripPhotoCounts(TypedDict):
+    total: int
+    inferred: int
+
+
+class TripKindCounts(TypedDict):
+    flight: int
+    hotel: int
+    car: int
+    train: int
+    cruise: int
+    parking: int
+    visit: int
+
+
+class TripSummary(TypedDict):
+    days: int
+    nights: int
+    distance_km: float
+    flight_km: float
+    road_km: float
+    road_estimated: bool
+    states: list[str]
+    countries: list[str]
+    photos: TripPhotoCounts
+    kinds: TripKindCounts
+
+
 class TripBody(TypedDict):
     name: NotRequired[str]
     destination: NotRequired[str | None]
