@@ -457,6 +457,7 @@ class PhotoExclusion(Base):
     asset_id: Mapped[str]
     trip_id: Mapped[int]
     created: Mapped[float]
+    was_trip_id: Mapped[int | None]
 
 
 class PhotoSharingPrefs(Base):

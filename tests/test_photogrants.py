@@ -11,7 +11,7 @@ from waypoint.domain import people, photogrants, photos, trippeople, trips, visi
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
 from waypoint.storage import db
-from waypoint.storage.models import Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Trip, User
+from waypoint.storage.models import Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Segment, Trip, User
 
 ALLOWED = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint", "OIDC_ALLOWED_EMAILS": "u-jane@example.com,u-sam@example.com"}
 INSIDE_B = "2026-06-04T12:00"
@@ -167,6 +167,57 @@ class GrantTests(GrantCase):
             self.assertIsNone(photogrants.exclude(self.c, self.jane, self.b, [both.id], 40.0))
         self.assertEqual((self.row(both.id).trip_id, self.row(both.id).decided_by), (self.a, "owner"))
         self.assertEqual(self.c.execute(select(PhotoExclusion.asset_id)).fetchall(), [])
+
+    def test_put_back_restores_a_hand_placement_on_every_row_of_the_asset_while_the_trip_still_holds_it(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        self.c.orm.add(PhotoSource(person_id=self.jid, owner_sub="u-jane", url="https://second.example", immich_user_id="u", api_key="enc:v1:x", status="ok", created=1.0))
+        self.c.orm.flush()
+        second = self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.url == "https://second.example")).one()
+        first = self.photo(self.b, asset="twice-7r1d")
+        twin = self.photo(self.b, source=second, asset="twice-7r1d")
+        photos.decide(self.c, self.jane, first.id, self.a, None)
+        photogrants.exclude(self.c, self.jane, self.a, [first.id], 50.0)
+        self.assertEqual(self.c.orm.get(PhotoExclusion, (self.jid, "twice-7r1d", self.a)).was_trip_id, self.a)
+        for p in (first, twin):
+            self.assertEqual((self.row(p.id).trip_id, self.row(p.id).decided_by), (self.b, "auto"), p.id)
+        photogrants.put_back(self.c, self.jane, self.a, first.id)
+        for p in (first, twin):
+            self.assertEqual((self.row(p.id).trip_id, self.row(p.id).decided_by), (self.a, "owner"), p.id)
+        photogrants.exclude(self.c, self.jane, self.a, [first.id], 51.0)
+        self.c.execute(update(PhotoExclusion).where(PhotoExclusion.trip_id == self.a).values(was_trip_id=self.b))
+        self.c.execute(update(PhotoGrant).where(PhotoGrant.trip_id == self.b).values(revoked=52.0))
+        photogrants.put_back(self.c, self.jane, self.a, first.id)
+        self.assertEqual((self.row(first.id).trip_id, self.row(first.id).decided_by), (self.a, "auto"))
+
+    def test_put_back_sees_a_hand_placement_made_meanwhile_and_leaves_it(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        both = self.photo(self.b)
+        photogrants.exclude(self.c, self.jane, self.b, [both.id], 53.0)
+        self.assertEqual(self.row(both.id).trip_id, self.a)
+        real, moved = photos.lock_grants, []
+
+        def place_first(conn, person, trip_ids):
+            if not moved:
+                moved.append(True)
+                photos.decide(self.c, self.jane, both.id, self.a, None)
+            return real(conn, person, trip_ids)
+        with mock.patch.object(photos, "lock_grants", side_effect=place_first) as lock:
+            got = photogrants.put_back(self.c, self.jane, self.b, both.id)
+        self.assertEqual(lock.call_args_list[0].args[1:], (self.jid, [self.a, self.b]))
+        self.assertEqual((got["removed_count"], self.row(both.id).trip_id, self.row(both.id).decided_by), (0, self.a, "owner"))
+
+    def test_the_removed_list_keeps_only_photos_the_trips_current_window_holds(self):
+        self.share(self.jid, self.a)
+        only_a = self.photo(self.a, ONLY_A)
+        photogrants.exclude(self.c, self.jane, self.a, [only_a.id], 54.0)
+        self.assertEqual([p.id for p, _ in photos.removed(self.c, self.jane, self.a)], [only_a.id])
+        stay = self.c.orm.scalars(select(Segment.id).where(Segment.trip_id == self.a, Segment.kind == "hotel")).one()
+        trips.edit_segment(self.c, self.jane, stay, {"status": "cancelled"})
+        self.assertEqual(photos.removed(self.c, self.jane, self.a), [])
+        self.assertIsNone(photogrants.put_back(self.c, self.jane, self.a, only_a.id))
+        self.assertEqual(photogrants.state_of(self.c, self.jane, self.jid, self.a)["removed_count"], 0)
 
     def test_put_back_returns_the_photo_unless_its_person_placed_it_elsewhere_by_hand(self):
         self.share(self.jid, self.a)
@@ -362,6 +413,30 @@ class TripChangeTests(GrantCase):
         self.assertEqual(self.row(both.id).trip_id, self.a)
         self.assertEqual(self.c.execute(select(PhotoGrant.trip_id).where(PhotoGrant.trip_id == trip)).fetchall(), [])
 
+    def test_splitting_copies_every_exclusion_of_the_original_to_the_new_trip(self):
+        self.share(self.jid, self.a)
+        stay = self.c.orm.scalars(select(Segment.id).where(Segment.trip_id == self.a, Segment.kind == "hotel")).one()
+        self.c.orm.add_all([PhotoExclusion(person_id=self.jid, asset_id="rowless", trip_id=self.a, created=1.0, was_trip_id=self.a),
+                            PhotoExclusion(person_id=self.jid, asset_id="other", trip_id=self.b, created=1.0, was_trip_id=None)])
+        self.c.orm.flush()
+        new = trips.split(self.c, self.jane, self.a, [stay])["id"]
+        copied = self.c.execute(select(PhotoExclusion.asset_id, PhotoExclusion.was_trip_id).where(PhotoExclusion.trip_id == new)).fetchall()
+        self.assertEqual(copied, [("rowless", None)])
+        self.assertEqual(self.c.orm.get(PhotoExclusion, (self.jid, "rowless", self.a)).was_trip_id, self.a)
+
+    def test_someone_newly_aboard_without_a_window_change_drops_trip_grants_to_only_me(self):
+        self.share(self.jid, self.a)
+        mine = self.photo(self.a, "2026-06-02T12:00")
+        self.assertEqual(self.seen(self.sam, self.a), [mine.id])
+        trips.edit_trip(self.c, self.jane, self.a, {"people": [self.jid, self.sid, self.mia]}, confirmed=True)
+        self.assertEqual(self.grant(self.jid, self.a), ("only_me", None, "u-jane"))
+        self.assertTrue(self.c.orm.get(PhotoGrant, (self.jid, self.a)).ask_again)
+        self.assertEqual((self.seen(self.sam, self.a), self.seen(Viewer(self.mia), self.a), self.seen(self.jane, self.a)), ([], [], [mine.id]))
+        photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 60.0)
+        self.assertEqual(self.seen(Viewer(self.mia), self.a), [mine.id])
+        trips.edit_trip(self.c, self.jane, self.a, {"people": [self.jid, self.sid]}, confirmed=True)
+        self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
+
     def test_merging_carries_the_other_trips_exclusions_and_re_places_its_photos(self):
         self.share(self.jid, self.a)
         self.share(self.jid, self.b)
@@ -430,14 +505,17 @@ class LapsedAccessTests(GrantCase):
         self.c.orm.add(PhotoSharingPrefs(person_id=self.jid, default_scope="trip", share_all=True, set_by="u-sam", share_all_since=5.0, steward_sub=None))
         self.c.orm.flush()
         self.steward(self.mia, "u-sam")
+        self.share(self.mia, self.b, revoked=7.0, by="u-sam")
         groups = {**ALLOWED, "OIDC_ALLOWED_GROUPS": "household"}
         with mock.patch.dict(os.environ, groups):
             self.assertEqual(photogrants.end_lapsed(self.c, time.time()), 0)
             self.lapse("u-sam")
-            self.assertEqual(photogrants.end_lapsed(self.c, time.time()), 4)
+            self.assertEqual(photogrants.end_lapsed(self.c, time.time()), 5)
         self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
         self.assertIsNone(self.grant(self.jid, self.b))
         self.assertIsNone(self.grant(self.sid, self.a))
+        self.assertIsNone(self.grant(self.mia, self.b))
+        self.assertEqual(self.c.execute(select(PhotoGrant.granted_by).distinct()).fetchall(), [("u-jane",)])
         self.assertEqual(photogrants.prefs_of(self.c, self.jid), {"default_scope": "trip", "share_all": False})
         self.c.orm.expire_all()
         self.assertEqual((self.c.orm.get(PhotoSharingPrefs, self.jid).share_all_since, self.c.orm.get(PhotoSharingPrefs, self.mia).steward_sub), (None, None))
@@ -510,6 +588,39 @@ class DecisionTests(GrantCase):
             self.assertEqual((row.trip_id, row.decided_by, row.match, row.segment_id), (self.a, "owner", got["match"], got["segment_id"]), p.id)
         self.c.execute(update(PhotoSource).where(PhotoSource.id == self.janes).values(status="refused"))
         self.assertEqual(self.seen(self.jane, self.a), [twin.id])
+
+    def test_a_decision_is_refused_when_the_trips_current_window_does_not_hold_the_photo(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        late = self.photo(self.a, ONLY_A)
+        with self.assertRaises(photos.OutsideWindow) as refused:
+            photos.decide(self.c, self.jane, late.id, self.b, None)
+        self.assertEqual(str(refused.exception), photos.NOT_IN_WINDOW)
+        self.assertEqual((self.row(late.id).trip_id, self.row(late.id).decided_by), (self.a, None))
+        empty = trips.create_trip(self.c, self.jane, {"name": "Undated", "people": [self.jid]})["id"]
+        self.share(self.jid, empty)
+        with self.assertRaises(photos.OutsideWindow):
+            photos.decide(self.c, self.jane, late.id, empty, None)
+        dated = trips.create_trip(self.c, self.jane, {"name": "Dated", "people": [self.jid], "start_date": "2026-06-07", "end_date": "2026-06-07"})["id"]
+        self.share(self.jid, dated)
+        self.assertEqual(photos.decide(self.c, self.jane, late.id, dated, None)["match"], "time")
+
+    def test_leave_off_locks_the_candidates_and_sees_a_placement_made_meanwhile(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        torn = self.photo(None, match="ambiguous")
+        real, settled = photos.lock_grants, []
+
+        def settle_first(conn, person, trip_ids):
+            if not settled:
+                settled.append(True)
+                photos.decide(self.c, self.jane, torn.id, self.b, None)
+            return real(conn, person, trip_ids)
+        with mock.patch.object(photos, "lock_grants", side_effect=settle_first) as lock:
+            self.assertIsNone(photos.decide(self.c, self.jane, torn.id, None, True))
+        self.assertEqual(lock.call_args_list[0].args[1:], (self.jid, [self.a, self.b]))
+        self.assertEqual((self.row(torn.id).trip_id, self.row(torn.id).decided_by), (self.b, "owner"))
+        self.assertEqual(self.c.execute(select(PhotoExclusion.asset_id)).fetchall(), [])
 
     def test_a_decision_locks_the_grants_of_both_trips_in_order(self):
         self.share(self.jid, self.a)
