@@ -12,7 +12,7 @@ from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
 from tests.test_trips import OUT, RouteCase, guest
 from waypoint import oidc
-from waypoint.domain import people, photogrants, photos, photosources
+from waypoint.domain import people, photogrants, photos, photosources, trips
 from waypoint.domain.visibility import Viewer
 from waypoint.providers import immich
 from waypoint.server import ROUTES, jobs, mcp_access, mcp_http
@@ -538,6 +538,19 @@ class Storage(DbCase):
         self.assertIn("Immich library's key can't be decrypted", out.getvalue())
         self.assertNotIn(KEY, out.getvalue())
 
+    def test_a_key_lost_at_start_marks_the_library_until_it_is_entered_again(self):
+        paused = photo_sources.save(self.c, self.person, "sub-ana", LAN, ACCOUNT.user_id, NEW_KEY, None, 1.0, "off")
+        self.c.commit()
+        with mock.patch.dict(os.environ, {"WAYPOINT_SECRET_KEY": "a-brand-new-key-abcdefghijklmnopqrstuvwxyz"}), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(secretbox.encrypt_stored(self.c), 0)
+        found = {s["id"]: s for s in photo_sources.list_all(self.c)}
+        self.assertEqual((found[self.source]["status"], found[self.source]["last_error"]), ("refused", photosources.KEY_LOST))
+        self.assertEqual((found[paused]["status"], found[paused]["last_error"]), ("off", photosources.KEY_LOST))
+        photo_sources.set_key(self.c, self.source, KEY)
+        photo_sources.mark(self.c, self.source, "ok", None)
+        self.assertEqual(secretbox.encrypt_stored(self.c), 0)
+        self.assertEqual(photo_sources.get(self.c, self.source)["status"], "ok")
+
     def test_a_plain_key_is_sealed_at_start(self):
         self.c.execute(update(PhotoSource).where(PhotoSource.id == self.source).values(api_key=NEW_KEY))
         self.assertEqual(secretbox.encrypt_stored(self.c), 1)
@@ -694,6 +707,25 @@ class Races(DbCase):
         with mock.patch.dict(os.environ, groups):
             self.assertEqual(photosources.end_lapsed(self.c), 1)
         self.assertIsNone(photo_sources.get(self.c, source))
+
+    def test_the_grant_sweep_locks_the_owner_before_its_last_access_check(self):
+        trip = trips.add_segment(self.c, Viewer(self.ana.person_id), {**OUT, "travelers": [{"person_id": self.ana.person_id, "name": None}]})
+        assert trip is not None
+        self.c.orm.add(PhotoGrant(person_id=self.ana.person_id, trip_id=trip["trip_id"], scope="trip", revoked=None, changed=1.0, granted_by="sub-ana"))
+        self.c.orm.flush()
+        self.c.execute(update(User).where(User.sub == "sub-ana").values(last_seen=time.time() - 15 * 86400))
+        self.c.commit()
+        groups = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint", "OIDC_ALLOWED_EMAILS": "", "OIDC_ALLOWED_GROUPS": "household"}
+        order = []
+        checked, locked = oidc.access_lapsed, photo_sources.lock_owner
+        with mock.patch.dict(os.environ, groups), \
+                mock.patch.object(oidc, "access_lapsed", side_effect=lambda conn, sub, email, now=None: order.append(("check", sub)) or checked(conn, sub, email, now)), \
+                mock.patch.object(photo_sources, "lock_owner", side_effect=lambda conn, sub: order.append(("lock", sub)) or locked(conn, sub)):
+            self.assertEqual(photogrants.end_lapsed(self.c), 1)
+        self.assertIn(("lock", "sub-ana"), order)
+        self.assertEqual(order[-1], ("check", "sub-ana"))
+        self.assertLess(order.index(("lock", "sub-ana")), len(order) - 1)
+        self.assertEqual(self.c.execute(select(PhotoGrant.person_id)).scalars(), [])
 
     def test_connecting_for_a_guest_who_was_claimed_meanwhile_finds_nobody(self):
         def claimed(conn):
