@@ -43,7 +43,7 @@ jobs:
     permissions:
       contents: write          # delete releases and tags
       packages: write          # move image tags and delete image versions
-    uses: AnthonyPluth/fleet/.github/workflows/tidy-releases.yml@b554ed883ec02bab75af3ba976743a3b4ed3ba5a   # v2.2.0
+    uses: AnthonyPluth/fleet/.github/workflows/tidy-releases.yml@77f776706ed977c3e5732b036bbf6a821c62d860   # v2.2.1
     with:
       image: waypoint
       versions: ${{ inputs.versions }}
