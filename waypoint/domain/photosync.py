@@ -89,6 +89,7 @@ class _Run:
     windows: dict[int, TripWindow]
     summary: Summary
     sealed: str | None = None
+    dropped: int = 0
 
     @property
     def person(self) -> int:
@@ -249,6 +250,7 @@ def _write(run: _Run, trip_id: int, got: immich.Page) -> Written:
         conn.commit()
         return "changed"
     windows = [w for t, w in current.items() if t in live]
+    run.dropped += got.dropped
     assets = list({a.id: a for a in got.assets}.values())
     existing = {p.asset_id: p for p in _rows(conn, run.source_id, [a.id for a in assets])}
     excluded = _exclusions(conn, run.person, [a.id for a in assets])
@@ -332,7 +334,14 @@ def _relist(conn: db.Connection, source_id: int, now: datetime, full: bool) -> t
 
 def _order(conn: db.Connection, source_id: int, trip_ids: list[int]) -> list[int]:
     syncs = _syncs(conn, source_id)
-    return sorted(trip_ids, key=lambda t: (syncs[t].cursor is not None and syncs[t].fetch_started is None if t in syncs else False, t))
+    def done(t: int) -> bool:
+        return t in syncs and syncs[t].cursor is not None and syncs[t].fetch_started is None
+    return sorted(trip_ids, key=lambda t: (done(t), (syncs[t].synced or 0.0) if t in syncs else 0.0, t))
+
+
+def _done_since(conn: db.Connection, source_id: int, trip_ids: Iterable[int], started: float) -> set[int]:
+    syncs = _syncs(conn, source_id)
+    return {t for t in trip_ids if t in syncs and syncs[t].cursor is not None and syncs[t].fetch_started is None and (syncs[t].synced or 0.0) >= started}
 
 
 def _failed(conn: db.Connection, source: Stored, error: immich.ImmichError, sealed: str | None) -> None:
@@ -371,8 +380,11 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         started = None
     windows = job.windows
     finished, dense, moved = True, False, False
+    wanted = [t for t in windows if trips is None or t in trips]
+    if started is not None:
+        wanted = [t for t in wanted if t not in _done_since(conn, source_id, wanted, started)]
     try:
-        for n, trip_id in enumerate(_order(conn, source_id, [t for t in windows if trips is None or t in trips])):
+        for n, trip_id in enumerate(_order(conn, source_id, wanted)):
             outcome = STOPPED if n and _clock() >= job.deadline else _traverse(job, trip_id)
             if outcome == STOPPED:
                 finished = False
@@ -385,6 +397,14 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         _failed(conn, source, e, job.sealed)
         summary.failed = 1
         return summary
+    if started is not None and job.dropped:
+        db.set_setting(conn, _key(sk.PHOTOS_RELIST_STARTED, source_id), None)
+        conn.commit()
+        started = None
+    if started is not None and not dense and not moved and _done_since(conn, source_id, windows, started) == set(windows):
+        if not _finish_relist(job, started):
+            return summary
+        started = None
     if dense:
         summary.failed = 1
         photo_sources.mark(conn, source_id, OK, TOO_DENSE, keep_off=True, sealed=job.sealed, was=(source["status"], source["last_error"]))
@@ -395,7 +415,7 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         return summary
     if moved or not summary.pages:
         return summary
-    if trips is None and started is not None and not _finish_relist(job, started):
+    if trips is None and started is not None:
         return summary
     if trips is not None and source["status"] != UNREACHABLE:
         return summary
