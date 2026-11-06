@@ -641,13 +641,40 @@ def _own_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | No
     return found if found is not None and acts_for(conn, viewer, found[1]) else None
 
 
-def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None, excluded: bool | None) -> TripPhoto | None:
-    found = _own_photo(conn, viewer, photo_id) if not viewer.household else None
-    if found is None:
-        return None
-    lock_grants(conn, found[1], [t for t in (found[0].trip_id, trip_id) if t is not None])
-    conn.orm.expire_all()
+LOCK_ROUNDS = 3
+
+
+def _settled_under_lock(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None) -> Found | None:
     found = _own_photo(conn, viewer, photo_id)
+    locked: set[int] = set()
+    for _ in range(LOCK_ROUNDS):
+        if found is None:
+            return None
+        wanted = {t for t in (found[0].trip_id, trip_id) if t is not None}
+        if wanted <= locked:
+            return found
+        locked |= wanted
+        lock_grants(conn, found[1], sorted(locked))
+        conn.orm.expire_all()
+        found = _own_photo(conn, viewer, photo_id)
+    return None
+
+
+def _same_asset(conn: db.Connection, photo: Photo, person: int) -> list[Photo]:
+    q = select(Photo).join(PhotoSource, PhotoSource.id == Photo.source_id) \
+        .where(PhotoSource.person_id == person, Photo.asset_id == photo.asset_id, Photo.id != photo.id).order_by(Photo.id)
+    return list(conn.orm.scalars(q).all())
+
+
+def _copy_placement(conn: db.Connection, photo: Photo, person: int) -> None:
+    for twin in _same_asset(conn, photo, person):
+        for field in ("trip_id", "match", "segment_id", "distance_km", "decided_by", "latitude", "longitude", "location_source"):
+            setattr(twin, field, getattr(photo, field))
+    conn.orm.flush()
+
+
+def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None, excluded: bool | None) -> TripPhoto | None:
+    found = _settled_under_lock(conn, viewer, photo_id, trip_id) if not viewer.household else None
     if found is None:
         return None
     photo, person = found
@@ -661,6 +688,7 @@ def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | No
             raise trips.Invalid(PUT_BACK_FIRST)
         photo.trip_id = trip.id
         _place(photo, person, next((w for w in candidate_windows(conn, person) if w.trip_id == trip.id), None))
+        _copy_placement(conn, photo, person)
     if excluded:
         if photo.match != AMBIGUOUS or photo.trip_id is not None:
             raise trips.Invalid(NOT_UNSETTLED)

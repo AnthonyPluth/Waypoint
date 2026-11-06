@@ -451,13 +451,43 @@ class DecisionTests(GrantCase):
             self.assertIsNone(photos.decide(self.c, self.jane, both.id, self.a, None))
         self.assertIsNone(self.row(both.id))
 
+    def test_a_decision_locks_the_trip_a_concurrent_stop_moved_the_photo_to_before_deciding(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        c = trips.create_trip(self.c, self.jane, {"name": "Shortest", "people": [self.jid]})["id"]
+        self.add(self.jane, {**HOTEL, "start_local": "2026-06-03T15:00", "end_local": "2026-06-04T10:00"}, c)
+        self.share(self.jid, c)
+        row = photo_row(self.janes, self.b, INSIDE_B)
+        self.c.orm.add(row)
+        self.c.orm.flush()
+        with self.stopping_first(self.b, 74.0), mock.patch.object(photos, "lock_grants", wraps=photos.lock_grants) as lock:
+            got = photos.decide(self.c, self.jane, row.id, self.a, None)
+        self.assertEqual((got["trip_id"], self.row(row.id).decided_by), (self.a, "owner"))
+        self.assertEqual([call.args[1:] for call in lock.call_args_list], [(self.jid, [self.a, self.b]), (self.jid, [self.b]), (self.jid, [self.a, self.b, c])])
+
+    def test_a_hand_placement_is_written_to_every_row_of_the_same_asset(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        self.c.orm.add(PhotoSource(person_id=self.jid, owner_sub="u-jane", url="https://second.example", immich_user_id="u", api_key="enc:v1:x", status="ok", created=1.0))
+        self.c.orm.flush()
+        second = self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.url == "https://second.example")).one()
+        first = self.photo(self.b, asset="twice-5h2k")
+        twin = self.photo(self.b, source=second, asset="twice-5h2k", match="time")
+        got = photos.decide(self.c, self.jane, first.id, self.a, None)
+        self.assertEqual(got["trip_id"], self.a)
+        for p in (first, twin):
+            row = self.row(p.id)
+            self.assertEqual((row.trip_id, row.decided_by, row.match, row.segment_id), (self.a, "owner", got["match"], got["segment_id"]), p.id)
+        self.c.execute(update(PhotoSource).where(PhotoSource.id == self.janes).values(status="refused"))
+        self.assertEqual(self.seen(self.jane, self.a), [twin.id])
+
     def test_a_decision_locks_the_grants_of_both_trips_in_order(self):
         self.share(self.jid, self.a)
         self.share(self.jid, self.b)
         both = self.photo(self.b)
         with mock.patch.object(photos, "lock_grants", wraps=photos.lock_grants) as lock:
             self.assertEqual(photos.decide(self.c, self.jane, both.id, self.a, None)["trip_id"], self.a)
-        self.assertEqual(lock.call_args_list[0].args[1:], (self.jid, [self.b, self.a]))
+        self.assertEqual(lock.call_args_list[0].args[1:], (self.jid, [self.a, self.b]))
 
 
 class ClaimTests(GrantCase):
