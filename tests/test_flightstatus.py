@@ -14,7 +14,7 @@ from tests.privacy import no_leaks
 from tests.shared import DbCase
 from tests.test_trips import RouteCase
 from waypoint import monitoring, oidc
-from waypoint.domain import demo, flightstatus, loyalty, people, trips
+from waypoint.domain import demo, flightstatus, loyalty, people, photoqueue, trips
 from waypoint.domain.visibility import Viewer
 from waypoint.providers import flightstatus as service
 from waypoint.server import jobs
@@ -834,6 +834,7 @@ class JobTests(Household):
     def test_the_jobs_start_and_stop(self):
         stop = threading.Event()
         stop.set()
+        self.addCleanup(photoqueue.disable)
         with mock.patch.object(jobs, "sweep_lapsed") as sweep, mock.patch.object(jobs, "check_flights") as check, \
                 mock.patch.object(jobs, "send_reminders") as remind, mock.patch.object(jobs, "warm_map_data") as warm:
             for t in jobs.start(stop):
