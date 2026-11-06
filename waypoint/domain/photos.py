@@ -392,10 +392,11 @@ def removed(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[Found]:
         return []
     left_out = select(PhotoExclusion.asset_id).where(PhotoExclusion.person_id == PhotoSource.person_id, PhotoExclusion.asset_id == Photo.asset_id,
                                                      PhotoExclusion.trip_id == trip_id).exists()
+    shared = select(PhotoGrant.person_id).where(PhotoGrant.person_id == PhotoSource.person_id, PhotoGrant.trip_id == trip_id, PhotoGrant.revoked.is_(None)).exists()
     found = trip_window(conn, trip_id)
     if found is None:
         return []
-    return [(p, person) for p, person in _rows(conn, PhotoSource.person_id.in_(persons), left_out) if found.start <= instant(p.taken_utc) <= found.end]
+    return [(p, person) for p, person in _rows(conn, PhotoSource.person_id.in_(persons), left_out, shared) if found.start <= instant(p.taken_utc) <= found.end]
 
 
 def _zone_by_place(points: Sequence[SegmentPoint], at: datetime, spot: Point) -> str | None:

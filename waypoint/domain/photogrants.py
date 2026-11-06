@@ -473,11 +473,11 @@ def _re_place_automatic(conn: db.Connection, trip_id: int) -> None:
 
 
 def _ask_again(conn: db.Connection, trip_id: int, now: float) -> None:
-    active = conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.trip_id == trip_id, PhotoGrant.revoked.is_(None), PhotoGrant.scope == photos.TRIP)
-                              .order_by(PhotoGrant.person_id)).all()
-    for g in active:
+    for g in _active(conn, trip_id):
         lock(conn, g.person_id, [trip_id])
-        g.scope, g.ask_again, g.changed = photos.ONLY_ME, True, now
+        if g.scope == photos.TRIP:
+            g.scope, g.ask_again = photos.ONLY_ME, True
+        g.changed = now
     conn.orm.flush()
 
 
@@ -500,7 +500,7 @@ def trips_changed(conn: db.Connection, trip_ids: Iterable[int], before: Mapping[
     for trip_id, was, after in settled:
         if _shrank(was.window, after):
             _re_place_shrunk(conn, trip_id, after)
-        if was.points != photos.trip_points(conn, trip_id):
+        if was.points != photos.trip_points(conn, trip_id) or was.window != after:
             _re_place_automatic(conn, trip_id)
 
 
@@ -523,8 +523,7 @@ def trip_deleted(conn: db.Connection, trip_id: int) -> None:
         return
     granted = set(conn.execute(select(PhotoGrant.person_id).where(PhotoGrant.trip_id == trip_id)).scalars())
     placed = set(conn.execute(select(PhotoSource.person_id).join(Photo, Photo.source_id == PhotoSource.id).where(Photo.trip_id == trip_id)).scalars())
-    for person in sorted(granted | placed):
-        lock(conn, person, [trip_id])
+    lock_grants_for(conn, [trip_id])
     conn.execute(delete(PhotoGrant).where(PhotoGrant.trip_id == trip_id))
     conn.execute(delete(PhotoExclusion).where(PhotoExclusion.trip_id == trip_id))
     conn.execute(delete(PhotoTripSync).where(PhotoTripSync.trip_id == trip_id))
@@ -551,10 +550,11 @@ def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     for person in sorted({person for _, person, _ in lapsed} | set(settings)):
         people.lock(conn, person)
     lock_trips(conn, [trip for trip, _, _ in lapsed])
+    gone = {s for s in sorted(gone) if _lapsed(conn, s, stamp)}
     for trip, person, by in lapsed:
         conn.orm.expire_all()
         held = lock(conn, person, [trip]).get(trip)
-        if held is None or held.granted_by != by:
+        if held is None or held.granted_by != by or by not in gone:
             continue
         if held.revoked is None:
             _end(conn, person, trip)
@@ -613,17 +613,21 @@ def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
 def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -> None:
     kept = {p.asset_id: p for p in conn.orm.scalars(select(Photo).where(Photo.source_id == mine.id)).all()}
     placed: list[tuple[Photo, int | None]] = []
+    moved: list[Photo] = []
     for p in conn.orm.scalars(select(Photo).where(Photo.source_id == theirs.id).order_by(Photo.id)).all():
         twin = kept.get(p.asset_id)
         if twin is None:
             p.source_id = mine.id
+            if p.decided_by == photos.OWNER:
+                moved.append(p)
             continue
         if p.decided_by == photos.OWNER and twin.decided_by != photos.OWNER:
             placed.append((twin, p.trip_id))
         conn.orm.delete(p)
-    synced = {s.trip_id for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == mine.id)).all()}
+    synced = {s.trip_id: s for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == mine.id)).all()}
     for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == theirs.id)).all():
         if s.trip_id in synced:
+            _merge_sync(synced[s.trip_id], s)
             conn.orm.delete(s)
         else:
             s.source_id = mine.id
@@ -632,6 +636,14 @@ def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -
     conn.orm.flush()
     for twin, trip_id in placed:
         photos.place_by_hand(conn, twin, mine.person_id, trip_id)
+    for p in moved:
+        photos.copy_placement(conn, p, mine.person_id)
+
+
+def _merge_sync(kept: PhotoTripSync, gone: PhotoTripSync) -> None:
+    same_window = (kept.window_start, kept.window_end) == (gone.window_start, gone.window_end)
+    kept.cursor = min(kept.cursor, gone.cursor) if same_window and kept.cursor and gone.cursor else None
+    kept.resume_page, kept.fetch_started = None, None
 
 
 def _claim_sources(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
