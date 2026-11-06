@@ -396,7 +396,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       <figure class="fig"><figcaption>j1 · Shared with everyone on the trip</figcaption>
         <div class="dev frag"><div class="main">
           <section class="card mine" aria-labelledby="j1h">
-            <div class="src-top"><div class="txt"><h3 id="j1h" class="t-heading">Your photos on this trip</h3><p class="t-caption muted">171 photos from your library</p></div><span class="chip info">Everyone on this trip</span></div>
+            <div class="src-top"><div class="txt"><h3 id="j1h" class="t-heading">Your photos on this trip</h3><p class="t-caption muted">169 photos from your library</p></div><span class="chip info">Everyone on this trip</span></div>
             <fieldset class="scope"><legend class="eyebrow">Who can see your photos on this trip</legend>
               <label class="choice"><input type="radio" name="j1s"><span><b>Only me</b><br><span class="t-caption muted">Nobody else on the trip can tell they’re there.</span></span></label>
               <label class="choice"><input type="radio" name="j1s" checked><span><b>Everyone on this trip</b><br><span class="t-caption muted">Everyone else on the trip sees them, on the map and in the counts too.</span></span></label>
@@ -414,14 +414,14 @@ details.looks > summary::-webkit-details-marker { display: none; }
         <div class="dim"></div>
         <div class="confirm" role="alertdialog" aria-modal="true" aria-labelledby="j2t" aria-describedby="j2d">
           <h2 id="j2t" class="t-heading">Stop sharing your photos on this trip?</h2>
-          <p id="j2d">Your 171 photos leave Four Corners loop right away, for everyone: the gallery, the map, the replay and the trip’s counts. Nothing changes in Immich, and you can share them again later.</p>
+          <p id="j2d">Your 169 photos leave Four Corners loop right away, for everyone: the gallery, the map, the replay and the trip’s counts. Nothing changes in Immich, and you can share them again later.</p>
           <div class="confirm-acts"><button class="btn outline" type="button">Keep sharing</button><button class="btn destroy" type="button">Stop sharing</button></div>
         </div></div>
       </figure>
       <figure class="fig"><figcaption>j3 · Switched back to Only me</figcaption>
         <div class="dev frag"><div class="main">
           <section class="card mine" aria-labelledby="j3h">
-            <div class="src-top"><div class="txt"><h3 id="j3h" class="t-heading">Your photos on this trip</h3><p class="t-caption muted">171 photos from your library</p></div><span class="chip quiet">Only me</span></div>
+            <div class="src-top"><div class="txt"><h3 id="j3h" class="t-heading">Your photos on this trip</h3><p class="t-caption muted">169 photos from your library</p></div><span class="chip quiet">Only me</span></div>
             <fieldset class="scope"><legend class="eyebrow">Who can see your photos on this trip</legend>
               <label class="choice"><input type="radio" name="j3s" checked><span><b>Only me</b><br><span class="t-caption muted">Nobody else on the trip can tell they’re there.</span></span></label>
               <label class="choice"><input type="radio" name="j3s"><span><b>Everyone on this trip</b><br><span class="t-caption muted">Everyone else on the trip sees them, on the map and in the counts too.</span></span></label>
@@ -435,7 +435,8 @@ details.looks > summary::-webkit-details-marker { display: none; }
     <div class="spec">
       <div><h3>Accessible names</h3><ul>
         <li>Card: <code>section</code> named <q>Your photos on this trip</q>; shown only to someone whose library has photos from the trip.</li>
-        <li>Radio group <q>Who can see your photos on this trip</q>: <q>Only me</q>, <q>Everyone on this trip</q>. Choosing Only me saves at once and announces the toast; choosing everyone asks “Show your 171 photos to everyone on this trip?” with <q>Cancel</q> and <q>Show them</q>.</li>
+        <li>Every count on the card and in both questions leaves out the photos under <q>Removed from this trip</q>: the 171 photos from the library minus the 2 removed are 169, as k and m count (168 after 3 removed).</li>
+        <li>Radio group <q>Who can see your photos on this trip</q>: <q>Only me</q>, <q>Everyone on this trip</q>. Choosing Only me saves at once and announces the toast; choosing everyone asks “Show your 169 photos to everyone on this trip?” with <q>Cancel</q> and <q>Show them</q>.</li>
         <li><q>Stop sharing on this trip</q> opens an <code>alertdialog</code> <q>Stop sharing your photos on this trip?</q> with <q>Keep sharing</q> (focused first) and <q>Stop sharing</q>.</li>
         <li><q>Removed from this trip (2)</q>: a disclosure (<code>aria-expanded</code>), see (k).</li>
         <li>Toast (<code>role="status"</code>): <q>Now only you see your photos on this trip.</q> with <q>Undo</q>.</li>
@@ -497,7 +498,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
   document.querySelectorAll("[data-strip]").forEach(function (el) {
     var off = el.getAttribute("data-strip") === "off";
     if (el.getAttribute("data-strip") === "ada") {
-      el.innerHTML = ADA_ONLY.map(tile).join("") + '<button type="button" class="more-tile" aria-label="See all 171 photos"><b>+161</b>See all</button>';
+      el.innerHTML = ADA_ONLY.map(tile).join("") + '<button type="button" class="more-tile" aria-label="See all 169 photos"><b>+159</b>See all</button>';
       return;
     }
     var html = STRIP.map(function (t, i) {

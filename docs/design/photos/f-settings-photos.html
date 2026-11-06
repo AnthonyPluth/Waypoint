@@ -410,7 +410,11 @@ details.looks > summary::-webkit-details-marker { display: none; }
                 </div>
                 <div class="src">
                   <div class="src-top"><span class="avatar a4" aria-hidden="true">TB</span><div class="txt"><p class="t-heading">Theo Brook</p><p class="mono t-caption muted">immich.brook.example</p><p class="t-caption muted">Theo manages this library and what it shares.</p></div><span class="chip quiet">Connected</span></div>
-                                  </div>
+                </div>
+                <div class="src">
+                  <div class="src-top"><span class="avatar a5" aria-hidden="true">JB</span><div class="txt"><p class="t-heading">June Brook</p><p class="mono t-caption muted">immich.brook.example</p><p class="t-caption muted">You manage this library because June doesn’t sign in. Last synced Fri 6 Nov, 5:48 AM · 640 photos on 4 trips</p></div><span class="chip ok">Up to date</span></div>
+                  <div class="src-acts"><button class="btn outline sm" type="button" aria-label="Sync now, June Brook’s library"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>Sync now</button><button class="btn outline sm" type="button" aria-label="Change key, June Brook’s library">Change key</button><button class="btn outline sm" type="button" aria-label="Pause, June Brook’s library">Pause</button><button class="btn danger sm" type="button" aria-label="Remove June Brook’s library">Remove</button></div>
+                </div>
                 <form class="form" aria-labelledby="f-connect" onsubmit="event.preventDefault()">
                   <h3 id="f-connect" class="t-heading">Connect an Immich library</h3>
                   <div class="form-grid">
@@ -435,7 +439,8 @@ details.looks > summary::-webkit-details-marker { display: none; }
       <div><h3>Accessible names</h3><ul>
         <li>Card buttons name the library: <q>Sync now, Ada Brook’s library</q>, <q>Change key, Ada Brook’s library</q>, <q>Pause, Ada Brook’s library</q> (then <q>Resume, …</q>), <q>Remove Ada Brook’s library</q> (asks first in <code>ConfirmDialog</code>: “Remove Ada Brook’s library? Its 1,904 photos leave every trip. Nothing changes in Immich.”).</li>
         <li>Sync progress is a <code>role="status"</code> line.</li>
-        <li>Someone else’s library (Theo’s) shows only their name, host and a <q>Connected</q> chip: no counts, no last sync, no buttons, since its counts would show that photos exist.</li>
+        <li>A library the viewer manages gets the full card, counts and buttons: their own (Ada’s) and one they are steward of because its person has no sign-in (June’s), where the card says <q>You manage this library because June doesn’t sign in.</q> and the buttons are named for it: <q>Sync now, June Brook’s library</q>, <q>Change key, June Brook’s library</q>, <q>Pause, June Brook’s library</q>, <q>Remove June Brook’s library</q>.</li>
+        <li>A library managed by another member (Theo’s, who signs in) is read-only: only the name, host and a <q>Connected</q> chip, with no counts, no last sync and no buttons, since its counts would show that photos exist.</li>
         <li>Form named by its heading <q>Connect an Immich library</q>; fields <q>Whose library</q>, <q>Immich address</q>, <q>API key</q>; <q>Show the key</q> (<code>aria-pressed</code>); <q>Test</q>; <q>Save</q>.</li>
         <li>Test result is a <code>role="status"</code> line: <q>Key works. It belongs to the Immich user june@brook.example.</q></li>
         <li>Change key opens the same key field inline in the card; a key for a different Immich user is refused with “This key belongs to another Immich user.”</li>
