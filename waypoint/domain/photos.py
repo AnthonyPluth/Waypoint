@@ -80,6 +80,7 @@ class TripPhoto(TypedDict):
     match: MatchKind
     distance_km: float | None
     cluster: int | None
+    removed_at: float | None
 
 
 class PhotoCluster(TypedDict):
@@ -440,7 +441,7 @@ def photo_out(photo: Photo, person_id: int, placed: Mapping[int, Sequence[Segmen
         "taken_local": photo.taken_local, "zone": _zone(photo, placed),
         "latitude": photo.latitude, "longitude": photo.longitude, "location_source": cast(LocationSource | None, photo.location_source),
         "segment_id": photo.segment_id, "match": cast(MatchKind, photo.match), "distance_km": photo.distance_km,
-        "cluster": None,
+        "cluster": None, "removed_at": None,
     }
 
 

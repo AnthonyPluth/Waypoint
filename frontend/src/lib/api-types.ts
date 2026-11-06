@@ -637,6 +637,8 @@ export interface PhotoPrefsBody {
   default_scope?: "only_me" | "trip";
   share_all?: boolean;
   windows?: Record<string, PhotoWindow>;
+  audiences?: Record<string, number[]>;
+  sources?: PhotoSourceVersion[];
 }
 
 export interface PhotoReview {
@@ -651,6 +653,8 @@ export interface PhotoSharing {
   removed: TripPhoto[];
   window: PhotoWindow | null;
   changed: number | null;
+  audience: number[];
+  sources: PhotoSourceVersion[];
 }
 
 export interface PhotoSharingBody {
@@ -659,6 +663,13 @@ export interface PhotoSharingBody {
   declined?: boolean;
   window?: PhotoWindow;
   expected_changed?: number;
+  audience?: number[];
+  sources?: PhotoSourceVersion[];
+}
+
+export interface PhotoSourceVersion {
+  id: number;
+  status: string;
 }
 
 export interface PhotoWindow {
@@ -815,6 +826,7 @@ export interface ReviewPhoto {
   match: "place" | "time" | "far" | "ambiguous" | "home" | "none";
   distance_km: number | null;
   cluster: number | null;
+  removed_at: number | null;
   candidates: PhotoCandidate[];
 }
 
@@ -1241,6 +1253,7 @@ export interface TripPhoto {
   match: "place" | "time" | "far" | "ambiguous" | "home" | "none";
   distance_km: number | null;
   cluster: number | null;
+  removed_at: number | null;
 }
 
 export interface TripPhotoCounts {

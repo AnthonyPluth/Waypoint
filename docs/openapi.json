@@ -6302,6 +6302,21 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/PhotoWindow"
             }
+          },
+          "audiences": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoSourceVersion"
+            }
           }
         },
         "required": [],
@@ -6367,6 +6382,18 @@
               "number",
               "null"
             ]
+          },
+          "audience": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoSourceVersion"
+            }
           }
         },
         "required": [
@@ -6376,7 +6403,9 @@
           "removed_count",
           "removed",
           "window",
-          "changed"
+          "changed",
+          "audience",
+          "sources"
         ],
         "additionalProperties": false
       },
@@ -6400,9 +6429,37 @@
           },
           "expected_changed": {
             "type": "number"
+          },
+          "audience": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoSourceVersion"
+            }
           }
         },
         "required": [],
+        "additionalProperties": false
+      },
+      "PhotoSourceVersion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
         "additionalProperties": false
       },
       "PhotoWindow": {
@@ -7097,6 +7154,12 @@
               "null"
             ]
           },
+          "removed_at": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
           "candidates": {
             "type": "array",
             "items": {
@@ -7118,6 +7181,7 @@
           "match",
           "distance_km",
           "cluster",
+          "removed_at",
           "candidates"
         ],
         "additionalProperties": false
@@ -9073,6 +9137,12 @@
               "integer",
               "null"
             ]
+          },
+          "removed_at": {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         },
         "required": [
@@ -9088,7 +9158,8 @@
           "segment_id",
           "match",
           "distance_km",
-          "cluster"
+          "cluster",
+          "removed_at"
         ],
         "additionalProperties": false
       },

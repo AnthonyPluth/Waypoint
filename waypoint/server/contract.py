@@ -586,6 +586,7 @@ class TripPhoto(TypedDict):
     match: Literal["place", "time", "far", "ambiguous", "home", "none"]
     distance_km: float | None
     cluster: int | None
+    removed_at: float | None
 
 
 class PhotoCluster(TypedDict):
@@ -640,6 +641,11 @@ class PhotoWindow(TypedDict):
     end: str
 
 
+class PhotoSourceVersion(TypedDict):
+    id: int
+    status: str
+
+
 class PhotoSharing(TypedDict):
     state: Literal["shared", "declined", "ask", "none"]
     scope: Literal["only_me", "trip"] | None
@@ -648,6 +654,8 @@ class PhotoSharing(TypedDict):
     removed: list[TripPhoto]
     window: PhotoWindow | None
     changed: float | None
+    audience: list[int]
+    sources: list[PhotoSourceVersion]
 
 
 class PhotoSharingBody(TypedDict):
@@ -656,6 +664,8 @@ class PhotoSharingBody(TypedDict):
     declined: NotRequired[bool]
     window: NotRequired[PhotoWindow]
     expected_changed: NotRequired[float]
+    audience: NotRequired[list[int]]
+    sources: NotRequired[list[PhotoSourceVersion]]
 
 
 class PhotoExclusionsBody(TypedDict):
@@ -671,6 +681,8 @@ class PhotoPrefsBody(TypedDict):
     default_scope: NotRequired[Literal["only_me", "trip"]]
     share_all: NotRequired[bool]
     windows: NotRequired[dict[str, PhotoWindow]]
+    audiences: NotRequired[dict[str, list[int]]]
+    sources: NotRequired[list[PhotoSourceVersion]]
 
 
 class PhotoGrantTrip(TypedDict):
