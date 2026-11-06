@@ -402,8 +402,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._feed(method, url.path)
         if url.path not in PUBLIC_FILES:
             api = url.path.startswith("/api/")
-            scheme = (self.headers.get("Authorization") or "").split(None, 1)[:1]
-            bearer = api and bool(scheme) and scheme[0].lower() == "bearer"
+            scheme = (self.headers.get("Authorization") or "").split(None, 1)
+            bearer = api and len(scheme) == 2 and scheme[0].lower() == "bearer" and scheme[1].startswith(mcp_oauth.ACCESS_PREFIX)
             self.user = self._app_user() if bearer else self._user(renew=api)
             if not self.user:
                 if url.path.startswith("/api/"):
