@@ -2,21 +2,22 @@ import contextlib
 import io
 import json
 import os
+import time
 import unittest
 from unittest import mock
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
-from tests.test_trips import RouteCase, guest
+from tests.test_trips import OUT, RouteCase, guest
 from waypoint import oidc
 from waypoint.domain import people, photogrants, photos, photosources
 from waypoint.domain.visibility import Viewer
 from waypoint.providers import immich
 from waypoint.server import ROUTES, jobs, mcp_access, mcp_http
 from waypoint.storage import backup, db, photo_sources, secretbox
-from waypoint.storage.models import Photo, PhotoGrant, PhotoSharingPrefs, PhotoSource
+from waypoint.storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, User
 
 URL = "https://immich-canary-8h2k.example:2283"
 LAN = "http://immich.local:2283"
@@ -199,6 +200,27 @@ class SourceRoutes(RouteCase):
         self.assertEqual(got[theirs["id"]], {**theirs, "status": "unreachable", "last_error": immich.UNREACHABLE, "last_sync": "2023-11-14T22:13:20+00:00",
                                              "photos": 1, "trips": 1})
         self.assertEqual((got[mine["id"]]["photos"], got[mine["id"]]["trips"], got[mine["id"]]["last_sync"], got[mine["id"]]["mine"]), (None, None, None, False))
+
+    def test_a_photo_removed_from_its_only_trip_leaves_the_librarys_counts_at_once(self):
+        trip = self.book("ana", travelers=[{"person_id": self.person["ana"]}])["trip_id"]
+        other = self.book("ana", {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, travelers=[{"person_id": self.person["ana"]}])["trip_id"]
+        mine = self.connect()
+        with db.session() as conn:
+            conn.orm.add_all([photo(mine["id"], trip, 1), photo(mine["id"], trip, 2), photo(mine["id"], other, 3)])
+            conn.orm.flush()
+        counts = lambda: next((s["photos"], s["trips"]) for s in self.listing("ana")["sources"] if s["id"] == mine["id"])
+        self.assertEqual(counts(), (3, 2))
+        with db.session() as conn:
+            conn.orm.add(PhotoExclusion(person_id=self.person["ana"], asset_id="asset-3", trip_id=other, created=2.0, was_trip_id=other))
+            conn.orm.flush()
+        self.assertEqual(counts(), (2, 1))
+        with db.session() as conn:
+            conn.orm.add(PhotoExclusion(person_id=self.person["ben"], asset_id="asset-1", trip_id=trip, created=2.0, was_trip_id=trip))
+            conn.orm.flush()
+        self.assertEqual(counts(), (2, 1))
+        with db.session() as conn:
+            conn.execute(delete(PhotoExclusion).where(PhotoExclusion.person_id == self.person["ana"]))
+        self.assertEqual(counts(), (3, 2))
 
     def test_only_the_owner_edits_tests_removes_and_syncs_a_library(self):
         made = self.connect()
@@ -632,9 +654,13 @@ class Races(DbCase):
         source = photo_sources.save(self.c, self.guest, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)
         self.c.commit()
 
+        handed = []
+
         def handed_over(conn, sub, email, now=None):
-            with db.session(self.path) as other:
-                photogrants.claim(other, self.guest, self.ben.person_id, "sub-ben")
+            if not handed:
+                handed.append(sub)
+                with db.session(self.path) as other:
+                    photogrants.claim(other, self.guest, self.ben.person_id, "sub-ben")
             return "user_removed" if sub == "sub-ana" else None
         with mock.patch.object(oidc, "access_lapsed", side_effect=handed_over):
             self.assertEqual(photosources.end_lapsed(self.c), 0)
@@ -643,6 +669,29 @@ class Races(DbCase):
         assert found is not None
         self.assertEqual((found["owner_sub"], found["person_id"]), ("sub-ben", self.ben.person_id))
         with mock.patch.object(oidc, "access_lapsed", side_effect=lambda conn, sub, email, now=None: "user_removed" if sub == "sub-ben" else None):
+            self.assertEqual(photosources.end_lapsed(self.c), 1)
+        self.assertIsNone(photo_sources.get(self.c, source))
+
+    def test_the_sweep_leaves_a_library_whose_owner_signs_in_as_it_runs(self):
+        source = photo_sources.save(self.c, self.ana.person_id, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)
+        self.c.execute(update(User).where(User.sub == "sub-ana").values(last_seen=time.time() - 15 * 86400))
+        self.c.commit()
+        groups = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint", "OIDC_ALLOWED_EMAILS": "", "OIDC_ALLOWED_GROUPS": "household"}
+        checked = oidc.access_lapsed
+
+        def signs_in_after_the_check(conn, sub, email, now=None):
+            found = checked(conn, sub, email, now)
+            if found is not None:
+                with db.session(self.path) as other:
+                    oidc.remember_user(other, "sub-ana", "ana@example.com", "Ana", None)
+            return found
+        with mock.patch.dict(os.environ, groups), mock.patch.object(oidc, "access_lapsed", side_effect=signs_in_after_the_check):
+            self.assertEqual(photosources.end_lapsed(self.c), 0)
+        self.c.commit()
+        self.assertIsNotNone(photo_sources.get(self.c, source))
+        self.c.execute(update(User).where(User.sub == "sub-ana").values(last_seen=time.time() - 15 * 86400))
+        self.c.commit()
+        with mock.patch.dict(os.environ, groups):
             self.assertEqual(photosources.end_lapsed(self.c), 1)
         self.assertIsNone(photo_sources.get(self.c, source))
 

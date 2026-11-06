@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
-from sqlalchemy import ColumnElement, delete, func, select, true, update
+from sqlalchemy import ColumnElement, delete, exists, func, select, true, update
 
 from . import db, secretbox
-from .models import Person, Photo, PhotoGrant, PhotoSharingPrefs, PhotoSource
+from .models import Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, User
 
 Status = Literal["ok", "refused", "unreachable", "off"]
 OK: Status = "ok"
@@ -127,6 +127,13 @@ def source_for_provider(conn: db.Connection, source_id: int) -> Unlocked | None:
 
 
 def counts(conn: db.Connection) -> dict[int, tuple[int, int]]:
+    removed = exists().where(PhotoExclusion.person_id == PhotoSource.person_id, PhotoExclusion.asset_id == Photo.asset_id,
+                             PhotoExclusion.trip_id == Photo.trip_id)
     rows = conn.execute(select(Photo.source_id, func.count(Photo.id), func.count(Photo.trip_id.distinct()))
-                        .where(Photo.trip_id.is_not(None), Photo.match.in_(ON_A_TRIP)).group_by(Photo.source_id)).fetchall()
+                        .join(PhotoSource, PhotoSource.id == Photo.source_id)
+                        .where(Photo.trip_id.is_not(None), Photo.match.in_(ON_A_TRIP), ~removed).group_by(Photo.source_id)).fetchall()
     return {int(r[0]): (int(r[1]), int(r[2])) for r in rows}
+
+
+def lock_owner(conn: db.Connection, sub: str) -> bool:
+    return int(conn.execute(update(User).where(User.sub == sub).values(name=User.name)).rowcount) > 0

@@ -232,11 +232,18 @@ def remove(conn: db.Connection, actor: Actor, source_id: int) -> None:
         raise NoSuchSource()
 
 
+def _lapsed(conn: db.Connection, sub: str, now: float) -> bool:
+    email = conn.execute(select(User.email).where(User.sub == sub)).scalar()
+    return oidc.access_lapsed(conn, sub, email, now) is not None
+
+
 def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     now = time.time() if now is None else now
     ended = 0
     for s in photo_sources.list_all(conn):
-        email = conn.execute(select(User.email).where(User.sub == s["owner_sub"])).scalar()
-        if oidc.access_lapsed(conn, s["owner_sub"], email, now) and photo_sources.remove(conn, s["id"], owner=s["owner_sub"]):
+        if not _lapsed(conn, s["owner_sub"], now):
+            continue
+        photo_sources.lock_owner(conn, s["owner_sub"])
+        if _lapsed(conn, s["owner_sub"], now) and photo_sources.remove(conn, s["id"], owner=s["owner_sub"]):
             ended += 1
     return ended
