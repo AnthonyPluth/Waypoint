@@ -18,6 +18,7 @@ from .api.loyalty import api_loyalty, api_loyalty_add, api_loyalty_edit, api_loy
 from .api.assistant import (api_assistant_review, api_assistant_review_create, api_assistant_review_dismiss, api_assistant_review_email,
                             api_assistant_review_item, api_assistant_review_match, api_assistant_segment_emails)
 from .api.mcp import api_mcp_mail, api_mcp_revoke, api_mcp_settings, api_mcp_writes
+from .api.photos import api_photo_decide, api_photo_review, api_trip_photos
 from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, api_person_add, api_person_claim,
                           api_person_edit, api_person_remove)
 from .api.logos import api_loyalty_logo, api_segment_logo
@@ -56,6 +57,9 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/trips/{id}/merge", api_trip_merge),
     ("POST", "/api/trips/{id}/split", api_trip_split),
     ("POST", "/api/trips/{id}/destination/suggest", api_trip_destination_suggest),
+    ("GET", "/api/trips/{id}/photos", api_trip_photos),
+    ("GET", "/api/photos/review", api_photo_review),
+    ("POST", "/api/photos/{id}", api_photo_decide),
     ("POST", "/api/segments", api_segment_add),
     ("GET", "/api/segments/{id}", api_segment),
     ("GET", "/api/segments/{id}/logo", api_segment_logo),

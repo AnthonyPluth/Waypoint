@@ -572,6 +572,71 @@ class TripPlaces(TypedDict):
     boundaries: list[TripStateLine]
 
 
+class TripPhoto(TypedDict):
+    id: int
+    person_id: int
+    trip_id: int | None
+    kind: Literal["image", "video"]
+    taken_local: str
+    zone: str | None
+    latitude: float | None
+    longitude: float | None
+    location_source: Literal["exif", "inferred"] | None
+    segment_id: int | None
+    match: Literal["place", "time", "far", "ambiguous", "home", "none"]
+    distance_km: float | None
+    cluster: int | None
+    hidden: bool
+
+
+class PhotoCluster(TypedDict):
+    latitude: float
+    longitude: float
+    count: int
+    first: str
+    last: str
+    cover: int
+    inferred: bool
+
+
+class PhotoCounts(TypedDict):
+    total: int
+    located: int
+    inferred: int
+    far: int
+    hidden: int
+
+
+class PhotoPerson(TypedDict):
+    person_id: int
+    count: int
+
+
+class TripPhotos(TypedDict):
+    photos: list[TripPhoto]
+    clusters: list[PhotoCluster]
+    counts: PhotoCounts
+    people: list[PhotoPerson]
+
+
+class PhotoCandidate(TypedDict):
+    id: int
+    name: str
+
+
+class ReviewPhoto(TripPhoto):
+    candidates: list[PhotoCandidate]
+
+
+class PhotoReview(TypedDict):
+    photos: list[ReviewPhoto]
+
+
+class PhotoBody(TypedDict):
+    trip_id: NotRequired[int | None]
+    hidden: NotRequired[bool]
+
+
 class TripPhotoCounts(TypedDict):
     total: int
     inferred: int
