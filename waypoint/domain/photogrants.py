@@ -26,6 +26,7 @@ STALE_SHARE = "The trip changed. Review who sees your photos under Your photos o
 STALE_REMOVAL = "The trip changed since that photo was removed. Open the removed list again."
 STALE_SETTING = "Your trips changed. Review them before sharing on all."
 NO_WINDOW = "Give the trip dates or a booking before sharing photos on it"
+STALE_SOURCES = "Your libraries changed. Review them before sharing."
 
 
 class Stale(Exception):
@@ -39,6 +40,36 @@ def _window_matches(conn: db.Connection, trip_id: int, window: Mapping[str, str]
 class Prefs(TypedDict):
     default_scope: photos.Scope
     share_all: bool
+
+
+class SourceVersion(TypedDict):
+    id: int
+    status: str
+
+
+def sources_of(conn: db.Connection, person_id: int) -> list[SourceVersion]:
+    rows = conn.execute(select(PhotoSource.id, PhotoSource.status).where(PhotoSource.person_id == person_id).order_by(PhotoSource.id)).fetchall()
+    return [{"id": int(source_id), "status": str(status)} for source_id, status in rows]
+
+
+def audience_of(conn: db.Connection, trip_id: int) -> list[int]:
+    return sorted(trippeople.of(conn, [trip_id])[trip_id])
+
+
+def _audience_matches(conn: db.Connection, trip_id: int, seen: Sequence[object]) -> bool:
+    try:
+        wanted = {int(str(p)) for p in seen}
+    except (TypeError, ValueError):
+        return False
+    return wanted == set(audience_of(conn, trip_id))
+
+
+def _sources_match(conn: db.Connection, person_id: int, seen: Sequence[Mapping[str, object]]) -> bool:
+    try:
+        wanted = {(int(str(s["id"])), str(s["status"])) for s in seen}
+    except (KeyError, TypeError, ValueError):
+        return False
+    return wanted == {(s["id"], s["status"]) for s in sources_of(conn, person_id)}
 
 
 class Sharing(TypedDict):
@@ -181,7 +212,8 @@ def state_of(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) 
 
 
 def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, scope: photos.Scope, now: float | None = None,
-          window: Mapping[str, str] | None = None, expected_changed: float | None = None) -> Sharing | None:
+          window: Mapping[str, str] | None = None, expected_changed: float | None = None,
+          sources: Sequence[Mapping[str, object]] | None = None, audience: Sequence[object] | None = None) -> Sharing | None:
     acting = _acting(conn, viewer, person_id, trip_id)
     if acting is None or scope not in photos.SCOPES:
         return None
@@ -192,9 +224,13 @@ def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, sco
         raise trips.Invalid(NO_WINDOW)
     if window is not None and not _window_matches(conn, trip.id, window):
         raise Stale(STALE_SHARE)
+    if audience is not None and not _audience_matches(conn, trip.id, audience):
+        raise Stale(STALE_SHARE)
     row = lock(conn, person_id, [trip.id]).get(trip.id)
     if expected_changed is not None and (row is None or row.changed != expected_changed):
         raise Stale(STALE_SHARE)
+    if sources is not None and not _sources_match(conn, person_id, sources):
+        raise Stale(STALE_SOURCES)
     _write(conn, person_id, trip.id, scope, by, time.time() if now is None else now)
     return sharing(conn, viewer, person_id, trip.id)
 
@@ -337,7 +373,8 @@ def _share_all(conn: db.Connection, person_id: int, by: str, scope: photos.Scope
 
 
 def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope: photos.Scope | None, share_all: bool | None,
-              now: float | None = None, windows: Mapping[str, Mapping[str, str]] | None = None) -> Prefs | None:
+              now: float | None = None, windows: Mapping[str, Mapping[str, str]] | None = None,
+              sources: Sequence[Mapping[str, object]] | None = None, audiences: Mapping[str, Sequence[object]] | None = None) -> Prefs | None:
     if viewer.household or not photos.acts_for(conn, viewer, person_id):
         return None
     by = photos.viewer_sub(conn, viewer)
@@ -351,6 +388,10 @@ def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope
     pending = _unshared(conn, person_id, by) if share_all and not was_on else []
     if windows is not None and any(str(t) not in windows or not _window_matches(conn, t, windows[str(t)]) for t in pending):
         raise Stale(STALE_SETTING)
+    if audiences is not None and any(str(t) not in audiences or not _audience_matches(conn, t, audiences[str(t)]) for t in pending):
+        raise Stale(STALE_SETTING)
+    if sources is not None and share_all and not was_on and not _sources_match(conn, person_id, sources):
+        raise Stale(STALE_SOURCES)
     db.insert_ignore(conn, PhotoSharingPrefs, {"person_id": person_id, "default_scope": photos.ONLY_ME, "share_all": False, "set_by": None, "share_all_since": None,
                                                "steward_sub": None}, key=["person_id"])
     row = conn.orm.get(PhotoSharingPrefs, person_id, with_for_update=True)
@@ -505,6 +546,9 @@ def trips_changed(conn: db.Connection, trip_ids: Iterable[int], before: Mapping[
         for person in sorted(_photo_people(conn, trip_id) - aboard):
             left(conn, person, trip_id)
         reconcile(conn, trip_id, stamp)
+        if photos.trip_window(conn, trip_id) is None:
+            for g in _active(conn, trip_id):
+                _end(conn, g.person_id, trip_id)
         if was is not None:
             settled.append((trip_id, was, after))
     for trip_id, was, after in settled:
