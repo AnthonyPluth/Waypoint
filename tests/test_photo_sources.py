@@ -508,6 +508,36 @@ class Races(DbCase):
             self.assertEqual((found["owner_sub"], found["person_id"], found["label"], found["status"], found["last_error"]), ("sub-ben", self.ben.person_id, None, "ok", None))
 
 
+    def test_the_sweep_leaves_a_library_handed_to_a_member_who_still_signs_in(self):
+        source = photo_sources.save(self.c, self.guest, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)
+        self.c.commit()
+
+        def handed_over(conn, sub, email, now=None):
+            with db.session(self.path) as other:
+                photo_sources.claim(other, self.guest, self.ben.person_id, "sub-ben")
+            return "user_removed" if sub == "sub-ana" else None
+        with mock.patch.object(oidc, "access_lapsed", side_effect=handed_over):
+            self.assertEqual(photosources.end_lapsed(self.c), 0)
+        self.c.commit()
+        found = photo_sources.get(self.c, source)
+        assert found is not None
+        self.assertEqual((found["owner_sub"], found["person_id"]), ("sub-ben", self.ben.person_id))
+        with mock.patch.object(oidc, "access_lapsed", side_effect=lambda conn, sub, email, now=None: "user_removed" if sub == "sub-ben" else None):
+            self.assertEqual(photosources.end_lapsed(self.c), 1)
+        self.assertIsNone(photo_sources.get(self.c, source))
+
+    def test_connecting_for_a_guest_who_was_claimed_meanwhile_finds_nobody(self):
+        def claimed(conn):
+            people.claim_guest(conn, self.ben.person_id, self.guest, "2026-10-05")
+        with self.elsewhere(claimed):
+            with self.assertRaises(photosources.NoSuchPerson):
+                photosources.connect(self.c, self.ana, self.guest, URL, KEY, None)
+        self.c.rollback()
+        self.assertEqual(photo_sources.list_all(self.c), [])
+        self.assertFalse(photo_sources.lock_person(self.c, self.guest))
+        self.assertTrue(photo_sources.lock_person(self.c, self.ben.person_id))
+
+
 class Claiming(DbCase):
     def setUp(self):
         super().setUp()
@@ -530,6 +560,14 @@ class Claiming(DbCase):
         unlocked = photo_sources.source_for_provider(self.c, moved)
         assert unlocked is not None
         self.assertEqual(unlocked.key, KEY)
+
+    def test_claiming_locks_the_guest_before_moving_their_libraries(self):
+        order = []
+        lock, move = photo_sources.lock_person, photo_sources.claim
+        with mock.patch.object(photo_sources, "lock_person", side_effect=lambda conn, person: order.append(("lock", person)) or lock(conn, person)), \
+                mock.patch.object(photo_sources, "claim", side_effect=lambda conn, *rest: order.append(("move", rest[0])) or move(conn, *rest)):
+            people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        self.assertEqual(order, [("lock", self.guest), ("move", self.guest)])
 
     def test_claiming_writes_no_key_anywhere(self):
         photo_sources.save(self.c, self.guest, "sub-steward", URL, ACCOUNT.user_id, KEY, None, 1.0)
