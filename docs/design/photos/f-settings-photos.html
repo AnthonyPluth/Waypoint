@@ -303,7 +303,7 @@ body.desk .dev.tall { height: 800px; }
 .src { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
 .src-top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .src-top .txt { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.src-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.src-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .note { border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border); padding: 12px 14px; font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
 .perm { display: flex; flex-wrap: wrap; gap: 6px; }
 .perm code { font-family: var(--mono); font-size: 12px; background: var(--surface-3); border-radius: 6px; padding: 2px 7px; }
@@ -319,6 +319,41 @@ body.desk .dev.tall { height: 800px; }
 details.looks > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 600; font-size: 14px; }
 details.looks > summary::-webkit-details-marker { display: none; }
 .empty { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+
+.ask { display: flex; flex-direction: column; gap: 12px; }
+.scope { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.scope legend { margin-bottom: 8px; padding: 0; }
+.mine { display: flex; flex-direction: column; gap: 14px; }
+.toast { position: absolute; left: 16px; right: 16px; bottom: 96px; z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--popover); border: 1px solid var(--border); box-shadow: var(--elevation-3); font-size: 14px; }
+.toast.inline { position: static; }
+.viewer .toast { bottom: auto; top: 96px; }
+@container (min-width: 768px) { .toast { left: auto; right: 24px; bottom: 24px; width: 380px; } .viewer .toast { top: 76px; right: 384px; } .toast.inline { width: auto; max-width: 420px; } }
+.confirm { position: absolute; z-index: 6; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); background: var(--card); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--elevation-3); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.confirm-acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+@container (min-width: 768px) { .confirm { left: 50%; right: auto; width: 30rem; transform: translate(-50%, -50%); } }
+.btn.destroy { background: var(--destructive); color: #2a0806; }
+.selbar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; background: var(--background); }
+.tile .chk { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 99px; border: 2px solid var(--foreground); background: rgb(3 4 6 / 35%); display: grid; place-items: center; color: var(--primary-foreground); }
+.tile .chk .ic { width: 13px; height: 13px; stroke-width: 3; visibility: hidden; }
+.tile.sel { outline: 3px solid var(--ring); outline-offset: -3px; }
+.tile.sel .chk { background: var(--primary); border-color: var(--primary); }
+.tile.sel .chk .ic { visibility: visible; }
+.tile.locked { opacity: 0.55; cursor: default; }
+.removed { display: flex; flex-direction: column; gap: 10px; }
+.rgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.rgrid li { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.rgrid .tile { border-radius: 8px; cursor: default; }
+@container (min-width: 768px) { .rgrid { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+.viewer.solo { grid-template-rows: auto minmax(0, 1fr); }
+@container (min-width: 768px) { .viewer.solo { grid-template-columns: minmax(0, 1fr); } }
+.gone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; color: var(--muted-foreground); max-width: 22rem; }
+.gone .ic { width: 36px; height: 36px; stroke-width: 1.5; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--primary); flex: none; }
+.block { display: block; }
+.grant .txt { flex: 1 1 200px; min-width: 0; }
+.grant .sel { width: auto; height: 34px; font-size: 13px; }
+@container (max-width: 767px) { .grant .sel { height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .pin.lit::after { animation: none; opacity: 0.6; } }
 </style>
 </head>
@@ -345,15 +380,16 @@ details.looks > summary::-webkit-details-marker { display: none; }
     <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"/></symbol>
     <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
     <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
     <symbol id="i-bed" viewBox="0 0 24 24"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></symbol>
   </defs>
 </svg>
 
 <div class="doc">
   <header class="dochead">
-    <p class="eyebrow">Waypoint · issue #485 · for the owner’s sign-off</p>
+    <p class="eyebrow">Waypoint · issue #485, extended for #504 · for the owner’s sign-off</p>
     <h1>Trip photos and map</h1>
-    <p>Mockups for every screen and state in the issue’s Scope, drawn with Waypoint’s own tokens (<code>frontend/src/app.css</code>) and component names. Dark only. Use the toggle to see each screen at phone width (390 px) or desktop width (1280 px; content-only fragments show the 960 px content column). Every name, place, host and date here is made up.</p>
+    <p>Mockups for every screen and state in the issue’s Scope, drawn with Waypoint’s own tokens (<code>frontend/src/app.css</code>) and component names. Dark only. Use the toggle to see each screen at phone width (390 px) or desktop width (1280 px; content-only fragments show the 960 px content column). Sections (i)–(m) add the sharing rules from #504: nothing from a person’s library is on a trip until they share it there, <b>Only me</b> is the default, and anyone can take their photos back at once. Every name, place, host and date here is made up.</p>
   </header>
 
   <div class="bar">
@@ -361,12 +397,12 @@ details.looks > summary::-webkit-details-marker { display: none; }
       <button type="button" id="w-phone" aria-pressed="true">Phone · 390</button>
       <button type="button" id="w-desk" aria-pressed="false">Desktop · 1280</button>
     </div>
-    <nav class="toc" aria-label="Screens"><a href="a-trip-page.html">a Trip page</a><a href="b-photo-viewer.html">b Viewer</a><a href="c-trip-map.html">c Map</a><a href="d-map-pins-only.html">d Pins only</a><a href="e-trip-summary.html">e Summary</a><a href="f-settings-photos.html" aria-current="page">f Settings</a><a href="g-empty-states.html">g Empty</a><a href="h-needs-a-look.html">h Needs a look</a></nav>
+    <nav class="toc" aria-label="Screens"><a href="a-trip-page.html">a Trip page</a><a href="b-photo-viewer.html">b Viewer</a><a href="c-trip-map.html">c Map</a><a href="d-map-pins-only.html">d Pins only</a><a href="e-trip-summary.html">e Summary</a><a href="f-settings-photos.html" aria-current="page">f Settings</a><a href="g-empty-states.html">g Empty</a><a href="h-needs-a-look.html">h Needs a look</a><a href="i-sharing-prompt.html">i Share prompt</a><a href="j-your-photos.html">j Your photos</a><a href="k-remove-photos.html">k Remove</a><a href="l-others-view.html">l Others' view</a><a href="m-sharing-settings.html">m Sharing settings</a></nav>
   </div>
 
   <section class="sec" id="f" aria-labelledby="f-title">
     <div class="sechead"><span class="letter">f</span><h2 id="f-title">Settings › Photos</h2></div>
-    <p class="lede"><code>PhotosSection</code>, after Gmail. One card per library with its person, host, status chip, last sync and count, and Sync now, Change key, Pause and Remove. Below, the Connect form, here filled in for June, who has no login, and after a passing Test.</p>
+    <p class="lede"><code>PhotosSection</code>, after Gmail. One card per library with its person, host, status chip, last sync and count, and Sync now, Change key, Pause and Remove. Someone else’s library shows its name and status only. Below, the Connect form, here filled in for June, who has no login, and after a passing Test. Sharing settings sit under these cards (m).</p>
     <div class="stage"><div class="frames">
       <figure class="fig"><figcaption>f1 · Source cards and the Connect form</figcaption>
         <div class="dev"><div class="shell"><nav class="side" data-nav="settings" aria-label="Main"></nav><div class="app">
@@ -384,9 +420,8 @@ details.looks > summary::-webkit-details-marker { display: none; }
                   <a class="t-caption" href="h-needs-a-look.html" style="color:var(--status-warn-ink)">Needs a look (5)</a>
                 </div>
                 <div class="src">
-                  <div class="src-top"><span class="avatar a4" aria-hidden="true">TB</span><div class="txt"><p class="t-heading">Theo Brook</p><p class="mono t-caption muted">immich.brook.example</p><p class="t-caption muted" role="status">Syncing… 4 of 9 trips read · 611 photos so far</p></div><span class="chip info">Syncing</span></div>
-                  <div class="src-acts"><button class="btn outline sm" type="button" disabled aria-label="Syncing, Theo Brook’s library">Syncing…</button><button class="btn outline sm" type="button" aria-label="Change key, Theo Brook’s library">Change key</button><button class="btn outline sm" type="button" aria-label="Pause, Theo Brook’s library">Pause</button><button class="btn danger sm" type="button" aria-label="Remove Theo Brook’s library">Remove</button></div>
-                </div>
+                  <div class="src-top"><span class="avatar a4" aria-hidden="true">TB</span><div class="txt"><p class="t-heading">Theo Brook</p><p class="mono t-caption muted">immich.brook.example</p><p class="t-caption muted">Theo manages this library and what it shares.</p></div><span class="chip quiet">Connected</span></div>
+                                  </div>
                 <form class="form" aria-labelledby="f-connect" onsubmit="event.preventDefault()">
                   <h3 id="f-connect" class="t-heading">Connect an Immich library</h3>
                   <div class="form-grid">
@@ -396,7 +431,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
                       <p class="t-caption muted">Make the key in Immich under Account settings › API keys, signed in as June, and tick:</p>
                       <p class="perm"><code>asset.read</code><code>asset.view</code><code>asset.download</code><code>user.read</code></p></div>
                   </div>
-                  <div class="note"><p><b>What Waypoint reads.</b> Photos taken during June’s trips and the 12 hours around them. For each one it keeps when and where it was taken, including photos that turn out not to belong to a trip. It never keeps the pictures: they are shown straight from Immich.</p><p class="muted">Everyone who can see a trip sees all its photos. The key is stored encrypted and is never shown again.</p></div>
+                  <div class="note"><p><b>What Waypoint reads.</b> Photos taken during June’s trips and the 12 hours around them. For each one it keeps when and where it was taken, including photos that turn out not to belong to a trip. It never keeps the pictures: they are shown straight from Immich.</p><p class="muted">Nothing from this library shows on a trip until it is shared there, and then only to the people chosen (see i and m). June doesn’t sign in, so you manage what her library shares. The key is stored encrypted and is never shown again.</p></div>
                   <p class="result" role="status"><span class="chip ok">Key works</span><span>It belongs to the Immich user <span class="mono">june@brook.example</span>.</span></p>
                   <div class="src-acts"><button class="btn outline" type="button">Test</button><button class="btn" type="submit">Save</button></div>
                 </form>
@@ -411,6 +446,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       <div><h3>Accessible names</h3><ul>
         <li>Card buttons name the library: <q>Sync now, Ada Brook’s library</q>, <q>Change key, Ada Brook’s library</q>, <q>Pause, Ada Brook’s library</q> (then <q>Resume, …</q>), <q>Remove Ada Brook’s library</q> (asks first in <code>ConfirmDialog</code>: “Remove Ada Brook’s library? Its 1,904 photos leave every trip. Nothing changes in Immich.”).</li>
         <li>Sync progress is a <code>role="status"</code> line.</li>
+        <li>Someone else’s library (Theo’s) shows only their name, host and a <q>Connected</q> chip: no counts, no last sync, no buttons, since its counts would show that photos exist.</li>
         <li>Form named by its heading <q>Connect an Immich library</q>; fields <q>Whose library</q>, <q>Immich address</q>, <q>API key</q>; <q>Show the key</q> (<code>aria-pressed</code>); <q>Test</q>; <q>Save</q>.</li>
         <li>Test result is a <code>role="status"</code> line: <q>Key works. It belongs to the Immich user june@brook.example.</q></li>
         <li>Change key opens the same key field inline in the card; a key for a different Immich user is refused with “This key belongs to another Immich user.”</li>
@@ -418,7 +454,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       <div><h3>Tokens and components</h3><ul>
         <li>The <code>GmailSection</code> pattern: <code>h2.eyebrow</code>, a <code>.rows</code> card, <code>Button</code> <code>outline size="sm"</code>; Remove uses <code>text-status-bad-ink</code> on the outline.</li>
         <li>Avatar by <code>avatarTone(person)</code>; host in <code>font-mono</code>.</li>
-        <li><code>StatusChip</code>: <q>Up to date</q> ok, <q>Syncing</q> info, <q>Paused</q> quiet, <q>Not synced yet</q> quiet, <q>Can’t reach Immich</q> warn, <q>Key refused</q> bad (see g).</li>
+        <li><code>StatusChip</code> on your own cards: <q>Up to date</q> ok, <q>Syncing</q> info, <q>Paused</q> quiet, <q>Not synced yet</q> quiet, <q>Can’t reach Immich</q> warn, <q>Key refused</q> bad (see g).</li>
         <li>Plain-language note on <code>bg-surface-2</code>; permission names in <code>font-mono</code> on <code>bg-surface-3</code>.</li>
         <li>Save stays disabled until Test passes for the address and key as typed.</li>
       </ul></div>
@@ -469,8 +505,13 @@ details.looks > summary::-webkit-details-marker { display: none; }
     if (el) el.innerHTML = GROUPS[k].map(tile).join("");
   });
   var STRIP = [GROUPS.d1[1], GROUPS.d1[4], GROUPS.d3[1], GROUPS.d3[4], GROUPS.d3[5], GROUPS.d5[0], GROUPS.d3[9], GROUPS.d5[4], GROUPS.d1[7], GROUPS.d3[6]];
+  var ADA_ONLY = [].concat(GROUPS.d1, GROUPS.d3, GROUPS.d5).filter(function (t) { return t.who === A; }).slice(0, 10);
   document.querySelectorAll("[data-strip]").forEach(function (el) {
     var off = el.getAttribute("data-strip") === "off";
+    if (el.getAttribute("data-strip") === "ada") {
+      el.innerHTML = ADA_ONLY.map(tile).join("") + '<button type="button" class="more-tile" aria-label="See all 171 photos"><b>+161</b>See all</button>';
+      return;
+    }
     var html = STRIP.map(function (t, i) {
       if (off && t.who === T) return '<button type="button" class="tile" aria-label="Photo from Theo’s library, can’t be loaded right now"><span class="mk mk-off" aria-hidden="true">' + ic("i-imgoff") + "</span></button>";
       return tile(t);
@@ -478,6 +519,19 @@ details.looks > summary::-webkit-details-marker { display: none; }
     html += '<button type="button" class="more-tile" aria-label="See all 248 photos"><b>+238</b>See all</button>';
     el.innerHTML = html;
   });
+
+  var SEL = { 3: 1, 5: 1, 9: 1 };
+  var selEl = document.querySelector("[data-sel]");
+  if (selEl) selEl.innerHTML = GROUPS.d3.map(function (t, i) {
+    if (t.who !== A) return '<span class="tile locked g' + t.g + '" aria-hidden="true"></span>';
+    var on = !!SEL[i];
+    return '<label class="tile g' + t.g + (on ? " sel" : "") + '"><input class="sr" type="checkbox"' + (on ? " checked" : "") + ' aria-label="Photo, ' + t.time + ', near ' + t.place + '"><span class="chk" aria-hidden="true">' + ic("i-check") + "</span></label>";
+  }).join("");
+  var REMOVED = [P(7, "Mon 8 Sep, 4:11 PM"), P(10, "Mon 8 Sep, 8:05 PM"), P(1, "Wed 10 Sep, 7:44 PM")];
+  var remEl = document.querySelector("[data-removed]");
+  if (remEl) remEl.innerHTML = REMOVED.map(function (t) {
+    return '<li><span class="tile g' + t.g + '" role="img" aria-label="Photo, ' + t.time + '"></span><button type="button" class="btn ghost sm" aria-label="Put back the photo from ' + t.time + '">Put back</button></li>';
+  }).join("");
 
   var STOPS = [
     { x: 120, y: 300, k: "air", n: "Brennan Field" }, { x: 210, y: 190, k: "stay", n: "Cedar Hollow" }, { x: 360, y: 140, k: "stay", n: "Marlow Springs" },
@@ -521,8 +575,12 @@ details.looks > summary::-webkit-details-marker { display: none; }
   var LAKE = '<rect width="800" height="500" fill="var(--map-land)"/><path d="M290 210C330 150 470 140 530 186C600 238 568 318 480 324C390 330 320 300 292 254Z" fill="var(--map-sea)" stroke="var(--map-border)" stroke-width="1" vector-effect="non-scaling-stroke"/>' +
     '<g fill="none" stroke="var(--map-border)" stroke-linecap="round" stroke-width="1.6"><path d="M0 120C160 130 260 90 420 110S640 170 800 150"/><path d="M640 0C620 160 660 320 600 500"/></g>';
 
+  var ADA_N = { p1: 4, p2: 25, p4: 50, p9: 3, p5: 30, p10: 8, p8: 51 };
+  var ADA = PINS.filter(function (p) { return ADA_N[p.id]; }).map(function (p) { return Object.assign({}, p, { n: ADA_N[p.id] }); });
   function mapHTML(mode, w) {
     var k = 800 / Math.max(280, w);
+    var set = PINS;
+    if (mode === "ada") { set = ADA; mode = "route"; }
     if (mode === "pins") {
       var svgp = '<svg viewBox="0 0 800 500" role="img" aria-label="Map of where this trip’s photos were taken">' + LAKE + "</svg>";
       return '<div class="mapwrap"><div class="map">' + svgp + LAKE_PINS.map(function (p) { return pinBtn(p); }).join("") + "</div>" +
@@ -546,7 +604,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
     if (mover) marks += '<g transform="translate(' + mover.x.toFixed(1) + " " + mover.y.toFixed(1) + ") rotate(" + mover.ang.toFixed(1) + ") scale(" + (1.1 * k).toFixed(2) + ')"><rect x="-9" y="-5" width="18" height="10" rx="3" fill="var(--map-stay)" stroke="var(--map-sea)" stroke-width="1.2"/><rect x="1" y="-3.5" width="4" height="7" rx="1" fill="var(--map-sea)"/></g>';
     var svg = '<svg viewBox="0 0 800 500" role="img" aria-label="Map of the route, stop by stop, with photo places; the stops are listed below">' + LAND + '<g fill="none" stroke-linecap="round">' + legs + fl + "</g>" + marks + "</svg>";
     var passed = { p1: 1, p2: 1, p3: 1, p4: 1, p9: 1, p5: 1, p6: 1, p10: 1 };
-    var pins = PINS.map(function (p) {
+    var pins = set.map(function (p) {
       var cls = "";
       if (mode === "tapped" && p.id === "p4") cls = " tapped";
       if (mode === "replay") cls = p.id === "p10" ? " lit" : passed[p.id] ? "" : " dim";
@@ -556,7 +614,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
     if (mode === "replay") extra = '<div class="maplabel" aria-hidden="true"><b>Pinyon Flats</b><span class="muted">Thu 11 – Sat 13 Sep</span></div><div class="maplabel photo" aria-hidden="true"><span class="dot"></span><span><b>12 photos</b><span class="muted">Sat 13 Sep, from 9:20 AM</span></span></div>';
     var card = function (cls) { return '<div class="pincard ' + cls + '" role="group" aria-label="73 photos near Marlow Springs"><div class="thumb g8" aria-hidden="true"></div><div class="txt"><p class="t-heading">73 photos</p><p class="t-caption muted">Mon 8 – Thu 11 Sep · near Marlow Springs</p></div><div class="acts"><button type="button" class="btn sm">Show these photos</button><button type="button" class="btn ghost icon sm" aria-label="Close">' + ic("i-x") + "</button></div></div>"; };
     if (mode === "tapped") extra += card("pincard-in");
-    var key = '<ul class="key" aria-label="Map key"><li><span class="kd air" aria-hidden="true"></span>Airport</li><li><span class="kd stay" aria-hidden="true"></span>Stay</li><li><span class="kd flight" aria-hidden="true"></span>Flight</li><li><span class="kd ground" aria-hidden="true"></span>Other travel</li><li><span class="kd state" aria-hidden="true"></span>State line</li><li><span class="kd ph" aria-hidden="true"></span>Photos</li><li><span class="kd phh" aria-hidden="true"></span>Photos placed from the itinerary</li><li><span class="kd farr" aria-hidden="true"></span>Far from every booking</li></ul>';
+    var key = '<ul class="key" aria-label="Map key"><li><span class="kd air" aria-hidden="true"></span>Airport</li><li><span class="kd stay" aria-hidden="true"></span>Stay</li><li><span class="kd flight" aria-hidden="true"></span>Flight</li><li><span class="kd ground" aria-hidden="true"></span>Other travel</li><li><span class="kd state" aria-hidden="true"></span>State line</li><li><span class="kd ph" aria-hidden="true"></span>Photos</li>' + (set.some(function (p) { return p.inf; }) ? '<li><span class="kd phh" aria-hidden="true"></span>Photos placed from the itinerary</li>' : "") + (set.some(function (p) { return p.far; }) ? '<li><span class="kd farr" aria-hidden="true"></span>Far from every booking</li>' : "") + '</ul>';
     var playing = mode === "replay";
     var ctrl = '<div class="ctrl"><button type="button" class="btn outline">' + ic(playing ? "i-pause" : "i-play") + (playing ? "Pause" : "Play") + '</button><button type="button" class="btn outline sm" aria-label="Playback speed 1×">1×</button><input type="range" min="0" max="100" value="' + (playing ? 52 : 100) + '" aria-label="Position along the route" aria-valuetext="' + (playing ? "Pinyon Flats to Redstone Gap, Sat 13 Sep" : "Back at Brennan Field, Sat 20 Sep") + '"></div>';
     var list = "";

@@ -303,7 +303,7 @@ body.desk .dev.tall { height: 800px; }
 .src { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
 .src-top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .src-top .txt { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.src-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.src-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .note { border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border); padding: 12px 14px; font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
 .perm { display: flex; flex-wrap: wrap; gap: 6px; }
 .perm code { font-family: var(--mono); font-size: 12px; background: var(--surface-3); border-radius: 6px; padding: 2px 7px; }
@@ -319,6 +319,41 @@ body.desk .dev.tall { height: 800px; }
 details.looks > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 600; font-size: 14px; }
 details.looks > summary::-webkit-details-marker { display: none; }
 .empty { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+
+.ask { display: flex; flex-direction: column; gap: 12px; }
+.scope { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.scope legend { margin-bottom: 8px; padding: 0; }
+.mine { display: flex; flex-direction: column; gap: 14px; }
+.toast { position: absolute; left: 16px; right: 16px; bottom: 96px; z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--popover); border: 1px solid var(--border); box-shadow: var(--elevation-3); font-size: 14px; }
+.toast.inline { position: static; }
+.viewer .toast { bottom: auto; top: 96px; }
+@container (min-width: 768px) { .toast { left: auto; right: 24px; bottom: 24px; width: 380px; } .viewer .toast { top: 76px; right: 384px; } .toast.inline { width: auto; max-width: 420px; } }
+.confirm { position: absolute; z-index: 6; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); background: var(--card); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--elevation-3); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.confirm-acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+@container (min-width: 768px) { .confirm { left: 50%; right: auto; width: 30rem; transform: translate(-50%, -50%); } }
+.btn.destroy { background: var(--destructive); color: #2a0806; }
+.selbar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; background: var(--background); }
+.tile .chk { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 99px; border: 2px solid var(--foreground); background: rgb(3 4 6 / 35%); display: grid; place-items: center; color: var(--primary-foreground); }
+.tile .chk .ic { width: 13px; height: 13px; stroke-width: 3; visibility: hidden; }
+.tile.sel { outline: 3px solid var(--ring); outline-offset: -3px; }
+.tile.sel .chk { background: var(--primary); border-color: var(--primary); }
+.tile.sel .chk .ic { visibility: visible; }
+.tile.locked { opacity: 0.55; cursor: default; }
+.removed { display: flex; flex-direction: column; gap: 10px; }
+.rgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.rgrid li { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.rgrid .tile { border-radius: 8px; cursor: default; }
+@container (min-width: 768px) { .rgrid { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+.viewer.solo { grid-template-rows: auto minmax(0, 1fr); }
+@container (min-width: 768px) { .viewer.solo { grid-template-columns: minmax(0, 1fr); } }
+.gone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; color: var(--muted-foreground); max-width: 22rem; }
+.gone .ic { width: 36px; height: 36px; stroke-width: 1.5; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--primary); flex: none; }
+.block { display: block; }
+.grant .txt { flex: 1 1 200px; min-width: 0; }
+.grant .sel { width: auto; height: 34px; font-size: 13px; }
+@container (max-width: 767px) { .grant .sel { height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .pin.lit::after { animation: none; opacity: 0.6; } }
 </style>
 </head>
@@ -345,15 +380,16 @@ details.looks > summary::-webkit-details-marker { display: none; }
     <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"/></symbol>
     <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
     <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
     <symbol id="i-bed" viewBox="0 0 24 24"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></symbol>
   </defs>
 </svg>
 
 <div class="doc">
   <header class="dochead">
-    <p class="eyebrow">Waypoint · issue #485 · for the owner’s sign-off</p>
+    <p class="eyebrow">Waypoint · issue #485, extended for #504 · for the owner’s sign-off</p>
     <h1>Trip photos and map</h1>
-    <p>Mockups for every screen and state in the issue’s Scope, drawn with Waypoint’s own tokens (<code>frontend/src/app.css</code>) and component names. Dark only. Use the toggle to see each screen at phone width (390 px) or desktop width (1280 px; content-only fragments show the 960 px content column). Every name, place, host and date here is made up.</p>
+    <p>Mockups for every screen and state in the issue’s Scope, drawn with Waypoint’s own tokens (<code>frontend/src/app.css</code>) and component names. Dark only. Use the toggle to see each screen at phone width (390 px) or desktop width (1280 px; content-only fragments show the 960 px content column). Sections (i)–(m) add the sharing rules from #504: nothing from a person’s library is on a trip until they share it there, <b>Only me</b> is the default, and anyone can take their photos back at once. Every name, place, host and date here is made up.</p>
   </header>
 
   <div class="bar">
@@ -361,7 +397,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       <button type="button" id="w-phone" aria-pressed="true">Phone · 390</button>
       <button type="button" id="w-desk" aria-pressed="false">Desktop · 1280</button>
     </div>
-    <nav class="toc" aria-label="Screens"><a href="a-trip-page.html">a Trip page</a><a href="b-photo-viewer.html" aria-current="page">b Viewer</a><a href="c-trip-map.html">c Map</a><a href="d-map-pins-only.html">d Pins only</a><a href="e-trip-summary.html">e Summary</a><a href="f-settings-photos.html">f Settings</a><a href="g-empty-states.html">g Empty</a><a href="h-needs-a-look.html">h Needs a look</a></nav>
+    <nav class="toc" aria-label="Screens"><a href="a-trip-page.html">a Trip page</a><a href="b-photo-viewer.html" aria-current="page">b Viewer</a><a href="c-trip-map.html">c Map</a><a href="d-map-pins-only.html">d Pins only</a><a href="e-trip-summary.html">e Summary</a><a href="f-settings-photos.html">f Settings</a><a href="g-empty-states.html">g Empty</a><a href="h-needs-a-look.html">h Needs a look</a><a href="i-sharing-prompt.html">i Share prompt</a><a href="j-your-photos.html">j Your photos</a><a href="k-remove-photos.html">k Remove</a><a href="l-others-view.html">l Others' view</a><a href="m-sharing-settings.html">m Sharing settings</a></nav>
   </div>
 
   <section class="sec" id="b" aria-labelledby="b-title">
@@ -376,7 +412,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
             <div><p class="mono t-title">10:42 AM</p><p class="t-caption muted">Tue 9 Sep 2026 · Marlow Springs time</p></div>
             <div class="vrow"><svg class="ic" aria-hidden="true"><use href="#i-pin"/></svg><div><p>Near Marlow Springs, Colorado</p><p class="t-caption muted">From the photo’s location · 3 km from Juniper House</p></div></div>
             <div class="vrow"><span class="avatar sm a2" aria-hidden="true">AB</span><p>From Ada Brook’s library</p></div>
-            <div class="vacts"><a class="btn outline" href="#b"><svg class="ic" aria-hidden="true"><use href="#i-ext"/></svg>Open original</a><button class="btn ghost" type="button"><svg class="ic" aria-hidden="true"><use href="#i-eyeoff"/></svg>Hide from this trip</button></div>
+            <div class="vacts"><a class="btn outline" href="b-photo-viewer.html"><svg class="ic" aria-hidden="true"><use href="#i-ext"/></svg>Open original</a><button class="btn ghost" type="button"><svg class="ic" aria-hidden="true"><use href="#i-eyeoff"/></svg>Remove from this trip</button></div>
           </div>
         </div></div>
       </figure>
@@ -389,7 +425,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
             <div><p class="mono t-title">4:18 PM</p><p class="t-caption muted">Wed 10 Sep 2026 · Marlow Springs time · Video, 0:42</p></div>
             <div class="vrow"><svg class="ic" aria-hidden="true"><use href="#i-pin"/></svg><div><p>Marlow Springs, Colorado <span class="chip quiet small" style="margin-left:4px">From the itinerary</span></p><p class="t-caption muted">This video has no location. You were staying at Juniper House, Marlow Springs.</p></div></div>
             <div class="vrow"><span class="avatar sm a4" aria-hidden="true">TB</span><p>From Theo Brook’s library</p></div>
-            <div class="vacts"><a class="btn outline" href="#b"><svg class="ic" aria-hidden="true"><use href="#i-ext"/></svg>Open original</a></div>
+            <div class="vacts"><a class="btn outline" href="b-photo-viewer.html"><svg class="ic" aria-hidden="true"><use href="#i-ext"/></svg>Open original</a></div>
           </div>
         </div></div>
       </figure>
@@ -403,7 +439,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
             <div class="vrow"><svg class="ic" aria-hidden="true"><use href="#i-pin"/></svg><div><p>Saltwick Bay, California</p><p class="t-caption muted">From the photo’s location</p></div></div>
             <p class="chip warn">Far: 612 km from every booking</p>
             <div class="vrow"><span class="avatar sm a2" aria-hidden="true">AB</span><p>From Ada Brook’s library</p></div>
-            <div class="vacts"><a class="btn outline" href="h-needs-a-look.html">Needs a look</a><a class="btn outline" href="#b"><svg class="ic" aria-hidden="true"><use href="#i-ext"/></svg>Open original</a></div>
+            <div class="vacts"><a class="btn outline" href="h-needs-a-look.html">Needs a look</a><a class="btn outline" href="b-photo-viewer.html"><svg class="ic" aria-hidden="true"><use href="#i-ext"/></svg>Open original</a></div>
           </div>
         </div></div>
       </figure>
@@ -414,7 +450,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
         <li><q>Close</q> (also Escape), <q>Previous photo</q>, <q>Next photo</q> (also the arrow keys).</li>
         <li><q>Play video, 0:42</q> on a video.</li>
         <li><q>Open original</q>: a link to <code>/api/photos/{id}/original</code>, which opens in a new tab or downloads.</li>
-        <li><q>Hide from this trip</q> and <q>Needs a look</q>: only for the library’s person.</li>
+        <li><q>Remove from this trip</q> and <q>Needs a look</q>: only for the library’s person (see k).</li>
       </ul></div>
       <div><h3>Tokens and components</h3><ul>
         <li>Phone: full-screen dialog like <code>.code-dialog</code> on a new <code>--lightbox: #030406</code>; the info panel is <code>bg-card</code> with <code>radius-3xl</code> top corners. Desktop: a 360 px <code>bg-card</code> side panel with a left border.</li>
@@ -470,8 +506,13 @@ details.looks > summary::-webkit-details-marker { display: none; }
     if (el) el.innerHTML = GROUPS[k].map(tile).join("");
   });
   var STRIP = [GROUPS.d1[1], GROUPS.d1[4], GROUPS.d3[1], GROUPS.d3[4], GROUPS.d3[5], GROUPS.d5[0], GROUPS.d3[9], GROUPS.d5[4], GROUPS.d1[7], GROUPS.d3[6]];
+  var ADA_ONLY = [].concat(GROUPS.d1, GROUPS.d3, GROUPS.d5).filter(function (t) { return t.who === A; }).slice(0, 10);
   document.querySelectorAll("[data-strip]").forEach(function (el) {
     var off = el.getAttribute("data-strip") === "off";
+    if (el.getAttribute("data-strip") === "ada") {
+      el.innerHTML = ADA_ONLY.map(tile).join("") + '<button type="button" class="more-tile" aria-label="See all 171 photos"><b>+161</b>See all</button>';
+      return;
+    }
     var html = STRIP.map(function (t, i) {
       if (off && t.who === T) return '<button type="button" class="tile" aria-label="Photo from Theo’s library, can’t be loaded right now"><span class="mk mk-off" aria-hidden="true">' + ic("i-imgoff") + "</span></button>";
       return tile(t);
@@ -479,6 +520,19 @@ details.looks > summary::-webkit-details-marker { display: none; }
     html += '<button type="button" class="more-tile" aria-label="See all 248 photos"><b>+238</b>See all</button>';
     el.innerHTML = html;
   });
+
+  var SEL = { 3: 1, 5: 1, 9: 1 };
+  var selEl = document.querySelector("[data-sel]");
+  if (selEl) selEl.innerHTML = GROUPS.d3.map(function (t, i) {
+    if (t.who !== A) return '<span class="tile locked g' + t.g + '" aria-hidden="true"></span>';
+    var on = !!SEL[i];
+    return '<label class="tile g' + t.g + (on ? " sel" : "") + '"><input class="sr" type="checkbox"' + (on ? " checked" : "") + ' aria-label="Photo, ' + t.time + ', near ' + t.place + '"><span class="chk" aria-hidden="true">' + ic("i-check") + "</span></label>";
+  }).join("");
+  var REMOVED = [P(7, "Mon 8 Sep, 4:11 PM"), P(10, "Mon 8 Sep, 8:05 PM"), P(1, "Wed 10 Sep, 7:44 PM")];
+  var remEl = document.querySelector("[data-removed]");
+  if (remEl) remEl.innerHTML = REMOVED.map(function (t) {
+    return '<li><span class="tile g' + t.g + '" role="img" aria-label="Photo, ' + t.time + '"></span><button type="button" class="btn ghost sm" aria-label="Put back the photo from ' + t.time + '">Put back</button></li>';
+  }).join("");
 
   var STOPS = [
     { x: 120, y: 300, k: "air", n: "Brennan Field" }, { x: 210, y: 190, k: "stay", n: "Cedar Hollow" }, { x: 360, y: 140, k: "stay", n: "Marlow Springs" },
@@ -522,8 +576,12 @@ details.looks > summary::-webkit-details-marker { display: none; }
   var LAKE = '<rect width="800" height="500" fill="var(--map-land)"/><path d="M290 210C330 150 470 140 530 186C600 238 568 318 480 324C390 330 320 300 292 254Z" fill="var(--map-sea)" stroke="var(--map-border)" stroke-width="1" vector-effect="non-scaling-stroke"/>' +
     '<g fill="none" stroke="var(--map-border)" stroke-linecap="round" stroke-width="1.6"><path d="M0 120C160 130 260 90 420 110S640 170 800 150"/><path d="M640 0C620 160 660 320 600 500"/></g>';
 
+  var ADA_N = { p1: 4, p2: 25, p4: 50, p9: 3, p5: 30, p10: 8, p8: 51 };
+  var ADA = PINS.filter(function (p) { return ADA_N[p.id]; }).map(function (p) { return Object.assign({}, p, { n: ADA_N[p.id] }); });
   function mapHTML(mode, w) {
     var k = 800 / Math.max(280, w);
+    var set = PINS;
+    if (mode === "ada") { set = ADA; mode = "route"; }
     if (mode === "pins") {
       var svgp = '<svg viewBox="0 0 800 500" role="img" aria-label="Map of where this trip’s photos were taken">' + LAKE + "</svg>";
       return '<div class="mapwrap"><div class="map">' + svgp + LAKE_PINS.map(function (p) { return pinBtn(p); }).join("") + "</div>" +
@@ -547,7 +605,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
     if (mover) marks += '<g transform="translate(' + mover.x.toFixed(1) + " " + mover.y.toFixed(1) + ") rotate(" + mover.ang.toFixed(1) + ") scale(" + (1.1 * k).toFixed(2) + ')"><rect x="-9" y="-5" width="18" height="10" rx="3" fill="var(--map-stay)" stroke="var(--map-sea)" stroke-width="1.2"/><rect x="1" y="-3.5" width="4" height="7" rx="1" fill="var(--map-sea)"/></g>';
     var svg = '<svg viewBox="0 0 800 500" role="img" aria-label="Map of the route, stop by stop, with photo places; the stops are listed below">' + LAND + '<g fill="none" stroke-linecap="round">' + legs + fl + "</g>" + marks + "</svg>";
     var passed = { p1: 1, p2: 1, p3: 1, p4: 1, p9: 1, p5: 1, p6: 1, p10: 1 };
-    var pins = PINS.map(function (p) {
+    var pins = set.map(function (p) {
       var cls = "";
       if (mode === "tapped" && p.id === "p4") cls = " tapped";
       if (mode === "replay") cls = p.id === "p10" ? " lit" : passed[p.id] ? "" : " dim";
@@ -557,7 +615,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
     if (mode === "replay") extra = '<div class="maplabel" aria-hidden="true"><b>Pinyon Flats</b><span class="muted">Thu 11 – Sat 13 Sep</span></div><div class="maplabel photo" aria-hidden="true"><span class="dot"></span><span><b>12 photos</b><span class="muted">Sat 13 Sep, from 9:20 AM</span></span></div>';
     var card = function (cls) { return '<div class="pincard ' + cls + '" role="group" aria-label="73 photos near Marlow Springs"><div class="thumb g8" aria-hidden="true"></div><div class="txt"><p class="t-heading">73 photos</p><p class="t-caption muted">Mon 8 – Thu 11 Sep · near Marlow Springs</p></div><div class="acts"><button type="button" class="btn sm">Show these photos</button><button type="button" class="btn ghost icon sm" aria-label="Close">' + ic("i-x") + "</button></div></div>"; };
     if (mode === "tapped") extra += card("pincard-in");
-    var key = '<ul class="key" aria-label="Map key"><li><span class="kd air" aria-hidden="true"></span>Airport</li><li><span class="kd stay" aria-hidden="true"></span>Stay</li><li><span class="kd flight" aria-hidden="true"></span>Flight</li><li><span class="kd ground" aria-hidden="true"></span>Other travel</li><li><span class="kd state" aria-hidden="true"></span>State line</li><li><span class="kd ph" aria-hidden="true"></span>Photos</li><li><span class="kd phh" aria-hidden="true"></span>Photos placed from the itinerary</li><li><span class="kd farr" aria-hidden="true"></span>Far from every booking</li></ul>';
+    var key = '<ul class="key" aria-label="Map key"><li><span class="kd air" aria-hidden="true"></span>Airport</li><li><span class="kd stay" aria-hidden="true"></span>Stay</li><li><span class="kd flight" aria-hidden="true"></span>Flight</li><li><span class="kd ground" aria-hidden="true"></span>Other travel</li><li><span class="kd state" aria-hidden="true"></span>State line</li><li><span class="kd ph" aria-hidden="true"></span>Photos</li>' + (set.some(function (p) { return p.inf; }) ? '<li><span class="kd phh" aria-hidden="true"></span>Photos placed from the itinerary</li>' : "") + (set.some(function (p) { return p.far; }) ? '<li><span class="kd farr" aria-hidden="true"></span>Far from every booking</li>' : "") + '</ul>';
     var playing = mode === "replay";
     var ctrl = '<div class="ctrl"><button type="button" class="btn outline">' + ic(playing ? "i-pause" : "i-play") + (playing ? "Pause" : "Play") + '</button><button type="button" class="btn outline sm" aria-label="Playback speed 1×">1×</button><input type="range" min="0" max="100" value="' + (playing ? 52 : 100) + '" aria-label="Position along the route" aria-valuetext="' + (playing ? "Pinyon Flats to Redstone Gap, Sat 13 Sep" : "Back at Brennan Field, Sat 20 Sep") + '"></div>';
     var list = "";
