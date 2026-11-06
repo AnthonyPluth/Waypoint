@@ -112,7 +112,7 @@ def save(conn: db.Connection, body: dict[str, Any]) -> HomeOut:
     dated = photogrants.dated_trips(conn)
     before = photogrants.snapshot(conn, dated)
     db.set_setting(conn, sk.HOME, json.dumps(home))
-    photogrants.trips_changed(conn, dated, before)
+    photogrants.home_changed(conn, dated, before)
     return {"city": home["city"], "state": home["state"], "zip": home["zip"], "country": home["country"],
             "saved": True, "placed": _point(home) is not None}
 
@@ -121,5 +121,5 @@ def clear(conn: db.Connection) -> HomeOut:
     dated = photogrants.dated_trips(conn)
     before = photogrants.snapshot(conn, dated)
     db.set_setting(conn, sk.HOME, None)
-    photogrants.trips_changed(conn, dated, before)
+    photogrants.home_changed(conn, dated, before)
     return read(conn)
