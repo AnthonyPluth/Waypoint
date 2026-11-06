@@ -444,7 +444,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
             <section class="photos" aria-labelledby="a2-photos">
               <div class="photos-head">
                 <h2 id="a2-photos" class="t-heading">Photos <span class="muted t-caption">248</span></h2>
-                <button class="btn outline sm" type="button" aria-expanded="true" aria-controls="a2-gallery">Show fewer</button>
+                <div class="src-acts"><button class="btn outline sm" type="button" aria-label="Select your photos to remove">Select</button><button class="btn outline sm" type="button" aria-expanded="true" aria-controls="a2-gallery">Show fewer</button></div>
               </div>
               <div id="a2-gallery" class="photos">
                 <section class="day" aria-labelledby="d1"><div class="dayh"><h3 id="d1" class="t-heading">Sat 6 Sep</h3><p class="t-caption muted">Day 1 · Brennan Field, Cedar Hollow · 9 photos</p></div><div class="grid" data-grid="d1"></div></section>
@@ -461,6 +461,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       <div><h3>Accessible names</h3><ul>
         <li>Section: heading <q>Photos</q> (the count is in the heading’s caption).</li>
         <li>Toggle button: <q>See all 248 photos</q>, then <q>Show fewer</q>; <code>aria-expanded</code> and <code>aria-controls</code> on the gallery.</li>
+        <li>Gallery header, next to the toggle: <q>Select</q> (<q>Select your photos to remove</q>), shown only to people who have photos of their own on the trip and so may remove them (as in k); it enters the select mode k2 shows.</li>
         <li>Each tile is a <code>button</code>: <q>Photo, 10:42 AM, near Marlow Springs, Ada’s library</q>; inferred adds <q>, place from the itinerary</q>; far adds <q>, 612 km from every booking</q>; a video starts <q>Video, 0:42, …</q>. Opens the viewer.</li>
         <li>Last strip tile: <q>See all 248 photos</q> (same action as the header button).</li>
         <li>Pointer row link: <q>Review 3 far photos</q>, shown only to the library’s person, or to its steward when that person has no sign-in.</li>
