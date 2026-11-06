@@ -119,6 +119,33 @@ class GrantTests(GrantCase):
             self.assertFalse(photogrants.joined(self.c, self.mia, theirs, 16.0))
         self.assertEqual(self.grant(self.mia, theirs)[1], 1.0)
 
+    def test_a_stop_that_races_with_the_viewer_losing_the_trip_answers_nothing_and_discloses_nothing(self):
+        self.steward(self.mia, "u-jane")
+        flight = self.add(self.sam, {**OUT, "start_local": "2027-03-01T19:00", "end_local": "2027-03-02T07:10"}, None, self.on(self.sid, self.jid, self.mia))
+        theirs = flight["trip_id"]
+        trips.edit_segment(self.c, self.sam, flight["id"], {"travelers": self.on(self.sid, self.mia)})
+        self.share(self.mia, theirs, by="u-jane")
+        real, gone = photogrants._lock_trip, []
+
+        def steward_leaves_first(conn, trip_id):
+            if not gone:
+                gone.append(True)
+                trips.edit_trip(self.c, self.sam, theirs, {"people": [self.sid, self.mia]}, confirmed=True)
+            return real(conn, trip_id)
+        with mock.patch.object(photogrants, "_lock_trip", side_effect=steward_leaves_first):
+            self.assertIsNone(photogrants.stop(self.c, self.jane, self.mia, theirs, 19.0))
+        self.assertIsNone(self.grant(self.mia, theirs))
+        self.assertIsNone(visibility.visible_trip(self.c, self.jane, theirs))
+        self.share(self.mia, theirs, by="u-sam")
+        trips.edit_trip(self.c, self.sam, theirs, {"people": [self.sid, self.jid, self.mia]}, confirmed=True)
+        self.assertEqual(self.grant(self.mia, theirs), ("only_me", None, "u-sam"))
+        self.assertTrue(self.c.orm.get(PhotoGrant, (self.mia, theirs)).ask_again)
+        gone.clear()
+        with mock.patch.object(photogrants, "_lock_trip", side_effect=steward_leaves_first):
+            self.assertIsNone(photogrants.decline(self.c, self.jane, self.mia, theirs, 20.0))
+        self.assertEqual(self.grant(self.mia, theirs), ("only_me", None, "u-sam"))
+        self.assertTrue(self.c.orm.get(PhotoGrant, (self.mia, theirs)).ask_again)
+
     def test_a_share_for_a_guest_that_races_with_their_claim_writes_nothing_under_the_guest(self):
         self.steward(self.mia, "u-jane")
         trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
@@ -751,6 +778,20 @@ class TripChangeTests(GrantCase):
         self.assertEqual(self.seen(Viewer(self.mia), self.a), [mine.id])
         trips.edit_trip(self.c, self.jane, self.a, {"people": [self.jid, self.sid]}, confirmed=True)
         self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
+
+    def test_not_now_on_a_re_ask_advances_the_version_so_the_other_tabs_delayed_widening_is_refused(self):
+        self.share(self.jid, self.a)
+        mine = self.photo(self.a, "2026-06-02T12:00")
+        trips.edit_trip(self.c, self.jane, self.a, {"people": [self.jid, self.sid, self.mia]}, confirmed=True)
+        asked = photogrants.state_of(self.c, self.jane, self.jid, self.a)
+        self.assertEqual(asked["state"], "ask")
+        declined = photogrants.decline(self.c, self.jane, self.jid, self.a, 95.0)
+        self.assertEqual((declined["state"], declined["scope"], declined["changed"]), ("shared", "only_me", 95.0))
+        with self.assertRaises(photogrants.Stale):
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 96.0, window=asked["window"], expected_changed=asked["changed"])
+        self.assertEqual(self.grant(self.jid, self.a), ("only_me", None, "u-jane"))
+        self.assertEqual(self.seen(Viewer(self.mia), self.a), [])
+        self.assertEqual(self.seen(self.jane, self.a), [mine.id])
 
     def test_someone_joining_bumps_an_only_me_grants_version_so_a_delayed_widening_is_refused(self):
         self.share(self.jid, self.a, "only_me")
@@ -1393,6 +1434,20 @@ class ClaimTests(GrantCase):
         self.assertEqual(self.row(both.id).trip_id, self.a)
         self.assertEqual(self.c.execute(select(PhotoTripSync.trip_id)).fetchall(), [(self.a,)])
         self.assertIsNotNone(self.row(at_home.id))
+
+    def test_a_guests_active_grant_that_a_members_stop_overrides_loses_its_derived_rows_too(self):
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        self.share(self.jid, self.b, "trip", revoked=5.0)
+        self.share(self.mia, self.b, "trip", by="u-sam")
+        self.c.orm.add(PhotoSource(person_id=self.mia, owner_sub="u-sam", url="https://other.example", immich_user_id="u2", api_key="enc:v1:x", status="ok", created=1.0))
+        self.c.orm.flush()
+        other = self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.person_id == self.mia)).one()
+        theirs = self.photo(self.b, source=other)
+        self.c.execute(insert(PhotoTripSync).values(source_id=other, trip_id=self.b, window_start="s", window_end="e"))
+        people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+        self.assertEqual(self.grant(self.jid, self.b), ("trip", 5.0, "u-jane"))
+        self.assertIsNone(self.row(theirs.id))
+        self.assertEqual(self.c.execute(select(PhotoTripSync.trip_id)).fetchall(), [])
 
     def test_a_claimed_guests_sharing_and_libraries_pass_to_the_member(self):
         trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)

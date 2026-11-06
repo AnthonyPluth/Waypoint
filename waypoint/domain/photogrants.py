@@ -204,10 +204,16 @@ def stop(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, now:
     if acting is None:
         return None
     trip, by = acting
-    if not _lock_trip(conn, trip.id) or (conn.orm.get(PhotoGrant, (person_id, trip.id)) is None and person_id not in trippeople.of(conn, [trip.id])[trip.id]):
+    if not _lock_trip(conn, trip.id) or not _still_acting(conn, viewer, person_id, trip.id):
+        return None
+    if conn.orm.get(PhotoGrant, (person_id, trip.id)) is None and person_id not in trippeople.of(conn, [trip.id])[trip.id]:
         return None
     _stop(conn, person_id, trip.id, by, time.time() if now is None else now)
     return sharing(conn, viewer, person_id, trip.id)
+
+
+def _still_acting(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) -> bool:
+    return photos.acts_for(conn, viewer, person_id) and visibility.visible_trip(conn, viewer, trip_id) is not None
 
 
 def decline(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, now: float | None = None) -> Sharing | None:
@@ -215,12 +221,12 @@ def decline(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, n
     if acting is None:
         return None
     trip, _ = acting
-    if not _lock_trip(conn, trip.id):
+    if not _lock_trip(conn, trip.id) or not _still_acting(conn, viewer, person_id, trip.id):
         return None
     row = lock(conn, person_id, [trip.id]).get(trip.id)
     if row is None or row.revoked is not None or not row.ask_again:
         return stop(conn, viewer, person_id, trip_id, now)
-    row.ask_again = False
+    row.ask_again, row.changed = False, time.time() if now is None else now
     conn.orm.flush()
     return sharing(conn, viewer, person_id, trip.id)
 
@@ -579,22 +585,24 @@ def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     return ended
 
 
-def _narrower(mine: PhotoGrant, theirs: PhotoGrant) -> None:
+def _narrower(mine: PhotoGrant, theirs: PhotoGrant, now: float) -> None:
+    was = (mine.scope, mine.revoked)
     if theirs.revoked is not None:
         mine.revoked = theirs.revoked if mine.revoked is None else max(mine.revoked, theirs.revoked)
     elif mine.revoked is None and theirs.scope == photos.ONLY_ME:
         mine.scope = photos.ONLY_ME
-    mine.changed = max(mine.changed, theirs.changed)
+    mine.changed = max(mine.changed, theirs.changed, now) if (mine.scope, mine.revoked) != was else max(mine.changed, theirs.changed)
 
 
-def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
+def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str, now: float | None = None) -> None:
+    stamp = time.time() if now is None else now
     mine = {g.trip_id: g for g in conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.person_id == member_id).order_by(PhotoGrant.trip_id)).all()}
     closed: list[int] = []
     for theirs in conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.person_id == guest_id, PhotoGrant.trip_id.in_(list(mine))).order_by(PhotoGrant.trip_id)).all():
         kept = mine[theirs.trip_id]
-        active = kept.revoked is None
-        _narrower(kept, theirs)
-        if active and kept.revoked is not None:
+        open_before = kept.revoked is None or theirs.revoked is None
+        _narrower(kept, theirs, stamp)
+        if open_before and kept.revoked is not None:
             closed.append(kept.trip_id)
     conn.orm.flush()
     conn.execute(delete(PhotoGrant).where(PhotoGrant.person_id == guest_id, PhotoGrant.trip_id.in_(list(mine))))
