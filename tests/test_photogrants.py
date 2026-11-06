@@ -539,6 +539,22 @@ class TripChangeTests(GrantCase):
         trips.edit_segment(self.c, self.jane, flight.id, {"destination": "LCY", "end_zone": "Europe/London"})
         self.assertEqual((self.row(row.id).trip_id, self.row(row.id).decided_by), (self.a, "auto"))
 
+    def test_an_edit_that_shrinks_the_window_and_changes_the_route_still_re_matches_overlapping_rows(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        stay = self.c.orm.scalars(select(Segment.id).where(Segment.trip_id == self.b)).one()
+        self.c.execute(update(Segment).where(Segment.id == stay).values(latitude=51.1537, longitude=-0.1821))
+        flight = self.c.orm.scalars(select(Segment).where(Segment.trip_id == self.a, Segment.kind == "flight")).one()
+        row = self.photo(self.b, INSIDE_B)
+        photos.re_place(self.c, self.row(row.id), self.jid)
+        self.assertEqual(self.row(row.id).trip_id, self.b)
+        before = photos.trip_window(self.c, self.a)
+        trips.edit_segment(self.c, self.jane, flight.id, {"start_local": "2026-06-02T01:00", "destination": "LCY", "end_zone": "Europe/London"})
+        after = photos.trip_window(self.c, self.a)
+        self.assertGreater(after.start, before.start)
+        self.assertNotEqual(after.points, before.points)
+        self.assertEqual((self.row(row.id).trip_id, self.row(row.id).decided_by), (self.a, "auto"))
+
     def test_a_trip_that_shrinks_keeps_a_hand_placement_its_new_window_still_holds(self):
         flight = self.only_flight(self.jid)
         trip = flight["trip_id"]
@@ -1006,9 +1022,30 @@ class ClaimTests(GrantCase):
         self.assertEqual((self.c.orm.get(PhotoSource, other).person_id, self.c.orm.get(PhotoSource, other).owner_sub), (self.jid, "u-jane"))
         self.assertIsNone(self.row(theirs_a.id))
         kept = self.row(mine_a.id)
-        self.assertEqual((kept.source_id, kept.decided_by, kept.match), (self.janes, "owner", theirs_a.match))
+        self.assertEqual((kept.source_id, kept.decided_by, kept.match), (self.janes, "owner", "time"))
         self.assertEqual((self.row(mine_b.id).source_id, self.row(theirs_c.id).source_id, self.row(elsewhere.id).source_id), (self.janes, self.janes, other))
         self.assertEqual(sorted(self.c.execute(select(PhotoTripSync.source_id, PhotoTripSync.trip_id)).fetchall()), [(self.janes, self.a), (self.janes, self.b)])
+
+    def test_a_merged_sources_hand_placement_keeps_the_members_own_location_and_derives_the_match_from_it(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        self.share(self.mia, self.b, by="u-sam")
+        stay = self.c.orm.scalars(select(Segment.id).where(Segment.trip_id == self.b)).one()
+        self.c.execute(update(Segment).where(Segment.id == stay).values(latitude=52.4862, longitude=-1.8904))
+        self.c.orm.add(source_row(self.mia, "u-sam"))
+        self.c.orm.flush()
+        same = self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.person_id == self.mia)).one()
+        mine = self.photo(self.a, asset="shared-asset", match="time")
+        theirs = photo_row(same, self.b, INSIDE_B, where=(52.4862, -1.8904), located="inferred", decided="owner", match="place", distance=0.0, asset="shared-asset")
+        self.c.orm.add(theirs)
+        self.c.orm.flush()
+        people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+        self.assertIsNone(self.row(theirs.id))
+        kept = self.row(mine.id)
+        self.assertEqual((kept.trip_id, kept.decided_by, kept.latitude, kept.longitude, kept.location_source), (self.b, "owner", *SOHO, "exif"))
+        self.assertEqual((kept.match, kept.segment_id), ("time", stay))
+        self.assertGreater(kept.distance_km, 100.0)
 
     def test_a_merged_sources_hand_placement_reaches_every_row_of_the_members_asset(self):
         self.share(self.jid, self.a)
