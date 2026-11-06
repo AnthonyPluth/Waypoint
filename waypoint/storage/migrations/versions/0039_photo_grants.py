@@ -18,6 +18,7 @@ grants = sa.table('photo_grants', sa.column('person_id', sa.Integer()), sa.colum
                   sa.column('revoked', sa.Float()))
 exclusions = sa.table('photo_exclusions', sa.column('person_id', sa.Integer()), sa.column('asset_id', sa.Text()), sa.column('trip_id', sa.Integer()),
                       sa.column('created', sa.Float()))
+trip_people = sa.table('trip_people', sa.column('trip_id', sa.Integer()), sa.column('person_id', sa.Integer()))
 
 
 def upgrade() -> None:
@@ -49,6 +50,8 @@ def upgrade() -> None:
     sa.Column('default_scope', sa.Text(), server_default=sa.text("'only_me'"), nullable=False),
     sa.Column('share_all', sa.Boolean(), server_default=sa.false(), nullable=False),
     sa.Column('set_by', sa.Text(), nullable=True),
+    sa.Column('share_all_since', sa.Float(), nullable=True),
+    sa.Column('steward_sub', sa.Text(), nullable=True),
     sa.CheckConstraint("default_scope IN ('only_me', 'trip')", name='ck_photo_sharing_prefs_default_scope'),
     sa.ForeignKeyConstraint(['person_id'], ['people.id'], name='fk_photo_sharing_prefs_person_id', ondelete='CASCADE', initially='IMMEDIATE', deferrable=True),
     sa.PrimaryKeyConstraint('person_id'),
@@ -66,14 +69,13 @@ def downgrade() -> None:
     op.add_column('photos', sa.Column('hidden', sa.Boolean(), server_default=sa.false(), nullable=False))
     active = sa.select(grants.c.person_id).where(grants.c.person_id == sources.c.person_id, grants.c.trip_id == photos.c.trip_id,
                                                  grants.c.revoked.is_(None))
-    ungranted = sa.select(photos.c.id).join_from(photos, sources, sources.c.id == photos.c.source_id) \
-        .where(sa.or_(photos.c.trip_id.is_(None), ~active.exists()))
-    op.execute(photos.delete().where(photos.c.id.in_(ungranted)))
-    only_me = active.where(grants.c.scope == ONLY_ME)
+    aboard = sa.select(trip_people.c.person_id).where(trip_people.c.person_id == sources.c.person_id, trip_people.c.trip_id == photos.c.trip_id)
     removed = sa.select(exclusions.c.asset_id).where(exclusions.c.person_id == sources.c.person_id, exclusions.c.asset_id == photos.c.asset_id,
                                                      exclusions.c.trip_id == photos.c.trip_id)
-    private = sa.select(photos.c.id).join_from(photos, sources, sources.c.id == photos.c.source_id) \
-        .where(sa.or_(only_me.exists(), removed.exists()))
+    unseen = sa.select(photos.c.id).join_from(photos, sources, sources.c.id == photos.c.source_id) \
+        .where(sa.or_(photos.c.trip_id.is_(None), ~active.exists(), ~aboard.exists(), removed.exists()))
+    op.execute(photos.delete().where(photos.c.id.in_(unseen)))
+    private = sa.select(photos.c.id).join_from(photos, sources, sources.c.id == photos.c.source_id).where(active.where(grants.c.scope == ONLY_ME).exists())
     op.execute(photos.update().where(photos.c.id.in_(private)).values(hidden=True))
     op.drop_table('photo_sharing_prefs')
     op.drop_index('ix_photo_exclusions_trip_id', table_name='photo_exclusions')

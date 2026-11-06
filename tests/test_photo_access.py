@@ -9,7 +9,7 @@ from tests.test_photos_api import ASSET, KEY, SOHO, URL, grant_row, photo_row, s
 from tests.test_trips import HOTEL, OUT, RouteCase
 from waypoint.server import mcp_access, mcp_http
 from waypoint.storage import db
-from waypoint.storage.models import PhotoExclusion, PhotoGrant, PhotoTripSync, TripPerson
+from waypoint.storage.models import PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoTripSync, TripPerson
 
 STATE, COUNTRY = "Canaryshire-7q2x", "Canaryland-3k9v"
 EMPTY = {"photos": [], "clusters": [], "counts": {"total": 0, "located": 0, "inferred": 0, "far": 0}, "people": []}
@@ -266,6 +266,7 @@ class StewardTests(AccessCase):
         self.kid = self.ok("ana", "POST", "/api/people", {"display_name": "Kid Example"})["id"]
         self.ok("ana", "POST", f"/api/trips/{self.trip}", {"people": [self.person["ana"], self.person["ben"], self.kid], "confirm": True})
         self.sources["kid"] = self.keep(source_row(self.kid, "sub-ana"))
+        self.keep(PhotoSharingPrefs(person_id=self.kid, default_scope="only_me", share_all=False, set_by=None, share_all_since=None, steward_sub="sub-ana"))
 
     def kids(self, trip=None, **fields):
         return self.keep(photo_row(self.sources["kid"], trip or self.trip, "2026-06-02T12:00", where=SOHO, **fields))
@@ -295,6 +296,34 @@ class StewardTests(AccessCase):
         self.assertEqual(self.seen_by("ben"), [theirs])
         self.assertEqual(self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-sharing?person_id={self.kid}")["state"], "declined")
         self.assertEqual(self.seen_by("ben"), [])
+
+    def test_a_library_alone_makes_nobody_a_steward(self):
+        with db.session() as conn:
+            conn.execute(delete(PhotoSharingPrefs).where(PhotoSharingPrefs.person_id == self.kid))
+        self.assertEqual(self.call("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"person_id": self.kid, "scope": "only_me"}), (404, NO_TRIP))
+        self.assertEqual([p["person_id"] for p in self.ok("ana", "GET", "/api/photo-grants")["people"]], [self.person["ana"]])
+        self.keep(grant_row(self.kid, self.trip, "only_me", by="sub-ana"))
+        self.kids()
+        self.assertEqual(self.seen_by("ana"), [])
+
+    def test_needs_a_look_shows_a_steward_nothing_whose_only_trips_they_cannot_see(self):
+        theirs = self.book("ben", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"}, travelers=[{"person_id": self.kid}])
+        self.keep(grant_row(self.kid, theirs["trip_id"], "trip", by="sub-ben"))
+        torn = self.keep(photo_row(self.sources["kid"], None, "2027-01-02T09:00", where=SOHO, match="ambiguous"))
+        self.assertEqual(self.ok("ana", "GET", "/api/photos/review")["photos"], [])
+        self.assertEqual(self.ok("ben", "GET", "/api/photos/review")["photos"], [])
+        for body in ({"excluded": True}, {"trip_id": theirs["trip_id"]}, {"trip_id": self.trip}):
+            self.assertEqual(self.call("ana", "POST", f"/api/photos/{torn}", body), (404, NO_PHOTO), body)
+        self.assertEqual(stored(torn)["trip_id"], None)
+        with db.session() as conn:
+            self.assertEqual(conn.execute(select(PhotoExclusion.asset_id)).fetchall(), [])
+        self.keep(grant_row(self.kid, self.trip, "trip", by="sub-ana"))
+        self.book("ana", {**HOTEL, "start_local": "2027-01-02T08:00", "end_local": "2027-01-03T10:00"}, trip_id=self.trip)
+        got = self.ok("ana", "GET", "/api/photos/review")
+        self.assertEqual([(p["id"], [c["id"] for c in p["candidates"]]) for p in got["photos"]], [(torn, [self.trip])])
+        self.ok("ana", "POST", f"/api/photos/{torn}", {"excluded": True})
+        with db.session() as conn:
+            self.assertEqual(conn.execute(select(PhotoExclusion.trip_id)).fetchall(), [(self.trip,)])
 
     def test_a_steward_cannot_share_on_a_trip_they_cannot_see(self):
         theirs = self.book("ben", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"}, travelers=[{"person_id": self.kid}])

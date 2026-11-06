@@ -53,6 +53,10 @@ class GrantCase(Household):
         self.c.orm.expire_all()
         return None if row is None else (row.scope, row.revoked, row.granted_by)
 
+    def steward(self, person, sub):
+        self.c.orm.add(PhotoSharingPrefs(person_id=person, default_scope="only_me", share_all=False, set_by=None, share_all_since=None, steward_sub=sub))
+        self.c.orm.flush()
+
     def seen(self, who, trip):
         got = photos.for_trip(self.c, who, trip)
         return [p["id"] for p in got["photos"]] if got else None
@@ -77,6 +81,15 @@ class GrantTests(GrantCase):
         self.assertEqual(photogrants.state_of(self.c, self.jane, self.jid, self.a)["state"], "shared")
         self.assertIsNone(photogrants.state_of(self.c, self.sam, self.jid, self.a))
         self.assertIsNone(photogrants.state_of(self.c, self.jane, self.jid, self.b + 1000))
+
+    def test_two_requests_that_both_find_no_row_write_one_grant(self):
+        self.share(self.jid, self.a, "only_me", revoked=3.0, by="u-sam")
+        with mock.patch.object(photogrants, "lock", return_value={}):
+            self.assertEqual(photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 10.0)["scope"], "trip")
+            self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
+            photogrants.stop(self.c, self.jane, self.jid, self.a, 11.0)
+            self.assertEqual(self.grant(self.jid, self.a), ("trip", 11.0, "u-jane"))
+        self.assertEqual(self.c.execute(select(PhotoGrant.trip_id)).fetchall(), [(self.a,)])
 
     def test_not_now_needs_the_person_on_the_trip_but_stopping_an_old_grant_does_not(self):
         booked = self.add(self.jane, {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, None, self.on(self.sid))["trip_id"]
@@ -191,6 +204,7 @@ class StandingSettingTests(GrantCase):
         self.assertFalse(photogrants.joined(self.c, self.jid, newer, 52.0))
         self.c.orm.add(source_row(self.mia, "u-jane"))
         self.c.orm.flush()
+        self.steward(self.mia, "u-jane")
         photogrants.set_prefs(self.c, self.jane, self.mia, "only_me", True, 53.0)
         hidden = self.add(self.sam, {**OUT, "start_local": "2027-05-01T19:00", "end_local": "2027-05-02T07:10"}, None, self.on(self.sid, self.mia))["trip_id"]
         self.assertFalse(photogrants.joined(self.c, self.mia, hidden, 54.0))
@@ -201,6 +215,30 @@ class StandingSettingTests(GrantCase):
         self.assertEqual(self.grant(self.mia, hidden), ("only_me", None, "u-jane"))
         self.assertEqual(self.grant(self.jid, hidden), ("trip", None, "u-jane"))
         self.assertEqual(photogrants.reconcile(self.c, hidden, 57.0), 0)
+
+    def test_reconcile_re_shares_a_decline_older_than_the_setting_and_ends_a_grant_its_setter_lost_sight_of(self):
+        self.share(self.jid, self.a, revoked=5.0)
+        photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 60.0)
+        self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
+        photogrants.stop(self.c, self.jane, self.jid, self.a, 61.0)
+        self.assertEqual(photogrants.reconcile(self.c, self.a, 62.0), 0)
+        self.assertEqual(self.grant(self.jid, self.a), ("trip", 61.0, "u-jane"))
+        self.c.execute(update(PhotoGrant).where(PhotoGrant.person_id == self.jid, PhotoGrant.trip_id == self.a).values(revoked=59.0))
+        self.assertEqual(photogrants.reconcile(self.c, self.a, 63.0), 1)
+        self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
+        self.c.orm.add(source_row(self.mia, "u-sam"))
+        self.c.orm.flush()
+        self.steward(self.mia, "u-sam")
+        apart = self.add(self.jane, {**OUT, "start_local": "2027-05-01T19:00", "end_local": "2027-05-02T07:10"}, None, self.on(self.jid, self.mia))["trip_id"]
+        self.share(self.mia, apart, by="u-sam")
+        lost = self.photo(apart, "2027-05-02T09:00", source=self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.person_id == self.mia)).one())
+        self.c.execute(insert(PhotoTripSync).values(source_id=lost.source_id, trip_id=apart, window_start="s", window_end="e"))
+        self.assertEqual(photogrants.reconcile(self.c, apart, 64.0), 2)
+        self.assertIsNone(self.grant(self.mia, apart))
+        self.assertEqual(self.grant(self.jid, apart), ("trip", None, "u-jane"))
+        self.assertIsNone(self.row(lost.id))
+        self.assertEqual(self.c.execute(select(PhotoTripSync.trip_id)).fetchall(), [])
+        self.assertEqual(photogrants.reconcile(self.c, apart, 65.0), 0)
 
 
 class TripChangeTests(GrantCase):
@@ -248,17 +286,20 @@ class LapsedAccessTests(GrantCase):
         self.share(self.jid, self.b, by="u-sam")
         self.share(self.sid, self.a, by="u-sam")
         both = self.photo(self.b)
-        self.c.orm.add(PhotoSharingPrefs(person_id=self.jid, default_scope="trip", share_all=True, set_by="u-sam"))
+        self.c.orm.add(PhotoSharingPrefs(person_id=self.jid, default_scope="trip", share_all=True, set_by="u-sam", share_all_since=5.0, steward_sub=None))
         self.c.orm.flush()
+        self.steward(self.mia, "u-sam")
         groups = {**ALLOWED, "OIDC_ALLOWED_GROUPS": "household"}
         with mock.patch.dict(os.environ, groups):
             self.assertEqual(photogrants.end_lapsed(self.c, time.time()), 0)
             self.lapse("u-sam")
-            self.assertEqual(photogrants.end_lapsed(self.c, time.time()), 3)
+            self.assertEqual(photogrants.end_lapsed(self.c, time.time()), 4)
         self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
-        self.assertIsNotNone(self.grant(self.jid, self.b)[1])
-        self.assertIsNotNone(self.grant(self.sid, self.a)[1])
+        self.assertIsNone(self.grant(self.jid, self.b))
+        self.assertIsNone(self.grant(self.sid, self.a))
         self.assertEqual(photogrants.prefs_of(self.c, self.jid), {"default_scope": "trip", "share_all": False})
+        self.c.orm.expire_all()
+        self.assertEqual((self.c.orm.get(PhotoSharingPrefs, self.jid).share_all_since, self.c.orm.get(PhotoSharingPrefs, self.mia).steward_sub), (None, None))
         self.assertEqual(self.row(both.id).trip_id, self.a)
         with mock.patch.dict(os.environ, groups):
             self.assertEqual(photogrants.end_lapsed(self.c, time.time()), 0)
@@ -268,7 +309,7 @@ class LapsedAccessTests(GrantCase):
         self.c.commit()
         with mock.patch.dict(os.environ, {**ALLOWED, "OIDC_ALLOWED_EMAILS": "u-jane@example.com"}):
             jobs.sweep_lapsed()
-        self.assertIsNotNone(self.grant(self.jid, self.a)[1])
+        self.assertIsNone(self.grant(self.jid, self.a))
 
 
 class ClaimTests(GrantCase):
@@ -283,7 +324,7 @@ class ClaimTests(GrantCase):
         self.share(self.mia, self.b, "trip", by="u-sam")
         self.c.orm.add_all([PhotoExclusion(person_id=self.mia, asset_id="x", trip_id=self.b, created=2.0), PhotoExclusion(person_id=self.jid, asset_id="x", trip_id=self.b, created=1.0),
                             PhotoExclusion(person_id=self.mia, asset_id="y", trip_id=self.a, created=3.0),
-                            PhotoSharingPrefs(person_id=self.mia, default_scope="trip", share_all=True, set_by="u-sam")])
+                            PhotoSharingPrefs(person_id=self.mia, default_scope="trip", share_all=True, set_by="u-sam", share_all_since=4.0, steward_sub="u-sam")])
         self.c.orm.flush()
         people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
         self.assertEqual(self.grant(self.jid, self.a), ("only_me", None, "u-jane"))
@@ -292,14 +333,14 @@ class ClaimTests(GrantCase):
         self.assertEqual(sorted(self.c.execute(select(PhotoExclusion.person_id, PhotoExclusion.asset_id, PhotoExclusion.trip_id, PhotoExclusion.created)).fetchall()),
                          [(self.jid, "x", self.b, 1.0), (self.jid, "y", self.a, 3.0)])
         prefs = self.c.orm.get(PhotoSharingPrefs, self.jid)
-        self.assertEqual((prefs.default_scope, prefs.share_all, prefs.set_by), ("trip", True, "u-jane"))
+        self.assertEqual((prefs.default_scope, prefs.share_all, prefs.set_by, prefs.share_all_since, prefs.steward_sub), ("trip", True, "u-jane", 4.0, None))
         self.assertEqual(sorted(self.c.execute(select(PhotoSource.person_id, PhotoSource.url, PhotoSource.owner_sub)).fetchall()),
                          sorted([(self.jid, "https://immich-canary-8h2k.example:2283", "u-jane"), (self.jid, "https://other.example", "u-jane")]))
         self.assertIsNone(self.c.orm.get(Person, self.mia))
 
     def test_a_member_with_preferences_keeps_them(self):
-        self.c.orm.add_all([PhotoSharingPrefs(person_id=self.jid, default_scope="only_me", share_all=False, set_by=None),
-                            PhotoSharingPrefs(person_id=self.mia, default_scope="trip", share_all=True, set_by="u-sam")])
+        self.c.orm.add_all([PhotoSharingPrefs(person_id=self.jid, default_scope="only_me", share_all=False, set_by=None, share_all_since=None, steward_sub=None),
+                            PhotoSharingPrefs(person_id=self.mia, default_scope="trip", share_all=True, set_by="u-sam", share_all_since=4.0, steward_sub="u-sam")])
         self.c.orm.flush()
         people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
         self.assertEqual(photogrants.prefs_of(self.c, self.jid), {"default_scope": "only_me", "share_all": False})

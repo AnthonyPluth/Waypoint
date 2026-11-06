@@ -464,3 +464,5 @@ class PhotoSharingPrefs(Base):
     default_scope: Mapped[str]
     share_all: Mapped[bool]
     set_by: Mapped[str | None]
+    share_all_since: Mapped[float | None]
+    steward_sub: Mapped[str | None]
