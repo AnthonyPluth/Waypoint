@@ -196,7 +196,7 @@ class _DeadlineHTTPSConnection(http.client.HTTPSConnection):
     def __init__(self, *args, deadline: float, **kwargs):
         super().__init__(*args, **kwargs)
         self.deadline = deadline
-        self.secure_with: ssl.SSLContext = kwargs.get("context") or ssl_context()
+        self.secure_with = ssl_context()
         self._create_connection = self._connect_within
 
     def _connect_within(self, address, timeout=None, source_address=None, *args) -> socket.socket:

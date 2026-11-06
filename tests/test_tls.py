@@ -183,7 +183,7 @@ class DeadlineTests(unittest.TestCase):
 
     def test_the_tunnel_hands_the_plain_socket_back_for_the_handshake(self):
         proxy = self.serve([(b"HTTP/1.1 200 Connection established\r\n\r\n", 0)])
-        context = ssl.create_default_context()
+        context = tls.ssl_context()
         wrapped = mock.Mock()
         conn = tls._DeadlineHTTPSConnection("127.0.0.1", self.server.server_address[1], timeout=5, deadline=time.monotonic() + 5,
                                             context=context)
@@ -201,7 +201,7 @@ class DeadlineTests(unittest.TestCase):
     def test_a_proxy_that_refuses_the_tunnel_closes_the_connection(self):
         proxy = self.serve([(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n", 0)])
         conn = tls._DeadlineHTTPSConnection("127.0.0.1", self.server.server_address[1], timeout=5, deadline=time.monotonic() + 5,
-                                            context=ssl.create_default_context())
+                                            context=tls.ssl_context())
         conn.set_tunnel("photos.example.invalid", 443)
         with self.assertRaises(OSError):
             conn.connect()
@@ -237,7 +237,7 @@ class DeadlineTests(unittest.TestCase):
         def connected(conn):
             conn.sock = plain
         for timeout in (5, object()):
-            context = ssl.create_default_context()
+            context = tls.ssl_context()
             conn = tls._DeadlineHTTPSConnection("example.com", timeout=timeout, deadline=time.monotonic() + 1, context=context)
             with self.subTest(timeout=timeout), mock.patch.object(http.client.HTTPConnection, "connect", connected), \
                     mock.patch.object(context, "wrap_socket", return_value=secured) as wrap:
@@ -252,9 +252,20 @@ class DeadlineTests(unittest.TestCase):
                 self.assertLessEqual(handshake_timeout, 1)
 
     def test_a_connection_that_ends_up_with_no_socket_is_an_error(self):
-        conn = tls._DeadlineHTTPSConnection("example.com", timeout=5, deadline=time.monotonic() + 1, context=ssl.create_default_context())
+        conn = tls._DeadlineHTTPSConnection("example.com", timeout=5, deadline=time.monotonic() + 1, context=tls.ssl_context())
         with mock.patch.object(http.client.HTTPConnection, "connect", lambda conn: None), self.assertRaises(OSError):
             conn.connect()
+
+    def test_every_context_a_request_can_use_needs_tls_1_2_or_newer(self):
+        weak = mock.Mock(spec=ssl.SSLContext)
+        conn = tls._DeadlineHTTPSConnection("example.com", timeout=5, deadline=time.monotonic() + 5, context=weak)
+        handlers = [*tls.opener(allow_http=True).handlers, tls._DeadlineHTTPSHandler(time.monotonic() + 5)]
+        contexts = [conn.secure_with, *(h._context for h in handlers if isinstance(h, urllib.request.HTTPSHandler))]
+        self.assertEqual(len(contexts), 3)
+        for context in contexts:
+            with self.subTest(context=context):
+                self.assertIs(context, tls.ssl_context())
+                self.assertGreaterEqual(context.minimum_version, ssl.TLSVersion.TLSv1_2)
 
     def test_without_a_deadline_the_standard_handlers_are_used(self):
         kinds = {type(h) for h in tls.opener(allow_http=True).handlers}
@@ -326,7 +337,7 @@ class ConnectDeadlineTests(unittest.TestCase):
         self.assertEqual(len(_Unanswered.made), 6)
 
     def handshake_after_a_slow_connect(self, delay):
-        context = ssl.create_default_context()
+        context = tls.ssl_context()
         seen = []
 
         def wrap(sock, **kwargs):
@@ -359,7 +370,7 @@ class ConnectDeadlineTests(unittest.TestCase):
             conn.connect()
 
     def test_an_https_connection_tries_its_addresses_inside_the_deadline_too(self):
-        context = ssl.create_default_context()
+        context = tls.ssl_context()
         with mock.patch.object(context, "wrap_socket", side_effect=lambda sock, **kwargs: sock):
             conn = self.connect(tls._DeadlineHTTPSConnection, answers_at={8002}, refuse=True, context=context)
         self.assertEqual(conn.sock.sock.address, ("192.0.2.1", 8002))
