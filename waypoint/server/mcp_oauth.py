@@ -15,10 +15,15 @@ from typing import Any
 from sqlalchemy import delete, exists, insert, or_, select, true, update
 
 from .. import oidc
+from ..storage import db
 from ..storage.models import OAuthClient, OAuthCode, OAuthConsent, OAuthGrant, OAuthToken
 
 SCOPES = ("read", "write")
-SETTINGS_SCOPES = (*SCOPES, "mail")
+SETTINGS_SCOPES = (*SCOPES, "mail", "app")
+APP_CLIENT = "wpc_waypoint_ios"
+APP_NAME = "Waypoint for iPhone"
+APP_REDIRECT = "waypoint://auth"
+APP_SCOPE = "app"
 CONSENT = {
     "write": ("Change trips",
               "Add, change and remove trips, bookings, travellers, people and guests, settle or dismiss Review items, and the distance unit. "
@@ -130,6 +135,14 @@ def resource_metadata_url(iss: str) -> str:
     return iss + "/.well-known/oauth-protected-resource/mcp"
 
 
+def app_resource(iss: str) -> str:
+    return iss + "/app"
+
+
+def canonical_for(client_id: str, iss: str) -> str:
+    return app_resource(iss) if client_id == APP_CLIENT else resource(iss)
+
+
 def check_redirect_uri(uri: Any) -> str:
     def bad(why: str) -> OAuthError:
         return OAuthError("invalid_redirect_uri", why)
@@ -164,6 +177,8 @@ def _loopback(uri: str) -> tuple[str, str, str] | None:
 
 
 def redirect_matches(registered: list[str], given: Any) -> bool:
+    if given == APP_REDIRECT:
+        return APP_REDIRECT in registered
     try:
         check_redirect_uri(given)
     except OAuthError:
@@ -241,7 +256,7 @@ def register(conn, meta: Any, now: float | None = None) -> dict:
         scope = scope_text(parse_scope(scope, "invalid_client_metadata"))
 
     housekeeping(conn, now)
-    unapproved = ~exists().where(OAuthGrant.client_id == OAuthClient.id)
+    unapproved = ~exists().where(OAuthGrant.client_id == OAuthClient.id) & (OAuthClient.id != APP_CLIENT)
     for limit, cond in ((MAX_UNCONSENTED, OAuthClient.created < now - CONSENT_TTL), (MAX_UNCONSENTED_ALL, true())):
         conn.execute(delete(OAuthClient).where(OAuthClient.id.in_(
             select(OAuthClient.id).where(unapproved, cond).order_by(OAuthClient.created.desc(), OAuthClient.id)
@@ -265,6 +280,9 @@ def register(conn, meta: Any, now: float | None = None) -> dict:
 def get_client(conn, client_id: Any):
     if not isinstance(client_id, str) or not client_id.startswith("wpc_"):
         return None
+    if client_id == APP_CLIENT:
+        db.insert_ignore(conn, OAuthClient, {"id": APP_CLIENT, "name": APP_NAME, "redirect_uris": json.dumps([APP_REDIRECT]),
+                                             "auth_method": "none", "kind": "app", "created": time.time()}, key=["id"])
     row = conn.execute(select(OAuthClient).where(OAuthClient.id == client_id)).fetchone()
     return row if row is not None and _same(row["id"], client_id) else None
 
@@ -340,11 +358,16 @@ def check_authorize(conn, query: dict[str, list[str]], iss: str) -> AuthRequest:
     challenge = q.get("code_challenge") or ""
     if not _CHALLENGE.fullmatch(challenge):
         raise back("invalid_request", "code_challenge must be an S256 challenge (43 base64url characters).")
-    try:
-        scope = parse_scope(q.get("scope"))
-    except OAuthError as e:
-        raise back(e.error, e.description) from None
-    canonical = resource(iss)
+    canonical = canonical_for(client["id"], iss)
+    if client["id"] == APP_CLIENT:
+        if q.get("scope") not in (None, APP_SCOPE):
+            raise back("invalid_scope", f"Waypoint for iPhone asks for the {APP_SCOPE} scope only.")
+        scope = frozenset({APP_SCOPE})
+    else:
+        try:
+            scope = parse_scope(q.get("scope"))
+        except OAuthError as e:
+            raise back(e.error, e.description) from None
     check_resource(q.get("resource"), canonical, RedirectError, redirect_uri=redirect, state=state)
     return AuthRequest(client["id"], client["name"], redirect, scope, state, challenge, canonical)
 
@@ -410,7 +433,7 @@ def _issue(conn, grant, now: float) -> tuple[dict, str]:
 def token(conn, client, form: dict[str, str], iss: str, now: float | None = None) -> dict:
     now = time.time() if now is None else now
     housekeeping(conn, now)
-    canonical = resource(iss)
+    canonical = canonical_for(client["id"], iss)
     grant_type = form.get("grant_type")
     if grant_type not in GRANT_TYPES:
         raise OAuthError("unsupported_grant_type", "grant_type must be authorization_code or refresh_token.")
@@ -530,7 +553,7 @@ def connections(conn, now: float | None = None) -> list[dict]:
     rows = conn.execute(select(OAuthGrant.id, OAuthClient.name, OAuthGrant.sub, OAuthGrant.email, OAuthGrant.scope,
                                OAuthGrant.created, OAuthGrant.last_used)
                         .join(OAuthClient, OAuthClient.id == OAuthGrant.client_id)
-                        .where(OAuthGrant.revoked.is_(None), has_tokens)
+                        .where(OAuthGrant.revoked.is_(None), has_tokens, OAuthGrant.client_id != APP_CLIENT)
                         .order_by(OAuthGrant.created.desc(), OAuthGrant.id.desc())).fetchall()
     return [{"id": r["id"], "client": r["name"], "who": r["email"] or r["sub"], "scope": r["scope"].split(),
              "created": r["created"], "last_used": r["last_used"]} for r in rows]
@@ -554,6 +577,6 @@ def housekeeping(conn, now: float | None = None) -> None:
     conn.execute(delete(OAuthGrant).where(OAuthGrant.revoked.is_(None), OAuthGrant.created < now - CODE_TTL,
                                           ~has_tokens, ~has_codes))
     conn.execute(delete(OAuthGrant).where(OAuthGrant.revoked < now - KEEP))
-    conn.execute(delete(OAuthClient).where(OAuthClient.created < now - UNCONSENTED_TTL,
+    conn.execute(delete(OAuthClient).where(OAuthClient.created < now - UNCONSENTED_TTL, OAuthClient.id != APP_CLIENT,
                                            ~exists().where(OAuthGrant.client_id == OAuthClient.id)))
 

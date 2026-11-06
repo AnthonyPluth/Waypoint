@@ -208,6 +208,19 @@ def finish_login(conn, params: dict, login_cookie: str | None) -> tuple[str, str
     return token, safe_next(row["next"])
 
 
+def user_name(conn, sub: str | None) -> str | None:
+    return conn.execute(select(User.name).where(User.sub == sub)).scalar() if sub else None
+
+
+def create_session(conn, sub: str | None, email: str | None, name: str | None) -> tuple[str, int]:
+    token = secrets.token_urlsafe(32)
+    now = time.time()
+    life = config()["session_days"] * 86400
+    conn.execute(insert(AuthSession).values(token_hash=_hash(token), sub=sub, email=email, name=name, created=now, expires=now + life,
+                                            id_token=None))
+    return token, int(life)
+
+
 def first_name(name: str | None, email: str | None, given: str | None = None) -> str:
     if given and given.strip():
         return given.strip().split()[0]

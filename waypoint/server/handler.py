@@ -17,7 +17,7 @@ from typing import Any
 from ..domain import demo
 from ..storage import db, secretbox
 from .. import monitoring, oidc
-from . import feed, jobs, mcp_http, mcp_oauth, mcp_server, oauth_http, routes, static
+from . import feed, jobs, mcp_access, mcp_http, mcp_oauth, mcp_server, oauth_http, routes, static
 from .common import NOT_READ, ApiError, BadJson, Response, _current, header_value, host_allowed, server_error
 
 PUBLIC_FILES = {"/page.css", "/logo.svg", "/logo-180.png", "/fonts/Geist-Variable.woff2", "/fonts/GeistMono-Variable.woff2", "/manifest.webmanifest", "/sw.js",
@@ -45,7 +45,7 @@ def content_security_policy(nonce: str | None = None) -> str:
             "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 
 
-AUTH_PATHS = {"/auth/login", "/auth/callback", "/auth/logout", "/auth/signed-out"}
+AUTH_PATHS = {"/auth/login", "/auth/callback", "/auth/logout", "/auth/signed-out", "/auth/app-session"}
 
 
 def route_name(path: str) -> str:
@@ -220,6 +220,28 @@ class Handler(BaseHTTPRequestHandler):
                 self._set_cookies.append(self._cookie_header("waypoint_session", token, max_age))
         return user
 
+    def _app_user(self) -> dict | None:
+        iss = mcp_oauth.issuer(self.headers.get("Host"))
+        if iss is None or not oidc.enabled():
+            return None
+        with db.session() as conn:
+            access = mcp_access.resolve_bearer(conn, self.headers.get("Authorization"), mcp_oauth.app_resource(iss))
+            if access is None or not access.has(mcp_oauth.APP_SCOPE):
+                return None
+            name = oidc.user_name(conn, access.sub)
+        return {"sub": access.sub, "email": access.email, "name": name}
+
+    def _app_session(self) -> None:
+        if self.headers.get("X-Waypoint") != "1":
+            return self._json(403, {"error": NO_APP_HEADER})
+        user = self._app_user()
+        if user is None:
+            return self._json(401, {"error": "Sign in to Waypoint again.", "login": "/auth/login"})
+        with db.session() as conn:
+            token, max_age = oidc.create_session(conn, user["sub"], user["email"], user["name"])
+        self._json(200, {"name": "waypoint_session", "value": token, "max_age": max_age,
+                         "secure": bool(oidc.config()["secure_cookie"])})
+
     def end_headers(self):
         cookies, self._set_cookies = getattr(self, "_set_cookies", None) or [], []
         for ck in cookies:
@@ -369,6 +391,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(403, {"error": NOT_SAME_SITE})
         if url.path.startswith("/auth/") and method == "GET" and self._auth_routes(url):
             return
+        if url.path == "/auth/app-session":
+            return self._app_session() if method == "POST" else self._send(405, b"", "text/plain", extra={"Allow": "POST"})
         if url.path == "/auth/logout" and method == "POST":
             if self.headers.get("X-Waypoint") != "1":
                 return self._json(403, {"error": NO_APP_HEADER})
@@ -376,7 +400,8 @@ class Handler(BaseHTTPRequestHandler):
         if url.path.startswith(feed.PREFIX):
             return self._feed(method, url.path)
         if url.path not in PUBLIC_FILES:
-            self.user = self._user(renew=url.path.startswith("/api/"))
+            api = url.path.startswith("/api/")
+            self.user = (self._app_user() if api and self.headers.get("Authorization") else None) or self._user(renew=api)
             if not self.user:
                 if url.path.startswith("/api/"):
                     return self._json(401, {"error": "You've been signed out.", "login": "/auth/login"})
