@@ -120,6 +120,15 @@ class ClusterTests(unittest.TestCase):
         self.assertAlmostEqual(abs(only["longitude"]), 180.0, places=9)
         self.assertTrue(-180.0 <= only["longitude"] < 180.0)
 
+    def test_near_the_pole_the_nearest_neighbour_wins_whatever_its_grid_column(self):
+        rows = [row(1, (89.8, 180.0)), row(2, (89.8, 179.999)), row(3, (82.0, 0.0)), row(4, (82.0, 0.001)), row(5, (86.7, 0.0))]
+        self.assertLess(distance_km((86.7, 0.0), (89.8, 180.0)), distance_km((86.7, 0.0), (82.0, 0.0)))
+        with mock.patch.object(photos, "MAX_CLUSTERS", 2):
+            found = photos.clusters(rows)
+        self.assertEqual([r["cluster"] for r in rows], [0, 0, 1, 1, 0])
+        self.assertEqual([c["count"] for c in found], [3, 2])
+        self.assertAlmostEqual(found[0]["latitude"], (2 * 89.8 + 86.7) / 3, places=6)
+
     def test_the_cap_scans_neighbours_through_the_grid_rather_than_every_cluster(self):
         rows = [row(r * 50 + c, (r * 10.0 / KM_PER_DEGREE, -20.0 + c * 10.0 / KM_PER_DEGREE)) for r in range(60) for c in range(50)]
         with mock.patch.object(photos, "distance_km", wraps=distance_km) as measured:

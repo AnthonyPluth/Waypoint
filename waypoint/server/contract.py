@@ -633,7 +633,7 @@ class PhotoReview(TypedDict):
 
 
 class PhotoBody(TypedDict):
-    trip_id: NotRequired[int]
+    trip_id: NotRequired[int | None]
     hidden: NotRequired[bool]
 
 

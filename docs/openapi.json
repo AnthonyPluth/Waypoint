@@ -5770,7 +5770,10 @@
         "type": "object",
         "properties": {
           "trip_id": {
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "hidden": {
             "type": "boolean"

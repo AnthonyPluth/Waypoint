@@ -572,7 +572,7 @@ export interface PersonLink {
 }
 
 export interface PhotoBody {
-  trip_id?: number;
+  trip_id?: number | null;
   hidden?: boolean;
 }
 

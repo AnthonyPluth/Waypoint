@@ -13,8 +13,8 @@ from sqlalchemy import ColumnElement, or_, select
 from ..storage import db, geocode
 from ..storage.models import Airport, Photo, PhotoSource, Segment
 from . import photomatch, trippeople, trips, visibility
-from .photomatch import CLUSTER, GAP, MatchKind, PhotoIn, Point, SegmentPoint, TripWindow, window
-from .stats import distance_km
+from .photomatch import CLUSTER, GAP, NEAR, MatchKind, PhotoIn, Point, SegmentPoint, TripWindow, window
+from .stats import EARTH_RADIUS_KM, distance_km
 from .visibility import Viewer
 
 Located = tuple[float, float, int]
@@ -28,6 +28,7 @@ MAX_CLUSTERS = 400
 NOT_ON_TRIP = "Choose a trip you are on"
 CELL = 0.1
 COLUMNS = round(360 / CELL)
+ROWS = round(180 / CELL)
 KM_PER_DEGREE = 111.0
 
 
@@ -143,7 +144,7 @@ def _points(seg: Segment, airport_at: Mapping[str, Point], ports: Sequence[trips
         depart = trips.instant(port["depart_local"], port["zone"]) if port["depart_local"] else end
         calls.append(SegmentPoint(seg.id, seg.kind, arrive, depart, found.latitude, found.longitude, timed=timed, zone=port["zone"], to_zone=port["zone"]))
     if main.origin is None and calls:
-        main = replace(main, latitude=calls[0].latitude, longitude=calls[0].longitude)
+        main = replace(main, latitude=calls[0].latitude, longitude=calls[0].longitude, zone=calls[0].zone)
     return [main, *calls]
 
 
@@ -188,9 +189,10 @@ def _owns(viewer: Viewer, person_id: int) -> bool:
 
 
 def _zone_by_place(points: Sequence[SegmentPoint], at: datetime, spot: Point) -> str | None:
-    ends = [(distance_km(spot, place), p.gap(at), n, p.segment_id, zone) for p in points
+    ends = [(distance_km(spot, place), p.gap(at), p.segment_id, order, n, zone) for order, p in enumerate(points)
             for n, (place, zone) in enumerate(((p.origin, p.zone), (p.destination, p.to_zone))) if place is not None]
-    return min(ends, default=(0.0, GAP, 0, 0, None))[4]
+    nearest = min(ends, default=None)
+    return nearest[5] if nearest is not None and nearest[0] <= NEAR else None
 
 
 def _zone_by_time(points: Sequence[SegmentPoint], at: datetime) -> str | None:
@@ -284,13 +286,32 @@ def _ring(cell: tuple[int, int], span: int, ring: int) -> Iterator[tuple[int, in
     width, inner = min(ring * span, COLUMNS // 2), min((ring - 1) * span, COLUMNS // 2)
     across = range(-width, width + 1) if 2 * width + 1 < COLUMNS else range(COLUMNS)
     for dr in (-ring, ring):
-        for dc in across:
-            yield row + dr, (col + dc) % COLUMNS
+        if -ROWS // 2 <= row + dr < ROWS // 2:
+            for dc in across:
+                yield row + dr, (col + dc) % COLUMNS
     if width > inner:
         sides = [*range(-width, -inner), *range(inner + 1, width + 1)]
-        for dr in range(1 - ring, ring):
+        for dr in range(max(1 - ring, -ROWS // 2 - row), min(ring, ROWS // 2 - row)):
             for dc in sides:
                 yield row + dr, (col + dc) % COLUMNS
+
+
+def _cap(point: Point, radius_km: float) -> Iterator[tuple[int, int]]:
+    reach = math.degrees(radius_km / EARTH_RADIUS_KM)
+    col = _cell(point)[1]
+    rows = range(max(-ROWS // 2, math.floor((point[0] - reach) / CELL)), min(ROWS // 2, math.floor((point[0] + reach) / CELL) + 1))
+    if abs(point[0]) + reach >= 90.0:
+        across = range(COLUMNS)
+    else:
+        half = math.degrees(math.asin(min(1.0, math.sin(math.radians(reach)) / math.cos(math.radians(point[0])))))
+        width = min(COLUMNS // 2, math.ceil(half / CELL) + 1)
+        across = range(-width, width + 1) if 2 * width + 1 < COLUMNS else range(COLUMNS)
+    for r in rows:
+        for dc in across:
+            yield r, (col + dc) % COLUMNS
+
+
+Closest = tuple[float, int, "_Cluster"]
 
 
 class _Grid:
@@ -310,16 +331,21 @@ class _Grid:
                 return c
         return None
 
+    def _closest(self, cluster: _Cluster, indexes: set[int], best: Closest) -> Closest:
+        here = (cluster.latitude, cluster.longitude)
+        for i in indexes:
+            other = self.found[i]
+            if other is not cluster:
+                best = min(best, (distance_km(here, (other.latitude, other.longitude)), other.first_at, other))
+        return best
+
     def nearest(self, cluster: _Cluster) -> _Cluster:
-        span, best = _span(cluster.latitude), (math.inf, 0, cluster)
+        best: Closest = (math.inf, 0, cluster)
         ring = 0
-        while (ring - 1) * CLUSTER * 0.99 <= best[0] and ring <= COLUMNS:
-            for i in self._in(_ring(cluster.cell, span, ring)):
-                other = self.found[i]
-                if other is not cluster:
-                    best = min(best, (distance_km((cluster.latitude, cluster.longitude), (other.latitude, other.longitude)), other.first_at, other))
+        while best[0] == math.inf and ring <= ROWS:
+            best = self._closest(cluster, self._in(_ring(cluster.cell, _span(abs(cluster.latitude) + ring * CELL), ring)), best)
             ring += 1
-        return best[2]
+        return self._closest(cluster, self._in(_cap((cluster.latitude, cluster.longitude), best[0])), best)[2]
 
     def add(self, cluster: _Cluster) -> None:
         cluster.index, cluster.cell = len(self.found), _cell((cluster.latitude, cluster.longitude))
