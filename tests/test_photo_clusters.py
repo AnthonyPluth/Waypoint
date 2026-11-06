@@ -129,6 +129,28 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual([c["count"] for c in found], [3, 2])
         self.assertAlmostEqual(found[0]["latitude"], (2 * 89.8 + 86.7) / 3, places=6)
 
+    def test_the_poles_and_the_date_line_themselves_are_inside_the_grid(self):
+        rows = [row(1, (90.0, 0.0)), row(2, (89.99, 0.0)), row(3, (-90.0, 0.0)), row(4, (-89.99, 0.0)), row(5, (0.0, 180.0)), row(6, (0.0, -179.99)),
+                row(7, (90.0, 123.0)), row(8, (-90.0, -180.0))]
+        found = photos.clusters(rows)
+        self.assertEqual([r["cluster"] for r in rows], [0, 0, 1, 1, 2, 2, 0, 1])
+        self.assertEqual([c["count"] for c in found], [3, 3, 2])
+        self.assertAlmostEqual(found[0]["latitude"], (90.0 + 89.99 + 90.0) / 3, places=9)
+        self.assertAlmostEqual(found[1]["latitude"], (-90.0 - 89.99 - 90.0) / 3, places=9)
+        self.assertAlmostEqual(abs(found[2]["longitude"]), 179.995, places=9)
+        self.assertEqual(photos._cell((90.0, 180.0)), photos._cell((89.95, -180.0)))
+        self.assertEqual(photos._cell((-90.0, 0.0))[0], -photos.ROWS // 2)
+
+    def test_the_cap_merges_a_cluster_at_the_pole_itself_with_its_nearest(self):
+        rows = [row(1, (89.5, 0.0)), row(2, (89.5, 0.001)), row(3, (85.0, 0.0)), row(4, (85.0, 0.001)), row(5, (90.0, 0.0)),
+                row(6, (89.5, 120.0)), row(7, (89.5, 120.001)), row(8, (-90.0, 0.0))]
+        with mock.patch.object(photos, "MAX_CLUSTERS", 3):
+            found = photos.clusters(rows)
+        self.assertEqual([r["cluster"] for r in rows], [0, 0, 1, 1, 0, 2, 2, 1])
+        self.assertEqual([c["count"] for c in found], [3, 3, 2])
+        self.assertAlmostEqual(found[0]["latitude"], (89.5 * 2 + 90.0) / 3, places=6)
+        self.assertAlmostEqual(found[1]["latitude"], (85.0 * 2 - 90.0) / 3, places=6)
+
     def test_the_cap_scans_neighbours_through_the_grid_rather_than_every_cluster(self):
         rows = [row(r * 50 + c, (r * 10.0 / KM_PER_DEGREE, -20.0 + c * 10.0 / KM_PER_DEGREE)) for r in range(60) for c in range(50)]
         with mock.patch.object(photos, "distance_km", wraps=distance_km) as measured:

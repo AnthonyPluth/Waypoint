@@ -4,7 +4,7 @@ import unittest
 from datetime import UTC
 
 from tests.privacy import no_leaks
-from tests.test_trips import CRUISE, HOTEL, OUT, PORTS, Household, RouteCase
+from tests.test_trips import CRUISE, HOTEL, OUT, Household, RouteCase
 from sqlalchemy import select, update
 
 from waypoint.domain import photos, trips
@@ -23,10 +23,19 @@ HEATHROW = (51.4706, -0.4619)
 ROUTES = ("/api/trips/{id}/photos", "/api/photos/review", "/api/photos/{id}")
 ROME = (41.9028, 12.4964)
 PARIS = "Europe/Paris"
+CHICAGO, CANCUN, PUERTO_RICO = "America/Chicago", "America/Cancun", "America/Puerto_Rico"
 ST_PANCRAS = (51.5312, -0.1262)
 GARE_DU_NORD = (48.8809, 2.3553)
 DENVER = (39.8561, -104.6737)
 PHOENIX = (33.4342, -112.0116)
+REYKJAVIK = (64.1466, -21.9426)
+TOKYO = (35.6895, 139.6917)
+GALVESTON = (29.3013, -94.7977)
+COZUMEL = (20.5004, -86.9427)
+SAN_JUAN = (18.4663, -66.1057)
+AT_SEA = (24.5, -88.0)
+CALLS = [{"name": "Cozumel", "zone": CANCUN, "arrive_local": "2026-03-03T08:00", "depart_local": "2026-03-03T17:00"},
+         {"name": "San Juan", "zone": PUERTO_RICO, "arrive_local": "2026-03-05T08:00", "depart_local": "2026-03-05T17:00"}]
 _assets = itertools.count()
 
 
@@ -140,56 +149,87 @@ class PhotoRoutes(RouteCase):
         labels = {p["id"]: p["zone"] for p in self.listing("ana")["photos"]}
         self.assertEqual([labels[i] for i, _ in cases], [z for _, z in cases])
 
-    def test_the_zone_follows_the_place_the_photo_matched_not_the_bookings_clock(self):
-        early = self.photo(self.ana, self.trip, "2026-06-02T06:30", where=HEATHROW, segment_id=self.flight["id"])
-        unplaced = self.photo(self.ana, self.trip, "2026-06-02T06:35", segment_id=self.flight["id"])
-        guessed = self.photo(self.ana, self.trip, "2026-06-02T06:40", where=HEATHROW, located="inferred", segment_id=self.flight["id"])
-        still_there = self.photo(self.ana, self.trip, "2026-06-01T23:30", NEW_YORK, where=(40.64, -73.78), segment_id=self.flight["id"])
-        labels = {p["id"]: p["zone"] for p in self.listing("ana")["photos"]}
-        self.assertEqual([labels[i] for i in (early, unplaced, guessed, still_there)], [LONDON, NEW_YORK, NEW_YORK, NEW_YORK])
-
     def located(self, segment_id, where):
         with db.session() as conn:
             conn.execute(update(Segment).where(Segment.id == segment_id).values(latitude=where[0], longitude=where[1]))
 
-    def test_a_platform_photo_keeps_the_start_zone_until_the_train_arrives(self):
-        train = self.book("ana", {"kind": "train", "origin": "London St Pancras", "destination": "Paris Gare du Nord", "provider": "Example Rail",
-                                  "start_local": "2026-06-03T09:00", "end_local": "2026-06-03T12:30", "start_zone": LONDON, "end_zone": PARIS},
-                          trip_id=self.trip, travelers=[{"person_id": self.person["ana"]}])
-        self.located(train["id"], GARE_DU_NORD)
-        cases = [(self.photo(self.ana, self.trip, "2026-06-03T08:45", where=ST_PANCRAS, segment_id=train["id"]), LONDON),
-                 (self.photo(self.ana, self.trip, "2026-06-03T10:00", segment_id=train["id"]), LONDON),
-                 (self.photo(self.ana, self.trip, "2026-06-03T10:30", where=(50.9, 1.8), segment_id=train["id"]), LONDON),
-                 (self.photo(self.ana, self.trip, "2026-06-03T12:45", PARIS, where=GARE_DU_NORD, segment_id=train["id"]), PARIS),
-                 (self.photo(self.ana, self.trip, "2026-06-03T13:00", PARIS, segment_id=train["id"]), PARIS)]
-        labels = {p["id"]: p["zone"] for p in self.listing("ana")["photos"]}
-        self.assertEqual([labels[i] for i, _ in cases], [z for _, z in cases])
+    def labels(self, trip, cases):
+        ids = [self.photo(self.ana, trip, local, zone, where=where, segment_id=segment, located="exif" if where else None) for local, zone, where, segment, _ in cases]
+        found = {p["id"]: p["zone"] for p in self.listing("ana", trip)["photos"]}
+        self.assertEqual([found[i] for i in ids], [expected for *_, expected in cases])
 
-    def test_a_one_way_rental_reads_in_the_drop_off_zone_only_once_it_is_there(self):
+    def test_a_flight_reads_at_the_airport_the_photo_is_near_else_by_its_clock(self):
+        f, jfk = self.flight["id"], (40.6413, -73.7781)
+        self.labels(self.trip, [("2026-06-01T17:00", NEW_YORK, jfk, f, NEW_YORK), ("2026-06-01T20:00", NEW_YORK, jfk, f, NEW_YORK), ("2026-06-02T09:00", LONDON, jfk, f, NEW_YORK),
+                                ("2026-06-01T17:00", NEW_YORK, HEATHROW, f, LONDON), ("2026-06-02T06:30", LONDON, HEATHROW, f, LONDON), ("2026-06-02T09:00", LONDON, HEATHROW, f, LONDON),
+                                ("2026-06-01T17:00", NEW_YORK, REYKJAVIK, f, NEW_YORK), ("2026-06-02T02:00", LONDON, REYKJAVIK, f, NEW_YORK), ("2026-06-02T07:10", LONDON, REYKJAVIK, f, LONDON),
+                                ("2026-06-01T17:00", NEW_YORK, None, f, NEW_YORK), ("2026-06-02T02:00", LONDON, None, f, NEW_YORK), ("2026-06-02T09:00", LONDON, None, f, LONDON)])
+
+    def test_a_stay_and_a_parking_booking_read_in_their_one_zone_wherever_the_photo_is(self):
+        self.located(self.stay["id"], SOHO)
+        lot = self.book("ana", {"kind": "parking", "origin": "Pike Lot", "start_local": "2026-06-04T06:00", "end_local": "2026-06-05T22:00",
+                                "start_zone": "America/Denver", "end_zone": "America/Denver"}, trip_id=self.trip)
+        self.located(lot["id"], DENVER)
+        cases = []
+        for where in (SOHO, GARE_DU_NORD, None):
+            cases += [(local, LONDON, where, self.stay["id"], LONDON) for local in ("2026-06-02T12:00", "2026-06-05T12:00", "2026-06-08T12:00")]
+            cases += [(local, "America/Denver", DENVER if where is SOHO else where, lot["id"], "America/Denver") for local in ("2026-06-04T05:00", "2026-06-04T18:00", "2026-06-05T23:00")]
+        self.labels(self.trip, cases)
+
+    def test_a_one_way_rental_reads_at_the_pickup_point_when_near_it_else_by_its_clock(self):
         car = self.book("ana", {"kind": "car", "origin": "Denver Airport", "destination": "Phoenix Airport", "provider": "Example Cars",
                                 "start_local": "2026-06-04T10:00", "end_local": "2026-06-05T10:00", "start_zone": "America/Denver", "end_zone": "America/Phoenix"},
                         trip_id=self.trip)
         self.located(car["id"], DENVER)
-        cases = [(self.photo(self.ana, self.trip, "2026-06-04T10:30", "America/Denver", where=DENVER, segment_id=car["id"]), "America/Denver"),
-                 (self.photo(self.ana, self.trip, "2026-06-04T18:00", "America/Denver", where=(36.0, -109.0), segment_id=car["id"]), "America/Denver"),
-                 (self.photo(self.ana, self.trip, "2026-06-05T09:00", "America/Phoenix", where=PHOENIX, segment_id=car["id"]), "America/Denver"),
-                 (self.photo(self.ana, self.trip, "2026-06-05T11:00", "America/Phoenix", where=PHOENIX, segment_id=car["id"]), "America/Phoenix"),
-                 (self.photo(self.ana, self.trip, "2026-06-05T11:30", "America/Phoenix", segment_id=car["id"]), "America/Phoenix")]
-        labels = {p["id"]: p["zone"] for p in self.listing("ana")["photos"]}
-        self.assertEqual([labels[i] for i, _ in cases], [z for _, z in cases])
+        c, denver, phoenix = car["id"], "America/Denver", "America/Phoenix"
+        self.labels(self.trip, [("2026-06-04T09:00", denver, DENVER, c, denver), ("2026-06-04T18:00", denver, DENVER, c, denver), ("2026-06-05T11:00", phoenix, DENVER, c, denver),
+                                ("2026-06-04T09:00", denver, PHOENIX, c, denver), ("2026-06-05T09:00", phoenix, PHOENIX, c, denver), ("2026-06-05T11:00", phoenix, PHOENIX, c, phoenix),
+                                ("2026-06-04T09:00", denver, None, c, denver), ("2026-06-04T18:00", denver, None, c, denver), ("2026-06-05T11:00", phoenix, None, c, phoenix)])
 
-    def test_a_photo_at_a_port_of_call_takes_the_ports_zone(self):
-        voyage = self.own_trip("ana", "Caribbean")
-        cruise = self.book("ana", {**CRUISE, "itinerary": PORTS}, trip_id=voyage, travelers=[{"person_id": self.person["ana"]}])
-        nassau, cozumel, miami = (25.06, -77.34), (20.42, -86.92), (25.77, -80.19)
-        cases = [(self.photo(self.ana, voyage, "2026-03-02T12:00", "America/Nassau", where=nassau, segment_id=cruise["id"]), "America/Nassau"),
-                 (self.photo(self.ana, voyage, "2026-03-02T12:30", "America/Nassau", segment_id=cruise["id"]), "America/Nassau"),
-                 (self.photo(self.ana, voyage, "2026-03-03T12:00", NEW_YORK, segment_id=cruise["id"]), NEW_YORK),
-                 (self.photo(self.ana, voyage, "2026-03-05T12:00", "America/Cancun", where=cozumel, segment_id=cruise["id"]), "America/Cancun"),
-                 (self.photo(self.ana, voyage, "2026-03-01T15:00", NEW_YORK, where=miami, segment_id=cruise["id"]), NEW_YORK),
-                 (self.photo(self.ana, voyage, "2026-03-08T09:00", NEW_YORK, segment_id=cruise["id"]), NEW_YORK)]
-        labels = {p["id"]: p["zone"] for p in self.listing("ana", voyage)["photos"]}
-        self.assertEqual([labels[i] for i, _ in cases], [z for _, z in cases])
+    def test_a_train_reads_at_its_arrival_station_when_near_it_else_by_its_clock(self):
+        train = self.book("ana", {"kind": "train", "origin": "London St Pancras", "destination": "Paris Gare du Nord", "provider": "Example Rail",
+                                  "start_local": "2026-06-03T09:00", "end_local": "2026-06-03T12:30", "start_zone": LONDON, "end_zone": PARIS},
+                          trip_id=self.trip, travelers=[{"person_id": self.person["ana"]}])
+        self.located(train["id"], GARE_DU_NORD)
+        t = train["id"]
+        self.labels(self.trip, [("2026-06-03T08:00", LONDON, GARE_DU_NORD, t, PARIS), ("2026-06-03T10:00", LONDON, GARE_DU_NORD, t, PARIS), ("2026-06-03T13:00", PARIS, GARE_DU_NORD, t, PARIS),
+                                ("2026-06-03T08:45", LONDON, ST_PANCRAS, t, LONDON), ("2026-06-03T10:00", LONDON, ST_PANCRAS, t, LONDON), ("2026-06-03T13:00", PARIS, ST_PANCRAS, t, PARIS),
+                                ("2026-06-03T08:45", LONDON, None, t, LONDON), ("2026-06-03T10:00", LONDON, None, t, LONDON), ("2026-06-03T12:30", PARIS, None, t, PARIS)])
+
+    def test_a_visit_reads_in_its_countrys_zone_wherever_the_photo_is(self):
+        japan = self.own_trip("ana", "Japan")
+        visit = self.book("ana", {"kind": "visit", "destination": "JP", "start_local": "2026-06-20T00:00", "end_local": "2026-06-22T00:00"}, trip_id=japan)
+        self.located(visit["id"], TOKYO)
+        v, tokyo = visit["id"], "Asia/Tokyo"
+        self.labels(japan, [(local, tokyo, where, v, tokyo) for where in (TOKYO, SOHO, None) for local in ("2026-06-19T12:00", "2026-06-21T12:00", "2026-06-23T12:00")])
+
+    def cruise(self, trip, with_point=True):
+        voyage = self.book("ana", {**CRUISE, "origin": "Galveston", "destination": "Galveston", "start_zone": CHICAGO, "end_zone": CHICAGO, "itinerary": CALLS},
+                           trip_id=trip, travelers=[{"person_id": self.person["ana"]}])
+        self.located(voyage["id"], GALVESTON if with_point else (None, None))
+        return voyage["id"]
+
+    def test_a_cruise_reads_at_the_port_the_photo_is_near_else_by_the_ships_clock_and_its_calls(self):
+        voyage = self.own_trip("ana", "Gulf cruise")
+        c = self.cruise(voyage)
+        self.labels(voyage, [("2026-03-01T15:00", CHICAGO, GALVESTON, c, CHICAGO), ("2026-03-04T12:00", CHICAGO, GALVESTON, c, CHICAGO), ("2026-03-08T09:00", CHICAGO, GALVESTON, c, CHICAGO),
+                             ("2026-03-03T12:00", CANCUN, COZUMEL, c, CANCUN), ("2026-03-03T06:00", CANCUN, COZUMEL, c, CANCUN), ("2026-03-05T12:00", PUERTO_RICO, SAN_JUAN, c, PUERTO_RICO),
+                             ("2026-03-01T15:00", CHICAGO, AT_SEA, c, CHICAGO), ("2026-03-04T12:00", CHICAGO, AT_SEA, c, CHICAGO), ("2026-03-03T12:00", CANCUN, AT_SEA, c, CANCUN),
+                             ("2026-03-08T09:00", CHICAGO, AT_SEA, c, CHICAGO),
+                             ("2026-03-01T15:00", CHICAGO, None, c, CHICAGO), ("2026-03-04T12:00", CHICAGO, None, c, CHICAGO), ("2026-03-03T12:00", CANCUN, None, c, CANCUN),
+                             ("2026-03-05T12:00", PUERTO_RICO, None, c, PUERTO_RICO), ("2026-03-08T09:00", CHICAGO, None, c, CHICAGO)])
+
+    def test_a_cruise_without_its_own_point_keeps_the_ships_clock_away_from_its_calls(self):
+        voyage = self.own_trip("ana", "Gulf cruise")
+        c = self.cruise(voyage, with_point=False)
+        self.labels(voyage, [("2026-03-02T12:00", CHICAGO, COZUMEL, c, CANCUN), ("2026-03-03T12:00", CANCUN, COZUMEL, c, CANCUN), ("2026-03-06T12:00", CHICAGO, COZUMEL, c, CANCUN),
+                             ("2026-03-01T15:00", CHICAGO, GALVESTON, c, CHICAGO), ("2026-03-04T12:00", CHICAGO, GALVESTON, c, CHICAGO), ("2026-03-08T09:00", CHICAGO, GALVESTON, c, CHICAGO),
+                             ("2026-03-01T15:00", CHICAGO, None, c, CHICAGO), ("2026-03-02T12:00", CHICAGO, None, c, CHICAGO), ("2026-03-03T12:00", CANCUN, None, c, CANCUN),
+                             ("2026-03-04T12:00", CHICAGO, None, c, CHICAGO), ("2026-03-08T09:00", CHICAGO, None, c, CHICAGO)])
+        with db.session() as conn:
+            (main, *calls) = photos.segment_points(conn, [conn.orm.get(Segment, c)])[c]
+        self.assertEqual((main.origin, main.zone, main.to_zone, main.borrowed), (calls[0].origin, CHICAGO, CHICAGO, True))
+        self.assertEqual([(p.zone, p.borrowed) for p in calls], [(CANCUN, False), (PUERTO_RICO, False)])
 
     def test_photos_are_ordered_by_the_instant_whatever_its_spelling(self):
         spelled = [("2026-06-02T09:00:00Z", "09:00Z"), ("2026-06-02T08:30:00+00:00", "08:30"), ("2026-06-02T08:00:00", "naive 08:00"),
@@ -376,20 +416,6 @@ class PhotoViewers(Household):
         self.assertIsNone(photos.for_trip(self.c, self.sam, self.trip))
         got = photos.decide(self.c, self.jane, hers, None, True)
         self.assertEqual((got["id"], got["hidden"]), (hers, True))
-
-    def test_a_cruise_without_its_own_point_takes_its_first_ports_zone_at_embarkation(self):
-        cruise = self.add(self.jane, {**CRUISE, "itinerary": PORTS}, None, self.on(self.jid))
-        self.c.execute(update(Segment).where(Segment.id == cruise["id"]).values(latitude=None, longitude=None))
-        self.c.orm.expire_all()
-        nassau = (25.06, -77.34)
-        during = self.photo(self.janes, cruise["trip_id"], "2026-03-02T12:00", "America/Nassau", where=nassau, segment_id=cruise["id"])
-        before = self.photo(self.janes, cruise["trip_id"], "2026-03-01T20:00", NEW_YORK, where=nassau, segment_id=cruise["id"])
-        at_sea = self.photo(self.janes, cruise["trip_id"], "2026-03-03T12:00", NEW_YORK, segment_id=cruise["id"])
-        ashore = self.photo(self.janes, cruise["trip_id"], "2026-03-08T09:00", NEW_YORK, segment_id=cruise["id"])
-        labels = {p["id"]: p["zone"] for p in photos.for_trip(self.c, self.jane, cruise["trip_id"])["photos"]}
-        self.assertEqual([labels[i] for i in (before, during, at_sea, ashore)], ["America/Nassau", "America/Nassau", "America/Nassau", NEW_YORK])
-        (main, *calls) = photos.segment_points(self.c, [self.c.orm.get(Segment, cruise["id"])])[cruise["id"]]
-        self.assertEqual((main.origin, main.zone, main.to_zone), (calls[0].origin, "America/Nassau", NEW_YORK))
 
     def test_the_offset_label_reads_as_utc_plus_or_minus(self):
         self.assertEqual([photos.offset_label(m) for m in (0, 60, -60, 330, -570, 765, -720)],

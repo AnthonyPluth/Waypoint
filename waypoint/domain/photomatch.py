@@ -46,6 +46,7 @@ class SegmentPoint:
     timed: bool = True
     zone: str | None = None
     to_zone: str | None = None
+    borrowed: bool = False
 
     @property
     def origin(self) -> Point | None:

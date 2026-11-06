@@ -144,7 +144,7 @@ def _points(seg: Segment, airport_at: Mapping[str, Point], ports: Sequence[trips
         depart = trips.instant(port["depart_local"], port["zone"]) if port["depart_local"] else end
         calls.append(SegmentPoint(seg.id, seg.kind, arrive, depart, found.latitude, found.longitude, timed=timed, zone=port["zone"], to_zone=port["zone"]))
     if main.origin is None and calls:
-        main = replace(main, latitude=calls[0].latitude, longitude=calls[0].longitude, zone=calls[0].zone)
+        main = replace(main, latitude=calls[0].latitude, longitude=calls[0].longitude, borrowed=True)
     return [main, *calls]
 
 
@@ -189,7 +189,7 @@ def _owns(viewer: Viewer, person_id: int) -> bool:
 
 
 def _zone_by_place(points: Sequence[SegmentPoint], at: datetime, spot: Point) -> str | None:
-    ends = [(distance_km(spot, place), p.gap(at), p.segment_id, order, n, zone) for order, p in enumerate(points)
+    ends = [(distance_km(spot, place), p.gap(at), p.segment_id, order, n, zone) for order, p in enumerate(points) if not p.borrowed
             for n, (place, zone) in enumerate(((p.origin, p.zone), (p.destination, p.to_zone))) if place is not None]
     nearest = min(ends, default=None)
     return nearest[5] if nearest is not None and nearest[0] <= NEAR else None
@@ -270,7 +270,7 @@ class _Cluster:
 
 
 def _cell(point: Point) -> tuple[int, int]:
-    return math.floor(point[0] / CELL), math.floor(point[1] / CELL) % COLUMNS
+    return min(math.floor(point[0] / CELL), ROWS // 2 - 1), math.floor(point[1] / CELL) % COLUMNS
 
 
 def _span(latitude: float) -> int:
@@ -296,19 +296,14 @@ def _ring(cell: tuple[int, int], span: int, ring: int) -> Iterator[tuple[int, in
                 yield row + dr, (col + dc) % COLUMNS
 
 
-def _cap(point: Point, radius_km: float) -> Iterator[tuple[int, int]]:
+def _cap(point: Point, radius_km: float) -> tuple[range, range]:
     reach = math.degrees(radius_km / EARTH_RADIUS_KM)
-    col = _cell(point)[1]
     rows = range(max(-ROWS // 2, math.floor((point[0] - reach) / CELL)), min(ROWS // 2, math.floor((point[0] + reach) / CELL) + 1))
     if abs(point[0]) + reach >= 90.0:
-        across = range(COLUMNS)
-    else:
-        half = math.degrees(math.asin(min(1.0, math.sin(math.radians(reach)) / math.cos(math.radians(point[0])))))
-        width = min(COLUMNS // 2, math.ceil(half / CELL) + 1)
-        across = range(-width, width + 1) if 2 * width + 1 < COLUMNS else range(COLUMNS)
-    for r in rows:
-        for dc in across:
-            yield r, (col + dc) % COLUMNS
+        return rows, range(COLUMNS)
+    half = math.degrees(math.asin(min(1.0, math.sin(math.radians(reach)) / math.cos(math.radians(point[0])))))
+    width = min(COLUMNS // 2, math.ceil(half / CELL) + 1)
+    return rows, range(-width, width + 1) if 2 * width + 1 < COLUMNS else range(COLUMNS)
 
 
 Closest = tuple[float, int, "_Cluster"]
@@ -339,13 +334,24 @@ class _Grid:
                 best = min(best, (distance_km(here, (other.latitude, other.longitude)), other.first_at, other))
         return best
 
+    def _every(self, cluster: _Cluster, best: Closest) -> _Cluster:
+        return self._closest(cluster, {i for i, c in enumerate(self.found) if c.alive}, best)[2]
+
     def nearest(self, cluster: _Cluster) -> _Cluster:
         best: Closest = (math.inf, 0, cluster)
-        ring = 0
-        while best[0] == math.inf and ring <= ROWS:
-            best = self._closest(cluster, self._in(_ring(cluster.cell, _span(abs(cluster.latitude) + ring * CELL), ring)), best)
+        ring = looked = 0
+        while best[0] == math.inf:
+            cells = list(_ring(cluster.cell, _span(abs(cluster.latitude) + ring * CELL), ring))
+            looked += len(cells)
+            if looked > self.alive:
+                return self._every(cluster, best)
+            best = self._closest(cluster, self._in(iter(cells)), best)
             ring += 1
-        return self._closest(cluster, self._in(_cap((cluster.latitude, cluster.longitude), best[0])), best)[2]
+        rows, across = _cap((cluster.latitude, cluster.longitude), best[0])
+        if len(rows) * len(across) > self.alive:
+            return self._every(cluster, best)
+        col = cluster.cell[1]
+        return self._closest(cluster, self._in((r, (col + dc) % COLUMNS) for r in rows for dc in across), best)[2]
 
     def add(self, cluster: _Cluster) -> None:
         cluster.index, cluster.cell = len(self.found), _cell((cluster.latitude, cluster.longitude))
