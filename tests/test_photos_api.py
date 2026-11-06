@@ -128,13 +128,34 @@ class PhotoRoutes(RouteCase):
         self.assertEqual(self.call("ana", "GET", "/api/trips/99999/photos"), stranger)
         self.assertEqual(self.call("ana", "GET", "/api/trips/x/photos"), stranger)
 
-    def test_whoever_booked_a_segment_of_the_trip_gets_its_photos_too(self):
+    def test_whoever_booked_a_segment_of_the_trip_without_being_on_it_sees_the_trip_but_not_its_photos(self):
         booked = self.book("ana", {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, travelers=[{"person_id": self.person["ben"]}])
         self.share("ben", booked["trip_id"])
         only = self.photo(self.ben, booked["trip_id"], "2026-09-02T09:00", segment_id=booked["id"])
-        self.assertEqual([p["id"] for p in self.listing("ana", booked["trip_id"])["photos"]], [only])
+        self.assertEqual(self.ok("ana", "GET", f"/api/trips/{booked['trip_id']}")["id"], booked["trip_id"])
+        self.assertEqual(self.listing("ana", booked["trip_id"])["photos"], [])
         self.assertEqual([p["id"] for p in self.listing("ben", booked["trip_id"])["photos"]], [only])
         self.assertEqual(self.call("cy", "GET", f"/api/trips/{booked['trip_id']}/photos")[0], 404)
+        self.ok("ben", "POST", f"/api/segments/{booked['id']}", {"travelers": [{"person_id": self.person["ben"]}, {"person_id": self.person["ana"]}]})
+        self.assertEqual([p["id"] for p in self.listing("ana", booked["trip_id"])["photos"]], [only])
+
+    def test_the_same_asset_through_two_libraries_of_one_person_is_one_photo(self):
+        second = self.keep(PhotoSource(person_id=self.person["ana"], owner_sub="sub-ana", url=URL + "1", immich_user_id="immich-user-1",
+                                       api_key=secretbox.encrypt(KEY) or "", status="ok", created=1.0))
+        first = self.photo(self.ana, self.trip, "2026-06-02T10:00", where=SOHO, asset="twice-9k2m")
+        twin = self.photo(second, self.trip, "2026-06-02T10:00", where=SOHO, asset="twice-9k2m")
+        for who in ("ana", "ben"):
+            got = self.listing(who)
+            self.assertEqual(([p["id"] for p in got["photos"]], got["counts"]["total"], got["people"], got["clusters"][0]["count"]),
+                             ([first], 1, [{"person_id": self.person["ana"], "count": 1}], 1), who)
+        self.assertEqual(self.ok("ana", "GET", f"/api/trips/{self.trip}/summary")["photos"], {"total": 1, "inferred": 0})
+        self.assertEqual(self.call("ana", "POST", f"/api/photos/{twin}", {"trip_id": self.trip}), (404, {"error": "No such photo"}))
+        self.assertEqual(self.call("ana", "POST", f"/api/trips/{self.trip}/photo-exclusions", {"photo_ids": [twin]}), (404, {"error": "No such photo"}))
+        got = self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-exclusions", {"photo_ids": [first]})
+        self.assertEqual((got["removed_count"], [p["id"] for p in got["removed"]]), (1, [first]))
+        self.assertEqual(self.listing("ana")["photos"], [])
+        self.assertEqual(self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-exclusions/{first}")["count"], 1)
+        self.assertEqual([p["id"] for p in self.listing("ben")["photos"]], [first])
 
     def test_ambiguous_home_and_unmatched_rows_never_show_on_a_trip(self):
         for match in ("ambiguous", "home", "none"):

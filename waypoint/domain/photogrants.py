@@ -53,10 +53,7 @@ class Grants(TypedDict):
 
 
 def lock(conn: db.Connection, person_id: int, trip_ids: Iterable[int]) -> dict[int, PhotoGrant]:
-    ids = sorted(set(trip_ids))
-    rows = conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.person_id == person_id, PhotoGrant.trip_id.in_(ids))
-                            .order_by(PhotoGrant.trip_id).with_for_update()).all()
-    return {r.trip_id: r for r in rows}
+    return photos.lock_grants(conn, person_id, trip_ids)
 
 
 KEY = ["person_id", "trip_id"]
@@ -337,9 +334,20 @@ def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     return ended
 
 
+def _narrower(mine: PhotoGrant, theirs: PhotoGrant) -> None:
+    if theirs.revoked is not None and mine.revoked is None:
+        mine.revoked = theirs.revoked
+    elif mine.revoked is None and theirs.scope == photos.ONLY_ME:
+        mine.scope = photos.ONLY_ME
+    mine.changed = max(mine.changed, theirs.changed)
+
+
 def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
-    have = select(PhotoGrant.trip_id).where(PhotoGrant.person_id == member_id)
-    conn.execute(delete(PhotoGrant).where(PhotoGrant.person_id == guest_id, PhotoGrant.trip_id.in_(have)))
+    mine = {g.trip_id: g for g in conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.person_id == member_id).order_by(PhotoGrant.trip_id)).all()}
+    for theirs in conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.person_id == guest_id, PhotoGrant.trip_id.in_(list(mine))).order_by(PhotoGrant.trip_id)).all():
+        _narrower(mine[theirs.trip_id], theirs)
+    conn.orm.flush()
+    conn.execute(delete(PhotoGrant).where(PhotoGrant.person_id == guest_id, PhotoGrant.trip_id.in_(list(mine))))
     conn.execute(update(PhotoGrant).where(PhotoGrant.person_id == guest_id).values(person_id=member_id, granted_by=sub))
     for e in conn.orm.scalars(select(PhotoExclusion).where(PhotoExclusion.person_id == guest_id)).all():
         db.insert_ignore(conn, PhotoExclusion, {"person_id": member_id, "asset_id": e.asset_id, "trip_id": e.trip_id, "created": e.created},
@@ -349,6 +357,8 @@ def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
     urls = select(PhotoSource.url).where(PhotoSource.person_id == member_id)
     conn.execute(update(PhotoSource).where(PhotoSource.person_id == guest_id, PhotoSource.url.not_in(urls)).values(person_id=member_id, owner_sub=sub))
     conn.orm.expire_all()
+    for trip_id in list(conn.execute(select(TripPerson.trip_id).where(TripPerson.person_id == member_id).order_by(TripPerson.trip_id)).scalars()):
+        reconcile(conn, trip_id)
 
 
 def grants(conn: db.Connection, viewer: Viewer) -> Grants:

@@ -9,7 +9,7 @@ from tests.test_photos_api import ASSET, KEY, SOHO, URL, grant_row, photo_row, s
 from tests.test_trips import HOTEL, OUT, RouteCase
 from waypoint.server import mcp_access, mcp_http
 from waypoint.storage import db
-from waypoint.storage.models import PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoTripSync, TripPerson
+from waypoint.storage.models import PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoTripSync, SegmentRecipient, TripPerson
 
 STATE, COUNTRY = "Canaryshire-7q2x", "Canaryland-3k9v"
 EMPTY = {"photos": [], "clusters": [], "counts": {"total": 0, "located": 0, "inferred": 0, "far": 0}, "people": []}
@@ -109,11 +109,22 @@ class ScopeTests(AccessCase):
         self.assertEqual(self.call("ana", "POST", f"/api/trips/{trip}/photo-sharing", {"scope": "only_me", "person_id": self.person["ben"]}), (404, NO_TRIP))
         self.assertEqual(self.call("ana", "DELETE", f"/api/trips/{trip}/photo-sharing?person_id={self.person['ben']}"), (404, NO_TRIP))
         self.share("ben", trip, "trip")
-        self.assertEqual(self.seen_by("ana", trip), [mine])
+        self.assertNoPhotos("ana", trip)
         self.assertEqual(self.call("ana", "POST", f"/api/trips/{trip}/photo-exclusions", {"photo_ids": [mine]}), (404, NO_PHOTO))
         self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"trip_id": trip}), (404, NO_PHOTO))
         self.assertEqual(self.seen_by("ben", trip), [mine])
         self.assertEqual(self.ok("ana", "GET", "/api/photo-grants")["people"], [{"person_id": self.person["ana"], "prefs": {"default_scope": "only_me", "share_all": False}, "trips": []}])
+
+    def test_trip_scope_reaches_the_trips_people_alone_not_a_confirmation_recipient(self):
+        self.share("ben")
+        mine = self.photo("ben")
+        self.assertEqual(self.seen_by("ana"), [mine])
+        with db.session() as conn:
+            conn.execute(delete(TripPerson).where(TripPerson.person_id == self.person["ana"]))
+            conn.execute(insert(SegmentRecipient).values(segment_id=self.flight["id"], person_id=self.person["ana"]))
+        self.assertEqual(self.ok("ana", "GET", f"/api/trips/{self.trip}")["id"], self.trip)
+        self.assertNoPhotos("ana")
+        self.assertEqual(self.seen_by("ben"), [mine])
 
     def test_a_grant_for_someone_no_longer_on_the_trip_shows_nothing(self):
         self.share("ben")

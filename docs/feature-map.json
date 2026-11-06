@@ -301,6 +301,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_photo_access.py",
+        "tests/test_photos_api.py",
         "tests/test_trip_summary.py",
         "tests/test_trips.py"
       ],

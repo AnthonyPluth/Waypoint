@@ -311,7 +311,73 @@ class LapsedAccessTests(GrantCase):
         self.assertIsNone(self.grant(self.jid, self.a))
 
 
+class DecisionTests(GrantCase):
+    def stopping_first(self, trip_id, stamp):
+        real, stopped = photos.lock_grants, []
+
+        def lock(conn, person, trip_ids):
+            if not stopped:
+                stopped.append(True)
+                photogrants.stop(self.c, self.jane, self.jid, trip_id, stamp)
+            return real(conn, person, trip_ids)
+        return mock.patch.object(photos, "lock_grants", side_effect=lock)
+
+    def test_a_decision_that_races_with_stop_sharing_sees_the_stop(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        both = self.photo(self.b)
+        with self.stopping_first(self.a, 70.0), self.assertRaises(trips.Invalid) as refused:
+            photos.decide(self.c, self.jane, both.id, self.a, None)
+        self.assertEqual(str(refused.exception), photos.SHARE_FIRST)
+        self.assertEqual((self.row(both.id).trip_id, self.row(both.id).decided_by), (self.b, None))
+        self.share(self.jid, self.a)
+        with self.stopping_first(self.b, 71.0):
+            self.assertEqual(photos.decide(self.c, self.jane, both.id, self.a, None)["trip_id"], self.a)
+        self.assertEqual((self.row(both.id).trip_id, self.row(both.id).decided_by), (self.a, "owner"))
+        photogrants.stop(self.c, self.jane, self.jid, self.b, 72.0)
+        with self.stopping_first(self.a, 73.0):
+            self.assertIsNone(photos.decide(self.c, self.jane, both.id, self.a, None))
+        self.assertIsNone(self.row(both.id))
+
+    def test_a_decision_locks_the_grants_of_both_trips_in_order(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        both = self.photo(self.b)
+        with mock.patch.object(photos, "lock_grants", wraps=photos.lock_grants) as lock:
+            self.assertEqual(photos.decide(self.c, self.jane, both.id, self.a, None)["trip_id"], self.a)
+        self.assertEqual(lock.call_args_list[0].args[1:], (self.jid, [self.b, self.a]))
+
+
 class ClaimTests(GrantCase):
+    def test_overlapping_grants_keep_the_more_restrictive_decision(self):
+        self.c.orm.add(source_row(self.mia, "u-sam"))
+        self.c.orm.flush()
+        c = trips.create_trip(self.c, self.jane, {"name": "Third", "people": [self.jid, self.mia]}, confirmed=True)["id"]
+        d = trips.create_trip(self.c, self.jane, {"name": "Fourth", "people": [self.jid, self.mia]}, confirmed=True)["id"]
+        trips.edit_trip(self.c, self.jane, self.a, {"people": [self.jid, self.sid, self.mia]}, confirmed=True)
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        self.share(self.jid, self.a, "trip")
+        self.share(self.mia, self.a, "only_me", by="u-sam")
+        self.share(self.jid, self.b, "trip")
+        self.share(self.mia, self.b, "trip", revoked=9.0, by="u-sam")
+        self.share(self.jid, c, "only_me")
+        self.share(self.mia, c, "trip", by="u-sam")
+        self.share(self.jid, d, "trip", revoked=8.0)
+        self.share(self.mia, d, "trip", by="u-sam")
+        people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+        self.assertEqual(self.grant(self.jid, self.a), ("only_me", None, "u-jane"))
+        self.assertEqual(self.grant(self.jid, self.b), ("trip", 9.0, "u-jane"))
+        self.assertEqual(self.grant(self.jid, c), ("only_me", None, "u-jane"))
+        self.assertEqual(self.grant(self.jid, d), ("trip", 8.0, "u-jane"))
+        self.assertEqual(self.c.execute(select(PhotoGrant.person_id).distinct()).fetchall(), [(self.jid,)])
+
+    def test_claiming_reconciles_the_trips_the_member_is_now_on(self):
+        photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 80.0)
+        theirs = self.add(self.sam, {**OUT, "start_local": "2027-03-01T19:00", "end_local": "2027-03-02T07:10"}, None, self.on(self.sid, self.mia))["trip_id"]
+        self.assertIsNone(self.grant(self.jid, theirs))
+        people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+        self.assertEqual(self.grant(self.jid, theirs), ("trip", None, "u-jane"))
+
     def test_a_claimed_guests_sharing_and_libraries_pass_to_the_member(self):
         trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
         self.c.orm.add_all([source_row(self.mia, "u-sam"), PhotoSource(person_id=self.mia, owner_sub="u-sam", url="https://other.example", immich_user_id="u2",
