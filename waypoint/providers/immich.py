@@ -508,10 +508,10 @@ def markers(source: Source, after: datetime, before: datetime) -> list[Marker]:
     return parse_markers(_json(source, _request(source, MARKERS, JSON_TYPE, query=query)))
 
 
-def thumbnail(source: Source, asset_id: str, size: Size) -> tuple[str, bytes] | None:
+def thumbnail(source: Source, asset_id: str, size: Size, *, seconds: float | None = None) -> tuple[str, bytes] | None:
     if not ASSET_ID.fullmatch(asset_id) or size not in CAPS:
         return None
-    deadline = time.monotonic() + IMAGE_SECONDS
+    deadline = time.monotonic() + (IMAGE_SECONDS if seconds is None else seconds)
     request = _request(source, f"{ASSETS}{asset_id}/thumbnail", IMAGE_TYPES, query={"size": size})
     response = _open(source, request, IMAGE_TIMEOUT, deadline, missing=RENDITION_MISSING)
     if response is None:
@@ -524,10 +524,11 @@ def thumbnail(source: Source, asset_id: str, size: Size) -> tuple[str, bytes] | 
     return kind, data
 
 
-def asset_exists(source: Source, asset_id: str) -> bool:
+def asset_exists(source: Source, asset_id: str, *, seconds: float | None = None) -> bool:
     if not ASSET_ID.fullmatch(asset_id):
         return False
-    response = _open(source, _request(source, f"{ASSETS}{asset_id}", JSON_TYPE), TIMEOUT, time.monotonic() + JSON_SECONDS, missing=RENDITION_MISSING)
+    deadline = time.monotonic() + (JSON_SECONDS if seconds is None else seconds)
+    response = _open(source, _request(source, f"{ASSETS}{asset_id}", JSON_TYPE), TIMEOUT, deadline, missing=RENDITION_MISSING)
     if response is None:
         return False
     response.close()

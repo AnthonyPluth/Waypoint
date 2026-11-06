@@ -115,9 +115,16 @@ def _ask[T](conn: db.Connection, served: Served, library: Library, ask: Callable
         raise Unavailable(UNAVAILABLE) from None
 
 
-def _gone(conn: db.Connection, served: Served, library: Library) -> None:
+def _left(served: Served, budget: float) -> float:
+    left = served.checked + budget - time.monotonic()
+    if left <= 0:
+        raise Unavailable(UNAVAILABLE)
+    return left
+
+
+def _gone(conn: db.Connection, served: Served, library: Library, budget: float) -> None:
     try:
-        if _ask(conn, served, library, lambda: immich.asset_exists(library.source, served.asset_id)):
+        if _ask(conn, served, library, lambda: immich.asset_exists(library.source, served.asset_id, seconds=_left(served, budget))):
             return
     except (Missing, Unavailable):
         return
@@ -132,11 +139,11 @@ def rendition(conn: db.Connection, served: Served, size: Rendition) -> Picture |
     if library is None:
         return None
     try:
-        got = _ask(conn, served, library, lambda: immich.thumbnail(library.source, served.asset_id, size))
+        got = _ask(conn, served, library, lambda: immich.thumbnail(library.source, served.asset_id, size, seconds=_left(served, immich.IMAGE_SECONDS)))
     except Missing:
         return None
     if got is None:
-        _gone(conn, served, library)
+        _gone(conn, served, library, immich.IMAGE_SECONDS)
         return None
     return Picture(*got)
 
@@ -146,9 +153,10 @@ def _once(data: bytes) -> Body:
 
 
 def _open(conn: db.Connection, served: Served, library: Library, byte_range: str | None) -> immich.Original:
-    got = _ask(conn, served, library, lambda: immich.open_original(library.source, served.asset_id, byte_range=byte_range))
+    got = _ask(conn, served, library,
+               lambda: immich.open_original(library.source, served.asset_id, seconds=_left(served, immich.ORIGINAL_SECONDS), byte_range=byte_range))
     if got is None:
-        _gone(conn, served, library)
+        _gone(conn, served, library, immich.ORIGINAL_SECONDS)
         raise Missing()
     return got
 

@@ -103,7 +103,7 @@ class FakeImmich:
     def __call__(self, req, timeout=None, **kwargs):
         parts = urllib.parse.urlsplit(req.full_url)
         sent = {k.lower(): v for k, v in req.header_items()}
-        self.calls.append({"url": req.full_url, "path": parts.path, "query": parts.query, "headers": sent})
+        self.calls.append({"url": req.full_url, "path": parts.path, "query": parts.query, "headers": sent, "deadline": kwargs.get("deadline")})
         answer = self.routes.get(parts.path)
         if answer is None:
             raise http_error(404)
@@ -289,6 +289,14 @@ class RenditionTests(ProxyCase):
         self.assertEqual(f"/api/assets/{self.asset_of(self.mine)}", replacement[0])
         self.assertIsNotNone(stored(self.mine))
 
+    def test_the_asset_lookup_after_a_miss_shares_the_renditions_budget(self):
+        self.immich.routes[f"{self.asset}/thumbnail"] = failing(http_error(404))
+        self.missing("ana", f"/api/photos/{self.mine}/thumbnail")
+        rendition, lookup = self.immich.calls
+        self.assertEqual((rendition["path"], lookup["path"]), (f"{self.asset}/thumbnail", self.asset))
+        self.assertAlmostEqual(rendition["deadline"], lookup["deadline"], delta=0.05)
+        self.assertLess(rendition["deadline"] - time.monotonic(), immich.IMAGE_SECONDS)
+
     def test_a_missing_original_follows_the_same_rule(self):
         self.immich.routes[f"{self.asset}/original"] = failing(http_error(404))
         self.missing("ana", f"/api/photos/{self.mine}/original")
@@ -403,6 +411,28 @@ class OriginalTests(ProxyCase):
         self.immich.routes[f"{replacement}/original"] = ranged(SVG, "image/svg+xml")
         self.missing("ana", f"/api/photos/{self.mine}/original", {"Range": "bytes=10-19"})
         self.assertEqual(self.upstream()[2:], [(f"{replacement}/original", "", "bytes=0-4095")])
+
+    def streamed(self, who, path, headers):
+        link = http.client.HTTPConnection("127.0.0.1", self.httpd.server_port, timeout=20)
+        self.addCleanup(link.close)
+        link.request("GET", path, headers={"X-Waypoint": "1", **self.who[who], **headers})
+        reply = link.getresponse()
+        got = bytearray()
+        while piece := reply.read(1024):
+            got += piece
+        return reply.status, reply.headers, bytes(got)
+
+    def test_one_budget_covers_the_prefix_probe_and_the_range_it_allows(self):
+        body = bytes(MP4) * 4
+        self.immich.routes[f"{self.asset}/original"] = ranged(body, "video/mp4", piece=1024, pause=0.2)
+        with mock.patch.object(immich, "ORIGINAL_SECONDS", 1.0):
+            status, headers, raw = self.streamed("ana", f"/api/photos/{self.mine}/original", {"Range": "bytes=0-8191"})
+        self.assertEqual((status, headers["Content-Length"]), (206, "8192"))
+        self.assertLess(len(raw), 8192)
+        self.assertEqual(raw, body[:len(raw)])
+        probe, streamed = self.immich.calls[-2:]
+        self.assertEqual((probe["headers"].get("range"), streamed["headers"].get("range")), ("bytes=0-4095", "bytes=0-8191"))
+        self.assertAlmostEqual(probe["deadline"], streamed["deadline"], delta=0.05)
 
     def test_a_range_of_a_type_the_prefix_refuses_streams_nothing(self):
         self.immich.routes[f"{self.asset}/original"] = ranged(SVG, "image/svg+xml")
