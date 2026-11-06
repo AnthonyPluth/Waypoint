@@ -10,7 +10,7 @@ KM_PER_DEGREE = 111.195
 
 def row(ident, where=None, source="exif", local=None, hidden=False):
     lat, lon = where or (None, None)
-    return {"id": ident, "person_id": 1, "kind": "image", "taken_local": local or f"2026-06-{1 + ident // 1000:02d}T{(ident // 60) % 24:02d}:{ident % 60:02d}",
+    return {"id": ident, "person_id": 1, "kind": "image", "taken_local": local or f"2026-06-{1 + ident // 1440:02d}T{(ident // 60) % 24:02d}:{ident % 60:02d}",
             "zone": None, "latitude": lat, "longitude": lon, "location_source": source if where else None, "segment_id": None,
             "match": "place", "distance_km": None, "cluster": None, "hidden": hidden}
 
@@ -101,6 +101,42 @@ class ClusterTests(unittest.TestCase):
 
     def test_no_photos_make_no_clusters(self):
         self.assertEqual(photos.clusters([]), [])
+
+    def test_photos_either_side_of_the_date_line_share_a_pin_near_180(self):
+        rows = [row(1, (10.0, 179.99)), row(2, (10.0, -179.99)), row(3, (0.0, 179.98)), row(4, (0.0, 179.99)), row(5, (0.0, -179.99))]
+        found = photos.clusters(rows)
+        self.assertEqual([r["cluster"] for r in rows], [0, 0, 1, 1, 1])
+        self.assertEqual([c["count"] for c in found], [2, 3])
+        self.assertAlmostEqual(abs(found[0]["longitude"]), 180.0, places=9)
+        self.assertAlmostEqual(found[1]["longitude"], 179.99333333, places=6)
+        self.assertEqual([c["latitude"] for c in found], [10.0, 0.0])
+
+    def test_a_merge_across_the_date_line_keeps_the_centroid_near_180(self):
+        rows = [row(1, (10.0, 179.9)), row(2, (10.0, -179.9)), row(3, (10.0, -179.9)), row(4, (10.0, 179.9))]
+        self.assertEqual([c["count"] for c in photos.clusters(rows)], [2, 2])
+        with mock.patch.object(photos, "MAX_CLUSTERS", 1):
+            (only,) = photos.clusters(rows)
+        self.assertEqual((only["count"], only["cover"], [r["cluster"] for r in rows]), (4, 1, [0, 0, 0, 0]))
+        self.assertAlmostEqual(abs(only["longitude"]), 180.0, places=9)
+        self.assertTrue(-180.0 <= only["longitude"] < 180.0)
+
+    def test_the_cap_scans_neighbours_through_the_grid_rather_than_every_cluster(self):
+        rows = [row(r * 50 + c, (r * 10.0 / KM_PER_DEGREE, -20.0 + c * 10.0 / KM_PER_DEGREE)) for r in range(60) for c in range(50)]
+        with mock.patch.object(photos, "distance_km", wraps=distance_km) as measured:
+            found = photos.clusters(rows)
+        self.assertEqual((len(found), sum(c["count"] for c in found)), (400, 3000))
+        self.assertLess(measured.call_count, 400_000)
+        self.assertEqual([c["first"] for c in found], sorted(c["first"] for c in found))
+        self.assertTrue(all(r["cluster"] is not None for r in rows))
+
+    def test_an_isolated_cluster_still_finds_its_nearest_neighbour_far_away(self):
+        rows = [row(2 * n + k, (n * 0.3 + k * 0.001, 10.0 + n * 0.3)) for n in range(30) for k in (0, 1)] + [row(99, (-20.0, 10.0))]
+        with mock.patch.object(photos, "distance_km", wraps=distance_km) as measured, mock.patch.object(photos, "MAX_CLUSTERS", 30):
+            found = photos.clusters(rows)
+        self.assertEqual((len(found), rows[-1]["cluster"], found[0]["count"]), (30, 0, 3))
+        self.assertAlmostEqual(found[0]["latitude"], -20.0 / 3 + 0.001 / 3, places=6)
+        self.assertEqual([c["count"] for c in found[1:]], [2] * 29)
+        self.assertLess(measured.call_count, 200)
 
 
 if __name__ == "__main__":

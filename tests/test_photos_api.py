@@ -4,7 +4,7 @@ import unittest
 from datetime import UTC
 
 from tests.privacy import no_leaks
-from tests.test_trips import HOTEL, OUT, Household, RouteCase
+from tests.test_trips import CRUISE, HOTEL, OUT, PORTS, Household, RouteCase
 from sqlalchemy import select
 
 from waypoint.domain import photos, trips
@@ -35,9 +35,9 @@ def source_row(person_id, owner):
 
 
 def photo_row(source_id, trip_id, local, zone=LONDON, *, match="place", where=None, segment_id=None, hidden=False, offset=None,
-              decided=None, located=None, kind="image", distance=None):
+              decided=None, located=None, kind="image", distance=None, taken_utc=None):
     lat, lon = where or (None, None)
-    return Photo(source_id=source_id, asset_id=f"{ASSET}-{next(_assets)}", asset_updated="2026-06-02T00:00:00Z", kind=kind, taken_utc=utc(local, zone), taken_local=local,
+    return Photo(source_id=source_id, asset_id=f"{ASSET}-{next(_assets)}", asset_updated="2026-06-02T00:00:00Z", kind=kind, taken_utc=taken_utc or utc(local, zone), taken_local=local,
                  taken_offset=offset, latitude=lat, longitude=lon, location_source=located or ("exif" if where else None), state=None, country=None,
                  trip_id=trip_id, segment_id=segment_id, match=match, distance_km=distance, decided_by=decided, hidden=hidden, seen=1.0)
 
@@ -134,6 +134,33 @@ class PhotoRoutes(RouteCase):
         self.ok("ana", "POST", f"/api/segments/{self.stay['id']}", {"status": "cancelled"})
         labels = {p["id"]: p["zone"] for p in self.listing("ana")["photos"]}
         self.assertEqual([labels[i] for i, _ in cases], [z for _, z in cases])
+
+    def test_the_zone_follows_the_place_the_photo_matched_not_the_bookings_clock(self):
+        early = self.photo(self.ana, self.trip, "2026-06-02T06:30", where=HEATHROW, segment_id=self.flight["id"])
+        unplaced = self.photo(self.ana, self.trip, "2026-06-02T06:35", segment_id=self.flight["id"])
+        guessed = self.photo(self.ana, self.trip, "2026-06-02T06:40", where=HEATHROW, located="inferred", segment_id=self.flight["id"])
+        still_there = self.photo(self.ana, self.trip, "2026-06-01T23:30", NEW_YORK, where=(40.64, -73.78), segment_id=self.flight["id"])
+        labels = {p["id"]: p["zone"] for p in self.listing("ana")["photos"]}
+        self.assertEqual([labels[i] for i in (early, unplaced, guessed, still_there)], [LONDON, NEW_YORK, NEW_YORK, NEW_YORK])
+
+    def test_a_photo_at_a_port_of_call_takes_the_ports_zone(self):
+        voyage = self.own_trip("ana", "Caribbean")
+        cruise = self.book("ana", {**CRUISE, "itinerary": PORTS}, trip_id=voyage, travelers=[{"person_id": self.person["ana"]}])
+        nassau, cozumel, miami = (25.06, -77.34), (20.42, -86.92), (25.77, -80.19)
+        cases = [(self.photo(self.ana, voyage, "2026-03-02T12:00", "America/Nassau", where=nassau, segment_id=cruise["id"]), "America/Nassau"),
+                 (self.photo(self.ana, voyage, "2026-03-02T12:30", "America/Nassau", segment_id=cruise["id"]), "America/Nassau"),
+                 (self.photo(self.ana, voyage, "2026-03-03T12:00", NEW_YORK, segment_id=cruise["id"]), NEW_YORK),
+                 (self.photo(self.ana, voyage, "2026-03-05T12:00", "America/Cancun", where=cozumel, segment_id=cruise["id"]), "America/Cancun"),
+                 (self.photo(self.ana, voyage, "2026-03-01T15:00", NEW_YORK, where=miami, segment_id=cruise["id"]), NEW_YORK),
+                 (self.photo(self.ana, voyage, "2026-03-08T09:00", NEW_YORK, segment_id=cruise["id"]), NEW_YORK)]
+        labels = {p["id"]: p["zone"] for p in self.listing("ana", voyage)["photos"]}
+        self.assertEqual([labels[i] for i, _ in cases], [z for _, z in cases])
+
+    def test_photos_are_ordered_by_the_instant_whatever_its_spelling(self):
+        spelled = [("2026-06-02T09:00:00Z", "09:00Z"), ("2026-06-02T08:30:00+00:00", "08:30"), ("2026-06-02T08:00:00", "naive 08:00"),
+                   ("2026-06-02T12:45:00+05:00", "07:45 as +05:00"), ("2026-06-02T09:00:00+00:00", "09:00 again")]
+        ids = [self.photo(self.ana, self.trip, f"2026-06-02T{n:02d}:00", taken_utc=text) for n, (text, _) in enumerate(spelled)]
+        self.assertEqual([p["id"] for p in self.listing("ana")["photos"]], [ids[3], ids[2], ids[1], ids[0], ids[4]])
 
     def test_a_trip_with_no_bookings_shows_its_photos_with_no_zone_and_no_pin_for_the_unplaced(self):
         empty = self.own_trip("ana", "Zoë’s week")

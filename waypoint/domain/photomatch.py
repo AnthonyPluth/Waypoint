@@ -44,6 +44,8 @@ class SegmentPoint:
     to_latitude: float | None = None
     to_longitude: float | None = None
     timed: bool = True
+    zone: str | None = None
+    to_zone: str | None = None
 
     @property
     def origin(self) -> Point | None:
