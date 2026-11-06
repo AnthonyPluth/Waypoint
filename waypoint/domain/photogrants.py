@@ -230,15 +230,16 @@ def exclude(conn: db.Connection, viewer: Viewer, trip_id: int, photo_ids: Sequen
             return None
         found.append(row)
     stamp = time.time() if now is None else now
-    if not _lock_trip(conn, trip_id):
+    persons = sorted({person for _, person in found})
+    if not all(people.lock(conn, person) for person in persons) or not _lock_trip(conn, trip_id):
         return None
-    for person in sorted({person for _, person in found}):
+    for person in persons:
         lock(conn, person, [trip_id])
     conn.orm.expire_all()
     fresh: list[tuple[Photo, int]] = []
     for photo, _ in found:
         row = photos.visible_photo(conn, viewer, photo.id)
-        if row is None or row[0].trip_id != trip_id:
+        if row is None or row[0].trip_id != trip_id or not photos.acts_for(conn, viewer, row[1]):
             return None
         fresh.append(row)
     for photo, person in fresh:
@@ -259,7 +260,7 @@ def put_back(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int, c
         return None
     photo, person = found
     involved = sorted({t for t in (trip_id, photo.trip_id) if t is not None})
-    if lock_trips(conn, involved) != involved:
+    if not people.lock(conn, person) or lock_trips(conn, involved) != involved:
         return None
     lock(conn, person, involved)
     conn.orm.expire_all()
@@ -506,14 +507,17 @@ def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     subs = {g.granted_by for g in every} | {p.set_by for p in standing if p.set_by} | {p.steward_sub for p in stewarded if p.steward_sub}
     gone = {s for s in sorted(subs) if _lapsed(conn, s, stamp)}
     ended = 0
-    lapsed = sorted(((g.trip_id, g.person_id, g.revoked) for g in every if g.granted_by in gone), key=lambda g: g[:2])
+    lapsed = sorted(((g.trip_id, g.person_id, g.granted_by) for g in every if g.granted_by in gone), key=lambda g: g[:2])
     lock_trips(conn, [trip for trip, _, _ in lapsed])
-    for trip, person, revoked in lapsed:
-        if revoked is None:
+    for trip, person, by in lapsed:
+        conn.orm.expire_all()
+        held = lock(conn, person, [trip]).get(trip)
+        if held is None or held.granted_by != by:
+            continue
+        if held.revoked is None:
             _end(conn, person, trip)
         else:
-            lock(conn, person, [trip])
-            conn.execute(delete(PhotoGrant).where(PhotoGrant.person_id == person, PhotoGrant.trip_id == trip))
+            conn.execute(delete(PhotoGrant).where(PhotoGrant.person_id == person, PhotoGrant.trip_id == trip, PhotoGrant.granted_by == by))
         ended += 1
     for p in [p for p in standing if p.set_by in gone]:
         p.share_all, p.share_all_since = False, None
@@ -535,8 +539,13 @@ def _narrower(mine: PhotoGrant, theirs: PhotoGrant) -> None:
 
 def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
     mine = {g.trip_id: g for g in conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.person_id == member_id).order_by(PhotoGrant.trip_id)).all()}
+    closed: list[int] = []
     for theirs in conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.person_id == guest_id, PhotoGrant.trip_id.in_(list(mine))).order_by(PhotoGrant.trip_id)).all():
-        _narrower(mine[theirs.trip_id], theirs)
+        kept = mine[theirs.trip_id]
+        active = kept.revoked is None
+        _narrower(kept, theirs)
+        if active and kept.revoked is not None:
+            closed.append(kept.trip_id)
     conn.orm.flush()
     conn.execute(delete(PhotoGrant).where(PhotoGrant.person_id == guest_id, PhotoGrant.trip_id.in_(list(mine))))
     conn.execute(update(PhotoGrant).where(PhotoGrant.person_id == guest_id).values(person_id=member_id, granted_by=sub))
@@ -547,6 +556,10 @@ def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
         conn.execute(update(PhotoSharingPrefs).where(PhotoSharingPrefs.person_id == guest_id).values(person_id=member_id, set_by=sub, steward_sub=None))
     _claim_sources(conn, guest_id, member_id, sub)
     conn.orm.expire_all()
+    if closed:
+        lock(conn, member_id, closed)
+    for trip_id in closed:
+        _drop_derived(conn, member_id, trip_id)
     for trip_id in _reachable(conn, member_id):
         reconcile(conn, trip_id)
 

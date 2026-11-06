@@ -1460,10 +1460,10 @@ def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int, conf
     trip.notes = trip.notes or other.notes
     trip.booked_by = trip.booked_by if trip.booked_by is not None else other.booked_by
     conn.orm.flush()
+    refresh(conn, trip)
     photogrants.merged(conn, trip.id, other.id)
     conn.execute(delete(Trip).where(Trip.id == other.id))
     conn.orm.expire(trip)
-    refresh(conn, trip)
     photogrants.trips_changed(conn, [trip.id], windows)
     return _trip_outs(conn, viewer, [trip])[0]
 
