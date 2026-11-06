@@ -677,6 +677,8 @@ def _place(photo: Photo, person: int, chosen: TripWindow | None) -> None:
 
 
 def re_place(conn: db.Connection, photo: Photo, person: int, windows: Sequence[TripWindow] | None = None) -> bool:
+    if photo.match == HOME and photo.trip_id is None:
+        return True
     shot = _shot(photo, person)
     inside = [w for w in (candidate_windows(conn, person) if windows is None else windows) if w.start <= shot.taken <= w.end]
     left_out = excluded_trips(conn, person, photo.asset_id)

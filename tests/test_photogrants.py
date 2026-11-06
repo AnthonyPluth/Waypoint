@@ -627,6 +627,26 @@ class TripChangeTests(GrantCase):
         self.assertIsNotNone(self.row(during.id))
         self.assertEqual(self.row(during.id).trip_id, new)
 
+    def test_a_home_photo_inside_a_window_that_shrinks_stays_tripless_and_suppressed(self):
+        flight = self.only_flight(self.jid, self.sid)
+        trip = flight["trip_id"]
+        hotel = self.add(self.jane, {**HOTEL, "start_local": "2027-06-02T15:00", "end_local": "2027-06-08T10:00"}, trip)
+        at_home = self.photo(None, "2027-06-02T09:00", match="home")
+        trips.edit_segment(self.c, self.jane, hotel["id"], {"status": "cancelled"})
+        after = photos.trip_window(self.c, trip)
+        self.assertTrue(after.start <= photos.instant(at_home.taken_utc) <= after.end)
+        self.assertEqual((self.row(at_home.id).trip_id, self.row(at_home.id).match), (None, "home"))
+        self.assertEqual(self.seen(self.sam, trip), [])
+
+    def test_re_placing_never_moves_a_home_photo_onto_a_trip(self):
+        self.share(self.jid, self.a)
+        at_home = self.photo(None, INSIDE_B, match="home")
+        self.assertTrue(photos.re_place(self.c, at_home, self.jid))
+        self.assertEqual((self.row(at_home.id).trip_id, self.row(at_home.id).match), (None, "home"))
+        self.assertEqual(self.seen(self.sam, self.a), [])
+        photogrants._re_place(self.c, self.jid, [])
+        self.assertEqual((self.row(at_home.id).trip_id, self.row(at_home.id).match), (None, "home"))
+
     def test_a_trip_that_shrinks_keeps_a_hand_placement_its_new_window_still_holds(self):
         flight = self.only_flight(self.jid)
         trip = flight["trip_id"]

@@ -98,7 +98,8 @@ def _write(conn: db.Connection, person_id: int, trip_id: int, scope: photos.Scop
 def _person_rows(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> list[Photo]:
     on_trips = Photo.trip_id.in_(list(trip_ids)) if trip_ids else Photo.trip_id.is_(None)
     q = select(Photo).join(PhotoSource, PhotoSource.id == Photo.source_id) \
-        .where(PhotoSource.person_id == person_id, or_(on_trips, and_(Photo.trip_id.is_(None), Photo.match == photos.AMBIGUOUS))).order_by(Photo.id)
+        .where(PhotoSource.person_id == person_id, Photo.match != photos.HOME, or_(on_trips, and_(Photo.trip_id.is_(None), Photo.match == photos.AMBIGUOUS))) \
+        .order_by(Photo.id)
     return list(conn.orm.scalars(q).all())
 
 
